@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>回声厅 · Echo Hall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  :root{
+    --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
+    --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
+    --ink:#EAF0FF; --sub:#98A3C7; --dim:#5B6688;
+    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D;
+    --grid:rgba(80,120,255,.05);
+    --glow-cyan:0 0 24px rgba(40,230,216,.5); --glow-mag:0 0 24px rgba(255,60,172,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
+    position:relative;
+  }
+  /* ==== 背景：网格 + 呼吸辉光 ==== */
+  .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000 55%,transparent 100%)}
+  .bg-orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.4;z-index:0;pointer-events:none;animation:float 14s ease-in-out infinite}
+  .orb1{width:420px;height:420px;background:radial-gradient(circle,var(--violet),transparent 70%);top:-120px;left:-80px}
+  .orb2{width:380px;height:380px;background:radial-gradient(circle,var(--cyan),transparent 70%);bottom:-120px;right:-60px;animation-delay:-5s}
+  .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,20px) scale(.95)}}
+
+  .stage{position:relative;z-index:2;height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .scene{display:none;width:100%;height:100%}
+  .scene.on{display:flex}
+
+  /* 通用玻璃面板 */
+  .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
+    border:1px solid var(--line);border-radius:18px}
+
+  /* ============ 场景1：入场 ============ */
+  #enter{align-items:center;justify-content:center;flex-direction:column}
+  .enter-card{width:min(440px,92vw);padding:38px 34px;text-align:center;position:relative;overflow:hidden}
+  .enter-card::before{content:"";position:absolute;inset:0;border-radius:18px;padding:1px;
+    background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
+  .logo-wrap{margin-bottom:6px}
+  .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
+  .title{font-size:38px;font-weight:800;letter-spacing:2px;margin:8px 0 4px;
+    background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 40px rgba(40,230,216,.2)}
+  .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
+  .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
+  @keyframes blink{50%{opacity:0}}
+
+  .identity{display:flex;align-items:center;gap:16px;padding:16px;border-radius:14px;
+    background:rgba(10,12,24,.6);border:1px solid var(--line);margin-bottom:20px;text-align:left}
+  .id-av{width:56px;height:56px;border-radius:14px;flex-shrink:0;display:grid;place-items:center;font-size:26px;position:relative;
+    transition:.4s cubic-bezier(.2,.9,.3,1.3)}
+  .id-info{flex:1;min-width:0}
+  .id-name{font-size:19px;font-weight:700;letter-spacing:.5px}
+  .id-tag{font-size:11.5px;color:var(--dim);margin-top:3px}
+  .reroll{background:none;border:1px solid var(--line2);color:var(--sub);border-radius:9px;padding:8px 10px;cursor:pointer;
+    font-family:inherit;font-size:12px;transition:.15s;white-space:nowrap}
+  .reroll:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .reroll:active{transform:scale(.94)}
+
+  .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
+    letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
+    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.25)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,60,172,.35)}
+  .btn-primary:active{transform:translateY(0) scale(.99)}
+  .btn-primary:disabled{opacity:.5;cursor:wait}
+
+  /* ============ 场景2：大厅 ============ */
+  #lobby{flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:24px}
+  .lobby-head{text-align:center}
+  .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
+  .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
+  .lobby-head .you{color:var(--cyan)}
+  .channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;width:min(760px,94vw)}
+  .ch{padding:22px 20px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
+    border:1px solid var(--line);background:var(--panel)}
+  .ch:hover{transform:translateY(-4px);border-color:var(--ch-c);box-shadow:0 14px 40px rgba(0,0,0,.4)}
+  .ch::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ch-c);opacity:.8}
+  .ch .icon{font-size:30px;margin-bottom:12px}
+  .ch h3{font-size:17px;font-weight:700;letter-spacing:.5px}
+  .ch .desc{font-size:12px;color:var(--sub);margin-top:5px;line-height:1.5}
+  .ch .live{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:12px;color:var(--ch-c)}
+  .ch .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ch-c);box-shadow:0 0 8px var(--ch-c);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+
+  /* ============ 场景3：聊天厅 ============ */
+  #hall{flex-direction:column;width:min(900px,96vw);height:min(92vh,900px);margin:auto;overflow:hidden;padding:0}
+  .hall-top{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
+    border:1px solid var(--line);transition:.15s;flex-shrink:0}
+  .back:hover{color:var(--cyan);border-color:var(--cyan)}
+  .hall-ti{flex:1;min-width:0}
+  .hall-ti h3{font-size:16px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .hall-ti .cnt{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .conn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);white-space:nowrap}
+  .conn .led{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:.3s}
+  .conn.live .led{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .conn.live{color:var(--cyan)}
+
+  /* 在线光墙 */
+  .presence{display:flex;gap:8px;padding:12px 20px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;min-height:60px}
+  .presence::-webkit-scrollbar{height:0}
+  .pav{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;font-size:18px;position:relative;
+    animation:popin .4s cubic-bezier(.2,.9,.3,1.4);transition:.3s}
+  .pav .ring{position:absolute;inset:-3px;border-radius:13px;border:1.5px solid currentColor;opacity:.5}
+  .pav.me::after{content:"你";position:absolute;bottom:-14px;left:0;right:0;text-align:center;font-size:9px;color:var(--cyan)}
+  @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+
+  .stream{flex:1;overflow-y:auto;padding:18px 20px 8px;display:flex;flex-direction:column;gap:2px}
+  .stream::-webkit-scrollbar{width:6px}
+  .stream::-webkit-scrollbar-thumb{background:rgba(120,140,220,.25);border-radius:3px}
+
+  .msg{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
+  @keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .msg .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:2px}
+  .msg .body{flex:1;min-width:0}
+  .msg .meta{display:flex;align-items:baseline;gap:8px}
+  .msg .nm{font-size:13px;font-weight:700}
+  .msg .tm{font-size:10px;color:var(--dim)}
+  .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;
+    background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative}
+  .msg.me{flex-direction:row-reverse}
+  .msg.me .meta{flex-direction:row-reverse}
+  .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
+  .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,rgba(40,230,216,.14),rgba(139,92,255,.14));border-color:var(--line2)}
+  /* 回声（点赞）*/
+  .msg .echo{position:absolute;right:-8px;bottom:-10px;background:var(--panel-solid);border:1px solid var(--line2);
+    border-radius:10px;padding:1px 7px;font-size:11px;cursor:pointer;user-select:none;transition:.15s;color:var(--sub);opacity:0}
+  .msg:hover .echo,.msg .echo.has{opacity:1}
+  .msg .echo:hover{border-color:var(--magenta);color:var(--magenta)}
+  .msg .echo.has{color:var(--magenta);border-color:rgba(255,60,172,.4)}
+  /* 动作消息 /me */
+  .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
+  /* 系统消息 */
+  .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
+  .sysmsg b{color:var(--sub)}
+
+  /* 正在输入 */
+  .typing-bar{height:20px;padding:0 20px;font-size:11.5px;color:var(--cyan);flex-shrink:0;display:flex;align-items:center;gap:6px;opacity:0;transition:.2s}
+  .typing-bar.on{opacity:1}
+  .typing-bar .d{display:inline-flex;gap:3px}
+  .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bounce 1.2s infinite}
+  .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+
+  /* 输入区 */
+  .composer{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end}
+  .cin-wrap{flex:1;display:flex;align-items:center;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
+  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:14.5px;resize:none;
+    line-height:1.5;max-height:100px;min-height:24px;padding:10px 0}
+  .cin::placeholder{color:var(--dim)}
+  .emoji-btn{font-size:20px;cursor:pointer;padding:6px;border-radius:8px;transition:.15s;user-select:none}
+  .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
+  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
+    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
+  .go svg{width:20px;height:20px;color:#04060c}
+  .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
+  .go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
+
+  .emoji-tray{position:absolute;bottom:72px;right:70px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+    padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  .emoji-tray.on{display:grid}
+  .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
+  .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
+
+  /* 粒子层 */
+  #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
+  .particle{position:absolute;font-size:26px;animation:rise 3.4s ease-out forwards;will-change:transform,opacity}
+  @keyframes rise{0%{transform:translateY(0) scale(.5) rotate(0);opacity:0}
+    12%{opacity:1;transform:translateY(-40px) scale(1.1)}
+    100%{transform:translateY(-90vh) scale(.9) rotate(var(--spin));opacity:0}}
+
+  /* toast */
+  #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:60;
+    background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+  #toast.on{transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:600px){
+    .title{font-size:30px}
+    #hall{height:100vh;border-radius:0;border:none}
+    .channels{grid-template-columns:1fr}
+    .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
+<div id="particles"></div>
+<div id="toast"></div>
+
+<div class="stage">
+
+  <!-- ===== 场景1：入场 ===== -->
+  <div class="scene on" id="enter">
+    <div class="glass enter-card">
+      <div class="logo-wrap"><span class="logo">◢◤ Realtime ◢◤</span></div>
+      <div class="title">回声厅</div>
+      <div class="sub-line" id="subLine"></div>
+      <div class="identity">
+        <div class="id-av" id="idAv">🦊</div>
+        <div class="id-info">
+          <div class="id-name" id="idName">量子水獭</div>
+          <div class="id-tag" id="idTag">你的临时身份 · 无需注册</div>
+        </div>
+        <button class="reroll" id="rerollBtn">↻ 换一个</button>
+      </div>
+      <button class="btn-primary" id="enterBtn">进 入 回 声 厅</button>
+    </div>
+  </div>
+
+  <!-- ===== 场景2：大厅 ===== -->
+  <div class="scene" id="lobby">
+    <div class="lobby-head">
+      <h2>选择一个频道</h2>
+      <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 数字代表此刻真实在线人数</p>
+    </div>
+    <div class="channels" id="channels"></div>
+  </div>
+
+  <!-- ===== 场景3：聊天厅 ===== -->
+  <div class="scene" id="hall">
+    <div class="hall-top">
+      <div class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
+      <div class="hall-ti">
+        <h3 id="hallName">—</h3>
+        <div class="cnt" id="hallCnt">连接中…</div>
+      </div>
+      <div class="conn" id="conn"><span class="led"></span><span id="connTxt">连接中</span></div>
+    </div>
+    <div class="presence" id="presence"></div>
+    <div class="stream" id="stream"></div>
+    <div class="typing-bar" id="typingBar"><span id="typingTxt"></span><span class="d"><i></i><i></i><i></i></span></div>
+    <div class="composer">
+      <div class="emoji-btn" id="emojiBtn">😊</div>
+      <div class="cin-wrap">
+        <textarea class="cin" id="cin" placeholder="说点什么… (试试 /me 跳了段舞  或连发 emoji)" rows="1"></textarea>
+      </div>
+      <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+    </div>
+    <div class="emoji-tray" id="emojiTray"></div>
+  </div>
+
+</div>
+
+<!-- MQTT over WebSocket 客户端 -->
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+// ============================================================
+//  回声厅 Echo Hall — 真·实时聊天（MQTT over WebSocket）
+//  broker 公共免费，消息不落库（刷新即散），用随机命名空间隔离
+// ============================================================
+const NS = 'echohall/v1';                       // 命名空间前缀（隔离公共 broker 上的流量）
+const BROKER = 'wss://broker.emqx.io:8084/mqtt'; // EMQX 公共 broker
+
+const $ = s => document.querySelector(s);
+const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const rand = arr => arr[Math.floor(Math.random()*arr.length)];
+const uid = () => Math.random().toString(36).slice(2,10);
+
+// ---- 身份生成 ----
+const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
+const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
+const FACE= ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','�éléph','🦇','🐬','🐈‍⬛','🦋','🦭'];
+const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅'];
+const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
+
+let me = null;
+function rollIdentity(){
+  const emo = rand(EMO);
+  me = {
+    id: uid(),
+    name: rand(ADJ)+rand(ANI),
+    emoji: emo,
+    color: rand(COLORS),
+  };
+  paintIdentity();
+}
+function paintIdentity(){
+  const av = $('#idAv');
+  av.textContent = me.emoji;
+  av.style.background = me.color+'22';
+  av.style.boxShadow = `0 0 24px ${me.color}55, inset 0 0 0 1.5px ${me.color}`;
+  av.style.color = me.color;
+  av.style.transform = 'scale(1.12) rotate(-6deg)';
+  setTimeout(()=>av.style.transform='scale(1) rotate(0)', 60);
+  $('#idName').textContent = me.name;
+  $('#idName').style.color = me.color;
+}
+
+// ---- 打字机副标题 ----
+const SUBTEXT = '陌生人的实时聊天空间 · 进来 · 说话 · 消散';
+let subI = 0;
+function typeSub(){
+  const el = $('#subLine');
+  if(subI <= SUBTEXT.length){
+    el.innerHTML = esc(SUBTEXT.slice(0,subI)) + '<span class="cursor">&nbsp;</span>';
+    subI++;
+    setTimeout(typeSub, 55);
+  } else {
+    el.innerHTML = esc(SUBTEXT) + '<span class="cursor">&nbsp;</span>';
+  }
+}
+
+// ---- 频道定义 ----
+const CHANNELS = [
+  {id:'plaza',  name:'闲聊广场', icon:'🌐', c:'#28E6D8', desc:'什么都能聊，此刻最热闹的地方'},
+  {id:'night',  name:'深夜电台', icon:'🌙', c:'#8B5CFF', desc:'睡不着的人，在这里说给彼此听'},
+  {id:'geek',   name:'技术黑话', icon:'⚡', c:'#FFB84D', desc:'代码、脑洞、赛博未来'},
+  {id:'void',   name:'虚空回音', icon:'🕳️', c:'#FF3CAC', desc:'对着虚空喊话，看谁会回应'},
+];
+
+// ============ 场景切换 ============
+function goScene(id){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+}
+
+// ============ MQTT 连接管理 ============
+let client = null;
+let curCh = null;
+let presence = {};       // id -> {name,emoji,color,ts}
+let presenceTimer = null;
+let heartbeat = null;
+let typingUsers = {};     // id -> timeout
+let sentTyping = 0;
+
+function topic(ch, kind){ return `${NS}/${ch}/${kind}`; }
+
+function connect(onReady){
+  const cid = 'eh_'+me.id+'_'+uid();
+  client = mqtt.connect(BROKER, {
+    clientId: cid, clean:true, connectTimeout:8000, reconnectPeriod:2000,
+    keepalive:30,
+  });
+  client.on('connect', ()=>{ setConn(true); if(onReady){onReady();onReady=null;} });
+  client.on('reconnect', ()=>setConn(false,'重连中'));
+  client.on('offline', ()=>setConn(false,'离线'));
+  client.on('error', e=>{ console.warn('mqtt error',e); setConn(false,'连接错误'); });
+  client.on('message', onMessage);
+}
+function setConn(live, txt){
+  const el=$('#conn');
+  el.classList.toggle('live', live);
+  $('#connTxt').textContent = live ? '实时在线' : (txt||'连接中');
+}
+
+// 进入频道：订阅 msg/typing/presence
+function joinChannel(ch){
+  curCh = ch;
+  presence = {}; typingUsers = {};
+  $('#stream').innerHTML='';
+  $('#hallName').innerHTML = `${ch.icon} ${esc(ch.name)}`;
+  renderPresence();
+  goScene('hall');
+
+  const doJoin = ()=>{
+    client.subscribe([topic(ch.id,'msg'), topic(ch.id,'typing'), topic(ch.id,'presence')], {qos:0});
+    // 宣告自己上线（retain=false，靠心跳维持）
+    announce('join');
+    startHeartbeat();
+    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(ch.name)}」`);
+  };
+  if(client && client.connected) doJoin();
+  else connect(doJoin);
+}
+
+// presence：定期广播自己在线 + 清理超时的人
+function announce(kind){
+  if(!client||!client.connected) return;
+  client.publish(topic(curCh.id,'presence'), JSON.stringify({
+    kind, id:me.id, name:me.name, emoji:me.emoji, color:me.color, ts:Date.now()
+  }), {qos:0});
+}
+function startHeartbeat(){
+  clearInterval(heartbeat);
+  presence[me.id] = {...me, ts:Date.now(), self:true};
+  renderPresence();
+  heartbeat = setInterval(()=>{
+    announce('ping');
+    // 清理 12s 未心跳的人
+    const now=Date.now(); let changed=false;
+    for(const id in presence){
+      if(id!==me.id && now-presence[id].ts>12000){ delete presence[id]; changed=true; }
+    }
+    if(changed) renderPresence();
+  }, 4000);
+}
+function leaveChannel(){
+  if(client && client.connected && curCh){
+    announce('leave');
+    client.unsubscribe([topic(curCh.id,'msg'), topic(curCh.id,'typing'), topic(curCh.id,'presence')]);
+  }
+  clearInterval(heartbeat); clearInterval(presenceTimer);
+  curCh=null;
+}
+
+// ============ 收消息 ============
+function onMessage(t, payload){
+  let d; try{ d=JSON.parse(payload.toString()); }catch(e){ return; }
+  const kind = t.split('/').pop();
+  if(kind==='presence') return onPresence(d);
+  if(kind==='typing')   return onTyping(d);
+  if(kind==='msg')      return onChatMsg(d);
+}
+function onPresence(d){
+  if(d.id===me.id) return;
+  if(d.kind==='leave'){
+    if(presence[d.id]){ delete presence[d.id]; renderPresence();
+      if(d.name) sysMsg(`<b>${esc(d.name)}</b> 离开了`); }
+    return;
+  }
+  const isNew = !presence[d.id];
+  presence[d.id] = {id:d.id,name:d.name,emoji:d.emoji,color:d.color,ts:Date.now()};
+  if(isNew){
+    renderPresence();
+    if(d.kind==='join'){
+      sysMsg(`<b>${esc(d.name)}</b> 进入了回声厅`);
+      announce('ping'); // 让新人立刻看到我
+    }
+  } else { presence[d.id].ts=Date.now(); }
+}
+function onTyping(d){
+  if(d.id===me.id) return;
+  clearTimeout(typingUsers[d.id]);
+  typingUsers[d.id] = setTimeout(()=>{ delete typingUsers[d.id]; renderTyping(); }, 2600);
+  typingUsers['_name_'+d.id] = d.name;
+  renderTyping();
+}
+function onChatMsg(d){
+  if(d.type==='echo'){ applyEcho(d.mid, d.id); return; }
+  addMsg(d, d.id===me.id);
+  if(d.id!==me.id && (d.emojiOnly)) burst(d.text);
+}
+
+// ============ 渲染在线光墙 ============
+function renderPresence(){
+  const box=$('#presence');
+  const list = Object.values(presence).sort((a,b)=> a.self?-1:b.self?1:0);
+  box.innerHTML = list.map(p=>`
+    <div class="pav ${p.self?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
+      ${p.emoji}<span class="ring"></span>
+    </div>`).join('');
+  const n = list.length;
+  $('#hallCnt').textContent = `${n} 人在线`;
+}
+
+// ============ 渲染消息 ============
+let msgSeq = 0;
+function fmtNow(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function addMsg(d, isMe){
+  const stream=$('#stream');
+  if(d.act){  // /me 动作
+    const el=document.createElement('div'); el.className='actmsg';
+    el.innerHTML = `✦ <b style="color:${d.color}">${esc(d.name)}</b> ${esc(d.text)}`;
+    stream.appendChild(el); scrollStream(); return;
+  }
+  const el=document.createElement('div');
+  el.className='msg'+(isMe?' me':'');
+  el.dataset.mid = d.mid;
+  el.innerHTML = `
+    <div class="av" style="background:${d.color}22;color:${d.color};box-shadow:inset 0 0 0 1.5px ${d.color}">${d.emoji}</div>
+    <div class="body">
+      <div class="meta"><span class="nm" style="color:${d.color}">${esc(d.name)}</span><span class="tm">${fmtNow()}</span></div>
+      <div class="txt">${esc(d.text)}<span class="echo" data-mid="${d.mid}">🔥 <span class="ec">0</span></span></div>
+    </div>`;
+  stream.appendChild(el);
+  el.querySelector('.echo').onclick = ()=>sendEcho(d.mid);
+  scrollStream();
+}
+function sysMsg(html){
+  const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html;
+  $('#stream').appendChild(el); scrollStream();
+}
+function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
+
+// 回声（点赞）
+const echoCount = {};
+function sendEcho(mid){
+  client.publish(topic(curCh.id,'msg'), JSON.stringify({type:'echo', mid, id:me.id}), {qos:0});
+  applyEcho(mid, me.id);
+}
+function applyEcho(mid, who){
+  echoCount[mid] = (echoCount[mid]||0)+1;
+  const el = document.querySelector(`.msg[data-mid="${mid}"] .echo`);
+  if(el){ el.classList.add('has'); el.querySelector('.ec').textContent=echoCount[mid];
+    el.style.transform='scale(1.3)'; setTimeout(()=>el.style.transform='',150); }
+  if(who!==me.id) burst('🔥',6);
+}
+
+// ============ 正在输入 ============
+function renderTyping(){
+  const names = Object.keys(typingUsers).filter(k=>!k.startsWith('_name_')).map(id=>typingUsers['_name_'+id]).filter(Boolean);
+  const bar=$('#typingBar');
+  if(names.length){
+    $('#typingTxt').textContent = names.length===1 ? `${names[0]} 正在输入` : `${names.length} 人正在输入`;
+    bar.classList.add('on');
+  } else bar.classList.remove('on');
+}
+
+// ============ 发送 ============
+function send(){
+  const inp=$('#cin'); let text=inp.value.trim();
+  if(!text || !client || !client.connected) return;
+  let act=false;
+  if(text.startsWith('/me ')){ act=true; text=text.slice(4); }
+  const emojiOnly = /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(text) && text.length<=12;
+  const mid = me.id+'_'+(msgSeq++);
+  const payload = {mid, id:me.id, name:me.name, emoji:me.emoji, color:me.color, text, act, emojiOnly};
+  client.publish(topic(curCh.id,'msg'), JSON.stringify(payload), {qos:0});
+  addMsg(payload, true);
+  if(emojiOnly) burst(text);
+  inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true;
+}
+
+// ============ emoji 粒子 ============
+function burst(str, count=10){
+  const chars = [...str].filter(c=>/\p{Emoji}/u.test(c));
+  if(!chars.length) chars.push('✨');
+  const layer=$('#particles');
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div'); p.className='particle';
+    p.textContent = rand(chars);
+    p.style.left = (10+Math.random()*80)+'vw';
+    p.style.bottom = '60px';
+    p.style.setProperty('--spin', (Math.random()*720-360)+'deg');
+    p.style.animationDelay = (Math.random()*0.3)+'s';
+    p.style.fontSize = (20+Math.random()*20)+'px';
+    layer.appendChild(p);
+    setTimeout(()=>p.remove(), 3800);
+  }
+}
+
+// ============ toast ============
+let toastT=null;
+function toast(msg){
+  const t=$('#toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2400);
+}
+
+// ============ 大厅：频道卡 + 实时在线数 ============
+let lobbyClient=null, lobbyCounts={};
+function renderChannels(){
+  $('#channels').innerHTML = CHANNELS.map(ch=>`
+    <div class="ch" data-ch="${ch.id}" style="--ch-c:${ch.c}">
+      <div class="icon">${ch.icon}</div>
+      <h3>${ch.name}</h3>
+      <div class="desc">${ch.desc}</div>
+      <div class="live"><span class="pulse"></span><span id="cnt_${ch.id}">— 人在线</span></div>
+    </div>`).join('');
+  document.querySelectorAll('.ch').forEach(el=>el.onclick=()=>{
+    const ch = CHANNELS.find(c=>c.id===el.dataset.ch);
+    stopLobbyProbe();
+    joinChannel(ch);
+  });
+}
+// 大厅期间：订阅各频道 presence，统计实时人数
+function startLobbyProbe(){
+  lobbyCounts={};
+  const probe = mqtt.connect(BROKER,{clientId:'ehprobe_'+uid(),clean:true,reconnectPeriod:2000,keepalive:30});
+  lobbyClient=probe;
+  const seen={};
+  probe.on('connect',()=>{
+    CHANNELS.forEach(ch=>probe.subscribe(topic(ch.id,'presence'),{qos:0}));
+    // 主动 ping 一下让各房间的人应答（探测用，不加入）
+  });
+  probe.on('message',(t,pl)=>{
+    let d;try{d=JSON.parse(pl.toString())}catch(e){return;}
+    const chId = t.split('/')[t.split('/').length-2];
+    seen[chId]=seen[chId]||{};
+    if(d.kind==='leave'){ delete seen[chId][d.id]; }
+    else seen[chId][d.id]={ts:Date.now()};
+    updateLobbyCounts(seen);
+  });
+  // 定期清理过期
+  lobbyCounts._timer = setInterval(()=>{
+    const now=Date.now();
+    for(const ch in seen){ for(const id in seen[ch]){ if(now-seen[ch][id].ts>12000) delete seen[ch][id]; } }
+    updateLobbyCounts(seen);
+  },4000);
+}
+function updateLobbyCounts(seen){
+  CHANNELS.forEach(ch=>{
+    const n = seen[ch.id]?Object.keys(seen[ch.id]).length:0;
+    const el=$('#cnt_'+ch.id); if(el) el.textContent = `${n} 人在线`;
+  });
+}
+function stopLobbyProbe(){
+  if(lobbyClient){ try{lobbyClient.end(true)}catch(e){} lobbyClient=null; }
+  if(lobbyCounts._timer) clearInterval(lobbyCounts._timer);
+}
+
+// ============ 事件绑定 ============
+$('#rerollBtn').onclick = ()=>rollIdentity();
+$('#enterBtn').onclick = ()=>{
+  $('#lobbyName').textContent = me.name;
+  $('#lobbyName').style.color = me.color;
+  goScene('lobby');
+  renderChannels();
+  startLobbyProbe();
+};
+$('#backBtn').onclick = ()=>{
+  leaveChannel();
+  goScene('lobby');
+  renderChannels();
+  startLobbyProbe();
+};
+
+// 输入框
+const cin=$('#cin');
+cin.addEventListener('input',()=>{
+  cin.style.height='24px'; cin.style.height=Math.min(cin.scrollHeight,100)+'px';
+  $('#goBtn').disabled = !cin.value.trim();
+  // 广播 typing（节流 1.2s）
+  const now=Date.now();
+  if(cin.value.trim() && now-sentTyping>1200 && client && client.connected){
+    sentTyping=now;
+    client.publish(topic(curCh.id,'typing'), JSON.stringify({id:me.id,name:me.name}), {qos:0});
+  }
+});
+cin.addEventListener('keydown',e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+$('#goBtn').onclick = send;
+
+// emoji 面板
+const TRAY = ['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
+$('#emojiTray').innerHTML = TRAY.map(e=>`<b>${e}</b>`).join('');
+$('#emojiBtn').onclick = e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
+$('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{
+  e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus();
+});
+document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
+
+// 离开页面时通知
+window.addEventListener('beforeunload',()=>{ if(curCh) announce('leave'); });
+
+// ============ 启动 ============
+rollIdentity();
+typeSub();
+</script>
+</body>
+</html>
