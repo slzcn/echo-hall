@@ -186,6 +186,52 @@
     transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
   #toast.on{transform:translateX(-50%) translateY(0)}
 
+  /* ============ 私密房区（大厅内）============ */
+  .priv-sec{width:min(760px,94vw);margin-top:6px}
+  .priv-divider{display:flex;align-items:center;text-align:center;color:var(--dim);font-size:11.5px;margin:8px 0 16px}
+  .priv-divider::before,.priv-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .priv-divider span{padding:0 14px;white-space:nowrap}
+  .priv-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .priv-btn{padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
+  .priv-btn:hover{transform:translateY(-2px)}
+  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:var(--glow-mag)}
+  .my-rooms{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+  .rm{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);transition:.18s}
+  .rm:hover{border-color:var(--violet);transform:translateX(3px)}
+  .rm .rm-ic{font-size:22px}
+  .rm .rm-nm{flex:1;font-weight:700;font-size:14px}
+  .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
+  .rm .rm-arr{color:var(--dim)}
+
+  /* ============ 弹窗 ============ */
+  .modal-mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-mask.on{display:flex}
+  .modal{width:min(400px,92vw);padding:30px 28px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
+  .modal-x{position:absolute;top:16px;right:18px;color:var(--dim);cursor:pointer;font-size:16px;transition:.15s}
+  .modal-x:hover{color:var(--magenta)}
+  .modal h3{font-size:21px;font-weight:800;margin-bottom:8px;letter-spacing:.5px}
+  .modal-sub{font-size:12.5px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .fld{display:block;margin-bottom:18px}
+  .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
+  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+    color:var(--ink);font-family:inherit;font-size:14.5px;outline:none;transition:.18s}
+  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .emoji-pick{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+  .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
+  .emoji-pick b:hover{background:rgba(255,255,255,.06)}
+  .emoji-pick b.on{border-color:var(--cyan);background:rgba(40,230,216,.12)}
+  .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:22px;
+    background:rgba(40,230,216,.08);border:1px solid rgba(40,230,216,.3)}
+  .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
+  .code-copy{padding:8px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);
+    font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
+  .code-copy:hover{border-color:var(--cyan);color:var(--cyan)}
+  .modal-err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:12px}
+
   @media(max-width:600px){
     .title{font-size:30px}
     #hall{height:100vh;border-radius:0;border:none}
@@ -227,6 +273,16 @@
       <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 数字代表此刻真实在线人数</p>
     </div>
     <div class="channels" id="channels"></div>
+
+    <!-- 私密房区 -->
+    <div class="priv-sec">
+      <div class="priv-divider"><span>🔒 私密房 · 仅限邀请码进入 · 消息持久保存</span></div>
+      <div class="priv-actions">
+        <button class="priv-btn create" id="createRoomBtn">＋ 创建私密房</button>
+        <button class="priv-btn join" id="joinRoomBtn">🔑 用邀请码加入</button>
+      </div>
+      <div class="my-rooms" id="myRooms"></div>
+    </div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -254,15 +310,66 @@
 
 </div>
 
-<!-- MQTT over WebSocket 客户端 -->
+<!-- ===== 弹窗：建房 / 入房 ===== -->
+<div class="modal-mask" id="modalMask">
+  <div class="glass modal" id="modal">
+    <div class="modal-x" id="modalX">✕</div>
+    <!-- 建房 -->
+    <div class="modal-body" id="mCreate">
+      <h3>创建私密房</h3>
+      <p class="modal-sub">建好后会生成一个邀请码，把码发给谁，谁就能进。</p>
+      <label class="fld"><span>房间名</span>
+        <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会 / 3班摸鱼群"></label>
+      <label class="fld"><span>图标</span>
+        <div class="emoji-pick" id="roomEmojiPick"></div></label>
+      <button class="btn-primary" id="doCreateBtn">生 成 房 间</button>
+    </div>
+    <!-- 建房成功：展示邀请码 -->
+    <div class="modal-body" id="mCreated" style="display:none">
+      <h3>房间已创建 🎉</h3>
+      <p class="modal-sub">把这个邀请码发给朋友，他们就能进来：</p>
+      <div class="code-box"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
+      <button class="btn-primary" id="enterCreatedBtn">进 入 房 间</button>
+    </div>
+    <!-- 入房 -->
+    <div class="modal-body" id="mJoin" style="display:none">
+      <h3>用邀请码加入</h3>
+      <p class="modal-sub">输入朋友给你的邀请码：</p>
+      <label class="fld"><span>邀请码</span>
+        <input id="codeIn" maxlength="16" placeholder="例如 A3F9K2" style="text-transform:uppercase;letter-spacing:3px;font-size:18px"></label>
+      <div class="modal-err" id="joinErr"></div>
+      <button class="btn-primary" id="doJoinBtn">进 入 房 间</button>
+    </div>
+  </div>
+</div>
+
+<!-- MQTT over WebSocket 客户端（公共频道用）-->
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<!-- Supabase 客户端（私密房用：落库 + RLS + Realtime）-->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ============================================================
-//  回声厅 Echo Hall — 真·实时聊天（MQTT over WebSocket）
-//  broker 公共免费，消息不落库（刷新即散），用随机命名空间隔离
+//  回声厅 Echo Hall
+//  · 公共频道：MQTT over WebSocket，不落库，刷新即散
+//  · 私密房：Supabase(匿名登录 + RLS 行级隔离 + Realtime)，成员制、消息持久化
 // ============================================================
 const NS = 'echohall/v1';                       // 命名空间前缀（隔离公共 broker 上的流量）
 const BROKER = 'wss://broker.emqx.io:8084/mqtt'; // EMQX 公共 broker
+
+// ---- Supabase 私密房后端（vc 库，eh_ 前缀表，与其他项目隔离）----
+const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
+const sb = window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true } });
+// 匿名登录：每个浏览器自动拿一个持久的匿名身份（满足 RLS 的 auth.uid()，又不打断"进来就聊"）
+let sbReady = (async ()=>{
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) return session.user.id;
+  const { data, error } = await sb.auth.signInAnonymously();
+  if(error){ console.warn('anon signin failed', error); return null; }
+  return data.user.id;
+})();
+
+let mode = 'mqtt';   // 当前聊天厅模式：mqtt(公共) | sb(私密)
 
 const $ = s => document.querySelector(s);
 const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -272,7 +379,7 @@ const uid = () => Math.random().toString(36).slice(2,10);
 // ---- 身份生成 ----
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
-const FACE= ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','�éléph','🦇','🐬','🐈‍⬛','🦋','🦭'];
+const FACE= ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐘','🦇','🐬','🐈‍⬛','🦋','🦭'];
 const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
 
@@ -488,6 +595,8 @@ function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
 // 回声（点赞）
 const echoCount = {};
 function sendEcho(mid){
+  if(mode==='sb'){ applyEcho(mid, sbUid); return; } // 私密房：本地回声（不广播，暂不落库）
+  if(!client || !client.connected) return;
   client.publish(topic(curCh.id,'msg'), JSON.stringify({type:'echo', mid, id:me.id}), {qos:0});
   applyEcho(mid, me.id);
 }
@@ -511,6 +620,7 @@ function renderTyping(){
 
 // ============ 发送 ============
 function send(){
+  if(mode==='sb') return sbSend();
   const inp=$('#cin'); let text=inp.value.trim();
   if(!text || !client || !client.connected) return;
   let act=false;
@@ -522,6 +632,134 @@ function send(){
   addMsg(payload, true);
   if(emojiOnly) burst(text);
   inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true;
+}
+
+// ============================================================
+//  私密房（Supabase）
+// ============================================================
+let curRoom = null;      // {id,name,emoji} 当前私密房
+let sbUid = null;        // 匿名登录的 user id
+let roomChan = null;     // Realtime channel
+
+// 大厅：拉我加入过的房间列表
+async function loadMyRooms(){
+  const box=$('#myRooms'); if(!box) return;
+  sbUid = await sbReady;
+  if(!sbUid){ box.innerHTML=''; return; }
+  // 我是成员的房（RLS 只会返回我所在的房）
+  const { data, error } = await sb.from('eh_rooms').select('id,name,emoji,invite_code').order('created_at',{ascending:false});
+  if(error || !data || !data.length){ box.innerHTML=''; return; }
+  box.innerHTML = data.map(r=>`
+    <div class="rm" data-rid="${r.id}" data-rnm="${esc(r.name)}" data-rem="${r.emoji||'🔒'}">
+      <span class="rm-ic">${r.emoji||'🔒'}</span>
+      <span class="rm-nm">${esc(r.name)}</span>
+      <span class="rm-code">${r.invite_code}</span>
+      <span class="rm-arr">→</span>
+    </div>`).join('');
+  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>{
+    enterRoom({id:el.dataset.rid, name:el.dataset.rnm, emoji:el.dataset.rem});
+  });
+}
+
+// 生成 6 位邀请码
+function genCode(){
+  const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s=''; for(let i=0;i<6;i++) s+=CH[Math.floor(Math.random()*CH.length)];
+  return s;
+}
+
+// 建房
+async function createRoom(name, emoji){
+  sbUid = await sbReady;
+  if(!sbUid){ toast('身份初始化失败，刷新重试'); return null; }
+  // 邀请码唯一，冲突则重试几次
+  for(let tries=0; tries<5; tries++){
+    const code = genCode();
+    const { data, error } = await sb.from('eh_rooms')
+      .insert({ name, emoji, invite_code:code, owner:sbUid })
+      .select('id,name,emoji,invite_code').single();
+    if(!error && data){
+      // 房主自动入成员表
+      await sb.from('eh_members').insert({ room_id:data.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color });
+      return data;
+    }
+    if(error && !/duplicate|unique/i.test(error.message||'')){ console.warn('createRoom',error); toast('建房失败'); return null; }
+  }
+  toast('邀请码冲突，请重试'); return null;
+}
+
+// 凭码入房
+async function joinRoomByCode(code){
+  sbUid = await sbReady;
+  if(!sbUid) return {err:'身份初始化失败，刷新重试'};
+  // 用 SECURITY DEFINER 函数按码查房（非成员也能查到基本信息）
+  const { data:rooms, error } = await sb.rpc('eh_find_room_by_code', { code });
+  if(error){ console.warn(error); return {err:'查询失败'}; }
+  const room = Array.isArray(rooms)?rooms[0]:rooms;
+  if(!room){ return {err:'邀请码无效或房间不存在'}; }
+  // 加入成员表（重复加入靠主键冲突忽略）
+  const { error:mErr } = await sb.from('eh_members')
+    .insert({ room_id:room.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color });
+  if(mErr && !/duplicate|unique/i.test(mErr.message||'')){ console.warn(mErr); return {err:'加入失败'}; }
+  return { room };
+}
+
+// 进入私密房：拉历史 + 订阅 Realtime
+async function enterRoom(room){
+  curRoom = room; mode='sb';
+  stopLobbyProbe(); if(client && client.connected) leaveChannel();
+  $('#stream').innerHTML=''; presence={}; typingUsers={};
+  $('#hallName').innerHTML = `${room.emoji||'🔒'} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· 私密</span>`;
+  $('#hallCnt').textContent='加载中…';
+  renderPresence();
+  goScene('hall');
+  setConn(true);
+
+  sbUid = await sbReady;
+  // 拉历史消息
+  const { data:hist } = await sb.from('eh_messages')
+    .select('*').eq('room_id', room.id).order('id',{ascending:true}).limit(500);
+  (hist||[]).forEach(m=>{
+    addMsg({mid:'db_'+m.id, id:m.user_id, name:m.name, emoji:m.emoji, color:m.color, text:m.text, act:m.kind==='act'}, m.user_id===sbUid);
+  });
+  // 成员数
+  const { count } = await sb.from('eh_members').select('*',{count:'exact',head:true}).eq('room_id', room.id);
+  $('#hallCnt').textContent = `${count||1} 名成员`;
+
+  // 订阅新消息
+  if(roomChan){ sb.removeChannel(roomChan); roomChan=null; }
+  roomChan = sb.channel('room:'+room.id)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'eh_messages', filter:'room_id=eq.'+room.id },
+      payload=>{
+        const m=payload.new;
+        if(m.user_id===sbUid) return; // 自己发的已本地上屏
+        addMsg({mid:'db_'+m.id, id:m.user_id, name:m.name, emoji:m.emoji, color:m.color, text:m.text, act:m.kind==='act'}, false);
+        const eo=/^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(m.text)&&m.text.length<=12;
+        if(eo) burst(m.text);
+      })
+    .subscribe();
+}
+
+// 私密房发消息
+async function sbSend(){
+  const inp=$('#cin'); let text=inp.value.trim();
+  if(!text || !curRoom) return;
+  let act=false;
+  if(text.startsWith('/me ')){ act=true; text=text.slice(4); }
+  const emojiOnly = /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(text) && text.length<=12;
+  // 本地先上屏（乐观）
+  addMsg({mid:'local_'+(msgSeq++), id:sbUid, name:me.name, emoji:me.emoji, color:me.color, text, act}, true);
+  if(emojiOnly) burst(text);
+  inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true;
+  const { error } = await sb.from('eh_messages').insert({
+    room_id:curRoom.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color, text, kind:act?'act':'msg'
+  });
+  if(error){ console.warn('sbSend',error); toast('发送失败'); }
+}
+
+function leaveRoom(){
+  if(roomChan){ sb.removeChannel(roomChan); roomChan=null; }
+  curRoom=null; mode='mqtt';
 }
 
 // ============ emoji 粒子 ============
@@ -609,12 +847,70 @@ $('#enterBtn').onclick = ()=>{
   goScene('lobby');
   renderChannels();
   startLobbyProbe();
+  loadMyRooms();
 };
+
+// ============ 私密房弹窗 ============
+const ROOM_EMOJIS = ['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
+let pickedEmoji = '🔒';
+function openModal(which){
+  $('#modalMask').classList.add('on');
+  ['mCreate','mCreated','mJoin'].forEach(id=>$('#'+id).style.display = (id===which?'block':'none'));
+  if(which==='mCreate'){
+    $('#roomNameIn').value=''; pickedEmoji='🔒';
+    $('#roomEmojiPick').innerHTML = ROOM_EMOJIS.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+    $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{
+      pickedEmoji=b.textContent;
+      $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+    });
+    setTimeout(()=>$('#roomNameIn').focus(),50);
+  }
+  if(which==='mJoin'){ $('#codeIn').value=''; $('#joinErr').textContent=''; setTimeout(()=>$('#codeIn').focus(),50); }
+}
+function closeModal(){ $('#modalMask').classList.remove('on'); }
+$('#modalX').onclick = closeModal;
+$('#modalMask').onclick = e=>{ if(e.target===$('#modalMask')) closeModal(); };
+
+$('#createRoomBtn').onclick = ()=>openModal('mCreate');
+$('#joinRoomBtn').onclick   = ()=>openModal('mJoin');
+
+let createdRoom = null;
+$('#doCreateBtn').onclick = async ()=>{
+  const name = $('#roomNameIn').value.trim();
+  if(!name){ $('#roomNameIn').focus(); toast('给房间起个名'); return; }
+  const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
+  createdRoom = await createRoom(name, pickedEmoji);
+  btn.disabled=false; btn.textContent='生 成 房 间';
+  if(createdRoom){
+    $('#codeVal').textContent = createdRoom.invite_code;
+    openModal('mCreated');
+  }
+};
+$('#codeCopy').onclick = ()=>{
+  const code=$('#codeVal').textContent;
+  navigator.clipboard?.writeText(code).then(()=>toast('邀请码已复制'),()=>toast('复制失败，请手动记下'));
+};
+$('#enterCreatedBtn').onclick = ()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
+
+$('#doJoinBtn').onclick = async ()=>{
+  const code = $('#codeIn').value.trim().toUpperCase();
+  if(!code){ $('#codeIn').focus(); return; }
+  const btn=$('#doJoinBtn'); btn.disabled=true; btn.textContent='进入中…';
+  $('#joinErr').textContent='';
+  const res = await joinRoomByCode(code);
+  btn.disabled=false; btn.textContent='进 入 房 间';
+  if(res.err){ $('#joinErr').textContent=res.err; return; }
+  closeModal(); enterRoom(res.room);
+};
+$('#codeIn') && $('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();$('#doJoinBtn').click();} });
 $('#backBtn').onclick = ()=>{
-  leaveChannel();
+  if(mode==='sb') leaveRoom();
+  else leaveChannel();
   goScene('lobby');
   renderChannels();
   startLobbyProbe();
+  loadMyRooms();
 };
 
 // 输入框
@@ -622,9 +918,9 @@ const cin=$('#cin');
 cin.addEventListener('input',()=>{
   cin.style.height='24px'; cin.style.height=Math.min(cin.scrollHeight,100)+'px';
   $('#goBtn').disabled = !cin.value.trim();
-  // 广播 typing（节流 1.2s）
+  // 广播 typing（节流 1.2s）——仅公共频道(MQTT)。私密房暂不做输入态。
   const now=Date.now();
-  if(cin.value.trim() && now-sentTyping>1200 && client && client.connected){
+  if(mode==='mqtt' && cin.value.trim() && now-sentTyping>1200 && client && client.connected && curCh){
     sentTyping=now;
     client.publish(topic(curCh.id,'typing'), JSON.stringify({id:me.id,name:me.name}), {qos:0});
   }
