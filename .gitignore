@@ -3,3 +3,12 @@ supabase_setup.sql
 supabase/
 *.env
 .env
+.back_backup_20260710.html.bak
+.keepalive_backup_20260710.html.bak
+.optcnt_backup_20260710.html.bak
+.parallel_backup_20260710.html.bak
+.perf_backup_20260710_index.html.bak
+.prefetch_backup_20260710.html.bak
+.theme_backup_20260710.html.bak
+.sec_backup_20260709/
+*.html.bak
