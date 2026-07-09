@@ -17,6 +17,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Pages 已由首次运行的 configure-pages(enablement) 自动开启，此后 deploy-pages
+    # 要求声明 github-pages environment 才能部署
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
