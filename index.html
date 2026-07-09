@@ -250,17 +250,22 @@
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
 
-  /* 语音消息 */
-  .composer.recording .cin-wrap,.composer.recording .go,.composer.recording .emoji-btn{display:none}
-  .rec-strip{display:none;flex:1;align-items:center;gap:10px;min-height:46px;padding:2px 8px 2px 14px;
-    background:rgba(255,60,172,.08);border:1px solid rgba(255,60,172,.35);border-radius:12px}
-  .composer.recording .rec-strip{display:flex}
-  .rec-dot{width:10px;height:10px;border-radius:50%;background:var(--magenta);box-shadow:0 0 10px var(--magenta);animation:pulse 1.2s infinite;flex-shrink:0}
-  .rec-strip .rt{font-size:13px;color:var(--magenta);white-space:nowrap}
-  .rec-strip button{border:1px solid var(--line2);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;
-    font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;transition:.15s;flex-shrink:0}
-  .rec-strip button:hover{border-color:var(--cyan);color:var(--cyan)}
-  .rec-strip .rec-send{background:linear-gradient(120deg,var(--cyan),var(--magenta));color:#04060c;border:none;font-weight:700}
+  /* 语音消息 · 按住说话 */
+  .mic-btn{touch-action:none}
+  .composer.recording .mic-btn{background:var(--magenta);color:#fff;box-shadow:0 0 18px var(--magenta);transform:scale(1.1)}
+  .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
+  .rec-overlay.on{display:flex}
+  .rec-panel{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 40px;border-radius:22px;
+    background:var(--panel-solid);border:1px solid var(--line2);box-shadow:0 24px 60px rgba(0,0,0,.6);transition:.2s}
+  .rec-panel.cancel{border-color:var(--magenta);background:rgba(60,10,30,.9)}
+  .rec-wave{display:flex;align-items:center;gap:4px;height:52px}
+  .rec-wave i{width:5px;border-radius:3px;background:linear-gradient(var(--cyan),var(--magenta));height:10px;transition:height .09s ease-out}
+  .rec-panel.cancel .rec-wave i{background:var(--dim)}
+  .rec-time{font-size:24px;font-weight:800;letter-spacing:1px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .rec-tip{font-size:12.5px;color:var(--sub);letter-spacing:.5px}
+  .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
+  .rec-panel.cancel .rec-time{color:var(--magenta)}
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle}
   .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,12,24,.5);
     color:var(--cyan);cursor:pointer;font-size:11px;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
@@ -284,7 +289,10 @@
   @keyframes songspin{to{transform:rotate(360deg)}}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
-  .song-lyric{font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
+  .song-lyric .sl-ch.sung{color:var(--ink)}
+  .song-lyric .sl-ch.on{color:var(--cyan);text-shadow:0 0 8px var(--cyan);font-weight:700}
   .song-eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:2px}
   .song-eq i{width:2.5px;height:5px;border-radius:1px;background:currentColor;opacity:.7}
   .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
@@ -301,9 +309,15 @@
   .song-tray .st-chip{padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:rgba(10,12,24,.5);
     cursor:pointer;text-align:center;transition:.15s}
   .song-tray .st-chip:hover{border-color:var(--magenta);transform:translateY(-2px)}
+  .song-tray .st-chip.on{border-color:var(--cyan);background:rgba(40,230,216,.12);box-shadow:0 0 0 1px var(--cyan) inset}
   .song-tray .st-chip .se{font-size:20px}
   .song-tray .st-chip .sn{font-size:11.5px;font-weight:700;margin-top:3px}
   .song-tray .st-chip .sd{font-size:9.5px;color:var(--dim);margin-top:1px}
+  .song-tray .st-foot{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .song-tray .st-cur{flex:1;font-size:10.5px;color:var(--dim)}
+  .song-tray .st-send{padding:10px 18px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;
+    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.15s}
+  .song-tray .st-send:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(255,60,172,.3)}
 
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
@@ -505,15 +519,10 @@
     </div>
     <div class="composer">
       <div class="emoji-btn" id="emojiBtn">😊</div>
-      <div class="emoji-btn" id="micBtn" title="发语音">🎤</div>
+      <div class="emoji-btn mic-btn" id="micBtn" title="按住说话">🎤</div>
       <div class="emoji-btn" id="songBtn" title="文字变神曲">🎵</div>
       <div class="cin-wrap">
-        <textarea class="cin" id="cin" placeholder="说点什么… 试试打个 /" rows="1"></textarea>
-      </div>
-      <div class="rec-strip" id="recStrip">
-        <span class="rec-dot"></span><span class="rt" id="recTime">0:00 / 0:30</span>
-        <span style="flex:1"></span>
-        <button id="recCancel">取消</button><button class="rec-send" id="recSend">发送</button>
+        <textarea class="cin" id="cin" placeholder="说点什么… 长按🎤说话 · 打个 / 看命令" rows="1"></textarea>
       </div>
       <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <div class="emoji-tray" id="emojiTray"></div>
@@ -526,6 +535,15 @@
 
 <!-- 长按互动环 -->
 <div class="act-ring" id="actRing"></div>
+
+<!-- 语音录制浮层(按住说话) -->
+<div class="rec-overlay" id="recOverlay">
+  <div class="rec-panel" id="recPanel">
+    <div class="rec-wave" id="recWave"></div>
+    <div class="rec-time" id="recTime">0:00</div>
+    <div class="rec-tip" id="recTip">松开发送 · 上滑取消</div>
+  </div>
+</div>
 
 <!-- ===== 弹窗：建房 / 入房 / 绑定 ===== -->
 <div class="modal-mask" id="modalMask">
@@ -1178,7 +1196,8 @@ function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px
 const VOICE_BUCKET='eh-voice', VOICE_MAX_SEC=30;
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
 const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
-let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false;
+let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
+let waveRAF=null, recAnalyser=null;
 function fmtDur(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
 // 播放器 HTML(只信任本站语音桶/本地 blob 的地址，其余按纯文本展示，防伪造 URL)
 function voiceHtml(src){
@@ -1207,27 +1226,52 @@ document.addEventListener('click',e=>{
 });
 async function startRec(){
   if(!curRoom || recorder) return;
-  if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ toast('此浏览器不支持录音'); return; }
+  if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ toast('此浏览器不支持录音'); recActive=false; return; }
   let stream;
   try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ toast('需要麦克风权限才能发语音'); return; }
-  recChunks=[]; recSec=0; recWanted=false;
+  catch(e){ toast('需要麦克风权限才能发语音'); recActive=false; return; }
+  if(!recActive){ stream.getTracks().forEach(t=>t.stop()); return; } // 授权期间已松手，放弃
+  recChunks=[]; recSec=0; recWanted=false; recCanceled=false;
   try{ recorder=new MediaRecorder(stream,{mimeType:REC_MIME,audioBitsPerSecond:24000}); }
   catch(e){ stream.getTracks().forEach(t=>t.stop()); toast('录音初始化失败'); return; }
   recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop=()=>{
     stream.getTracks().forEach(t=>t.stop());
-    endRecUI();
-    if(recWanted && recChunks.length) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.max(1,recSec));
+    stopWave(); hideRecUI();
+    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC));
+    else if(recWanted && !recCanceled && recSec<1) toast('说话时间太短');
     recorder=null; recChunks=[];
   };
   recorder.start(250);
-  document.querySelector('.composer').classList.add('recording'); updateRecTime();
+  showRecUI(stream);
   recTimer=setInterval(()=>{ recSec++; updateRecTime();
-    if(recSec>=VOICE_MAX_SEC && recorder && recorder.state!=='inactive'){ recWanted=true; recorder.stop(); } },1000);
+    if(recSec>=VOICE_MAX_SEC){ recWanted=true; stopRec(); } },1000);
 }
-function updateRecTime(){ $('#recTime').textContent=`${fmtDur(recSec)} / ${fmtDur(VOICE_MAX_SEC)}`; }
-function endRecUI(){ clearInterval(recTimer); recTimer=null; document.querySelector('.composer').classList.remove('recording'); }
+function stopRec(){ clearInterval(recTimer); recTimer=null; if(recorder && recorder.state!=='inactive') recorder.stop(); }
+function showRecUI(stream){
+  document.querySelector('.composer').classList.add('recording');
+  const panel=$('#recPanel'); panel.classList.remove('cancel');
+  $('#recTip').textContent='松开发送 · 上滑取消';
+  $('#recWave').innerHTML=Array.from({length:24},()=>'<i></i>').join('');
+  $('#recOverlay').classList.add('on'); updateRecTime(); startWave(stream);
+}
+function hideRecUI(){ document.querySelector('.composer').classList.remove('recording'); $('#recOverlay').classList.remove('on'); }
+function updateRecTime(){ $('#recTime').textContent=fmtDur(recSec); }
+function setRecCancel(on){ if(recCanceled===on) return; recCanceled=on; $('#recPanel').classList.toggle('cancel',on); $('#recTip').textContent=on?'松开手指 · 取消发送':'松开发送 · 上滑取消'; }
+function startWave(stream){
+  try{
+    const ctx=ac(); if(!ctx) return;
+    const src=ctx.createMediaStreamSource(stream);
+    recAnalyser=ctx.createAnalyser(); recAnalyser.fftSize=64; src.connect(recAnalyser);
+    const data=new Uint8Array(recAnalyser.frequencyBinCount);
+    const bars=[...$('#recWave').querySelectorAll('i')];
+    const loop=()=>{ if(!recAnalyser) return; recAnalyser.getByteFrequencyData(data);
+      bars.forEach((b,i)=>{ const v=data[(i*2)%data.length]/255; b.style.height=(8+v*44)+'px'; });
+      waveRAF=requestAnimationFrame(loop); };
+    loop();
+  }catch(e){}
+}
+function stopWave(){ if(waveRAF) cancelAnimationFrame(waveRAF); waveRAF=null; recAnalyser=null; }
 async function sendVoice(blob, secs){
   if(!curRoom || !myUid) return;
   if(blob.size>950*1024){ toast('录音太长，发送失败'); return; }
@@ -1249,9 +1293,25 @@ async function sendVoice(blob, secs){
   optimistic.id=row.id;
   if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
 }
-$('#micBtn').onclick=()=>startRec();
-$('#recCancel').onclick=()=>{ if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } else endRecUI(); };
-$('#recSend').onclick=()=>{ if(recorder && recorder.state!=='inactive'){ recWanted=true; recorder.stop(); } };
+// 按住说话：pointerdown 开始录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
+const micBtn=$('#micBtn');
+micBtn.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(recorder || recActive) return;
+  recActive=true; recStartY=e.clientY;
+  try{ micBtn.setPointerCapture(e.pointerId); }catch(_){}
+  startRec();
+});
+window.addEventListener('pointermove',e=>{ if(!recActive) return; setRecCancel((recStartY-e.clientY)>90); });
+function micRelease(){
+  if(!recActive) return;
+  recActive=false;
+  recWanted=true;                 // 松手即发(除非已标记取消)
+  if(recorder) stopRec();         // 授权仍在进行(recorder 未就绪)时，startRec 会因 recActive=false 自行放弃
+  else { clearInterval(recTimer); recTimer=null; stopWave(); hideRecUI(); }
+}
+window.addEventListener('pointerup',micRelease);
+window.addEventListener('pointercancel',micRelease);
 if(!REC_MIME || !navigator.mediaDevices?.getUserMedia) $('#micBtn').style.display='none';
 
 // ============ 神曲(文字→洗脑歌曲, Web Audio 合成节拍 + 语音合成"唱"字) ============
@@ -1288,11 +1348,13 @@ function parseSong(text){
 function songHtml(text){
   const { sid, lyric }=parseSong(text);
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+  // 逐字包 span → 播放时卡拉OK高亮
+  const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
   return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}">
     <button class="song-play" title="播放">▶</button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
-    <span class="song-lyric">${esc(lyric)}</span></span></span>`;
+    <span class="song-lyric">${chs}</span></span></span>`;
 }
 
 // Web Audio 基础
@@ -1315,19 +1377,35 @@ function kick(ctx,dest,t){ const o=ctx.createOscillator(), g=ctx.createGain(); o
 function hat(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7000; const g=ctx.createGain(); g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05); s.connect(hp).connect(g).connect(dest); s.start(t); s.stop(t+0.07); return s; }
 function snare(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; const g=ctx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18); s.connect(bp).connect(g).connect(dest); s.start(t); s.stop(t+0.2); return s; }
 
-let zhVoice=null;
-function loadVoices(){ try{ const vs=speechSynthesis.getVoices()||[]; zhVoice=vs.find(v=>/zh|cmn|chinese/i.test((v.lang||'')+(v.name||'')))||null; }catch(e){} }
-if('speechSynthesis' in window){ loadVoices(); try{ speechSynthesis.onvoiceschanged=loadVoices; }catch(e){} }
+// ---- 共振峰(formant)人声合成：真正"唱"出旋律的元音，而非断续念字 ----
+const VOWELS={ a:[800,1150,2800], o:[500,900,2400], e:[500,1700,2500], i:[320,2300,3000], u:[320,800,2500] };
+const VOWEL_KEYS=['a','o','e','i','u'];
+// 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
+function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
+function singVoice(ctx,dest,freq,t,dur,vowel,gain){
+  const src=ctx.createOscillator(); src.type='sawtooth';
+  src.frequency.setValueAtTime(freq*0.94,t); src.frequency.linearRampToValueAtTime(freq,t+0.07); // 上滑起音，像"唱"
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;                                       // 颤音(vibrato)
+  const lfoG=ctx.createGain(); lfoG.gain.value=freq*0.015; lfo.connect(lfoG).connect(src.frequency);
+  const env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
+  env.gain.setValueAtTime(gain*0.9,t+dur*0.65); env.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.32];
+  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?7:9;
+    const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
+  env.connect(dest);
+  src.start(t); src.stop(t+dur+0.05); lfo.start(t); lfo.stop(t+dur+0.05);
+  return [src,lfo];
+}
 
 let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el}
 function stopSong(){
   if(!curSong) return;
   const s=curSong; curSong=null;
   s.timeouts.forEach(clearTimeout);
-  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
   try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
-  if(s.el) s.el.classList.remove('playing');
+  if(s.el){ s.el.classList.remove('playing'); s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
 }
 function playSong(lyric, sid, el){
   stopVoice(); stopSong();
@@ -1340,7 +1418,7 @@ function playSong(lyric, sid, el){
   const t0=ctx.currentTime+0.12;
   const totalDur=chars.length*step + spb*2;
   curSong={ ctx, master, oscs:[], timeouts:[], el:el||null };
-  if(el) el.classList.add('playing');
+  if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
   // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
   const bars=Math.ceil(totalDur/barLen);
   for(let b=0;b<bars;b++){
@@ -1355,17 +1433,14 @@ function playSong(lyric, sid, el){
     }
     [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,'triangle',0.045)));
   }
-  // 主旋律 + 逐字"唱"
+  // 主唱：共振峰人声"唱"旋律 + 卡拉OK逐字高亮
+  const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
   chars.forEach((ch,i)=>{
     const t=t0+i*step, deg=st.motif[i%st.motif.length];
     const semi=st.base+scaleSemi(st.scale,deg);
-    curSong.oscs.push(tone(ctx,master,NOTE(semi+12),t,step*0.9,st.wave,0.16));
-    if('speechSynthesis' in window){
-      const pitch=clamp(st.tts.pitch+(deg-2)*st.tts.spread,0.1,2);
-      curSong.timeouts.push(setTimeout(()=>{
-        try{ const u=new SpeechSynthesisUtterance(ch); u.lang='zh-CN'; u.rate=st.tts.rate; u.pitch=pitch; if(zhVoice) u.voice=zhVoice; speechSynthesis.speak(u); }catch(e){}
-      }, Math.max(0,(t-ctx.currentTime)*1000)));
-    }
+    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),0.24).forEach(o=>curSong.oscs.push(o));
+    const chEl=chEls[i];
+    if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, Math.max(0,(t-ctx.currentTime)*1000)));
   });
   curSong.timeouts.push(setTimeout(()=>stopSong(), (totalDur+0.4)*1000));
 }
@@ -1392,13 +1467,23 @@ async function sendSong(lyric, sid){
   if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
-// 曲风选择托盘
+// 曲风选择托盘：点曲风=本地试听，满意再点发送
+let songSel=SONG_STYLES[0].id;
 function renderSongTray(){
-  $('#songTray').innerHTML=`<div class="st-h">挑个曲风，把输入框的字唱成神曲 🎶</div>
-    <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip" data-sid="${s.id}">
+  const lyric=$('#cin').value.trim();
+  $('#songTray').innerHTML=`
+    <div class="st-h">${lyric?'点曲风先试听 🎧 满意再发送':'先在输入框打字，再来把它唱成神曲 🎤'}</div>
+    <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}">
       <div class="se">${s.emoji}</div><div class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</div>
-      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>`;
-  $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation(); sendSong($('#cin').value, c.dataset.sid); });
+      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>
+    <div class="st-foot"><span class="st-cur" id="songCur"></span><button class="st-send" id="songSendBtn">🚀 发送神曲</button></div>`;
+  $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
+    songSel=c.dataset.sid;
+    $('#songTray').querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
+    const ly=$('#cin').value.trim();
+    if(ly) playSong(ly, songSel, null); else toast('先打点字再试听');
+  });
+  $('#songSendBtn').onclick=e=>{ e.stopPropagation(); stopSong(); sendSong($('#cin').value, songSel); };
 }
 function closeSongTray(){ $('#songTray').classList.remove('on'); }
 $('#songBtn').onclick=e=>{ e.stopPropagation();
