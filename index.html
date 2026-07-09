@@ -362,6 +362,11 @@
         <input id="enterEmail" type="email" placeholder="you@example.com（可留空，之后也能在个人空间绑定）">
       </div>
       <button class="btn-primary" id="enterBtn">进 入 回 声 厅</button>
+      <div class="opt-email" id="loginToggle" style="margin:14px 0 0;text-align:center">已有账号？<b style="color:var(--cyan)">邮箱登录 →</b></div>
+      <div class="opt-email-box" id="loginBox">
+        <input id="loginEmail" type="email" placeholder="注册时用的邮箱" style="margin-bottom:8px">
+        <button class="btn-primary" id="loginBtn" style="box-shadow:none">发送登录链接</button>
+      </div>
     </div>
   </div>
 
@@ -1129,6 +1134,20 @@ async function bindEmail(){
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
 $('#optEmailToggle').onclick=()=>{ $('#optEmailBox').classList.toggle('on'); if($('#optEmailBox').classList.contains('on')) $('#enterEmail').focus(); };
+// 已注册账号：邮箱登录(magic link)。点链接回跳后 onAuthStateChange 拉回原身份+历史。
+$('#loginToggle').onclick=()=>{ $('#loginBox').classList.toggle('on'); if($('#loginBox').classList.contains('on')) $('#loginEmail').focus(); };
+async function loginByEmail(){
+  const email=$('#loginEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ toast('邮箱格式不对'); return; }
+  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='发送中…';
+  // shouldCreateUser:false → 只给已注册邮箱发链接，未注册的不会凭空建号
+  const { error }=await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:false, emailRedirectTo:location.origin+location.pathname } });
+  btn.disabled=false; btn.textContent='发送登录链接';
+  if(error){ toast(/not found|signups|exist/i.test(error.message)?'该邮箱未注册过':(error.message||'发送失败')); return; }
+  toast('登录链接已发到 '+email+'，去邮箱点开即登入');
+}
+$('#loginBtn').onclick=()=>loginByEmail();
+$('#loginEmail').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();loginByEmail();} });
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
@@ -1191,9 +1210,23 @@ window.addEventListener('beforeunload',()=>{
 loadOrRollIdentity();
 paintIdentity();
 typeSub();
-// 检测 magic link 回跳(绑定成功后 URL 带 token)
-sb.auth.onAuthStateChange((ev,session)=>{
-  if(session?.user?.email && me){ me && (me.id=session.user.id); myUid=session.user.id; }
+// 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
+let authHandled=false;
+const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
+sb.auth.onAuthStateChange(async (ev,session)=>{
+  if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
+    myUid=session.user.id;
+    // 从 eh_users 拉回该账号原有的昵称/形象(跨设备找回的关键)
+    const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
+    if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; }
+    else { me = me || {}; me.id=myUid; } // 新绑定的账号,沿用当前身份
+    saveIdentity(); paintIdentity();
+    if(location.hash) history.replaceState(null,'',location.pathname+location.search);
+    // 从登录/绑定链接回跳进来的,自动进大厅
+    if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
+      authHandled=true; toast('已登录 '+session.user.email); goScene('lobby'); renderLobby();
+    }
+  }
 });
 </script>
 </body>
