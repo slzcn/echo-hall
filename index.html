@@ -712,6 +712,16 @@ function fmtAgo(ts){
   if(s<60) return '刚刚'; if(s<3600) return Math.floor(s/60)+'分钟前';
   if(s<86400) return Math.floor(s/3600)+'小时前'; return Math.floor(s/86400)+'天前';
 }
+// 从卡片 .cnt 文字("N 人在线")解析已知在线数，用于进房乐观显示
+function readKnownOnline(cardEl){
+  try{ const t=cardEl.querySelector('.cnt')?.textContent||''; const m=t.match(/(\d+)/); return m?parseInt(m[1],10):null; }catch(e){ return null; }
+}
+// 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
+function optimisticCnt(room){
+  const k=room&&room.knownOnline;
+  if(k!=null && k>=0){ const n=k+1; return `~ <b>${n}</b> 人在线`; }
+  return '连接中…';
+}
 // 异步填充卡片动态数据: 在线人数 + 最新消息预览 + 活跃时间
 async function fillRoomStats(box, rid){
   const card=box.querySelector(`.ch[data-rid="${rid}"]`); if(!card) return;
@@ -747,7 +757,7 @@ async function renderMyRooms(soft){
     <span class="rm-ic">${safeEmoji(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
     <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
-  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
+  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private',knownOnline:readKnownOnline(el)}));
   prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
 }
 // 进房预取缓存: 列表渲染后主动预取 + 悬停补充，点进去瞬间显示
@@ -775,6 +785,7 @@ function prefetchAll(rooms){
 function bindRoomCards(box){
   box.querySelectorAll('.ch').forEach(el=>{
     const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
+    room.knownOnline = readKnownOnline(el);   // 从卡片已显示的在线数取乐观初值
     const pf=()=>prefetchRoom(room.id, room.kind);
     el.addEventListener('pointerenter', pf);   // 桌面悬停预取
     el.addEventListener('touchstart', pf, {passive:true}); // 移动按下预取
@@ -794,7 +805,7 @@ async function enterRoom(room){
   if(snapHit){
     // 秒还原已渲染消息 + 滚动位置状态
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
-    $('#presence').innerHTML=''; $('#hallCnt').textContent='连接中…';
+    $('#presence').innerHTML=''; $('#hallCnt').innerHTML=optimisticCnt(room);
     goScene('hall'); setConn(false,'连接中'); scrollStream();
     roomSnap=null;
     await ensureAuth();
@@ -812,7 +823,7 @@ async function enterRoom(room){
   }
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
-  $('#hallCnt').textContent='连接中…';
+  $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML='';
   goScene('hall'); setConn(false,'连接中');
 
