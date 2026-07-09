@@ -237,6 +237,14 @@ async function loadRooms(){
   $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=()=>loadMessages(el.dataset.rid,el.dataset.nm));
 }
 
+// 语音消息渲染为播放器；只信任本站语音桶的地址，其余按纯文本展示
+const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
+function voiceOrText(m){
+  const src=String(m.text||'');
+  if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
+    return `<audio controls preload="none" style="height:30px;max-width:100%" src="${esc(src.split('#')[0])}"></audio>`;
+  return esc(m.text);
+}
 async function loadMessages(rid,name){
   const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
   $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
@@ -247,7 +255,8 @@ async function loadMessages(rid,name){
     <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
     ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
     ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
-    <div style="margin-top:4px">${esc(m.text)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
+    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎤语音</span>':''}
+    <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
   $('#msgCard').scrollIntoView({behavior:'smooth'});
 }
 $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
