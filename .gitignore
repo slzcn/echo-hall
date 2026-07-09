@@ -1,0 +1,5 @@
+# 后端建库脚本 & Edge Function 源码 & 本地配置——不公开(仅本地/私密保存)
+supabase_setup.sql
+supabase/
+*.env
+.env
