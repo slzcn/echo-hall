@@ -1327,68 +1327,95 @@ async function openGear(){
 function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); }
 
 // ============ 个人空间抽屉 ============
+let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
 async function openMe(){
   const body=$('#meBody');
-  const bound = !!(me && me.id && !me.__anon);   // 先用缓存粗判，稍后校准
-  // 立即开抽屉 + 渲染身份骨架(不等数据查询)，消除"点头像卡很久"
+  const isBound = !!(me && me.registered);
+  // 本地已知的(昵称/状态/邮箱/账号区)首屏直接渲染, 不显"…"。邮箱缓存在 me.email。
+  const emailKnown = me.email !== undefined; // 已缓存过(可能为空串=未设置)
+  const realEmail = me.email || '';
+  const regSlotHtml = isBound
+    ? (emailKnown
+        ? (realEmail
+            ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
+            : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`)
+        : `<div class="drow"><span class="dk">邮箱</span><span class="dv" id="meEmailVal" style="color:var(--dim)">读取中…</span></div><button class="dbtn" id="meEmail">✉️ 邮箱设置</button>`)
+    : '<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
+  // 列表: 有缓存先渲染缓存(秒显), 否则骨架
+  const roomsHtml = _meCache.rooms ? renderMyRoomList(_meCache.rooms) : '<div class="empty-hint">加载中…</div>';
+  const msgsHtml  = _meCache.msgs  ? renderMyMsgList(_meCache.msgs)   : '<div class="empty-hint">加载中…</div>';
   body.innerHTML=`
     <div class="dsec"><div class="dl">我的身份</div>
       <div class="dcard">
         <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${safeColor(me.color)}">${safeEmoji(me.emoji)} ${esc(me.name)}</span></div>
-        <div class="drow"><span class="dk">状态</span><span class="dv" id="meStatus">…</span></div>
-        <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
-        <div id="meRegSlot"></div>
+        <div class="drow"><span class="dk">状态</span><span class="dv">${isBound?'正式账号':'匿名（本设备）'}</span></div>
+        <button class="dbtn" id="meReroll">${isBound?'✎ 编辑昵称形象':'↻ 换个昵称形象'}</button>
+        <div id="meRegSlot">${regSlotHtml}</div>
       </div></div>
-    <div class="dsec"><div class="dl" id="meRoomsLabel">我在的房间</div>
-      <div class="mlist" id="meRoomsList"><div class="empty-hint">加载中…</div></div></div>
-    <div class="dsec"><div class="dl" id="meMsgsLabel">我最近发的话</div>
-      <div class="dcard" style="max-height:200px;overflow-y:auto" id="meMsgsList"><div class="empty-hint">加载中…</div></div></div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我在的房间${_meCache.rooms?' ('+_meCache.rooms.length+')':''}</div>
+      <div class="mlist" id="meRoomsList">${roomsHtml}</div></div>
+    <div class="dsec"><div class="dl" id="meMsgsLabel">我最近发的话${_meCache.msgs?' ('+_meCache.msgs.length+')':''}</div>
+      <div class="dcard" style="max-height:200px;overflow-y:auto" id="meMsgsList">${msgsHtml}</div></div>
     <div class="dsec"><div class="dl">账号</div>
       <div class="dcard">
-        <button class="dbtn danger" id="meLogout">退出 / 换个身份</button>
-        <div class="note" id="meLogoutNote" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
+        <button class="dbtn danger" id="meLogout">${isBound?'退出登录':'退出 / 换个身份'}</button>
+        <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6">${isBound?'退出后聊天记录仍与你的账号关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。'}</div>
       </div></div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
-  // 匿名: 随机换一个临时身份; 正式账号: 打开编辑形象弹窗(自定义, 不随机、不动用户名)
-  $('#meReroll').textContent = me.registered ? '✎ 编辑昵称形象' : '↻ 换个昵称形象';
+  bindMeActions(isBound);
+  // 后台静默刷新数据(不影响已渲染内容, 有更新再替换)
+  const tasks=[
+    sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
+    sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
+  ];
+  if(isBound && !emailKnown) tasks.push(sb.from('eh_accounts').select('email').eq('auth_uid',myUid).maybeSingle());
+  const [msgsRes, roomsRes, accRes] = await Promise.all(tasks);
+  const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
+  _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
+  // 邮箱: 首次读到后缓存到 me, 之后打开直接显示不闪
+  if(isBound && !emailKnown && accRes){ me.email=accRes.data?.email||''; saveIdentity(); rebindEmailSlot(); }
+  // 用最新数据刷新列表(首屏已渲染缓存/骨架, 这里替换为最新)
+  $('#meRoomsLabel').textContent=`我在的房间 (${myRooms.length})`;
+  $('#meRoomsList').innerHTML=renderMyRoomList(myRooms);
+  $('#meMsgsLabel').textContent=`我最近发的话 (${myMsgs.length})`;
+  $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+}
+// 列表渲染 helper(供首屏缓存 + 刷新复用)
+function renderMyRoomList(rooms){
+  return (rooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
+    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+}
+function renderMyMsgList(msgs){
+  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
+}
+// 绑定个人空间的按钮动作(reroll/注册/邮箱/登出)
+function bindMeActions(isBound){
   $('#meReroll').onclick=async()=>{
     if(me.registered){ closeMe(); openProfileEditor(); return; }
     rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe();
   };
-  // 异步并行填充(不重复 ensureAuth: 进大厅时已确保 myUid)。正式账号并行查 eh_accounts.email。
-  const isBound = !!(me && me.registered);
-  const [msgsRes, roomsRes, accRes] = await Promise.all([
-    sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
-    sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
-    isBound ? sb.from('eh_accounts').select('email').eq('auth_uid',myUid).maybeSingle() : Promise.resolve({data:null}),
-  ]);
-  const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
-  const realEmail=accRes?.data?.email||'';
-  $('#meStatus').textContent = isBound?'正式账号':'匿名（本设备）';
-  if(isBound){
-    // 未设置邮箱: 只显示"设置邮箱"按钮(不显示空的当前邮箱行); 已设置: 显示邮箱+修改
-    $('#meRegSlot').innerHTML = realEmail
-      ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
-      : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`;
-    $('#meEmail').onclick=()=>{ closeMe(); openModal('mEmail'); setTimeout(()=>{
-      const has=!!realEmail;
-      $('#curEmailRow').style.display = has?'block':'none';   // 未设置不显示"当前邮箱"行
-      if(has) $('#curEmail').value=realEmail;
-      $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
-    },50); };
-  } else {
-    $('#meRegSlot').innerHTML='<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
-    $('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); };
-  }
-  $('#meRoomsLabel').textContent=`我在的房间 (${myRooms.length})`;
-  $('#meRoomsList').innerHTML=myRooms.map(r=>{const rm=r.eh_rooms||{};return `
-    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji) || '🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
-    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
-  $('#meMsgsLabel').textContent=`我最近发的话 (${myMsgs.length})`;
-  $('#meMsgsList').innerHTML=myMsgs.map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
-  $('#meLogout').textContent = isBound?'退出登录':'退出 / 换个身份';
-  $('#meLogoutNote').textContent = isBound?'退出后聊天记录仍与你的邮箱关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。';
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
+  bindMeReg(); bindMeEmail();
+}
+function bindMeReg(){ const b=$('#meReg'); if(b) b.onclick=()=>{ closeMe(); openModal('mReg'); }; }
+function bindMeEmail(){
+  const b=$('#meEmail'); if(!b) return;
+  b.onclick=()=>{ const realEmail=me.email||''; closeMe(); openModal('mEmail'); setTimeout(()=>{
+    const has=!!realEmail;
+    $('#curEmailRow').style.display = has?'block':'none';
+    if(has) $('#curEmail').value=realEmail;
+    $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
+  },50); };
+}
+// 邮箱首次读到后, 重渲染 meRegSlot(从"读取中"变成真实态)
+function rebindEmailSlot(){
+  if(!$('#meRegSlot')) return;
+  const realEmail=me.email||'';
+  $('#meRegSlot').innerHTML = realEmail
+    ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
+    : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`;
+  bindMeEmail();
 }
 // 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
 async function logoutIdentity(bound){
