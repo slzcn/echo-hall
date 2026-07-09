@@ -156,7 +156,8 @@
 <script>
 const FN='https://cddkniwbhvcbfgkgomtl.supabase.co/functions/v1/eh-admin-api';
 const $=s=>document.querySelector(s);
-const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeColor=c=>/^#[0-9A-Fa-f]{3,8}$/.test(c||'')?c:'#98A3C7';
 const LS_TK='eh_admin_token';
 let token=localStorage.getItem(LS_TK)||'';
 let meAdmin=null;
@@ -243,7 +244,7 @@ async function loadRooms(){
     const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
     const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
     return `<tr class="roomrow" data-rid="${r.id}" data-nm="${esc(r.name)}">
-      <td>${r.emoji||''} ${esc(r.name)}</td>
+      <td>${esc(r.emoji)} ${esc(r.name)}</td>
       <td><span class="k-tag k-${r.kind}">${kt}</span></td>
       <td>${arch||'—'}</td>
       <td>${(r.created_at||'').slice(0,10)}</td></tr>`;
@@ -257,7 +258,7 @@ async function loadMessages(rid,name){
   if(!res.ok){ $('#msgList').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
   const msgs=(res.body.messages||[]).slice().reverse();
   $('#msgList').innerHTML=msgs.map(m=>`<div class="msgline">
-    <span class="mm-nm" style="color:${m.color||'#98A3C7'}">${m.emoji||''} ${esc(m.name)}</span>
+    <span class="mm-nm" style="color:${safeColor(m.color)}">${esc(m.emoji)} ${esc(m.name)}</span>
     <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
     ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
     ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
