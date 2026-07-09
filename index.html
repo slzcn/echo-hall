@@ -649,7 +649,7 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 // ---- 身份 ----
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
-const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅'];
+const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🐙','🦩','🦚'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
 const LS_ID = 'eh_identity_v2';
 
@@ -1731,6 +1731,9 @@ async function saveProfile(){
   const { error }=await sb.from('eh_users').update({ name, emoji:_profEmoji, color:_profColor }).eq('id',myUid);
   btn.disabled=false; btn.textContent='保 存';
   if(error){ $('#profErr').textContent='保存失败'; return; }
+  // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
+  if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
+  const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
   toast('形象已更新'); closeModal();
 }
 
@@ -1837,9 +1840,15 @@ sb.auth.onAuthStateChange((ev,session)=>{
     myUid=session.user.id;
     if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
-      const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; saveIdentity(); }
+      // 一并查身份档案 + 账号信息(username/email/role), 缓存到 me, 避免顶部@用户名缺失
+      const [{ data:prof }, { data:acc }] = await Promise.all([
+        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role').eq('auth_uid',myUid).maybeSingle(),
+      ]);
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
       else { me = me||{}; me.registered=true; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; }
+      saveIdentity();
       paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
       // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
