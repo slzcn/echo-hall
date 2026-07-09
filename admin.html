@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>回声厅 · 后台</title>
+<style>
+  :root{
+    --bg:#07080d; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
+    --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
+    --ink:#EAF0FF; --sub:#98A3C7; --dim:#5B6688;
+    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
+    --glow-cyan:0 0 24px rgba(40,230,216,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;
+    background-image:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(139,92,255,.12),transparent 70%)}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 60px}
+  .glass{background:var(--panel);backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:16px}
+  a{color:var(--cyan)}
+
+  /* 登录 */
+  #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .auth-card{width:min(400px,92vw);padding:34px 30px;position:relative}
+  .auth-card h1{font-size:26px;font-weight:800;letter-spacing:1px;text-align:center;
+    background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .auth-card .sub{text-align:center;color:var(--sub);font-size:12.5px;margin:8px 0 24px}
+  .fld{display:block;margin-bottom:16px}
+  .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px}
+  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+    color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
+  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .btn{width:100%;padding:13px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:1px;
+    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--violet));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.2)}
+  .btn:hover{transform:translateY(-2px)} .btn:disabled{opacity:.5;cursor:wait}
+  .toggle{text-align:center;margin-top:16px;font-size:12.5px;color:var(--sub)}
+  .toggle b{color:var(--cyan);cursor:pointer}
+  .err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:8px;text-align:center}
+  .badge-super{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,60,172,.15);color:var(--magenta)}
+  .badge-normal{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(120,140,220,.15);color:var(--sub)}
+
+  /* 后台主体 */
+  #panel{display:none}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+  .top h1{font-size:22px;font-weight:800;letter-spacing:1px}
+  .top .who{margin-left:auto;font-size:12.5px;color:var(--sub);display:flex;align-items:center;gap:10px}
+  .logout{cursor:pointer;color:var(--dim);border:1px solid var(--line);padding:6px 12px;border-radius:9px;transition:.15s}
+  .logout:hover{color:var(--magenta);border-color:var(--magenta)}
+  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--sub);
+    cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  .tab.on{background:var(--violet);color:#fff;border-color:var(--violet)}
+  .tab:not(.on):hover{border-color:var(--cyan);color:var(--cyan)}
+  .page{display:none} .page.on{display:block}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:20px}
+  .kpi{padding:18px;border-radius:14px}
+  .kpi .n{font-size:28px;font-weight:800;color:var(--cyan)}
+  .kpi .l{font-size:11.5px;color:var(--sub);margin-top:4px}
+  .card{padding:18px;border-radius:14px;margin-bottom:16px}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:11px}
+  td{color:var(--ink)}
+  .roomrow{cursor:pointer;transition:.12s}
+  .roomrow:hover td{background:rgba(40,230,216,.06)}
+  .k-tag{font-size:9px;padding:2px 6px;border-radius:5px}
+  .k-official{background:rgba(40,230,216,.15);color:var(--cyan)}
+  .k-public{background:rgba(77,227,138,.15);color:var(--green)}
+  .k-private{background:rgba(255,60,172,.15);color:var(--magenta)}
+  .k-arch{background:rgba(120,140,220,.1);color:var(--dim)}
+  .msgline{padding:8px 10px;border-radius:9px;background:rgba(10,12,24,.4);margin-bottom:6px;font-size:12.5px}
+  .msgline .mm-nm{font-weight:700}
+  .msgline .mm-tm{font-size:10px;color:var(--dim);margin-left:8px}
+  .mini-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
+    font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
+  .mini-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .mini-btn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
+  .inline-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .inline-form input{padding:9px 12px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+    color:var(--ink);font-family:inherit;font-size:13px;outline:none}
+  .inline-form input:focus{border-color:var(--cyan)}
+  .empty{color:var(--dim);font-size:12.5px;padding:20px;text-align:center}
+  #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:60;
+    background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none}
+  #toast.on{transform:translateX(-50%) translateY(0)}
+  @media(max-width:600px){ th:nth-child(4),td:nth-child(4){display:none} }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- 登录/注册 -->
+<div id="auth">
+  <div class="glass auth-card">
+    <h1>回声厅 · 后台</h1>
+    <div class="sub" id="authSub">管理员登录</div>
+    <div class="err" id="authErr"></div>
+    <label class="fld"><span>用户名</span><input id="username" autocomplete="username" placeholder="管理员账号"></label>
+    <label class="fld"><span>密码</span><input id="password" type="password" autocomplete="current-password" placeholder="密码"></label>
+    <button class="btn" id="authBtn">登 录</button>
+    <div class="toggle" id="toggleBox"></div>
+  </div>
+</div>
+
+<!-- 后台面板 -->
+<div id="panel"><div class="wrap">
+  <div class="top">
+    <h1>回声厅控制台</h1>
+    <div class="who"><span id="whoName">—</span><span id="whoRole"></span><span class="logout" id="logoutBtn">退出</span></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on" data-page="overview">概览</div>
+    <div class="tab" data-page="rooms">房间 & 聊天记录</div>
+    <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
+  </div>
+
+  <div class="page on" id="p-overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="glass card"><h3>说明</h3>
+      <div style="font-size:12.5px;color:var(--sub);line-height:1.8">
+        · 公开消息（官方+公开房）默认保留 3 个月，每天自动清理超期。<br>
+        · 普通管理员只能查看公开房间记录；超级管理员可查看全站（含私密房）。<br>
+        · 私密房消息永久保留，不自动清理。
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="p-rooms">
+    <div class="glass card"><h3>房间列表 <span style="font-size:11px;color:var(--dim)" id="roomsHint"></span></h3>
+      <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th></tr></thead><tbody id="roomsTbody"></tbody></table>
+    </div>
+    <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
+      <div id="msgList"></div>
+    </div>
+  </div>
+
+  <div class="page" id="p-admins">
+    <div class="glass card"><h3>添加普通管理员</h3>
+      <div class="inline-form">
+        <input id="newAdminUser" placeholder="用户名(≥3位)">
+        <input id="newAdminPass" type="password" placeholder="密码(≥6位)">
+        <button class="mini-btn" id="addAdminBtn">＋ 添加</button>
+      </div>
+    </div>
+    <div class="glass card"><h3>管理员列表</h3>
+      <table><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table>
+    </div>
+  </div>
+</div></div>
+
+<script>
+const FN='https://cddkniwbhvcbfgkgomtl.supabase.co/functions/v1/eh-admin-api';
+const $=s=>document.querySelector(s);
+const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const LS_TK='eh_admin_token';
+let token=localStorage.getItem(LS_TK)||'';
+let meAdmin=null;
+let mode='login'; // login | register
+
+let toastT;
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+
+async function api(path,{method='GET',body,auth=true}={}){
+  const headers={'Content-Type':'application/json'};
+  if(auth && token) headers['Authorization']='Bearer '+token;
+  const r=await fetch(FN+path,{method,headers,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  return {ok:r.ok,status:r.status,body:j};
+}
+
+// ---- 判断是首个注册还是登录 ----
+async function detectMode(){
+  // 试探：无 token 时调 register 端点会告诉我们是否已关闭
+  // 简化：先尝试判断——无账号则显示注册
+  const probe=await api('/login',{method:'POST',auth:false,body:{username:'__probe__',password:'__probe__'}});
+  // 若返回"账号或密码错误"→已有账号(登录模式)；若其它→仍登录模式默认
+  // 用 register 的 dry 探测更准：直接尝试注册一个探测(会因already exists或密码规则失败)不好。
+  // 改为：调用 register 端点用非法短密码，若返回"注册已关闭"则是登录模式，否则注册模式。
+  const probe2=await api('/register',{method:'POST',auth:false,body:{username:'x',password:'x'}});
+  if(probe2.body?.error && probe2.body.error.includes('注册已关闭')){ mode='login'; }
+  else { mode='register'; } // 密码规则错误说明注册开放(表为空)
+  paintAuthMode();
+}
+function paintAuthMode(){
+  if(mode==='register'){
+    $('#authSub').textContent='首次使用 · 注册即成为超级管理员';
+    $('#authBtn').textContent='注 册 并 登 录';
+    $('#toggleBox').innerHTML='';
+    $('#password').autocomplete='new-password';
+  } else {
+    $('#authSub').textContent='管理员登录';
+    $('#authBtn').textContent='登 录';
+    $('#toggleBox').innerHTML='';
+  }
+}
+
+async function doAuth(){
+  const username=$('#username').value.trim(), password=$('#password').value;
+  $('#authErr').textContent='';
+  if(!username||!password){ $('#authErr').textContent='请填写账号和密码'; return; }
+  const btn=$('#authBtn'); btn.disabled=true;
+  const res=await api('/'+(mode==='register'?'register':'login'),{method:'POST',auth:false,body:{username,password}});
+  btn.disabled=false;
+  if(!res.ok){ $('#authErr').textContent=res.body?.error||'失败'; if(res.body?.error?.includes('注册已关闭')){mode='login';paintAuthMode();} return; }
+  token=res.body.token; localStorage.setItem(LS_TK,token); meAdmin=res.body.admin;
+  enterPanel();
+}
+
+function enterPanel(){
+  $('#auth').style.display='none'; $('#panel').style.display='block';
+  $('#whoName').textContent=meAdmin.username;
+  $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
+  $('#adminsTab').style.display=meAdmin.role==='super'?'block':'none';
+  loadOverview(); loadRooms();
+}
+
+async function loadMe(){
+  const res=await api('/me');
+  if(!res.ok){ token=''; localStorage.removeItem(LS_TK); return false; }
+  meAdmin=res.body.admin; return true;
+}
+
+async function loadOverview(){
+  const res=await api('/stats'); if(!res.ok) return;
+  const s=res.body;
+  $('#kpis').innerHTML=[
+    ['用户',s.users],['官方频道',s.rooms_official],['公开房',s.rooms_public],
+    ['私密房',s.rooms_private],['已归档公开房',s.rooms_public_archived],['消息总数',s.messages]
+  ].map(([l,n])=>`<div class="glass kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+let roomsCache=[];
+async function loadRooms(){
+  const res=await api('/rooms'); if(!res.ok) return;
+  roomsCache=res.body.rooms||[];
+  $('#roomsHint').textContent=meAdmin.role==='super'?'（超管：全站含私密）':'（仅公开房）';
+  $('#roomsTbody').innerHTML=roomsCache.map(r=>{
+    const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
+    const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
+    return `<tr class="roomrow" data-rid="${r.id}" data-nm="${esc(r.name)}">
+      <td>${r.emoji||''} ${esc(r.name)}</td>
+      <td><span class="k-tag k-${r.kind}">${kt}</span></td>
+      <td>${arch||'—'}</td>
+      <td>${(r.created_at||'').slice(0,10)}</td></tr>`;
+  }).join('')||'<tr><td colspan="4" class="empty">没有房间</td></tr>';
+  $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=()=>loadMessages(el.dataset.rid,el.dataset.nm));
+}
+
+async function loadMessages(rid,name){
+  const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
+  $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
+  if(!res.ok){ $('#msgList').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
+  const msgs=(res.body.messages||[]).slice().reverse();
+  $('#msgList').innerHTML=msgs.map(m=>`<div class="msgline">
+    <span class="mm-nm" style="color:${m.color||'#98A3C7'}">${m.emoji||''} ${esc(m.name)}</span>
+    <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
+    ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
+    ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
+    <div style="margin-top:4px">${esc(m.text)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
+  $('#msgCard').scrollIntoView({behavior:'smooth'});
+}
+$('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
+
+async function loadAdmins(){
+  const res=await api('/admins'); if(!res.ok) return;
+  $('#adminsTbody').innerHTML=(res.body.admins||[]).map(a=>{
+    const isMe=a.id===meAdmin.id;
+    let ops='';
+    if(a.role!=='super'){
+      ops=`<button class="mini-btn" data-transfer="${a.id}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.id}">删除</button>`;
+    } else if(isMe){ ops='<span style="color:var(--dim)">（你）</span>'; }
+    return `<tr><td>${esc(a.username)}</td>
+      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'普管'}</span></td>
+      <td>${a.last_login?a.last_login.replace('T',' ').slice(0,16):'—'}</td>
+      <td>${ops}</td></tr>`;
+  }).join('');
+  $('#adminsTbody').querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('删除该管理员？')) return;
+    const r=await api('/revoke',{method:'POST',body:{id:b.dataset.revoke}});
+    toast(r.ok?'已删除':(r.body?.error||'失败')); loadAdmins();
+  });
+  $('#adminsTbody').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('转让超管身份给该管理员？你将降为普通管理员。')) return;
+    const r=await api('/transfer',{method:'POST',body:{id:b.dataset.transfer}});
+    if(r.ok){ toast('已转让，你已降为普管'); await loadMe(); enterPanel(); }
+    else toast(r.body?.error||'失败');
+  });
+}
+$('#addAdminBtn').onclick=async()=>{
+  const username=$('#newAdminUser').value.trim(), password=$('#newAdminPass').value;
+  const r=await api('/appoint',{method:'POST',body:{username,password}});
+  if(r.ok){ toast('已添加'); $('#newAdminUser').value='';$('#newAdminPass').value=''; loadAdmins(); }
+  else toast(r.body?.error||'失败');
+};
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  $('#p-'+t.dataset.page).classList.add('on');
+  if(t.dataset.page==='admins') loadAdmins();
+  if(t.dataset.page==='rooms') loadRooms();
+});
+$('#authBtn').onclick=doAuth;
+$('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
+$('#logoutBtn').onclick=()=>{ token='';localStorage.removeItem(LS_TK); location.reload(); };
+
+// 启动
+(async()=>{
+  if(token && await loadMe()){ enterPanel(); }
+  else { await detectMode(); }
+})();
+</script>
+</body>
+</html>

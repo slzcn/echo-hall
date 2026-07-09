@@ -4,24 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>回声厅 · Echo Hall</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#5B6688;
-    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D;
+    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
     --grid:rgba(80,120,255,.05);
     --glow-cyan:0 0 24px rgba(40,230,216,.5); --glow-mag:0 0 24px rgba(255,60,172,.5);
   }
-  *{margin:0;padding:0;box-sizing:border-box}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden}
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
-    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
-    position:relative;
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;position:relative;
   }
-  /* ==== 背景：网格 + 呼吸辉光 ==== */
+  /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000 55%,transparent 100%)}
@@ -31,12 +29,10 @@
   .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
   @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,20px) scale(.95)}}
 
-  .stage{position:relative;z-index:2;height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;
+  .stage{position:relative;z-index:2;height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;
     padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
   .scene{display:none;width:100%;height:100%}
   .scene.on{display:flex}
-
-  /* 通用玻璃面板 */
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
@@ -47,7 +43,6 @@
     background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
-  .logo-wrap{margin-bottom:6px}
   .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
   .title{font-size:38px;font-weight:800;letter-spacing:2px;margin:8px 0 4px;
     background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
@@ -55,7 +50,6 @@
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
-
   .identity{display:flex;align-items:center;gap:16px;padding:16px;border-radius:14px;
     background:rgba(10,12,24,.6);border:1px solid var(--line);margin-bottom:20px;text-align:left}
   .id-av{width:56px;height:56px;border-radius:14px;flex-shrink:0;display:grid;place-items:center;font-size:26px;position:relative;
@@ -67,7 +61,6 @@
     font-family:inherit;font-size:12px;transition:.15s;white-space:nowrap}
   .reroll:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .reroll:active{transform:scale(.94)}
-
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.25)}
@@ -76,39 +69,68 @@
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
   /* ============ 场景2：大厅 ============ */
-  #lobby{flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:24px}
-  .lobby-head{text-align:center}
+  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto}
+  .lobby-head{text-align:center;position:relative;width:100%;max-width:760px}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
-  .lobby-head .you{color:var(--cyan)}
-  .channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;width:min(760px,94vw)}
-  .ch{padding:22px 20px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
+  .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
+  .me-btn{position:absolute;top:0;right:0;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;
+    cursor:pointer;border:1px solid var(--line);background:var(--panel);transition:.18s}
+  .me-btn:hover{border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .sec-label{width:min(760px,94vw);font-size:11.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;margin-top:4px}
+  .sec-label::after{content:"";flex:1;height:1px;background:var(--line)}
+  .channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:min(760px,94vw)}
+  .ch{padding:20px 18px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
     border:1px solid var(--line);background:var(--panel)}
   .ch:hover{transform:translateY(-4px);border-color:var(--ch-c);box-shadow:0 14px 40px rgba(0,0,0,.4)}
   .ch::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ch-c);opacity:.8}
-  .ch .icon{font-size:30px;margin-bottom:12px}
-  .ch h3{font-size:17px;font-weight:700;letter-spacing:.5px}
-  .ch .desc{font-size:12px;color:var(--sub);margin-top:5px;line-height:1.5}
-  .ch .live{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:12px;color:var(--ch-c)}
+  .ch .icon{font-size:28px;margin-bottom:10px}
+  .ch h3{font-size:16px;font-weight:700;letter-spacing:.5px}
+  .ch .desc{font-size:11.5px;color:var(--sub);margin-top:5px;line-height:1.5;min-height:32px}
+  .ch .live{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11.5px;color:var(--ch-c)}
   .ch .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ch-c);box-shadow:0 0 8px var(--ch-c);animation:pulse 1.6s infinite}
+  .ch .tagk{position:absolute;top:12px;right:12px;font-size:9px;padding:2px 7px;border-radius:6px;letter-spacing:1px;
+    background:rgba(255,255,255,.06);color:var(--dim)}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+  .empty-hint{width:min(760px,94vw);text-align:center;color:var(--dim);font-size:12px;padding:8px}
+
+  .priv-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;width:min(760px,94vw)}
+  .priv-btn{padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
+  .priv-btn:hover{transform:translateY(-2px)}
+  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:var(--glow-mag)}
+  .my-rooms{display:flex;flex-direction:column;gap:8px;width:min(760px,94vw)}
+  .rm{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);transition:.18s}
+  .rm:hover{border-color:var(--violet);transform:translateX(3px)}
+  .rm .rm-ic{font-size:22px}
+  .rm .rm-nm{flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
+  .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:rgba(139,92,255,.15);color:var(--violet)}
+  .rm .rm-arr{color:var(--dim)}
 
   /* ============ 场景3：聊天厅 ============ */
   #hall{flex-direction:column;width:min(900px,96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
-  .hall-top{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
   .back:hover{color:var(--cyan);border-color:var(--cyan)}
   .hall-ti{flex:1;min-width:0}
-  .hall-ti h3{font-size:16px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
-  .hall-ti .cnt{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .hall-ti h3{font-size:15.5px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hall-ti .cnt{font-size:11px;color:var(--dim);margin-top:2px}
+  .hall-ti .cnt b{color:var(--sub)}
+  .gear{width:34px;height:34px;border-radius:9px;display:none;place-items:center;cursor:pointer;color:var(--sub);
+    border:1px solid var(--line);transition:.15s;flex-shrink:0;font-size:16px}
+  .gear.show{display:grid}
+  .gear:hover{color:var(--amber);border-color:var(--amber)}
   .conn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);white-space:nowrap}
   .conn .led{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:.3s}
   .conn.live .led{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
   .conn.live{color:var(--cyan)}
 
-  /* 在线光墙 */
-  .presence{display:flex;gap:8px;padding:12px 20px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;min-height:60px}
+  .presence{display:flex;gap:8px;padding:12px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;min-height:60px}
   .presence::-webkit-scrollbar{height:0}
   .pav{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;font-size:18px;position:relative;
     animation:popin .4s cubic-bezier(.2,.9,.3,1.4);transition:.3s}
@@ -116,9 +138,12 @@
   .pav.me::after{content:"你";position:absolute;bottom:-14px;left:0;right:0;text-align:center;font-size:9px;color:var(--cyan)}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 
-  .stream{flex:1;overflow-y:auto;padding:18px 20px 8px;display:flex;flex-direction:column;gap:2px}
+  .stream{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px}
   .stream::-webkit-scrollbar{width:6px}
   .stream::-webkit-scrollbar-thumb{background:rgba(120,140,220,.25);border-radius:3px}
+  .load-more{align-self:center;margin:4px 0 10px;padding:6px 16px;border-radius:8px;border:1px solid var(--line2);
+    background:none;color:var(--sub);font-family:inherit;font-size:11.5px;cursor:pointer;transition:.15s}
+  .load-more:hover{border-color:var(--cyan);color:var(--cyan)}
 
   .msg{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
   @keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -127,37 +152,44 @@
   .msg .meta{display:flex;align-items:baseline;gap:8px}
   .msg .nm{font-size:13px;font-weight:700}
   .msg .tm{font-size:10px;color:var(--dim)}
+  .msg .reply-ref{font-size:11px;color:var(--dim);border-left:2px solid var(--line2);padding:2px 8px;margin:2px 0;
+    background:rgba(255,255,255,.02);border-radius:0 6px 6px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;
-    background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative}
+    background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
+    -webkit-user-select:none;user-select:none}
   .msg.me{flex-direction:row-reverse}
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
   .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,rgba(40,230,216,.14),rgba(139,92,255,.14));border-color:var(--line2)}
-  /* 回声（点赞）*/
+  .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
+  .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
   .msg .echo{position:absolute;right:-8px;bottom:-10px;background:var(--panel-solid);border:1px solid var(--line2);
     border-radius:10px;padding:1px 7px;font-size:11px;cursor:pointer;user-select:none;transition:.15s;color:var(--sub);opacity:0}
   .msg:hover .echo,.msg .echo.has{opacity:1}
   .msg .echo:hover{border-color:var(--magenta);color:var(--magenta)}
   .msg .echo.has{color:var(--magenta);border-color:rgba(255,60,172,.4)}
-  /* 动作消息 /me */
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
-  /* 系统消息 */
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
 
-  /* 正在输入 */
-  .typing-bar{height:20px;padding:0 20px;font-size:11.5px;color:var(--cyan);flex-shrink:0;display:flex;align-items:center;gap:6px;opacity:0;transition:.2s}
+  .typing-bar{height:20px;padding:0 18px;font-size:11.5px;color:var(--cyan);flex-shrink:0;display:flex;align-items:center;gap:6px;opacity:0;transition:.2s}
   .typing-bar.on{opacity:1}
   .typing-bar .d{display:inline-flex;gap:3px}
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bounce 1.2s infinite}
   .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
   @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
 
-  /* 输入区 */
-  .composer{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end}
+  /* 回复预览条 */
+  .reply-preview{display:none;align-items:center;gap:8px;padding:8px 18px;border-top:1px solid var(--line);
+    background:rgba(139,92,255,.06);font-size:12px;color:var(--sub);flex-shrink:0}
+  .reply-preview.on{display:flex}
+  .reply-preview .rp-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reply-preview .rp-x{cursor:pointer;color:var(--dim);padding:2px 6px}
+  .reply-preview .rp-x:hover{color:var(--magenta)}
+
+  .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
   .cin-wrap{flex:1;display:flex;align-items:center;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
-  /* font-size 必须 ≥16px，否则 iOS Safari 聚焦输入框会自动放大整页 */
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;
     line-height:1.5;max-height:100px;min-height:24px;padding:10px 0}
   .cin::placeholder{color:var(--dim)}
@@ -168,78 +200,114 @@
   .go svg{width:20px;height:20px;color:#04060c}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
   .go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
-
   .emoji-tray{position:absolute;bottom:72px;right:70px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .emoji-tray.on{display:grid}
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
 
-  /* 粒子层 */
+  /* 斜杠命令菜单 */
+  .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
+    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  .slash-menu.on{display:block}
+  .slash-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:.12s}
+  .slash-item:hover,.slash-item.sel{background:rgba(40,230,216,.1)}
+  .slash-item .sc{font-family:inherit;font-weight:700;color:var(--cyan);font-size:13px;min-width:72px}
+  .slash-item .sd{font-size:11.5px;color:var(--sub)}
+
+  /* 长按互动环 */
+  .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+    padding:6px;display:none;gap:2px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
+  .act-ring.on{display:flex}
+  .act-ring button{background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
+    border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
+  .act-ring button .ai{font-size:18px}
+  .act-ring button:hover{background:rgba(255,255,255,.08)}
+
+  /* 粒子/共鸣 */
   #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
   .particle{position:absolute;font-size:26px;animation:rise 3.4s ease-out forwards;will-change:transform,opacity}
   @keyframes rise{0%{transform:translateY(0) scale(.5) rotate(0);opacity:0}
     12%{opacity:1;transform:translateY(-40px) scale(1.1)}
     100%{transform:translateY(-90vh) scale(.9) rotate(var(--spin));opacity:0}}
+  #resonance{position:fixed;inset:0;z-index:39;pointer-events:none;opacity:0;transition:opacity .3s}
+  #resonance.on{opacity:1}
+  .proj{position:fixed;left:100%;white-space:nowrap;z-index:41;font-size:clamp(20px,4vw,34px);font-weight:800;pointer-events:none;
+    color:var(--cyan);text-shadow:0 0 20px var(--cyan);animation:fly 8s linear forwards}
+  @keyframes fly{from{transform:translateX(0)}to{transform:translateX(calc(-100vw - 100%))}}
 
-  /* toast */
-  #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:60;
+  #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:90;
     background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;
-    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;max-width:90vw}
   #toast.on{transform:translateX(-50%) translateY(0)}
 
-  /* ============ 私密房区（大厅内）============ */
-  .priv-sec{width:min(760px,94vw);margin-top:6px}
-  .priv-divider{display:flex;align-items:center;text-align:center;color:var(--dim);font-size:11.5px;margin:8px 0 16px}
-  .priv-divider::before,.priv-divider::after{content:"";flex:1;height:1px;background:var(--line)}
-  .priv-divider span{padding:0 14px;white-space:nowrap}
-  .priv-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .priv-btn{padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
-    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
-  .priv-btn:hover{transform:translateY(-2px)}
-  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
-  .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:var(--glow-mag)}
-  .my-rooms{display:flex;flex-direction:column;gap:8px;margin-top:16px}
-  .rm{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;cursor:pointer;
-    background:var(--panel);border:1px solid var(--line);transition:.18s}
-  .rm:hover{border-color:var(--violet);transform:translateX(3px)}
-  .rm .rm-ic{font-size:22px}
-  .rm .rm-nm{flex:1;font-weight:700;font-size:14px}
-  .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
-  .rm .rm-arr{color:var(--dim)}
-
-  /* ============ 弹窗 ============ */
+  /* ============ 弹窗 & 抽屉 ============ */
   .modal-mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);
     display:none;align-items:center;justify-content:center;padding:20px}
   .modal-mask.on{display:flex}
-  .modal{width:min(400px,92vw);max-height:90dvh;overflow-y:auto;padding:30px 28px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
-  .modal-x{position:absolute;top:16px;right:18px;color:var(--dim);cursor:pointer;font-size:16px;transition:.15s}
+  .modal{width:min(400px,92vw);max-height:90dvh;overflow-y:auto;padding:28px 26px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
+  .modal-x{position:absolute;top:16px;right:18px;color:var(--dim);cursor:pointer;font-size:16px;transition:.15s;z-index:2}
   .modal-x:hover{color:var(--magenta)}
-  .modal h3{font-size:21px;font-weight:800;margin-bottom:8px;letter-spacing:.5px}
-  .modal-sub{font-size:12.5px;color:var(--sub);line-height:1.6;margin-bottom:22px}
-  .fld{display:block;margin-bottom:18px}
+  .modal h3{font-size:20px;font-weight:800;margin-bottom:8px;letter-spacing:.5px}
+  .modal-sub{font-size:12.5px;color:var(--sub);line-height:1.6;margin-bottom:20px}
+  .fld{display:block;margin-bottom:16px}
   .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
   .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
   .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .seg{display:flex;gap:8px;margin-bottom:16px}
+  .seg .opt{flex:1;padding:12px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.5);cursor:pointer;
+    text-align:center;transition:.15s}
+  .seg .opt.on{border-color:var(--cyan);background:rgba(40,230,216,.1)}
+  .seg .opt .ot{font-size:14px;font-weight:700;margin-bottom:3px}
+  .seg .opt .od{font-size:10.5px;color:var(--dim)}
   .emoji-pick{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
   .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
   .emoji-pick b:hover{background:rgba(255,255,255,.06)}
   .emoji-pick b.on{border-color:var(--cyan);background:rgba(40,230,216,.12)}
-  .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:22px;
+  .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:20px;
     background:rgba(40,230,216,.08);border:1px solid rgba(40,230,216,.3)}
   .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
   .code-copy{padding:8px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);
     font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
   .code-copy:hover{border-color:var(--cyan);color:var(--cyan)}
-  .modal-err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:12px}
+  .modal-err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:10px}
+
+  /* 抽屉(个人空间/房主设置) */
+  .drawer-mask{position:fixed;inset:0;z-index:82;background:rgba(4,6,12,.6);backdrop-filter:blur(3px);display:none}
+  .drawer-mask.on{display:block}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,90vw);background:var(--panel-solid);border-left:1px solid var(--line2);
+    z-index:83;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1.1);display:flex;flex-direction:column;
+    padding:max(20px,env(safe-area-inset-top)) 22px max(20px,env(safe-area-inset-bottom))}
+  .drawer.on{transform:translateX(0)}
+  .drawer-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-shrink:0}
+  .drawer-h h3{font-size:18px;font-weight:800}
+  .drawer-h .dx{cursor:pointer;color:var(--dim);font-size:18px}
+  .drawer-h .dx:hover{color:var(--magenta)}
+  .drawer-body{flex:1;overflow-y:auto}
+  .dsec{margin-bottom:22px}
+  .dsec .dl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  .dcard{background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .drow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;border-bottom:1px solid var(--line)}
+  .drow:last-child{border-bottom:none}
+  .drow .dk{color:var(--sub);min-width:70px}
+  .drow .dv{flex:1;color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis}
+  .dbtn{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line2);background:rgba(10,12,24,.5);color:var(--ink);
+    font-family:inherit;font-size:13px;cursor:pointer;transition:.15s;margin-top:8px}
+  .dbtn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .dbtn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
+  .mlist{display:flex;flex-direction:column;gap:6px}
+  .mitem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:rgba(10,12,24,.4)}
+  .mitem .mi-av{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
+  .mitem .mi-nm{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mitem .mi-role{font-size:9px;padding:2px 6px;border-radius:5px;background:rgba(255,184,77,.15);color:var(--amber)}
+  .mitem .mi-kick{font-size:11px;color:var(--dim);cursor:pointer;padding:2px 6px}
+  .mitem .mi-kick:hover{color:var(--magenta)}
 
   @media(max-width:600px){
     .title{font-size:30px}
-    /* 手机端聊天厅铺满：stage 去 padding 让 hall 真正贴边，hall 用 dvh 避开地址栏遮挡 */
     .stage:has(#hall.on){padding:0}
     #hall{width:100%;height:100vh;height:100dvh;border-radius:0;border:none}
-    /* 顶栏/输入区吃安全区，避免刘海和底部横条遮挡 */
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -247,9 +315,8 @@
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .enter-card{padding:32px 22px}
-    .modal{padding:26px 20px}
+    .modal{padding:24px 20px}
   }
-  /* 不支持 :has() 的旧浏览器兜底：手机端 stage 统一收窄 padding */
   @supports not (selector(:has(*))){
     @media(max-width:600px){ .stage{padding:0} }
   }
@@ -259,6 +326,7 @@
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
 <div id="particles"></div>
+<div id="resonance"></div>
 <div id="toast"></div>
 
 <div class="stage">
@@ -284,20 +352,21 @@
   <!-- ===== 场景2：大厅 ===== -->
   <div class="scene" id="lobby">
     <div class="lobby-head">
-      <h2>选择一个频道</h2>
-      <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 数字代表此刻真实在线人数</p>
+      <h2>回声厅</h2>
+      <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
+      <div class="me-btn" id="meBtn" title="个人空间">🦊</div>
     </div>
+    <div class="sec-label">官方频道</div>
     <div class="channels" id="channels"></div>
-
-    <!-- 私密房区 -->
-    <div class="priv-sec">
-      <div class="priv-divider"><span>🔒 私密房 · 仅限邀请码进入 · 消息持久保存</span></div>
-      <div class="priv-actions">
-        <button class="priv-btn create" id="createRoomBtn">＋ 创建私密房</button>
-        <button class="priv-btn join" id="joinRoomBtn">🔑 用邀请码加入</button>
-      </div>
-      <div class="my-rooms" id="myRooms"></div>
+    <div class="sec-label">公开房间</div>
+    <div class="my-rooms" id="publicRooms"></div>
+    <div class="empty-hint" id="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
+    <div class="sec-label">私密房 · 仅邀请码进入</div>
+    <div class="priv-actions">
+      <button class="priv-btn create" id="createRoomBtn">＋ 创建房间</button>
+      <button class="priv-btn join" id="joinRoomBtn">🔑 邀请码加入</button>
     </div>
+    <div class="my-rooms" id="myRooms"></div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -308,45 +377,54 @@
         <h3 id="hallName">—</h3>
         <div class="cnt" id="hallCnt">连接中…</div>
       </div>
+      <div class="gear" id="gearBtn">⚙</div>
       <div class="conn" id="conn"><span class="led"></span><span id="connTxt">连接中</span></div>
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
     <div class="typing-bar" id="typingBar"><span id="typingTxt"></span><span class="d"><i></i><i></i><i></i></span></div>
+    <div class="reply-preview" id="replyPreview">
+      <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
+    </div>
     <div class="composer">
       <div class="emoji-btn" id="emojiBtn">😊</div>
       <div class="cin-wrap">
-        <textarea class="cin" id="cin" placeholder="说点什么…" rows="1"></textarea>
+        <textarea class="cin" id="cin" placeholder="说点什么… 试试打个 /" rows="1"></textarea>
       </div>
       <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <div class="emoji-tray" id="emojiTray"></div>
+      <div class="slash-menu" id="slashMenu"></div>
     </div>
-    <div class="emoji-tray" id="emojiTray"></div>
   </div>
 
 </div>
 
-<!-- ===== 弹窗：建房 / 入房 ===== -->
+<!-- 长按互动环 -->
+<div class="act-ring" id="actRing"></div>
+
+<!-- ===== 弹窗：建房 / 入房 / 绑定 ===== -->
 <div class="modal-mask" id="modalMask">
   <div class="glass modal" id="modal">
     <div class="modal-x" id="modalX">✕</div>
-    <!-- 建房 -->
     <div class="modal-body" id="mCreate">
-      <h3>创建私密房</h3>
-      <p class="modal-sub">建好后会生成一个邀请码，把码发给谁，谁就能进。</p>
+      <h3>创建房间</h3>
+      <p class="modal-sub">公开房进大厅列表谁都能进；私密房生成邀请码，仅受邀者可入。</p>
+      <div class="seg" id="kindSeg">
+        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od">大厅可见</div></div>
+        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od">邀请码进</div></div>
+      </div>
       <label class="fld"><span>房间名</span>
-        <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会 / 3班摸鱼群"></label>
+        <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会"></label>
       <label class="fld"><span>图标</span>
         <div class="emoji-pick" id="roomEmojiPick"></div></label>
       <button class="btn-primary" id="doCreateBtn">生 成 房 间</button>
     </div>
-    <!-- 建房成功：展示邀请码 -->
     <div class="modal-body" id="mCreated" style="display:none">
       <h3>房间已创建 🎉</h3>
-      <p class="modal-sub">把这个邀请码发给朋友，他们就能进来：</p>
-      <div class="code-box"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
+      <p class="modal-sub" id="createdSub">把邀请码发给朋友，他们就能进来：</p>
+      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
       <button class="btn-primary" id="enterCreatedBtn">进 入 房 间</button>
     </div>
-    <!-- 入房 -->
     <div class="modal-body" id="mJoin" style="display:none">
       <h3>用邀请码加入</h3>
       <p class="modal-sub">输入朋友给你的邀请码：</p>
@@ -355,613 +433,714 @@
       <div class="modal-err" id="joinErr"></div>
       <button class="btn-primary" id="doJoinBtn">进 入 房 间</button>
     </div>
+    <div class="modal-body" id="mBind" style="display:none">
+      <h3>绑定邮箱</h3>
+      <p class="modal-sub">绑定后可跨设备找回身份与聊天记录。我们会发一封登录链接到你的邮箱。</p>
+      <label class="fld"><span>邮箱</span>
+        <input id="bindEmail" type="email" placeholder="you@example.com"></label>
+      <div class="modal-err" id="bindErr"></div>
+      <button class="btn-primary" id="doBindBtn">发 送 登 录 链 接</button>
+    </div>
   </div>
 </div>
 
-<!-- MQTT over WebSocket 客户端（公共频道用）-->
-<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
-<!-- Supabase 客户端（私密房用：落库 + RLS + Realtime）-->
+<!-- ===== 抽屉：个人空间 ===== -->
+<div class="drawer-mask" id="meMask"></div>
+<div class="drawer" id="meDrawer">
+  <div class="drawer-h"><h3>个人空间</h3><span class="dx" id="meDx">✕</span></div>
+  <div class="drawer-body" id="meBody"></div>
+</div>
+
+<!-- ===== 抽屉：房主设置 ===== -->
+<div class="drawer-mask" id="gearMask"></div>
+<div class="drawer" id="gearDrawer">
+  <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx">✕</span></div>
+  <div class="drawer-body" id="gearBody"></div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ============================================================
-//  回声厅 Echo Hall
-//  · 公共频道：MQTT over WebSocket，不落库，刷新即散
-//  · 私密房：Supabase(匿名登录 + RLS 行级隔离 + Realtime)，成员制、消息持久化
+//  回声厅 Echo Hall 2.0 — 全站 Supabase(匿名登录 + RLS + Realtime + Presence)
 // ============================================================
-const NS = 'echohall/v1';                       // 命名空间前缀（隔离公共 broker 上的流量）
-const BROKER = 'wss://broker.emqx.io:8084/mqtt'; // EMQX 公共 broker
-
-// ---- Supabase 私密房后端（vc 库，eh_ 前缀表，与其他项目隔离）----
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
 const sb = window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true } });
-// 匿名登录：每个浏览器自动拿一个持久的匿名身份（满足 RLS 的 auth.uid()，又不打断"进来就聊"）
-let sbReady = (async ()=>{
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session) return session.user.id;
-  const { data, error } = await sb.auth.signInAnonymously();
-  if(error){ console.warn('anon signin failed', error); return null; }
-  return data.user.id;
-})();
-
-let mode = 'mqtt';   // 当前聊天厅模式：mqtt(公共) | sb(私密)
 
 const $ = s => document.querySelector(s);
 const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const rand = arr => arr[Math.floor(Math.random()*arr.length)];
-const uid = () => Math.random().toString(36).slice(2,10);
 
-// ---- 身份生成 ----
+// ---- 身份 ----
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
-const FACE= ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐘','🦇','🐬','🐈‍⬛','🦋','🦭'];
 const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
+const LS_ID = 'eh_identity_v2';
 
-let me = null;
-function rollIdentity(){
-  const emo = rand(EMO);
-  me = {
-    id: uid(),
-    name: rand(ADJ)+rand(ANI),
-    emoji: emo,
-    color: rand(COLORS),
-  };
-  paintIdentity();
+let me = null;      // {id(uid), name, emoji, color}
+let myUid = null;
+
+function loadOrRollIdentity(){
+  try{ const s=localStorage.getItem(LS_ID); if(s){ me=JSON.parse(s); return; } }catch(e){}
+  rollIdentity();
 }
+function rollIdentity(){
+  me = { id: me?.id||null, name: rand(ADJ)+rand(ANI), emoji: rand(EMO), color: rand(COLORS) };
+  saveIdentity(); paintIdentity();
+}
+function saveIdentity(){ try{ localStorage.setItem(LS_ID, JSON.stringify(me)); }catch(e){} }
 function paintIdentity(){
-  const av = $('#idAv');
-  av.textContent = me.emoji;
-  av.style.background = me.color+'22';
-  av.style.boxShadow = `0 0 24px ${me.color}55, inset 0 0 0 1.5px ${me.color}`;
-  av.style.color = me.color;
-  av.style.transform = 'scale(1.12) rotate(-6deg)';
-  setTimeout(()=>av.style.transform='scale(1) rotate(0)', 60);
-  $('#idName').textContent = me.name;
-  $('#idName').style.color = me.color;
+  const av=$('#idAv'); if(!av) return;
+  av.textContent=me.emoji; av.style.background=me.color+'22';
+  av.style.boxShadow=`0 0 24px ${me.color}55, inset 0 0 0 1.5px ${me.color}`; av.style.color=me.color;
+  av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
+  $('#idName').textContent=me.name; $('#idName').style.color=me.color;
+  const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+}
+
+// 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
+async function ensureAuth(){
+  const { data:{ session } } = await sb.auth.getSession();
+  let uid = session?.user?.id;
+  if(!uid){
+    const { data, error } = await sb.auth.signInAnonymously();
+    if(error){ console.warn('anon signin', error); toast('身份初始化失败，刷新重试'); return null; }
+    uid = data.user.id;
+  }
+  myUid = uid; me.id = uid; saveIdentity();
+  // upsert 到 eh_users
+  const isAnon = !session?.user?.email;
+  await sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:isAnon, last_seen:new Date().toISOString() });
+  return uid;
 }
 
 // ---- 打字机副标题 ----
-const SUBTEXT = '陌生人的实时聊天空间 · 进来 · 说话 · 消散';
-let subI = 0;
+const SUBTEXT = '陌生人的实时聊天空间 · 进来 · 说话 · 留存';
+let subI=0;
 function typeSub(){
-  const el = $('#subLine');
-  if(subI <= SUBTEXT.length){
-    el.innerHTML = esc(SUBTEXT.slice(0,subI)) + '<span class="cursor">&nbsp;</span>';
-    subI++;
-    setTimeout(typeSub, 55);
-  } else {
-    el.innerHTML = esc(SUBTEXT) + '<span class="cursor">&nbsp;</span>';
-  }
+  const el=$('#subLine'); if(!el) return;
+  if(subI<=SUBTEXT.length){ el.innerHTML=esc(SUBTEXT.slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
+  else el.innerHTML=esc(SUBTEXT)+'<span class="cursor">&nbsp;</span>';
 }
-
-// ---- 频道定义 ----
-const CHANNELS = [
-  {id:'plaza',  name:'闲聊广场', icon:'🌐', c:'#28E6D8', desc:'什么都能聊，此刻最热闹的地方'},
-  {id:'night',  name:'深夜电台', icon:'🌙', c:'#8B5CFF', desc:'睡不着的人，在这里说给彼此听'},
-  {id:'geek',   name:'技术黑话', icon:'⚡', c:'#FFB84D', desc:'代码、脑洞、赛博未来'},
-  {id:'void',   name:'虚空回音', icon:'🕳️', c:'#FF3CAC', desc:'对着虚空喊话，看谁会回应'},
-];
 
 // ============ 场景切换 ============
-function goScene(id){
-  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on'));
-  $('#'+id).classList.add('on');
+function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); }
+
+// ============ 全局状态 ============
+let curRoom = null;        // {id,name,emoji,kind,topic,role}
+let msgChan = null;        // Realtime postgres_changes 频道
+let presChan = null;       // Realtime presence 频道
+let oldestId = null;       // 已加载最早消息 id(用于加载更多)
+let replyTo = null;        // 正在引用的消息 {id,name,text}
+let echoState = {};        // message_id -> {count, mine}
+const HISTORY_PAGE = 60;
+
+// ============ 大厅渲染 ============
+const OFFICIAL_FALLBACK_C = {'闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC'};
+async function renderLobby(){
+  $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color;
+  await Promise.all([renderOfficial(), renderPublic(), renderMyRooms()]);
+}
+async function renderOfficial(){
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
+  const box=$('#channels');
+  box.innerHTML=(data||[]).map(r=>{
+    const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
+    return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${r.emoji}" data-kind="official" style="--ch-c:${c}">
+      <div class="icon">${r.emoji}</div><h3>${esc(r.name)}</h3>
+      <div class="desc">${esc(r.topic||'')}</div>
+      <div class="live"><span class="pulse"></span><span>进入畅聊</span></div></div>`;
+  }).join('');
+  bindRoomCards(box);
+}
+async function renderPublic(){
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
+  const box=$('#publicRooms'), empty=$('#publicEmpty');
+  if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${r.emoji}" data-kind="public" style="--ch-c:#4DE38A">
+    <div class="tagk">公开</div><div class="icon">${r.emoji}</div><h3>${esc(r.name)}</h3>
+    <div class="desc">${esc(r.topic||'')}</div><div class="live"><span class="pulse"></span><span>进入</span></div></div>`).join('');
+  // publicRooms 用 channels 的卡片样式：改成 grid
+  box.style.display='grid'; box.style.gridTemplateColumns='repeat(auto-fit,minmax(220px,1fr))'; box.style.gap='14px';
+  bindRoomCards(box);
+}
+async function renderMyRooms(){
+  if(!myUid){ $('#myRooms').innerHTML=''; return; }
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
+  const box=$('#myRooms');
+  if(!data || !data.length){ box.innerHTML=''; return; }
+  box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${r.emoji}" data-kind="private">
+    <span class="rm-ic">${r.emoji}</span><span class="rm-nm">${esc(r.name)}</span>
+    ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
+    <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
+  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
+}
+function bindRoomCards(box){
+  box.querySelectorAll('.ch').forEach(el=>el.onclick=()=>enterRoom({
+    id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind
+  }));
 }
 
-// ============ MQTT 连接管理 ============
-let client = null;
-let curCh = null;
-let presence = {};       // id -> {name,emoji,color,ts}
-let presenceTimer = null;
-let heartbeat = null;
-let typingUsers = {};     // id -> timeout
-let sentTyping = 0;
-
-function topic(ch, kind){ return `${NS}/${ch}/${kind}`; }
-
-function connect(onReady){
-  const cid = 'eh_'+me.id+'_'+uid();
-  client = mqtt.connect(BROKER, {
-    clientId: cid, clean:true, connectTimeout:8000, reconnectPeriod:2000,
-    keepalive:30,
-  });
-  client.on('connect', ()=>{ setConn(true); if(onReady){onReady();onReady=null;} });
-  client.on('reconnect', ()=>setConn(false,'重连中'));
-  client.on('offline', ()=>setConn(false,'离线'));
-  client.on('error', e=>{ console.warn('mqtt error',e); setConn(false,'连接错误'); });
-  client.on('message', onMessage);
-}
-function setConn(live, txt){
-  const el=$('#conn');
-  el.classList.toggle('live', live);
-  $('#connTxt').textContent = live ? '实时在线' : (txt||'连接中');
-}
-
-// 进入频道：订阅 msg/typing/presence
-function joinChannel(ch){
-  curCh = ch;
-  presence = {}; typingUsers = {};
-  $('#stream').innerHTML='';
-  $('#hallName').innerHTML = `${ch.icon} ${esc(ch.name)}`;
-  renderPresence();
-  goScene('hall');
-
-  const doJoin = ()=>{
-    client.subscribe([topic(ch.id,'msg'), topic(ch.id,'typing'), topic(ch.id,'presence')], {qos:0});
-    // 宣告自己上线（retain=false，靠心跳维持）
-    announce('join');
-    startHeartbeat();
-    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(ch.name)}」`);
-  };
-  if(client && client.connected) doJoin();
-  else connect(doJoin);
-}
-
-// presence：定期广播自己在线 + 清理超时的人
-function announce(kind){
-  if(!client||!client.connected) return;
-  client.publish(topic(curCh.id,'presence'), JSON.stringify({
-    kind, id:me.id, name:me.name, emoji:me.emoji, color:me.color, ts:Date.now()
-  }), {qos:0});
-}
-function startHeartbeat(){
-  clearInterval(heartbeat);
-  presence[me.id] = {...me, ts:Date.now(), self:true};
-  renderPresence();
-  heartbeat = setInterval(()=>{
-    announce('ping');
-    // 清理 12s 未心跳的人
-    const now=Date.now(); let changed=false;
-    for(const id in presence){
-      if(id!==me.id && now-presence[id].ts>12000){ delete presence[id]; changed=true; }
-    }
-    if(changed) renderPresence();
-  }, 4000);
-}
-function leaveChannel(){
-  if(client && client.connected && curCh){
-    announce('leave');
-    client.unsubscribe([topic(curCh.id,'msg'), topic(curCh.id,'typing'), topic(curCh.id,'presence')]);
-  }
-  clearInterval(heartbeat); clearInterval(presenceTimer);
-  curCh=null;
-}
-
-// ============ 收消息 ============
-function onMessage(t, payload){
-  let d; try{ d=JSON.parse(payload.toString()); }catch(e){ return; }
-  const kind = t.split('/').pop();
-  if(kind==='presence') return onPresence(d);
-  if(kind==='typing')   return onTyping(d);
-  if(kind==='msg')      return onChatMsg(d);
-}
-function onPresence(d){
-  if(d.id===me.id) return;
-  if(d.kind==='leave'){
-    if(presence[d.id]){ delete presence[d.id]; renderPresence();
-      if(d.name) sysMsg(`<b>${esc(d.name)}</b> 离开了`); }
-    return;
-  }
-  const isNew = !presence[d.id];
-  presence[d.id] = {id:d.id,name:d.name,emoji:d.emoji,color:d.color,ts:Date.now()};
-  if(isNew){
-    renderPresence();
-    if(d.kind==='join'){
-      sysMsg(`<b>${esc(d.name)}</b> 进入了回声厅`);
-      announce('ping'); // 让新人立刻看到我
-    }
-  } else { presence[d.id].ts=Date.now(); }
-}
-function onTyping(d){
-  if(d.id===me.id) return;
-  clearTimeout(typingUsers[d.id]);
-  typingUsers[d.id] = setTimeout(()=>{ delete typingUsers[d.id]; renderTyping(); }, 2600);
-  typingUsers['_name_'+d.id] = d.name;
-  renderTyping();
-}
-function onChatMsg(d){
-  // EMQX broker 会把自己发的消息回推给自己；本地发送时已乐观上屏，故跳过自己的回环，避免重复两份。
-  if(d.id===me.id) return;
-  if(d.type==='echo'){ applyEcho(d.mid, d.id); return; }
-  addMsg(d, false);
-  if(d.emojiOnly) burst(d.text);
-}
-
-// ============ 渲染在线光墙 ============
-function renderPresence(){
-  const box=$('#presence');
-  const list = Object.values(presence).sort((a,b)=> a.self?-1:b.self?1:0);
-  box.innerHTML = list.map(p=>`
-    <div class="pav ${p.self?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
-      ${p.emoji}<span class="ring"></span>
-    </div>`).join('');
-  const n = list.length;
-  $('#hallCnt').textContent = `${n} 人在线`;
-}
-
-// ============ 渲染消息 ============
-let msgSeq = 0;
-function fmtNow(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-function addMsg(d, isMe){
-  const stream=$('#stream');
-  if(d.act){  // /me 动作
-    const el=document.createElement('div'); el.className='actmsg';
-    el.innerHTML = `✦ <b style="color:${d.color}">${esc(d.name)}</b> ${esc(d.text)}`;
-    stream.appendChild(el); scrollStream(); return;
-  }
-  const el=document.createElement('div');
-  el.className='msg'+(isMe?' me':'');
-  el.dataset.mid = d.mid;
-  el.innerHTML = `
-    <div class="av" style="background:${d.color}22;color:${d.color};box-shadow:inset 0 0 0 1.5px ${d.color}">${d.emoji}</div>
-    <div class="body">
-      <div class="meta"><span class="nm" style="color:${d.color}">${esc(d.name)}</span><span class="tm">${fmtNow()}</span></div>
-      <div class="txt">${esc(d.text)}<span class="echo" data-mid="${d.mid}">🔥 <span class="ec">0</span></span></div>
-    </div>`;
-  stream.appendChild(el);
-  el.querySelector('.echo').onclick = ()=>sendEcho(d.mid);
-  scrollStream();
-}
-function sysMsg(html){
-  const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html;
-  $('#stream').appendChild(el); scrollStream();
-}
-function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
-
-// 回声（点赞）
-const echoCount = {};
-function sendEcho(mid){
-  if(mode==='sb'){ applyEcho(mid, sbUid); return; } // 私密房：本地回声（不广播，暂不落库）
-  if(!client || !client.connected) return;
-  client.publish(topic(curCh.id,'msg'), JSON.stringify({type:'echo', mid, id:me.id}), {qos:0});
-  applyEcho(mid, me.id);
-}
-function applyEcho(mid, who){
-  echoCount[mid] = (echoCount[mid]||0)+1;
-  const el = document.querySelector(`.msg[data-mid="${mid}"] .echo`);
-  if(el){ el.classList.add('has'); el.querySelector('.ec').textContent=echoCount[mid];
-    el.style.transform='scale(1.3)'; setTimeout(()=>el.style.transform='',150); }
-  if(who!==me.id) burst('🔥',6);
-}
-
-// ============ 正在输入 ============
-function renderTyping(){
-  const names = Object.keys(typingUsers).filter(k=>!k.startsWith('_name_')).map(id=>typingUsers['_name_'+id]).filter(Boolean);
-  const bar=$('#typingBar');
-  if(names.length){
-    $('#typingTxt').textContent = names.length===1 ? `${names[0]} 正在输入` : `${names.length} 人正在输入`;
-    bar.classList.add('on');
-  } else bar.classList.remove('on');
-}
-
-// ============ 发送 ============
-function send(){
-  if(mode==='sb') return sbSend();
-  const inp=$('#cin'); let text=inp.value.trim();
-  if(!text || !client || !client.connected) return;
-  let act=false;
-  if(text.startsWith('/me ')){ act=true; text=text.slice(4); }
-  const emojiOnly = /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(text) && text.length<=12;
-  const mid = me.id+'_'+(msgSeq++);
-  const payload = {mid, id:me.id, name:me.name, emoji:me.emoji, color:me.color, text, act, emojiOnly};
-  client.publish(topic(curCh.id,'msg'), JSON.stringify(payload), {qos:0});
-  addMsg(payload, true);
-  if(emojiOnly) burst(text);
-  inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true;
-}
-
-// ============================================================
-//  私密房（Supabase）
-// ============================================================
-let curRoom = null;      // {id,name,emoji} 当前私密房
-let sbUid = null;        // 匿名登录的 user id
-let roomChan = null;     // Realtime channel
-
-// 大厅：拉我加入过的房间列表
-async function loadMyRooms(){
-  const box=$('#myRooms'); if(!box) return;
-  sbUid = await sbReady;
-  if(!sbUid){ box.innerHTML=''; return; }
-  // 我是成员的房（RLS 只会返回我所在的房）
-  const { data, error } = await sb.from('eh_rooms').select('id,name,emoji,invite_code').order('created_at',{ascending:false});
-  if(error || !data || !data.length){ box.innerHTML=''; return; }
-  box.innerHTML = data.map(r=>`
-    <div class="rm" data-rid="${r.id}" data-rnm="${esc(r.name)}" data-rem="${r.emoji||'🔒'}">
-      <span class="rm-ic">${r.emoji||'🔒'}</span>
-      <span class="rm-nm">${esc(r.name)}</span>
-      <span class="rm-code">${r.invite_code}</span>
-      <span class="rm-arr">→</span>
-    </div>`).join('');
-  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>{
-    enterRoom({id:el.dataset.rid, name:el.dataset.rnm, emoji:el.dataset.rem});
-  });
-}
-
-// 生成 6 位邀请码
-function genCode(){
-  const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let s=''; for(let i=0;i<6;i++) s+=CH[Math.floor(Math.random()*CH.length)];
-  return s;
-}
-
-// 建房
-async function createRoom(name, emoji){
-  sbUid = await sbReady;
-  if(!sbUid){ toast('身份初始化失败，刷新重试'); return null; }
-  // 邀请码唯一，冲突则重试几次
-  for(let tries=0; tries<5; tries++){
-    const code = genCode();
-    const { data, error } = await sb.from('eh_rooms')
-      .insert({ name, emoji, invite_code:code, owner:sbUid })
-      .select('id,name,emoji,invite_code').single();
-    if(!error && data){
-      // 房主自动入成员表
-      await sb.from('eh_members').insert({ room_id:data.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color });
-      return data;
-    }
-    if(error && !/duplicate|unique/i.test(error.message||'')){ console.warn('createRoom',error); toast('建房失败'); return null; }
-  }
-  toast('邀请码冲突，请重试'); return null;
-}
-
-// 凭码入房
-async function joinRoomByCode(code){
-  sbUid = await sbReady;
-  if(!sbUid) return {err:'身份初始化失败，刷新重试'};
-  // 用 SECURITY DEFINER 函数按码查房（非成员也能查到基本信息）
-  const { data:rooms, error } = await sb.rpc('eh_find_room_by_code', { code });
-  if(error){ console.warn(error); return {err:'查询失败'}; }
-  const room = Array.isArray(rooms)?rooms[0]:rooms;
-  if(!room){ return {err:'邀请码无效或房间不存在'}; }
-  // 加入成员表（重复加入靠主键冲突忽略）
-  const { error:mErr } = await sb.from('eh_members')
-    .insert({ room_id:room.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color });
-  if(mErr && !/duplicate|unique/i.test(mErr.message||'')){ console.warn(mErr); return {err:'加入失败'}; }
-  return { room };
-}
-
-// 进入私密房：拉历史 + 订阅 Realtime
+// ============ 进入房间 ============
 async function enterRoom(room){
-  curRoom = room; mode='sb';
-  stopLobbyProbe(); if(client && client.connected) leaveChannel();
-  $('#stream').innerHTML=''; presence={}; typingUsers={};
-  $('#hallName').innerHTML = `${room.emoji||'🔒'} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· 私密</span>`;
-  $('#hallCnt').textContent='加载中…';
-  renderPresence();
-  goScene('hall');
+  curRoom = room;
+  $('#stream').innerHTML=''; oldestId=null; echoState={}; clearReply();
+  const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
+  $('#hallName').innerHTML=`${room.emoji} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  $('#hallCnt').textContent='连接中…';
+  $('#presence').innerHTML='';
+  goScene('hall'); setConn(false,'连接中');
+
+  await ensureAuth();
+  // 确保成为成员(官方/公开：直接加入；私密：调用处已保证)
+  await joinAsMember(room);
+  // 判定房主
+  const { data:mem } = await sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle();
+  room.role = mem?.role || 'member';
+  $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
+
+  await loadHistory(true);
+  subscribeMessages(room.id);
+  await setupPresence(room);
   setConn(true);
+  sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+}
 
-  sbUid = await sbReady;
-  // 拉历史消息
-  const { data:hist } = await sb.from('eh_messages')
-    .select('*').eq('room_id', room.id).order('id',{ascending:true}).limit(500);
-  (hist||[]).forEach(m=>{
-    addMsg({mid:'db_'+m.id, id:m.user_id, name:m.name, emoji:m.emoji, color:m.color, text:m.text, act:m.kind==='act'}, m.user_id===sbUid);
+async function joinAsMember(room){
+  // upsert 成员(重复靠主键忽略)
+  const { error } = await sb.from('eh_members').insert({
+    room_id:room.id, user_id:myUid, role:'member', name:me.name, emoji:me.emoji, color:me.color
   });
-  // 成员数
-  const { count } = await sb.from('eh_members').select('*',{count:'exact',head:true}).eq('room_id', room.id);
-  $('#hallCnt').textContent = `${count||1} 名成员`;
+  if(error && !/duplicate|unique/i.test(error.message||'')) console.warn('join', error);
+}
 
-  // 订阅新消息
-  if(roomChan){ sb.removeChannel(roomChan); roomChan=null; }
-  roomChan = sb.channel('room:'+room.id)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'eh_messages', filter:'room_id=eq.'+room.id },
-      payload=>{
-        const m=payload.new;
-        if(m.user_id===sbUid) return; // 自己发的已本地上屏
-        addMsg({mid:'db_'+m.id, id:m.user_id, name:m.name, emoji:m.emoji, color:m.color, text:m.text, act:m.kind==='act'}, false);
-        const eo=/^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(m.text)&&m.text.length<=12;
-        if(eo) burst(m.text);
-      })
+// ---- 历史消息(分页) ----
+async function loadHistory(first){
+  let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
+  if(oldestId) q = q.lt('id', oldestId);
+  const { data } = await q;
+  const rows = (data||[]).slice().reverse();
+  if(rows.length){ oldestId = rows[0].id; }
+  // 加载更多按钮
+  const stream=$('#stream');
+  let moreBtn=$('#loadMoreBtn');
+  const frag=document.createDocumentFragment();
+  rows.forEach(m=>{ const el=buildMsgEl(m); if(el) frag.appendChild(el); });
+  if(first){
+    stream.appendChild(frag); scrollStream();
+    // 拉取这些消息的 echo 计数
+    fetchEchoes(rows.map(m=>m.id));
+    if(rows.length===HISTORY_PAGE) addLoadMore();
+  } else {
+    // 插到顶部，保持滚动位置
+    const prevH=stream.scrollHeight;
+    if(moreBtn) moreBtn.remove();
+    stream.insertBefore(frag, stream.firstChild);
+    if(rows.length===HISTORY_PAGE) addLoadMore(true);
+    stream.scrollTop = stream.scrollHeight - prevH;
+    fetchEchoes(rows.map(m=>m.id));
+  }
+}
+function addLoadMore(top){
+  const stream=$('#stream');
+  const b=document.createElement('button'); b.className='load-more'; b.id='loadMoreBtn'; b.textContent='↑ 加载更早的消息';
+  b.onclick=()=>loadHistory(false);
+  stream.insertBefore(b, stream.firstChild);
+}
+
+// ---- Realtime 订阅新消息 + echo ----
+function subscribeMessages(rid){
+  if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
+  msgChan = sb.channel('room-msg:'+rid)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
+      const m=p.new;
+      if(m.user_id===myUid) return; // 自己的已乐观上屏
+      // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
+      if(m.kind==='whisper' && m.to_user!==myUid) return;
+      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
+      maybeResonate(m);
+      if(isEmojiOnly(m.text)) burst(m.text);
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
+      applyEchoRealtime(p.new.message_id, p.new.user_id);
+    })
     .subscribe();
 }
 
-// 私密房发消息
-async function sbSend(){
-  const inp=$('#cin'); let text=inp.value.trim();
-  if(!text || !curRoom) return;
-  let act=false;
-  if(text.startsWith('/me ')){ act=true; text=text.slice(4); }
-  const emojiOnly = /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(text) && text.length<=12;
-  // 本地先上屏（乐观）
-  addMsg({mid:'local_'+(msgSeq++), id:sbUid, name:me.name, emoji:me.emoji, color:me.color, text, act}, true);
-  if(emojiOnly) burst(text);
-  inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true;
-  const { error } = await sb.from('eh_messages').insert({
-    room_id:curRoom.id, user_id:sbUid, name:me.name, emoji:me.emoji, color:me.color, text, kind:act?'act':'msg'
-  });
-  if(error){ console.warn('sbSend',error); toast('发送失败'); }
+// ---- Presence(在线光墙 + 正在输入) ----
+async function setupPresence(room){
+  if(presChan){ await sb.removeChannel(presChan); presChan=null; }
+  presChan = sb.channel('room-pres:'+room.id, { config:{ presence:{ key: myUid } } });
+  presChan.on('presence',{event:'sync'},()=>renderPresence())
+    .on('broadcast',{event:'typing'}, ({payload})=>onTyping(payload))
+    .subscribe(async status=>{
+      if(status==='SUBSCRIBED'){
+        await presChan.track({ id:myUid, name:me.name, emoji:me.emoji, color:me.color });
+        setTimeout(renderPresence, 300); // 保底：track 后主动渲染一次，避免 hallCnt 卡在"连接中"
+      }
+    });
+}
+function renderPresence(){
+  if(!presChan) return;
+  const state=presChan.presenceState();
+  const users=[]; const seen=new Set();
+  Object.values(state).forEach(arr=>arr.forEach(u=>{ if(!seen.has(u.id)){ seen.add(u.id); users.push(u); } }));
+  users.sort((a,b)=> a.id===myUid?-1:b.id===myUid?1:0);
+  $('#presence').innerHTML=users.map(p=>`
+    <div class="pav ${p.id===myUid?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
+      ${p.emoji}<span class="ring"></span></div>`).join('');
+  const kindLabel = curRoom.kind==='private'?'名成员在线':'人在线';
+  $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
+}
+let typingUsers={};
+function onTyping(d){
+  if(!d || d.id===myUid) return;
+  clearTimeout(typingUsers['_t_'+d.id]);
+  typingUsers[d.id]=d.name;
+  typingUsers['_t_'+d.id]=setTimeout(()=>{ delete typingUsers[d.id]; renderTyping(); },2600);
+  renderTyping();
+}
+function renderTyping(){
+  const names=Object.keys(typingUsers).filter(k=>!k.startsWith('_t_')).map(id=>typingUsers[id]);
+  const bar=$('#typingBar');
+  if(names.length){ $('#typingTxt').textContent=names.length===1?`${names[0]} 正在输入`:`${names.length} 人正在输入`; bar.classList.add('on'); }
+  else bar.classList.remove('on');
 }
 
-function leaveRoom(){
-  if(roomChan){ sb.removeChannel(roomChan); roomChan=null; }
-  curRoom=null; mode='mqtt';
+function setConn(live,txt){ const el=$('#conn'); el.classList.toggle('live',live); $('#connTxt').textContent=live?'实时在线':(txt||'连接中'); }
+
+// ============ 消息渲染 ============
+const isEmojiOnly = t => /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(t||'') && (t||'').length<=12;
+function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+function buildMsgEl(m){
+  const isMe = m.user_id===myUid;
+  if(m.kind==='act'){
+    const el=document.createElement('div'); el.className='actmsg';
+    el.innerHTML=`✦ <b style="color:${m.color||'#8B5CFF'}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
+  }
+  const el=document.createElement('div');
+  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
+  el.dataset.mid=m.id;
+  el.dataset.text=m.text; el.dataset.name=m.name;
+  let replyHtml='';
+  if(m.reply_to && m._replyRef){ replyHtml=`<div class="reply-ref">↳ ${esc(m._replyRef)}</div>`; }
+  el.innerHTML=`
+    <div class="av" style="background:${m.color}22;color:${m.color};box-shadow:inset 0 0 0 1.5px ${m.color}">${m.emoji||'👤'}</div>
+    <div class="body">
+      <div class="meta"><span class="nm" style="color:${m.color}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
+      ${replyHtml}
+      <div class="txt">${esc(m.text)}<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span></div>
+    </div>`;
+  const txtEl=el.querySelector('.txt');
+  const echoEl=el.querySelector('.echo');
+  if(echoState[m.id]?.count){ echoEl.classList.add('has'); }
+  echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); };
+  // 长按/右键 → 互动环
+  attachLongPress(txtEl, m);
+  return el;
+}
+function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
+function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
+
+// ============ 发送 ============
+async function send(){
+  const inp=$('#cin'); let text=inp.value.trim();
+  if(!text || !curRoom) return;
+  // 斜杠命令
+  if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
+  let kind='msg';
+  if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind, reply_to: replyTo?.id||null };
+  // 乐观上屏
+  const optimistic={...payload, id:'local_'+Date.now(), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
+  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+  if(isEmojiOnly(text)) burst(text);
+  const rt=replyTo; resetInput(); clearReply();
+  const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
+  if(error){ console.warn('send',error); toast('发送失败'); }
+  else if(data){ el && (el.dataset.mid=data.id); }
+}
+function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true; hideSlash(); }
+
+// ============ echo(🔥) 落库 ============
+async function toggleEcho(mid){
+  if(String(mid).startsWith('local_')) return;
+  const st=echoState[mid]||{count:0,mine:false};
+  if(st.mine){
+    st.count=Math.max(0,st.count-1); st.mine=false; echoState[mid]=st; paintEcho(mid);
+    await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid);
+  } else {
+    st.count++; st.mine=true; echoState[mid]=st; paintEcho(mid); burst('🔥',6);
+    await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid});
+  }
+}
+function applyEchoRealtime(mid, who){
+  if(who===myUid) return;
+  const st=echoState[mid]||{count:0,mine:false}; st.count++; echoState[mid]=st; paintEcho(mid);
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst('🔥',4);
+}
+function paintEcho(mid){
+  const echoEl=document.querySelector(`.echo[data-mid="${mid}"]`); if(!echoEl) return;
+  const st=echoState[mid]||{count:0}; echoEl.querySelector('.ec').textContent=st.count;
+  echoEl.classList.toggle('has', st.count>0);
+  echoEl.style.transform='scale(1.3)'; setTimeout(()=>echoEl.style.transform='',150);
+}
+async function fetchEchoes(ids){
+  if(!ids || !ids.length) return;
+  const { data } = await sb.from('eh_message_echoes').select('message_id,user_id').in('message_id',ids);
+  (data||[]).forEach(e=>{ const st=echoState[e.message_id]||{count:0,mine:false}; st.count++; if(e.user_id===myUid) st.mine=true; echoState[e.message_id]=st; });
+  ids.forEach(id=>{ if(echoState[id]) paintEcho(id); });
+}
+
+// ============ 斜杠命令 ============
+const SLASH_CMDS=[
+  {c:'/me',    d:'以动作形式说话，如 /me 跳了段舞'},
+  {c:'/dice',  d:'掷一颗骰子 🎲'},
+  {c:'/flip',  d:'抛硬币，正면还是反面'},
+  {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
+  {c:'/echo',  d:'放一串全屏烟花 🎆'},
+];
+async function handleSlash(text){
+  const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
+  if(cmd==='/me'){ return false; } // 交给 send 主流程处理成 act
+  if(cmd==='/dice'){ const n=1+Math.floor(secureRand()*6); await sendSystemAct(`掷出了 🎲 ${n} 点`); return true; }
+  if(cmd==='/flip'){ const r=secureRand()<0.5?'正面 🪙':'反面 🪙'; await sendSystemAct(`抛硬币：${r}`); return true; }
+  if(cmd==='/echo'){ burst('🎆',24); burst('✨',20); await sendSystemAct('放了一串烟花 🎆'); return true; }
+  if(cmd==='/whisper'){
+    const mName=arg.match(/^@?(\S+)\s+(.+)$/);
+    if(!mName){ toast('用法：/whisper @昵称 内容'); return true; }
+    const target=await findMemberByName(mName[1]);
+    if(!target){ toast('没找到这个人（需在本房在线）'); return true; }
+    await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.id});
+    // 本地也显示一条
+    const el=buildMsgEl({id:'local_'+Date.now(),user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.id,created_at:new Date().toISOString()});
+    if(el){ $('#stream').appendChild(el); scrollStream(); }
+    return true;
+  }
+  return false; // 非命令，按普通消息发
+}
+async function sendSystemAct(text){
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'act'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  await sb.from('eh_messages').insert(payload);
+}
+function findMemberByName(name){
+  if(!presChan) return null;
+  const state=presChan.presenceState(); let found=null;
+  Object.values(state).forEach(arr=>arr.forEach(u=>{ if(u.name===name || u.name.includes(name)) found=u; }));
+  return found;
+}
+function secureRand(){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296; }
+
+// 斜杠菜单 UI
+function renderSlashMenu(filter){
+  const menu=$('#slashMenu');
+  const list=SLASH_CMDS.filter(c=>c.c.startsWith(filter));
+  if(!list.length){ hideSlash(); return; }
+  menu.innerHTML=list.map((c,i)=>`<div class="slash-item ${i===0?'sel':''}" data-cmd="${c.c}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
+  menu.querySelectorAll('.slash-item').forEach(el=>el.onclick=()=>{
+    const inp=$('#cin'); inp.value=el.dataset.cmd+' '; inp.focus(); hideSlash(); inp.dispatchEvent(new Event('input'));
+  });
+  menu.classList.add('on');
+}
+function hideSlash(){ $('#slashMenu').classList.remove('on'); }
+
+// ============ 长按互动环 ============
+let lpTimer=null;
+function attachLongPress(el, m){
+  const open=(x,y)=>showActRing(x,y,m);
+  el.addEventListener('contextmenu',e=>{ e.preventDefault(); open(e.clientX,e.clientY); });
+  el.addEventListener('touchstart',e=>{ lpTimer=setTimeout(()=>{ const t=e.touches[0]; open(t.clientX,t.clientY); },480); },{passive:true});
+  el.addEventListener('touchend',()=>clearTimeout(lpTimer));
+  el.addEventListener('touchmove',()=>clearTimeout(lpTimer));
+}
+function showActRing(x,y,m){
+  const ring=$('#actRing');
+  ring.innerHTML=`
+    <button data-a="echo"><span class="ai">🔥</span>回声</button>
+    <button data-a="reply"><span class="ai">↳</span>回复</button>
+    <button data-a="project"><span class="ai">📽️</span>投影</button>`;
+  ring.querySelector('[data-a="echo"]').onclick=()=>{ toggleEcho(isNaN(+m.id)?m.id:+m.id); hideActRing(); };
+  ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
+  ring.querySelector('[data-a="project"]').onclick=()=>{ projectText(m.text,m.color); hideActRing(); };
+  ring.classList.add('on');
+  const rw=ring.offsetWidth||200, rh=ring.offsetHeight||56;
+  ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
+  ring.style.top=Math.max(8,y-rh-10)+'px';
+}
+function hideActRing(){ $('#actRing').classList.remove('on'); }
+document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
+
+// 引用回复
+function startReply(m){ replyTo={id:isNaN(+m.id)?m.id:+m.id, name:m.name, text:m.text}; $('#rpTxt').textContent=`回复 ${m.name}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus(); }
+function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); }
+
+// 投影弹幕
+function projectText(text,color){
+  const p=document.createElement('div'); p.className='proj'; p.textContent=text; p.style.color=color||'#28E6D8';
+  p.style.textShadow=`0 0 20px ${color||'#28E6D8'}`;
+  p.style.top=(15+secureRand()*60)+'vh'; document.body.appendChild(p);
+  setTimeout(()=>p.remove(),8000);
+}
+
+// ============ 消息共鸣(多人短时同 emoji) ============
+let resoWindow={};  // emoji -> [ts...]
+function maybeResonate(m){
+  if(!isEmojiOnly(m.text)) return;
+  const key=[...m.text][0]; const now=Date.now();
+  resoWindow[key]=(resoWindow[key]||[]).filter(t=>now-t<4000); resoWindow[key].push(now);
+  if(resoWindow[key].length>=3){ triggerResonance(key,m.color); resoWindow[key]=[]; }
+}
+function triggerResonance(emoji,color){
+  const r=$('#resonance');
+  r.style.background=`radial-gradient(circle at 50% 60%, ${color||'#FF3CAC'}44, transparent 70%)`;
+  r.classList.add('on'); burst(emoji,40); toast(`✨ 共鸣！大家都在发 ${emoji}`);
+  setTimeout(()=>r.classList.remove('on'),1200);
 }
 
 // ============ emoji 粒子 ============
-function burst(str, count=10){
-  const chars = [...str].filter(c=>/\p{Emoji}/u.test(c));
-  if(!chars.length) chars.push('✨');
+function burst(str,count=10){
+  const chars=[...(str||'')].filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars.push('✨');
   const layer=$('#particles');
   for(let i=0;i<count;i++){
-    const p=document.createElement('div'); p.className='particle';
-    p.textContent = rand(chars);
-    p.style.left = (10+Math.random()*80)+'vw';
-    p.style.bottom = '60px';
-    p.style.setProperty('--spin', (Math.random()*720-360)+'deg');
-    p.style.animationDelay = (Math.random()*0.3)+'s';
-    p.style.fontSize = (20+Math.random()*20)+'px';
-    layer.appendChild(p);
-    setTimeout(()=>p.remove(), 3800);
+    const p=document.createElement('div'); p.className='particle'; p.textContent=rand(chars);
+    p.style.left=(10+secureRand()*80)+'vw'; p.style.bottom='60px';
+    p.style.setProperty('--spin',(secureRand()*720-360)+'deg');
+    p.style.animationDelay=(secureRand()*0.3)+'s'; p.style.fontSize=(20+secureRand()*20)+'px';
+    layer.appendChild(p); setTimeout(()=>p.remove(),3800);
   }
 }
 
 // ============ toast ============
 let toastT=null;
-function toast(msg){
-  const t=$('#toast'); t.innerHTML=msg; t.classList.add('on');
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2400);
+function toast(msg){ const t=$('#toast'); t.innerHTML=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+
+// ============ 离开房间 ============
+async function leaveRoom(){
+  if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
+  if(presChan){ await sb.removeChannel(presChan); presChan=null; }
+  typingUsers={};
+  // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
+  if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
+  curRoom=null;
 }
 
-// ============ 大厅：频道卡 + 实时在线数 ============
-let lobbyClient=null, lobbyCounts={};
-function renderChannels(){
-  $('#channels').innerHTML = CHANNELS.map(ch=>`
-    <div class="ch" data-ch="${ch.id}" style="--ch-c:${ch.c}">
-      <div class="icon">${ch.icon}</div>
-      <h3>${ch.name}</h3>
-      <div class="desc">${ch.desc}</div>
-      <div class="live"><span class="pulse"></span><span id="cnt_${ch.id}">— 人在线</span></div>
-    </div>`).join('');
-  document.querySelectorAll('.ch').forEach(el=>el.onclick=()=>{
-    const ch = CHANNELS.find(c=>c.id===el.dataset.ch);
-    stopLobbyProbe();
-    joinChannel(ch);
+// ============ 房主设置抽屉 ============
+async function openGear(){
+  if(!curRoom || curRoom.role!=='owner') return;
+  const { data:members } = await sb.from('eh_members').select('user_id,name,emoji,color,role').eq('room_id',curRoom.id);
+  const body=$('#gearBody');
+  body.innerHTML=`
+    <div class="dsec"><div class="dl">房间信息</div>
+      <div class="dcard">
+        <label class="fld"><span>房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+        <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
+        <button class="dbtn" id="gSaveBtn">保存修改</button>
+      </div></div>
+    <div class="dsec"><div class="dl">成员 (${(members||[]).length})</div>
+      <div class="mlist">${(members||[]).map(mm=>`
+        <div class="mitem"><div class="mi-av" style="background:${mm.color}22;color:${mm.color}">${mm.emoji||'👤'}</div>
+          <span class="mi-nm">${esc(mm.name)}</span>
+          ${mm.role==='owner'?'<span class="mi-role">房主</span>':(mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
+        </div>`).join('')}</div></div>
+    <div class="dsec"><div class="dl">危险操作</div>
+      <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`;
+  $('#gSaveBtn').onclick=async()=>{
+    const name=$('#gRoomName').value.trim(), topic=$('#gRoomTopic').value.trim();
+    if(!name){ toast('房间名不能为空'); return; }
+    const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
+    if(error){ toast('保存失败'); return; }
+    curRoom.name=name; curRoom.topic=topic;
+    $('#hallName').innerHTML=`${curRoom.emoji} ${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
+    toast('已保存'); closeGear();
+  };
+  body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
+    if(!confirm('确定踢出该成员？')) return;
+    await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',el.dataset.uid);
+    toast('已踢出'); openGear();
   });
+  $('#gDissolveBtn').onclick=async()=>{
+    if(!confirm('解散后房间和消息将从前台消失，确定？')) return;
+    await sb.from('eh_rooms').delete().eq('id',curRoom.id);
+    toast('房间已解散'); closeGear(); backToLobby();
+  };
+  $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on');
 }
-// 大厅期间：订阅各频道 presence，统计实时人数
-function startLobbyProbe(){
-  lobbyCounts={};
-  const probe = mqtt.connect(BROKER,{clientId:'ehprobe_'+uid(),clean:true,reconnectPeriod:2000,keepalive:30});
-  lobbyClient=probe;
-  const seen={};
-  probe.on('connect',()=>{
-    CHANNELS.forEach(ch=>probe.subscribe(topic(ch.id,'presence'),{qos:0}));
-    // 主动 ping 一下让各房间的人应答（探测用，不加入）
-  });
-  probe.on('message',(t,pl)=>{
-    let d;try{d=JSON.parse(pl.toString())}catch(e){return;}
-    const chId = t.split('/')[t.split('/').length-2];
-    seen[chId]=seen[chId]||{};
-    if(d.kind==='leave'){ delete seen[chId][d.id]; }
-    else seen[chId][d.id]={ts:Date.now()};
-    updateLobbyCounts(seen);
-  });
-  // 定期清理过期
-  lobbyCounts._timer = setInterval(()=>{
-    const now=Date.now();
-    for(const ch in seen){ for(const id in seen[ch]){ if(now-seen[ch][id].ts>12000) delete seen[ch][id]; } }
-    updateLobbyCounts(seen);
-  },4000);
-}
-function updateLobbyCounts(seen){
-  CHANNELS.forEach(ch=>{
-    const n = seen[ch.id]?Object.keys(seen[ch.id]).length:0;
-    const el=$('#cnt_'+ch.id); if(el) el.textContent = `${n} 人在线`;
-  });
-}
-function stopLobbyProbe(){
-  if(lobbyClient){ try{lobbyClient.end(true)}catch(e){} lobbyClient=null; }
-  if(lobbyCounts._timer) clearInterval(lobbyCounts._timer);
-}
+function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); }
 
-// ============ 事件绑定 ============
-$('#rerollBtn').onclick = ()=>rollIdentity();
-$('#enterBtn').onclick = ()=>{
-  $('#lobbyName').textContent = me.name;
-  $('#lobbyName').style.color = me.color;
-  goScene('lobby');
-  renderChannels();
-  startLobbyProbe();
-  loadMyRooms();
-};
+// ============ 个人空间抽屉 ============
+async function openMe(){
+  await ensureAuth();
+  const body=$('#meBody');
+  const { data:{ session } } = await sb.auth.getSession();
+  const bound = !!session?.user?.email;
+  // 我发的消息(最近)
+  const { data:myMsgs } = await sb.from('eh_messages').select('text,created_at,room_id').eq('user_id',myUid).order('id',{ascending:false}).limit(20);
+  // 我在的房间
+  const { data:myRooms } = await sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50);
+  body.innerHTML=`
+    <div class="dsec"><div class="dl">我的身份</div>
+      <div class="dcard">
+        <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${me.color}">${me.emoji} ${esc(me.name)}</span></div>
+        <div class="drow"><span class="dk">状态</span><span class="dv">${bound?'已绑定 '+esc(session.user.email):'匿名（本设备）'}</span></div>
+        <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
+        ${bound?'':'<button class="dbtn" id="meBind">✉️ 绑定邮箱（跨设备找回）</button>'}
+      </div></div>
+    <div class="dsec"><div class="dl">我在的房间 (${(myRooms||[]).length})</div>
+      <div class="mlist">${(myRooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
+        <div class="mitem"><div class="mi-av">${rm.emoji||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+        ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>'}</div></div>
+    <div class="dsec"><div class="dl">我最近发的话 (${(myMsgs||[]).length})</div>
+      <div class="dcard" style="max-height:200px;overflow-y:auto">
+        ${(myMsgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>'}
+      </div></div>`;
+  $('#meReroll') && ($('#meReroll').onclick=async()=>{ rollIdentity(); await sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); });
+  $('#meBind') && ($('#meBind').onclick=()=>{ closeMe(); openModal('mBind'); });
+  $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
+}
+function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
-// ============ 私密房弹窗 ============
-const ROOM_EMOJIS = ['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
-let pickedEmoji = '🔒';
+// ============ 返回大厅 ============
+async function backToLobby(){ await leaveRoom(); goScene('lobby'); renderLobby(); }
+
+// ============ 建房 / 入房 弹窗 ============
+const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
+let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
 function openModal(which){
   $('#modalMask').classList.add('on');
-  ['mCreate','mCreated','mJoin'].forEach(id=>$('#'+id).style.display = (id===which?'block':'none'));
+  ['mCreate','mCreated','mJoin','mBind'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
   if(which==='mCreate'){
-    $('#roomNameIn').value=''; pickedEmoji='🔒';
-    $('#roomEmojiPick').innerHTML = ROOM_EMOJIS.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
-    $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{
-      pickedEmoji=b.textContent;
-      $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on'));
-      b.classList.add('on');
-    });
+    $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
+    $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o.dataset.kind==='public'));
+    renderEmojiPick();
     setTimeout(()=>$('#roomNameIn').focus(),50);
   }
   if(which==='mJoin'){ $('#codeIn').value=''; $('#joinErr').textContent=''; setTimeout(()=>$('#codeIn').focus(),50); }
+  if(which==='mBind'){ $('#bindEmail').value=''; $('#bindErr').textContent=''; setTimeout(()=>$('#bindEmail').focus(),50); }
+}
+function renderEmojiPick(){
+  const first = pickedKind==='public'?'🌐':'🔒'; pickedEmoji=first;
+  const list=[first,...ROOM_EMOJIS.filter(e=>e!==first)];
+  $('#roomEmojiPick').innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+  $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ pickedEmoji=b.textContent; $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 }
 function closeModal(){ $('#modalMask').classList.remove('on'); }
-$('#modalX').onclick = closeModal;
-$('#modalMask').onclick = e=>{ if(e.target===$('#modalMask')) closeModal(); };
 
-$('#createRoomBtn').onclick = ()=>openModal('mCreate');
-$('#joinRoomBtn').onclick   = ()=>openModal('mJoin');
-
-let createdRoom = null;
-$('#doCreateBtn').onclick = async ()=>{
-  const name = $('#roomNameIn').value.trim();
-  if(!name){ $('#roomNameIn').focus(); toast('给房间起个名'); return; }
+function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
+async function createRoom(){
+  const name=$('#roomNameIn').value.trim();
+  if(!name){ toast('给房间起个名'); return; }
+  await ensureAuth();
   const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
-  createdRoom = await createRoom(name, pickedEmoji);
-  btn.disabled=false; btn.textContent='生 成 房 间';
-  if(createdRoom){
-    $('#codeVal').textContent = createdRoom.invite_code;
-    openModal('mCreated');
+  let room=null;
+  if(pickedKind==='public'){
+    const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'public',owner:myUid}).select('id,name,emoji').single();
+    if(!error) room={...data,kind:'public'};
+    else { console.warn(error); }
+  } else {
+    for(let t=0;t<5;t++){ const code=genCode();
+      const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'private',invite_code:code,owner:myUid}).select('id,name,emoji,invite_code').single();
+      if(!error){ room={...data,kind:'private'}; break; }
+      if(!/duplicate|unique/i.test(error.message||'')){ console.warn(error); break; }
+    }
   }
-};
-$('#codeCopy').onclick = ()=>{
-  const code=$('#codeVal').textContent;
-  navigator.clipboard?.writeText(code).then(()=>toast('邀请码已复制'),()=>toast('复制失败，请手动记下'));
-};
-$('#enterCreatedBtn').onclick = ()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
-
-$('#doJoinBtn').onclick = async ()=>{
-  const code = $('#codeIn').value.trim().toUpperCase();
-  if(!code){ $('#codeIn').focus(); return; }
-  const btn=$('#doJoinBtn'); btn.disabled=true; btn.textContent='进入中…';
-  $('#joinErr').textContent='';
-  const res = await joinRoomByCode(code);
+  btn.disabled=false; btn.textContent='生 成 房 间';
+  if(!room){ toast('建房失败'); return; }
+  // 房主入成员表
+  await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
+  createdRoom=room;
+  if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; }
+  else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; }
+  openModal('mCreated');
+}
+async function joinByCode(){
+  const code=$('#codeIn').value.trim().toUpperCase();
+  if(!code) return;
+  await ensureAuth();
+  const btn=$('#doJoinBtn'); btn.disabled=true; btn.textContent='进入中…'; $('#joinErr').textContent='';
+  const { data:rooms, error }=await sb.rpc('eh_find_room_by_code',{code});
+  const room=Array.isArray(rooms)?rooms[0]:rooms;
   btn.disabled=false; btn.textContent='进 入 房 间';
-  if(res.err){ $('#joinErr').textContent=res.err; return; }
-  closeModal(); enterRoom(res.room);
+  if(error || !room){ $('#joinErr').textContent='邀请码无效或房间不存在'; return; }
+  const { error:mErr }=await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'member',name:me.name,emoji:me.emoji,color:me.color});
+  if(mErr && !/duplicate|unique/i.test(mErr.message||'')){ $('#joinErr').textContent='加入失败'; return; }
+  closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
+}
+async function bindEmail(){
+  const email=$('#bindEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ $('#bindErr').textContent='邮箱格式不对'; return; }
+  const btn=$('#doBindBtn'); btn.disabled=true; btn.textContent='发送中…'; $('#bindErr').textContent='';
+  // 匿名用户就地升级：linkIdentity 需 OAuth；邮箱用 updateUser + magic link 二选一。
+  // 用 updateUser 绑定邮箱，触发确认邮件；确认后匿名账号即绑定该邮箱(uid 不变)。
+  const { error }=await sb.auth.updateUser({ email });
+  btn.disabled=false; btn.textContent='发 送 登 录 链 接';
+  if(error){ $('#bindErr').textContent=error.message||'发送失败'; return; }
+  toast('确认邮件已发送，去邮箱点链接完成绑定'); closeModal();
+}
+
+// ============ 事件绑定 ============
+$('#rerollBtn').onclick=()=>rollIdentity();
+$('#enterBtn').onclick=async()=>{
+  const btn=$('#enterBtn'); btn.disabled=true;
+  await ensureAuth();
+  btn.disabled=false;
+  goScene('lobby'); renderLobby();
 };
-$('#codeIn') && $('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();$('#doJoinBtn').click();} });
-$('#backBtn').onclick = ()=>{
-  if(mode==='sb') leaveRoom();
-  else leaveChannel();
-  goScene('lobby');
-  renderChannels();
-  startLobbyProbe();
-  loadMyRooms();
-};
+$('#backBtn').onclick=()=>backToLobby();
+$('#gearBtn').onclick=()=>openGear();
+$('#meBtn').onclick=()=>openMe();
+$('#lobbyName').onclick=()=>openMe();
+$('#meDx').onclick=()=>closeMe(); $('#meMask').onclick=()=>closeMe();
+$('#gearDx').onclick=()=>closeGear(); $('#gearMask').onclick=()=>closeGear();
+
+$('#createRoomBtn').onclick=()=>openModal('mCreate');
+$('#joinRoomBtn').onclick=()=>openModal('mJoin');
+$('#modalX').onclick=()=>closeModal();
+$('#modalMask').onclick=e=>{ if(e.target===$('#modalMask')) closeModal(); };
+$('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
+$('#doCreateBtn').onclick=()=>createRoom();
+$('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast('邀请码已复制'),()=>toast('复制失败')); };
+$('#enterCreatedBtn').onclick=()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
+$('#doJoinBtn').onclick=()=>joinByCode();
+$('#doBindBtn').onclick=()=>bindEmail();
+$('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
+$('#rpX').onclick=()=>clearReply();
 
 // 输入框
 const cin=$('#cin');
 cin.addEventListener('input',()=>{
   cin.style.height='24px'; cin.style.height=Math.min(cin.scrollHeight,100)+'px';
-  $('#goBtn').disabled = !cin.value.trim();
-  // 广播 typing（节流 1.2s）——仅公共频道(MQTT)。私密房暂不做输入态。
+  $('#goBtn').disabled=!cin.value.trim();
+  const v=cin.value;
+  if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
+  // typing 广播(节流)
   const now=Date.now();
-  if(mode==='mqtt' && cin.value.trim() && now-sentTyping>1200 && client && client.connected && curCh){
-    sentTyping=now;
-    client.publish(topic(curCh.id,'typing'), JSON.stringify({id:me.id,name:me.name}), {qos:0});
-  }
+  if(v.trim() && now-(cin._lastTyping||0)>1200 && presChan){ cin._lastTyping=now; presChan.send({type:'broadcast',event:'typing',payload:{id:myUid,name:me.name}}); }
 });
-cin.addEventListener('keydown',e=>{
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
-});
-$('#goBtn').onclick = send;
+cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+$('#goBtn').onclick=send;
 
 // emoji 面板
-const TRAY = ['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
-$('#emojiTray').innerHTML = TRAY.map(e=>`<b>${e}</b>`).join('');
-$('#emojiBtn').onclick = e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
-$('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{
-  e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus();
-});
+const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
+$('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
+$('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
+$('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus(); });
 document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
 
-// 离开页面时通知
-window.addEventListener('beforeunload',()=>{ if(curCh) announce('leave'); });
+window.addEventListener('beforeunload',()=>{ if(presChan) presChan.untrack(); });
 
 // ============ 启动 ============
-rollIdentity();
+loadOrRollIdentity();
+paintIdentity();
 typeSub();
+// 检测 magic link 回跳(绑定成功后 URL 带 token)
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(session?.user?.email && me){ me && (me.id=session.user.id); myUid=session.user.id; }
+});
 </script>
 </body>
 </html>
