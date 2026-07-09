@@ -344,8 +344,8 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    .stage:has(#hall.on){padding:0}
-    #hall{width:100%;height:100vh;height:100dvh;border-radius:0;border:none}
+    .stage:has(#hall.on){padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
+    #hall{width:100%;height:100dvh;height:var(--appvh,100dvh);border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -545,10 +545,10 @@ async function authApi(path, body){
 }
 
 const $ = s => document.querySelector(s);
-// 转义 HTML(含引号，防止属性上下文逃逸)
 const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-// 颜色白名单：只放行合法 hex，否则回退默认色(防 style 注入)
-const safeColor = c => /^#[0-9A-Fa-f]{3,8}$/.test(c||'') ? c : '#8B5CFF';
+    // 安全过滤：颜色只允许 #hex，非法则回退默认色；emoji 截断+转义防注入
+    const safeColor = (c,def='#8B5CFF') => (typeof c==='string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : def;
+    const safeEmoji = (e) => esc((e||'').slice(0,8));
 const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 
 // ---- 身份 ----
@@ -573,7 +573,7 @@ function saveIdentity(){ try{ localStorage.setItem(LS_ID, JSON.stringify(me)); }
 function paintIdentity(){
   const av=$('#idAv'); if(!av) return;
   av.textContent=me.emoji; av.style.background=me.color+'22';
-  av.style.boxShadow=`0 0 24px ${me.color}55, inset 0 0 0 1.5px ${me.color}`; av.style.color=me.color;
+  av.style.boxShadow=`0 0 24px ${safeColor(me.color)}55, inset 0 0 0 1.5px ${safeColor(me.color)}`; av.style.color=me.color;
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
@@ -627,8 +627,8 @@ async function renderOfficial(){
   const box=$('#channels');
   box.innerHTML=(data||[]).map(r=>{
     const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
-    return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${esc(r.emoji)}" data-kind="official" style="--ch-c:${c}">
-      <div class="icon">${esc(r.emoji)}</div><h3>${esc(r.name)}</h3>
+    return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
+      <div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
       <div class="live"><span class="pulse"></span><span>进入畅聊</span></div></div>`;
   }).join('');
@@ -639,8 +639,8 @@ async function renderPublic(){
   const box=$('#publicRooms'), empty=$('#publicEmpty');
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
-  box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${esc(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
-    <div class="tagk">公开</div><div class="icon">${esc(r.emoji)}</div><h3>${esc(r.name)}</h3>
+  box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
+    <div class="tagk">公开</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
     <div class="desc">${esc(r.topic||'')}</div><div class="live"><span class="pulse"></span><span>进入</span></div></div>`).join('');
   bindRoomCards(box);
 }
@@ -649,16 +649,27 @@ async function renderMyRooms(){
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
   const box=$('#myRooms');
   if(!data || !data.length){ box.innerHTML=''; return; }
-  box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${esc(r.emoji)}" data-kind="private">
-    <span class="rm-ic">${esc(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
+  box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="private">
+    <span class="rm-ic">${safeEmoji(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
-    <span class="rm-code">${esc(r.invite_code||'')}</span><span class="rm-arr">→</span></div>`).join('');
+    <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
 }
+// 进房预取缓存: 悬停/按下卡片时提前拉该公开房最近消息，点进去瞬间显示
+const prefetchCache={};
+function prefetchRoom(rid, kind){
+  if(kind!=='official' && kind!=='public') return;   // 私密房不预取(RLS需成员)
+  if(prefetchCache[rid]) return;
+  prefetchCache[rid] = sb.rpc('eh_public_recent',{ rid, lim:100 }).then(({data})=>data||[]).catch(()=>[]);
+}
 function bindRoomCards(box){
-  box.querySelectorAll('.ch').forEach(el=>el.onclick=()=>enterRoom({
-    id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind
-  }));
+  box.querySelectorAll('.ch').forEach(el=>{
+    const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
+    const pf=()=>prefetchRoom(room.id, room.kind);
+    el.addEventListener('pointerenter', pf);   // 桌面悬停预取
+    el.addEventListener('touchstart', pf, {passive:true}); // 移动按下预取
+    el.onclick=()=>enterRoom(room);
+  });
 }
 
 // ============ 进入房间 ============
@@ -666,7 +677,7 @@ async function enterRoom(room){
   curRoom = room;
   $('#stream').innerHTML=''; oldestId=null; echoState={}; clearReply();
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
-  $('#hallName').innerHTML=`${esc(room.emoji)} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  $('#hallName').innerHTML=`${safeEmoji(room.emoji)} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
   $('#hallCnt').textContent='连接中…';
   $('#presence').innerHTML='';
   goScene('hall'); setConn(false,'连接中');
@@ -703,7 +714,10 @@ async function loadHistory(first){
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows;
   if(isPublic){
-    const { data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 });
+    // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
+    let data;
+    if(first && prefetchCache[curRoom.id]){ data = await prefetchCache[curRoom.id]; delete prefetchCache[curRoom.id]; }
+    else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
@@ -793,9 +807,9 @@ async function refreshPresence(){
   // 兜底：自己一定在线（DB 读取延迟/失败时也至少显示自己），避免卡"连接中/0人"
   if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
   users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
-  $('#presence').innerHTML=users.map(p=>{const pc=safeColor(p.color);return `
-    <div class="pav ${p.user_id===myUid?'me':''}" style="background:${pc}22;color:${pc};box-shadow:inset 0 0 0 1.5px ${pc}" title="${esc(p.name)}">
-      ${esc(p.emoji)}<span class="ring"></span></div>`;}).join('');
+  $('#presence').innerHTML=users.map(p=>`
+    <div class="pav ${p.user_id===myUid?'me':''}" style="background:${safeColor(p.color)}22;color:${safeColor(p.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(p.color)}" title="${esc(p.name)}">
+      ${safeEmoji(p.emoji)}<span class="ring"></span></div>`).join('');
   const kindLabel = curRoom.kind==='private'?'名成员在线':'人在线';
   $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
   // 正在输入：typing_at 在 3s 内的他人
@@ -824,7 +838,7 @@ function buildMsgEl(m){
   if(m.kind==='proj') return null;   // 投影是瞬时飞幕，不进消息流
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
-    el.innerHTML=`✦ <b style="color:${safeColor(m.color)}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
+    el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   const el=document.createElement('div');
   el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
@@ -838,11 +852,10 @@ function buildMsgEl(m){
   }
   // 自己发的消息不显示 echo 入口(不能给自己点赞)
   const echoHtml = isMe ? '' : `<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span>`;
-  const mc=safeColor(m.color);
   el.innerHTML=`
-    <div class="av" style="background:${mc}22;color:${mc};box-shadow:inset 0 0 0 1.5px ${mc}">${esc(m.emoji)||'👤'}</div>
+    <div class="av" style="background:${safeColor(m.color)}22;color:${safeColor(m.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(m.color)}">${safeEmoji(m.emoji) || '👤'}</div>
     <div class="body">
-      <div class="meta"><span class="nm" style="color:${mc}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
+      <div class="meta"><span class="nm" style="color:${safeColor(m.color)}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
       ${replyHtml}
       <div class="txt">${esc(m.text)}${echoHtml}</div>
     </div>`;
@@ -1014,7 +1027,7 @@ function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); 
 // 投影弹幕：本地飞 + 广播(kind='proj'消息)，让房里所有人都看到
 function projectText(text,color){
   const p=document.createElement('div'); p.className='proj'; p.textContent=text; p.style.color=color||'#28E6D8';
-  p.style.textShadow=`0 0 20px ${color||'#28E6D8'}`;
+  p.style.textShadow=`0 0 20px ${safeColor(color,'#28E6D8')}`;
   p.style.top=(15+secureRand()*60)+'vh'; document.body.appendChild(p);
   setTimeout(()=>p.remove(),8000);
 }
@@ -1035,8 +1048,8 @@ function maybeResonate(m){
 }
 function triggerResonance(emoji,color){
   const r=$('#resonance');
-  r.style.background=`radial-gradient(circle at 50% 60%, ${color||'#FF3CAC'}44, transparent 70%)`;
-  r.classList.add('on'); burst(emoji,40); toast(`✨ 共鸣！大家都在发 ${emoji}`);
+  r.style.background=`radial-gradient(circle at 50% 60%, ${safeColor(color,'#FF3CAC')}44, transparent 70%)`;
+  r.classList.add('on'); burst(emoji,40); toast(`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
   setTimeout(()=>r.classList.remove('on'),1200);
 }
 
@@ -1097,11 +1110,11 @@ async function openGear(){
         <button class="dbtn" id="gSaveBtn">保存修改</button>
       </div></div>
     <div class="dsec"><div class="dl">成员 (${(members||[]).length})</div>
-      <div class="mlist">${(members||[]).map(mm=>{const cc=safeColor(mm.color);return `
-        <div class="mitem"><div class="mi-av" style="background:${cc}22;color:${cc}">${esc(mm.emoji)||'👤'}</div>
+      <div class="mlist">${(members||[]).map(mm=>`
+        <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;color:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
           <span class="mi-nm">${esc(mm.name)}</span>
           ${mm.role==='owner'?'<span class="mi-role">房主</span>':(mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
-        </div>`;}).join('')}</div></div>
+        </div>`).join('')}</div></div>
     <div class="dsec"><div class="dl">危险操作</div>
       <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`;
   $('#gSaveBtn').onclick=async()=>{
@@ -1110,7 +1123,7 @@ async function openGear(){
     const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
     if(error){ toast('保存失败'); return; }
     curRoom.name=name; curRoom.topic=topic;
-    $('#hallName').innerHTML=`${esc(curRoom.emoji)} ${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
+    $('#hallName').innerHTML=`${safeEmoji(curRoom.emoji)} ${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
     toast('已保存'); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
@@ -1135,7 +1148,7 @@ async function openMe(){
   body.innerHTML=`
     <div class="dsec"><div class="dl">我的身份</div>
       <div class="dcard">
-        <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${safeColor(me.color)}">${esc(me.emoji)} ${esc(me.name)}</span></div>
+        <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${safeColor(me.color)}">${safeEmoji(me.emoji)} ${esc(me.name)}</span></div>
         <div class="drow"><span class="dk">状态</span><span class="dv" id="meStatus">…</span></div>
         <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
         <div id="meRegSlot"></div>
@@ -1165,7 +1178,7 @@ async function openMe(){
   $('#meReg') && ($('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); });
   $('#meRoomsLabel').textContent=`我在的房间 (${myRooms.length})`;
   $('#meRoomsList').innerHTML=myRooms.map(r=>{const rm=r.eh_rooms||{};return `
-    <div class="mitem"><div class="mi-av">${esc(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji) || '🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
     ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
   $('#meMsgsLabel').textContent=`我最近发的话 (${myMsgs.length})`;
   $('#meMsgsList').innerHTML=myMsgs.map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
@@ -1258,16 +1271,29 @@ async function joinByCode(){
 }
 // ============ 正式账号：注册 / 登录 / 找回 ============
 // 登录：账号(用户名或邮箱)+密码。先 resolve 出登录邮箱，再 signInWithPassword。
+// 用户名→内部登录邮箱(与后端 eh-auth 的 uname2email 一致): u_<hex(小写用户名)>@eh.local
+function unameToEmail(u){
+  const bytes=new TextEncoder().encode(u.toLowerCase());
+  let hex=''; for(const b of bytes) hex+=b.toString(16).padStart(2,'0');
+  return 'u_'+hex+'@eh.local';
+}
 async function doLogin(){
   const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
   $('#loginErr').textContent='';
   if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
   const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='登录中…';
-  const res=await authApi('/resolve',{account});
-  if(!res.ok || !res.body.loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent=res.body.error||'账号不存在'; return; }
-  const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
+  // 用户名: 本地直接算内部邮箱, 省掉 resolve 往返(提速)。真邮箱: 走 resolve(可能绑过).
+  let loginEmail;
+  if(/^\S+@\S+\.\S+$/.test(account)){
+    const res=await authApi('/resolve',{account});
+    loginEmail = res.body?.loginEmail;
+    if(!loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent='账号不存在'; return; }
+  } else {
+    loginEmail = unameToEmail(account);
+  }
+  const { data:sess, error }=await sb.auth.signInWithPassword({ email:loginEmail, password });
   btn.disabled=false; btn.textContent='登 录';
-  if(error){ $('#loginErr').textContent='密码错误'; return; }
+  if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
   myUid=sess.user.id;
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
   if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); }
@@ -1369,6 +1395,23 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
+// ============ iOS 键盘遮挡修复 ============
+// iOS Safari 键盘弹起时不压缩 100dvh，会盖住底部输入框。
+// 用 visualViewport 实时把可视高度写进 --appvh，移动端 #hall 用它做高度。
+function syncViewportH(){
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--appvh', h + 'px');
+  // 键盘弹起后确保输入框可见
+  if(document.activeElement && document.activeElement.id==='cin') scrollStream();
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncViewportH);
+  window.visualViewport.addEventListener('scroll', syncViewportH);
+}
+window.addEventListener('resize', syncViewportH);
+syncViewportH();
+
 // ============ 启动 ============
 loadOrRollIdentity();
 paintIdentity();
@@ -1376,19 +1419,20 @@ typeSub();
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
 const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
-sb.auth.onAuthStateChange(async (ev,session)=>{
+// ⚠️ onAuthStateChange 回调里绝不能直接 await sb.* 请求(GoTrue 会死锁, 表现为登录后所有请求卡住)。
+// 故这里只做同步赋值, 异步部分用 setTimeout defer 到回调外执行。
+sb.auth.onAuthStateChange((ev,session)=>{
   if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
     myUid=session.user.id;
-    // 从 eh_users 拉回该账号原有的昵称/形象(跨设备找回的关键)
-    const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-    if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; }
-    else { me = me || {}; me.id=myUid; } // 新绑定的账号,沿用当前身份
-    saveIdentity(); paintIdentity();
-    if(location.hash) history.replaceState(null,'',location.pathname+location.search);
-    // 从登录/绑定链接回跳进来的,自动进大厅
-    if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
-      authHandled=true; toast('已登录 '+session.user.email); goScene('lobby'); renderLobby();
-    }
+    if(me) me.id=myUid;
+    setTimeout(async ()=>{
+      const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); paintIdentity(); }
+      if(location.hash) history.replaceState(null,'',location.pathname+location.search);
+      if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
+        authHandled=true; toast('已登录'); goScene('lobby'); renderLobby();
+      }
+    },0);
   }
 });
 </script>
