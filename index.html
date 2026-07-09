@@ -94,6 +94,9 @@
   .reroll:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .reroll:active{transform:scale(.94)}
   .opt-email{font-size:11.5px;color:var(--dim);cursor:pointer;margin-bottom:14px;transition:.15s;user-select:none}
+  .vbadge{font-size:10px;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+  .vbadge.ok{background:rgba(77,227,138,.15);color:var(--green)}
+  .vbadge.no{background:rgba(255,184,77,.15);color:var(--amber)}
   .opt-email:hover{color:var(--cyan)}
   .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
   .opt-email-box.on{max-height:70px;margin-bottom:16px}
@@ -578,8 +581,12 @@
     <div class="modal-body" id="mEmail" style="display:none">
       <h3>邮箱设置</h3>
       <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld" id="curEmailRow"><span>当前邮箱</span>
+      <label class="fld" id="curEmailRow"><span>当前邮箱 <span id="emailVerifyBadge"></span></span>
         <input id="curEmail" type="email" disabled style="opacity:.6"></label>
+      <div id="verifyRow" style="display:none;margin:-6px 0 14px">
+        <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
+        <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
+      </div>
       <label class="fld"><span id="newEmailLabel">新邮箱</span>
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
@@ -1564,12 +1571,12 @@ async function openMe(){
     sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
     sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
   ];
-  if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role').eq('auth_uid',myUid).maybeSingle());
+  if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
   const [msgsRes, roomsRes, accRes] = await Promise.all(tasks);
   const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
   _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
   // 账号信息首次读到后缓存(username+email+role), 之后打开直接显示
-  if(isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; saveIdentity();
+  if(isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
     // 补上顶部 @用户名 + 正确徽章(首屏可能没有)
     const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : '<span class="mh-badge reg">正式账号</span>';
     if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
@@ -1613,7 +1620,39 @@ function bindMeEmail(){
     $('#curEmailRow').style.display = has?'block':'none';
     if(has) $('#curEmail').value=realEmail;
     $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
+    renderEmailVerifyUI();
   },50); };
+}
+// 邮箱验证状态 UI: 徽章 + 发送验证按钮(有邮箱且未验证时显示)
+function renderEmailVerifyUI(){
+  const has=!!(me.email);
+  const verified=!!me.emailVerified;
+  const badge=$('#emailVerifyBadge'), row=$('#verifyRow'), hint=$('#verifyHint');
+  if(!badge||!row) return;
+  if(!has){ badge.innerHTML=''; row.style.display='none'; return; }
+  badge.innerHTML = verified ? '<span class="vbadge ok">✓ 已验证</span>' : '<span class="vbadge no">未验证</span>';
+  row.style.display = verified ? 'none' : 'block';
+  if(hint) hint.textContent='';
+  const sb2=$('#sendVerifyBtn'); if(sb2){ sb2.disabled=false; sb2.textContent='✉️ 发送验证邮件'; }
+}
+// 发送邮箱验证: 调 eh-auth /send-verify。SMTP 未配时后端降级返回验证链接, 前台直接给本人点。
+async function sendVerifyEmail(){
+  const btn=$('#sendVerifyBtn'); if(!btn) return;
+  btn.disabled=true; btn.textContent='发送中…';
+  const { data:{ session } }=await sb.auth.getSession();
+  if(!session){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; toast('请先登录'); return; }
+  const r=await fetch(EH_AUTH_FN+'/send-verify',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({origin:location.origin+location.pathname.replace(/\/[^/]*$/,'')}) });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok || !j.ok){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; $('#verifyHint').textContent=j.error||'发送失败'; return; }
+  if(j.already){ me.emailVerified=true; saveIdentity(); renderEmailVerifyUI(); toast('邮箱已验证'); return; }
+  // SMTP 未配: sent=false, 后端返回验证链接。给本人一个可点的链接(过渡方案)。
+  if(j.sent===false && j.link){
+    btn.style.display='none';
+    $('#verifyHint').innerHTML='邮件投递暂未开通，先用下面的链接完成验证（同一浏览器打开即可）：<br><a href="'+j.link+'" style="color:var(--cyan);word-break:break-all">点此立即验证 →</a>';
+  } else {
+    btn.textContent='✓ 已发送';
+    $('#verifyHint').textContent='验证邮件已发送到 '+(j.email||me.email)+'，请查收并点击链接。';
+  }
 }
 // 邮箱首次读到后, 重渲染 meRegSlot(从"读取中"变成真实态)
 function rebindEmailSlot(){
@@ -1789,7 +1828,8 @@ async function changeEmail(){
   const j=await r.json().catch(()=>({}));
   btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
   if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
-  toast('邮箱已更新'); closeModal();
+  me.email=email; me.emailVerified=false; saveIdentity();  // 换邮箱→需重新验证
+  toast('邮箱已更新，请验证'); closeModal();
 }
 // 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
 let _profEmoji, _profColor;
@@ -1839,6 +1879,7 @@ $('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
 $('#doRegBtn').onclick=()=>doRegister();
 $('#doResetBtn').onclick=()=>doReset();
 $('#doEmailBtn').onclick=()=>changeEmail();
+$('#sendVerifyBtn').onclick=()=>sendVerifyEmail();
 $('#doProfBtn').onclick=()=>saveProfile();
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
@@ -1918,6 +1959,20 @@ syncViewportH();
 loadOrRollIdentity();
 paintIdentity();
 typeSub();
+// 邮箱验证回跳: URL 带 ?ehverify=<token> → 调 /verify-email 标记已验证
+(function handleEmailVerify(){
+  const m=/[?&]ehverify=([a-f0-9]+)/i.exec(location.search||'');
+  if(!m) return;
+  const token=m[1];
+  // 清掉 URL 上的 token(避免重复/泄露), 不刷新页面
+  const clean=location.pathname+location.search.replace(/([?&])ehverify=[a-f0-9]+/i,'$1').replace(/[?&]$/,'').replace(/\?&/,'?');
+  history.replaceState(null,'',clean);
+  fetch(EH_AUTH_FN+'/verify-email',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token}) })
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.ok){ if(me){ me.emailVerified=true; saveIdentity(); } toast('✓ 邮箱验证成功'); }
+      else toast(j&&j.error||'验证失败');
+    }).catch(()=>toast('验证失败'));
+})();
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
 const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
@@ -1931,11 +1986,11 @@ sb.auth.onAuthStateChange((ev,session)=>{
       // 一并查身份档案 + 账号信息(username/email/role), 缓存到 me, 避免顶部@用户名缺失
       const [{ data:prof }, { data:acc }] = await Promise.all([
         sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-        sb.from('eh_accounts').select('username,email,role').eq('auth_uid',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
       ]);
       if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
       else { me = me||{}; me.registered=true; }
-      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
       saveIdentity();
       paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
