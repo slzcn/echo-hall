@@ -175,29 +175,31 @@ async function api(path,{method='GET',body,auth=true}={}){
 }
 
 // ---- 判断是首个注册还是登录 ----
+// 探测方式：用不合规参数调 /register。返回"注册已关闭"→ 已有账号(登录模式)；
+// 其它 4xx 校验错误 → 注册开放(首次部署)。探测失败(网络/后端异常/文案改动)
+// 一律保守回退登录模式——下方提供手动切换入口，判断错也不会卡死。
 async function detectMode(){
-  // 试探：无 token 时调 register 端点会告诉我们是否已关闭
-  // 简化：先尝试判断——无账号则显示注册
-  const probe=await api('/login',{method:'POST',auth:false,body:{username:'__probe__',password:'__probe__'}});
-  // 若返回"账号或密码错误"→已有账号(登录模式)；若其它→仍登录模式默认
-  // 用 register 的 dry 探测更准：直接尝试注册一个探测(会因already exists或密码规则失败)不好。
-  // 改为：调用 register 端点用非法短密码，若返回"注册已关闭"则是登录模式，否则注册模式。
-  const probe2=await api('/register',{method:'POST',auth:false,body:{username:'x',password:'x'}});
-  if(probe2.body?.error && probe2.body.error.includes('注册已关闭')){ mode='login'; }
-  else { mode='register'; } // 密码规则错误说明注册开放(表为空)
+  mode='login';
+  try{
+    const probe=await api('/register',{method:'POST',auth:false,body:{username:'x',password:'x'}});
+    const err=probe.body?.error||'';
+    if(probe.status>=400 && probe.status<500 && err && !err.includes('注册已关闭')) mode='register';
+  }catch(e){}
   paintAuthMode();
 }
 function paintAuthMode(){
   if(mode==='register'){
     $('#authSub').textContent='首次使用 · 注册即成为超级管理员';
     $('#authBtn').textContent='注 册 并 登 录';
-    $('#toggleBox').innerHTML='';
+    $('#toggleBox').innerHTML='已有账号？<b id="modeSwitch">去登录</b>';
     $('#password').autocomplete='new-password';
   } else {
     $('#authSub').textContent='管理员登录';
     $('#authBtn').textContent='登 录';
-    $('#toggleBox').innerHTML='';
+    $('#toggleBox').innerHTML='首次部署？<b id="modeSwitch">注册超级管理员</b>';
+    $('#password').autocomplete='current-password';
   }
+  $('#modeSwitch').onclick=()=>{ mode=mode==='login'?'register':'login'; $('#authErr').textContent=''; paintAuthMode(); };
 }
 
 async function doAuth(){
