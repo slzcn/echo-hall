@@ -61,6 +61,13 @@
     font-family:inherit;font-size:12px;transition:.15s;white-space:nowrap}
   .reroll:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .reroll:active{transform:scale(.94)}
+  .opt-email{font-size:11.5px;color:var(--dim);cursor:pointer;margin-bottom:14px;transition:.15s;user-select:none}
+  .opt-email:hover{color:var(--cyan)}
+  .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
+  .opt-email-box.on{max-height:70px;margin-bottom:16px}
+  .opt-email-box input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+    color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
+  .opt-email-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.25)}
@@ -80,7 +87,7 @@
   .sec-label{width:min(760px,94vw);font-size:11.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;
     display:flex;align-items:center;gap:8px;margin-top:4px}
   .sec-label::after{content:"";flex:1;height:1px;background:var(--line)}
-  .channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:min(760px,94vw)}
+  .channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;width:min(760px,94vw)}
   .ch{padding:20px 18px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
     border:1px solid var(--line);background:var(--panel)}
   .ch:hover{transform:translateY(-4px);border-color:var(--ch-c);box-shadow:0 14px 40px rgba(0,0,0,.4)}
@@ -341,9 +348,13 @@
         <div class="id-av" id="idAv">🦊</div>
         <div class="id-info">
           <div class="id-name" id="idName">量子水獭</div>
-          <div class="id-tag" id="idTag">你的临时身份 · 无需注册</div>
+          <div class="id-tag" id="idTag">临时身份 · 无需注册</div>
         </div>
         <button class="reroll" id="rerollBtn">↻ 换一个</button>
+      </div>
+      <div class="opt-email" id="optEmailToggle">✉️ 想跨设备找回身份？绑个邮箱（选填）</div>
+      <div class="opt-email-box" id="optEmailBox">
+        <input id="enterEmail" type="email" placeholder="you@example.com（可留空，之后也能在个人空间绑定）">
       </div>
       <button class="btn-primary" id="enterBtn">进 入 回 声 厅</button>
     </div>
@@ -359,7 +370,7 @@
     <div class="sec-label">官方频道</div>
     <div class="channels" id="channels"></div>
     <div class="sec-label">公开房间</div>
-    <div class="my-rooms" id="publicRooms"></div>
+    <div class="channels" id="publicRooms"></div>
     <div class="empty-hint" id="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
     <div class="sec-label">私密房 · 仅邀请码进入</div>
     <div class="priv-actions">
@@ -562,8 +573,6 @@ async function renderPublic(){
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${r.emoji}" data-kind="public" style="--ch-c:#4DE38A">
     <div class="tagk">公开</div><div class="icon">${r.emoji}</div><h3>${esc(r.name)}</h3>
     <div class="desc">${esc(r.topic||'')}</div><div class="live"><span class="pulse"></span><span>进入</span></div></div>`).join('');
-  // publicRooms 用 channels 的卡片样式：改成 grid
-  box.style.display='grid'; box.style.gridTemplateColumns='repeat(auto-fit,minmax(220px,1fr))'; box.style.gap='14px';
   bindRoomCards(box);
 }
 async function renderMyRooms(){
@@ -669,44 +678,48 @@ function subscribeMessages(rid){
     .subscribe();
 }
 
-// ---- Presence(在线光墙 + 正在输入) ----
+// ---- 在线状态(用 eh_presence 表 + postgres_changes；不用 Realtime Presence，
+//      因该项目 realtime.messages 广播通道鉴权不通，postgres_changes 才可靠) ----
+const ONLINE_WINDOW = 35000;   // 35s 内有心跳算在线
+let heartbeatTimer = null;
 async function setupPresence(room){
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
-  presChan = sb.channel('room-pres:'+room.id, { config:{ presence:{ key: myUid } } });
-  presChan.on('presence',{event:'sync'},()=>renderPresence())
-    .on('broadcast',{event:'typing'}, ({payload})=>onTyping(payload))
-    .subscribe(async status=>{
-      if(status==='SUBSCRIBED'){
-        await presChan.track({ id:myUid, name:me.name, emoji:me.emoji, color:me.color });
-        setTimeout(renderPresence, 300); // 保底：track 后主动渲染一次，避免 hallCnt 卡在"连接中"
-      }
-    });
+  clearInterval(heartbeatTimer);
+  // 立即写一条自己的心跳
+  await beat();
+  // 订阅本房 presence 变化 → 刷新光墙
+  presChan = sb.channel('room-pres:'+room.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>refreshPresence())
+    .subscribe();
+  await refreshPresence();
+  // 心跳 + 清理定时器
+  heartbeatTimer = setInterval(async()=>{ await beat(); refreshPresence(); }, 15000);
 }
-function renderPresence(){
-  if(!presChan) return;
-  const state=presChan.presenceState();
-  const users=[]; const seen=new Set();
-  Object.values(state).forEach(arr=>arr.forEach(u=>{ if(!seen.has(u.id)){ seen.add(u.id); users.push(u); } }));
-  users.sort((a,b)=> a.id===myUid?-1:b.id===myUid?1:0);
+async function beat(extra){
+  if(!curRoom || !myUid) return;
+  const row = { room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, last_seen:new Date().toISOString(), ...(extra||{}) };
+  await sb.from('eh_presence').upsert(row);
+}
+async function refreshPresence(){
+  if(!curRoom) return;
+  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
+  const users=(data||[]).slice().sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
   $('#presence').innerHTML=users.map(p=>`
-    <div class="pav ${p.id===myUid?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
+    <div class="pav ${p.user_id===myUid?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
       ${p.emoji}<span class="ring"></span></div>`).join('');
   const kindLabel = curRoom.kind==='private'?'名成员在线':'人在线';
   $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
-}
-let typingUsers={};
-function onTyping(d){
-  if(!d || d.id===myUid) return;
-  clearTimeout(typingUsers['_t_'+d.id]);
-  typingUsers[d.id]=d.name;
-  typingUsers['_t_'+d.id]=setTimeout(()=>{ delete typingUsers[d.id]; renderTyping(); },2600);
-  renderTyping();
-}
-function renderTyping(){
-  const names=Object.keys(typingUsers).filter(k=>!k.startsWith('_t_')).map(id=>typingUsers[id]);
+  // 正在输入：typing_at 在 3s 内的他人
+  const now=Date.now();
+  const typers=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.name);
   const bar=$('#typingBar');
-  if(names.length){ $('#typingTxt').textContent=names.length===1?`${names[0]} 正在输入`:`${names.length} 人正在输入`; bar.classList.add('on'); }
+  if(typers.length){ $('#typingTxt').textContent=typers.length===1?`${typers[0]} 正在输入`:`${typers.length} 人正在输入`; bar.classList.add('on'); }
   else bar.classList.remove('on');
+}
+async function leavePresence(){
+  clearInterval(heartbeatTimer); heartbeatTimer=null;
+  if(curRoom && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 }
 
 function setConn(live,txt){ const el=$('#conn'); el.classList.toggle('live',live); $('#connTxt').textContent=live?'实时在线':(txt||'连接中'); }
@@ -814,9 +827,9 @@ async function handleSlash(text){
     if(!mName){ toast('用法：/whisper @昵称 内容'); return true; }
     const target=await findMemberByName(mName[1]);
     if(!target){ toast('没找到这个人（需在本房在线）'); return true; }
-    await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.id});
+    await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id});
     // 本地也显示一条
-    const el=buildMsgEl({id:'local_'+Date.now(),user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.id,created_at:new Date().toISOString()});
+    const el=buildMsgEl({id:'local_'+Date.now(),user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id,created_at:new Date().toISOString()});
     if(el){ $('#stream').appendChild(el); scrollStream(); }
     return true;
   }
@@ -828,11 +841,11 @@ async function sendSystemAct(text){
   if(el){ $('#stream').appendChild(el); scrollStream(); }
   await sb.from('eh_messages').insert(payload);
 }
-function findMemberByName(name){
-  if(!presChan) return null;
-  const state=presChan.presenceState(); let found=null;
-  Object.values(state).forEach(arr=>arr.forEach(u=>{ if(u.name===name || u.name.includes(name)) found=u; }));
-  return found;
+async function findMemberByName(name){
+  if(!curRoom) return null;
+  const since=new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const { data } = await sb.from('eh_presence').select('user_id,name').eq('room_id',curRoom.id).gte('last_seen',since);
+  return (data||[]).find(u=>u.name===name) || (data||[]).find(u=>u.name.includes(name)) || null;
 }
 function secureRand(){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296; }
 
@@ -921,9 +934,9 @@ function toast(msg){ const t=$('#toast'); t.innerHTML=msg; t.classList.add('on')
 
 // ============ 离开房间 ============
 async function leaveRoom(){
+  await leavePresence();
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
-  typingUsers={};
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
@@ -1084,9 +1097,16 @@ async function bindEmail(){
 
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
+$('#optEmailToggle').onclick=()=>{ $('#optEmailBox').classList.toggle('on'); if($('#optEmailBox').classList.contains('on')) $('#enterEmail').focus(); };
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
+  // 选填邮箱：填了就发确认邮件绑定（不阻塞进入）
+  const email=$('#enterEmail') ? $('#enterEmail').value.trim() : '';
+  if(email){
+    if(/^\S+@\S+\.\S+$/.test(email)){ sb.auth.updateUser({email}).then(({error})=>{ if(!error) toast('确认邮件已发到 '+email+'，点链接即绑定'); }); }
+    else toast('邮箱格式不对，已先用匿名身份进入');
+  }
   btn.disabled=false;
   goScene('lobby'); renderLobby();
 };
@@ -1117,9 +1137,9 @@ cin.addEventListener('input',()=>{
   $('#goBtn').disabled=!cin.value.trim();
   const v=cin.value;
   if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
-  // typing 广播(节流)
+  // 正在输入：写 presence 表的 typing_at(节流 1.5s)，他人靠 refreshPresence 读到
   const now=Date.now();
-  if(v.trim() && now-(cin._lastTyping||0)>1200 && presChan){ cin._lastTyping=now; presChan.send({type:'broadcast',event:'typing',payload:{id:myUid,name:me.name}}); }
+  if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
@@ -1131,7 +1151,10 @@ $('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggl
 $('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus(); });
 document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
 
-window.addEventListener('beforeunload',()=>{ if(presChan) presChan.untrack(); });
+window.addEventListener('beforeunload',()=>{
+  // 尽力删除自己的在线行(用 sendBeacon 式的同步兜底：直接 fire-and-forget)
+  if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
+});
 
 // ============ 启动 ============
 loadOrRollIdentity();
