@@ -743,6 +743,8 @@ function subscribeMessages(rid){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
       if(m.user_id===myUid) return; // 自己的已乐观上屏
+      // 投影：触发全屏飞幕，不进消息流
+      if(m.kind==='proj'){ projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
@@ -812,6 +814,7 @@ function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.get
 
 function buildMsgEl(m){
   const isMe = m.user_id===myUid;
+  if(m.kind==='proj') return null;   // 投影是瞬时飞幕，不进消息流
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
     el.innerHTML=`✦ <b style="color:${m.color||'#8B5CFF'}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
@@ -820,22 +823,39 @@ function buildMsgEl(m){
   el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
   el.dataset.mid=m.id;
   el.dataset.text=m.text; el.dataset.name=m.name;
+  // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
-  if(m.reply_to && m._replyRef){ replyHtml=`<div class="reply-ref">↳ ${esc(m._replyRef)}</div>`; }
+  if(m.reply_to){
+    const ref = m._replyRef || refFromDom(m.reply_to);
+    replyHtml=`<div class="reply-ref" data-ref="${m.reply_to}">↳ ${esc(ref||'查看原消息')}</div>`;
+  }
+  // 自己发的消息不显示 echo 入口(不能给自己点赞)
+  const echoHtml = isMe ? '' : `<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span>`;
   el.innerHTML=`
     <div class="av" style="background:${m.color}22;color:${m.color};box-shadow:inset 0 0 0 1.5px ${m.color}">${m.emoji||'👤'}</div>
     <div class="body">
       <div class="meta"><span class="nm" style="color:${m.color}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
       ${replyHtml}
-      <div class="txt">${esc(m.text)}<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span></div>
+      <div class="txt">${esc(m.text)}${echoHtml}</div>
     </div>`;
   const txtEl=el.querySelector('.txt');
   const echoEl=el.querySelector('.echo');
-  if(echoState[m.id]?.count){ echoEl.classList.add('has'); }
-  echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); };
-  // 长按/右键 → 互动环
+  if(echoEl){ if(echoState[m.id]?.count) echoEl.classList.add('has'); echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); }; }
+  // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
+  if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   attachLongPress(txtEl, m);
   return el;
+}
+// 从已渲染消息 DOM 里取某条的原文(名字:内容)
+function refFromDom(mid){
+  const t=document.querySelector(`.msg[data-mid="${mid}"]`);
+  if(!t) return '';
+  return (t.dataset.name?t.dataset.name+'：':'')+(t.dataset.text||'');
+}
+// 引用原文本地取不到时，查库补上
+async function fillReplyRef(el, mid){
+  const { data } = await sb.from('eh_messages').select('name,text').eq('id',mid).maybeSingle();
+  if(data){ const r=el.querySelector('.reply-ref'); if(r) r.textContent='↳ '+(data.name?data.name+'：':'')+data.text; }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
 function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
@@ -955,13 +975,15 @@ function attachLongPress(el, m){
 }
 function showActRing(x,y,m){
   const ring=$('#actRing');
+  const isMine = m.user_id===myUid;
+  // 自己的消息不能给自己点回声
   ring.innerHTML=`
-    <button data-a="echo"><span class="ai">🔥</span>回声</button>
+    ${isMine?'':'<button data-a="echo"><span class="ai">🔥</span>回声</button>'}
     <button data-a="reply"><span class="ai">↳</span>回复</button>
     <button data-a="project"><span class="ai">📽️</span>投影</button>`;
-  ring.querySelector('[data-a="echo"]').onclick=()=>{ toggleEcho(isNaN(+m.id)?m.id:+m.id); hideActRing(); };
+  const eb=ring.querySelector('[data-a="echo"]'); if(eb) eb.onclick=()=>{ toggleEcho(isNaN(+m.id)?m.id:+m.id); hideActRing(); };
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
-  ring.querySelector('[data-a="project"]').onclick=()=>{ projectText(m.text,m.color); hideActRing(); };
+  ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
   ring.classList.add('on');
   const rw=ring.offsetWidth||200, rh=ring.offsetHeight||56;
   ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
@@ -974,12 +996,18 @@ document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hid
 function startReply(m){ replyTo={id:isNaN(+m.id)?m.id:+m.id, name:m.name, text:m.text}; $('#rpTxt').textContent=`回复 ${m.name}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus(); }
 function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); }
 
-// 投影弹幕
+// 投影弹幕：本地飞 + 广播(kind='proj'消息)，让房里所有人都看到
 function projectText(text,color){
   const p=document.createElement('div'); p.className='proj'; p.textContent=text; p.style.color=color||'#28E6D8';
   p.style.textShadow=`0 0 20px ${color||'#28E6D8'}`;
   p.style.top=(15+secureRand()*60)+'vh'; document.body.appendChild(p);
   setTimeout(()=>p.remove(),8000);
+}
+async function broadcastProject(text,color){
+  projectText(text,color); // 本地先飞
+  if(!curRoom || !myUid) return;
+  // 用 kind='proj' 的消息广播；收到方触发飞幕、不进消息流
+  await sb.from('eh_messages').insert({ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:String(text).slice(0,200), kind:'proj' });
 }
 
 // ============ 消息共鸣(多人短时同 emoji) ============
