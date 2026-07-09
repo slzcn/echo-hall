@@ -309,6 +309,10 @@
   .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
   .emoji-pick b:hover{background:rgba(255,255,255,.06)}
   .emoji-pick b.on{border-color:var(--cyan);background:rgba(40,230,216,.12)}
+  .color-pick{display:flex;flex-wrap:wrap;gap:8px}
+  .color-pick i{width:30px;height:30px;border-radius:9px;cursor:pointer;transition:.12s;border:2px solid transparent;box-sizing:border-box}
+  .color-pick i:hover{transform:scale(1.12)}
+  .color-pick i.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
   .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:20px;
     background:rgba(40,230,216,.08);border:1px solid rgba(40,230,216,.3)}
   .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
@@ -516,6 +520,18 @@
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
+    </div>
+    <div class="modal-body" id="mProfile" style="display:none">
+      <h3>编辑形象</h3>
+      <p class="modal-sub">自定义你的昵称和头像（用户名登录不受影响）。</p>
+      <label class="fld"><span>昵称</span>
+        <input id="profName" maxlength="24" placeholder="显示给别人看的名字"></label>
+      <label class="fld"><span>头像</span>
+        <div class="emoji-pick" id="profEmojiPick"></div></label>
+      <label class="fld"><span>主题色</span>
+        <div class="color-pick" id="profColorPick"></div></label>
+      <div class="modal-err" id="profErr"></div>
+      <button class="btn-primary" id="doProfBtn">保 存</button>
     </div>
   </div>
 </div>
@@ -1290,7 +1306,12 @@ async function openMe(){
         <div class="note" id="meLogoutNote" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div></div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
-  $('#meReroll').onclick=async()=>{ rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); };
+  // 匿名: 随机换一个临时身份; 正式账号: 打开编辑形象弹窗(自定义, 不随机、不动用户名)
+  $('#meReroll').textContent = me.registered ? '✎ 编辑昵称形象' : '↻ 换个昵称形象';
+  $('#meReroll').onclick=async()=>{
+    if(me.registered){ closeMe(); openProfileEditor(); return; }
+    rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe();
+  };
   // 异步并行填充(不重复 ensureAuth: 进大厅时已确保 myUid)。正式账号并行查 eh_accounts.email。
   const isBound = !!(me && me.registered);
   const [msgsRes, roomsRes, accRes] = await Promise.all([
@@ -1354,7 +1375,7 @@ const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨'
 let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
 function openModal(which){
   $('#modalMask').classList.add('on');
-  ['mCreate','mCreated','mJoin','mReg','mReset','mEmail'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
+  ['mCreate','mCreated','mJoin','mReg','mReset','mEmail','mProfile'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
     $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o.dataset.kind==='public'));
@@ -1365,6 +1386,7 @@ function openModal(which){
   if(which==='mReg'){ $('#regUser').value='';$('#regPass').value='';$('#regEmail').value='';$('#regErr').textContent=''; setTimeout(()=>$('#regUser').focus(),50); }
   if(which==='mReset'){ $('#resetEmail').value='';$('#resetErr').textContent=''; setTimeout(()=>$('#resetEmail').focus(),50); }
   if(which==='mEmail'){ $('#newEmail').value='';$('#emailErr').textContent=''; setTimeout(()=>$('#newEmail').focus(),50); }
+  if(which==='mProfile'){ $('#profErr').textContent=''; }
 }
 function renderEmojiPick(){
   const first = pickedKind==='public'?'🌐':'🔒'; pickedEmoji=first;
@@ -1492,6 +1514,34 @@ async function changeEmail(){
   if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
   toast('邮箱已更新'); closeModal();
 }
+// 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
+let _profEmoji, _profColor;
+function openProfileEditor(){
+  openModal('mProfile');
+  _profEmoji=me.emoji||'🦊'; _profColor=me.color||'#28E6D8';
+  setTimeout(()=>{ $('#profName').value=me.name||''; },50);
+  // emoji 选择器(当前高亮在首位)
+  const emos=[_profEmoji,...EMO.filter(e=>e!==_profEmoji)];
+  $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+  $('#profEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ _profEmoji=b.textContent; $('#profEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
+  // 颜色选择器
+  const cols=COLORS.includes(_profColor)?COLORS:[_profColor,...COLORS];
+  $('#profColorPick').innerHTML=cols.map(c=>`<i class="${c===_profColor?'on':''}" data-c="${c}" style="background:${c}"></i>`).join('');
+  $('#profColorPick').querySelectorAll('i').forEach(el=>el.onclick=()=>{ _profColor=el.dataset.c; $('#profColorPick').querySelectorAll('i').forEach(x=>x.classList.remove('on')); el.classList.add('on'); });
+}
+async function saveProfile(){
+  const name=$('#profName').value.trim();
+  if(name.length<1){ $('#profErr').textContent='昵称不能为空'; return; }
+  if(name.length>24){ $('#profErr').textContent='昵称最多 24 字'; return; }
+  const btn=$('#doProfBtn'); btn.disabled=true; btn.textContent='保存中…';
+  // 关键: 只更新昵称/头像/颜色, 保留 id 和 registered 标记(不动用户名/登录)
+  me.name=name; me.emoji=_profEmoji; me.color=_profColor;
+  saveIdentity(); paintIdentity();
+  const { error }=await sb.from('eh_users').update({ name, emoji:_profEmoji, color:_profColor }).eq('id',myUid);
+  btn.disabled=false; btn.textContent='保 存';
+  if(error){ $('#profErr').textContent='保存失败'; return; }
+  toast('形象已更新'); closeModal();
+}
 
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
@@ -1507,6 +1557,7 @@ $('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
 $('#doRegBtn').onclick=()=>doRegister();
 $('#doResetBtn').onclick=()=>doReset();
 $('#doEmailBtn').onclick=()=>changeEmail();
+$('#doProfBtn').onclick=()=>saveProfile();
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
