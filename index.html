@@ -267,6 +267,38 @@
   @keyframes vbar{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1.15)}}
   .vplay .vp-t{font-size:11px;color:var(--dim);min-width:30px}
 
+  /* 神曲消息 */
+  .song-card{display:inline-flex;align-items:center;gap:10px;min-width:170px;max-width:100%;vertical-align:middle;
+    padding:2px 2px 2px 0}
+  .song-play{width:34px;height:34px;flex-shrink:0;border-radius:50%;border:none;cursor:pointer;font-size:13px;
+    display:grid;place-items:center;color:#04060c;background:linear-gradient(120deg,var(--magenta),var(--violet));
+    box-shadow:0 4px 14px rgba(255,60,172,.35);transition:.15s}
+  .song-play:hover{transform:scale(1.08)}
+  .song-card.playing .song-play{background:linear-gradient(120deg,var(--cyan),var(--magenta));animation:songspin 3s linear infinite}
+  @keyframes songspin{to{transform:rotate(360deg)}}
+  .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
+  .song-lyric{font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .song-eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:2px}
+  .song-eq i{width:2.5px;height:5px;border-radius:1px;background:currentColor;opacity:.7}
+  .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
+  .song-card.playing .song-eq i:nth-child(2){animation-delay:.15s}
+  .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
+  .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
+
+  /* 曲风选择托盘 */
+  .song-tray{position:absolute;bottom:72px;left:16px;right:16px;max-width:440px;background:var(--panel-solid);
+    border:1px solid var(--line2);border-radius:14px;padding:10px;display:none;z-index:34;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  .song-tray.on{display:block}
+  .song-tray .st-h{font-size:11.5px;color:var(--dim);margin:0 4px 8px;letter-spacing:.5px}
+  .song-tray .st-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .song-tray .st-chip{padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:rgba(10,12,24,.5);
+    cursor:pointer;text-align:center;transition:.15s}
+  .song-tray .st-chip:hover{border-color:var(--magenta);transform:translateY(-2px)}
+  .song-tray .st-chip .se{font-size:20px}
+  .song-tray .st-chip .sn{font-size:11.5px;font-weight:700;margin-top:3px}
+  .song-tray .st-chip .sd{font-size:9.5px;color:var(--dim);margin-top:1px}
+
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5)}
@@ -375,8 +407,10 @@
     .priv-actions{flex-direction:column}
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
-    .emoji-btn{width:36px;font-size:20px}
-    .composer{gap:6px;padding-left:10px;padding-right:10px}
+    .emoji-btn{width:32px;font-size:19px}
+    .composer{gap:4px;padding-left:8px;padding-right:8px}
+    .song-tray .st-grid{grid-template-columns:repeat(3,1fr)}
+    .song-lyric{max-width:150px}
     .enter-card{padding:32px 22px}
     .modal{padding:24px 20px}
   }
@@ -462,6 +496,7 @@
     <div class="composer">
       <div class="emoji-btn" id="emojiBtn">😊</div>
       <div class="emoji-btn" id="micBtn" title="发语音">🎤</div>
+      <div class="emoji-btn" id="songBtn" title="文字变神曲">🎵</div>
       <div class="cin-wrap">
         <textarea class="cin" id="cin" placeholder="说点什么… 试试打个 /" rows="1"></textarea>
       </div>
@@ -472,6 +507,7 @@
       </div>
       <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <div class="emoji-tray" id="emojiTray"></div>
+      <div class="song-tray" id="songTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
     </div>
   </div>
@@ -706,7 +742,7 @@ function bindRoomCards(box){
 // ============ 进入房间 ============
 async function enterRoom(room){
   curRoom = room;
-  stopVoice();
+  stopVoice(); stopSong();
   $('#stream').innerHTML=''; oldestId=null; echoState={}; clearReply();
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
   $('#hallName').innerHTML=`${safeEmoji(room.emoji)} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
@@ -876,7 +912,8 @@ function buildMsgEl(m){
   el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
   el.dataset.mid=m.id;
   const isVoice = m.kind==='voice';
-  el.dataset.text=isVoice?'[语音消息]':m.text; el.dataset.name=m.name;
+  const isSong = m.kind==='song';
+  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=m.name;
   // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
   if(m.reply_to){
@@ -890,15 +927,15 @@ function buildMsgEl(m){
     <div class="body">
       <div class="meta"><span class="nm" style="color:${safeColor(m.color)}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
       ${replyHtml}
-      <div class="txt">${isVoice?voiceHtml(m.text):esc(m.text)}${echoHtml}</div>
+      <div class="txt">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):esc(m.text))}${echoHtml}</div>
     </div>`;
   const txtEl=el.querySelector('.txt');
   const echoEl=el.querySelector('.echo');
   if(echoEl){ if(echoState[m.id]?.count) echoEl.classList.add('has'); echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); }; }
   // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
-  // 语音消息的引用/投影用文字标签，不用原始 URL
-  attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:m);
+  // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
+  attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
   return el;
 }
 // 从已渲染消息 DOM 里取某条的原文(名字:内容)
@@ -1019,6 +1056,162 @@ $('#recCancel').onclick=()=>{ if(recorder && recorder.state!=='inactive'){ recWa
 $('#recSend').onclick=()=>{ if(recorder && recorder.state!=='inactive'){ recWanted=true; recorder.stop(); } };
 if(!REC_MIME || !navigator.mediaDevices?.getUserMedia) $('#micBtn').style.display='none';
 
+// ============ 神曲(文字→洗脑歌曲, Web Audio 合成节拍 + 语音合成"唱"字) ============
+// 消息编码: kind='song', text='曲风id|歌词'。曲风白名单校验, 不认识则整体当纯文本(向后兼容)。
+const SCALE={
+  majP:[0,2,4,7,9],       // 大调五声(欢快)
+  minP:[0,3,5,7,10],      // 小调五声(蓝调/洗脑)
+  major:[0,2,4,5,7,9,11],
+  minor:[0,2,3,5,7,8,10],
+};
+// motif=旋律动机(反复出现→洗脑), chords=每小节根音(半音), groove=鼓型
+const SONG_STYLES=[
+  { id:'dj',    name:'蹦迪DJ',  emoji:'🕺', color:'#28E6D8', bpm:128, bpc:0.5, base:3,  scale:SCALE.minP,
+    motif:[0,0,2,0,3,2,1,0], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.35,pitch:1.0,spread:0.14} },
+  { id:'shen',  name:'神曲喊麦', emoji:'🎤', color:'#FF3CAC', bpm:95,  bpc:0.5, base:-2, scale:SCALE.minor,
+    motif:[0,0,0,2,3,2,0,-1], chords:[0,0,5,3], wave:'square', bass:'sawtooth', groove:'boom', tts:{rate:1.5,pitch:0.7,spread:0.10} },
+  { id:'kid',   name:'儿歌',    emoji:'🧸', color:'#FFB84D', bpm:112, bpc:0.5, base:5,  scale:SCALE.major,
+    motif:[0,2,4,4,2,0,2,4], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.6,spread:0.16} },
+  { id:'gufeng',name:'古风',    emoji:'🏮', color:'#8B5CFF', bpm:82,  bpc:1.0, base:0,  scale:SCALE.majP,
+    motif:[0,1,2,1,0,2,3,2], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.15,spread:0.12} },
+  { id:'disco', name:'迪斯科',  emoji:'🪩', color:'#4DE38A', bpm:116, bpc:0.5, base:3,  scale:SCALE.major,
+    motif:[0,2,4,2,5,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1,spread:0.14} },
+  { id:'8bit',  name:'电玩',    emoji:'👾', color:'#5B8CFF', bpm:144, bpc:0.5, base:0,  scale:SCALE.minP,
+    motif:[0,2,4,3,2,4,1,0], chords:[0,3,-2,5], wave:'square', bass:'square', groove:'four', tts:{rate:1.4,pitch:1.35,spread:0.18} },
+];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
+function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); return scale[((deg%n)+n)%n]+12*oct; }
+function parseSong(text){
+  const t=String(text||''), i=t.indexOf('|');
+  if(i>0){ const sid=t.slice(0,i); if(SONG_STYLES.some(s=>s.id===sid)) return { sid, lyric:t.slice(i+1) }; }
+  return { sid:SONG_STYLES[0].id, lyric:t };
+}
+function songHtml(text){
+  const { sid, lyric }=parseSong(text);
+  const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}">
+    <button class="song-play" title="播放">▶</button>
+    <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
+      <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
+    <span class="song-lyric">${esc(lyric)}</span></span></span>`;
+}
+
+// Web Audio 基础
+let audioCtx=null;
+function ac(){
+  if(!audioCtx){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; audioCtx=new C(); }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+let noiseBuf=null;
+function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
+function tone(ctx,dest,freq,t,dur,type,gain){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(gain,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(dest); o.start(t); o.stop(t+dur+0.05); return o;
+}
+function kick(ctx,dest,t){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.11); g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16); o.connect(g).connect(dest); o.start(t); o.stop(t+0.2); return o; }
+function hat(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7000; const g=ctx.createGain(); g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05); s.connect(hp).connect(g).connect(dest); s.start(t); s.stop(t+0.07); return s; }
+function snare(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; const g=ctx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18); s.connect(bp).connect(g).connect(dest); s.start(t); s.stop(t+0.2); return s; }
+
+let zhVoice=null;
+function loadVoices(){ try{ const vs=speechSynthesis.getVoices()||[]; zhVoice=vs.find(v=>/zh|cmn|chinese/i.test((v.lang||'')+(v.name||'')))||null; }catch(e){} }
+if('speechSynthesis' in window){ loadVoices(); try{ speechSynthesis.onvoiceschanged=loadVoices; }catch(e){} }
+
+let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el}
+function stopSong(){
+  if(!curSong) return;
+  const s=curSong; curSong=null;
+  s.timeouts.forEach(clearTimeout);
+  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
+  s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
+  try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
+  if(s.el) s.el.classList.remove('playing');
+}
+function playSong(lyric, sid, el){
+  stopVoice(); stopSong();
+  const ctx=ac(); if(!ctx){ toast('此浏览器不支持音频合成'); return; }
+  const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
+  if(!chars.length){ toast('没有可唱的内容'); return; }
+  const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
+  const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
+  const t0=ctx.currentTime+0.12;
+  const totalDur=chars.length*step + spb*2;
+  curSong={ ctx, master, oscs:[], timeouts:[], el:el||null };
+  if(el) el.classList.add('playing');
+  // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
+  const bars=Math.ceil(totalDur/barLen);
+  for(let b=0;b<bars;b++){
+    const bt=t0+b*barLen, root=st.base+st.chords[b%st.chords.length];
+    for(let beat=0;beat<4;beat++){
+      const t=bt+beat*spb;
+      if(st.groove==='four') curSong.oscs.push(kick(ctx,master,t));
+      else if(beat%2===0) curSong.oscs.push(kick(ctx,master,t));
+      if(beat%2===1) curSong.oscs.push(snare(ctx,master,t));
+      curSong.oscs.push(hat(ctx,master,t)); curSong.oscs.push(hat(ctx,master,t+spb/2));
+      curSong.oscs.push(tone(ctx,master,NOTE(root-12),t,spb*0.85,st.bass,0.22));
+    }
+    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,'triangle',0.045)));
+  }
+  // 主旋律 + 逐字"唱"
+  chars.forEach((ch,i)=>{
+    const t=t0+i*step, deg=st.motif[i%st.motif.length];
+    const semi=st.base+scaleSemi(st.scale,deg);
+    curSong.oscs.push(tone(ctx,master,NOTE(semi+12),t,step*0.9,st.wave,0.16));
+    if('speechSynthesis' in window){
+      const pitch=clamp(st.tts.pitch+(deg-2)*st.tts.spread,0.1,2);
+      curSong.timeouts.push(setTimeout(()=>{
+        try{ const u=new SpeechSynthesisUtterance(ch); u.lang='zh-CN'; u.rate=st.tts.rate; u.pitch=pitch; if(zhVoice) u.voice=zhVoice; speechSynthesis.speak(u); }catch(e){}
+      }, Math.max(0,(t-ctx.currentTime)*1000)));
+    }
+  });
+  curSong.timeouts.push(setTimeout(()=>stopSong(), (totalDur+0.4)*1000));
+}
+// 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.song-play'); if(!btn) return;
+  const card=btn.closest('.song-card'); if(!card) return;
+  if(curSong && curSong.el===card){ stopSong(); return; }
+  playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
+});
+
+async function sendSong(lyric, sid){
+  if(!curRoom || !myUid) return;
+  lyric=String(lyric||'').trim().slice(0,60);
+  if(!lyric){ toast('先打点字，让它唱出来'); return; }
+  if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
+  const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
+  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+  resetInput(); closeSongTray();
+  // 本地立即试听(发送者刚有手势, 允许自动播放)
+  if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
+  const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
+  if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
+  optimistic.id=row.id; if(el) el.dataset.mid=row.id;
+}
+// 曲风选择托盘
+function renderSongTray(){
+  $('#songTray').innerHTML=`<div class="st-h">挑个曲风，把输入框的字唱成神曲 🎶</div>
+    <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip" data-sid="${s.id}">
+      <div class="se">${s.emoji}</div><div class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</div>
+      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>`;
+  $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation(); sendSong($('#cin').value, c.dataset.sid); });
+}
+function closeSongTray(){ $('#songTray').classList.remove('on'); }
+$('#songBtn').onclick=e=>{ e.stopPropagation();
+  const open=!$('#songTray').classList.contains('on');
+  $('#emojiTray').classList.remove('on');
+  if(open){ renderSongTray(); $('#songTray').classList.add('on'); } else closeSongTray();
+};
+document.addEventListener('click',()=>closeSongTray());
+$('#songTray').addEventListener('click',e=>e.stopPropagation());
+if(!(window.AudioContext||window.webkitAudioContext)) $('#songBtn').style.display='none';
+
 // ============ echo(🔥) 落库 ============
 async function toggleEcho(mid){
   if(String(mid).startsWith('local_')) return;
@@ -1056,6 +1249,7 @@ const SLASH_CMDS=[
   {c:'/flip',  d:'抛硬币，正面还是反面'},
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
+  {c:'/sing',  d:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -1063,6 +1257,10 @@ async function handleSlash(text){
   if(cmd==='/dice'){ const n=1+Math.floor(secureRand()*6); await sendSystemAct(`掷出了 🎲 ${n} 点`); return true; }
   if(cmd==='/flip'){ const r=secureRand()<0.5?'正面 🪙':'反面 🪙'; await sendSystemAct(`抛硬币：${r}`); return true; }
   if(cmd==='/echo'){ burst('🎆',24); burst('✨',20); await sendSystemAct('放了一串烟花 🎆'); return true; }
+  if(cmd==='/sing'||cmd==='/唱'){
+    if(!arg){ toast('用法：/sing 要唱的文字'); return true; }
+    await sendSong(arg, rand(SONG_STYLES).id); return true;
+  }
   if(cmd==='/whisper'){
     const mName=arg.match(/^@?(\S+)\s+(.+)$/);
     if(!mName){ toast('用法：/whisper @昵称 内容'); return true; }
@@ -1198,7 +1396,7 @@ function ehConfirm(msg, title){
 
 // ============ 离开房间 ============
 async function leaveRoom(){
-  stopVoice();
+  stopVoice(); stopSong();
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
   await leavePresence();
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }

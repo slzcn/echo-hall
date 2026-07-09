@@ -239,10 +239,17 @@ async function loadRooms(){
 
 // 语音消息渲染为播放器；只信任本站语音桶的地址，其余按纯文本展示
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
+const SONG_STYLE_NAMES={dj:'蹦迪DJ',shen:'神曲喊麦',kid:'儿歌',gufeng:'古风',disco:'迪斯科','8bit':'电玩'};
 function voiceOrText(m){
   const src=String(m.text||'');
   if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
     return `<audio controls preload="none" style="height:30px;max-width:100%" src="${esc(src.split('#')[0])}"></audio>`;
+  if(m.kind==='song'){
+    const i=src.indexOf('|'), sid=i>0?src.slice(0,i):'';
+    const lyric=i>0 && SONG_STYLE_NAMES[sid]?src.slice(i+1):src;
+    const style=SONG_STYLE_NAMES[sid]?`<span style="color:var(--cyan)">[${SONG_STYLE_NAMES[sid]}] </span>`:'';
+    return style+esc(lyric);
+  }
   return esc(m.text);
 }
 async function loadMessages(rid,name){
