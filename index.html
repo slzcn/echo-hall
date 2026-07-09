@@ -92,6 +92,16 @@
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
   .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
   .fld-hint{font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  /* 通用确认弹层 */
+  .confirm-box{width:min(340px,88vw);padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
+  .confirm-title{font-size:17px;font-weight:800;margin-bottom:10px;letter-spacing:.5px}
+  .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .confirm-btns{display:flex;gap:10px}
+  .confirm-btns button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
+  .cf-cancel{background:rgba(10,12,24,.5);color:var(--sub)}
+  .cf-cancel:hover{border-color:var(--line2);color:var(--ink)}
+  .cf-ok{background:linear-gradient(120deg,var(--magenta),var(--violet));color:#fff;border:none}
+  .cf-ok:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,60,172,.3)}
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,60,172,.35)}
   .btn-primary:active{transform:translateY(0) scale(.99)}
   .btn-primary:disabled{opacity:.5;cursor:wait}
@@ -216,10 +226,10 @@
   .reply-preview .rp-x:hover{color:var(--magenta)}
 
   .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
-  .cin-wrap{flex:1;display:flex;align-items:center;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
+  .cin-wrap{flex:1;display:flex;align-items:center;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
-  .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;
-    line-height:1.5;max-height:100px;min-height:24px;padding:10px 0}
+  .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
+    line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
@@ -446,7 +456,7 @@
     <div class="modal-x" id="modalX">✕</div>
     <div class="modal-body" id="mCreate">
       <h3>创建房间</h3>
-      <p class="modal-sub">公开房进大厅列表谁都能进；私密房生成邀请码，仅受邀者可入。</p>
+      <p class="modal-sub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
         <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od">大厅可见</div></div>
         <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od">邀请码进</div></div>
@@ -479,8 +489,7 @@
       <label class="fld"><span>密码</span>
         <input id="regPass" type="password" placeholder="至少 6 位"></label>
       <label class="fld" style="margin-bottom:8px"><span>邮箱（选填）</span>
-        <input id="regEmail" type="email" placeholder="用于找回密码">
-        <div class="fld-hint">💡 建议填写：忘记密码时可凭邮箱找回；留空则密码丢失后无法找回账号。</div></label>
+        <input id="regEmail" type="email" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
       <button class="btn-primary" id="doRegBtn">注 册 并 进 入</button>
     </div>
@@ -491,6 +500,18 @@
         <input id="resetEmail" type="email" placeholder="注册时填的邮箱"></label>
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 通用确认弹层(替代原生 confirm) ===== -->
+<div class="modal-mask" id="confirmMask">
+  <div class="glass confirm-box">
+    <div class="confirm-title" id="confirmTitle">确认操作</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="cf-cancel" id="confirmNo">取消</button>
+      <button class="cf-ok" id="confirmYes">确定</button>
     </div>
   </div>
 </div>
@@ -648,16 +669,18 @@ async function enterRoom(room){
   goScene('hall'); setConn(false,'连接中');
 
   await ensureAuth();
+  // 实时订阅先挂上(不阻塞，立刻开始接新消息，不遗漏)
+  subscribeMessages(room.id);
   // 确保成为成员(官方/公开：直接加入；私密：调用处已保证)
   await joinAsMember(room);
-  // 判定房主
-  const { data:mem } = await sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle();
-  room.role = mem?.role || 'member';
+  // 成员身份就绪后：历史/房主判定/在线状态 三者并行拉取(而非串行等待)
+  const [histDone, memRes] = await Promise.all([
+    loadHistory(true),
+    sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
+    setupPresence(room),
+  ]);
+  room.role = memRes?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
-
-  await loadHistory(true);
-  subscribeMessages(room.id);
-  await setupPresence(room);
   setConn(true);
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
 }
@@ -670,29 +693,38 @@ async function joinAsMember(room){
   if(error && !/duplicate|unique/i.test(error.message||'')) console.warn('join', error);
 }
 
-// ---- 历史消息(分页) ----
+// ---- 历史消息 ----
+// 公开房(官方/public)：走 eh_public_recent(方案B，未进房/匿名也能读最近100条，更快)，不分页。
+// 私密房：走直查(成员RLS，成员只看加入后)，支持"加载更多"分页。
 async function loadHistory(first){
-  let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
-  if(oldestId) q = q.lt('id', oldestId);
-  const { data } = await q;
-  const rows = (data||[]).slice().reverse();
-  if(rows.length){ oldestId = rows[0].id; }
-  // 加载更多按钮
+  const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
+  let rows;
+  if(isPublic){
+    const { data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 });
+    rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
+    if(rows.length){ oldestId = rows[0].id; }
+  } else {
+    let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
+    if(oldestId) q = q.lt('id', oldestId);
+    const { data } = await q;
+    rows = (data||[]).slice().reverse();
+    if(rows.length){ oldestId = rows[0].id; }
+  }
+  // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶100，无更多)
+  const canLoadMore = !isPublic && rows.length===HISTORY_PAGE;
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   const frag=document.createDocumentFragment();
   rows.forEach(m=>{ const el=buildMsgEl(m); if(el) frag.appendChild(el); });
   if(first){
     stream.appendChild(frag); scrollStream();
-    // 拉取这些消息的 echo 计数
     fetchEchoes(rows.map(m=>m.id));
-    if(rows.length===HISTORY_PAGE) addLoadMore();
+    if(canLoadMore) addLoadMore();
   } else {
-    // 插到顶部，保持滚动位置
     const prevH=stream.scrollHeight;
     if(moreBtn) moreBtn.remove();
     stream.insertBefore(frag, stream.firstChild);
-    if(rows.length===HISTORY_PAGE) addLoadMore(true);
+    if(canLoadMore) addLoadMore(true);
     stream.scrollTop = stream.scrollHeight - prevH;
     fetchEchoes(rows.map(m=>m.id));
   }
@@ -826,7 +858,7 @@ async function send(){
   if(error){ console.warn('send',error); toast('发送失败'); }
   else if(data){ el && (el.dataset.mid=data.id); }
 }
-function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='24px'; $('#goBtn').disabled=true; hideSlash(); }
+function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; $('#goBtn').disabled=true; hideSlash(); }
 
 // ============ echo(🔥) 落库 ============
 async function toggleEcho(mid){
@@ -981,6 +1013,18 @@ function burst(str,count=10){
 // ============ toast ============
 let toastT=null;
 function toast(msg){ const t=$('#toast'); t.innerHTML=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+// 赛博风确认弹层，返回 Promise<boolean>，替代原生 confirm()
+function ehConfirm(msg, title){
+  return new Promise(res=>{
+    $('#confirmTitle').textContent = title||'确认操作';
+    $('#confirmMsg').textContent = msg;
+    $('#confirmMask').classList.add('on');
+    const done=(v)=>{ $('#confirmMask').classList.remove('on'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
+    $('#confirmYes').onclick=()=>done(true);
+    $('#confirmNo').onclick=()=>done(false);
+    $('#confirmMask').onclick=(e)=>{ if(e.target===$('#confirmMask')) done(false); };
+  });
+}
 
 // ============ 离开房间 ============
 async function leaveRoom(){
@@ -1022,12 +1066,12 @@ async function openGear(){
     toast('已保存'); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
-    if(!confirm('确定踢出该成员？')) return;
+    if(!await ehConfirm('确定踢出该成员？','踢出成员')) return;
     await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',el.dataset.uid);
     toast('已踢出'); openGear();
   });
   $('#gDissolveBtn').onclick=async()=>{
-    if(!confirm('解散后房间和消息将从前台消失，确定？')) return;
+    if(!await ehConfirm('解散后房间和消息将从前台消失，确定？','解散房间')) return;
     await sb.from('eh_rooms').delete().eq('id',curRoom.id);
     toast('房间已解散'); closeGear(); backToLobby();
   };
@@ -1037,45 +1081,53 @@ function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').cl
 
 // ============ 个人空间抽屉 ============
 async function openMe(){
-  await ensureAuth();
   const body=$('#meBody');
-  const { data:{ session } } = await sb.auth.getSession();
-  const bound = !!session?.user?.email;
-  // 我发的消息(最近)
-  const { data:myMsgs } = await sb.from('eh_messages').select('text,created_at,room_id').eq('user_id',myUid).order('id',{ascending:false}).limit(20);
-  // 我在的房间
-  const { data:myRooms } = await sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50);
+  const bound = !!(me && me.id && !me.__anon);   // 先用缓存粗判，稍后校准
+  // 立即开抽屉 + 渲染身份骨架(不等数据查询)，消除"点头像卡很久"
   body.innerHTML=`
     <div class="dsec"><div class="dl">我的身份</div>
       <div class="dcard">
         <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${me.color}">${me.emoji} ${esc(me.name)}</span></div>
-        <div class="drow"><span class="dk">状态</span><span class="dv">${bound?'正式账号':'匿名（本设备）'}</span></div>
+        <div class="drow"><span class="dk">状态</span><span class="dv" id="meStatus">…</span></div>
         <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
-        ${bound?'':'<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>'}
+        <div id="meRegSlot"></div>
       </div></div>
-    <div class="dsec"><div class="dl">我在的房间 (${(myRooms||[]).length})</div>
-      <div class="mlist">${(myRooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
-        <div class="mitem"><div class="mi-av">${rm.emoji||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
-        ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>'}</div></div>
-    <div class="dsec"><div class="dl">我最近发的话 (${(myMsgs||[]).length})</div>
-      <div class="dcard" style="max-height:200px;overflow-y:auto">
-        ${(myMsgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>'}
-      </div></div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我在的房间</div>
+      <div class="mlist" id="meRoomsList"><div class="empty-hint">加载中…</div></div></div>
+    <div class="dsec"><div class="dl" id="meMsgsLabel">我最近发的话</div>
+      <div class="dcard" style="max-height:200px;overflow-y:auto" id="meMsgsList"><div class="empty-hint">加载中…</div></div></div>
     <div class="dsec"><div class="dl">账号</div>
       <div class="dcard">
-        <button class="dbtn danger" id="meLogout">${bound?'退出登录':'退出 / 换个身份'}</button>
-        <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6">
-          ${bound?'退出后聊天记录仍与你的邮箱关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。'}
-        </div>
+        <button class="dbtn danger" id="meLogout">退出 / 换个身份</button>
+        <div class="note" id="meLogoutNote" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div></div>`;
-  $('#meReroll') && ($('#meReroll').onclick=async()=>{ rollIdentity(); await sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); });
-  $('#meReg') && ($('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); });
-  $('#meLogout') && ($('#meLogout').onclick=()=>logoutIdentity(bound));
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
+  $('#meReroll').onclick=async()=>{ rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); };
+  // 异步并行填充其余内容
+  await ensureAuth();
+  const [{ data:{ session } }, msgsRes, roomsRes] = await Promise.all([
+    sb.auth.getSession(),
+    sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
+    sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
+  ]);
+  const isBound = !!session?.user?.email;
+  const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
+  $('#meStatus').textContent = isBound?'正式账号':'匿名（本设备）';
+  $('#meRegSlot').innerHTML = isBound?'':'<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
+  $('#meReg') && ($('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); });
+  $('#meRoomsLabel').textContent=`我在的房间 (${myRooms.length})`;
+  $('#meRoomsList').innerHTML=myRooms.map(r=>{const rm=r.eh_rooms||{};return `
+    <div class="mitem"><div class="mi-av">${rm.emoji||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+  $('#meMsgsLabel').textContent=`我最近发的话 (${myMsgs.length})`;
+  $('#meMsgsList').innerHTML=myMsgs.map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
+  $('#meLogout').textContent = isBound?'退出登录':'退出 / 换个身份';
+  $('#meLogoutNote').textContent = isBound?'退出后聊天记录仍与你的邮箱关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。';
+  $('#meLogout').onclick=()=>logoutIdentity(isBound);
 }
 // 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
 async function logoutIdentity(bound){
-  if(!confirm(bound?'确定退出登录？':'确定退出并换一个新身份？')) return;
+  if(!await ehConfirm(bound?'确定退出登录？':'确定退出并换一个新身份？', bound?'退出登录':'切换身份')) return;
   try{ if(curRoom) await leaveRoom(); }catch(e){}
   try{ await sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem(LS_ID); }catch(e){}
@@ -1145,7 +1197,7 @@ async function createRoom(){
 }
 async function joinByCode(){
   const code=$('#codeIn').value.trim().toUpperCase();
-  if(!code) return;
+  if(!code){ $('#joinErr').textContent='请输入邀请码'; $('#codeIn').focus(); return; }
   await ensureAuth();
   const btn=$('#doJoinBtn'); btn.disabled=true; btn.textContent='进入中…'; $('#joinErr').textContent='';
   const { data:rooms, error }=await sb.rpc('eh_find_room_by_code',{code});
@@ -1246,7 +1298,7 @@ $('#rpX').onclick=()=>clearReply();
 // 输入框
 const cin=$('#cin');
 cin.addEventListener('input',()=>{
-  cin.style.height='24px'; cin.style.height=Math.min(cin.scrollHeight,100)+'px';
+  cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
   $('#goBtn').disabled=!cin.value.trim();
   const v=cin.value;
   if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
