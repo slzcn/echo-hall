@@ -344,8 +344,8 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    .stage:has(#hall.on){padding:0}
-    #hall{width:100%;height:100vh;height:100dvh;border-radius:0;border:none}
+    .stage:has(#hall.on){padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
+    #hall{width:100%;height:100dvh;height:var(--appvh,100dvh);border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -652,10 +652,21 @@ async function renderMyRooms(){
     <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
 }
+// 进房预取缓存: 悬停/按下卡片时提前拉该公开房最近消息，点进去瞬间显示
+const prefetchCache={};
+function prefetchRoom(rid, kind){
+  if(kind!=='official' && kind!=='public') return;   // 私密房不预取(RLS需成员)
+  if(prefetchCache[rid]) return;
+  prefetchCache[rid] = sb.rpc('eh_public_recent',{ rid, lim:100 }).then(({data})=>data||[]).catch(()=>[]);
+}
 function bindRoomCards(box){
-  box.querySelectorAll('.ch').forEach(el=>el.onclick=()=>enterRoom({
-    id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind
-  }));
+  box.querySelectorAll('.ch').forEach(el=>{
+    const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
+    const pf=()=>prefetchRoom(room.id, room.kind);
+    el.addEventListener('pointerenter', pf);   // 桌面悬停预取
+    el.addEventListener('touchstart', pf, {passive:true}); // 移动按下预取
+    el.onclick=()=>enterRoom(room);
+  });
 }
 
 // ============ 进入房间 ============
@@ -700,7 +711,10 @@ async function loadHistory(first){
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows;
   if(isPublic){
-    const { data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 });
+    // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
+    let data;
+    if(first && prefetchCache[curRoom.id]){ data = await prefetchCache[curRoom.id]; delete prefetchCache[curRoom.id]; }
+    else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
@@ -1348,6 +1362,23 @@ window.addEventListener('beforeunload',()=>{
   // 尽力删除自己的在线行(用 sendBeacon 式的同步兜底：直接 fire-and-forget)
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
+
+// ============ iOS 键盘遮挡修复 ============
+// iOS Safari 键盘弹起时不压缩 100dvh，会盖住底部输入框。
+// 用 visualViewport 实时把可视高度写进 --appvh，移动端 #hall 用它做高度。
+function syncViewportH(){
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--appvh', h + 'px');
+  // 键盘弹起后确保输入框可见
+  if(document.activeElement && document.activeElement.id==='cin') scrollStream();
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncViewportH);
+  window.visualViewport.addEventListener('scroll', syncViewportH);
+}
+window.addEventListener('resize', syncViewportH);
+syncViewportH();
 
 // ============ 启动 ============
 loadOrRollIdentity();
