@@ -173,17 +173,10 @@ async function api(path,{method='GET',body,auth=true}={}){
   return {ok:r.ok,status:r.status,body:j};
 }
 
-// ---- 判断是首个注册还是登录 ----
+// ---- 判断是首个注册还是登录：调 /status(已有管理员则登录模式) ----
 async function detectMode(){
-  // 试探：无 token 时调 register 端点会告诉我们是否已关闭
-  // 简化：先尝试判断——无账号则显示注册
-  const probe=await api('/login',{method:'POST',auth:false,body:{username:'__probe__',password:'__probe__'}});
-  // 若返回"账号或密码错误"→已有账号(登录模式)；若其它→仍登录模式默认
-  // 用 register 的 dry 探测更准：直接尝试注册一个探测(会因already exists或密码规则失败)不好。
-  // 改为：调用 register 端点用非法短密码，若返回"注册已关闭"则是登录模式，否则注册模式。
-  const probe2=await api('/register',{method:'POST',auth:false,body:{username:'x',password:'x'}});
-  if(probe2.body?.error && probe2.body.error.includes('注册已关闭')){ mode='login'; }
-  else { mode='register'; } // 密码规则错误说明注册开放(表为空)
+  const res=await api('/status',{auth:false});
+  mode = (res.ok && res.body?.registered) ? 'login' : 'register';
   paintAuthMode();
 }
 function paintAuthMode(){
