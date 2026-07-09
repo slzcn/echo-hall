@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>回声厅 · Echo Hall</title>
+<!-- 加速: 提前握手 CDN 与 Supabase 域名, 首屏并行拉取 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://cddkniwbhvcbfgkgomtl.supabase.co" crossorigin>
+<link rel="dns-prefetch" href="https://cddkniwbhvcbfgkgomtl.supabase.co">
+<link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js">
 <style>
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
@@ -200,7 +205,7 @@
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;
     line-height:1.5;max-height:100px;min-height:24px;padding:10px 0}
   .cin::placeholder{color:var(--dim)}
-  .emoji-btn{font-size:20px;cursor:pointer;padding:6px;border-radius:8px;transition:.15s;user-select:none}
+  .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
@@ -696,15 +701,20 @@ async function setupPresence(room){
   heartbeatTimer = setInterval(async()=>{ await beat(); refreshPresence(); }, 15000);
 }
 async function beat(extra){
-  if(!curRoom || !myUid) return;
+  if(!curRoom) return;
+  if(!myUid){ await ensureAuth(); if(!myUid) return; } // 兜底：myUid 未就绪先补登录
   const row = { room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, last_seen:new Date().toISOString(), ...(extra||{}) };
-  await sb.from('eh_presence').upsert(row);
+  const { error } = await sb.from('eh_presence').upsert(row);
+  if(error) console.warn('beat error', error.message);
 }
 async function refreshPresence(){
   if(!curRoom) return;
   const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
   const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
-  const users=(data||[]).slice().sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
+  let users=(data||[]).slice();
+  // 兜底：自己一定在线（DB 读取延迟/失败时也至少显示自己），避免卡"连接中/0人"
+  if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
+  users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
   $('#presence').innerHTML=users.map(p=>`
     <div class="pav ${p.user_id===myUid?'me':''}" style="background:${p.color}22;color:${p.color};box-shadow:inset 0 0 0 1.5px ${p.color}" title="${esc(p.name)}">
       ${p.emoji}<span class="ring"></span></div>`).join('');
@@ -1010,10 +1020,31 @@ async function openMe(){
     <div class="dsec"><div class="dl">我最近发的话 (${(myMsgs||[]).length})</div>
       <div class="dcard" style="max-height:200px;overflow-y:auto">
         ${(myMsgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>'}
+      </div></div>
+    <div class="dsec"><div class="dl">账号</div>
+      <div class="dcard">
+        <button class="dbtn danger" id="meLogout">${bound?'退出登录':'退出 / 换个身份'}</button>
+        <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6">
+          ${bound?'退出后聊天记录仍与你的邮箱关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。'}
+        </div>
       </div></div>`;
   $('#meReroll') && ($('#meReroll').onclick=async()=>{ rollIdentity(); await sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); });
   $('#meBind') && ($('#meBind').onclick=()=>{ closeMe(); openModal('mBind'); });
+  $('#meLogout') && ($('#meLogout').onclick=()=>logoutIdentity(bound));
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
+}
+// 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
+async function logoutIdentity(bound){
+  if(!confirm(bound?'确定退出登录？':'确定退出并换一个新身份？')) return;
+  try{ if(curRoom) await leaveRoom(); }catch(e){}
+  try{ await sb.auth.signOut(); }catch(e){}
+  try{ localStorage.removeItem(LS_ID); }catch(e){}
+  myUid=null; me=null;
+  closeMe();
+  // 重新生成一个身份并回到入场页
+  loadOrRollIdentity(); paintIdentity();
+  goScene('enter');
+  toast(bound?'已退出登录':'已换新身份');
 }
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
