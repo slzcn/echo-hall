@@ -1255,16 +1255,29 @@ async function joinByCode(){
 }
 // ============ 正式账号：注册 / 登录 / 找回 ============
 // 登录：账号(用户名或邮箱)+密码。先 resolve 出登录邮箱，再 signInWithPassword。
+// 用户名→内部登录邮箱(与后端 eh-auth 的 uname2email 一致): u_<hex(小写用户名)>@eh.local
+function unameToEmail(u){
+  const bytes=new TextEncoder().encode(u.toLowerCase());
+  let hex=''; for(const b of bytes) hex+=b.toString(16).padStart(2,'0');
+  return 'u_'+hex+'@eh.local';
+}
 async function doLogin(){
   const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
   $('#loginErr').textContent='';
   if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
   const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='登录中…';
-  const res=await authApi('/resolve',{account});
-  if(!res.ok || !res.body.loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent=res.body.error||'账号不存在'; return; }
-  const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
+  // 用户名: 本地直接算内部邮箱, 省掉 resolve 往返(提速)。真邮箱: 走 resolve(可能绑过).
+  let loginEmail;
+  if(/^\S+@\S+\.\S+$/.test(account)){
+    const res=await authApi('/resolve',{account});
+    loginEmail = res.body?.loginEmail;
+    if(!loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent='账号不存在'; return; }
+  } else {
+    loginEmail = unameToEmail(account);
+  }
+  const { data:sess, error }=await sb.auth.signInWithPassword({ email:loginEmail, password });
   btn.disabled=false; btn.textContent='登 录';
-  if(error){ $('#loginErr').textContent='密码错误'; return; }
+  if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
   myUid=sess.user.id;
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
   if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); }
@@ -1390,19 +1403,20 @@ typeSub();
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
 const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
-sb.auth.onAuthStateChange(async (ev,session)=>{
+// ⚠️ onAuthStateChange 回调里绝不能直接 await sb.* 请求(GoTrue 会死锁, 表现为登录后所有请求卡住)。
+// 故这里只做同步赋值, 异步部分用 setTimeout defer 到回调外执行。
+sb.auth.onAuthStateChange((ev,session)=>{
   if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
     myUid=session.user.id;
-    // 从 eh_users 拉回该账号原有的昵称/形象(跨设备找回的关键)
-    const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-    if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; }
-    else { me = me || {}; me.id=myUid; } // 新绑定的账号,沿用当前身份
-    saveIdentity(); paintIdentity();
-    if(location.hash) history.replaceState(null,'',location.pathname+location.search);
-    // 从登录/绑定链接回跳进来的,自动进大厅
-    if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
-      authHandled=true; toast('已登录 '+session.user.email); goScene('lobby'); renderLobby();
-    }
+    if(me) me.id=myUid;
+    setTimeout(async ()=>{
+      const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); paintIdentity(); }
+      if(location.hash) history.replaceState(null,'',location.pathname+location.search);
+      if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
+        authHandled=true; toast('已登录'); goScene('lobby'); renderLobby();
+      }
+    },0);
   }
 });
 </script>
