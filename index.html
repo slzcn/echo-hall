@@ -746,6 +746,7 @@ async function renderMyRooms(soft){
 const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
 const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
+let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
 function prefetchRoom(rid, kind){
   const hit=prefetchCache[rid];
   if(hit && Date.now()-hit.at < PREFETCH_TTL) return;   // 命中且未过期
@@ -774,24 +775,44 @@ function bindRoomCards(box){
 }
 
 // ============ 进入房间 ============
+const SNAP_TTL=30000;   // 快照有效期 30s
 async function enterRoom(room){
   curRoom = room;
-  $('#stream').innerHTML=''; oldestId=null; echoState={}; clearReply();
+  // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
+  const snapHit = roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
   $('#hallName').innerHTML=`${safeEmoji(room.emoji)} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  clearReply();
+  if(snapHit){
+    // 秒还原已渲染消息 + 滚动位置状态
+    $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
+    $('#presence').innerHTML=''; $('#hallCnt').textContent='连接中…';
+    goScene('hall'); setConn(false,'连接中'); scrollStream();
+    roomSnap=null;
+    await ensureAuth();
+    subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息
+    await joinAsMember(room);
+    const [ , memRes] = await Promise.all([
+      sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
+      setupPresence(room),
+      refreshSnapshotTail(room)       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
+    ]);
+    room.role = memRes?.data?.role || 'member';
+    $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
+    setConn(true);
+    return;
+  }
+  // ---- 无快照: 原全量流程 ----
+  $('#stream').innerHTML=''; oldestId=null; echoState={};
   $('#hallCnt').textContent='连接中…';
   $('#presence').innerHTML='';
   goScene('hall'); setConn(false,'连接中');
 
   await ensureAuth();
-  // 实时订阅先挂上(不阻塞，立刻开始接新消息，不遗漏)
   subscribeMessages(room.id);
-  // 公开房/官方房: 拉消息不依赖成员身份(eh_public_recent 匿名可读)，
-  //   立刻开拉、与 joinAsMember 并行，省掉串行等 insert 的 ~300ms
   const isPublic = room.kind==='official' || room.kind==='public';
   const histP = isPublic ? loadHistory(true) : null;
   await joinAsMember(room);
-  // 私密房必须成员就绪后才能读(RLS)，此时才拉
   const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
     setupPresence(room) ];
@@ -800,6 +821,24 @@ async function enterRoom(room){
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
   setConn(true);
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+}
+
+// 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
+async function refreshSnapshotTail(room){
+  try{
+    const isPublic = room.kind==='official' || room.kind==='public';
+    let rows;
+    if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:HISTORY_PAGE}); rows=(data||[]).slice().reverse(); }
+    else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE); rows=(data||[]).slice().reverse(); }
+    const stream=$('#stream');
+    const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
+    rows.forEach(m=>{
+      if(m && m.id!=null && !stream.querySelector(`.msg[data-mid="${m.id}"]`)){
+        const el=buildMsgEl(m); if(el) stream.appendChild(el);
+      }
+    });
+    if(near) scrollStream();   // 原本贴底才自动滚到底，避免打断用户回看
+  }catch(e){ console.warn('refreshSnapshotTail', e); }
 }
 
 async function joinAsMember(room){
@@ -1232,6 +1271,10 @@ function ehConfirm(msg, title){
 
 // ============ 离开房间 ============
 async function leaveRoom(){
+  // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
+  if(curRoom){
+    try{ roomSnap={ rid:curRoom.id, html:$('#stream').innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() }; }catch(e){ roomSnap=null; }
+  }
   await leavePresence();
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
