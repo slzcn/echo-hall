@@ -128,6 +128,12 @@
   .ch .desc{font-size:11.5px;color:var(--sub);margin-top:5px;line-height:1.5;min-height:32px}
   .ch .live{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11.5px;color:var(--ch-c)}
   .ch .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ch-c);box-shadow:0 0 8px var(--ch-c);animation:pulse 1.6s infinite}
+  .ch .live .cnt{font-weight:700}
+  .ch .live .tm{color:var(--dim);margin-left:auto;font-weight:400}
+  /* 最新消息预览(橱窗) */
+  .ch .preview{margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:16px}
+  .ch .preview b{color:var(--sub);font-weight:600}
+  .ch .preview.empty{font-style:italic;opacity:.7}
   .ch .tagk{position:absolute;top:12px;right:12px;font-size:9px;padding:2px 7px;border-radius:6px;letter-spacing:1px;
     background:rgba(255,255,255,.06);color:var(--dim)}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
@@ -358,6 +364,10 @@
   .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
   .emoji-pick b:hover{background:rgba(255,255,255,.06)}
   .emoji-pick b.on{border-color:var(--cyan);background:rgba(40,230,216,.12)}
+  .color-pick{display:flex;flex-wrap:wrap;gap:8px}
+  .color-pick i{width:30px;height:30px;border-radius:9px;cursor:pointer;transition:.12s;border:2px solid transparent;box-sizing:border-box}
+  .color-pick i:hover{transform:scale(1.12)}
+  .color-pick i.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
   .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:20px;
     background:rgba(40,230,216,.08);border:1px solid rgba(40,230,216,.3)}
   .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
@@ -568,6 +578,28 @@
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
+    <div class="modal-body" id="mEmail" style="display:none">
+      <h3>邮箱设置</h3>
+      <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
+      <label class="fld" id="curEmailRow"><span>当前邮箱</span>
+        <input id="curEmail" type="email" disabled style="opacity:.6"></label>
+      <label class="fld"><span id="newEmailLabel">新邮箱</span>
+        <input id="newEmail" type="email" placeholder="you@example.com"></label>
+      <div class="modal-err" id="emailErr"></div>
+      <button class="btn-primary" id="doEmailBtn">保 存</button>
+    </div>
+    <div class="modal-body" id="mProfile" style="display:none">
+      <h3>编辑形象</h3>
+      <p class="modal-sub">自定义你的昵称和头像（用户名登录不受影响）。</p>
+      <label class="fld"><span>昵称</span>
+        <input id="profName" maxlength="24" placeholder="显示给别人看的名字"></label>
+      <label class="fld"><span>头像</span>
+        <div class="emoji-pick" id="profEmojiPick"></div></label>
+      <label class="fld"><span>主题色</span>
+        <div class="color-pick" id="profColorPick"></div></label>
+      <div class="modal-err" id="profErr"></div>
+      <button class="btn-primary" id="doProfBtn">保 存</button>
+    </div>
   </div>
 </div>
 
@@ -644,6 +676,10 @@ function paintIdentity(){
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+  // 正式账号 vs 临时身份: 更新标签 + 换一个按钮(临时才可换)
+  const tag=$('#idTag'), rr=$('#rerollBtn');
+  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; }
+  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; }
 }
 
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
@@ -685,34 +721,84 @@ const HISTORY_PAGE = 60;
 
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = {'闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC'};
-async function renderLobby(){
+async function renderLobby(soft){
   $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color;
-  await Promise.all([renderOfficial(), renderPublic(), renderMyRooms()]);
+  await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
 }
-async function renderOfficial(){
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
+async function renderOfficial(soft){
   const box=$('#channels');
+  // soft 刷新: 卡片 DOM 已在则只静默刷新在线数/预览，不清空重建(消除返回闪烁)
+  if(soft && box.children.length){
+    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
+    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'official'})));
+    return;
+  }
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
   box.innerHTML=(data||[]).map(r=>{
     const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
       <div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
-      <div class="live"><span class="pulse"></span><span>进入畅聊</span></div></div>`;
+      <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
+      <div class="preview empty" data-prev>加载中…</div></div>`;
   }).join('');
   bindRoomCards(box);
+  (data||[]).forEach(r=>fillRoomStats(box, r.id));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'official'})));
 }
-async function renderPublic(){
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
+async function renderPublic(soft){
   const box=$('#publicRooms'), empty=$('#publicEmpty');
+  if(soft && box.children.length){
+    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
+    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'public'})));
+    return;
+  }
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
     <div class="tagk">公开</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
-    <div class="desc">${esc(r.topic||'')}</div><div class="live"><span class="pulse"></span><span>进入</span></div></div>`).join('');
+    <div class="desc">${esc(r.topic||'')}</div>
+    <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
+    <div class="preview empty" data-prev>加载中…</div></div>`).join('');
   bindRoomCards(box);
+  (data||[]).forEach(r=>fillRoomStats(box, r.id));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'public'})));
 }
-async function renderMyRooms(){
+// 相对时间: 刚刚/N分钟前/N小时前/N天前
+function fmtAgo(ts){
+  const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
+  if(s<60) return '刚刚'; if(s<3600) return Math.floor(s/60)+'分钟前';
+  if(s<86400) return Math.floor(s/3600)+'小时前'; return Math.floor(s/86400)+'天前';
+}
+// 异步填充卡片动态数据: 在线人数 + 最新消息预览 + 活跃时间
+async function fillRoomStats(box, rid){
+  const card=box.querySelector(`.ch[data-rid="${rid}"]`); if(!card) return;
+  const since=new Date(Date.now()-35000).toISOString();
+  const [{ count }, { data:recent }] = await Promise.all([
+    sb.from('eh_presence').select('*',{count:'exact',head:true}).eq('room_id',rid).gte('last_seen',since),
+    sb.rpc('eh_public_recent',{ rid, lim:1 }),
+  ]);
+  const online=count||0;
+  const cnt=card.querySelector('.cnt'); if(cnt) cnt.textContent = online>0? online+' 人在线' : '暂无人在线';
+  const last=(recent&&recent[0])||null;
+  const prev=card.querySelector('[data-prev]'), tm=card.querySelector('.tm');
+  if(last){
+    prev.classList.remove('empty');
+    const txt = last.kind==='act' ? '✦ '+last.text : (last.kind==='proj'?'📽️ 投影':last.text);
+    prev.innerHTML=`<b>${esc(last.name)}:</b> ${esc(String(txt).slice(0,40))}`;
+    if(tm) tm.textContent=fmtAgo(last.created_at);
+  } else {
+    prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
+  }
+}
+async function renderMyRooms(soft){
   if(!myUid){ $('#myRooms').innerHTML=''; return; }
+  const boxE=$('#myRooms');
+  if(soft && boxE.children.length){
+    prefetchAll([...boxE.querySelectorAll('.rm[data-rid]')].map(c=>({id:c.dataset.rid,kind:'private'})));
+    return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
+  }
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
   const box=$('#myRooms');
   if(!data || !data.length){ box.innerHTML=''; return; }
@@ -721,13 +807,29 @@ async function renderMyRooms(){
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
     <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
 }
-// 进房预取缓存: 悬停/按下卡片时提前拉该公开房最近消息，点进去瞬间显示
-const prefetchCache={};
+// 进房预取缓存: 列表渲染后主动预取 + 悬停补充，点进去瞬间显示
+const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
+const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
+const prefetchCache={};        // rid → { at, p:Promise<rows> }
+let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
 function prefetchRoom(rid, kind){
-  if(kind!=='official' && kind!=='public') return;   // 私密房不预取(RLS需成员)
-  if(prefetchCache[rid]) return;
-  prefetchCache[rid] = sb.rpc('eh_public_recent',{ rid, lim:100 }).then(({data})=>data||[]).catch(()=>[]);
+  const hit=prefetchCache[rid];
+  if(hit && Date.now()-hit.at < PREFETCH_TTL) return;   // 命中且未过期
+  let p;
+  if(kind==='official' || kind==='public'){
+    p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N }).then(({data})=>data||[]).catch(()=>[]);
+  } else {
+    // 私密房: 我的房间都是已加入的，直查最近(成员RLS放行)
+    p = sb.from('eh_messages').select('*').eq('room_id',rid).order('id',{ascending:false}).limit(PREFETCH_N)
+          .then(({data})=>data||[]).catch(()=>[]);
+  }
+  prefetchCache[rid] = { at:Date.now(), p };
+}
+// 列表渲染后主动错峰预取(避免十几房同时打请求拖慢首屏在线数/预览)
+function prefetchAll(rooms){
+  rooms.forEach((r,i)=>setTimeout(()=>prefetchRoom(r.id, r.kind), 120*i));
 }
 function bindRoomCards(box){
   box.querySelectorAll('.ch').forEach(el=>{
@@ -740,31 +842,71 @@ function bindRoomCards(box){
 }
 
 // ============ 进入房间 ============
+const SNAP_TTL=30000;   // 快照有效期 30s
 async function enterRoom(room){
   curRoom = room;
   stopVoice(); stopSong();
-  $('#stream').innerHTML=''; oldestId=null; echoState={}; clearReply();
+  // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
+  const snapHit = roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
   $('#hallName').innerHTML=`${safeEmoji(room.emoji)} ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  clearReply();
+  if(snapHit){
+    // 秒还原已渲染消息 + 滚动位置状态
+    $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
+    $('#presence').innerHTML=''; $('#hallCnt').textContent='连接中…';
+    goScene('hall'); setConn(false,'连接中'); scrollStream();
+    roomSnap=null;
+    await ensureAuth();
+    subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息
+    await joinAsMember(room);
+    const [ , memRes] = await Promise.all([
+      sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
+      setupPresence(room),
+      refreshSnapshotTail(room)       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
+    ]);
+    room.role = memRes?.data?.role || 'member';
+    $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
+    setConn(true);
+    return;
+  }
+  // ---- 无快照: 原全量流程 ----
+  $('#stream').innerHTML=''; oldestId=null; echoState={};
   $('#hallCnt').textContent='连接中…';
   $('#presence').innerHTML='';
   goScene('hall'); setConn(false,'连接中');
 
   await ensureAuth();
-  // 实时订阅先挂上(不阻塞，立刻开始接新消息，不遗漏)
   subscribeMessages(room.id);
-  // 确保成为成员(官方/公开：直接加入；私密：调用处已保证)
+  const isPublic = room.kind==='official' || room.kind==='public';
+  const histP = isPublic ? loadHistory(true) : null;
   await joinAsMember(room);
-  // 成员身份就绪后：历史/房主判定/在线状态 三者并行拉取(而非串行等待)
-  const [histDone, memRes] = await Promise.all([
-    loadHistory(true),
+  const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-    setupPresence(room),
-  ]);
+    setupPresence(room) ];
+  const [ , memRes] = await Promise.all(tasks);
   room.role = memRes?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
   setConn(true);
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+}
+
+// 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
+async function refreshSnapshotTail(room){
+  try{
+    const isPublic = room.kind==='official' || room.kind==='public';
+    let rows;
+    if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:HISTORY_PAGE}); rows=(data||[]).slice().reverse(); }
+    else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE); rows=(data||[]).slice().reverse(); }
+    const stream=$('#stream');
+    const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
+    rows.forEach(m=>{
+      if(m && m.id!=null && !stream.querySelector(`.msg[data-mid="${m.id}"]`)){
+        const el=buildMsgEl(m); if(el) stream.appendChild(el);
+      }
+    });
+    if(near) scrollStream();   // 原本贴底才自动滚到底，避免打断用户回看
+  }catch(e){ console.warn('refreshSnapshotTail', e); }
 }
 
 async function joinAsMember(room){
@@ -784,19 +926,28 @@ async function loadHistory(first){
   if(isPublic){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
-    if(first && prefetchCache[curRoom.id]){ data = await prefetchCache[curRoom.id]; delete prefetchCache[curRoom.id]; }
+    const hit=prefetchCache[curRoom.id];
+    if(first && hit && Date.now()-hit.at < PREFETCH_TTL){ data = await hit.p; delete prefetchCache[curRoom.id]; }
     else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
-    let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
-    if(oldestId) q = q.lt('id', oldestId);
-    const { data } = await q;
-    rows = (data||[]).slice().reverse();
-    if(rows.length){ oldestId = rows[0].id; }
+    // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
+    const hit=prefetchCache[curRoom.id];
+    if(first && !oldestId && hit && Date.now()-hit.at < PREFETCH_TTL){
+      const data = await hit.p; delete prefetchCache[curRoom.id];
+      rows = (data||[]).slice().reverse();
+      if(rows.length){ oldestId = rows[0].id; }
+    } else {
+      let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
+      if(oldestId) q = q.lt('id', oldestId);
+      const { data } = await q;
+      rows = (data||[]).slice().reverse();
+      if(rows.length){ oldestId = rows[0].id; }
+    }
   }
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶100，无更多)
-  const canLoadMore = !isPublic && rows.length===HISTORY_PAGE;
+  const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE || rows.length===PREFETCH_N);
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   const frag=document.createDocumentFragment();
@@ -838,6 +989,8 @@ function subscribeMessages(rid){
       if(isEmojiOnly(m.text)) burst(m.text);
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
+      // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
+      if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
       applyEchoRealtime(p.new.message_id, p.new.user_id);
     })
     .subscribe();
@@ -854,7 +1007,7 @@ async function setupPresence(room){
   await beat();
   // 订阅本房 presence 变化 → 刷新光墙
   presChan = sb.channel('room-pres:'+room.id)
-    .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>refreshPresence())
+    .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>schedulePresenceRefresh())
     .subscribe();
   await refreshPresence();
   // 心跳 + 清理定时器
@@ -867,25 +1020,70 @@ async function beat(extra){
   const { error } = await sb.from('eh_presence').upsert(row);
   if(error) console.warn('beat error', error.message);
 }
-async function refreshPresence(){
-  if(!curRoom) return;
-  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
-  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
-  let users=(data||[]).slice();
-  // 兜底：自己一定在线（DB 读取延迟/失败时也至少显示自己），避免卡"连接中/0人"
-  if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
-  users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
-  $('#presence').innerHTML=users.map(p=>`
-    <div class="pav ${p.user_id===myUid?'me':''}" style="background:${safeColor(p.color)}22;color:${safeColor(p.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(p.color)}" title="${esc(p.name)}">
-      ${safeEmoji(p.emoji)}<span class="ring"></span></div>`).join('');
-  const kindLabel = curRoom.kind==='private'?'名成员在线':'人在线';
+// —— 性能优化: diff 渲染头像 + 拆分 typing 更新, 避免每次心跳/输入全量重建 DOM ——
+const presenceMap = new Map();   // user_id → DOM 节点
+let lastUsersSnapshot = [];       // 供 renderTyping 复用
+
+function renderPresenceAvatars(users){
+  const container=$('#presence');
+  const seen=new Set();
+  users.forEach((p,idx)=>{
+    seen.add(p.user_id);
+    let el=presenceMap.get(p.user_id);
+    const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+(p.color||'')+'|'+(p.user_id===myUid?'me':'');
+    if(el && el.dataset.sig===sig){
+      // 顺序可能变了, 位置对齐一下
+      if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
+      return;
+    }
+    // 需要新建或重建
+    const c=safeColor(p.color);
+    const div=document.createElement('div');
+    div.className='pav'+(p.user_id===myUid?' me':'');
+    div.style.cssText=`background:${c}22;color:${c};box-shadow:inset 0 0 0 1.5px ${c}`;
+    div.title=p.name||'';
+    div.innerHTML=`${safeEmoji(p.emoji)}<span class="ring"></span>`;
+    div.dataset.sig=sig;
+    if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
+    presenceMap.set(p.user_id,div);
+  });
+  // 清理离开的人
+  presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
+  const kindLabel = curRoom && curRoom.kind==='private'?'名成员在线':'人在线';
   $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
-  // 正在输入：typing_at 在 3s 内的他人
+}
+
+function renderTyping(users){
   const now=Date.now();
   const typers=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.name);
   const bar=$('#typingBar');
   if(typers.length){ $('#typingTxt').textContent=typers.length===1?`${typers[0]} 正在输入`:`${typers.length} 人正在输入`; bar.classList.add('on'); }
   else bar.classList.remove('on');
+}
+
+async function refreshPresence(){
+  if(!curRoom) return;
+  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
+  let users=(data||[]).slice();
+  if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
+  users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
+  lastUsersSnapshot=users;
+  renderPresenceAvatars(users);
+  renderTyping(users);
+}
+
+// presence realtime 事件的 debounce 触发器: 300ms 合并瞬时多次变化
+let _presDebounce=null;
+function schedulePresenceRefresh(){
+  if(_presDebounce) return;
+  _presDebounce=setTimeout(()=>{ _presDebounce=null; refreshPresence(); },300);
+}
+// typing 独立轻量刷新: 复用最近一次 users 快照, 不查 DB 不重建头像
+let _typingLightTimer=null;
+function scheduleTypingRefresh(){
+  clearTimeout(_typingLightTimer);
+  _typingLightTimer=setTimeout(()=>renderTyping(lastUsersSnapshot),200);
 }
 async function leavePresence(){
   clearInterval(heartbeatTimer); heartbeatTimer=null;
@@ -1398,6 +1596,10 @@ function ehConfirm(msg, title){
 async function leaveRoom(){
   stopVoice(); stopSong();
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
+  // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
+  if(curRoom){
+    try{ roomSnap={ rid:curRoom.id, html:$('#stream').innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() }; }catch(e){ roomSnap=null; }
+  }
   await leavePresence();
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
@@ -1455,50 +1657,95 @@ async function openGear(){
 function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); }
 
 // ============ 个人空间抽屉 ============
+let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
 async function openMe(){
   const body=$('#meBody');
-  const bound = !!(me && me.id && !me.__anon);   // 先用缓存粗判，稍后校准
-  // 立即开抽屉 + 渲染身份骨架(不等数据查询)，消除"点头像卡很久"
+  const isBound = !!(me && me.registered);
+  // 本地已知的(昵称/状态/邮箱/账号区)首屏直接渲染, 不显"…"。邮箱缓存在 me.email。
+  const emailKnown = me.email !== undefined; // 已缓存过(可能为空串=未设置)
+  const realEmail = me.email || '';
+  const regSlotHtml = isBound
+    ? (emailKnown
+        ? (realEmail
+            ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
+            : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`)
+        : `<div class="drow"><span class="dk">邮箱</span><span class="dv" id="meEmailVal" style="color:var(--dim)">读取中…</span></div><button class="dbtn" id="meEmail">✉️ 邮箱设置</button>`)
+    : '<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
+  // 列表: 有缓存先渲染缓存(秒显), 否则骨架
+  const roomsHtml = _meCache.rooms ? renderMyRoomList(_meCache.rooms) : '<div class="empty-hint">加载中…</div>';
+  const msgsHtml  = _meCache.msgs  ? renderMyMsgList(_meCache.msgs)   : '<div class="empty-hint">加载中…</div>';
   body.innerHTML=`
     <div class="dsec"><div class="dl">我的身份</div>
       <div class="dcard">
         <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${safeColor(me.color)}">${safeEmoji(me.emoji)} ${esc(me.name)}</span></div>
-        <div class="drow"><span class="dk">状态</span><span class="dv" id="meStatus">…</span></div>
-        <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
-        <div id="meRegSlot"></div>
+        <div class="drow"><span class="dk">状态</span><span class="dv">${isBound?'正式账号':'匿名（本设备）'}</span></div>
+        <button class="dbtn" id="meReroll">${isBound?'✎ 编辑昵称形象':'↻ 换个昵称形象'}</button>
+        <div id="meRegSlot">${regSlotHtml}</div>
       </div></div>
-    <div class="dsec"><div class="dl" id="meRoomsLabel">我在的房间</div>
-      <div class="mlist" id="meRoomsList"><div class="empty-hint">加载中…</div></div></div>
-    <div class="dsec"><div class="dl" id="meMsgsLabel">我最近发的话</div>
-      <div class="dcard" style="max-height:200px;overflow-y:auto" id="meMsgsList"><div class="empty-hint">加载中…</div></div></div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我在的房间${_meCache.rooms?' ('+_meCache.rooms.length+')':''}</div>
+      <div class="mlist" id="meRoomsList">${roomsHtml}</div></div>
+    <div class="dsec"><div class="dl" id="meMsgsLabel">我最近发的话${_meCache.msgs?' ('+_meCache.msgs.length+')':''}</div>
+      <div class="dcard" style="max-height:200px;overflow-y:auto" id="meMsgsList">${msgsHtml}</div></div>
     <div class="dsec"><div class="dl">账号</div>
       <div class="dcard">
-        <button class="dbtn danger" id="meLogout">退出 / 换个身份</button>
-        <div class="note" id="meLogoutNote" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
+        <button class="dbtn danger" id="meLogout">${isBound?'退出登录':'退出 / 换个身份'}</button>
+        <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6">${isBound?'退出后聊天记录仍与你的账号关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。'}</div>
       </div></div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
-  $('#meReroll').onclick=async()=>{ rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); };
-  // 异步并行填充其余内容
-  await ensureAuth();
-  const [{ data:{ session } }, msgsRes, roomsRes] = await Promise.all([
-    sb.auth.getSession(),
+  bindMeActions(isBound);
+  // 后台静默刷新数据(不影响已渲染内容, 有更新再替换)
+  const tasks=[
     sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
     sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
-  ]);
-  const isBound = !!session?.user?.email;
+  ];
+  if(isBound && !emailKnown) tasks.push(sb.from('eh_accounts').select('email').eq('auth_uid',myUid).maybeSingle());
+  const [msgsRes, roomsRes, accRes] = await Promise.all(tasks);
   const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
-  $('#meStatus').textContent = isBound?'正式账号':'匿名（本设备）';
-  $('#meRegSlot').innerHTML = isBound?'':'<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
-  $('#meReg') && ($('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); });
+  _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
+  // 邮箱: 首次读到后缓存到 me, 之后打开直接显示不闪
+  if(isBound && !emailKnown && accRes){ me.email=accRes.data?.email||''; saveIdentity(); rebindEmailSlot(); }
+  // 用最新数据刷新列表(首屏已渲染缓存/骨架, 这里替换为最新)
   $('#meRoomsLabel').textContent=`我在的房间 (${myRooms.length})`;
-  $('#meRoomsList').innerHTML=myRooms.map(r=>{const rm=r.eh_rooms||{};return `
-    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji) || '🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
-    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+  $('#meRoomsList').innerHTML=renderMyRoomList(myRooms);
   $('#meMsgsLabel').textContent=`我最近发的话 (${myMsgs.length})`;
-  $('#meMsgsList').innerHTML=myMsgs.map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
-  $('#meLogout').textContent = isBound?'退出登录':'退出 / 换个身份';
-  $('#meLogoutNote').textContent = isBound?'退出后聊天记录仍与你的邮箱关联，重新登录即可找回。':'退出会清除本设备的匿名身份，换一个全新身份进入（旧身份的消息仍保留在数据库）。';
+  $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+}
+// 列表渲染 helper(供首屏缓存 + 刷新复用)
+function renderMyRoomList(rooms){
+  return (rooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
+    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+}
+function renderMyMsgList(msgs){
+  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
+}
+// 绑定个人空间的按钮动作(reroll/注册/邮箱/登出)
+function bindMeActions(isBound){
+  $('#meReroll').onclick=async()=>{
+    if(me.registered){ closeMe(); openProfileEditor(); return; }
+    rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe();
+  };
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
+  bindMeReg(); bindMeEmail();
+}
+function bindMeReg(){ const b=$('#meReg'); if(b) b.onclick=()=>{ closeMe(); openModal('mReg'); }; }
+function bindMeEmail(){
+  const b=$('#meEmail'); if(!b) return;
+  b.onclick=()=>{ const realEmail=me.email||''; closeMe(); openModal('mEmail'); setTimeout(()=>{
+    const has=!!realEmail;
+    $('#curEmailRow').style.display = has?'block':'none';
+    if(has) $('#curEmail').value=realEmail;
+    $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
+  },50); };
+}
+// 邮箱首次读到后, 重渲染 meRegSlot(从"读取中"变成真实态)
+function rebindEmailSlot(){
+  if(!$('#meRegSlot')) return;
+  const realEmail=me.email||'';
+  $('#meRegSlot').innerHTML = realEmail
+    ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
+    : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`;
+  bindMeEmail();
 }
 // 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
 async function logoutIdentity(bound){
@@ -1516,14 +1763,19 @@ async function logoutIdentity(bound){
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
 // ============ 返回大厅 ============
-async function backToLobby(){ await leaveRoom(); goScene('lobby'); renderLobby(); }
+function backToLobby(){
+  // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
+  goScene('lobby'); renderLobby(true);
+  // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
+  leaveRoom().catch(e=>console.warn('leaveRoom', e));
+}
 
 // ============ 建房 / 入房 弹窗 ============
 const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
 let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
 function openModal(which){
   $('#modalMask').classList.add('on');
-  ['mCreate','mCreated','mJoin','mReg','mReset'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
+  ['mCreate','mCreated','mJoin','mReg','mReset','mEmail','mProfile'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
     $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o.dataset.kind==='public'));
@@ -1533,6 +1785,8 @@ function openModal(which){
   if(which==='mJoin'){ $('#codeIn').value=''; $('#joinErr').textContent=''; setTimeout(()=>$('#codeIn').focus(),50); }
   if(which==='mReg'){ $('#regUser').value='';$('#regPass').value='';$('#regEmail').value='';$('#regErr').textContent=''; setTimeout(()=>$('#regUser').focus(),50); }
   if(which==='mReset'){ $('#resetEmail').value='';$('#resetErr').textContent=''; setTimeout(()=>$('#resetEmail').focus(),50); }
+  if(which==='mEmail'){ $('#newEmail').value='';$('#emailErr').textContent=''; setTimeout(()=>$('#newEmail').focus(),50); }
+  if(which==='mProfile'){ $('#profErr').textContent=''; }
 }
 function renderEmojiPick(){
   const first = pickedKind==='public'?'🌐':'🔒'; pickedEmoji=first;
@@ -1610,7 +1864,10 @@ async function doLogin(){
   if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
   myUid=sess.user.id;
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-  if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); }
+  me = prof && prof.name
+    ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }
+    : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true };
+  saveIdentity(); paintIdentity();
   toast('欢迎回来'); goScene('lobby'); renderLobby();
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
@@ -1644,6 +1901,47 @@ async function doReset(){
   // 出于安全，无论邮箱是否存在都提示已发送
   toast('若该邮箱已注册，重置链接已发送'); closeModal();
 }
+// 修改邮箱: 更新 eh_accounts.email(真邮箱, 找回密码用)。不动 auth 登录邮箱(u_hex@eh.local)。
+async function changeEmail(){
+  const email=$('#newEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ $('#emailErr').textContent='邮箱格式不对'; return; }
+  const btn=$('#doEmailBtn'); btn.disabled=true; btn.textContent='保存中…'; $('#emailErr').textContent='';
+  const { data:{ session } }=await sb.auth.getSession();
+  if(!session){ btn.disabled=false; btn.textContent='发 送 确 认 邮 件'; $('#emailErr').textContent='请先登录'; return; }
+  const r=await fetch(EH_AUTH_FN+'/update-email',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({email}) });
+  const j=await r.json().catch(()=>({}));
+  btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
+  if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
+  toast('邮箱已更新'); closeModal();
+}
+// 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
+let _profEmoji, _profColor;
+function openProfileEditor(){
+  openModal('mProfile');
+  _profEmoji=me.emoji||'🦊'; _profColor=me.color||'#28E6D8';
+  setTimeout(()=>{ $('#profName').value=me.name||''; },50);
+  // emoji 选择器(当前高亮在首位)
+  const emos=[_profEmoji,...EMO.filter(e=>e!==_profEmoji)];
+  $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+  $('#profEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ _profEmoji=b.textContent; $('#profEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
+  // 颜色选择器
+  const cols=COLORS.includes(_profColor)?COLORS:[_profColor,...COLORS];
+  $('#profColorPick').innerHTML=cols.map(c=>`<i class="${c===_profColor?'on':''}" data-c="${c}" style="background:${c}"></i>`).join('');
+  $('#profColorPick').querySelectorAll('i').forEach(el=>el.onclick=()=>{ _profColor=el.dataset.c; $('#profColorPick').querySelectorAll('i').forEach(x=>x.classList.remove('on')); el.classList.add('on'); });
+}
+async function saveProfile(){
+  const name=$('#profName').value.trim();
+  if(name.length<1){ $('#profErr').textContent='昵称不能为空'; return; }
+  if(name.length>24){ $('#profErr').textContent='昵称最多 24 字'; return; }
+  const btn=$('#doProfBtn'); btn.disabled=true; btn.textContent='保存中…';
+  // 关键: 只更新昵称/头像/颜色, 保留 id 和 registered 标记(不动用户名/登录)
+  me.name=name; me.emoji=_profEmoji; me.color=_profColor;
+  saveIdentity(); paintIdentity();
+  const { error }=await sb.from('eh_users').update({ name, emoji:_profEmoji, color:_profColor }).eq('id',myUid);
+  btn.disabled=false; btn.textContent='保 存';
+  if(error){ $('#profErr').textContent='保存失败'; return; }
+  toast('形象已更新'); closeModal();
+}
 
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
@@ -1658,6 +1956,8 @@ $('#toReg').onclick=()=>openModal('mReg');
 $('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
 $('#doRegBtn').onclick=()=>doRegister();
 $('#doResetBtn').onclick=()=>doReset();
+$('#doEmailBtn').onclick=()=>changeEmail();
+$('#doProfBtn').onclick=()=>saveProfile();
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
@@ -1685,12 +1985,18 @@ $('#rpX').onclick=()=>clearReply();
 
 // 输入框
 const cin=$('#cin');
+let _inputRaf=0;
 cin.addEventListener('input',()=>{
-  cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
-  $('#goBtn').disabled=!cin.value.trim();
+  // 高度/按钮/斜杠菜单用 rAF 合并, 避免每字符触发 layout thrash
+  if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
+    _inputRaf=0;
+    cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
+    $('#goBtn').disabled=!cin.value.trim();
+    const v=cin.value;
+    if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
+  });
+  // typing_at 保持原节流 1.5s
   const v=cin.value;
-  if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
-  // 正在输入：写 presence 表的 typing_at(节流 1.5s)，他人靠 refreshPresence 读到
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
 });
@@ -1738,13 +2044,16 @@ const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.h
 sb.auth.onAuthStateChange((ev,session)=>{
   if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
     myUid=session.user.id;
-    if(me) me.id=myUid;
+    if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
       const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); paintIdentity(); }
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; saveIdentity(); }
+      else { me = me||{}; me.registered=true; }
+      paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
-      if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
-        authHandled=true; toast('已登录'); goScene('lobby'); renderLobby();
+      // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
+      if(!authHandled && $('#enter').classList.contains('on')){
+        authHandled=true; if(!cameFromLink) toast('欢迎回来'); goScene('lobby'); renderLobby();
       }
     },0);
   }
