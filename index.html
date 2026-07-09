@@ -510,9 +510,9 @@
     <div class="modal-body" id="mEmail" style="display:none">
       <h3>邮箱设置</h3>
       <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld"><span>当前邮箱</span>
+      <label class="fld" id="curEmailRow"><span>当前邮箱</span>
         <input id="curEmail" type="email" disabled style="opacity:.6"></label>
-      <label class="fld"><span>新邮箱</span>
+      <label class="fld"><span id="newEmailLabel">新邮箱</span>
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
@@ -1289,23 +1289,27 @@ async function openMe(){
       </div></div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
   $('#meReroll').onclick=async()=>{ rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); };
-  // 异步并行填充其余内容
-  await ensureAuth();
-  const [{ data:{ session } }, msgsRes, roomsRes] = await Promise.all([
-    sb.auth.getSession(),
+  // 异步并行填充(不重复 ensureAuth: 进大厅时已确保 myUid)。正式账号并行查 eh_accounts.email。
+  const isBound = !!(me && me.registered);
+  const [msgsRes, roomsRes, accRes] = await Promise.all([
     sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
     sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
+    isBound ? sb.from('eh_accounts').select('email').eq('auth_uid',myUid).maybeSingle() : Promise.resolve({data:null}),
   ]);
-  const isBound = !!session?.user?.email;
   const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
-  // 正式账号内部登录邮箱是 u_hex@eh.local(非真邮箱), 查 eh_accounts.email 才是用户填的真邮箱
-  let realEmail='';
-  if(isBound){ const { data:acc }=await sb.from('eh_accounts').select('email').eq('auth_uid',myUid).maybeSingle(); realEmail=acc?.email||''; }
+  const realEmail=accRes?.data?.email||'';
   $('#meStatus').textContent = isBound?'正式账号':'匿名（本设备）';
   if(isBound){
-    $('#meRegSlot').innerHTML = `<div class="drow"><span class="dk">邮箱</span><span class="dv">${realEmail?esc(realEmail):'<span style="color:var(--dim)">未设置</span>'}</span></div>
-      <button class="dbtn" id="meEmail">✉️ ${realEmail?'修改邮箱':'设置邮箱（找回密码用）'}</button>`;
-    $('#meEmail').onclick=()=>{ closeMe(); openModal('mEmail'); setTimeout(()=>{ $('#curEmail').value=realEmail||'（未设置）'; },50); };
+    // 未设置邮箱: 只显示"设置邮箱"按钮(不显示空的当前邮箱行); 已设置: 显示邮箱+修改
+    $('#meRegSlot').innerHTML = realEmail
+      ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
+      : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`;
+    $('#meEmail').onclick=()=>{ closeMe(); openModal('mEmail'); setTimeout(()=>{
+      const has=!!realEmail;
+      $('#curEmailRow').style.display = has?'block':'none';   // 未设置不显示"当前邮箱"行
+      if(has) $('#curEmail').value=realEmail;
+      $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
+    },50); };
   } else {
     $('#meRegSlot').innerHTML='<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>';
     $('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); };
