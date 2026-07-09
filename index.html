@@ -645,6 +645,7 @@ async function renderOfficial(){
   }).join('');
   bindRoomCards(box);
   (data||[]).forEach(r=>fillRoomStats(box, r.id));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'official'})));
 }
 async function renderPublic(){
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
@@ -658,6 +659,7 @@ async function renderPublic(){
     <div class="preview empty" data-prev>加载中…</div></div>`).join('');
   bindRoomCards(box);
   (data||[]).forEach(r=>fillRoomStats(box, r.id));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'public'})));
 }
 // 相对时间: 刚刚/N分钟前/N小时前/N天前
 function fmtAgo(ts){
@@ -696,13 +698,28 @@ async function renderMyRooms(){
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
     <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private'}));
+  prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
 }
-// 进房预取缓存: 悬停/按下卡片时提前拉该公开房最近消息，点进去瞬间显示
-const prefetchCache={};
+// 进房预取缓存: 列表渲染后主动预取 + 悬停补充，点进去瞬间显示
+const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
+const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
+const prefetchCache={};        // rid → { at, p:Promise<rows> }
 function prefetchRoom(rid, kind){
-  if(kind!=='official' && kind!=='public') return;   // 私密房不预取(RLS需成员)
-  if(prefetchCache[rid]) return;
-  prefetchCache[rid] = sb.rpc('eh_public_recent',{ rid, lim:100 }).then(({data})=>data||[]).catch(()=>[]);
+  const hit=prefetchCache[rid];
+  if(hit && Date.now()-hit.at < PREFETCH_TTL) return;   // 命中且未过期
+  let p;
+  if(kind==='official' || kind==='public'){
+    p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N }).then(({data})=>data||[]).catch(()=>[]);
+  } else {
+    // 私密房: 我的房间都是已加入的，直查最近(成员RLS放行)
+    p = sb.from('eh_messages').select('*').eq('room_id',rid).order('id',{ascending:false}).limit(PREFETCH_N)
+          .then(({data})=>data||[]).catch(()=>[]);
+  }
+  prefetchCache[rid] = { at:Date.now(), p };
+}
+// 列表渲染后主动错峰预取(避免十几房同时打请求拖慢首屏在线数/预览)
+function prefetchAll(rooms){
+  rooms.forEach((r,i)=>setTimeout(()=>prefetchRoom(r.id, r.kind), 120*i));
 }
 function bindRoomCards(box){
   box.querySelectorAll('.ch').forEach(el=>{
@@ -758,19 +775,28 @@ async function loadHistory(first){
   if(isPublic){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
-    if(first && prefetchCache[curRoom.id]){ data = await prefetchCache[curRoom.id]; delete prefetchCache[curRoom.id]; }
+    const hit=prefetchCache[curRoom.id];
+    if(first && hit && Date.now()-hit.at < PREFETCH_TTL){ data = await hit.p; delete prefetchCache[curRoom.id]; }
     else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
-    let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
-    if(oldestId) q = q.lt('id', oldestId);
-    const { data } = await q;
-    rows = (data||[]).slice().reverse();
-    if(rows.length){ oldestId = rows[0].id; }
+    // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
+    const hit=prefetchCache[curRoom.id];
+    if(first && !oldestId && hit && Date.now()-hit.at < PREFETCH_TTL){
+      const data = await hit.p; delete prefetchCache[curRoom.id];
+      rows = (data||[]).slice().reverse();
+      if(rows.length){ oldestId = rows[0].id; }
+    } else {
+      let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
+      if(oldestId) q = q.lt('id', oldestId);
+      const { data } = await q;
+      rows = (data||[]).slice().reverse();
+      if(rows.length){ oldestId = rows[0].id; }
+    }
   }
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶100，无更多)
-  const canLoadMore = !isPublic && rows.length===HISTORY_PAGE;
+  const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE || rows.length===PREFETCH_N);
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   const frag=document.createDocumentFragment();
