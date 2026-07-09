@@ -473,6 +473,7 @@
     <div class="lobby-head">
       <h2>回声厅</h2>
       <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
+      <div class="me-btn" id="bgmBtn" title="氛围音乐" style="right:92px">🔊</div>
       <div class="me-btn" id="skinBtn" title="皮肤" style="right:52px">🎨</div>
       <div class="me-btn" id="meBtn" title="个人空间">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
@@ -713,6 +714,70 @@ const THEMES=[
 ];
 // 官方房专属默认皮肤(按房名)
 const ROOM_THEME={'闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora'};
+// ============ BGM 氛围引擎(Web Audio 程序化生成, 零文件零跨域) ============
+const LS_BGM='eh_bgm';
+// 每官方房一套氛围: 根音(Hz)/和弦音程/音色波形/律动(ms,0=纯pad无脉冲)/滤波截止
+const ROOM_BGM={
+  '闲聊广场':{root:220,chord:[0,4,7,11],wave:'triangle',pulse:2400,cut:1400,name:'明亮合成 pad'},   // cyber 大七和弦 明亮
+  '深夜电台':{root:146.83,chord:[0,3,7,10],wave:'sine',pulse:0,cut:900,name:'蒸汽波暖垫'},          // vapor 小七 温暖无脉冲
+  '技术黑话':{root:98,chord:[0,7,12],wave:'sawtooth',pulse:3200,cut:560,name:'极简低频 drone'},      // mono 空五度 低沉
+  '虚空回音':{root:329.63,chord:[0,5,7,12],wave:'sine',pulse:1600,cut:2600,name:'空灵铃音'},          // aurora 高频 空灵
+};
+const AudioEngine=(function(){
+  let ctx=null, nodes=[], timer=null, cur=null, master=null;
+  function ensure(){ if(!ctx){ try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);}catch(e){ctx=null;} } return ctx; }
+  function clearNodes(){ nodes.forEach(n=>{try{n.stop&&n.stop();}catch(e){} try{n.disconnect&&n.disconnect();}catch(e){}}); nodes=[]; if(timer){clearInterval(timer);timer=null;} }
+  function playCfg(cfg){
+    if(!ensure()) return;
+    clearNodes(); cur=cfg;
+    try{ ctx.resume&&ctx.resume(); }catch(e){}
+    // 和弦垫音: 每个音程一个振荡器 + 慢 LFO 微颤 + 低通滤波
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=cfg.cut; lp.connect(master); nodes.push(lp);
+    cfg.chord.forEach((semi,i)=>{
+      const o=ctx.createOscillator(); o.type=cfg.wave;
+      o.frequency.value=cfg.root*Math.pow(2,semi/12);
+      const g=ctx.createGain(); g.gain.value=(i===0?0.10:0.05);
+      // 慢 LFO 让音量轻微起伏, 更"活"
+      const lfo=ctx.createOscillator(); lfo.frequency.value=0.05+i*0.02;
+      const lg=ctx.createGain(); lg.gain.value=0.02; lfo.connect(lg); lg.connect(g.gain);
+      o.connect(g); g.connect(lp); o.start(); lfo.start();
+      nodes.push(o,g,lfo,lg);
+    });
+    // 律动脉冲(可选): 定时给根音一个短促点缀, 增加节奏感
+    if(cfg.pulse>0){
+      timer=setInterval(()=>{
+        if(!ctx||ctx.state!=='running') return;
+        const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=cfg.root*2;
+        const g=ctx.createGain(); const t=ctx.currentTime;
+        g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.06,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
+        o.connect(g); g.connect(master); o.start(t); o.stop(t+0.55);
+      }, cfg.pulse);
+    }
+    // 淡入
+    const t=ctx.currentTime; master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0.7,t+1.2);
+  }
+  return {
+    start(cfg){ if(!bgmOn()) return; playCfg(cfg); },
+    stop(){ if(ctx&&master){ const t=ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0,t+0.6); } setTimeout(clearNodes,700); cur=null; },
+    resume(){ if(ctx){ try{ctx.resume();}catch(e){} } },
+    playing(){ return !!cur; },
+    curName(){ return cur?cur:null; },
+  };
+})();
+function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b=$('#bgmBtn'); if(b) b.textContent=on?'🔊':'🔇'; if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function startRoomBGM(room){
+  if(!bgmOn()) return;
+  if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
+  else AudioEngine.stop();  // 公开/私密房暂无专属 BGM
+}
+function initBgmUI(){
+  const b=$('#bgmBtn'); if(!b) return;
+  b.textContent=bgmOn()?'🔊':'🔇';
+  b.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+}
+
 const LS_THEME='eh_theme', LS_THEME_LOCK='eh_theme_lock';
 function applyTheme(id){
   if(!THEMES.some(t=>t.id===id)) id='cyber';
@@ -741,6 +806,7 @@ function initThemeUI(){
   if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); };
   document.addEventListener('click',e=>{ if(!menu.contains(e.target) && e.target!==btn) menu.classList.remove('on'); });
   applyTheme(currentTheme());
+  initBgmUI();
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); }
 
@@ -910,7 +976,7 @@ async function enterRoom(room){
     // 秒还原已渲染消息 + 滚动位置状态
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=''; $('#hallCnt').innerHTML=optimisticCnt(room);
-    goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room);
+    goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息
@@ -929,7 +995,7 @@ async function enterRoom(room){
   $('#stream').innerHTML=''; oldestId=null; echoState={};
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML='';
-  goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room);
+  goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
 
   await ensureAuth();
   subscribeMessages(room.id);
@@ -1574,7 +1640,7 @@ async function logoutIdentity(bound){
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ applyTheme(themeLocked()?currentTheme():currentTheme());
+function backToLobby(){ AudioEngine.stop(); applyTheme(themeLocked()?currentTheme():currentTheme());
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
