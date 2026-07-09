@@ -76,6 +76,18 @@
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.25)}
+  .btn-line{width:100%;padding:12px;border:1px solid var(--line2);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;
+    letter-spacing:2px;cursor:pointer;color:var(--ink);background:rgba(10,12,24,.5);transition:.2s}
+  .btn-line:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .btn-line:disabled{opacity:.5;cursor:wait}
+  .auth-divider{display:flex;align-items:center;text-align:center;color:var(--dim);font-size:11px;margin:18px 0 14px}
+  .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .auth-divider span{padding:0 12px;white-space:nowrap}
+  .login-row{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .login-row input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+    color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
+  .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .fld-hint{font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.5}
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,60,172,.35)}
   .btn-primary:active{transform:translateY(0) scale(.99)}
   .btn-primary:disabled{opacity:.5;cursor:wait}
@@ -357,16 +369,15 @@
         </div>
         <button class="reroll" id="rerollBtn">↻ 换一个</button>
       </div>
-      <div class="opt-email" id="optEmailToggle">✉️ 想跨设备找回身份？绑个邮箱（选填）</div>
-      <div class="opt-email-box" id="optEmailBox">
-        <input id="enterEmail" type="email" placeholder="you@example.com（可留空，之后也能在个人空间绑定）">
+      <button class="btn-primary" id="enterBtn">匿 名 进 入</button>
+      <div class="auth-divider"><span>已有账号 / 想长期保存</span></div>
+      <div class="login-row">
+        <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="username">
+        <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password">
       </div>
-      <button class="btn-primary" id="enterBtn">进 入 回 声 厅</button>
-      <div class="opt-email" id="loginToggle" style="margin:14px 0 0;text-align:center">已有账号？<b style="color:var(--cyan)">邮箱登录 →</b></div>
-      <div class="opt-email-box" id="loginBox">
-        <input id="loginEmail" type="email" placeholder="注册时用的邮箱" style="margin-bottom:8px">
-        <button class="btn-primary" id="loginBtn" style="box-shadow:none">发送登录链接</button>
-      </div>
+      <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
+      <button class="btn-line" id="loginBtn">登 录</button>
+      <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
     </div>
   </div>
 
@@ -454,13 +465,26 @@
       <div class="modal-err" id="joinErr"></div>
       <button class="btn-primary" id="doJoinBtn">进 入 房 间</button>
     </div>
-    <div class="modal-body" id="mBind" style="display:none">
-      <h3>绑定邮箱</h3>
-      <p class="modal-sub">绑定后可跨设备找回身份与聊天记录。我们会发一封登录链接到你的邮箱。</p>
+    <div class="modal-body" id="mReg" style="display:none">
+      <h3>注册账号</h3>
+      <p class="modal-sub" id="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
+      <label class="fld"><span>用户名</span>
+        <input id="regUser" maxlength="20" placeholder="3-20 位，支持中英文"></label>
+      <label class="fld"><span>密码</span>
+        <input id="regPass" type="password" placeholder="至少 6 位"></label>
+      <label class="fld" style="margin-bottom:8px"><span>邮箱（选填）</span>
+        <input id="regEmail" type="email" placeholder="用于找回密码">
+        <div class="fld-hint">💡 建议填写：忘记密码时可凭邮箱找回；留空则密码丢失后无法找回账号。</div></label>
+      <div class="modal-err" id="regErr"></div>
+      <button class="btn-primary" id="doRegBtn">注 册 并 进 入</button>
+    </div>
+    <div class="modal-body" id="mReset" style="display:none">
+      <h3>找回密码</h3>
+      <p class="modal-sub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
-        <input id="bindEmail" type="email" placeholder="you@example.com"></label>
-      <div class="modal-err" id="bindErr"></div>
-      <button class="btn-primary" id="doBindBtn">发 送 登 录 链 接</button>
+        <input id="resetEmail" type="email" placeholder="注册时填的邮箱"></label>
+      <div class="modal-err" id="resetErr"></div>
+      <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
   </div>
 </div>
@@ -487,6 +511,11 @@
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
 const sb = window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:true, autoRefreshToken:true } });
+const EH_AUTH_FN = SB_URL + '/functions/v1/eh-auth';
+async function authApi(path, body){
+  const r = await fetch(EH_AUTH_FN+path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) };
+}
 
 const $ = s => document.querySelector(s);
 const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -1014,9 +1043,9 @@ async function openMe(){
     <div class="dsec"><div class="dl">我的身份</div>
       <div class="dcard">
         <div class="drow"><span class="dk">昵称</span><span class="dv" style="color:${me.color}">${me.emoji} ${esc(me.name)}</span></div>
-        <div class="drow"><span class="dk">状态</span><span class="dv">${bound?'已绑定 '+esc(session.user.email):'匿名（本设备）'}</span></div>
+        <div class="drow"><span class="dk">状态</span><span class="dv">${bound?'正式账号':'匿名（本设备）'}</span></div>
         <button class="dbtn" id="meReroll">↻ 换个昵称形象</button>
-        ${bound?'':'<button class="dbtn" id="meBind">✉️ 绑定邮箱（跨设备找回）</button>'}
+        ${bound?'':'<button class="dbtn" id="meReg">✨ 注册账号（用户名+密码，跨设备）</button>'}
       </div></div>
     <div class="dsec"><div class="dl">我在的房间 (${(myRooms||[]).length})</div>
       <div class="mlist">${(myRooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
@@ -1034,7 +1063,7 @@ async function openMe(){
         </div>
       </div></div>`;
   $('#meReroll') && ($('#meReroll').onclick=async()=>{ rollIdentity(); await sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe(); });
-  $('#meBind') && ($('#meBind').onclick=()=>{ closeMe(); openModal('mBind'); });
+  $('#meReg') && ($('#meReg').onclick=()=>{ closeMe(); openModal('mReg'); });
   $('#meLogout') && ($('#meLogout').onclick=()=>logoutIdentity(bound));
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
 }
@@ -1061,7 +1090,7 @@ const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨'
 let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
 function openModal(which){
   $('#modalMask').classList.add('on');
-  ['mCreate','mCreated','mJoin','mBind'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
+  ['mCreate','mCreated','mJoin','mReg','mReset'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
     $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o.dataset.kind==='public'));
@@ -1069,7 +1098,8 @@ function openModal(which){
     setTimeout(()=>$('#roomNameIn').focus(),50);
   }
   if(which==='mJoin'){ $('#codeIn').value=''; $('#joinErr').textContent=''; setTimeout(()=>$('#codeIn').focus(),50); }
-  if(which==='mBind'){ $('#bindEmail').value=''; $('#bindErr').textContent=''; setTimeout(()=>$('#bindEmail').focus(),50); }
+  if(which==='mReg'){ $('#regUser').value='';$('#regPass').value='';$('#regEmail').value='';$('#regErr').textContent=''; setTimeout(()=>$('#regUser').focus(),50); }
+  if(which==='mReset'){ $('#resetEmail').value='';$('#resetErr').textContent=''; setTimeout(()=>$('#resetEmail').focus(),50); }
 }
 function renderEmojiPick(){
   const first = pickedKind==='public'?'🌐':'🔒'; pickedEmoji=first;
@@ -1119,44 +1149,66 @@ async function joinByCode(){
   if(mErr && !/duplicate|unique/i.test(mErr.message||'')){ $('#joinErr').textContent='加入失败'; return; }
   closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
 }
-async function bindEmail(){
-  const email=$('#bindEmail').value.trim();
-  if(!/^\S+@\S+\.\S+$/.test(email)){ $('#bindErr').textContent='邮箱格式不对'; return; }
-  const btn=$('#doBindBtn'); btn.disabled=true; btn.textContent='发送中…'; $('#bindErr').textContent='';
-  // 匿名用户就地升级：linkIdentity 需 OAuth；邮箱用 updateUser + magic link 二选一。
-  // 用 updateUser 绑定邮箱，触发确认邮件；确认后匿名账号即绑定该邮箱(uid 不变)。
-  const { error }=await sb.auth.updateUser({ email });
-  btn.disabled=false; btn.textContent='发 送 登 录 链 接';
-  if(error){ $('#bindErr').textContent=error.message||'发送失败'; return; }
-  toast('确认邮件已发送，去邮箱点链接完成绑定'); closeModal();
+// ============ 正式账号：注册 / 登录 / 找回 ============
+// 登录：账号(用户名或邮箱)+密码。先 resolve 出登录邮箱，再 signInWithPassword。
+async function doLogin(){
+  const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
+  $('#loginErr').textContent='';
+  if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
+  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='登录中…';
+  const res=await authApi('/resolve',{account});
+  if(!res.ok || !res.body.loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent=res.body.error||'账号不存在'; return; }
+  const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
+  btn.disabled=false; btn.textContent='登 录';
+  if(error){ $('#loginErr').textContent='密码错误'; return; }
+  myUid=sess.user.id;
+  const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
+  if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); }
+  toast('欢迎回来'); goScene('lobby'); renderLobby();
+}
+// 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
+async function doRegister(){
+  const username=$('#regUser').value.trim(); const password=$('#regPass').value; const email=$('#regEmail').value.trim();
+  $('#regErr').textContent='';
+  if(username.length<3){ $('#regErr').textContent='用户名至少 3 位'; return; }
+  if(password.length<6){ $('#regErr').textContent='密码至少 6 位'; return; }
+  const btn=$('#doRegBtn'); btn.disabled=true; btn.textContent='注册中…';
+  // 确保有匿名 uid 可继承(把当前匿名身份+历史转正)
+  await ensureAuth();
+  const res=await authApi('/register',{ username, password, email, anonUid:myUid });
+  if(!res.ok || !res.body.ok){ btn.disabled=false; btn.textContent='注 册 并 进 入'; $('#regErr').textContent=res.body.error||'注册失败'; return; }
+  // 转正后用新账号密码登录(刷新 session 为已确认的邮箱账号)
+  const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
+  btn.disabled=false; btn.textContent='注 册 并 进 入';
+  if(error){ $('#regErr').textContent='注册成功但登录失败，请回登录页手动登录'; return; }
+  myUid=sess.user.id;
+  // 用注册的用户名更新前台昵称
+  me.name=username; me.id=myUid; saveIdentity(); paintIdentity();
+  await sb.from('eh_users').update({ name:username, is_anonymous:false }).eq('id',myUid);
+  toast('注册成功，已登录'); closeModal(); goScene('lobby'); renderLobby();
+}
+// 找回密码：仅对注册时填了邮箱的账号
+async function doReset(){
+  const email=$('#resetEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ $('#resetErr').textContent='邮箱格式不对'; return; }
+  const btn=$('#doResetBtn'); btn.disabled=true; btn.textContent='发送中…'; $('#resetErr').textContent='';
+  const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
+  btn.disabled=false; btn.textContent='发 送 重 置 链 接';
+  // 出于安全，无论邮箱是否存在都提示已发送
+  toast('若该邮箱已注册，重置链接已发送'); closeModal();
 }
 
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
-$('#optEmailToggle').onclick=()=>{ $('#optEmailBox').classList.toggle('on'); if($('#optEmailBox').classList.contains('on')) $('#enterEmail').focus(); };
-// 已注册账号：邮箱登录(magic link)。点链接回跳后 onAuthStateChange 拉回原身份+历史。
-$('#loginToggle').onclick=()=>{ $('#loginBox').classList.toggle('on'); if($('#loginBox').classList.contains('on')) $('#loginEmail').focus(); };
-async function loginByEmail(){
-  const email=$('#loginEmail').value.trim();
-  if(!/^\S+@\S+\.\S+$/.test(email)){ toast('邮箱格式不对'); return; }
-  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='发送中…';
-  // shouldCreateUser:false → 只给已注册邮箱发链接，未注册的不会凭空建号
-  const { error }=await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:false, emailRedirectTo:location.origin+location.pathname } });
-  btn.disabled=false; btn.textContent='发送登录链接';
-  if(error){ toast(/not found|signups|exist/i.test(error.message)?'该邮箱未注册过':(error.message||'发送失败')); return; }
-  toast('登录链接已发到 '+email+'，去邮箱点开即登入');
-}
-$('#loginBtn').onclick=()=>loginByEmail();
-$('#loginEmail').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();loginByEmail();} });
+$('#loginBtn').onclick=()=>doLogin();
+$('#loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
+$('#toReg').onclick=()=>openModal('mReg');
+$('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
+$('#doRegBtn').onclick=()=>doRegister();
+$('#doResetBtn').onclick=()=>doReset();
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
-  // 选填邮箱：填了就发确认邮件绑定（不阻塞进入）
-  const email=$('#enterEmail') ? $('#enterEmail').value.trim() : '';
-  if(email){
-    if(/^\S+@\S+\.\S+$/.test(email)){ sb.auth.updateUser({email}).then(({error})=>{ if(!error) toast('确认邮件已发到 '+email+'，点链接即绑定'); }); }
-    else toast('邮箱格式不对，已先用匿名身份进入');
-  }
   btn.disabled=false;
   goScene('lobby'); renderLobby();
 };
@@ -1176,7 +1228,6 @@ $('#doCreateBtn').onclick=()=>createRoom();
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast('邀请码已复制'),()=>toast('复制失败')); };
 $('#enterCreatedBtn').onclick=()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
 $('#doJoinBtn').onclick=()=>joinByCode();
-$('#doBindBtn').onclick=()=>bindEmail();
 $('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
 $('#rpX').onclick=()=>clearReply();
 
