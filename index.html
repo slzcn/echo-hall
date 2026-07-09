@@ -577,6 +577,10 @@ function paintIdentity(){
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+  // 正式账号 vs 临时身份: 更新标签 + 换一个按钮(临时才可换)
+  const tag=$('#idTag'), rr=$('#rerollBtn');
+  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; }
+  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; }
 }
 
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
@@ -1280,7 +1284,10 @@ async function doLogin(){
   if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
   myUid=sess.user.id;
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-  if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); }
+  me = prof && prof.name
+    ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }
+    : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true };
+  saveIdentity(); paintIdentity();
   toast('欢迎回来'); goScene('lobby'); renderLobby();
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
@@ -1408,13 +1415,16 @@ const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.h
 sb.auth.onAuthStateChange((ev,session)=>{
   if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
     myUid=session.user.id;
-    if(me) me.id=myUid;
+    if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
       const { data:prof } = await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
-      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8' }; saveIdentity(); paintIdentity(); }
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; saveIdentity(); }
+      else { me = me||{}; me.registered=true; }
+      paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
-      if(!authHandled && cameFromLink && $('#enter').classList.contains('on')){
-        authHandled=true; toast('已登录'); goScene('lobby'); renderLobby();
+      // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
+      if(!authHandled && $('#enter').classList.contains('on')){
+        authHandled=true; if(!cameFromLink) toast('欢迎回来'); goScene('lobby'); renderLobby();
       }
     },0);
   }
