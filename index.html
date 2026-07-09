@@ -83,6 +83,10 @@
   .auth-divider{display:flex;align-items:center;text-align:center;color:var(--dim);font-size:11px;margin:18px 0 14px}
   .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
   .auth-divider span{padding:0 12px;white-space:nowrap}
+  .auth-divider.clickable{cursor:pointer;transition:color .15s;user-select:none}
+  .auth-divider.clickable:hover{color:var(--cyan)}
+  .login-collapse{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .login-collapse.on{max-height:280px}
   .login-row{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
   .login-row input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
@@ -370,14 +374,16 @@
         <button class="reroll" id="rerollBtn">↻ 换一个</button>
       </div>
       <button class="btn-primary" id="enterBtn">匿 名 进 入</button>
-      <div class="auth-divider"><span>已有账号 / 想长期保存</span></div>
-      <div class="login-row">
-        <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="username">
-        <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password">
+      <div class="auth-divider clickable" id="loginToggle"><span>已有账号？点此登录 ▾</span></div>
+      <div class="login-collapse" id="loginCollapse">
+        <div class="login-row">
+          <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="username">
+          <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password">
+        </div>
+        <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
+        <button class="btn-line" id="loginBtn">登 录</button>
+        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
       </div>
-      <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
-      <button class="btn-line" id="loginBtn">登 录</button>
-      <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
     </div>
   </div>
 
@@ -461,7 +467,7 @@
       <h3>用邀请码加入</h3>
       <p class="modal-sub">输入朋友给你的邀请码：</p>
       <label class="fld"><span>邀请码</span>
-        <input id="codeIn" maxlength="16" placeholder="例如 A3F9K2" style="text-transform:uppercase;letter-spacing:3px;font-size:18px"></label>
+        <input id="codeIn" maxlength="12" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
       <div class="modal-err" id="joinErr"></div>
       <button class="btn-primary" id="doJoinBtn">进 入 房 间</button>
     </div>
@@ -1109,7 +1115,8 @@ function renderEmojiPick(){
 }
 function closeModal(){ $('#modalMask').classList.remove('on'); }
 
-function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
+// 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
+function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
 async function createRoom(){
   const name=$('#roomNameIn').value.trim();
   if(!name){ toast('给房间起个名'); return; }
@@ -1200,6 +1207,11 @@ async function doReset(){
 
 // ============ 事件绑定 ============
 $('#rerollBtn').onclick=()=>rollIdentity();
+$('#loginToggle').onclick=()=>{
+  const c=$('#loginCollapse'); const open=c.classList.toggle('on');
+  $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
+  if(open) setTimeout(()=>$('#loginAccount').focus(),200);
+};
 $('#loginBtn').onclick=()=>doLogin();
 $('#loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
 $('#toReg').onclick=()=>openModal('mReg');
