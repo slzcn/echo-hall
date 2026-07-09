@@ -638,13 +638,19 @@ const HISTORY_PAGE = 60;
 
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = {'闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC'};
-async function renderLobby(){
+async function renderLobby(soft){
   $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color;
-  await Promise.all([renderOfficial(), renderPublic(), renderMyRooms()]);
+  await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
 }
-async function renderOfficial(){
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
+async function renderOfficial(soft){
   const box=$('#channels');
+  // soft 刷新: 卡片 DOM 已在则只静默刷新在线数/预览，不清空重建(消除返回闪烁)
+  if(soft && box.children.length){
+    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
+    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'official'})));
+    return;
+  }
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
   box.innerHTML=(data||[]).map(r=>{
     const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
@@ -657,9 +663,14 @@ async function renderOfficial(){
   (data||[]).forEach(r=>fillRoomStats(box, r.id));
   prefetchAll((data||[]).map(r=>({id:r.id,kind:'official'})));
 }
-async function renderPublic(){
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
+async function renderPublic(soft){
   const box=$('#publicRooms'), empty=$('#publicEmpty');
+  if(soft && box.children.length){
+    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
+    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'public'})));
+    return;
+  }
+  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
@@ -698,8 +709,13 @@ async function fillRoomStats(box, rid){
     prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
   }
 }
-async function renderMyRooms(){
+async function renderMyRooms(soft){
   if(!myUid){ $('#myRooms').innerHTML=''; return; }
+  const boxE=$('#myRooms');
+  if(soft && boxE.children.length){
+    prefetchAll([...boxE.querySelectorAll('.rm[data-rid]')].map(c=>({id:c.dataset.rid,kind:'private'})));
+    return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
+  }
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
   const box=$('#myRooms');
   if(!data || !data.length){ box.innerHTML=''; return; }
@@ -1320,7 +1336,12 @@ async function logoutIdentity(bound){
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
 // ============ 返回大厅 ============
-async function backToLobby(){ await leaveRoom(); goScene('lobby'); renderLobby(); }
+function backToLobby(){
+  // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
+  goScene('lobby'); renderLobby(true);
+  // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
+  leaveRoom().catch(e=>console.warn('leaveRoom', e));
+}
 
 // ============ 建房 / 入房 弹窗 ============
 const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
