@@ -773,6 +773,8 @@ function subscribeMessages(rid){
       if(isEmojiOnly(m.text)) burst(m.text);
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
+      // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
+      if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
       applyEchoRealtime(p.new.message_id, p.new.user_id);
     })
     .subscribe();
@@ -789,7 +791,7 @@ async function setupPresence(room){
   await beat();
   // 订阅本房 presence 变化 → 刷新光墙
   presChan = sb.channel('room-pres:'+room.id)
-    .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>refreshPresence())
+    .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>schedulePresenceRefresh())
     .subscribe();
   await refreshPresence();
   // 心跳 + 清理定时器
@@ -802,25 +804,70 @@ async function beat(extra){
   const { error } = await sb.from('eh_presence').upsert(row);
   if(error) console.warn('beat error', error.message);
 }
-async function refreshPresence(){
-  if(!curRoom) return;
-  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
-  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
-  let users=(data||[]).slice();
-  // 兜底：自己一定在线（DB 读取延迟/失败时也至少显示自己），避免卡"连接中/0人"
-  if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
-  users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
-  $('#presence').innerHTML=users.map(p=>`
-    <div class="pav ${p.user_id===myUid?'me':''}" style="background:${safeColor(p.color)}22;color:${safeColor(p.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(p.color)}" title="${esc(p.name)}">
-      ${safeEmoji(p.emoji)}<span class="ring"></span></div>`).join('');
-  const kindLabel = curRoom.kind==='private'?'名成员在线':'人在线';
+// —— 性能优化: diff 渲染头像 + 拆分 typing 更新, 避免每次心跳/输入全量重建 DOM ——
+const presenceMap = new Map();   // user_id → DOM 节点
+let lastUsersSnapshot = [];       // 供 renderTyping 复用
+
+function renderPresenceAvatars(users){
+  const container=$('#presence');
+  const seen=new Set();
+  users.forEach((p,idx)=>{
+    seen.add(p.user_id);
+    let el=presenceMap.get(p.user_id);
+    const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+(p.color||'')+'|'+(p.user_id===myUid?'me':'');
+    if(el && el.dataset.sig===sig){
+      // 顺序可能变了, 位置对齐一下
+      if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
+      return;
+    }
+    // 需要新建或重建
+    const c=safeColor(p.color);
+    const div=document.createElement('div');
+    div.className='pav'+(p.user_id===myUid?' me':'');
+    div.style.cssText=`background:${c}22;color:${c};box-shadow:inset 0 0 0 1.5px ${c}`;
+    div.title=p.name||'';
+    div.innerHTML=`${safeEmoji(p.emoji)}<span class="ring"></span>`;
+    div.dataset.sig=sig;
+    if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
+    presenceMap.set(p.user_id,div);
+  });
+  // 清理离开的人
+  presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
+  const kindLabel = curRoom && curRoom.kind==='private'?'名成员在线':'人在线';
   $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
-  // 正在输入：typing_at 在 3s 内的他人
+}
+
+function renderTyping(users){
   const now=Date.now();
   const typers=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.name);
   const bar=$('#typingBar');
   if(typers.length){ $('#typingTxt').textContent=typers.length===1?`${typers[0]} 正在输入`:`${typers.length} 人正在输入`; bar.classList.add('on'); }
   else bar.classList.remove('on');
+}
+
+async function refreshPresence(){
+  if(!curRoom) return;
+  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
+  let users=(data||[]).slice();
+  if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
+  users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
+  lastUsersSnapshot=users;
+  renderPresenceAvatars(users);
+  renderTyping(users);
+}
+
+// presence realtime 事件的 debounce 触发器: 300ms 合并瞬时多次变化
+let _presDebounce=null;
+function schedulePresenceRefresh(){
+  if(_presDebounce) return;
+  _presDebounce=setTimeout(()=>{ _presDebounce=null; refreshPresence(); },300);
+}
+// typing 独立轻量刷新: 复用最近一次 users 快照, 不查 DB 不重建头像
+let _typingLightTimer=null;
+function scheduleTypingRefresh(){
+  clearTimeout(_typingLightTimer);
+  _typingLightTimer=setTimeout(()=>renderTyping(lastUsersSnapshot),200);
 }
 async function leavePresence(){
   clearInterval(heartbeatTimer); heartbeatTimer=null;
@@ -1362,12 +1409,18 @@ $('#rpX').onclick=()=>clearReply();
 
 // 输入框
 const cin=$('#cin');
+let _inputRaf=0;
 cin.addEventListener('input',()=>{
-  cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
-  $('#goBtn').disabled=!cin.value.trim();
+  // 高度/按钮/斜杠菜单用 rAF 合并, 避免每字符触发 layout thrash
+  if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
+    _inputRaf=0;
+    cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
+    $('#goBtn').disabled=!cin.value.trim();
+    const v=cin.value;
+    if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
+  });
+  // typing_at 保持原节流 1.5s
   const v=cin.value;
-  if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
-  // 正在输入：写 presence 表的 typing_at(节流 1.5s)，他人靠 refreshPresence 读到
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
 });
