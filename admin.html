@@ -94,16 +94,16 @@
 <body>
 <div id="toast"></div>
 
-<!-- 登录/注册 -->
+<!-- 登录(统一账号: 与前台同一套账号密码) -->
 <div id="auth">
   <div class="glass auth-card">
     <h1>回声厅 · 后台</h1>
-    <div class="sub" id="authSub">管理员登录</div>
+    <div class="sub" id="authSub">管理员登录 · 与前台同一账号</div>
     <div class="err" id="authErr"></div>
-    <label class="fld"><span>用户名</span><input id="username" autocomplete="username" placeholder="管理员账号"></label>
+    <label class="fld"><span>账号</span><input id="username" autocomplete="username" placeholder="用户名 或 邮箱"></label>
     <label class="fld"><span>密码</span><input id="password" type="password" autocomplete="current-password" placeholder="密码"></label>
     <button class="btn" id="authBtn">登 录</button>
-    <div class="toggle" id="toggleBox"></div>
+    <div class="toggle" style="font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6">只有被设为管理员的账号能进入后台。<br>没有账号请先到前台注册。</div>
   </div>
 </div>
 
@@ -140,12 +140,12 @@
   </div>
 
   <div class="page" id="p-admins">
-    <div class="glass card"><h3>添加普通管理员</h3>
+    <div class="glass card"><h3>任命管理员</h3>
       <div class="inline-form">
-        <input id="newAdminUser" placeholder="用户名(≥3位)">
-        <input id="newAdminPass" type="password" placeholder="密码(≥6位)">
-        <button class="mini-btn" id="addAdminBtn">＋ 添加</button>
+        <input id="newAdminUser" placeholder="对方的前台用户名">
+        <button class="mini-btn" id="addAdminBtn">设为管理员</button>
       </div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:8px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
     </div>
     <div class="glass card"><h3>管理员列表</h3>
       <table><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table>
@@ -153,55 +153,45 @@
   </div>
 </div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const FN='https://cddkniwbhvcbfgkgomtl.supabase.co/functions/v1/eh-admin-api';
+const SB_URL='https://cddkniwbhvcbfgkgomtl.supabase.co';
+const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
+const FN=SB_URL+'/functions/v1/eh-admin-api';
+const AUTH_FN=SB_URL+'/functions/v1/eh-auth';
+const sb=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true}});
 const $=s=>document.querySelector(s);
 const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const LS_TK='eh_admin_token';
-let token=localStorage.getItem(LS_TK)||'';
 let meAdmin=null;
-let mode='login'; // login | register
 
 let toastT;
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
 
-async function api(path,{method='GET',body,auth=true}={}){
+// 调 eh-admin-api，带当前 Supabase 登录 token
+async function api(path,{method='GET',body}={}){
+  const { data:{ session } } = await sb.auth.getSession();
   const headers={'Content-Type':'application/json'};
-  if(auth && token) headers['Authorization']='Bearer '+token;
+  if(session?.access_token) headers['Authorization']='Bearer '+session.access_token;
   const r=await fetch(FN+path,{method,headers,body:body?JSON.stringify(body):undefined});
   const j=await r.json().catch(()=>({}));
   return {ok:r.ok,status:r.status,body:j};
 }
 
-// ---- 判断是首个注册还是登录：调 /status(已有管理员则登录模式) ----
-async function detectMode(){
-  const res=await api('/status',{auth:false});
-  mode = (res.ok && res.body?.registered) ? 'login' : 'register';
-  paintAuthMode();
-}
-function paintAuthMode(){
-  if(mode==='register'){
-    $('#authSub').textContent='首次使用 · 注册即成为超级管理员';
-    $('#authBtn').textContent='注 册 并 登 录';
-    $('#toggleBox').innerHTML='';
-    $('#password').autocomplete='new-password';
-  } else {
-    $('#authSub').textContent='管理员登录';
-    $('#authBtn').textContent='登 录';
-    $('#toggleBox').innerHTML='';
-  }
-}
-
+// 登录: 账号(用户名/邮箱)→resolve登录邮箱→signInWithPassword→/me验管理员角色
 async function doAuth(){
-  const username=$('#username').value.trim(), password=$('#password').value;
+  const account=$('#username').value.trim(), password=$('#password').value;
   $('#authErr').textContent='';
-  if(!username||!password){ $('#authErr').textContent='请填写账号和密码'; return; }
+  if(!account||!password){ $('#authErr').textContent='请填写账号和密码'; return; }
   const btn=$('#authBtn'); btn.disabled=true;
-  const res=await api('/'+(mode==='register'?'register':'login'),{method:'POST',auth:false,body:{username,password}});
-  btn.disabled=false;
-  if(!res.ok){ $('#authErr').textContent=res.body?.error||'失败'; if(res.body?.error?.includes('注册已关闭')){mode='login';paintAuthMode();} return; }
-  token=res.body.token; localStorage.setItem(LS_TK,token); meAdmin=res.body.admin;
-  enterPanel();
+  try{
+    const rz=await (await fetch(AUTH_FN+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account})})).json();
+    if(!rz.loginEmail){ $('#authErr').textContent='账号不存在'; return; }
+    const { error }=await sb.auth.signInWithPassword({ email:rz.loginEmail, password });
+    if(error){ $('#authErr').textContent='账号或密码错误'; return; }
+    const ok=await loadMe();
+    if(!ok){ $('#authErr').textContent='该账号没有后台权限'; await sb.auth.signOut(); return; }
+    enterPanel();
+  } finally { btn.disabled=false; }
 }
 
 function enterPanel(){
@@ -212,10 +202,13 @@ function enterPanel(){
   loadOverview(); loadRooms();
 }
 
+// 取当前登录账号的后台角色; 非 admin/super 返回 false
 async function loadMe(){
   const res=await api('/me');
-  if(!res.ok){ token=''; localStorage.removeItem(LS_TK); return false; }
-  meAdmin=res.body.admin; return true;
+  if(!res.ok) return false;
+  if(res.body.role!=='admin' && res.body.role!=='super') return false;
+  meAdmin={ uid:res.body.uid, username:res.body.username, role:res.body.role };
+  return true;
 }
 
 async function loadOverview(){
@@ -262,20 +255,20 @@ $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
 async function loadAdmins(){
   const res=await api('/admins'); if(!res.ok) return;
   $('#adminsTbody').innerHTML=(res.body.admins||[]).map(a=>{
-    const isMe=a.id===meAdmin.id;
+    const isMe=a.auth_uid===meAdmin.uid;
     let ops='';
     if(a.role!=='super'){
-      ops=`<button class="mini-btn" data-transfer="${a.id}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.id}">删除</button>`;
+      ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
     } else if(isMe){ ops='<span style="color:var(--dim)">（你）</span>'; }
     return `<tr><td>${esc(a.username)}</td>
-      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'普管'}</span></td>
-      <td>${a.last_login?a.last_login.replace('T',' ').slice(0,16):'—'}</td>
+      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'管理员'}</span></td>
+      <td>${(a.created_at||'').replace('T',' ').slice(0,16)}</td>
       <td>${ops}</td></tr>`;
   }).join('');
   $('#adminsTbody').querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('删除该管理员？')) return;
-    const r=await api('/revoke',{method:'POST',body:{id:b.dataset.revoke}});
-    toast(r.ok?'已删除':(r.body?.error||'失败')); loadAdmins();
+    if(!confirm('撤销该管理员的后台权限？(其前台账号保留)')) return;
+    const r=await api('/revoke',{method:'POST',body:{auth_uid:b.dataset.revoke}});
+    toast(r.ok?'已撤销':(r.body?.error||'失败')); loadAdmins();
   });
   $('#adminsTbody').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=async()=>{
     if(!confirm('转让超管身份给该管理员？你将降为普通管理员。')) return;
@@ -285,9 +278,10 @@ async function loadAdmins(){
   });
 }
 $('#addAdminBtn').onclick=async()=>{
-  const username=$('#newAdminUser').value.trim(), password=$('#newAdminPass').value;
-  const r=await api('/appoint',{method:'POST',body:{username,password}});
-  if(r.ok){ toast('已添加'); $('#newAdminUser').value='';$('#newAdminPass').value=''; loadAdmins(); }
+  const username=$('#newAdminUser').value.trim();
+  if(!username){ toast('请输入用户名'); return; }
+  const r=await api('/appoint',{method:'POST',body:{username}});
+  if(r.ok){ toast('已设为管理员'); $('#newAdminUser').value=''; loadAdmins(); }
   else toast(r.body?.error||'失败');
 };
 
@@ -301,12 +295,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
-$('#logoutBtn').onclick=()=>{ token='';localStorage.removeItem(LS_TK); location.reload(); };
+$('#logoutBtn').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
 
-// 启动
+// 启动: 若已有登录 session 且是管理员, 直接进后台
 (async()=>{
-  if(token && await loadMe()){ enterPanel(); }
-  else { await detectMode(); }
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session && await loadMe()){ enterPanel(); }
 })();
 </script>
 </body>
