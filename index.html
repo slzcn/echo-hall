@@ -890,8 +890,17 @@ function bindRoomCards(box){
 
 // ============ 进入房间 ============
 const SNAP_TTL=30000;   // 快照有效期 30s
+// 刷新页面后恢复上次所在房间(进大厅后调, 仅当有记录)
+function restoreLastRoom(){
+  try{
+    const s=localStorage.getItem('eh_last_room'); if(!s) return;
+    const r=JSON.parse(s); if(r && r.id) enterRoom(r);
+  }catch(e){}
+}
 async function enterRoom(room){
   curRoom = room;
+  // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
+  try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){}
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
@@ -1396,6 +1405,7 @@ async function leaveRoom(){
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
+  try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
 // ============ 房主设置抽屉 ============
@@ -1866,6 +1876,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
       // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
       if(!authHandled && $('#enter').classList.contains('on')){
         authHandled=true; if(!cameFromLink) toast('欢迎回来'); goScene('lobby'); renderLobby();
+        restoreLastRoom();  // 刷新前在某房间→自动恢复进房
       }
     },0);
   }
