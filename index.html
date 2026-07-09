@@ -770,14 +770,16 @@ async function enterRoom(room){
   await ensureAuth();
   // 实时订阅先挂上(不阻塞，立刻开始接新消息，不遗漏)
   subscribeMessages(room.id);
-  // 确保成为成员(官方/公开：直接加入；私密：调用处已保证)
+  // 公开房/官方房: 拉消息不依赖成员身份(eh_public_recent 匿名可读)，
+  //   立刻开拉、与 joinAsMember 并行，省掉串行等 insert 的 ~300ms
+  const isPublic = room.kind==='official' || room.kind==='public';
+  const histP = isPublic ? loadHistory(true) : null;
   await joinAsMember(room);
-  // 成员身份就绪后：历史/房主判定/在线状态 三者并行拉取(而非串行等待)
-  const [histDone, memRes] = await Promise.all([
-    loadHistory(true),
+  // 私密房必须成员就绪后才能读(RLS)，此时才拉
+  const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-    setupPresence(room),
-  ]);
+    setupPresence(room) ];
+  const [ , memRes] = await Promise.all(tasks);
   room.role = memRes?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
   setConn(true);
