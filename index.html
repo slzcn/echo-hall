@@ -588,7 +588,7 @@
       <h3>编辑形象</h3>
       <p class="modal-sub">自定义你的昵称和头像（用户名登录不受影响）。</p>
       <label class="fld"><span>昵称</span>
-        <input id="profName" maxlength="24" placeholder="显示给别人看的名字"></label>
+        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
       <label class="fld"><span>头像</span>
         <div class="emoji-pick" id="profEmojiPick"></div></label>
       <label class="fld"><span>主题色</span>
@@ -1475,6 +1475,8 @@ async function openMe(){
       <div class="me-stat" id="meStatRooms"><div class="n">${roomsN}</div><div class="l">加入的房间</div></div>
       <div class="me-stat" id="meStatMsgs"><div class="n">${msgsN}</div><div class="l">发过的消息</div></div>
     </div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间</div>
+      <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
     <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言</div>
       <div class="dcard" style="max-height:180px;overflow-y:auto" id="meMsgsList">${_meCache.msgs?renderMyMsgList(_meCache.msgs):'<div class="empty-hint">加载中…</div>'}</div></div>
     <button class="dbtn danger" id="meLogout" style="width:100%">${isBound?'退出登录':'退出 / 换个身份'}</button>
@@ -1496,16 +1498,24 @@ async function openMe(){
     const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : '<span class="mh-badge reg">正式账号</span>';
     if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
   }
-  // 刷新统计数字 + 最近发言
+  // 刷新统计数字 + 我的房间(可点进房) + 最近发言
   $('#meStatRooms').querySelector('.n').textContent=myRooms.length;
   $('#meStatMsgs').querySelector('.n').textContent=myMsgs.length;
+  $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
   $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
 }
 // 列表渲染 helper(供首屏缓存 + 刷新复用)
 function renderMyRoomList(rooms){
   return (rooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
-    <div class="mitem"><div class="mi-av">${safeEmoji(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
-    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+    <div class="mitem mitem-go" data-rid="${r.room_id}" data-nm="${esc(rm.name||'')}" data-em="${safeEmoji(rm.emoji)||'🔒'}" data-kind="${rm.kind||'public'}" style="cursor:pointer">
+    <div class="mi-av">${safeEmoji(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
+    ${r.role==='owner'?'<span class="mi-role">房主</span>':'<span class="mi-go">进入 →</span>'}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+}
+// 绑定"我的房间"列表点击进房
+function bindMyRoomClicks(){
+  document.querySelectorAll('#meRoomsList .mitem-go').forEach(el=>el.onclick=()=>{
+    closeMe(); enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:el.dataset.kind});
+  });
 }
 function renderMyMsgList(msgs){
   return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
@@ -1711,6 +1721,8 @@ function openProfileEditor(){
   openModal('mProfile');
   _profEmoji=me.emoji||'🦊'; _profColor=me.color||'#28E6D8';
   setTimeout(()=>{ $('#profName').value=me.name||''; },50);
+  // 随机昵称按钮(复用词库), 昵称与登录无关可随意换
+  $('#profDice').onclick=()=>{ $('#profName').value=rand(ADJ)+rand(ANI); $('#profName').focus(); };
   // emoji 选择器(当前高亮在首位)
   const emos=[_profEmoji,...EMO.filter(e=>e!==_profEmoji)];
   $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
