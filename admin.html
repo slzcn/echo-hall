@@ -168,6 +168,19 @@
     .kpis{grid-template-columns:1fr 1fr;gap:10px}
     .kpi .n{font-size:23px}
   }
+  /* 分组折叠文案表 */
+  .txt-group{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;overflow:hidden}
+  .txt-grp-head{padding:10px 12px;cursor:pointer;user-select:none;background:rgba(255,255,255,.02);font-size:13px;display:flex;align-items:center;gap:6px}
+  .txt-grp-head:hover{background:rgba(255,255,255,.05)}
+  .txt-grp-caret{color:var(--cyan);font-size:11px;width:12px;display:inline-block}
+  .txt-grp-cnt{color:var(--dim);font-size:11px;margin-left:2px}
+  .txt-grp-reset{margin-left:auto}
+  .txt-grp-body{padding:8px 12px 12px}
+  .txt-row{margin-bottom:11px}
+  .txt-row-label{font-size:12px;color:var(--sub);margin-bottom:3px}
+  .txt-row-key{color:var(--dim);font-family:monospace;font-size:10px;margin-left:5px;opacity:.6}
+  .txt-row-input{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;box-sizing:border-box}
+  .txt-row-def{font-size:10.5px;color:var(--dim);margin-top:3px;padding-left:2px}
 </style>
 </head>
 <body>
@@ -271,6 +284,7 @@
     </div>
     <div class="glass card"><h3>界面文案
       <button class="mini-btn" id="textSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存文案</button> <button class="mini-btn" id="textResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div id="textSearch" style="margin-bottom:10px"><input id="textSearchInput" placeholder="🔍 搜索文案(中文标签/key/内容)" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none"></div>
       <div id="textTable"></div>
     </div>
   </div>
@@ -512,6 +526,17 @@ const CFG_DEFAULT = {
   text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时身份 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"官方频道",hallPublic:"公开房间",hallPrivate:"私密房 · 仅邀请码进入",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存"},
 };
 
+// ---- 文案分组元数据: 组名 → [ [key,中文标签], ... ] ; 决定折叠面板结构+友好标签 ----
+const TEXT_GROUPS = [
+  ['入场页', [['entrySlogan','副标语'],['entryBtn','匿名进入按钮']]],
+  ['大厅', [['hallOfficial','官方频道标题'],['hallPublic','公开房间标题'],['hallPrivate','私密房标题'],['publicEmpty','公开房空状态'],['officialDesc','闲聊广场描述语']]],
+  ['聊天室·模式', [['modeVoiceTitle','语音留声标题'],['modeVoiceSub','语音留声副标'],['modeVoidTitle','说给虚空标题'],['modeVoidSub','说给虚空副标'],['modeSingTitle','文字神曲标题'],['modeSingSub','文字神曲副标']]],
+  ['聊天室·输入', [['composerPlaceholder','输入框提示'],['voidPlaceholder','虚空模式提示'],['roomFirstMsg','房间空状态'],['cmdSing','/sing 命令说明'],['cmdWhisper','/whisper 命令说明']]],
+  ['按钮', [['btnCreateRoom','生成房间'],['btnEnterRoom','进入房间'],['btnLogin','登录'],['btnRegister','注册并进入']]],
+  ['房间创建', [['roomTypePublicDesc','公开房说明'],['roomTypePrivateDesc','私密房说明'],['roomCreatedTitle','创建成功标题']]],
+  ['系统', [['connecting','连接中'],['loading','加载中']]],
+];
+
 async function loadConfig(){
   if(CFG_CACHE) return CFG_CACHE;
   const r=await api('/config');
@@ -618,12 +643,76 @@ async function loadTextBind(){
   });
   fc+='</tbody></table></div>'; $('#fallbackCTable').innerHTML=fc;
   $('#fallbackCTable').querySelectorAll('[data-fc-picker]').forEach(p=>p.oninput=()=>{ const t=$('#fallbackCTable').querySelector(`[data-fc="${p.dataset.fcPicker}"]`); if(t) t.value=p.value; });
-  // text
-  let tx='<div style="overflow-x:auto"><table><thead><tr><th>key</th><th>文案</th></tr></thead><tbody>';
-  Object.keys(cfg.text).forEach(k=>{
-    tx+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px">${k}</td><td><input data-tx="${k}" value="${esc(cfg.text[k])}" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td></tr>`;
+  // text —— 分组折叠 + 搜索 + 默认值对比
+  renderTextGroups(cfg);
+}
+
+// 渲染分组折叠文案表
+function renderTextGroups(cfg){
+  const def=CFG_DEFAULT.text;
+  let html='';
+  TEXT_GROUPS.forEach((grp,gi)=>{
+    const [gname, items]=grp;
+    // 统计本组改过几条
+    let changed=0; items.forEach(([k])=>{ if(cfg.text[k]!==def[k]) changed++; });
+    html+=`<div class="txt-group" data-group="${gi}">`;
+    html+=`<div class="txt-grp-head" onclick="toggleTxtGroup(${gi})">`;
+    html+=`<span class="txt-grp-caret">▸</span> <b>${esc(gname)}</b> <span class="txt-grp-cnt">${items.length}条${changed?` · <span style="color:var(--amber)">${changed}改</span>`:''}</span>`;
+    html+=`<button class="mini-btn txt-grp-reset" onclick="event.stopPropagation();resetTextGroup(${gi})" style="border-color:var(--dim);color:var(--sub);float:right;font-size:10.5px;padding:2px 8px">↺ 本组</button>`;
+    html+=`</div>`;
+    html+=`<div class="txt-grp-body" style="display:none">`;
+    items.forEach(([k,label])=>{
+      const cur=cfg.text[k]!=null?cfg.text[k]:'', dv=def[k]!=null?def[k]:'';
+      const isChanged=cur!==dv;
+      html+=`<div class="txt-row" data-k="${k}" data-label="${esc(label)}">`;
+      html+=`<div class="txt-row-label">${esc(label)} <span class="txt-row-key">${k}</span></div>`;
+      html+=`<input data-tx="${k}" value="${esc(cur)}" class="txt-row-input" oninput="onTxtInput(this)" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor=(this.value!==this.dataset.def)?'var(--amber)':'var(--line)'" data-def="${esc(dv)}">`;
+      html+=`<div class="txt-row-def" style="${isChanged?'':'display:none'}">默认: ${esc(dv)} <a onclick="revertTxt('${k}')" style="color:var(--cyan);cursor:pointer;margin-left:4px">↺还原这条</a></div>`;
+      html+=`</div>`;
+    });
+    html+=`</div></div>`;
   });
-  tx+='</tbody></table></div>'; $('#textTable').innerHTML=tx;
+  $('#textTable').innerHTML=html;
+}
+// 折叠展开
+function toggleTxtGroup(gi){
+  const g=document.querySelector(`.txt-group[data-group="${gi}"]`); if(!g) return;
+  const body=g.querySelector('.txt-grp-body'), caret=g.querySelector('.txt-grp-caret');
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none'; caret.textContent=open?'▾':'▸';
+}
+// 输入时实时显示/隐藏默认值对比
+function onTxtInput(el){
+  const row=el.closest('.txt-row'), defEl=row.querySelector('.txt-row-def');
+  if(el.value!==el.dataset.def){ defEl.style.display='block'; el.style.borderColor='var(--amber)'; }
+  else { defEl.style.display='none'; el.style.borderColor='var(--line)'; }
+}
+// 单条还原默认
+function revertTxt(k){
+  const el=$('#textTable').querySelector(`[data-tx="${k}"]`); if(!el) return;
+  el.value=el.dataset.def; onTxtInput(el);
+}
+// 本组恢复默认(仅重置输入框,不自动保存,需点保存文案)
+function resetTextGroup(gi){
+  const items=TEXT_GROUPS[gi][1];
+  items.forEach(([k])=>{ const el=$('#textTable').querySelector(`[data-tx="${k}"]`); if(el){ el.value=el.dataset.def; onTxtInput(el); } });
+  toast('已重置本组输入框,点【💾 保存文案】生效');
+}
+// 搜索过滤
+function filterText(q){
+  q=(q||'').trim().toLowerCase();
+  document.querySelectorAll('.txt-group').forEach(g=>{
+    let anyVisible=false;
+    g.querySelectorAll('.txt-row').forEach(row=>{
+      const k=row.dataset.k.toLowerCase(), label=row.dataset.label.toLowerCase();
+      const val=(row.querySelector('.txt-row-input').value||'').toLowerCase();
+      const hit=!q||k.includes(q)||label.includes(q)||val.includes(q);
+      row.style.display=hit?'block':'none'; if(hit) anyVisible=true;
+    });
+    // 搜索时自动展开有命中的组,无命中隐藏整组
+    g.style.display=anyVisible?'block':'none';
+    if(q&&anyVisible){ g.querySelector('.txt-grp-body').style.display='block'; g.querySelector('.txt-grp-caret').textContent='▾'; }
+  });
 }
 
 $('#themeSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('themePalettes',collectThemePalettes()); });
@@ -653,6 +742,7 @@ $('#themeResetBtn')?.addEventListener('click',()=>resetConfigKeys(['themePalette
 $('#bgmResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomBgm'], loadBgm, 'BGM'));
 $('#bindResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomTheme','officialFallbackC'], loadTextBind, '房间绑定'));
 $('#textResetBtn')?.addEventListener('click',()=>resetConfigKeys(['text'], loadTextBind, '界面文案'));
+$('#textSearchInput')?.addEventListener('input',e=>filterText(e.target.value));
 $('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
 
 // tabs
