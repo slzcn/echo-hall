@@ -342,12 +342,12 @@ function confirmBox(msg,title){
 }
 
 // ===== 皮肤(与前台共用 localStorage eh_theme) =====
-const SKINS=[['cyber','赛博青','#28E6D8'],['vapor','蒸汽波','#FF5FA2'],['mono','暗夜金','#E9C877'],['aurora','极光','#2EF0C8']];
+const SKINS=[['cyber','赛博青','#28E6D8'],['vapor','蒸汽波','#FF5FA2'],['mono','暗夜金','#E9C877'],['aurora','极光','#A98BFF']];
 function curTheme(){ try{ return localStorage.getItem('eh_theme')||'cyber'; }catch(e){ return 'cyber'; } }
 function applyTheme(id){ if(id==='cyber') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',id);
   try{ localStorage.setItem('eh_theme',id); }catch(e){} renderSkinMenu(); }
 function renderSkinMenu(){ const cur=curTheme();
-  $('#skinMenu').innerHTML=SKINS.map(([id,nm,c])=>`<div class="skin-opt${id===cur?' active':''}" data-skin="${id}"><span class="sw" style="background:${c}"></span>${nm}<span class="ck">✓</span></div>`).join('');
+  $('#skinMenu').innerHTML=SKINS.map(([id,nm,c])=>`<div class="skin-opt${id===cur?' active':''}" data-skin="${id}"><span class="sw" style="background:${c}"></span>${nm}<span class="ck" style="color:${c}">✓</span></div>`).join('');
   $('#skinMenu').querySelectorAll('.skin-opt').forEach(el=>el.onclick=e=>{ e.stopPropagation(); applyTheme(el.dataset.skin); }); }
 $('#skinBtn').onclick=e=>{ e.stopPropagation(); $('#skinMenu').classList.toggle('on'); };
 document.addEventListener('click',()=>$('#skinMenu').classList.remove('on'));
@@ -521,7 +521,7 @@ const CFG_DEFAULT = {
     mono:{"--bg":"#000000","--bg2":"#0a0a0c","--panel":"rgba(16,16,20,.82)","--panel-solid":"#0e0e12","--line":"rgba(210,180,120,.16)","--line2":"rgba(210,180,120,.3)","--ink":"#F4F1E9","--sub":"#B8B0A0","--dim":"#827B6D","--cyan":"#E9C877","--magenta":"#E9C877","--violet":"#D8B85C","--amber":"#E9C877","--green":"#C9BE96","--grid":"rgba(210,180,120,.035)","--glow-cyan":"0 0 20px rgba(233,200,119,.4)","--glow-mag":"0 0 20px rgba(233,200,119,.4)"},
     aurora:{"--bg":"#04121a","--bg2":"#062230","--panel":"rgba(10,40,52,.7)","--panel-solid":"#08202c","--line":"rgba(90,220,200,.18)","--line2":"rgba(90,220,200,.32)","--ink":"#E6FBF6","--sub":"#9BD4CC","--dim":"#5F928C","--cyan":"#2EF0C8","--magenta":"#FF6EC7","--violet":"#A98BFF","--amber":"#FFCE6B","--green":"#3EE89A","--grid":"rgba(80,220,255,.05)","--glow-cyan":"0 0 26px rgba(46,240,200,.55)","--glow-mag":"0 0 24px rgba(255,110,199,.5)"},
   },
-  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF5FA2"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#2EF0C8"}],
+  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF5FA2"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#A98BFF"}],
   roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"mono","虚空回音":"aurora"},
   officialFallbackC:{"闲聊广场":"#28E6D8","深夜电台":"#8B5CFF","技术黑话":"#FFB84D","虚空回音":"#FF3CAC"},
   roomBgm:{

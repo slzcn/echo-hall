@@ -163,7 +163,7 @@
   .skin-opt.active{color:var(--ink);background:rgba(255,255,255,.05)}
   .skin-opt .dot{width:13px;height:13px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
   .skin-opt .ck{margin-left:auto;opacity:0;font-size:12px}
-  .skin-opt.active .ck{opacity:1;color:var(--cyan)}
+  .skin-opt.active .ck{opacity:1}
   .sec-label{width:100%;max-width:var(--content-max);font-size:12px;color:var(--sub);letter-spacing:.5px;font-weight:700;
     display:flex;align-items:center;gap:10px}
   .sec-label .sl-t{flex-shrink:0}
@@ -883,7 +883,7 @@ const EH_CONFIG_DEFAULT = {
     { id:'cyber',  name:'赛博霓虹', dot:'#28E6D8' },
     { id:'vapor',  name:'蒸汽波',   dot:'#FF5FA2' },
     { id:'mono',   name:'暗夜极简', dot:'#E9C877' },
-    { id:'aurora', name:'极光渐变', dot:'#2EF0C8' },
+    { id:'aurora', name:'极光渐变', dot:'#A98BFF' },
   ],
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
@@ -1425,7 +1425,7 @@ function applyRoomTheme(room){
 }
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
-  const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
+  const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck" style="color:${t.dot}">✓</span></div>`).join('');
   const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); });
   buildMenu(menu); bind(menu);
   const btn=$('#skinBtn');

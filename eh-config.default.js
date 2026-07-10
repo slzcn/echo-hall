@@ -65,7 +65,7 @@
     { id:'cyber',  name:'赛博霓虹', dot:'#28E6D8' },
     { id:'vapor',  name:'蒸汽波',   dot:'#FF5FA2' },
     { id:'mono',   name:'暗夜极简', dot:'#E9C877' },
-    { id:'aurora', name:'极光渐变', dot:'#2EF0C8' },
+    { id:'aurora', name:'极光渐变', dot:'#A98BFF' },
   ];
 
   // ---- 官方房 → 专属默认主题(进房自动套,用户未手动锁定时) ----
