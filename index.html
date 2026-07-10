@@ -152,10 +152,10 @@
   .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
   .me-btn{position:absolute;top:0;right:0;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
     cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.18s}
-  .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .me-btn:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));box-shadow:0 0 16px -4px var(--accent,var(--cyan))}
   .me-btn.ic svg{width:18px;height:18px}
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
-  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)}
+  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--accent,var(--cyan));box-shadow:0 0 12px -3px var(--accent,var(--cyan));transform:translateY(-1px)}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -234,12 +234,12 @@
   .hall-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
   .tool-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:18px;flex-shrink:0;user-select:none}
-  .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .tool-btn:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));box-shadow:0 0 16px -4px var(--accent,var(--cyan))}
   /* 触屏点后短暂禁用指针, 强制脱落 :hover, 不再粘住 */
   .nohover{pointer-events:none!important}
   /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
   .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
-  .tool-btn.active,.me-btn.active{color:var(--cyan);border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,transparent)}
+  .tool-btn.active,.me-btn.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
   .gear.active{color:var(--amber);border-color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent)}  /* 齿轮用琥珀主色, 与其 hover 一致 */
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
@@ -853,28 +853,28 @@ const EH_CONFIG_DEFAULT = {
       '--bg':'#07080d','--bg2':'#0d0f1a','--panel':'rgba(18,21,36,.72)','--panel-solid':'#121524',
       '--line':'rgba(120,140,220,.16)','--line2':'rgba(120,140,220,.28)',
       '--ink':'#EAF0FF','--sub':'#98A3C7','--dim':'#717EA9',
-      '--cyan':'#28E6D8','--magenta':'#FF3CAC','--violet':'#8B5CFF','--amber':'#FFB84D','--green':'#4DE38A',
+      '--cyan':'#28E6D8','--magenta':'#FF3CAC','--violet':'#8B5CFF','--amber':'#FFB84D','--green':'#4DE38A','--accent':'#28E6D8',
       '--grid':'rgba(80,120,255,.05)','--glow-cyan':'0 0 24px rgba(40,230,216,.5)','--glow-mag':'0 0 24px rgba(255,60,172,.5)',
     },
     vapor: {
       '--bg':'#160a1f','--bg2':'#22103a','--panel':'rgba(40,18,60,.72)','--panel-solid':'#241035',
       '--line':'rgba(255,120,200,.18)','--line2':'rgba(255,120,200,.32)',
       '--ink':'#FFE8F6','--sub':'#D9A8D0','--dim':'#9B77A8',
-      '--cyan':'#38E1D0','--magenta':'#FF5FA2','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0',
+      '--cyan':'#38E1D0','--magenta':'#FF5FA2','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0','--accent':'#FF5FA2',
       '--grid':'rgba(255,120,220,.06)','--glow-cyan':'0 0 24px rgba(56,225,208,.5)','--glow-mag':'0 0 26px rgba(255,95,162,.55)',
     },
     mono: {
       '--bg':'#000000','--bg2':'#0a0a0c','--panel':'rgba(16,16,20,.82)','--panel-solid':'#0e0e12',
       '--line':'rgba(210,180,120,.16)','--line2':'rgba(210,180,120,.3)',
       '--ink':'#F4F1E9','--sub':'#B8B0A0','--dim':'#827B6D',
-      '--cyan':'#E9C877','--magenta':'#E9C877','--violet':'#D8B85C','--amber':'#E9C877','--green':'#C9BE96',
+      '--cyan':'#E9C877','--magenta':'#E9C877','--violet':'#D8B85C','--amber':'#E9C877','--green':'#C9BE96','--accent':'#E9C877',
       '--grid':'rgba(210,180,120,.035)','--glow-cyan':'0 0 20px rgba(233,200,119,.4)','--glow-mag':'0 0 20px rgba(233,200,119,.4)',
     },
     aurora: {
       '--bg':'#04121a','--bg2':'#062230','--panel':'rgba(10,40,52,.7)','--panel-solid':'#08202c',
       '--line':'rgba(90,220,200,.18)','--line2':'rgba(90,220,200,.32)',
       '--ink':'#E6FBF6','--sub':'#9BD4CC','--dim':'#5F928C',
-      '--cyan':'#2EF0C8','--magenta':'#FF6EC7','--violet':'#A98BFF','--amber':'#FFCE6B','--green':'#3EE89A',
+      '--cyan':'#2EF0C8','--magenta':'#FF6EC7','--violet':'#A98BFF','--amber':'#FFCE6B','--green':'#3EE89A','--accent':'#2EF0C8',
       '--grid':'rgba(80,220,255,.05)','--glow-cyan':'0 0 26px rgba(46,240,200,.55)','--glow-mag':'0 0 24px rgba(255,110,199,.5)',
     },
   },
