@@ -428,7 +428,7 @@
   .playing .pglyph::before{left:0}.playing .pglyph::after{right:0}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
-  .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .song-lyric{font-size:13.5px;color:var(--sub);max-width:min(240px,72vw);white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
   .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
   .song-lyric .sl-ch.sung{color:var(--ink)}
   .song-lyric .sl-ch.on{color:var(--sc,var(--cyan));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
