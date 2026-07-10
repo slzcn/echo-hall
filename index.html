@@ -858,6 +858,10 @@ const AudioEngine=(function(){
     resume(){ if(ctx){ try{ctx.resume();}catch(e){} } },
     playing(){ return !!cur; },
     curName(){ return cur?cur:null; },
+    // 闪避: 神曲播放时把 BGM 压低, 结束再恢复(仅在 BGM 正在播时生效)
+    duck(on){ if(!ctx||!master||!cur) return; const t=ctx.currentTime;
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t);
+      master.gain.linearRampToValueAtTime(on?0.14:0.7, t+0.25); },
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
@@ -1612,6 +1616,7 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain){
 let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el}
 function stopSong(){
   if(!curSong) return;
+  AudioEngine.duck(false);   // 恢复官方房 BGM 音量
   const s=curSong; curSong=null;
   s.timeouts.forEach(clearTimeout);
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
@@ -1624,6 +1629,7 @@ function playSong(lyric, sid, el){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
   if(!chars.length){ toast('没有可唱的内容'); return; }
+  AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.12;
