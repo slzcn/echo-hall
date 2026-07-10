@@ -2345,7 +2345,7 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
-  // v7【采样元音·加法合成】主人 A/B 对比选定方案C: 20 谐波按共振峰高斯加权,
+  // v9【采样元音·加法合成·安卓兼容】保 v7 iOS 好听音色, 仅去掉谐波 frequency ramp(安卓杀手).
   // 比 v3~v6 的 3 个 bandpass 更平滑饱满、更像人声哼唱(不是电子音)。
   // 保留 v6 过期时间保护(安卓 setValueAtTime 传过期时间抛异常→整轨静音的实锤修复)。
   const tmin=ctx.currentTime+0.03; if(t<tmin) t=tmin;
@@ -2368,7 +2368,7 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
     for(let k=0;k<3;k++){ const bw=[120,140,190][k],a=[1,0.6,0.38][k]; w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2))); }
     if(w<0.045) continue;
     const o=ctx.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(hz*0.98,t); o.frequency.linearRampToValueAtTime(hz,t+gliss);
+    o.frequency.value=hz;   // v9: 安卓兼容——去掉 frequency ramp(安卓内核对"高频osc+frequency ramp"会哑). iOS音色不受影响.
     const g=ctx.createGain(); g.gain.value=w*(n===1?0.9:0.7)*0.42;
     o.connect(g).connect(env); o.start(t); o.stop(t+dur+0.06); oscs.push(o);
   }
