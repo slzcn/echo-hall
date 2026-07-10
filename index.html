@@ -634,18 +634,18 @@
           <div class="id-name" id="idName">量子水獭</div>
           <div class="id-tag" id="idTag" data-txt="entrySlogan">临时身份 · 无需注册</div>
         </div>
-        <button class="reroll" id="rerollBtn">↻ 换一个</button>
+        <button class="reroll" id="rerollBtn" data-txt="loginSwitchId">↻ 换一个</button>
       </div>
       <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
-      <div class="auth-divider clickable" id="loginToggle"><span>已有账号？点此登录 ▾</span></div>
+      <div class="auth-divider clickable" id="loginToggle"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
         <div class="login-row">
-          <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="off">
-          <input id="loginPassword" type="text" placeholder="密码" autocomplete="off">
+          <input id="loginAccount" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
+          <input id="loginPassword" type="text" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
         </div>
         <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
         <button class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
-        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
+        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" data-txt="loginForgot">忘记密码</b></div>
       </div>
     </div>
   </div>
@@ -654,9 +654,9 @@
   <div class="scene" id="lobby">
     <div class="lobby-head">
       <h2>回声厅</h2>
-      <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
-      <div class="me-btn" id="skinBtn" title="皮肤" style="right:48px">🎨</div>
-      <div class="me-btn me-avatar" id="meBtn" title="个人空间">🦊</div>
+      <p>以 <span class="you" id="lobbyName">—</span> <span data-txt="lobbyIdentityHint">的身份 · 点名字看个人空间</span></p>
+      <div class="me-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin" style="right:48px">🎨</div>
+      <div class="me-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
     <div class="sec-label"><span class="sl-t" data-txt="hallOfficial">📡 官方频道</span></div>
@@ -665,11 +665,11 @@
     <div class="channels" id="publicRooms"></div>
     <div class="empty-hint" id="publicEmpty" data-txt="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
     <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房</span>
-      <button class="priv-btn create" id="createRoomBtn">＋ 创建</button>
-      <button class="priv-btn join" id="joinRoomBtn">🔑 加入</button>
+      <button class="priv-btn create" id="createRoomBtn" data-txt="lobbyCreateBtn">＋ 创建</button>
+      <button class="priv-btn join" id="joinRoomBtn" data-txt="lobbyJoinBtn">🔑 加入</button>
     </div>
     <div class="my-rooms" id="myRooms"></div>
-    <div class="empty-hint" id="privEmpty" style="display:none">凭邀请码加入，或创建一个只有你和朋友的房间</div>
+    <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -684,10 +684,10 @@
         </div>
       </div>
       <div class="hall-tools">
-        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
-        <div class="tool-btn" id="skinBtnHall" title="皮肤">🎨</div>
-        <div class="gear" id="gearBtn" title="房间设置">⚙️</div>
-        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间">🦊</div>
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm">🔊</div>
+        <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
+        <div class="gear" id="gearBtn" title="房间设置" data-txt-title="titleRoomSet">⚙️</div>
+        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
     </div>
@@ -700,11 +700,11 @@
     <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
     <div class="song-strip" id="songStrip"></div>
     <form class="composer" onsubmit="return false" autocomplete="off" spellcheck="false">
-      <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
+      <div class="plus-btn" id="plusBtn" title="更多花样" data-txt-title="titleMore">＋</div>
       <div class="cin-wrap">
-        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
+        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情" data-txt-title="titleEmoji">😊</div>
         <textarea class="cin" id="cin" data-txt-ph="composerPlaceholder" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
-        <div class="hold-talk" id="holdTalk">按住 说话</div>
+        <div class="hold-talk" id="holdTalk" data-txt="holdToTalk">按住 说话</div>
       </div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
@@ -728,7 +728,7 @@
   <div class="rec-panel" id="recPanel">
     <div class="rec-wave" id="recWave"></div>
     <div class="rec-time" id="recTime">0:00</div>
-    <div class="rec-tip" id="recTip">松开发送 · 上滑取消</div>
+    <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
   </div>
 </div>
 
@@ -737,74 +737,74 @@
   <div class="glass modal" id="modal">
     <div class="modal-x" id="modalX">✕</div>
     <div class="modal-body" id="mCreate">
-      <h3>创建房间</h3>
-      <p class="modal-sub">选择房间类型，起个名字。</p>
+      <h3 data-txt="createRoomTitle">创建房间</h3>
+      <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
         <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
         <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
       </div>
-      <label class="fld"><span>房间名</span>
-        <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会"></label>
-      <label class="fld"><span>图标</span>
+      <label class="fld"><span data-txt="roomNameLabel">房间名</span>
+        <input id="roomNameIn" maxlength="40" data-txt-ph="roomNamePh" placeholder="比如：午夜同好会"></label>
+      <label class="fld"><span data-txt="roomIconLabel">图标</span>
         <div class="emoji-pick" id="roomEmojiPick"></div></label>
       <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
     </div>
     <div class="modal-body" id="mCreated" style="display:none">
       <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
-      <p class="modal-sub" id="createdSub">把邀请码发给朋友，他们就能进来：</p>
-      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
+      <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
+      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
       <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
-      <h3>用邀请码加入</h3>
-      <p class="modal-sub">输入朋友给你的邀请码：</p>
-      <label class="fld"><span>邀请码</span>
-        <input id="codeIn" maxlength="12" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
+      <h3 data-txt="joinRoomTitle">用邀请码加入</h3>
+      <p class="modal-sub" data-txt="joinRoomSub">输入朋友给你的邀请码：</p>
+      <label class="fld"><span data-txt="inviteCodeLabel">邀请码</span>
+        <input id="codeIn" maxlength="12" data-txt-ph="inviteCodePh" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
       <div class="modal-err" id="joinErr"></div>
       <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mReg" style="display:none">
-      <h3>注册账号</h3>
-      <p class="modal-sub" id="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
-      <label class="fld"><span>用户名</span>
-        <input id="regUser" maxlength="20" placeholder="3-20 位，支持中英文"></label>
+      <h3 data-txt="regTitle">注册账号</h3>
+      <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
+      <label class="fld"><span data-txt="regUserLabel">用户名</span>
+        <input id="regUser" maxlength="20" data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
       <label class="fld"><span>密码</span>
-        <input id="regPass" type="password" placeholder="至少 6 位"></label>
-      <label class="fld" style="margin-bottom:8px"><span>邮箱（选填）</span>
-        <input id="regEmail" type="email" placeholder="用于找回密码，建议填写"></label>
+        <input id="regPass" type="password" data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
+      <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
+        <input id="regEmail" type="email" data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
       <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
     <div class="modal-body" id="mReset" style="display:none">
-      <h3>找回密码</h3>
-      <p class="modal-sub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
+      <h3 data-txt="forgotTitle">找回密码</h3>
+      <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
-        <input id="resetEmail" type="email" placeholder="注册时填的邮箱"></label>
+        <input id="resetEmail" type="email" data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
     <div class="modal-body" id="mEmail" style="display:none">
-      <h3>邮箱设置</h3>
-      <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld" id="curEmailRow"><span>当前邮箱 <span id="emailVerifyBadge"></span></span>
+      <h3 data-txt="emailSetTitle">邮箱设置</h3>
+      <p class="modal-sub" data-txt="emailSetSub">用于找回密码。绑定用户名/密码登录不受影响。</p>
+      <label class="fld" id="curEmailRow"><span><span data-txt="emailCurLabel">当前邮箱</span> <span id="emailVerifyBadge"></span></span>
         <input id="curEmail" type="email" disabled style="opacity:.6"></label>
       <div id="verifyRow" style="display:none;margin:-6px 0 14px">
         <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
         <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div>
-      <label class="fld"><span id="newEmailLabel">新邮箱</span>
+      <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
     </div>
     <div class="modal-body" id="mProfile" style="display:none">
-      <h3>编辑形象</h3>
-      <p class="modal-sub">自定义你的昵称和头像（用户名登录不受影响）。</p>
-      <label class="fld"><span>昵称</span>
-        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
-      <label class="fld"><span>头像</span>
+      <h3 data-txt="editProfileTitle">编辑形象</h3>
+      <p class="modal-sub" data-txt="editProfileSub">自定义你的昵称和头像（用户名登录不受影响）。</p>
+      <label class="fld"><span data-txt="nickLabel">昵称</span>
+        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" data-txt-ph="nickPh" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
+      <label class="fld"><span data-txt="avatarLabel">头像</span>
         <div class="emoji-pick" id="profEmojiPick"></div></label>
-      <label class="fld"><span>主题色</span>
+      <label class="fld"><span data-txt="themeColorLabel">主题色</span>
         <div class="color-pick" id="profColorPick"></div></label>
       <div class="modal-err" id="profErr"></div>
       <button class="btn-primary" id="doProfBtn">保 存</button>
@@ -815,11 +815,11 @@
 <!-- ===== 通用确认弹层(替代原生 confirm) ===== -->
 <div class="modal-mask" id="confirmMask">
   <div class="glass confirm-box">
-    <div class="confirm-title" id="confirmTitle">确认操作</div>
+    <div class="confirm-title" id="confirmTitle" data-txt="confirmTitle">确认操作</div>
     <div class="confirm-msg" id="confirmMsg"></div>
     <div class="confirm-btns">
-      <button class="cf-cancel" id="confirmNo">取消</button>
-      <button class="cf-ok" id="confirmYes">确定</button>
+      <button class="cf-cancel" id="confirmNo" data-txt="cancelBtn">取消</button>
+      <button class="cf-ok" id="confirmYes" data-txt="okBtn">确定</button>
     </div>
   </div>
 </div>
@@ -924,6 +924,71 @@ const EH_CONFIG_DEFAULT = {
     roomCreatedTitle:'房间已创建 🎉',
     // 闲聊广场官方房描述(入口标语)
     officialDesc:'陌生人的实时聊天空间 · 进来 · 说话 · 留存',
+    // ---- 第二类·表单弹窗 ----
+    // 登录页
+    loginSwitchId:'↻ 换一个',
+    loginToggleShow:'已有账号？点此登录 ▾',
+    loginUserPh:'用户名 或 邮箱',
+    loginPwdPh:'密码',
+    loginNoAccount:'没有账号？',
+    loginGoReg:'注册一个 →',
+    loginForgot:'忘记密码',
+    // 大厅
+    lobbyIdentityHint:'的身份 · 点名字看个人空间',
+    lobbyPrivateHint:'凭邀请码加入，或创建一个只有你和朋友的房间',
+    lobbyCreateBtn:'＋ 创建',
+    lobbyJoinBtn:'🔑 加入',
+    // 聊天室·顶栏
+    titleBgm:'氛围音乐',
+    titleRoomSet:'房间设置',
+    titleProfile:'个人空间',
+    titleSkin:'皮肤',
+    titleMore:'更多花样',
+    titleEmoji:'表情',
+    // 聊天室·输入
+    holdToTalk:'按住 说话',
+    recordingHint:'松开发送 · 上滑取消',
+    // 房间创建
+    createRoomTitle:'创建房间',
+    createRoomSub:'选择房间类型，起个名字。',
+    roomNameLabel:'房间名',
+    roomNamePh:'比如：午夜同好会',
+    roomIconLabel:'图标',
+    inviteShareHint:'把邀请码发给朋友，他们就能进来：',
+    copyBtn:'复制',
+    // 加入房间
+    joinRoomTitle:'用邀请码加入',
+    joinRoomSub:'输入朋友给你的邀请码：',
+    inviteCodeLabel:'邀请码',
+    inviteCodePh:'例如 A3F9K2M7QX',
+    // 注册
+    regTitle:'注册账号',
+    regSub:'注册后可跨设备用账号密码登录，保留身份与聊天记录。',
+    regUserLabel:'用户名',
+    regUserPh:'3-20 位，支持中英文',
+    regPwdPh:'至少 6 位',
+    regEmailLabel:'邮箱（选填）',
+    regEmailPh:'用于找回密码，建议填写',
+    // 找回密码
+    forgotTitle:'找回密码',
+    forgotSub:'输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）',
+    forgotEmailPh:'注册时填的邮箱',
+    // 邮箱设置
+    emailSetTitle:'邮箱设置',
+    emailSetSub:'用于找回密码。绑定用户名/密码登录不受影响。',
+    emailCurLabel:'当前邮箱',
+    emailNewLabel:'新邮箱',
+    // 编辑形象
+    editProfileTitle:'编辑形象',
+    editProfileSub:'自定义你的昵称和头像（用户名登录不受影响）。',
+    nickLabel:'昵称',
+    nickPh:'显示给别人看的名字',
+    avatarLabel:'头像',
+    themeColorLabel:'主题色',
+    // 确认弹窗
+    confirmTitle:'确认操作',
+    cancelBtn:'取消',
+    okBtn:'确定',
   },
 };
 // 运行时配置(默认值的深拷贝,loadRemoteConfig 会用 DB 值覆盖)
@@ -952,6 +1017,9 @@ function applyTextConfig(){
     });
     document.querySelectorAll('[data-txt-ph]').forEach(el=>{
       const k=el.getAttribute('data-txt-ph'); if(T[k]!=null) el.placeholder=T[k];
+    });
+    document.querySelectorAll('[data-txt-title]').forEach(el=>{
+      const k=el.getAttribute('data-txt-title'); if(T[k]!=null) el.title=T[k];
     });
   }catch(_){}
 }
@@ -2541,7 +2609,7 @@ async function openGear(){
   body.innerHTML=`
     <div class="dsec"><div class="dl">房间信息</div>
       <div class="dcard">
-        <label class="fld"><span>房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+        <label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
         <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
         <button class="dbtn" id="gSaveBtn">保存修改</button>
       </div></div>
