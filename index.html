@@ -634,18 +634,18 @@
           <div class="id-name" id="idName">量子水獭</div>
           <div class="id-tag" id="idTag" data-txt="entrySlogan">临时身份 · 无需注册</div>
         </div>
-        <button class="reroll" id="rerollBtn">↻ 换一个</button>
+        <button class="reroll" id="rerollBtn" data-txt="loginSwitchId">↻ 换一个</button>
       </div>
       <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
-      <div class="auth-divider clickable" id="loginToggle"><span>已有账号？点此登录 ▾</span></div>
+      <div class="auth-divider clickable" id="loginToggle"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
         <div class="login-row">
-          <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="off">
-          <input id="loginPassword" type="text" placeholder="密码" autocomplete="off">
+          <input id="loginAccount" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
+          <input id="loginPassword" type="text" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
         </div>
         <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
         <button class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
-        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
+        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" data-txt="loginForgot">忘记密码</b></div>
       </div>
     </div>
   </div>
@@ -654,9 +654,9 @@
   <div class="scene" id="lobby">
     <div class="lobby-head">
       <h2>回声厅</h2>
-      <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
-      <div class="me-btn" id="skinBtn" title="皮肤" style="right:48px">🎨</div>
-      <div class="me-btn me-avatar" id="meBtn" title="个人空间">🦊</div>
+      <p>以 <span class="you" id="lobbyName">—</span> <span data-txt="lobbyIdentityHint">的身份 · 点名字看个人空间</span></p>
+      <div class="me-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin" style="right:48px">🎨</div>
+      <div class="me-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
     <div class="sec-label"><span class="sl-t" data-txt="hallOfficial">📡 官方频道</span></div>
@@ -665,11 +665,11 @@
     <div class="channels" id="publicRooms"></div>
     <div class="empty-hint" id="publicEmpty" data-txt="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
     <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房</span>
-      <button class="priv-btn create" id="createRoomBtn">＋ 创建</button>
-      <button class="priv-btn join" id="joinRoomBtn">🔑 加入</button>
+      <button class="priv-btn create" id="createRoomBtn" data-txt="lobbyCreateBtn">＋ 创建</button>
+      <button class="priv-btn join" id="joinRoomBtn" data-txt="lobbyJoinBtn">🔑 加入</button>
     </div>
     <div class="my-rooms" id="myRooms"></div>
-    <div class="empty-hint" id="privEmpty" style="display:none">凭邀请码加入，或创建一个只有你和朋友的房间</div>
+    <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -684,10 +684,10 @@
         </div>
       </div>
       <div class="hall-tools">
-        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
-        <div class="tool-btn" id="skinBtnHall" title="皮肤">🎨</div>
-        <div class="gear" id="gearBtn" title="房间设置">⚙️</div>
-        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间">🦊</div>
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm">🔊</div>
+        <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
+        <div class="gear" id="gearBtn" title="房间设置" data-txt-title="titleRoomSet">⚙️</div>
+        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
     </div>
@@ -700,11 +700,11 @@
     <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
     <div class="song-strip" id="songStrip"></div>
     <form class="composer" onsubmit="return false" autocomplete="off" spellcheck="false">
-      <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
+      <div class="plus-btn" id="plusBtn" title="更多花样" data-txt-title="titleMore">＋</div>
       <div class="cin-wrap">
-        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
+        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情" data-txt-title="titleEmoji">😊</div>
         <textarea class="cin" id="cin" data-txt-ph="composerPlaceholder" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
-        <div class="hold-talk" id="holdTalk">按住 说话</div>
+        <div class="hold-talk" id="holdTalk" data-txt="holdToTalk">按住 说话</div>
       </div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
@@ -728,7 +728,7 @@
   <div class="rec-panel" id="recPanel">
     <div class="rec-wave" id="recWave"></div>
     <div class="rec-time" id="recTime">0:00</div>
-    <div class="rec-tip" id="recTip">松开发送 · 上滑取消</div>
+    <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
   </div>
 </div>
 
@@ -737,74 +737,74 @@
   <div class="glass modal" id="modal">
     <div class="modal-x" id="modalX">✕</div>
     <div class="modal-body" id="mCreate">
-      <h3>创建房间</h3>
-      <p class="modal-sub">选择房间类型，起个名字。</p>
+      <h3 data-txt="createRoomTitle">创建房间</h3>
+      <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
         <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
         <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
       </div>
-      <label class="fld"><span>房间名</span>
-        <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会"></label>
-      <label class="fld"><span>图标</span>
+      <label class="fld"><span data-txt="roomNameLabel">房间名</span>
+        <input id="roomNameIn" maxlength="40" data-txt-ph="roomNamePh" placeholder="比如：午夜同好会"></label>
+      <label class="fld"><span data-txt="roomIconLabel">图标</span>
         <div class="emoji-pick" id="roomEmojiPick"></div></label>
       <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
     </div>
     <div class="modal-body" id="mCreated" style="display:none">
       <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
-      <p class="modal-sub" id="createdSub">把邀请码发给朋友，他们就能进来：</p>
-      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
+      <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
+      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
       <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
-      <h3>用邀请码加入</h3>
-      <p class="modal-sub">输入朋友给你的邀请码：</p>
-      <label class="fld"><span>邀请码</span>
-        <input id="codeIn" maxlength="12" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
+      <h3 data-txt="joinRoomTitle">用邀请码加入</h3>
+      <p class="modal-sub" data-txt="joinRoomSub">输入朋友给你的邀请码：</p>
+      <label class="fld"><span data-txt="inviteCodeLabel">邀请码</span>
+        <input id="codeIn" maxlength="12" data-txt-ph="inviteCodePh" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
       <div class="modal-err" id="joinErr"></div>
       <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mReg" style="display:none">
-      <h3>注册账号</h3>
-      <p class="modal-sub" id="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
-      <label class="fld"><span>用户名</span>
-        <input id="regUser" maxlength="20" placeholder="3-20 位，支持中英文"></label>
+      <h3 data-txt="regTitle">注册账号</h3>
+      <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
+      <label class="fld"><span data-txt="regUserLabel">用户名</span>
+        <input id="regUser" maxlength="20" data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
       <label class="fld"><span>密码</span>
-        <input id="regPass" type="password" placeholder="至少 6 位"></label>
-      <label class="fld" style="margin-bottom:8px"><span>邮箱（选填）</span>
-        <input id="regEmail" type="email" placeholder="用于找回密码，建议填写"></label>
+        <input id="regPass" type="password" data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
+      <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
+        <input id="regEmail" type="email" data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
       <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
     <div class="modal-body" id="mReset" style="display:none">
-      <h3>找回密码</h3>
-      <p class="modal-sub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
+      <h3 data-txt="forgotTitle">找回密码</h3>
+      <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
-        <input id="resetEmail" type="email" placeholder="注册时填的邮箱"></label>
+        <input id="resetEmail" type="email" data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
     <div class="modal-body" id="mEmail" style="display:none">
-      <h3>邮箱设置</h3>
-      <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld" id="curEmailRow"><span>当前邮箱 <span id="emailVerifyBadge"></span></span>
+      <h3 data-txt="emailSetTitle">邮箱设置</h3>
+      <p class="modal-sub" data-txt="emailSetSub">用于找回密码。绑定用户名/密码登录不受影响。</p>
+      <label class="fld" id="curEmailRow"><span><span data-txt="emailCurLabel">当前邮箱</span> <span id="emailVerifyBadge"></span></span>
         <input id="curEmail" type="email" disabled style="opacity:.6"></label>
       <div id="verifyRow" style="display:none;margin:-6px 0 14px">
         <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
         <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div>
-      <label class="fld"><span id="newEmailLabel">新邮箱</span>
+      <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
     </div>
     <div class="modal-body" id="mProfile" style="display:none">
-      <h3>编辑形象</h3>
-      <p class="modal-sub">自定义你的昵称和头像（用户名登录不受影响）。</p>
-      <label class="fld"><span>昵称</span>
-        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
-      <label class="fld"><span>头像</span>
+      <h3 data-txt="editProfileTitle">编辑形象</h3>
+      <p class="modal-sub" data-txt="editProfileSub">自定义你的昵称和头像（用户名登录不受影响）。</p>
+      <label class="fld"><span data-txt="nickLabel">昵称</span>
+        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" data-txt-ph="nickPh" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
+      <label class="fld"><span data-txt="avatarLabel">头像</span>
         <div class="emoji-pick" id="profEmojiPick"></div></label>
-      <label class="fld"><span>主题色</span>
+      <label class="fld"><span data-txt="themeColorLabel">主题色</span>
         <div class="color-pick" id="profColorPick"></div></label>
       <div class="modal-err" id="profErr"></div>
       <button class="btn-primary" id="doProfBtn">保 存</button>
@@ -815,11 +815,11 @@
 <!-- ===== 通用确认弹层(替代原生 confirm) ===== -->
 <div class="modal-mask" id="confirmMask">
   <div class="glass confirm-box">
-    <div class="confirm-title" id="confirmTitle">确认操作</div>
+    <div class="confirm-title" id="confirmTitle" data-txt="confirmTitle">确认操作</div>
     <div class="confirm-msg" id="confirmMsg"></div>
     <div class="confirm-btns">
-      <button class="cf-cancel" id="confirmNo">取消</button>
-      <button class="cf-ok" id="confirmYes">确定</button>
+      <button class="cf-cancel" id="confirmNo" data-txt="cancelBtn">取消</button>
+      <button class="cf-ok" id="confirmYes" data-txt="okBtn">确定</button>
     </div>
   </div>
 </div>
@@ -896,6 +896,12 @@ const EH_CONFIG_DEFAULT = {
     '技术黑话':{ root:98,     chord:[0,7,12],   wave:'sawtooth', pulse:3200, cut:560,  name:'极简低频 drone' },
     '虚空回音':{ root:329.63, chord:[0,5,7,12], wave:'sine',     pulse:1600, cut:2600, name:'空灵铃音' },
   },
+  // 身份随机池(昵称形容词/动物, 虚空匿名名字)
+  identityPool: {
+    adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],
+    animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'],
+    voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'],
+  },
   // 界面文案(后台可配) —— 第一类运营高频文案
   text: {
     // 空状态/提示
@@ -924,6 +930,124 @@ const EH_CONFIG_DEFAULT = {
     roomCreatedTitle:'房间已创建 🎉',
     // 闲聊广场官方房描述(入口标语)
     officialDesc:'陌生人的实时聊天空间 · 进来 · 说话 · 留存',
+    // ---- 第二类·表单弹窗 ----
+    // 登录页
+    loginSwitchId:'↻ 换一个',
+    loginToggleShow:'已有账号？点此登录 ▾',
+    loginUserPh:'用户名 或 邮箱',
+    loginPwdPh:'密码',
+    loginNoAccount:'没有账号？',
+    loginGoReg:'注册一个 →',
+    loginForgot:'忘记密码',
+    // 大厅
+    lobbyIdentityHint:'的身份 · 点名字看个人空间',
+    lobbyPrivateHint:'凭邀请码加入，或创建一个只有你和朋友的房间',
+    lobbyCreateBtn:'＋ 创建',
+    lobbyJoinBtn:'🔑 加入',
+    // 聊天室·顶栏
+    titleBgm:'氛围音乐',
+    titleRoomSet:'房间设置',
+    titleProfile:'个人空间',
+    titleSkin:'皮肤',
+    titleMore:'更多花样',
+    titleEmoji:'表情',
+    // 聊天室·输入
+    holdToTalk:'按住 说话',
+    recordingHint:'松开发送 · 上滑取消',
+    // 房间创建
+    createRoomTitle:'创建房间',
+    createRoomSub:'选择房间类型，起个名字。',
+    roomNameLabel:'房间名',
+    roomNamePh:'比如：午夜同好会',
+    roomIconLabel:'图标',
+    inviteShareHint:'把邀请码发给朋友，他们就能进来：',
+    copyBtn:'复制',
+    // 加入房间
+    joinRoomTitle:'用邀请码加入',
+    joinRoomSub:'输入朋友给你的邀请码：',
+    inviteCodeLabel:'邀请码',
+    inviteCodePh:'例如 A3F9K2M7QX',
+    // 注册
+    regTitle:'注册账号',
+    regSub:'注册后可跨设备用账号密码登录，保留身份与聊天记录。',
+    regUserLabel:'用户名',
+    regUserPh:'3-20 位，支持中英文',
+    regPwdPh:'至少 6 位',
+    regEmailLabel:'邮箱（选填）',
+    regEmailPh:'用于找回密码，建议填写',
+    // 找回密码
+    forgotTitle:'找回密码',
+    forgotSub:'输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）',
+    forgotEmailPh:'注册时填的邮箱',
+    // 邮箱设置
+    emailSetTitle:'邮箱设置',
+    emailSetSub:'用于找回密码。绑定用户名/密码登录不受影响。',
+    emailCurLabel:'当前邮箱',
+    emailNewLabel:'新邮箱',
+    // 编辑形象
+    editProfileTitle:'编辑形象',
+    editProfileSub:'自定义你的昵称和头像（用户名登录不受影响）。',
+    nickLabel:'昵称',
+    nickPh:'显示给别人看的名字',
+    avatarLabel:'头像',
+    themeColorLabel:'主题色',
+    // 确认弹窗
+    confirmTitle:'确认操作',
+    cancelBtn:'取消',
+    okBtn:'确定',
+    // ---- 第三类·Toast 提示 ----
+    // ✅ 成功
+    ok_emailVerified:'✓ 邮箱验证成功',
+    ok_saved:'已保存',
+    ok_kicked:'已踢出',
+    ok_profileUpdated:'形象已更新',
+    ok_roomDissolved:'房间已解散',
+    ok_welcomeBack:'欢迎回来',
+    ok_regDone:'注册成功，已登录',
+    ok_codeCopied:'邀请码已复制',
+    ok_emailUpdated:'邮箱已更新，请验证',
+    ok_resetSent:'若该邮箱已注册，重置链接已发送',
+    // ❌ 错误
+    err_saveFail:'保存失败',
+    err_sendFail:'发送失败',
+    err_copyFail:'复制失败',
+    err_createRoom:'建房失败',
+    err_recInit:'录音初始化失败',
+    err_recTooLong:'录音太长，发送失败',
+    err_recTooShort:'说话时间太短',
+    err_roomNameEmpty:'房间名不能为空',
+    err_noRecSupport:'此浏览器不支持录音',
+    err_noAudioSupport:'此浏览器不支持音频合成',
+    err_userNotFound:'没找到这个人（需在本房在线）',
+    err_regFail:'注册失败',
+    err_noAccount:'账号不存在',
+    err_wrongPwd:'账号或密码错误',
+    err_initId:'身份初始化失败，刷新重试',
+    err_badCode:'邀请码无效或房间不存在',
+    err_emailFmt:'邮箱格式不对',
+    err_needMic:'需要麦克风权限才能发语音',
+    err_voiceUpload:'语音上传失败',
+    err_voiceSend:'语音发送失败',
+    err_voiceLoad:'语音加载失败，可能已过期',
+    err_voiceUrl:'语音地址缺失',
+    err_voiceBucket:'语音存储未配置(缺 eh-voice 桶)',
+    err_verifyFail:'验证失败',
+    ok_emailAlready:'邮箱已验证',
+    err_singSend:'神曲发送失败',
+    // ⚠️ 警告
+    warn_regNeedLogin:'注册成功但登录失败，请回登录页手动登录',
+    warn_needLogin:'请先登录',
+    warn_needCredentials:'请填写账号和密码',
+    warn_needCode:'请输入邀请码',
+    warn_needRoomName:'给房间起个名',
+    warn_browserBlock:'被浏览器拦截，请再点一次',
+    warn_pwdShort:'密码至少 6 位',
+    warn_userShort:'用户名至少 3 位',
+    // ♻ 其他
+    help_sing:'用法：/sing 要唱的文字',
+    help_whisper:'用法：/whisper @昵称 内容',
+    sing_needText:'先打点字，让它唱出来',
+    sing_noContent:'没有可唱的内容',
   },
 };
 // 运行时配置(默认值的深拷贝,loadRemoteConfig 会用 DB 值覆盖)
@@ -953,6 +1077,9 @@ function applyTextConfig(){
     document.querySelectorAll('[data-txt-ph]').forEach(el=>{
       const k=el.getAttribute('data-txt-ph'); if(T[k]!=null) el.placeholder=T[k];
     });
+    document.querySelectorAll('[data-txt-title]').forEach(el=>{
+      const k=el.getAttribute('data-txt-title'); if(T[k]!=null) el.title=T[k];
+    });
   }catch(_){}
 }
 // ---- 从 Supabase eh_config 表拉取覆盖配置(存在则 merge) ----
@@ -963,7 +1090,7 @@ async function loadRemoteConfig(){
       const map={}; data.forEach(r=>{ map[r.key]=r.value; });
       // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
       // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-      ['themePalettes','themes','roomTheme','officialFallbackC','roomBgm','text'].forEach(k=>{
+      ['themePalettes','themes','roomTheme','officialFallbackC','roomBgm','text','identityPool'].forEach(k=>{
         if(!map[k]) return;
         const dst=EH_CONFIG[k];
         if(Array.isArray(dst)){
@@ -1006,8 +1133,8 @@ const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 
 // ---- 身份 ----
-const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
-const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
+const ADJ = EH_CONFIG.identityPool.adjectives;
+const ANI = EH_CONFIG.identityPool.animals;
 const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🐆','✨','🐙','🦌','🐦','🐈‍⬛','🐬','🐆','🦔','🦋'];
 // 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
 const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
@@ -1059,7 +1186,7 @@ async function ensureAuth(){
   let uid = session?.user?.id;
   if(!uid){
     const { data, error } = await sb.auth.signInAnonymously();
-    if(error){ console.warn('anon signin', error); toast('身份初始化失败，刷新重试'); return null; }
+    if(error){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
   }
   myUid = uid; me.id = uid; saveIdentity();
@@ -1339,7 +1466,7 @@ let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
 let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
 const VOID_TTL = 5*60*1000;   // 虚空消息存活 5 分钟
-const VOID_NAMES = ['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'];
+const VOID_NAMES = EH_CONFIG.identityPool.voidNames;
 let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
 const HISTORY_PAGE = 60;
 // 五种回声情绪: 共鸣/动容/脑电/困惑/观测
@@ -1883,7 +2010,7 @@ async function send(){
   const rt=replyTo; resetInput(); clearReply();
   // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
-  if(error){ console.warn('send',error); toast('发送失败'); }
+  if(error){ console.warn('send',error); toast(EH_CONFIG.text.err_sendFail); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
   else if(data){ optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; } }
 }
@@ -1966,12 +2093,12 @@ document.addEventListener('click',e=>{
   stopVoice();
   try{ if(typeof AudioEngine!=='undefined'){ AudioEngine.resume(); AudioEngine.duck(true); } }catch(e){} // 激活音频上下文+压低BGM
   const src=(wrap.dataset.src||'').split('#')[0];
-  if(!src){ toast('语音地址缺失'); return; }
+  if(!src){ toast(EH_CONFIG.text.err_voiceUrl); return; }
   const a=new Audio(src);
   vAudio=a; vPlayEl=wrap;
   wrap.classList.add('playing'); if(btn) btn.textContent='⏸';
   a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
-  a.onerror=()=>{ if(vPlayEl===wrap){ toast('语音加载失败，可能已过期'); stopVoice(); } };
+  a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };
   a.play().then(()=>{}).catch(err=>{
     // NotAllowedError=浏览器拦自动播放(极少见于真实点击); 其它=网络/解码
     const msg = (err&&err.name==='NotAllowedError') ? '被浏览器拦截，请再点一次' : '播放失败，请重试';
@@ -1980,20 +2107,20 @@ document.addEventListener('click',e=>{
 });
 async function startRec(){
   if(!curRoom || recorder) return;
-  if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ toast('此浏览器不支持录音'); recActive=false; return; }
+  if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ toast(EH_CONFIG.text.err_noRecSupport); recActive=false; return; }
   let stream;
   try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ toast('需要麦克风权限才能发语音'); recActive=false; return; }
+  catch(e){ toast(EH_CONFIG.text.err_needMic); recActive=false; return; }
   if(!recActive){ stream.getTracks().forEach(t=>t.stop()); return; } // 授权期间已松手，放弃
   recChunks=[]; recSec=0; recWanted=false; recCanceled=false;
   try{ recorder=new MediaRecorder(stream,{mimeType:REC_MIME,audioBitsPerSecond:24000}); }
-  catch(e){ stream.getTracks().forEach(t=>t.stop()); toast('录音初始化失败'); return; }
+  catch(e){ stream.getTracks().forEach(t=>t.stop()); toast(EH_CONFIG.text.err_recInit); return; }
   recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop=()=>{
     stream.getTracks().forEach(t=>t.stop());
     stopWave(); hideRecUI();
     if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC));
-    else if(recWanted && !recCanceled && recSec<1) toast('说话时间太短');
+    else if(recWanted && !recCanceled && recSec<1) toast(EH_CONFIG.text.err_recTooShort);
     recorder=null; recChunks=[];
   };
   recorder.start(250);
@@ -2028,7 +2155,7 @@ function startWave(stream){
 function stopWave(){ if(waveRAF) cancelAnimationFrame(waveRAF); waveRAF=null; recAnalyser=null; }
 async function sendVoice(blob, secs){
   if(!curRoom || !myUid) return;
-  if(blob.size>950*1024){ toast('录音太长，发送失败'); return; }
+  if(blob.size>950*1024){ toast(EH_CONFIG.text.err_recTooLong); return; }
   const ext=REC_MIME.includes('mp4')?'m4a':'webm';
   // 乐观上屏：先用本地 blob 播放
   const localUrl=URL.createObjectURL(blob)+'#dur='+secs;
@@ -2042,7 +2169,7 @@ async function sendVoice(blob, secs){
   const { data:pub }=sb.storage.from(VOICE_BUCKET).getPublicUrl(path);
   const url=pub.publicUrl+'#dur='+secs;
   const { data:row, error }=await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:url,kind:'voice'}).select('id').single();
-  if(error){ console.warn('voice send',error); toast('语音发送失败'); if(el) el.remove(); return; }
+  if(error){ console.warn('voice send',error); toast(EH_CONFIG.text.err_voiceSend); if(el) el.remove(); return; }
   // 回填真实 id 与正式 URL(与文本消息同理)
   optimistic.id=row.id;
   if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
@@ -2193,10 +2320,10 @@ function pickZhVoice(){
 if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCache=null; pickZhVoice(); }; pickZhVoice(); }catch(e){} }
 function playSong(lyric, sid, el, onEnd){
   stopVoice(); stopSong();
-  const ctx=ac(); if(!ctx){ toast('此浏览器不支持音频合成'); return; }
+  const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
-  if(!chars.length){ toast('没有可唱的内容'); return; }
+  if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const master=ctx.createGain(); master.gain.value=hasTTS?0.6:0.85; master.connect(ctx.destination);  // 有唱词时压低伴奏, 让字清楚
@@ -2264,7 +2391,7 @@ document.addEventListener('click',e=>{
 async function sendSong(lyric, sid){
   if(!curRoom || !myUid) return;
   lyric=String(lyric||'').trim().slice(0,60);
-  if(!lyric){ toast('先打点字，让它唱出来'); return; }
+  if(!lyric){ toast(EH_CONFIG.text.sing_needText); return; }
   if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
@@ -2272,7 +2399,7 @@ async function sendSong(lyric, sid){
   // 本地立即试听(发送者刚有手势, 允许自动播放)
   if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
-  if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
+  if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
@@ -2367,14 +2494,14 @@ async function handleSlash(text){
   if(cmd==='/flip'){ const r=secureRand()<0.5?'正面 🪙':'反面 🪙'; await sendSystemAct(`抛硬币：${r}`); return true; }
   if(cmd==='/echo'){ burst('🎆',24); burst('✨',20); await sendSystemAct('放了一串烟花 🎆'); return true; }
   if(cmd==='/sing'||cmd==='/唱'){
-    if(!arg){ toast('用法：/sing 要唱的文字'); return true; }
+    if(!arg){ toast(EH_CONFIG.text.help_sing); return true; }
     await sendSong(arg, rand(SONG_STYLES).id); return true;
   }
   if(cmd==='/whisper'){
     const mName=arg.match(/^@?(\S+)\s+(.+)$/);
-    if(!mName){ toast('用法：/whisper @昵称 内容'); return true; }
+    if(!mName){ toast(EH_CONFIG.text.help_whisper); return true; }
     const target=await findMemberByName(mName[1]);
-    if(!target){ toast('没找到这个人（需在本房在线）'); return true; }
+    if(!target){ toast(EH_CONFIG.text.err_userNotFound); return true; }
     const wPayload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id};
     // 本地先显示一条
     const wLocal={...wPayload,id:'local_'+Date.now(),created_at:new Date().toISOString()};
@@ -2543,7 +2670,7 @@ async function openGear(){
   body.innerHTML=`
     <div class="dsec"><div class="dl">房间信息</div>
       <div class="dcard">
-        <label class="fld"><span>房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+        <label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
         <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
         <button class="dbtn" id="gSaveBtn">保存修改</button>
       </div></div>
@@ -2555,25 +2682,26 @@ async function openGear(){
         </div>`).join('')}</div></div>
     <div class="dsec"><div class="dl">危险操作</div>
       <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`;
+  applyTextConfig();  // 重新应用文案到引入的动态元素
   $('#gSaveBtn').onclick=async()=>{
     const name=$('#gRoomName').value.trim(), topic=$('#gRoomTopic').value.trim();
-    if(!name){ toast('房间名不能为空'); return; }
+    if(!name){ toast(EH_CONFIG.text.err_roomNameEmpty); return; }
     const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
-    if(error){ toast('保存失败'); return; }
+    if(error){ toast(EH_CONFIG.text.err_saveFail); return; }
     curRoom.name=name; curRoom.topic=topic;
     { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
     $('#hallNameTxt').innerHTML=`${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
-    toast('已保存'); closeGear();
+    toast(EH_CONFIG.text.ok_saved); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
     if(!await ehConfirm('确定踢出该成员？','踢出成员')) return;
     await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',el.dataset.uid);
-    toast('已踢出'); openGear();
+    toast(EH_CONFIG.text.ok_kicked); openGear();
   });
   $('#gDissolveBtn').onclick=async()=>{
     if(!await ehConfirm('解散后房间和消息将从前台消失，确定？','解散房间')) return;
     await sb.from('eh_rooms').delete().eq('id',curRoom.id);
-    toast('房间已解散'); closeGear(); backToLobby();
+    toast(EH_CONFIG.text.ok_roomDissolved); closeGear(); backToLobby();
   };
   $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on'); $('#gearBtn').classList.add('active');
 }
@@ -2689,7 +2817,7 @@ function renderMyMsgList(msgs){
 function bindMeActions(isBound){
   $('#meReroll').onclick=async()=>{
     if(me.registered){ closeMe(); openProfileEditor(); return; }
-    rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast('形象已更新'); closeMe();
+    rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast(EH_CONFIG.text.ok_profileUpdated); closeMe();
   };
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
   bindMeReg(); bindMeEmail();
@@ -2722,11 +2850,11 @@ async function sendVerifyEmail(){
   const btn=$('#sendVerifyBtn'); if(!btn) return;
   btn.disabled=true; btn.textContent='发送中…';
   const { data:{ session } }=await sb.auth.getSession();
-  if(!session){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; toast('请先登录'); return; }
+  if(!session){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; toast(EH_CONFIG.text.warn_needLogin); return; }
   const r=await fetch(EH_AUTH_FN+'/send-verify',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({origin:location.origin+location.pathname.replace(/\/[^/]*$/,'')}) });
   const j=await r.json().catch(()=>({}));
   if(!r.ok || !j.ok){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; $('#verifyHint').textContent=j.error||'发送失败'; return; }
-  if(j.already){ me.emailVerified=true; saveIdentity(); renderEmailVerifyUI(); toast('邮箱已验证'); return; }
+  if(j.already){ me.emailVerified=true; saveIdentity(); renderEmailVerifyUI(); toast(EH_CONFIG.text.ok_emailAlready); return; }
   // SMTP 未配: sent=false, 后端返回验证链接。给本人一个可点的链接(过渡方案)。
   if(j.sent===false && j.link){
     btn.style.display='none';
@@ -2799,7 +2927,7 @@ function closeModal(){ $('#modalMask').classList.remove('on'); }
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
 async function createRoom(){
   const name=$('#roomNameIn').value.trim();
-  if(!name){ toast('给房间起个名'); return; }
+  if(!name){ toast(EH_CONFIG.text.warn_needRoomName); return; }
   await ensureAuth();
   const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
   let room=null;
@@ -2815,7 +2943,7 @@ async function createRoom(){
     }
   }
   btn.disabled=false; btn.textContent='生 成 房 间';
-  if(!room){ toast('建房失败'); return; }
+  if(!room){ toast(EH_CONFIG.text.err_createRoom); return; }
   // 房主入成员表
   await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
   createdRoom=room;
@@ -2867,7 +2995,7 @@ async function doLogin(){
     ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
     : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
   saveIdentity(); paintIdentity();
-  toast('欢迎回来'); goScene('lobby'); renderLobby();
+  toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
 async function doRegister(){
@@ -2888,7 +3016,7 @@ async function doRegister(){
   // 用注册的用户名更新前台昵称 + 缓存 username/registered(个人空间首屏直显@用户名)
   me.name=username; me.id=myUid; me.username=username; me.registered=true; me.email=me.email||''; saveIdentity(); paintIdentity();
   await sb.from('eh_users').update({ name:username, is_anonymous:false }).eq('id',myUid);
-  toast('注册成功，已登录'); closeModal(); goScene('lobby'); renderLobby();
+  toast(EH_CONFIG.text.ok_regDone); closeModal(); goScene('lobby'); renderLobby();
 }
 // 找回密码：仅对注册时填了邮箱的账号
 async function doReset(){
@@ -2898,7 +3026,7 @@ async function doReset(){
   const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
   btn.disabled=false; btn.textContent='发 送 重 置 链 接';
   // 出于安全，无论邮箱是否存在都提示已发送
-  toast('若该邮箱已注册，重置链接已发送'); closeModal();
+  toast(EH_CONFIG.text.ok_resetSent); closeModal();
 }
 // 修改邮箱: 更新 eh_accounts.email(真邮箱, 找回密码用)。不动 auth 登录邮箱(u_hex@eh.local)。
 async function changeEmail(){
@@ -2912,7 +3040,7 @@ async function changeEmail(){
   btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
   if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
   me.email=email; me.emailVerified=false; saveIdentity();  // 换邮箱→需重新验证
-  toast('邮箱已更新，请验证'); closeModal();
+  toast(EH_CONFIG.text.ok_emailUpdated); closeModal();
 }
 // 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
 let _profEmoji, _profColor;
@@ -2946,7 +3074,7 @@ async function saveProfile(){
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
   const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
-  toast('形象已更新'); closeModal();
+  toast(EH_CONFIG.text.ok_profileUpdated); closeModal();
 }
 
 // ============ 事件绑定 ============
@@ -2996,7 +3124,7 @@ $('#modalX').onclick=()=>closeModal();
 $('#modalMask').onclick=e=>{ if(e.target===$('#modalMask')) closeModal(); };
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
 $('#doCreateBtn').onclick=()=>createRoom();
-$('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast('邀请码已复制'),()=>toast('复制失败')); };
+$('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };
 $('#enterCreatedBtn').onclick=()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
 $('#doJoinBtn').onclick=()=>joinByCode();
 $('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
@@ -3089,9 +3217,9 @@ typeSub();
   history.replaceState(null,'',clean);
   fetch(EH_AUTH_FN+'/verify-email',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token}) })
     .then(r=>r.json()).then(j=>{
-      if(j&&j.ok){ if(me){ me.emailVerified=true; saveIdentity(); } toast('✓ 邮箱验证成功'); }
+      if(j&&j.ok){ if(me){ me.emailVerified=true; saveIdentity(); } toast(EH_CONFIG.text.ok_emailVerified); }
       else toast(j&&j.error||'验证失败');
-    }).catch(()=>toast('验证失败'));
+    }).catch(()=>toast(EH_CONFIG.text.err_verifyFail));
 })();
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
@@ -3116,7 +3244,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
       // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
       if(!authHandled && $('#enter').classList.contains('on')){
-        authHandled=true; if(!cameFromLink) toast('欢迎回来'); goScene('lobby'); renderLobby();
+        authHandled=true; if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
         restoreLastRoom();  // 刷新前在某房间→自动恢复进房
       }
     },0);
