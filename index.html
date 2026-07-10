@@ -622,11 +622,11 @@
         <div class="id-av" id="idAv">🦊</div>
         <div class="id-info">
           <div class="id-name" id="idName">量子水獭</div>
-          <div class="id-tag" id="idTag">临时身份 · 无需注册</div>
+          <div class="id-tag" id="idTag" data-txt="entrySlogan">临时身份 · 无需注册</div>
         </div>
         <button class="reroll" id="rerollBtn">↻ 换一个</button>
       </div>
-      <button class="btn-primary" id="enterBtn">匿 名 进 入</button>
+      <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
       <div class="auth-divider clickable" id="loginToggle"><span>已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
         <div class="login-row">
@@ -634,7 +634,7 @@
           <input id="loginPassword" type="text" placeholder="密码" autocomplete="off">
         </div>
         <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
-        <button class="btn-line" id="loginBtn">登 录</button>
+        <button class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
         <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center">没有账号？<b style="color:var(--cyan)">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset">忘记密码</b></div>
       </div>
     </div>
@@ -649,12 +649,12 @@
       <div class="me-btn me-avatar" id="meBtn" title="个人空间">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
-    <div class="sec-label">官方频道</div>
+    <div class="sec-label" data-txt="hallOfficial">官方频道</div>
     <div class="channels" id="channels"></div>
-    <div class="sec-label">公开房间</div>
+    <div class="sec-label" data-txt="hallPublic">公开房间</div>
     <div class="channels" id="publicRooms"></div>
-    <div class="empty-hint" id="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
-    <div class="sec-label">私密房 · 仅邀请码进入</div>
+    <div class="empty-hint" id="publicEmpty" data-txt="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
+    <div class="sec-label" data-txt="hallPrivate">私密房 · 仅邀请码进入</div>
     <div class="priv-actions">
       <button class="priv-btn create" id="createRoomBtn">＋ 创建房间</button>
       <button class="priv-btn join" id="joinRoomBtn">🔑 邀请码加入</button>
@@ -693,15 +693,15 @@
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
       <div class="cin-wrap">
         <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
-        <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
+        <textarea class="cin" id="cin" data-txt-ph="composerPlaceholder" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="hold-talk" id="holdTalk">按住 说话</div>
       </div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
       <div class="plus-menu" id="plusMenu">
-        <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b>语音留声</b><i>按住录音，松手发送</i></span></div>
-        <div class="pm-item" id="pmVoid"><span class="pm-ic">🕳️</span><span class="pm-tx"><b>说给虚空</b><i>匿名 · 5分钟后消散</i></span></div>
-        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b>文字神曲</b><i>把输入的话，唱出来</i></span></div>
+        <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
+        <div class="pm-item" id="pmVoid"><span class="pm-ic">🕳️</span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
+        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
@@ -730,20 +730,20 @@
       <h3>创建房间</h3>
       <p class="modal-sub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
-        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od">大厅可见</div></div>
-        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od">邀请码进</div></div>
+        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
+        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
       </div>
       <label class="fld"><span>房间名</span>
         <input id="roomNameIn" maxlength="40" placeholder="比如：午夜同好会"></label>
       <label class="fld"><span>图标</span>
         <div class="emoji-pick" id="roomEmojiPick"></div></label>
-      <button class="btn-primary" id="doCreateBtn">生 成 房 间</button>
+      <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
     </div>
     <div class="modal-body" id="mCreated" style="display:none">
-      <h3>房间已创建 🎉</h3>
+      <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
       <p class="modal-sub" id="createdSub">把邀请码发给朋友，他们就能进来：</p>
       <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy">复制</button></div>
-      <button class="btn-primary" id="enterCreatedBtn">进 入 房 间</button>
+      <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
       <h3>用邀请码加入</h3>
@@ -751,7 +751,7 @@
       <label class="fld"><span>邀请码</span>
         <input id="codeIn" maxlength="12" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
       <div class="modal-err" id="joinErr"></div>
-      <button class="btn-primary" id="doJoinBtn">进 入 房 间</button>
+      <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mReg" style="display:none">
       <h3>注册账号</h3>
@@ -763,7 +763,7 @@
       <label class="fld" style="margin-bottom:8px"><span>邮箱（选填）</span>
         <input id="regEmail" type="email" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
-      <button class="btn-primary" id="doRegBtn">注 册 并 进 入</button>
+      <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
     <div class="modal-body" id="mReset" style="display:none">
       <h3>找回密码</h3>
@@ -886,10 +886,34 @@ const EH_CONFIG_DEFAULT = {
     '技术黑话':{ root:98,     chord:[0,7,12],   wave:'sawtooth', pulse:3200, cut:560,  name:'极简低频 drone' },
     '虚空回音':{ root:329.63, chord:[0,5,7,12], wave:'sine',     pulse:1600, cut:2600, name:'空灵铃音' },
   },
-  // 界面文案
+  // 界面文案(后台可配) —— 第一类运营高频文案
   text: {
-    publicEmpty:'还没有公开房间,来创建第一个吧', roomFirstMsg:'还没有人说话,来当第一个',
+    // 空状态/提示
+    publicEmpty:'还没有公开房，建一个吧', roomFirstMsg:'还没有人说话，来当第一个',
     connecting:'连接中…', loading:'加载中…',
+    // 入场页
+    entrySlogan:'临时身份 · 无需注册',
+    entryBtn:'匿 名 进 入',
+    // 大厅
+    hallOfficial:'官方频道', hallPublic:'公开房间', hallPrivate:'私密房 · 仅邀请码进入',
+    // 互动模式(标题+副标题)
+    modeVoiceTitle:'语音留声', modeVoiceSub:'按住录音，松手发送',
+    modeVoidTitle:'说给虚空', modeVoidSub:'匿名 · 5分钟后消散',
+    modeSingTitle:'文字神曲', modeSingSub:'把输入的话，唱出来',
+    // 输入框 placeholder
+    composerPlaceholder:'说点什么… 打个 / 看命令',
+    voidPlaceholder:'说给虚空… 匿名，5分钟后消散 🕳️',
+    // 命令帮助
+    cmdSing:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵',
+    cmdWhisper:'/whisper @昵称 悄悄话（仅对方可见）',
+    // 主要按钮
+    btnCreateRoom:'生 成 房 间', btnEnterRoom:'进 入 房 间',
+    btnLogin:'登 录', btnRegister:'注 册 并 进 入',
+    // 房间创建
+    roomTypePublicDesc:'大厅可见', roomTypePrivateDesc:'邀请码进',
+    roomCreatedTitle:'房间已创建 🎉',
+    // 闲聊广场官方房描述(入口标语)
+    officialDesc:'陌生人的实时聊天空间 · 进来 · 说话 · 留存',
   },
 };
 // 运行时配置(默认值的深拷贝,loadRemoteConfig 会用 DB 值覆盖)
@@ -908,6 +932,18 @@ function injectThemeCSS(){
   let el = document.getElementById('eh-theme-vars');
   if(!el){ el=document.createElement('style'); el.id='eh-theme-vars'; document.head.appendChild(el); }
   el.textContent = buildThemeCSS(EH_CONFIG.themePalettes);
+}
+// ---- 把 EH_CONFIG.text 应用到所有 data-txt / data-txt-ph 标记的元素 ----
+function applyTextConfig(){
+  try{
+    const T=EH_CONFIG.text||{};
+    document.querySelectorAll('[data-txt]').forEach(el=>{
+      const k=el.getAttribute('data-txt'); if(T[k]!=null) el.textContent=T[k];
+    });
+    document.querySelectorAll('[data-txt-ph]').forEach(el=>{
+      const k=el.getAttribute('data-txt-ph'); if(T[k]!=null) el.placeholder=T[k];
+    });
+  }catch(_){}
 }
 // ---- 从 Supabase eh_config 表拉取覆盖配置(存在则 merge) ----
 async function loadRemoteConfig(){
@@ -931,13 +967,14 @@ async function loadRemoteConfig(){
         }
       });
       injectThemeCSS();
+      applyTextConfig();
       // 已进房时后台改主题需重新 apply(applyTheme 会读当前 docEl data-theme)
       try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
     }
   }catch(e){ /* 表不存在或读取失败 → 用默认配置,不影响运行 */ }
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
-try{ injectThemeCSS(); }catch(e){}
+try{ injectThemeCSS(); applyTextConfig(); }catch(e){}
 
 // ============================================================
 //  回声厅 Echo Hall 2.0 — 全站 Supabase(匿名登录 + RLS + Realtime + Presence)
@@ -1023,12 +1060,13 @@ async function ensureAuth(){
 }
 
 // ---- 打字机副标题 ----
-const SUBTEXT = '陌生人的实时聊天空间 · 进来 · 说话 · 留存';
+// SUBTEXT 动态取配置(loadRemoteConfig 后能用到新值)
+function getSubtext(){ return EH_CONFIG.text.officialDesc; }
 let subI=0;
 function typeSub(){
   const el=$('#subLine'); if(!el) return;
-  if(subI<=SUBTEXT.length){ el.innerHTML=esc(SUBTEXT.slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
-  else el.innerHTML=esc(SUBTEXT)+'<span class="cursor">&nbsp;</span>';
+  if(subI<=getSubtext().length){ el.innerHTML=esc(getSubtext().slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
+  else el.innerHTML=esc(getSubtext())+'<span class="cursor">&nbsp;</span>';
 }
 
 // ============ 场景切换 ============
@@ -1867,7 +1905,7 @@ function setMode(mode){
   const cin=$('#cin');
   if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; composer.style.setProperty('--song-c', safeColor(st.color)); }
   else { composer.style.removeProperty('--song-c'); }
-  if(voidMode){ cin.placeholder='说给虚空… 匿名，5分钟后消散 🕳️'; }
+  if(voidMode){ cin.placeholder=EH_CONFIG.text.voidPlaceholder; }
   else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
   else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
   if(!voiceMode) setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
