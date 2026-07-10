@@ -148,10 +148,10 @@
   .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
   .me-btn{position:absolute;top:0;right:0;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
     cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.18s}
-  @media(hover:hover){ .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)} }
+  .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
   .me-btn.ic svg{width:18px;height:18px}
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
-  @media(hover:hover){ .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)} }
+  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -222,7 +222,9 @@
   .hall-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
   .tool-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:18px;flex-shrink:0;user-select:none}
-  @media(hover:hover){ .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)} }
+  .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  /* 触屏点后短暂禁用指针, 强制脱落 :hover, 不再粘住 */
+  .nohover{pointer-events:none!important}
   /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
   .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
   .tool-btn.active,.me-btn.active,.gear.active{color:var(--cyan);border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,transparent)}
@@ -2920,6 +2922,13 @@ $('#meBtnHall')&&($('#meBtnHall').onclick=()=>openMe());
 $('#lobbyName').onclick=()=>openMe();
 $('#meDx').onclick=()=>closeMe(); $('#meMask').onclick=()=>closeMe();
 $('#gearDx').onclick=()=>closeGear(); $('#gearMask').onclick=()=>closeGear();
+// 触屏: 点顶栏按钮(且非触发式设备)后短暂禁指针, 让粘住的 :hover 脱落。
+// 用 click(在 onclick 之后, 不阻塞功能); 仅 coarse pointer(触屏)执行, 鼠标不受影响。
+if(window.matchMedia && matchMedia('(hover:none)').matches){
+  document.querySelectorAll('.tool-btn,.me-btn,.gear').forEach(b=>{
+    b.addEventListener('click',()=>{ setTimeout(()=>{ b.classList.add('nohover'); setTimeout(()=>b.classList.remove('nohover'),260); },0); });
+  });
+}
 
 $('#createRoomBtn').onclick=()=>openModal('mCreate');
 $('#joinRoomBtn').onclick=()=>openModal('mJoin');
