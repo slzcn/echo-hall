@@ -405,19 +405,21 @@
   .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
   .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
 
-  /* 曲风选择托盘 */
+  /* 曲风选择托盘 —— 轻量小色条(一行胶囊, 自动换行) */
   .song-tray{position:absolute;bottom:72px;left:16px;right:16px;max-width:440px;background:var(--panel-solid);
     border:1px solid var(--line2);border-radius:14px;padding:10px;display:none;z-index:34;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .song-tray.on{display:block}
-  .song-tray .st-h{font-size:11.5px;color:var(--dim);margin:0 4px 8px;letter-spacing:.5px}
-  .song-tray .st-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-  .song-tray .st-chip{padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:rgba(10,12,24,.5);
-    cursor:pointer;text-align:center;transition:.15s;position:relative}
-  .song-tray .st-chip:hover{border-color:var(--magenta);transform:translateY(-2px)}
-  .song-tray .st-chip.on{border-color:var(--cyan);background:rgba(40,230,216,.12);box-shadow:0 0 0 1px var(--cyan) inset}
-  .song-tray .st-chip .se{font-size:20px}
-  .song-tray .st-chip .sn{font-size:11.5px;font-weight:700;margin-top:3px}
-  .song-tray .st-chip .sd{font-size:9.5px;color:var(--dim);margin-top:1px}
+  .song-tray .st-h{font-size:11.5px;color:var(--dim);margin:0 2px 8px;letter-spacing:.5px}
+  .song-tray .st-row{display:flex;flex-wrap:wrap;gap:6px}
+  .song-tray .st-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:16px;
+    border:1px solid var(--line2);background:rgba(10,12,24,.5);cursor:pointer;transition:.15s;font-size:12.5px;font-weight:600;
+    color:var(--ink);--sc:var(--magenta)}
+  .song-tray .st-chip .se{font-size:14px}
+  .song-tray .st-chip:hover{border-color:var(--sc);transform:translateY(-1px)}
+  .song-tray .st-chip.on{border-color:var(--sc);background:rgba(255,255,255,.06);box-shadow:0 0 0 1px var(--sc) inset}
+  @supports (background:color-mix(in srgb,red 10%,transparent)){
+    .song-tray .st-chip.on{background:color-mix(in srgb,var(--sc) 16%,transparent)}
+  }
 
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
@@ -565,7 +567,6 @@
     .plus-btn{width:40px;font-size:23px}
     .cin-emoji{width:34px;font-size:19px}
     .composer{gap:5px;padding-left:8px;padding-right:8px}
-    .song-tray .st-grid{grid-template-columns:repeat(3,1fr)}
     .song-lyric{max-width:150px}
     .enter-card{padding:32px 22px}
     .modal{padding:24px 20px}
@@ -2186,9 +2187,8 @@ function setSongMode(on){ setMode(on?'song':'none'); }
 function renderSongTray(){
   $('#songTray').innerHTML=`
     <div class="st-h">选个曲风，接下来输入的话会被唱出来 🎵</div>
-    <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}">
-      <div class="se">${s.emoji}</div><div class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</div>
-      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>`;
+    <div class="st-row">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
+      <span class="se">${s.emoji}</span><span class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</span></div>`).join('')}</div>`;
   $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
     closeSongTray();
