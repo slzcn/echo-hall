@@ -637,7 +637,7 @@
     <div class="lobby-head">
       <h2>回声厅</h2>
       <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
-      <div class="me-btn ic" id="skinBtn" title="皮肤" style="right:48px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.6"/><circle cx="17.5" cy="10.5" r="1.6"/><circle cx="8.5" cy="7.5" r="1.6"/><circle cx="6.5" cy="12.5" r="1.6"/><path d="M12 2C6.5 2 2 6 2 11c0 3 2 5 5 5 1.5 0 1.8 1 1.2 2-.4.7-.2 2 1.3 2h.5c5 0 10-3.5 10-9C20 5.5 16 2 12 2z"/></svg></div>
+      <div class="me-btn" id="skinBtn" title="皮肤" style="right:48px">🎨</div>
       <div class="me-btn me-avatar" id="meBtn" title="个人空间">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
@@ -663,9 +663,9 @@
         <div class="cnt" id="hallCnt">连接中…</div>
       </div>
       <div class="hall-tools">
-        <div class="tool-btn ic" id="bgmBtnHall" title="氛围音乐"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div>
-        <div class="tool-btn ic" id="skinBtnHall" title="皮肤"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.6"/><circle cx="17.5" cy="10.5" r="1.6"/><circle cx="8.5" cy="7.5" r="1.6"/><circle cx="6.5" cy="12.5" r="1.6"/><path d="M12 2C6.5 2 2 6 2 11c0 3 2 5 5 5 1.5 0 1.8 1 1.2 2-.4.7-.2 2 1.3 2h.5c5 0 10-3.5 10-9C20 5.5 16 2 12 2z"/></svg></div>
-        <div class="gear ic" id="gearBtn" title="房间设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H8a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H22a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
+        <div class="tool-btn" id="skinBtnHall" title="皮肤">🎨</div>
+        <div class="gear" id="gearBtn" title="房间设置">⚙️</div>
         <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间">🦊</div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
@@ -1217,7 +1217,7 @@ const AudioEngine=(function(){
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.innerHTML=on?IC_VOL:IC_MUTE; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   if(!bgmOn()) return;
   if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
@@ -1225,7 +1225,7 @@ function startRoomBGM(room){
 }
 function initBgmUI(){
   const b2=$('#bgmBtnHall'); if(!b2) return;
-  b2.innerHTML=bgmOn()?IC_VOL:IC_MUTE; b2.classList.toggle('muted',!bgmOn());
+  b2.textContent=bgmOn()?'🔊':'🔇'; b2.classList.toggle('muted',!bgmOn());
   b2.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
 }
 
