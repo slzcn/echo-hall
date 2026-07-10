@@ -843,6 +843,31 @@
   <div class="drawer-body" id="gearBody"></div>
 </div>
 
+<script>
+// ⚡ 首帧防闪: 在阻塞的 supabase 库脚本之前同步决定初始场景。
+// 真机上 supabase.min.js 下载/解析要数秒, 期间浏览器已把默认 #enter 画出来 → 刷新闪首页。
+// 这里 HTML 解析时立即读 localStorage: 曾登录(eh_identity_v2.id)+上次在房(eh_last_room) → 直接切 hall 骨架。
+// 不依赖任何库/函数, 纯 DOM。真实数据/失效回落由后面主脚本的 resumeAfterAuth / 兜底接管。
+(function(){
+  try{
+    var id=JSON.parse(localStorage.getItem('eh_identity_v2')||'null');
+    var r=JSON.parse(localStorage.getItem('eh_last_room')||'null');
+    if(!id||!id.id||!r||!r.id) return;
+    var enter=document.getElementById('enter'), hall=document.getElementById('hall');
+    if(!enter||!hall) return;
+    enter.classList.remove('on'); hall.classList.add('on'); document.body.classList.add('hall-on');
+    var hi=document.getElementById('hallIcon'); if(hi){ hi.textContent=r.emoji||'💬';
+      var rc = r.kind==='public'?'#4DE38A':(r.kind==='private'?'#8B5CFF':'#28E6D8');
+      hi.style.setProperty('--room-c', rc); }
+    var nt=document.getElementById('hallNameTxt'); if(nt){
+      var kl = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
+      nt.innerHTML = (r.name||'').replace(/[<>&]/g,'')+' <span style="font-size:11px;color:var(--dim);font-weight:400">· '+kl+'</span>'; }
+    var pr=document.getElementById('presence');
+    if(pr){ var s=''; for(var i=0;i<3;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>'; pr.innerHTML=s; }
+    window.__preHall=true;   // 标记已预绘, 主脚本 preRestoreScene 不必重复
+  }catch(e){}
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ============================================================
