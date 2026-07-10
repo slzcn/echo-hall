@@ -1634,16 +1634,12 @@ function resumeAfterAuth(){
   else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
 }
 function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
-// 读持久化的 supabase session 里的 user(判断是否已登录正式账号, 用于刷新时同步预绘)
-function persistedSessionUser(){
-  try{ const raw=localStorage.getItem('sb-'+SB_URL.split('//')[1].split('.')[0]+'-auth-token');
-    if(!raw) return null; const j=JSON.parse(raw); return j?.user||j?.currentSession?.user||null; }catch(e){ return null; }
-}
 // 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
-// 仅当有 last_room + 已登录正式账号(有邮箱、非匿名)时预绘; 随后异步 restore 会补真实数据。
+// 判据用本地 me.registered(正式账号标记, loadOrRollIdentity 已同步读出) —— 不解析 supabase 内部存储
+// (其格式在不同版本会 base64/分片, JSON.parse 会失败). 若 session 实际已失效, 靠后面的兜底回落 enter。
 function preRestoreScene(){
   const r=lastRoom(); if(!r) return false;
-  const u=persistedSessionUser(); if(!u || !u.email || u.is_anonymous===true) return false;
+  if(!me || !me.registered) return false;
   const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
     const rc = r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||'#28E6D8') : (r.kind==='public'?'#4DE38A':'#8B5CFF');
     hi.style.setProperty('--room-c', rc); }
