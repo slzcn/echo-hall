@@ -3078,38 +3078,40 @@ async function saveProfile(){
 }
 
 // ============ 事件绑定 ============
-$('#rerollBtn').onclick=()=>rollIdentity();
-$('#loginToggle').onclick=()=>{
-  const c=$('#loginCollapse'); const open=c.classList.toggle('on');
+// 安全绑定: 元素不存在时静默跳过, 避免单个 null 中断整条绑定链(移动端密码管理器偶发改动DOM导致)
+function on(id, ev, fn){ const el=document.getElementById(id); if(el) el.addEventListener(ev, fn); return el; }
+on('rerollBtn','click',()=>rollIdentity());
+on('loginToggle','click',()=>{
+  const c=$('#loginCollapse'); if(!c) return; const open=c.classList.toggle('on');
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
   // 未点登录前 password 字段以 type=text 存在(iOS 不会对其弹 Face ID/密码填充);
   // 点开时才切成真正的 password + 开启自动填充, 关闭时切回避免下次进页面又被扫到
   const pw=$('#loginPassword'), ac=$('#loginAccount');
   if(open){ pw.type='password'; pw.autocomplete='current-password'; ac.autocomplete='username'; setTimeout(()=>ac.focus(),200); }
   else { pw.type='text'; pw.autocomplete='off'; ac.autocomplete='off'; }
-};
-$('#loginBtn').onclick=()=>doLogin();
-$('#loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
-$('#toReg').onclick=()=>openModal('mReg');
-$('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
-$('#doRegBtn').onclick=()=>doRegister();
-$('#doResetBtn').onclick=()=>doReset();
-$('#doEmailBtn').onclick=()=>changeEmail();
-$('#sendVerifyBtn').onclick=()=>sendVerifyEmail();
-$('#doProfBtn').onclick=()=>saveProfile();
-$('#enterBtn').onclick=async()=>{
+});
+on('loginBtn','click',()=>doLogin());
+on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
+on('toReg','click',()=>openModal('mReg'));
+on('toReset','click',(e)=>{ e.stopPropagation(); openModal('mReset'); });
+on('doRegBtn','click',()=>doRegister());
+on('doResetBtn','click',()=>doReset());
+on('doEmailBtn','click',()=>changeEmail());
+on('sendVerifyBtn','click',()=>sendVerifyEmail());
+on('doProfBtn','click',()=>saveProfile());
+on('enterBtn','click',async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
   await ensureAuth();
   btn.disabled=false;
   goScene('lobby'); renderLobby();
-};
-$('#backBtn').onclick=()=>backToLobby();
-$('#gearBtn').onclick=()=>openGear();
-$('#meBtn').onclick=()=>openMe();
-$('#meBtnHall')&&($('#meBtnHall').onclick=()=>openMe());
-$('#lobbyName').onclick=()=>openMe();
-$('#meDx').onclick=()=>closeMe(); $('#meMask').onclick=()=>closeMe();
-$('#gearDx').onclick=()=>closeGear(); $('#gearMask').onclick=()=>closeGear();
+});
+on('backBtn','click',()=>backToLobby());
+on('gearBtn','click',()=>openGear());
+on('meBtn','click',()=>openMe());
+on('meBtnHall','click',()=>openMe());
+on('lobbyName','click',()=>openMe());
+on('meDx','click',()=>closeMe()); on('meMask','click',()=>closeMe());
+on('gearDx','click',()=>closeGear()); on('gearMask','click',()=>closeGear());
 // 触屏: 点顶栏按钮(且非触发式设备)后短暂禁指针, 让粘住的 :hover 脱落。
 // 用 click(在 onclick 之后, 不阻塞功能); 仅 coarse pointer(触屏)执行, 鼠标不受影响。
 if(window.matchMedia && matchMedia('(hover:none)').matches){
@@ -3118,16 +3120,16 @@ if(window.matchMedia && matchMedia('(hover:none)').matches){
   });
 }
 
-$('#createRoomBtn').onclick=()=>openModal('mCreate');
-$('#joinRoomBtn').onclick=()=>openModal('mJoin');
-$('#modalX').onclick=()=>closeModal();
-$('#modalMask').onclick=e=>{ if(e.target===$('#modalMask')) closeModal(); };
+on('createRoomBtn','click',()=>openModal('mCreate'));
+on('joinRoomBtn','click',()=>openModal('mJoin'));
+on('modalX','click',()=>closeModal());
+on('modalMask','click',e=>{ if(e.target===$('#modalMask')) closeModal(); });
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
-$('#doCreateBtn').onclick=()=>createRoom();
+on('doCreateBtn','click',()=>createRoom());
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };
-$('#enterCreatedBtn').onclick=()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); };
-$('#doJoinBtn').onclick=()=>joinByCode();
-$('#codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
+on('enterCreatedBtn','click',()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); });
+on('doJoinBtn','click',()=>joinByCode());
+on('codeIn','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
 $('#rpX').onclick=()=>clearReply();
 
 // 输入框
