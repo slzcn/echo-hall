@@ -320,7 +320,7 @@
   .composer.song-mode .cin::placeholder{color:var(--song-c,var(--magenta));opacity:.6}
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
-  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 14px;transition:.2s}
+  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
@@ -688,8 +688,8 @@
     <div class="composer">
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
       <div class="cin-wrap">
-        <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
+        <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="hold-talk" id="holdTalk">按住 说话</div>
       </div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
