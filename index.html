@@ -148,10 +148,10 @@
   .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
   .me-btn{position:absolute;top:0;right:0;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
     cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.18s}
-  .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  @media(hover:hover){ .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)} }
   .me-btn.ic svg{width:18px;height:18px}
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
-  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)}
+  @media(hover:hover){ .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)} }
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -222,7 +222,7 @@
   .hall-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
   .tool-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:18px;flex-shrink:0;user-select:none}
-  .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  @media(hover:hover){ .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)} }
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
