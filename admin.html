@@ -116,6 +116,9 @@
   <div class="tabs">
     <div class="tab on" data-page="overview">概览</div>
     <div class="tab" data-page="rooms">房间 & 聊天记录</div>
+    <div class="tab" data-page="theme">🎨 主题配色</div>
+    <div class="tab" data-page="bgm">🎵 BGM</div>
+    <div class="tab" data-page="text">📝 文案 & 绑定</div>
     <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
   </div>
 
@@ -136,6 +139,54 @@
     </div>
     <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
       <div id="msgList"></div>
+    </div>
+  </div>
+
+  <!-- 🎨 主题配色 -->
+  <div class="page" id="p-theme">
+    <div class="glass card"><h3>四套主题配色 · 每套 17 个 CSS 变量
+      <button class="mini-btn" id="themeSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存所有主题</button></h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
+        · 修改后先点「保存」写入 Supabase eh_config → 前端启动时拉取覆盖默认值<br>
+        · 主题ID 固定(cyber/vapor/mono/aurora) · 键名不可改 · 值支持 #hex / rgba(...) / 阴影表达式
+      </div>
+      <div id="themeTable"></div>
+      <div style="margin-top:16px;padding:14px;border-radius:12px;background:rgba(10,12,24,.4);font-size:12px;color:var(--sub)">
+        💡 预览:<span id="themePreviewBox" style="display:inline-block;width:80px;height:24px;border-radius:6px;margin-left:8px;vertical-align:middle;background:var(--cyan)"></span>
+        <select id="themePreviewSel" style="margin-left:12px;padding:5px 10px;border-radius:8px;background:rgba(10,12,24,.6);color:var(--ink);border:1px solid var(--line2);font-family:inherit;font-size:12px">
+          <option value="cyber">cyber 赛博霓虹</option><option value="vapor">vapor 蒸汽波</option>
+          <option value="mono">mono 暗夜极简</option><option value="aurora">aurora 极光渐变</option>
+        </select>
+        选主题看当前 --cyan 效果
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎵 BGM -->
+  <div class="page" id="p-bgm">
+    <div class="glass card"><h3>官方房 BGM 氛围参数
+      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存 BGM</button></h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
+        · root:根音Hz(20-2000) · chord:和弦半音程(逗号分隔如 0,4,7,11) · wave:波形 · pulse:律动ms(0=纯pad) · cut:低通截止Hz
+      </div>
+      <div id="bgmTable"></div>
+    </div>
+  </div>
+
+  <!-- 📝 文案 & 绑定 -->
+  <div class="page" id="p-text">
+    <div class="glass card"><h3>官方房主题绑定
+      <button class="mini-btn" id="bindSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存绑定</button></h3>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">房间进入时自动应用该主题(用户未手动锁定时)</div>
+      <div id="roomThemeTable"></div>
+    </div>
+    <div class="glass card"><h3>官方房兜底强调色</h3>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">卡片左边框强调色(DB 未存则用此兜底)</div>
+      <div id="fallbackCTable"></div>
+    </div>
+    <div class="glass card"><h3>界面文案
+      <button class="mini-btn" id="textSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存文案</button></h3>
+      <div id="textTable"></div>
     </div>
   </div>
 
@@ -285,6 +336,155 @@ $('#addAdminBtn').onclick=async()=>{
   else toast(r.body?.error||'失败');
 };
 
+// ============ 集中配置管理(config) ============
+let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTheme, officialFallbackC, roomBgm, text }
+// 默认值(前台 index.html EH_CONFIG_DEFAULT 副本;后台无数据时用)
+const CFG_DEFAULT = {
+  themePalettes:{
+    cyber:{"--bg":"#07080d","--bg2":"#0d0f1a","--panel":"rgba(18,21,36,.72)","--panel-solid":"#121524","--line":"rgba(120,140,220,.16)","--line2":"rgba(120,140,220,.28)","--ink":"#EAF0FF","--sub":"#98A3C7","--dim":"#5B6688","--cyan":"#28E6D8","--magenta":"#FF3CAC","--violet":"#8B5CFF","--amber":"#FFB84D","--green":"#4DE38A","--grid":"rgba(80,120,255,.05)","--glow-cyan":"0 0 24px rgba(40,230,216,.5)","--glow-mag":"0 0 24px rgba(255,60,172,.5)"},
+    vapor:{"--bg":"#160a1f","--bg2":"#22103a","--panel":"rgba(40,18,60,.72)","--panel-solid":"#241035","--line":"rgba(255,120,200,.18)","--line2":"rgba(255,120,200,.32)","--ink":"#FFE8F6","--sub":"#D9A8D0","--dim":"#8A6A96","--cyan":"#38E1D0","--magenta":"#FF5FA2","--violet":"#B36BFF","--amber":"#FFC46B","--green":"#66E6B0","--grid":"rgba(255,120,220,.06)","--glow-cyan":"0 0 24px rgba(255,95,162,.5)","--glow-mag":"0 0 26px rgba(179,107,255,.55)"},
+    mono:{"--bg":"#000000","--bg2":"#0a0a0c","--panel":"rgba(16,16,20,.82)","--panel-solid":"#0e0e12","--line":"rgba(210,180,120,.16)","--line2":"rgba(210,180,120,.3)","--ink":"#F4F1E9","--sub":"#B8B0A0","--dim":"#6E685C","--cyan":"#E9C877","--magenta":"#E9C877","--violet":"#D8B85C","--amber":"#E9C877","--green":"#C9BE96","--grid":"rgba(210,180,120,.035)","--glow-cyan":"0 0 20px rgba(233,200,119,.4)","--glow-mag":"0 0 20px rgba(233,200,119,.4)"},
+    aurora:{"--bg":"#04121a","--bg2":"#062230","--panel":"rgba(10,40,52,.7)","--panel-solid":"#08202c","--line":"rgba(90,220,200,.18)","--line2":"rgba(90,220,200,.32)","--ink":"#E6FBF6","--sub":"#9BD4CC","--dim":"#5A8A84","--cyan":"#2EF0C8","--magenta":"#5AD1FF","--violet":"#7CE0B0","--amber":"#8CE6D0","--green":"#3EE89A","--grid":"rgba(80,220,255,.05)","--glow-cyan":"0 0 26px rgba(46,240,200,.55)","--glow-mag":"0 0 24px rgba(90,209,255,.5)"},
+  },
+  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF5FA2"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#2EF0C8"}],
+  roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"mono","虚空回音":"aurora"},
+  officialFallbackC:{"闲聊广场":"#28E6D8","深夜电台":"#8B5CFF","技术黑话":"#FFB84D","虚空回音":"#FF3CAC"},
+  roomBgm:{
+    "闲聊广场":{root:220,chord:[0,4,7,11],wave:"triangle",pulse:2400,cut:1400,name:"明亮合成 pad"},
+    "深夜电台":{root:146.83,chord:[0,3,7,10],wave:"sine",pulse:0,cut:900,name:"蒸汽波暖垫"},
+    "技术黑话":{root:98,chord:[0,7,12],wave:"sawtooth",pulse:3200,cut:560,name:"极简低频 drone"},
+    "虚空回音":{root:329.63,chord:[0,5,7,12],wave:"sine",pulse:1600,cut:2600,name:"空灵铃音"},
+  },
+  text:{publicEmpty:"还没有公开房间,来创建第一个吧",roomFirstMsg:"还没有人说话,来当第一个",connecting:"连接中…",loading:"加载中…"},
+};
+
+async function loadConfig(){
+  if(CFG_CACHE) return CFG_CACHE;
+  const r=await api('/config');
+  const remote={}; if(r.ok && Array.isArray(r.body.config)){ r.body.config.forEach(row=>{ remote[row.key]=row.value; }); }
+  // merge: 远程覆盖默认
+  CFG_CACHE = JSON.parse(JSON.stringify(CFG_DEFAULT));
+  Object.keys(remote).forEach(k=>{ if(k in CFG_CACHE) CFG_CACHE[k]=remote[k]; });
+  return CFG_CACHE;
+}
+
+async function saveConfigKey(key,value){
+  const r=await api('/config',{method:'POST',body:{key,value}});
+  if(r.ok){ toast('已保存: '+key); if(CFG_CACHE) CFG_CACHE[key]=value; }
+  else toast(r.body?.error||'保存失败');
+  return r.ok;
+}
+
+// ---- 🎨 主题配色 ----
+async function loadTheme(){
+  const cfg=await loadConfig();
+  const themes=['cyber','vapor','mono','aurora'];
+  const keys=Object.keys(cfg.themePalettes.cyber);
+  let html='<div style="overflow-x:auto"><table style="min-width:800px"><thead><tr><th style="min-width:150px">CSS 变量</th>';
+  themes.forEach(t=>{ html+=`<th style="min-width:150px">${t}</th>`; });
+  html+='</tr></thead><tbody>';
+  keys.forEach(k=>{
+    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px">${k}</td>`;
+    themes.forEach(t=>{
+      const v=cfg.themePalettes[t][k]||'';
+      const isHex=/^#[0-9a-fA-F]{3,8}$/.test(v);
+      const picker=isHex?`<input type="color" data-cpk="${t}|${k}" value="${v.length===4?'#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]:v.slice(0,7)}" style="width:28px;height:28px;padding:0;border:1px solid var(--line2);border-radius:5px;background:none;vertical-align:middle;cursor:pointer">`:'<span style="font-size:10px;color:var(--dim);vertical-align:middle;margin-right:4px">rgba/其他</span>';
+      html+=`<td>${picker}<input data-cv="${t}|${k}" value="${esc(v)}" style="width:calc(100% - 40px);padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;outline:none;margin-left:4px" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  $('#themeTable').innerHTML=html;
+  // 联动 color picker → 文本
+  $('#themeTable').querySelectorAll('[data-cpk]').forEach(cpk=>{
+    cpk.oninput=()=>{ const t=$('#themeTable').querySelector(`[data-cv="${cpk.dataset.cpk}"]`); if(t) t.value=cpk.value; refreshThemePreview(); };
+  });
+  $('#themeTable').querySelectorAll('[data-cv]').forEach(el=>el.oninput=refreshThemePreview);
+  refreshThemePreview();
+}
+function collectThemePalettes(){
+  const out=JSON.parse(JSON.stringify(CFG_CACHE.themePalettes));
+  $('#themeTable').querySelectorAll('[data-cv]').forEach(el=>{
+    const [t,k]=el.dataset.cv.split('|'); out[t][k]=el.value;
+  });
+  return out;
+}
+function refreshThemePreview(){
+  const t=$('#themePreviewSel').value;
+  const p=collectThemePalettes();
+  $('#themePreviewBox').style.background=p[t]['--cyan']||'#28E6D8';
+}
+
+// ---- 🎵 BGM ----
+async function loadBgm(){
+  const cfg=await loadConfig();
+  const rooms=Object.keys(cfg.roomBgm);
+  let html='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>root(Hz)</th><th>chord</th><th>wave</th><th>pulse(ms)</th><th>cut(Hz)</th><th>说明</th></tr></thead><tbody>';
+  const waveOpts=['sine','triangle','sawtooth','square'];
+  rooms.forEach(r=>{
+    const b=cfg.roomBgm[r];
+    html+=`<tr><td>${esc(r)}</td>
+      <td><input data-bgm="${r}|root"   value="${b.root}"  type="number" step="0.01" min="20" max="2000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|chord"  value="${(b.chord||[]).join(',')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><select data-bgm="${r}|wave" style="padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px">${waveOpts.map(w=>`<option ${w===b.wave?'selected':''}>${w}</option>`).join('')}</select></td>
+      <td><input data-bgm="${r}|pulse"  value="${b.pulse}" type="number" min="0" max="10000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|cut"    value="${b.cut}"   type="number" min="50" max="20000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|name"   value="${esc(b.name||'')}" style="width:130px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px"></td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  $('#bgmTable').innerHTML=html;
+}
+function collectBgm(){
+  const out=JSON.parse(JSON.stringify(CFG_CACHE.roomBgm));
+  $('#bgmTable').querySelectorAll('[data-bgm]').forEach(el=>{
+    const [r,f]=el.dataset.bgm.split('|');
+    if(f==='root'||f==='pulse'||f==='cut') out[r][f]=parseFloat(el.value)||0;
+    else if(f==='chord') out[r][f]=el.value.split(',').map(s=>parseInt(s.trim(),10)).filter(x=>!isNaN(x));
+    else out[r][f]=el.value;
+  });
+  return out;
+}
+
+// ---- 📝 文案 & 绑定 ----
+async function loadTextBind(){
+  const cfg=await loadConfig();
+  // roomTheme
+  const themeIds=cfg.themes.map(t=>t.id);
+  let rt='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>默认主题</th></tr></thead><tbody>';
+  Object.keys(cfg.roomTheme).forEach(r=>{
+    rt+=`<tr><td>${esc(r)}</td><td><select data-rt="${r}" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12px">${themeIds.map(t=>`<option ${t===cfg.roomTheme[r]?'selected':''}>${t}</option>`).join('')}</select></td></tr>`;
+  });
+  rt+='</tbody></table></div>'; $('#roomThemeTable').innerHTML=rt;
+  // officialFallbackC
+  let fc='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>兜底色</th></tr></thead><tbody>';
+  Object.keys(cfg.officialFallbackC).forEach(r=>{
+    const v=cfg.officialFallbackC[r];
+    fc+=`<tr><td>${esc(r)}</td><td><input type="color" data-fc-picker="${r}" value="${v}" style="width:32px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;vertical-align:middle;cursor:pointer"> <input data-fc="${r}" value="${esc(v)}" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;margin-left:6px"></td></tr>`;
+  });
+  fc+='</tbody></table></div>'; $('#fallbackCTable').innerHTML=fc;
+  $('#fallbackCTable').querySelectorAll('[data-fc-picker]').forEach(p=>p.oninput=()=>{ const t=$('#fallbackCTable').querySelector(`[data-fc="${p.dataset.fcPicker}"]`); if(t) t.value=p.value; });
+  // text
+  let tx='<div style="overflow-x:auto"><table><thead><tr><th>key</th><th>文案</th></tr></thead><tbody>';
+  Object.keys(cfg.text).forEach(k=>{
+    tx+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px">${k}</td><td><input data-tx="${k}" value="${esc(cfg.text[k])}" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td></tr>`;
+  });
+  tx+='</tbody></table></div>'; $('#textTable').innerHTML=tx;
+}
+
+$('#themeSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('themePalettes',collectThemePalettes()); });
+$('#bgmSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('roomBgm',collectBgm()); });
+$('#bindSaveBtn')?.addEventListener('click',async()=>{
+  const rt={}; $('#roomThemeTable').querySelectorAll('[data-rt]').forEach(el=>rt[el.dataset.rt]=el.value);
+  const fc={}; $('#fallbackCTable').querySelectorAll('[data-fc]').forEach(el=>fc[el.dataset.fc]=el.value);
+  await saveConfigKey('roomTheme',rt); await saveConfigKey('officialFallbackC',fc);
+});
+$('#textSaveBtn')?.addEventListener('click',async()=>{
+  const tx={}; $('#textTable').querySelectorAll('[data-tx]').forEach(el=>tx[el.dataset.tx]=el.value);
+  await saveConfigKey('text',tx);
+});
+$('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
+
 // tabs
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
@@ -292,6 +492,9 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   $('#p-'+t.dataset.page).classList.add('on');
   if(t.dataset.page==='admins') loadAdmins();
   if(t.dataset.page==='rooms') loadRooms();
+  if(t.dataset.page==='theme') loadTheme();
+  if(t.dataset.page==='bgm') loadBgm();
+  if(t.dataset.page==='text') loadTextBind();
 });
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
