@@ -386,7 +386,7 @@
   .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--cyan)}
   .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.15)}
   .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
-  .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;
+  .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;pointer-events:none;
     background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
   .rec-overlay.on{display:flex}
   .rec-panel{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 40px;border-radius:22px;
@@ -1327,7 +1327,9 @@ function initThemeUI(){
   initBgmUI();
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
-function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall'); }
+function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
+  // 切场景清掉可能残留的全屏遮挡(录音浮层/键盘态), 防其挡住点击
+  document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on'); }
 
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
