@@ -16,13 +16,13 @@
   body{font-family:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
     background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;
     background-image:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(139,92,255,.12),transparent 70%)}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 60px}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 20px 60px}
   .glass{background:var(--panel);backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:16px}
   a{color:var(--cyan)}
 
   /* 登录 */
   #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-  .auth-card{width:min(400px,92vw);padding:34px 30px;position:relative}
+  .auth-card{width:min(420px,92vw);padding:34px 30px;position:relative}
   .auth-card h1{font-size:26px;font-weight:800;letter-spacing:1px;text-align:center;
     background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
   .auth-card .sub{text-align:center;color:var(--sub);font-size:12.5px;margin:8px 0 24px}
@@ -229,7 +229,7 @@ async function loadRooms(){
     const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
     const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
     return `<tr class="roomrow" data-rid="${r.id}" data-nm="${esc(r.name)}">
-      <td>${safeEmoji(r) || ''} ${esc(r.name)}</td>
+      <td>${safeEmoji(r.emoji) || ''} ${esc(r.name)}</td>
       <td><span class="k-tag k-${r.kind}">${kt}</span></td>
       <td>${arch||'—'}</td>
       <td>${(r.created_at||'').slice(0,10)}</td></tr>`;
@@ -237,17 +237,33 @@ async function loadRooms(){
   $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=()=>loadMessages(el.dataset.rid,el.dataset.nm));
 }
 
+// 语音消息渲染为播放器；只信任本站语音桶的地址，其余按纯文本展示
+const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
+const SONG_STYLE_NAMES={dj:'蹦迪DJ',shen:'神曲喊麦',kid:'儿歌',gufeng:'古风',disco:'迪斯科','8bit':'电玩'};
+function voiceOrText(m){
+  const src=String(m.text||'');
+  if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
+    return `<audio controls preload="none" style="height:30px;max-width:100%" src="${esc(src.split('#')[0])}"></audio>`;
+  if(m.kind==='song'){
+    const i=src.indexOf('|'), sid=i>0?src.slice(0,i):'';
+    const lyric=i>0 && SONG_STYLE_NAMES[sid]?src.slice(i+1):src;
+    const style=SONG_STYLE_NAMES[sid]?`<span style="color:var(--cyan)">[${SONG_STYLE_NAMES[sid]}] </span>`:'';
+    return style+esc(lyric);
+  }
+  return esc(m.text);
+}
 async function loadMessages(rid,name){
   const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
   $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
   if(!res.ok){ $('#msgList').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
   const msgs=(res.body.messages||[]).slice().reverse();
   $('#msgList').innerHTML=msgs.map(m=>`<div class="msgline">
-    <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m) || ''} ${esc(m.name)}</span>
+    <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji) || ''} ${esc(m.name)}</span>
     <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
     ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
     ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
-    <div style="margin-top:4px">${esc(m.text)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
+    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎤语音</span>':''}
+    <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
   $('#msgCard').scrollIntoView({behavior:'smooth'});
 }
 $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
