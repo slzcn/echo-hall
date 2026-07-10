@@ -2283,24 +2283,31 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
+  // v3 更像人声哼唱: 声源=声带(锯齿/三角)经元音共振峰(甲醛滤波), 加胸声正弦垫厚实, 温和颤音
   const oscs=[];
-  const src=ctx.createOscillator(); src.type=wave||'sawtooth';   // 按曲风波形: 正弦柔/三角圆/方波尖/锯齿亮
-  src.frequency.setValueAtTime(freq*0.92,t); src.frequency.linearRampToValueAtTime(freq,t+0.06); // 上滑起音，像"唱"
-  const lfo=ctx.createOscillator(); lfo.frequency.setValueAtTime(5.2,t); lfo.frequency.linearRampToValueAtTime(6.2,t+dur); // 颤音渐强
-  const lfoG=ctx.createGain(); lfoG.gain.value=freq*0.013; lfo.connect(lfoG).connect(src.frequency);
+  const gliss=Math.min(0.035,dur*0.18);   // 起音上滑更短, 音更快"落定"到目标音高(不飘)
+  // 声带源(谐波丰富 → 经共振峰塑形成元音)
+  const src=ctx.createOscillator(); src.type=wave==='sine'?'triangle':(wave||'sawtooth');
+  src.frequency.setValueAtTime(freq*0.97,t); src.frequency.linearRampToValueAtTime(freq,t+gliss);
+  // 温和颤音: 延迟 0.12s 后才起(先稳稳唱出音), 深度小, 更自然
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;
+  const lfoG=ctx.createGain(); lfoG.gain.setValueAtTime(0.0001,t); lfoG.gain.setValueAtTime(0.0001,t+Math.min(0.12,dur*0.4)); lfoG.gain.linearRampToValueAtTime(freq*0.006,t+dur);
+  lfo.connect(lfoG).connect(src.frequency);
+  // ADSR: 柔起音(像人开口), 长 sustain, 渐弱收尾(连贯)
   const env=ctx.createGain();
-  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.045);
-  env.gain.setValueAtTime(gain*0.85,t+dur*0.6); env.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.55,0.28];
-  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?8:11;
+  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
+  env.gain.setValueAtTime(gain,t+dur*0.55); env.gain.linearRampToValueAtTime(gain*0.7,t+dur*0.9); env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
+  // 元音共振峰(Q 降低 → 宽峰更像人声, 不像扫频电子音)
+  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.35];
+  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?4:6;
     const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
   env.connect(dest);
-  src.start(t); src.stop(t+dur+0.05); lfo.start(t); lfo.stop(t+dur+0.05);
+  src.start(t); src.stop(t+dur+0.06); lfo.start(t); lfo.stop(t+dur+0.06);
   oscs.push(src,lfo);
-  // 上方八度弱和声(让嗓音饱满立体, 唱感更足)
-  const h=ctx.createOscillator(); h.type='sine'; h.frequency.setValueAtTime(freq*2*0.92,t); h.frequency.linearRampToValueAtTime(freq*2,t+0.06);
-  const hg=ctx.createGain(); hg.gain.setValueAtTime(0.0001,t); hg.gain.linearRampToValueAtTime(gain*0.28,t+0.05); hg.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  h.connect(hg).connect(dest); h.start(t); h.stop(t+dur+0.05); oscs.push(h);
+  // 胸声垫: 基频正弦(不经滤波)加厚底 → 声音更饱满温暖, 不尖细
+  const chest=ctx.createOscillator(); chest.type='sine'; chest.frequency.setValueAtTime(freq*0.97,t); chest.frequency.linearRampToValueAtTime(freq,t+gliss);
+  const cg=ctx.createGain(); cg.gain.setValueAtTime(0.0001,t); cg.gain.linearRampToValueAtTime(gain*0.5,t+0.05); cg.gain.setValueAtTime(gain*0.5,t+dur*0.6); cg.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
+  chest.connect(cg).connect(dest); chest.start(t); chest.stop(t+dur+0.06); oscs.push(chest);
   return oscs;
 }
 
@@ -2376,14 +2383,14 @@ function playSong(lyric, sid, el, onEnd){
     const semi=st.base+scaleSemi(st.scale,deg);
     const delay=Math.max(0,(t-ctx.currentTime)*1000);
     // 元音哼唱=主唱(gain 0.3), 跟着 motif 走音高, 带八度和声+颤音, 每套曲风波形音色各异
-    singVoice(ctx,voiceBus,NOTE(semi+12),t,step*1.05,charVowel(ch),0.7,st.wave).forEach(o=>curSong.oscs.push(o));
+    singVoice(ctx,voiceBus,NOTE(semi),t,step*1.05,charVowel(ch),0.7,st.wave).forEach(o=>curSong.oscs.push(o));
     const chEl=chEls[i];
     if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, delay));
   });
   // 结尾甩音"哟~"(上滑收尾, 洗脑记忆点)
   const endT=t0+chars.length*step;
   const endSemi=st.base+scaleSemi(st.scale,st.motif[0])+12;
-  singVoice(ctx,voiceBus,NOTE(endSemi+12),endT,spb*1.3,'o',0.6,st.wave).forEach(o=>curSong.oscs.push(o));
+  singVoice(ctx,voiceBus,NOTE(endSemi),endT,spb*1.3,'o',0.6,st.wave).forEach(o=>curSong.oscs.push(o));
   // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
   // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
   if(hasTTS){
