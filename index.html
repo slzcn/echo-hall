@@ -10,6 +10,8 @@
 <link rel="dns-prefetch" href="https://cddkniwbhvcbfgkgomtl.supabase.co">
 <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js">
 <style>
+  /* ===== 主题配色由 JS 从 EH_CONFIG 动态注入(见 buildThemeCSS/injectThemeCSS) ===== */
+  /* 首屏防白屏:仅内联 cyber(默认)关键变量,完整 17 变量 × 4 套由 JS 启动时补全 */
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
@@ -83,7 +85,7 @@
   .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
   .title{font-size:38px;font-weight:800;letter-spacing:2px;margin:8px 0 4px;
     background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
-    text-shadow:0 0 40px rgba(40,230,216,.2)}
+    text-shadow:0 0 40px color-mix(in srgb,var(--cyan) 20%,transparent)}
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
@@ -107,10 +109,10 @@
   .opt-email-box.on{max-height:70px;margin-bottom:16px}
   .opt-email-box input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
-  .opt-email-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .opt-email-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
-    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.25)}
+    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 25%,transparent)}
   .btn-line{width:100%;padding:12px;border:1px solid var(--line2);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:var(--ink);background:rgba(10,12,24,.5);transition:.2s}
   .btn-line:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
@@ -125,7 +127,7 @@
   .login-row{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
   .login-row input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
-  .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .fld-hint{font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.5}
   /* 通用确认弹层 */
   .confirm-box{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
@@ -136,8 +138,8 @@
   .cf-cancel{background:rgba(10,12,24,.5);color:var(--sub)}
   .cf-cancel:hover{border-color:var(--line2);color:var(--ink)}
   .cf-ok{background:linear-gradient(120deg,var(--magenta),var(--violet));color:#fff;border:none}
-  .cf-ok:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,60,172,.3)}
-  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,60,172,.35)}
+  .cf-ok:hover{transform:translateY(-1px);box-shadow:0 8px 24px color-mix(in srgb,var(--magenta) 30%,transparent)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px color-mix(in srgb,var(--magenta) 35%,transparent)}
   .btn-primary:active{transform:translateY(0) scale(.99)}
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
@@ -198,7 +200,7 @@
   .rm .rm-ic{font-size:22px}
   .rm .rm-nm{flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
-  .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:rgba(139,92,255,.15);color:var(--violet)}
+  .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--violet) 15%,transparent);color:var(--violet)}
   .rm .rm-arr{color:var(--dim)}
 
   /* ============ 场景3：聊天厅 ============ */
@@ -241,8 +243,8 @@
   .pav{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;position:relative;
     animation:popin .4s cubic-bezier(.2,.9,.3,1.4);cursor:default}
   .pav .av-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;position:relative;
-    background:var(--pav-c,#28E6D8)1f;box-shadow:inset 0 0 0 1.5px var(--pav-c,#28E6D8);transition:.25s}
-  .pav .av-ic::after{content:"";position:absolute;inset:-2.5px;border-radius:13px;border:1.5px solid var(--pav-c,#28E6D8);opacity:.35;transition:.25s}
+    background:color-mix(in srgb,var(--pav-c,var(--cyan)) 12%,transparent);box-shadow:inset 0 0 0 1.5px var(--pav-c,var(--cyan));transition:.25s}
+  .pav .av-ic::after{content:"";position:absolute;inset:-2.5px;border-radius:13px;border:1.5px solid var(--pav-c,var(--cyan));opacity:.35;transition:.25s}
   .pav:hover .av-ic{transform:translateY(-2px)}
   .pav:hover .av-ic::after{opacity:.7;inset:-3.5px}
   .pav .nm{font-size:9.5px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
@@ -277,7 +279,7 @@
   .msg.me{flex-direction:row-reverse}
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
-  .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,rgba(40,230,216,.14),rgba(139,92,255,.14));border-color:var(--line2)}
+  .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent));border-color:var(--line2)}
   .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
   /* 回声徽章条: 消息下方一排各情绪计数 */
@@ -305,7 +307,7 @@
 
   /* 回复预览条 */
   .reply-preview{display:none;align-items:center;gap:8px;padding:8px 18px;border-top:1px solid var(--line);
-    background:rgba(139,92,255,.06);font-size:12px;color:var(--sub);flex-shrink:0}
+    background:color-mix(in srgb,var(--violet) 6%,transparent);font-size:12px;color:var(--sub);flex-shrink:0}
   .reply-preview.on{display:flex}
   .reply-preview .rp-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .reply-preview .rp-x{cursor:pointer;color:var(--dim);padding:2px 6px}
@@ -445,7 +447,7 @@
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .slash-menu.on{display:block}
   .slash-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:.12s}
-  .slash-item:hover,.slash-item.sel{background:rgba(40,230,216,.1)}
+  .slash-item:hover,.slash-item.sel{background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   .slash-item .sc{font-family:inherit;font-weight:700;color:var(--cyan);font-size:13px;min-width:72px}
   .slash-item .sd{font-size:11.5px;color:var(--sub)}
 
@@ -495,23 +497,23 @@
   .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
   .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
-  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .seg{display:flex;gap:8px;margin-bottom:16px}
   .seg .opt{flex:1;padding:12px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.5);cursor:pointer;
     text-align:center;transition:.15s}
-  .seg .opt.on{border-color:var(--cyan);background:rgba(40,230,216,.1)}
+  .seg .opt.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   .seg .opt .ot{font-size:14px;font-weight:700;margin-bottom:3px}
   .seg .opt .od{font-size:10.5px;color:var(--dim)}
   .emoji-pick{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
   .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
   .emoji-pick b:hover{background:rgba(255,255,255,.06)}
-  .emoji-pick b.on{border-color:var(--cyan);background:rgba(40,230,216,.12)}
+  .emoji-pick b.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,transparent)}
   .color-pick{display:flex;flex-wrap:wrap;gap:8px}
   .color-pick i{width:30px;height:30px;border-radius:9px;cursor:pointer;transition:.12s;border:2px solid transparent;box-sizing:border-box}
   .color-pick i:hover{transform:scale(1.12)}
   .color-pick i.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
   .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:20px;
-    background:rgba(40,230,216,.08);border:1px solid rgba(40,230,216,.3)}
+    background:color-mix(in srgb,var(--cyan) 8%,transparent);border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent)}
   .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
   .code-copy{padding:8px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);
     font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
@@ -535,12 +537,12 @@
   .me-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:22px 16px 20px;
     background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:16px;margin-bottom:14px}
   .me-hero .mh-av{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font-size:32px;margin-bottom:12px;
-    background:var(--mh-c,#28E6D8)1f;box-shadow:inset 0 0 0 2px var(--mh-c,#28E6D8),0 0 24px -6px var(--mh-c,#28E6D8)}
+    background:color-mix(in srgb,var(--mh-c,var(--cyan)) 12%,transparent);box-shadow:inset 0 0 0 2px var(--mh-c,var(--cyan)),0 0 24px -6px var(--mh-c,var(--cyan))}
   .me-hero .mh-name{font-size:20px;font-weight:800;letter-spacing:.5px}
   .me-hero .mh-sub{font-size:11.5px;color:var(--dim);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
   .me-hero .mh-badge{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
-  .me-hero .mh-badge.super{background:rgba(255,60,172,.15);color:var(--magenta)}
-  .me-hero .mh-badge.reg{background:rgba(40,230,216,.15);color:var(--cyan)}
+  .me-hero .mh-badge.super{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
+  .me-hero .mh-badge.reg{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
   .me-hero .mh-badge.anon{background:rgba(120,140,220,.12);color:var(--sub)}
   .me-btns{display:flex;gap:8px;margin-top:14px;width:100%}
   .me-btns .dbtn{margin-top:0;flex:1}
@@ -829,6 +831,115 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ============================================================
+//  EH_CONFIG — 集中配置(四套主题配色/主题元数据/官方房绑定/BGM/文案)
+//  单一数据源:前端只留结构 + var(--xxx)/EH_CONFIG.xxx 引用。
+//  后台改动写入 Supabase eh_config 表,启动时 loadRemoteConfig() 拉取覆盖。
+// ============================================================
+const EH_CONFIG_DEFAULT = {
+  version: 1,
+  // 四套主题调色板(每套 17 变量,键必须一致)
+  themePalettes: {
+    cyber: {
+      '--bg':'#07080d','--bg2':'#0d0f1a','--panel':'rgba(18,21,36,.72)','--panel-solid':'#121524',
+      '--line':'rgba(120,140,220,.16)','--line2':'rgba(120,140,220,.28)',
+      '--ink':'#EAF0FF','--sub':'#98A3C7','--dim':'#5B6688',
+      '--cyan':'#28E6D8','--magenta':'#FF3CAC','--violet':'#8B5CFF','--amber':'#FFB84D','--green':'#4DE38A',
+      '--grid':'rgba(80,120,255,.05)','--glow-cyan':'0 0 24px rgba(40,230,216,.5)','--glow-mag':'0 0 24px rgba(255,60,172,.5)',
+    },
+    vapor: {
+      '--bg':'#160a1f','--bg2':'#22103a','--panel':'rgba(40,18,60,.72)','--panel-solid':'#241035',
+      '--line':'rgba(255,120,200,.18)','--line2':'rgba(255,120,200,.32)',
+      '--ink':'#FFE8F6','--sub':'#D9A8D0','--dim':'#8A6A96',
+      '--cyan':'#38E1D0','--magenta':'#FF5FA2','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0',
+      '--grid':'rgba(255,120,220,.06)','--glow-cyan':'0 0 24px rgba(255,95,162,.5)','--glow-mag':'0 0 26px rgba(179,107,255,.55)',
+    },
+    mono: {
+      '--bg':'#000000','--bg2':'#0a0a0c','--panel':'rgba(16,16,20,.82)','--panel-solid':'#0e0e12',
+      '--line':'rgba(210,180,120,.16)','--line2':'rgba(210,180,120,.3)',
+      '--ink':'#F4F1E9','--sub':'#B8B0A0','--dim':'#6E685C',
+      '--cyan':'#E9C877','--magenta':'#E9C877','--violet':'#D8B85C','--amber':'#E9C877','--green':'#C9BE96',
+      '--grid':'rgba(210,180,120,.035)','--glow-cyan':'0 0 20px rgba(233,200,119,.4)','--glow-mag':'0 0 20px rgba(233,200,119,.4)',
+    },
+    aurora: {
+      '--bg':'#04121a','--bg2':'#062230','--panel':'rgba(10,40,52,.7)','--panel-solid':'#08202c',
+      '--line':'rgba(90,220,200,.18)','--line2':'rgba(90,220,200,.32)',
+      '--ink':'#E6FBF6','--sub':'#9BD4CC','--dim':'#5A8A84',
+      '--cyan':'#2EF0C8','--magenta':'#5AD1FF','--violet':'#7CE0B0','--amber':'#8CE6D0','--green':'#3EE89A',
+      '--grid':'rgba(80,220,255,.05)','--glow-cyan':'0 0 26px rgba(46,240,200,.55)','--glow-mag':'0 0 24px rgba(90,209,255,.5)',
+    },
+  },
+  // 主题元数据(下拉菜单:id/名称/圆点色)
+  themes: [
+    { id:'cyber',  name:'赛博霓虹', dot:'#28E6D8' },
+    { id:'vapor',  name:'蒸汽波',   dot:'#FF5FA2' },
+    { id:'mono',   name:'暗夜极简', dot:'#E9C877' },
+    { id:'aurora', name:'极光渐变', dot:'#2EF0C8' },
+  ],
+  // 官方房 → 专属默认主题
+  roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
+  // 官方房卡片兜底强调色
+  officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC' },
+  // 官方房 BGM 氛围(root:根音Hz chord:半音程 wave:波形 pulse:律动ms cut:低通Hz)
+  roomBgm: {
+    '闲聊广场':{ root:220,    chord:[0,4,7,11], wave:'triangle', pulse:2400, cut:1400, name:'明亮合成 pad' },
+    '深夜电台':{ root:146.83, chord:[0,3,7,10], wave:'sine',     pulse:0,    cut:900,  name:'蒸汽波暖垫' },
+    '技术黑话':{ root:98,     chord:[0,7,12],   wave:'sawtooth', pulse:3200, cut:560,  name:'极简低频 drone' },
+    '虚空回音':{ root:329.63, chord:[0,5,7,12], wave:'sine',     pulse:1600, cut:2600, name:'空灵铃音' },
+  },
+  // 界面文案
+  text: {
+    publicEmpty:'还没有公开房间,来创建第一个吧', roomFirstMsg:'还没有人说话,来当第一个',
+    connecting:'连接中…', loading:'加载中…',
+  },
+};
+// 运行时配置(默认值的深拷贝,loadRemoteConfig 会用 DB 值覆盖)
+const EH_CONFIG = JSON.parse(JSON.stringify(EH_CONFIG_DEFAULT));
+
+// ---- 主题 CSS 注入引擎:把 themePalettes 生成 <style> 注入 <head> ----
+function buildThemeCSS(palettes){
+  const kv = o => Object.entries(o).map(([k,v])=>k+':'+v+';').join('');
+  let css = '';
+  for(const [id,pal] of Object.entries(palettes||{})){
+    css += (id==='cyber' ? ':root{' : 'html[data-theme="'+id+'"]{') + kv(pal) + '}\n';
+  }
+  return css;
+}
+function injectThemeCSS(){
+  let el = document.getElementById('eh-theme-vars');
+  if(!el){ el=document.createElement('style'); el.id='eh-theme-vars'; document.head.appendChild(el); }
+  el.textContent = buildThemeCSS(EH_CONFIG.themePalettes);
+}
+// ---- 从 Supabase eh_config 表拉取覆盖配置(存在则 merge) ----
+async function loadRemoteConfig(){
+  try{
+    const { data } = await sb.from('eh_config').select('key,value');
+    if(data && data.length){
+      const map={}; data.forEach(r=>{ map[r.key]=r.value; });
+      // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
+      // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
+      ['themePalettes','themes','roomTheme','officialFallbackC','roomBgm','text'].forEach(k=>{
+        if(!map[k]) return;
+        const dst=EH_CONFIG[k];
+        if(Array.isArray(dst)){
+          dst.length=0;
+          if(Array.isArray(map[k])) map[k].forEach(v=>dst.push(v));
+        } else if(dst && typeof dst==='object'){
+          Object.keys(dst).forEach(ok=>delete dst[ok]);
+          Object.assign(dst, map[k]);
+        } else {
+          EH_CONFIG[k]=map[k];
+        }
+      });
+      injectThemeCSS();
+      // 已进房时后台改主题需重新 apply(applyTheme 会读当前 docEl data-theme)
+      try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
+    }
+  }catch(e){ /* 表不存在或读取失败 → 用默认配置,不影响运行 */ }
+}
+// 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
+try{ injectThemeCSS(); }catch(e){}
+
+// ============================================================
 //  回声厅 Echo Hall 2.0 — 全站 Supabase(匿名登录 + RLS + Realtime + Presence)
 // ============================================================
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
@@ -922,136 +1033,14 @@ function typeSub(){
 
 // ============ 场景切换 ============
 // ============ 皮肤/主题引擎 ============
-const THEMES=[
-  {id:'cyber', name:'赛博霓虹', dot:'#28E6D8'},
-  {id:'vapor', name:'蒸汽波',   dot:'#FF5FA2'},
-  {id:'mono',  name:'暗夜极简', dot:'#E9C877'},
-  {id:'aurora',name:'极光渐变', dot:'#2EF0C8'},
-];
-// 官方房专属默认皮肤(按房名)
-const ROOM_THEME={'闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora'};
-// ============ BGM 氛围引擎 v2 (原创旋律版, Web Audio 程序化生成, 零文件零跨域) ============
-const IC_VOL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`, IC_MUTE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>`;
+// 主题元数据/官方房皮肤绑定 → 引用集中配置 EH_CONFIG(见文件顶部)
+const THEMES=EH_CONFIG.themes;
+const ROOM_THEME=EH_CONFIG.roomTheme;
+// ============ BGM 氛围引擎(Web Audio 程序化生成, 零文件零跨域) ============
 const LS_BGM='eh_bgm';
-// 音符名→半音数(相对 A0=0), 用于旋律书写. A=0 A#=1 B=2 C=3 ... 简化: 直接用 MIDI note number 表示
-// 用工具函数 n(midi) 返回频率
-function _mtof(m){ return 440*Math.pow(2,(m-69)/12); }
-// 每官方房一首原创曲子 (16步序列, BPM, 音色, 节奏配置)
-// 说明:
-//  - 闲聊广场: C大调五声, 8-bit 明亮 pop, BPM 108, chip lead + tri pad + arp bass
-//  - 深夜电台: Fm7 蒸汽波 lo-fi, BPM 72, warm epiano lead + sine pad + sub bass, 无鼓
-//  - 技术黑话: Am 极简 techno drone, BPM 96, saw bass + blip lead + 4x4 kick + hat
-//  - 虚空回音: E lydian ambient, BPM 60, 铃音随机 + pad + 慢 sub, 大量延迟感
-const ROOM_BGM={
-  '闲聊广场':{
-    name:'8-bit 明亮 pop',
-    bpm:108, steps:16, stepSubdiv:4,      // 16 步 = 4 拍 = 1 小节, stepSubdiv=4 表 1/16 音符
-    loopBars:4,                            // 4 小节 loop
-    layers:{
-      // 主旋律 (C大调五声: C D E G A = 60 62 64 67 69), 方波 chip lead
-      lead:{ wave:'square', vol:0.09, cutoff:2400, attack:0.005, release:0.12,
-        // 4 小节旋律 (64 步), 0=休止, midi 音高
-        notes:[
-          72,0,76,0, 79,0,76,72, 74,0,72,0, 67,0,69,0,     // 小节1: C高-E-G-E-C-D-C-G-A
-          76,0,79,0, 84,0,79,76, 74,72,0,74, 76,0,0,0,     // 小节2: E-G-C高高-G-E-D-C-D-E
-          72,74,76,79, 76,74,72,0, 67,69,72,74, 72,0,67,0, // 小节3
-          76,79,76,72, 74,72,69,67, 72,0,0,0, 0,0,0,0,     // 小节4 尾拉长
-        ]},
-      // Arp bass (C-E-G-E, 每小节循环), 三角波
-      bass:{ wave:'triangle', vol:0.11, cutoff:900, attack:0.005, release:0.18,
-        notes:[
-          48,52,55,52, 48,52,55,52, 48,52,55,52, 48,52,55,52,  // C
-          53,57,60,57, 53,57,60,57, 53,57,60,57, 53,57,60,57,  // F
-          50,53,57,53, 50,53,57,53, 50,53,57,53, 50,53,57,53,  // Dm
-          55,59,62,59, 55,59,62,59, 55,59,62,59, 55,59,62,59,  // G
-        ]},
-      // Pad 慢速和弦垫, 三角波柔和
-      pad:{ wave:'triangle', vol:0.05, cutoff:1200, attack:0.5, release:1.2, sustain:true,
-        // 每小节 1 个和弦(在第 0 步触发), 数组含 4 个音的 midi 表
-        chords:[ [60,64,67,72], [65,69,72,77], [62,65,69,74], [67,71,74,79] ]},
-      // 简易 hi-hat 白噪短促(每半拍触发)
-      hat:{ vol:0.03, everyStep:2 },
-    },
-  },
-  '深夜电台':{
-    name:'lo-fi 蒸汽波',
-    bpm:72, steps:16, stepSubdiv:4,
-    loopBars:4,
-    layers:{
-      // 电钢琴风格主旋律 (Fm 蓝调: F Ab Bb C Eb), 双 sine 微失真感
-      lead:{ wave:'sine', vol:0.08, cutoff:1600, attack:0.02, release:0.6, detune:8, dualOsc:true,
-        notes:[
-          77,0,0,0, 80,0,77,0, 75,0,73,0, 68,0,70,0,      // 小节1
-          0,73,0,75, 77,0,80,0, 82,0,80,0, 77,0,0,0,      // 小节2
-          75,0,0,73, 70,0,68,0, 68,0,70,0, 73,0,75,0,     // 小节3
-          77,0,80,82, 80,0,77,0, 75,0,73,70, 68,0,0,0,    // 小节4
-        ]},
-      // Sub bass 半速, sine
-      bass:{ wave:'sine', vol:0.14, cutoff:400, attack:0.03, release:0.8,
-        notes:[
-          41,0,0,0, 0,0,0,0, 41,0,0,0, 0,0,0,0,           // F1
-          44,0,0,0, 0,0,0,0, 44,0,0,0, 0,0,0,0,           // Ab
-          46,0,0,0, 0,0,0,0, 46,0,0,0, 0,0,0,0,           // Bb
-          39,0,0,0, 0,0,0,0, 39,0,0,0, 0,0,0,0,           // Eb
-        ]},
-      // Warm pad, 低通 sine
-      pad:{ wave:'sine', vol:0.06, cutoff:700, attack:1.5, release:2.5, sustain:true,
-        chords:[ [53,56,60,63], [56,60,63,68], [58,63,68,70], [51,56,60,63] ]},
-      // 无鼓 (深夜静谧)
-    },
-  },
-  '技术黑话':{
-    name:'极简 techno drone',
-    bpm:96, steps:16, stepSubdiv:4,
-    loopBars:2,
-    layers:{
-      // Blip 主音 (A minor: A C D E G = 57 60 62 64 67), 短促方波
-      lead:{ wave:'square', vol:0.06, cutoff:1800, attack:0.002, release:0.06,
-        notes:[
-          69,0,0,0, 72,0,74,0, 76,0,74,72, 69,0,67,0,
-          69,0,72,0, 74,0,76,0, 79,76,74,72, 69,0,0,0,
-        ]},
-      // Saw bass drone, sawtooth 低通
-      bass:{ wave:'sawtooth', vol:0.10, cutoff:500, attack:0.01, release:0.15,
-        notes:[
-          33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,  // A1 hypnotic
-          33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
-        ]},
-      // 4x4 kick (每拍第0步)
-      kick:{ vol:0.14, pattern:[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
-      // Hat 每半拍
-      hat:{ vol:0.04, everyStep:2 },
-    },
-  },
-  '虚空回音':{
-    name:'ambient 铃音',
-    bpm:60, steps:16, stepSubdiv:4,
-    loopBars:4,
-    layers:{
-      // 铃音: E lydian (E F# G# A# B C# D# = 64 66 68 70 71 73 75), sine + 高截止 + 延迟感
-      // 用 dualOsc 制造模拟延迟(第二个 osc 延后 0.35s 弱回声)
-      lead:{ wave:'sine', vol:0.07, cutoff:3200, attack:0.01, release:1.4, echo:true, echoDelay:0.35, echoGain:0.5,
-        notes:[
-          76,0,0,0, 0,0,80,0, 0,0,0,0, 83,0,0,0,           // 稀疏铃音
-          0,0,78,0, 0,0,0,0, 82,0,0,0, 0,0,85,0,
-          88,0,0,0, 0,80,0,0, 0,0,78,0, 0,0,0,0,
-          76,0,0,0, 0,0,73,0, 71,0,0,0, 0,0,0,0,
-        ]},
-      // 慢速 sub, sine
-      bass:{ wave:'sine', vol:0.08, cutoff:300, attack:2.0, release:3.0,
-        notes:[
-          40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,             // E1 每小节一下
-          42,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,             // F#1
-          44,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,             // G#1
-          40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
-        ]},
-      // 高频空灵 pad
-      pad:{ wave:'sine', vol:0.05, cutoff:2200, attack:2.5, release:4.0, sustain:true,
-        chords:[ [64,68,71,75], [66,70,73,76], [68,71,75,78], [64,68,71,75] ]},
-    },
-  },
-};
-
+// 每官方房一套氛围: 根音(Hz)/和弦音程/音色波形/律动(ms,0=纯pad无脉冲)/滤波截止
+// 官方房 BGM 氛围 → 引用集中配置 EH_CONFIG(见文件顶部)
+const ROOM_BGM=EH_CONFIG.roomBgm;
 const AudioEngine=(function(){
   let ctx=null, master=null, running=false, cur=null;
   let scheduler=null, nextTime=0, curStep=0;
@@ -1288,6 +1277,7 @@ function initThemeUI(){
   }
   applyTheme(currentTheme());
   initBgmUI();
+  loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall'); }
 
@@ -1315,7 +1305,7 @@ const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
 // ============ 大厅渲染 ============
-const OFFICIAL_FALLBACK_C = {'闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC'};
+const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
 let _themeUIInit=false;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
