@@ -389,14 +389,13 @@
   .song-play{width:32px;height:32px;flex-shrink:0;border-radius:50%;border:1px solid var(--sc,var(--magenta));cursor:pointer;font-size:12px;
     display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
   .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
-  .song-card.playing .song-play{color:#04060c;background:var(--sc,var(--magenta));animation:songspin 3s linear infinite}
-  @keyframes songspin{to{transform:rotate(360deg)}}
+  .song-card.playing .song-play{color:#04060c;background:var(--sc,var(--magenta))}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
   .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
   .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
   .song-lyric .sl-ch.sung{color:var(--ink)}
-  .song-lyric .sl-ch.on{color:var(--cyan);text-shadow:0 0 8px var(--cyan);font-weight:700}
+  .song-lyric .sl-ch.on{color:var(--sc,var(--cyan));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
   .song-eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:2px}
   .song-eq i{width:2.5px;height:5px;border-radius:1px;background:currentColor;opacity:.7}
   .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
@@ -2089,7 +2088,7 @@ function stopSong(){
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
   try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
   try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
-  if(s.el){ s.el.classList.remove('playing'); s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
+  if(s.el){ s.el.classList.remove('playing'); const b=s.el.querySelector('.song-play'); if(b) b.textContent='▶'; s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
   if(s.onEnd) try{ s.onEnd(); }catch(e){}
 }
 // 选一个中文嗓音(有则用, 提升"唱字"清晰度)
@@ -2115,7 +2114,7 @@ function playSong(lyric, sid, el, onEnd){
   const t0=ctx.currentTime+0.12;
   const totalDur=chars.length*step + spb*2;
   curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null };
-  if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
+  if(el){ el.classList.add('playing'); const b=el.querySelector('.song-play'); if(b) b.textContent='⏸'; el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
   // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
   const bars=Math.ceil(totalDur/barLen);
   for(let b=0;b<bars;b++){
