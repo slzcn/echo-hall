@@ -2320,31 +2320,39 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
-  // v6【实锤修复安卓"伴奏有声人声没"】: 代码复现证实——安卓 resume 时序下 t 可能<currentTime,
-  // setValueAtTime(负/过期时间) 会抛 "Time must be non-negative" 异常 → 整条包络静音(人声消失)。
-  // 伴奏 kick 用 exponentialRamp 快释放, 异常点凑巧没触发所以有声。
-  // 修法: 强制所有时间点不早于 currentTime+0.03, 杜绝过期(正常音符不受影响, 只顶起真过期的)。
+  // v7【采样元音·加法合成】主人 A/B 对比选定方案C: 20 谐波按共振峰高斯加权,
+  // 比 v3~v6 的 3 个 bandpass 更平滑饱满、更像人声哼唱(不是电子音)。
+  // 保留 v6 过期时间保护(安卓 setValueAtTime 传过期时间抛异常→整轨静音的实锤修复)。
   const tmin=ctx.currentTime+0.03; if(t<tmin) t=tmin;
   const oscs=[];
   const gliss=Math.min(0.035,dur*0.18);
-  const src=ctx.createOscillator(); src.type=wave==='sine'?'triangle':(wave||'sawtooth');
-  src.frequency.setValueAtTime(freq*0.97,t); src.frequency.linearRampToValueAtTime(freq,t+gliss);
-  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;
-  const lfoG=ctx.createGain(); lfoG.gain.setValueAtTime(0.0001,t); lfoG.gain.setValueAtTime(0.0001,t+Math.min(0.12,dur*0.4)); lfoG.gain.linearRampToValueAtTime(freq*0.006,t+dur);
-  lfo.connect(lfoG).connect(src.frequency);
+  const F=VOWELS[vowel]||VOWELS.a;
+  // 共用包络: 柔起音→保持→尾部渐弱(像人声的气口)
   const env=ctx.createGain();
-  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
-  env.gain.setValueAtTime(gain,t+dur*0.55); env.gain.linearRampToValueAtTime(gain*0.7,t+dur*0.9); env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
-  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.35];
-  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?4:6;
-    const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(gain,t+0.06);
+  env.gain.setValueAtTime(gain,t+dur*0.55);
+  env.gain.linearRampToValueAtTime(gain*0.72,t+dur*0.9);
+  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
   env.connect(dest);
-  src.start(t); src.stop(t+dur+0.06); lfo.start(t); lfo.stop(t+dur+0.06);
-  oscs.push(src,lfo);
-  // 胸声垫: 基频正弦加厚底 → 声音饱满温暖
-  const chest=ctx.createOscillator(); chest.type='sine'; chest.frequency.setValueAtTime(freq*0.97,t); chest.frequency.linearRampToValueAtTime(freq,t+gliss);
-  const cg=ctx.createGain(); cg.gain.setValueAtTime(0.0001,t); cg.gain.linearRampToValueAtTime(gain*0.5,t+0.05); cg.gain.setValueAtTime(gain*0.5,t+dur*0.6); cg.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
-  chest.connect(cg).connect(dest); chest.start(t); chest.stop(t+dur+0.06); oscs.push(chest);
+  // 加法合成: 每个谐波音量按 3 个共振峰(高斯窗)加权, 得到该元音的音色
+  const nH=Math.min(20,Math.floor(3800/freq));
+  for(let n=1;n<=nH;n++){
+    const hz=freq*n; if(hz>4200)break;
+    let w=0.04;
+    for(let k=0;k<3;k++){ const bw=[120,140,190][k],a=[1,0.6,0.38][k]; w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2))); }
+    if(w<0.045) continue;
+    const o=ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(hz*0.98,t); o.frequency.linearRampToValueAtTime(hz,t+gliss);
+    const g=ctx.createGain(); g.gain.value=w*(n===1?0.9:0.7)*0.42;
+    o.connect(g).connect(env); o.start(t); o.stop(t+dur+0.06); oscs.push(o);
+  }
+  // 颤音: 基频轻微上下摆(人声的自然抖动), 延后进入更自然
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.3;
+  const lfoG=ctx.createGain();
+  lfoG.gain.setValueAtTime(0,t); lfoG.gain.setValueAtTime(0,t+Math.min(0.12,dur*0.4));
+  lfoG.gain.linearRampToValueAtTime(freq*0.005,t+dur);
+  lfo.start(t); lfo.stop(t+dur+0.06); oscs.push(lfo);
   return oscs;
 }
 
@@ -2384,13 +2392,13 @@ async function playSong(lyric, sid, el, onEnd){
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
-  const master=ctx.createGain(); master.gain.value=0.75; master.connect(ctx.destination);
+  const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
   // 双总线: 伴奏压低(drumBus) + 主唱提高并加压缩(voiceBus) → 让唱声清晰浮在伴奏之上(修"听不出在唱")
   const drumBus=ctx.createGain(); drumBus.gain.value=0.22; drumBus.connect(master);   // v5: 伴奏狠压到22%让主唱明显浮出
   // 主唱总线直连 master(gain 1.3 补偿). 不用 DynamicsCompressor:
   // 国产浏览器(小米/QQ 等基于旧内核)对 DynamicsCompressor 支持有bug, 会把主唱信号压没/断掉
   // → 安卓表现"有伴奏没人声"(伴奏走master不经压缩器正常). 已改纯 GainNode, 全平台兼容.
-  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.15;
+  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.6;
   voiceBus.connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.18;   // 起始缓冲(安卓音频调度延迟更大, 留足余量防开头削音)
