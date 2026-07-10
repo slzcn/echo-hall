@@ -628,8 +628,8 @@
       <div class="auth-divider clickable" id="loginToggle"><span>已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
         <div class="login-row">
-          <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="username">
-          <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password">
+          <input id="loginAccount" placeholder="用户名 或 邮箱" autocomplete="username" disabled>
+          <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password" disabled>
         </div>
         <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
         <button class="btn-line" id="loginBtn">登 录</button>
@@ -2910,6 +2910,8 @@ $('#rerollBtn').onclick=()=>rollIdentity();
 $('#loginToggle').onclick=()=>{
   const c=$('#loginCollapse'); const open=c.classList.toggle('on');
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
+  // 登录字段默认 disabled(避免入场即弹 Face ID/密码填充), 展开时才启用
+  $('#loginAccount').disabled=!open; $('#loginPassword').disabled=!open;
   if(open) setTimeout(()=>$('#loginAccount').focus(),200);
 };
 $('#loginBtn').onclick=()=>doLogin();
