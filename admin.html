@@ -230,7 +230,7 @@
   <!-- 🎨 主题配色 -->
   <div class="page" id="p-theme">
     <div class="glass card"><h3>四套主题配色 · 每套 17 个 CSS 变量
-      <button class="mini-btn" id="themeSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存所有主题</button></h3>
+      <button class="mini-btn" id="themeSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存所有主题</button> <button class="mini-btn" id="themeResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
       <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
         · 修改后先点「保存」写入 Supabase eh_config → 前端启动时拉取覆盖默认值<br>
         · 主题ID 固定(cyber/vapor/mono/aurora) · 键名不可改 · 值支持 #hex / rgba(...) / 阴影表达式
@@ -250,7 +250,7 @@
   <!-- 🎵 BGM -->
   <div class="page" id="p-bgm">
     <div class="glass card"><h3>官方房 BGM 氛围参数
-      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存 BGM</button></h3>
+      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存 BGM</button> <button class="mini-btn" id="bgmResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
       <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
         · root:根音Hz(20-2000) · chord:和弦半音程(逗号分隔如 0,4,7,11) · wave:波形 · pulse:律动ms(0=纯pad) · cut:低通截止Hz
       </div>
@@ -261,7 +261,7 @@
   <!-- 📝 文案 & 绑定 -->
   <div class="page" id="p-text">
     <div class="glass card"><h3>官方房主题绑定
-      <button class="mini-btn" id="bindSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存绑定</button></h3>
+      <button class="mini-btn" id="bindSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存绑定</button> <button class="mini-btn" id="bindResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
       <div style="font-size:12px;color:var(--dim);margin-bottom:12px">房间进入时自动应用该主题(用户未手动锁定时)</div>
       <div id="roomThemeTable"></div>
     </div>
@@ -270,7 +270,7 @@
       <div id="fallbackCTable"></div>
     </div>
     <div class="glass card"><h3>界面文案
-      <button class="mini-btn" id="textSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存文案</button></h3>
+      <button class="mini-btn" id="textSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存文案</button> <button class="mini-btn" id="textResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
       <div id="textTable"></div>
     </div>
   </div>
@@ -509,7 +509,7 @@ const CFG_DEFAULT = {
     "技术黑话":{root:98,chord:[0,7,12],wave:"sawtooth",pulse:3200,cut:560,name:"极简低频 drone"},
     "虚空回音":{root:329.63,chord:[0,5,7,12],wave:"sine",pulse:1600,cut:2600,name:"空灵铃音"},
   },
-  text:{publicEmpty:"还没有公开房间,来创建第一个吧",roomFirstMsg:"还没有人说话,来当第一个",connecting:"连接中…",loading:"加载中…"},
+  text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时身份 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"官方频道",hallPublic:"公开房间",hallPrivate:"私密房 · 仅邀请码进入",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存"},
 };
 
 async function loadConfig(){
@@ -637,6 +637,22 @@ $('#textSaveBtn')?.addEventListener('click',async()=>{
   const tx={}; $('#textTable').querySelectorAll('[data-tx]').forEach(el=>tx[el.dataset.tx]=el.value);
   await saveConfigKey('text',tx);
 });
+
+// ---- ↺ 恢复默认: 把 CFG_DEFAULT 对应 key 写回后台 + 重新渲染当前 tab ----
+async function resetConfigKeys(keys, reRender, label){
+  if(!confirm('确定把【'+label+'】恢复为系统默认值？\n当前修改将被覆盖。')) return;
+  for(const k of keys){
+    const def=JSON.parse(JSON.stringify(CFG_DEFAULT[k]));
+    if(CFG_CACHE) CFG_CACHE[k]=def;
+    await saveConfigKey(k, def);
+  }
+  if(reRender) reRender();
+  toast('已恢复默认: '+label);
+}
+$('#themeResetBtn')?.addEventListener('click',()=>resetConfigKeys(['themePalettes'], loadTheme, '主题配色'));
+$('#bgmResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomBgm'], loadBgm, 'BGM'));
+$('#bindResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomTheme','officialFallbackC'], loadTextBind, '房间绑定'));
+$('#textResetBtn')?.addEventListener('click',()=>resetConfigKeys(['text'], loadTextBind, '界面文案'));
 $('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
 
 // tabs
