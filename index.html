@@ -877,10 +877,10 @@ function paintIdentity(){
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
   const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
-  // 正式账号 vs 临时身份: 更新标签 + 换一个按钮(临时才可换)
-  const tag=$('#idTag'), rr=$('#rerollBtn');
-  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; }
-  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; }
+  // 正式账号 vs 临时身份: 更新标签 + 主按钮文案 + 换一个按钮(临时才可换)
+  const tag=$('#idTag'), rr=$('#rerollBtn'), eb=$('#enterBtn');
+  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入'; }
+  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; if(eb) eb.textContent='匿 名 进 入'; }
 }
 
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
