@@ -293,20 +293,41 @@
   .reply-preview .rp-x{cursor:pointer;color:var(--dim);padding:2px 6px}
   .reply-preview .rp-x:hover{color:var(--magenta)}
 
-  .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
-  .cin-wrap{flex:1;display:flex;align-items:center;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
+  /* 虚空模式提示条 */
+  .void-bar{display:none;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--line);
+    background:rgba(139,92,255,.1);font-size:12px;color:var(--violet);flex-shrink:0}
+  .void-bar.on{display:flex}
+  .void-bar .vb-ic{font-size:14px}
+  .void-bar .vb-txt{flex:1}
+  .void-bar .vb-x{cursor:pointer;color:var(--violet);opacity:.8;padding:2px 8px;border:1px solid rgba(139,92,255,.4);border-radius:7px;font-size:11px}
+  .void-bar .vb-x:hover{opacity:1;background:rgba(139,92,255,.15)}
+
+  .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
+  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 14px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
-  /* 虚空模式按钮 */
-  .void-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:21px;cursor:pointer;border-radius:10px;transition:.18s;user-select:none;opacity:.55}
-  .void-btn:hover{background:rgba(139,92,255,.1);opacity:1}
-  .void-btn.on{opacity:1;background:rgba(139,92,255,.18);box-shadow:inset 0 0 0 1.5px var(--violet),0 0 14px -4px var(--violet)}
-  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,92,255,.12)}
-  .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.75}
+  /* 输入框内表情按钮(略小, 贴右) */
+  .cin-emoji{width:38px;height:42px;font-size:20px}
+  /* ＋ 花样按钮 */
+  .plus-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:10px;
+    transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
+  .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  /* ＋ 花样菜单 */
+  .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+    padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5);min-width:220px}
+  .plus-menu.on{display:flex}
+  .pm-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:.12s}
+  .pm-item:hover{background:rgba(255,255,255,.06)}
+  .pm-item .pm-ic{font-size:22px;width:26px;text-align:center}
+  .pm-item .pm-tx{display:flex;flex-direction:column;gap:1px}
+  .pm-item .pm-tx b{font-size:13px;font-weight:700}
+  .pm-item .pm-tx i{font-size:11px;color:var(--dim);font-style:normal}
+  .pm-item.on{background:rgba(139,92,255,.15)}
   /* 虚空消息气泡: 无名/紫调/虚线/倒计时 */
   .msg.void .av{background:rgba(139,92,255,.12)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px rgba(139,92,255,.4)!important}
   .msg.void .nm{color:var(--violet)!important;font-style:italic}
@@ -314,12 +335,11 @@
   .msg.void .vexp{font-size:10px;color:var(--violet);opacity:.8;margin-left:8px}
   .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
   @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
-  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
+  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:#04060c}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
-  .go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
-  .emoji-tray{position:absolute;bottom:72px;right:70px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+  .emoji-tray{position:absolute;bottom:72px;right:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .emoji-tray.on{display:grid}
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
@@ -537,8 +557,10 @@
     .priv-actions{flex-direction:column}
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
-    .emoji-btn,.void-btn{width:30px;font-size:18px}
-    .composer{gap:3px;padding-left:6px;padding-right:6px}
+    .plus-btn,.mic-btn{width:40px;font-size:24px}
+    .mic-btn{font-size:20px}
+    .cin-emoji{width:34px;font-size:19px}
+    .composer{gap:5px;padding-left:8px;padding-right:8px}
     .song-tray .st-grid{grid-template-columns:repeat(3,1fr)}
     .song-lyric{max-width:150px}
     .enter-card{padding:32px 22px}
@@ -631,15 +653,23 @@
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
+    <!-- 虚空模式提示条(开启后显示, 可随手关) -->
+    <div class="void-bar" id="voidBar">
+      <span class="vb-ic">🕳️</span><span class="vb-txt">虚空模式 · 匿名发送，5 分钟后消散</span><span class="vb-x" id="voidBarX">退出</span>
+    </div>
     <div class="composer">
-      <div class="void-btn" id="voidBtn" title="说给虚空：匿名 · 5分钟后消散">🕳️</div>
-      <div class="emoji-btn" id="emojiBtn">😊</div>
-      <div class="emoji-btn mic-btn" id="micBtn" title="按住说话">🎤</div>
-      <div class="emoji-btn" id="songBtn" title="文字变神曲">🎵</div>
+      <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
       <div class="cin-wrap">
-        <textarea class="cin" id="cin" placeholder="说点什么… 长按🎤说话 · 打个 / 看命令" rows="1"></textarea>
+        <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1"></textarea>
+        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
       </div>
-      <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <div class="emoji-btn mic-btn" id="micBtn" title="按住说话">🎤</div>
+      <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <!-- ＋ 花样菜单: 特殊发送方式 -->
+      <div class="plus-menu" id="plusMenu">
+        <div class="pm-item" id="pmVoid"><span class="pm-ic">🕳️</span><span class="pm-tx"><b>说给虚空</b><i>匿名 · 5 分钟后消散</i></span></div>
+        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b>文字变神曲</b><i>把输入的话唱出来</i></span></div>
+      </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="song-tray" id="songTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
@@ -1744,7 +1774,7 @@ async function send(){
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
-  if(useVoid) setVoidMode(false);  // 虚空是单次的, 发完自动关
+  // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('send',error); toast('发送失败'); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
@@ -1753,12 +1783,19 @@ async function send(){
 // 虚空模式开关
 function setVoidMode(on){
   voidMode=on;
-  $('#voidBtn').classList.toggle('on',on);
-  $('.composer').classList.toggle('void-mode',on);
+  $('#voidBar').classList.toggle('on',on);
+  $('#pmVoid').classList.toggle('on',on);
   const cin=$('#cin');
-  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 试试打个 /';
+  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 打个 / 看命令';
 }
-function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; $('#goBtn').disabled=true; hideSlash(); }
+function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; hideSlash(); syncSendBtn(); }
+// 输入框空↔有字: 切换 麦克风/发送 按钮(微信式)
+function syncSendBtn(){
+  const has=!!$('#cin').value.trim();
+  const go=$('#goBtn'), mic=$('#micBtn');
+  if(go) go.style.display = has?'grid':'none';
+  if(mic) mic.style.display = has?'none':'grid';
+}
 
 // ============ 语音消息(MediaRecorder 录音 → Supabase Storage → kind='voice') ============
 const VOICE_BUCKET='eh-voice', VOICE_MAX_SEC=30;
@@ -2067,14 +2104,13 @@ function renderSongTray(){
   $('#songSendBtn').onclick=e=>{ e.stopPropagation(); stopSong(); sendSong($('#cin').value, songSel); };
 }
 function closeSongTray(){ $('#songTray').classList.remove('on'); }
-$('#songBtn').onclick=e=>{ e.stopPropagation();
-  const open=!$('#songTray').classList.contains('on');
+function openSongTray(){
   $('#emojiTray').classList.remove('on');
-  if(open){ renderSongTray(); $('#songTray').classList.add('on'); } else closeSongTray();
-};
+  renderSongTray(); $('#songTray').classList.add('on');
+}
 document.addEventListener('click',()=>closeSongTray());
 $('#songTray').addEventListener('click',e=>e.stopPropagation());
-if(!(window.AudioContext||window.webkitAudioContext)) $('#songBtn').style.display='none';
+if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
 
 // ============ 多情绪回声 落库 ============
 // echoState[mid] = { '🔥':{count,mine}, ... }
@@ -2750,7 +2786,7 @@ cin.addEventListener('input',()=>{
   if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
     _inputRaf=0;
     cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
-    $('#goBtn').disabled=!cin.value.trim();
+    syncSendBtn();
     const v=cin.value;
     if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
   });
@@ -2761,8 +2797,19 @@ cin.addEventListener('input',()=>{
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
-// 虚空模式切换
-$('#voidBtn').onclick=()=>{ setVoidMode(!voidMode); if(voidMode) $('#cin').focus(); };
+syncSendBtn();  // 初始：空输入→显示麦克风
+// ＋ 花样菜单：虚空 / 神曲
+function closePlusMenu(){ $('#plusMenu').classList.remove('on'); $('#plusBtn').classList.remove('on'); }
+$('#plusBtn').onclick=e=>{ e.stopPropagation();
+  const open=!$('#plusMenu').classList.contains('on');
+  $('#emojiTray').classList.remove('on'); closeSongTray();
+  $('#plusMenu').classList.toggle('on',open); $('#plusBtn').classList.toggle('on',open);
+};
+$('#plusMenu').addEventListener('click',e=>e.stopPropagation());
+$('#pmVoid').onclick=()=>{ setVoidMode(!voidMode); closePlusMenu(); if(voidMode) $('#cin').focus(); };
+$('#pmSong').onclick=()=>{ closePlusMenu(); openSongTray(); };
+$('#voidBarX').onclick=()=>setVoidMode(false);
+document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
