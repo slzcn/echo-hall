@@ -2667,7 +2667,11 @@ function triggerResonance(emoji,color,msg){
 
 // ============ emoji 粒子 ============
 function burst(str,count=10){
-  const chars=[...(str||'')].filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars.push('✨');
+  // 按"字素簇"切分, 保住 ❤️ 的变体选择器(FE0F)/ZWJ 组合, 否则拆散后 ❤ 丢变体→渲染成单色白心
+  let chars;
+  try{ const seg=new Intl.Segmenter('zh',{granularity:'grapheme'}); chars=[...seg.segment(str||'')].map(s=>s.segment); }
+  catch(e){ chars=[...(str||'')]; }
+  chars=chars.filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars.push('✨️');
   const layer=$('#particles');
   for(let i=0;i<count;i++){
     const p=document.createElement('div'); p.className='particle'; p.textContent=rand(chars);
