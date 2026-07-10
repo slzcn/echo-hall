@@ -2903,7 +2903,7 @@ $('#plusBtn').onclick=e=>{ e.stopPropagation();
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); setMode('song'); };   // 直接进神曲(默认曲风), 换曲风用细色条
+$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secureRand()*SONG_STYLES.length)].id; setMode('song'); };   // 随机挑个曲风进神曲, 换曲风用细色条
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
