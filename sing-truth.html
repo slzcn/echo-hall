@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>人声真相诊断</title>
+<style>
+body{margin:0;padding:14px;font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;font-size:15px;line-height:1.6}
+h2{font-size:18px}button{display:block;width:100%;padding:16px;margin:10px 0;font-size:17px;border:none;border-radius:10px;font-weight:bold;color:#fff;background:#2f81f7}
+button:active{background:#1c5cba}.v{background:#2ea043}.v:active{background:#1a7f37}
+#log{background:#000;border:1px solid #30363d;border-radius:8px;padding:10px;margin-top:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;min-height:200px}
+.ok{color:#3fb950}.err{color:#f85149}.warn{color:#d29922}.hi{color:#79c0ff}
+</style></head><body>
+<h2>🔬 人声真相诊断</h2>
+<p style="font-size:13px;color:#8b949e">用生产版<b>一模一样</b>的 singVoice+voiceBus, 但把每步实时状态打印出来. 手机音量调大, 依次点下面按钮, 把日志念给我听(或截图).</p>
+
+<button class="v" id="b1">① 只放 1 个音符(生产singVoice+voiceBus)</button>
+<button class="v" id="b2">② 放 6 个音符连唱(完整主唱链)</button>
+<button id="b3">③ 对照: 只放伴奏鼓(生产drumBus)</button>
+<button id="b4">④ 主唱+伴奏一起(还原真实神曲)</button>
+<button class="v" id="b5" style="background:#8957e5">⑤ 安卓兼容版单音符(去ramp+砍高频)</button>
+<button class="v" id="b6" style="background:#db6d28">⑥ v8单音符(降八度+更像人声)</button>
+<button class="v" id="b7" style="background:#db6d28">⑦ v8六音符连唱(听像不像唱)</button>
+<button id="stop" style="background:#6e7681">⏹ 停</button>
+<div id="log">点按钮后这里显示真相…</div>
+
+<script>
+var L=document.getElementById('log');
+function log(m,c){L.innerHTML+='\n'+(c?'<span class="'+c+'">'+m+'</span>':m);}
+function clr(){L.innerHTML='';}
+var actx=null,live=[];
+function getCtx(){if(!actx){var C=window.AudioContext||window.webkitAudioContext;actx=new C();}return actx;}
+function stopAll(){live.forEach(function(o){try{o.stop();}catch(e){}});live=[];}
+
+/* ===== 生产版真实函数(原样抽取) ===== */
+const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
+
+function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); return scale[((deg%n)+n)%n]+12*oct; }
+
+const VOWELS={ a:[730,1090,2440], o:[570,840,2410], e:[530,1840,2480], i:[270,2290,3010], u:[300,870,2240] };
+
+const VOWEL_KEYS=['a','o','e','i','u'];
+
+function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
+
+function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
+  // v7【采样元音·加法合成】主人 A/B 对比选定方案C: 20 谐波按共振峰高斯加权,
+  // 比 v3~v6 的 3 个 bandpass 更平滑饱满、更像人声哼唱(不是电子音)。
+  // 保留 v6 过期时间保护(安卓 setValueAtTime 传过期时间抛异常→整轨静音的实锤修复)。
+  const tmin=ctx.currentTime+0.03; if(t<tmin) t=tmin;
+  const oscs=[];
+  const gliss=Math.min(0.035,dur*0.18);
+  const F=VOWELS[vowel]||VOWELS.a;
+  // 共用包络: 柔起音→保持→尾部渐弱(像人声的气口)
+  const env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(gain,t+0.06);
+  env.gain.setValueAtTime(gain,t+dur*0.55);
+  env.gain.linearRampToValueAtTime(gain*0.72,t+dur*0.9);
+  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
+  env.connect(dest);
+  // 加法合成: 每个谐波音量按 3 个共振峰(高斯窗)加权, 得到该元音的音色
+  const nH=Math.min(20,Math.floor(3800/freq));
+  for(let n=1;n<=nH;n++){
+    const hz=freq*n; if(hz>4200)break;
+    let w=0.04;
+    for(let k=0;k<3;k++){ const bw=[120,140,190][k],a=[1,0.6,0.38][k]; w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2))); }
+    if(w<0.045) continue;
+    const o=ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(hz*0.98,t); o.frequency.linearRampToValueAtTime(hz,t+gliss);
+    const g=ctx.createGain(); g.gain.value=w*(n===1?0.9:0.7)*0.42;
+    o.connect(g).connect(env); o.start(t); o.stop(t+dur+0.06); oscs.push(o);
+  }
+  // 颤音: 基频轻微上下摆(人声的自然抖动), 延后进入更自然
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.3;
+  const lfoG=ctx.createGain();
+  lfoG.gain.setValueAtTime(0,t); lfoG.gain.setValueAtTime(0,t+Math.min(0.12,dur*0.4));
+  lfoG.gain.linearRampToValueAtTime(freq*0.005,t+dur);
+  lfo.start(t); lfo.stop(t+dur+0.06); oscs.push(lfo);
+  return oscs;
+}
+/* kick 伴奏(简版, 对照用) */
+function kickD(ctx,dest,t){var o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(50,t+0.12);g.gain.setValueAtTime(0.8,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.14);o.connect(g).connect(dest);o.start(t);o.stop(t+0.16);return o;}
+
+
+/* ===== 安卓兼容版 singVoice: 去掉 frequency ramp(改直接赋值) + 砍高频谐波 + 用 detune 颤音 ===== */
+function singVoiceCompat(ctx,dest,freq,t,dur,vowel,gain){
+  var oscs=[];
+  var F=VOWELS[vowel]||VOWELS.a;
+  var env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(gain,t+0.06);
+  env.gain.setValueAtTime(gain,t+dur*0.55);
+  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
+  env.connect(dest);
+  var nH=Math.min(12,Math.floor(3000/freq));  // 只留 <=3000Hz 谐波
+  for(var n=1;n<=nH;n++){
+    var hz=freq*n; if(hz>3000)break;
+    var w=0.04;
+    for(var k=0;k<3;k++){var bw=[120,140,190][k],a=[1,0.6,0.38][k];w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2)));}
+    if(w<0.05)continue;
+    var o=ctx.createOscillator();o.type='sine';
+    o.frequency.value=hz;   // 直接赋值, 不用 ramp(安卓高危)
+    var g=ctx.createGain();g.gain.value=w*(n===1?0.9:0.7)*0.5;
+    o.connect(g).connect(env);o.start(t);o.stop(t+dur+0.06);oscs.push(o);
+  }
+  // 颤音走 detune(cent), 不碰 frequency ramp
+  var lfo=ctx.createOscillator();lfo.frequency.value=5.3;
+  var lg=ctx.createGain();lg.gain.value=8;  // ±8 cent
+  lfo.connect(lg);
+  oscs.forEach(function(o){try{lg.connect(o.detune);}catch(e){}});
+  lfo.start(t);lfo.stop(t+dur+0.06);oscs.push(lfo);
+  return oscs;
+}
+
+
+/* ===== v8 安卓兼容+更像人声: 降八度(谐波翻倍) + 无frequency ramp + 保3600Hz ===== */
+function singVoiceV8(ctx,dest,freq,t,dur,vowel,gain){
+  var oscs=[];
+  var F=VOWELS[vowel]||VOWELS.a;
+  // 降八度: 基频高于 220Hz 就降八度(谐波更密→更像人声饱满). 兼容: 只用 .value 直接赋值.
+  var f0=freq; while(f0>220) f0=f0/2;
+  var env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(gain,t+0.07);       // gain ramp 安卓没问题
+  env.gain.setValueAtTime(gain,t+dur*0.6);
+  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
+  env.connect(dest);
+  var nH=Math.min(28,Math.floor(3600/f0));
+  for(var n=1;n<=nH;n++){
+    var hz=f0*n; if(hz>3600)break;
+    var w=0.03;
+    for(var k=0;k<3;k++){var bw=[130,150,200][k],a=[1,0.7,0.45][k];w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2)));}
+    if(w<0.04)continue;
+    var o=ctx.createOscillator();o.type='sine';
+    o.frequency.value=hz;          // 直接赋值, 无 ramp (安卓兼容)
+    var g=ctx.createGain();g.gain.value=w*(n===1?0.85:0.6)*0.42;
+    o.connect(g).connect(env);o.start(t);o.stop(t+dur+0.06);oscs.push(o);
+  }
+  // 颤音走 detune (不碰 frequency ramp)
+  var lfo=ctx.createOscillator();lfo.frequency.value=5.2;
+  var lg=ctx.createGain();lg.gain.value=9;
+  lfo.connect(lg);oscs.forEach(function(o){try{lg.connect(o.detune);}catch(e){}});
+  lfo.start(t);lfo.stop(t+dur+0.06);oscs.push(lfo);
+  return oscs;
+}
+
+async function resumeCtx(ctx){
+  try{ctx.resume&&ctx.resume();}catch(e){}
+  for(var i=0;i<5&&ctx.state!=='running';i++){await new Promise(function(r){setTimeout(r,50);});try{ctx.resume&&ctx.resume();}catch(e){}}
+}
+
+document.getElementById('b1').onclick=async function(){
+  clr();stopAll();log('① 生产singVoice 单音符…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state+' currentTime='+ctx.currentTime.toFixed(3)+' sr='+ctx.sampleRate,ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18;
+    log('t0='+t0.toFixed(3)+' (=currentTime+0.18)');
+    var oscs;
+    try{ oscs=singVoice(ctx,voiceBus,NOTE(4),t0,1.2,'a',0.7,'sawtooth'); }
+    catch(e){ log('❌ singVoice 抛异常: '+e.message,'err'); return; }
+    log('singVoice 返回振荡器数='+(oscs?oscs.length:'null'),oscs&&oscs.length?'ok':'err');
+    oscs.forEach(function(o){live.push(o);});
+    log('▶ 应该听到 1.2 秒"啊". 听到了吗?',oscs.length?'ok':'err');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+
+document.getElementById('b2').onclick=async function(){
+  clr();stopAll();log('② 6 音符连唱(完整主唱链)…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state+' currentTime='+ctx.currentTime.toFixed(3),ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18,step=0.42;
+    var chars=['a','o','e','i','a','o'],freqs=[0,2,4,7,9,7],tot=0;
+    chars.forEach(function(ch,i){
+      var t=t0+i*step;
+      var oscs=singVoice(ctx,voiceBus,NOTE(freqs[i]),t,step*1.05,ch,0.7,'sawtooth');
+      tot+=oscs.length; oscs.forEach(function(o){live.push(o);});
+    });
+    log('6 音符共排振荡器数='+tot,tot?'ok':'err');
+    log('▶ 应听到"啊哦鹅衣啊哦"连唱. 有人声吗?',tot?'ok':'err');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+
+document.getElementById('b3').onclick=async function(){
+  clr();stopAll();log('③ 对照: 只放伴奏鼓…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state,ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var drumBus=ctx.createGain();drumBus.gain.value=0.22;drumBus.connect(master);
+    var t0=ctx.currentTime+0.18;
+    for(var i=0;i<8;i++){live.push(kickD(ctx,drumBus,t0+i*0.4));}
+    log('▶ 应听到 8 下鼓点. 有吗?','ok');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+
+document.getElementById('b4').onclick=async function(){
+  clr();stopAll();log('④ 主唱+伴奏一起(真实神曲)…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state,ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var drumBus=ctx.createGain();drumBus.gain.value=0.22;drumBus.connect(master);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18,step=0.42;
+    for(var i=0;i<8;i++){live.push(kickD(ctx,drumBus,t0+i*step));}
+    var chars=['a','o','e','i','a','o'],freqs=[0,2,4,7,9,7];
+    chars.forEach(function(ch,i){singVoice(ctx,voiceBus,NOTE(freqs[i]),t0+i*step,step*1.05,ch,0.7,'sawtooth').forEach(function(o){live.push(o);});});
+    log('▶ 鼓+人声一起. 能分辨出人声吗? 还是只有鼓?','warn');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+document.getElementById('b5').onclick=async function(){
+  clr();stopAll();log('⑤ 安卓兼容版单音符…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state+' currentTime='+ctx.currentTime.toFixed(3),ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18;
+    var oscs=singVoiceCompat(ctx,voiceBus,NOTE(4),t0,1.2,'a',0.7);
+    log('兼容版振荡器数='+oscs.length,oscs.length?'ok':'err');
+    oscs.forEach(function(o){live.push(o);});
+    log('▶ 应听到 1.2 秒"啊". 这个版安卓有声吗?',oscs.length?'ok':'err');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+document.getElementById('b6').onclick=async function(){
+  clr();stopAll();log('⑥ v8 单音符(降八度+密集谐波)…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state,ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var oscs=singVoiceV8(ctx,voiceBus,NOTE(4),ctx.currentTime+0.18,1.4,'a',0.7);
+    log('v8振荡器数='+oscs.length,oscs.length?'ok':'err');
+    oscs.forEach(function(o){live.push(o);});
+    log('▶ 应听到更饱满的"啊". 像人声吗?','ok');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+document.getElementById('b7').onclick=async function(){
+  clr();stopAll();log('⑦ v8 六音符连唱…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state,ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18,step=0.45;
+    var chars=['a','o','e','i','a','o'],freqs=[0,2,4,7,9,7],tot=0;
+    chars.forEach(function(ch,i){var oscs=singVoiceV8(ctx,voiceBus,NOTE(freqs[i]),t0+i*step,step*1.05,ch,0.7);tot+=oscs.length;oscs.forEach(function(o){live.push(o);});});
+    log('共振荡器='+tot,tot?'ok':'err');
+    log('▶ "啊哦鹅衣啊哦" 连唱. 像唱歌吗?','ok');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+document.getElementById('stop').onclick=function(){stopAll();clr();log('已停');};
+</script></body></html>
