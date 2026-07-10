@@ -992,7 +992,7 @@ async function fillRoomStats(box, rid){
   const prev=card.querySelector('[data-prev]'), tm=card.querySelector('.tm');
   if(last){
     prev.classList.remove('empty');
-    const txt = last.kind==='act' ? '✦ '+last.text : (last.kind==='proj'?'📽️ 投影':last.text);
+    const txt = msgPreview(last);
     prev.innerHTML=`<b>${esc(last.name)}:</b> ${esc(String(txt).slice(0,40))}`;
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
@@ -1545,6 +1545,17 @@ function parseSong(text){
   if(i>0){ const sid=t.slice(0,i); if(SONG_STYLES.some(s=>s.id===sid)) return { sid, lyric:t.slice(i+1) }; }
   return { sid:SONG_STYLES[0].id, lyric:t };
 }
+// 消息在"列表预览"里的纯文本呈现: 语音/神曲不能暴露 URL/内部编码
+function msgPreview(m){
+  if(!m) return '';
+  switch(m.kind){
+    case 'act':   return '✦ '+m.text;
+    case 'proj':  return '📽️ 投影';
+    case 'voice': return '🎤 语音消息';
+    case 'song':  return '🎵 '+parseSong(m.text).lyric;
+    default:      return m.text||'';
+  }
+}
 function songHtml(text){
   const { sid, lyric }=parseSong(text);
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
@@ -1986,7 +1997,7 @@ async function openMe(){
   bindMeActions(isBound);
   // 后台静默刷新(不阻塞首屏)
   const tasks=[
-    sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
+    sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
     sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
   ];
   if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
@@ -2019,7 +2030,7 @@ function bindMyRoomClicks(){
   });
 }
 function renderMyMsgList(msgs){
-  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
+  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(msgPreview(m))}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
 }
 // 绑定个人空间的按钮动作(reroll/注册/邮箱/登出)
 function bindMeActions(isBound){
@@ -2097,7 +2108,7 @@ async function logoutIdentity(bound){
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ AudioEngine.stop(); applyTheme(themeLocked()?currentTheme():currentTheme());
+function backToLobby(){ AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
