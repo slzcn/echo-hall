@@ -298,9 +298,9 @@
   .composer.void-mode .cin{color:var(--violet)}
   .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.6}
   /* 神曲模式输入框风格 */
-  .composer.song-mode .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.12)}
-  .composer.song-mode .cin{color:var(--magenta);font-weight:600}
-  .composer.song-mode .cin::placeholder{color:var(--magenta);opacity:.6}
+  .composer.song-mode .cin-wrap{border-color:var(--song-c,var(--magenta));box-shadow:0 0 0 3px color-mix(in srgb,var(--song-c,var(--magenta)) 14%,transparent)}
+  .composer.song-mode .cin{color:var(--song-c,var(--magenta));font-weight:600}
+  .composer.song-mode .cin::placeholder{color:var(--song-c,var(--magenta));opacity:.6}
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
   .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 14px;transition:.2s}
@@ -320,7 +320,7 @@
   /* ＋处于某模式时: 显该模式图标(不旋转), 高亮提示"可退出" */
   .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
   .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:rgba(139,92,255,.16);box-shadow:0 0 12px -3px var(--violet)}
-  .composer.song-mode .plus-btn.mode-on{border-color:var(--magenta);background:rgba(255,60,172,.16);box-shadow:0 0 12px -3px var(--magenta)}
+  .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
   /* ＋ 花样菜单 */
   .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5);min-width:220px}
@@ -1830,12 +1830,13 @@ function setMode(mode){
   // 神曲: 显示曲风细色条
   const strip=$('#songStrip');
   if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
-  // 占位文案
+  // 占位文案 + 神曲模式跟随当前曲风色
   const cin=$('#cin');
-  if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; }
-  else if(voidMode){ cin.placeholder='说给虚空… 匿名，5 分钟后消散 🕳️'; }
+  if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; composer.style.setProperty('--song-c', safeColor(st.color)); }
+  else { composer.style.removeProperty('--song-c'); }
+  if(voidMode){ cin.placeholder='说给虚空… 匿名，5 分钟后消散 🕳️'; }
   else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
-  else { cin.placeholder='说点什么… 打个 / 看命令'; }
+  else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
   if(!voiceMode) setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
   syncSendBtn();
 }
@@ -2196,9 +2197,10 @@ function renderSongStrip(){
   strip.querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
     strip.querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
-    // 更新输入框占位为当前曲风, 保持神曲模式
+    // 更新输入框占位 + 主题色为当前曲风, 保持神曲模式
     const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
     $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
+    $('.composer').style.setProperty('--song-c', safeColor(st.color));
     try{ if(curRoom) $('#cin').focus(); }catch(_){}
   });
 }
