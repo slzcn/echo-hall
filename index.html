@@ -1221,6 +1221,8 @@ const LS_BGM='eh_bgm';
 // 每官方房一套氛围: 根音(Hz)/和弦音程/音色波形/律动(ms,0=纯pad无脉冲)/滤波截止
 // 官方房 BGM 氛围 → 引用集中配置 EH_CONFIG(见文件顶部)
 const ROOM_BGM=EH_CONFIG.roomBgm;
+// MIDI 音高 → 频率(Hz)。之前 midiHz 引用 _mtof 却从未定义, 导致 BGM 一排音符就 ReferenceError
+function _mtof(m){ return 440*Math.pow(2,(m-69)/12); }
 const AudioEngine=(function(){
   let ctx=null, master=null, running=false, cur=null;
   let scheduler=null, nextTime=0, curStep=0;
@@ -1297,6 +1299,8 @@ const AudioEngine=(function(){
   }
   function playCfg(cfg){
     if(!ensure()) return;
+    // 兼容/防御: 配置缺 layers(如旧 v1 schema 或远端配置未就绪)时不播放, 绝不抛异常
+    if(!cfg || !cfg.layers){ return; }
     stopInternal(false);
     cur=cfg;
     try{ ctx.resume&&ctx.resume(); }catch(e){}
@@ -1398,8 +1402,11 @@ function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   if(!bgmOn()) return;
-  if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
-  else AudioEngine.stop();
+  // BGM 是可有可无的氛围增强, 任何失败都不能拖垮进房流程(进房主逻辑在其后)
+  try{
+    if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
+    else AudioEngine.stop();
+  }catch(e){ console.warn('BGM start failed', e); }
 }
 function initBgmUI(){
   const b2=$('#bgmBtnHall'); if(!b2) return;
