@@ -47,13 +47,14 @@
     --glow-cyan:0 0 26px rgba(46,240,200,.55); --glow-mag:0 0 24px rgba(90,209,255,.5);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
-  /* iOS Safari: overflow:hidden 挡不住横向橡皮筋/拖动, 用 fixed 把 body 钉死整屏 */
+  html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
   html{width:100%}
+  /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
+     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
     background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
-    position:fixed;inset:0;width:100%;max-width:100%;overflow:hidden;touch-action:pan-y;
+    position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
