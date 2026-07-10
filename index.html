@@ -2152,7 +2152,8 @@ function playSong(lyric, sid, el, onEnd){
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
   if(!chars.length){ toast('没有可唱的内容'); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
-  const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
+  const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
+  const master=ctx.createGain(); master.gain.value=hasTTS?0.6:0.85; master.connect(ctx.destination);  // 有唱词时压低伴奏, 让字清楚
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.12;
   const totalDur=chars.length*step + spb*2;
@@ -2175,34 +2176,36 @@ function playSong(lyric, sid, el, onEnd){
   }
   // 主唱：优先用系统 TTS 真正"念出"整句(按曲风调 语速/音高), 元音共振峰做和声垫在下面
   const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
-  const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const zhVoice = hasTTS ? pickZhVoice() : null;
   chars.forEach((ch,i)=>{
     const t=t0+i*step, deg=st.motif[i%st.motif.length];
     const semi=st.base+scaleSemi(st.scale,deg);
     const delay=Math.max(0,(t-ctx.currentTime)*1000);
-    // 元音哼唱(按曲风波形, 音色各异): TTS 可用时压低当和声垫, 否则作为主旋律
-    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),hasTTS?0.14:0.26,st.wave).forEach(o=>curSong.oscs.push(o));
+    // 元音哼唱(按曲风波形, 音色各异): TTS 可用时压得很低当和声垫(让人声唱词突出), 否则作为主旋律
+    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),hasTTS?0.08:0.26,st.wave).forEach(o=>curSong.oscs.push(o));
     const chEl=chEls[i];
     if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, delay));
   });
-  // TTS 整句一次念出(逐字排队会堆积/失步), 起在第一拍, 语速让整句大致铺满旋律时长
+  // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
+  // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
   if(hasTTS){
     const fullText=chars.join('');
-    const singDur=chars.length*step;                       // 旋律占用的时长(秒)
-    // 估算自然语速下的读句时长, 调 rate 让它大致等于 singDur, 再套曲风 rate 系数
-    const natural=chars.length*0.42;                        // 每字约0.42s的自然中文语速
-    let rate=clamp((natural/Math.max(singDur,0.6))*(st.tts?.rate??1.1), 0.6, 2.2);
+    const rate=clamp(st.tts?.rate??1.1, 0.7, 1.6);
     const pitch=clamp(st.tts?.pitch??1.0, 0.4, 2);
-    curSong.timeouts.push(setTimeout(()=>{
-      if(!curSong) return;
-      try{ speechSynthesis.cancel();
-        const u=new SpeechSynthesisUtterance(fullText); u.lang='zh-CN'; if(zhVoice)u.voice=zhVoice;
-        u.rate=rate; u.pitch=pitch; u.volume=1; speechSynthesis.speak(u);
-      }catch(e){}
-    }, Math.max(0,(t0-ctx.currentTime)*1000)));
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(fullText);
+      u.lang='zh-CN'; if(zhVoice) u.voice=zhVoice;
+      u.rate=rate; u.pitch=pitch; u.volume=1;
+      curSong._tts=u;
+      speechSynthesis.speak(u);
+      // Chrome 有时 speak 后卡在 paused, resume 兜底
+      setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
+    }catch(e){}
   }
-  curSong.timeouts.push(setTimeout(()=>stopSong(), (totalDur+0.4)*1000));
+  // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
+  const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
+  curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
 document.addEventListener('click',e=>{
