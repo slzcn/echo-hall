@@ -482,6 +482,8 @@
 
   /* 粒子/共鸣 */
   #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
+  /* emoji 元素强制用彩色 emoji 字体(安卓在等宽字体下会 fallback 到单色心/符号) */
+  .particle,.emoji-tray b,.emoji-btn,.pm-ic,.ar-echo .ai,.ec-pill,.mi-av,.rm .rm-ic,.id-av,.mh-av,.hall-icon,.pav .av-ic,.msg .av,.ch .icon,.song-style{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
   .particle{position:absolute;font-size:26px;animation:rise 3.4s ease-out forwards;will-change:transform,opacity}
   @keyframes rise{0%{transform:translateY(0) scale(.5) rotate(0);opacity:0}
     12%{opacity:1;transform:translateY(-40px) scale(1.1)}
