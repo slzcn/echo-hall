@@ -16,6 +16,7 @@ button:active{background:#1c5cba}.v{background:#2ea043}.v:active{background:#1a7
 <button class="v" id="b2">② 放 6 个音符连唱(完整主唱链)</button>
 <button id="b3">③ 对照: 只放伴奏鼓(生产drumBus)</button>
 <button id="b4">④ 主唱+伴奏一起(还原真实神曲)</button>
+<button class="v" id="b5" style="background:#8957e5">⑤ 安卓兼容版单音符(去ramp+砍高频)</button>
 <button id="stop" style="background:#6e7681">⏹ 停</button>
 <div id="log">点按钮后这里显示真相…</div>
 
@@ -76,6 +77,37 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
 }
 /* kick 伴奏(简版, 对照用) */
 function kickD(ctx,dest,t){var o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(50,t+0.12);g.gain.setValueAtTime(0.8,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.14);o.connect(g).connect(dest);o.start(t);o.stop(t+0.16);return o;}
+
+
+/* ===== 安卓兼容版 singVoice: 去掉 frequency ramp(改直接赋值) + 砍高频谐波 + 用 detune 颤音 ===== */
+function singVoiceCompat(ctx,dest,freq,t,dur,vowel,gain){
+  var oscs=[];
+  var F=VOWELS[vowel]||VOWELS.a;
+  var env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(gain,t+0.06);
+  env.gain.setValueAtTime(gain,t+dur*0.55);
+  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
+  env.connect(dest);
+  var nH=Math.min(12,Math.floor(3000/freq));  // 只留 <=3000Hz 谐波
+  for(var n=1;n<=nH;n++){
+    var hz=freq*n; if(hz>3000)break;
+    var w=0.04;
+    for(var k=0;k<3;k++){var bw=[120,140,190][k],a=[1,0.6,0.38][k];w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2)));}
+    if(w<0.05)continue;
+    var o=ctx.createOscillator();o.type='sine';
+    o.frequency.value=hz;   // 直接赋值, 不用 ramp(安卓高危)
+    var g=ctx.createGain();g.gain.value=w*(n===1?0.9:0.7)*0.5;
+    o.connect(g).connect(env);o.start(t);o.stop(t+dur+0.06);oscs.push(o);
+  }
+  // 颤音走 detune(cent), 不碰 frequency ramp
+  var lfo=ctx.createOscillator();lfo.frequency.value=5.3;
+  var lg=ctx.createGain();lg.gain.value=8;  // ±8 cent
+  lfo.connect(lg);
+  oscs.forEach(function(o){try{lg.connect(o.detune);}catch(e){}});
+  lfo.start(t);lfo.stop(t+dur+0.06);oscs.push(lfo);
+  return oscs;
+}
 
 async function resumeCtx(ctx){
   try{ctx.resume&&ctx.resume();}catch(e){}
@@ -145,6 +177,20 @@ document.getElementById('b4').onclick=async function(){
     var chars=['a','o','e','i','a','o'],freqs=[0,2,4,7,9,7];
     chars.forEach(function(ch,i){singVoice(ctx,voiceBus,NOTE(freqs[i]),t0+i*step,step*1.05,ch,0.7,'sawtooth').forEach(function(o){live.push(o);});});
     log('▶ 鼓+人声一起. 能分辨出人声吗? 还是只有鼓?','warn');
+  }catch(e){log('❌ '+e.message,'err');}
+};
+document.getElementById('b5').onclick=async function(){
+  clr();stopAll();log('⑤ 安卓兼容版单音符…','hi');
+  try{
+    var ctx=getCtx(); await resumeCtx(ctx);
+    log('ctx.state='+ctx.state+' currentTime='+ctx.currentTime.toFixed(3),ctx.state==='running'?'ok':'err');
+    var master=ctx.createGain();master.gain.value=0.85;master.connect(ctx.destination);
+    var voiceBus=ctx.createGain();voiceBus.gain.value=1.6;voiceBus.connect(master);
+    var t0=ctx.currentTime+0.18;
+    var oscs=singVoiceCompat(ctx,voiceBus,NOTE(4),t0,1.2,'a',0.7);
+    log('兼容版振荡器数='+oscs.length,oscs.length?'ok':'err');
+    oscs.forEach(function(o){live.push(o);});
+    log('▶ 应听到 1.2 秒"啊". 这个版安卓有声吗?',oscs.length?'ok':'err');
   }catch(e){log('❌ '+e.message,'err');}
 };
 document.getElementById('stop').onclick=function(){stopAll();clr();log('已停');};
