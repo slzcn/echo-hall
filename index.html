@@ -206,9 +206,10 @@
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
   .back:hover{color:var(--cyan);border-color:var(--cyan)}
-  .hall-ti{flex:1;min-width:0}
+  .hall-ti{flex:1;min-width:0;display:flex;align-items:center;gap:11px}
+  .hall-icon{font-size:34px;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;width:40px;text-align:center}
+  .tcol{flex:1;min-width:0}
   .hall-ti h3{font-size:15.5px;font-weight:700;letter-spacing:.5px;line-height:1.25;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .hall-ti h3 .rn-em{display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;flex-shrink:0;height:1em}
   .hall-ti .cnt{font-size:11px;color:var(--dim);margin-top:2px}
   .hall-ti .cnt{display:flex;align-items:center;gap:6px}
   .hall-ti .cnt b{color:var(--sub)}
@@ -661,8 +662,11 @@
     <div class="hall-top">
       <div class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
       <div class="hall-ti">
-        <h3 id="hallName"><span id="hallNameTxt">—</span></h3>
-        <div class="cnt" id="hallCnt">连接中…</div>
+        <div class="hall-icon" id="hallIcon">🌐</div>
+        <div class="tcol">
+          <h3 id="hallName"><span id="hallNameTxt">—</span></h3>
+          <div class="cnt" id="hallCnt">连接中…</div>
+        </div>
       </div>
       <div class="hall-tools">
         <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
@@ -1460,7 +1464,8 @@ async function enterRoom(room){
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
-  $('#hallNameTxt').innerHTML=`<span class="rn-em">${safeEmoji(room.emoji)}</span>${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(room.emoji)||'💬'; }
+  $('#hallNameTxt').innerHTML=`${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
   clearReply();
   if(snapHit){
     // 秒还原已渲染消息 + 滚动位置状态
@@ -2506,7 +2511,8 @@ async function openGear(){
     const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
     if(error){ toast('保存失败'); return; }
     curRoom.name=name; curRoom.topic=topic;
-    $('#hallNameTxt').innerHTML=`<span class="rn-em">${safeEmoji(curRoom.emoji)}</span>${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
+    { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
+    $('#hallNameTxt').innerHTML=`${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
     toast('已保存'); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
