@@ -298,7 +298,7 @@
     background:var(--panel-solid);border:1px solid var(--line2);color:var(--sub);transition:.15s;user-select:none;line-height:1.4}
   .ec-pill b{font-weight:700;font-size:11px}
   .ec-pill:hover{transform:translateY(-1px);border-color:var(--cyan)}
-  .ec-pill.mine{background:rgba(40,230,216,.12);border-color:var(--cyan);color:var(--cyan)}
+  .ec-pill.mine{background:color-mix(in srgb,var(--cyan) 12%,transparent);border-color:var(--cyan);color:var(--cyan)}
   /* 消息达阈值共鸣时的高亮脉冲 */
   .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
   @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
@@ -322,7 +322,7 @@
   .reply-preview .rp-x:hover{color:var(--magenta)}
 
   /* 虚空模式输入框风格 */
-  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,92,255,.12)}
+  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px color-mix(in srgb,var(--violet) 12%,transparent)}
   .composer.void-mode .cin{color:var(--violet)}
   .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.6}
   /* 神曲模式输入框风格 */
@@ -332,7 +332,7 @@
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
   .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
-  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
+  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
   .cin::placeholder{color:var(--dim)}
@@ -344,10 +344,10 @@
   .plus-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:10px;
     transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
   .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
-  .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   /* ＋处于某模式时: 显该模式图标(不旋转), 高亮提示"可退出" */
-  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
-  .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:rgba(139,92,255,.16);box-shadow:0 0 12px -3px var(--violet)}
+  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:color-mix(in srgb,var(--cyan) 14%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
+  .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:color-mix(in srgb,var(--violet) 16%,transparent);box-shadow:0 0 12px -3px var(--violet)}
   .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
   /* ＋ 花样菜单 */
   .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
@@ -359,11 +359,11 @@
   .pm-item .pm-tx{display:flex;flex-direction:column;gap:1px}
   .pm-item .pm-tx b{font-size:13px;font-weight:700}
   .pm-item .pm-tx i{font-size:11px;color:var(--dim);font-style:normal}
-  .pm-item.on{background:rgba(139,92,255,.15)}
+  .pm-item.on{background:color-mix(in srgb,var(--violet) 15%,transparent)}
   /* 虚空消息气泡: 无名/紫调/虚线/倒计时 */
-  .msg.void .av{background:rgba(139,92,255,.12)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px rgba(139,92,255,.4)!important}
+  .msg.void .av{background:color-mix(in srgb,var(--violet) 12%,transparent)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--violet) 40%,transparent)!important}
   .msg.void .nm{color:var(--violet)!important;font-style:italic}
-  .msg.void .txt{background:rgba(139,92,255,.07);border-color:rgba(139,92,255,.3);border-style:dashed}
+  .msg.void .txt{background:color-mix(in srgb,var(--violet) 7%,transparent);border-color:color-mix(in srgb,var(--violet) 30%,transparent);border-style:dashed}
   .msg.void .vexp{font-size:10px;color:var(--violet);opacity:.8;margin-left:8px}
   .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
   @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
@@ -384,7 +384,7 @@
   .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
   .composer.voice-mode .hold-talk{display:flex}
   .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--cyan)}
-  .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.15)}
+  .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px color-mix(in srgb,var(--magenta) 15%,transparent)}
   .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
   .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;pointer-events:none;
     background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
@@ -436,7 +436,7 @@
 
   /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
   .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
-    background:rgba(255,60,172,.06);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+    background:color-mix(in srgb,var(--magenta) 6%,transparent);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
   .song-strip::-webkit-scrollbar{height:0}
   .song-strip.on{display:flex}
   .song-strip .ss-lb{font-size:11px;color:var(--magenta);flex-shrink:0;margin-right:2px}
@@ -883,7 +883,7 @@ const EH_CONFIG_DEFAULT = {
     { id:'cyber',  name:'赛博霓虹', dot:'#28E6D8' },
     { id:'vapor',  name:'蒸汽波',   dot:'#FF5FA2' },
     { id:'mono',   name:'暗夜极简', dot:'#E9C877' },
-    { id:'aurora', name:'极光渐变', dot:'#2EF0C8' },
+    { id:'aurora', name:'极光渐变', dot:'#5AD1FF' },
   ],
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
