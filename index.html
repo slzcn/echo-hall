@@ -904,7 +904,7 @@ const EH_CONFIG_DEFAULT = {
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
   identityPool: {
     adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],
-    animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'],
+    animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猫头鹰','蝙蝠','章鱼','麋鹿','企鹅','黑猫','海豚','老虎','刺猬','蝴蝶'],
     voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'],
   },
   // 界面文案(后台可配) —— 第一类运营高频文案
@@ -1140,7 +1140,7 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 // ---- 身份 ----
 const ADJ = EH_CONFIG.identityPool.adjectives;
 const ANI = EH_CONFIG.identityPool.animals;
-const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🐆','✨','🐙','🦌','🐦','🐈‍⬛','🐬','🐆','🦔','🦋'];
+const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🦉','🦇','🐙','🦌','🐧','🐈‍⬛','🐬','🐯','🦔','🦋'];
 // 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
 const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
@@ -3204,7 +3204,7 @@ $('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secur
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
-const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
+const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨️','🎉','💯','🚀','🌈','🌙','⭐️','🍺','☕️','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧️'];
 $('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
 $('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
 $('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus(); });
