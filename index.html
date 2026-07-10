@@ -372,9 +372,9 @@
   .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
   .rec-panel.cancel .rec-time{color:var(--magenta)}
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
-  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,12,24,.5);
-    color:var(--cyan);cursor:pointer;font-size:11px;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
-  .vplay .vp-btn:hover{border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .vplay .vp-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--cyan);background:rgba(10,12,24,.5);
+    color:var(--cyan);cursor:pointer;font-size:12px;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
+  .vplay .vp-btn:hover{background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
   .vplay .vp-bars{display:flex;gap:2px;align-items:center;height:18px;color:var(--cyan)}
   .vplay .vp-bars i{width:3px;border-radius:2px;background:currentColor;opacity:.55}
   .vplay.playing .vp-bars i{animation:vbar .9s ease-in-out infinite}
@@ -386,11 +386,10 @@
   /* 神曲消息 */
   .song-card{display:inline-flex;align-items:center;gap:10px;min-width:170px;max-width:100%;vertical-align:middle;
     padding:2px 2px 2px 0}
-  .song-play{width:34px;height:34px;flex-shrink:0;border-radius:50%;border:none;cursor:pointer;font-size:13px;
-    display:grid;place-items:center;color:#04060c;background:linear-gradient(120deg,var(--magenta),var(--violet));
-    box-shadow:0 4px 14px rgba(255,60,172,.35);transition:.15s}
-  .song-play:hover{transform:scale(1.08)}
-  .song-card.playing .song-play{background:linear-gradient(120deg,var(--cyan),var(--magenta));animation:songspin 3s linear infinite}
+  .song-play{width:32px;height:32px;flex-shrink:0;border-radius:50%;border:1px solid var(--sc,var(--magenta));cursor:pointer;font-size:12px;
+    display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
+  .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
+  .song-card.playing .song-play{color:#04060c;background:var(--sc,var(--magenta));animation:songspin 3s linear infinite}
   @keyframes songspin{to{transform:rotate(360deg)}}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
@@ -2033,7 +2032,7 @@ function songHtml(text){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   // 逐字包 span → 播放时卡拉OK高亮
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
-  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}">
+  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:${safeColor(st.color)}">
     <button class="song-play" title="播放">▶</button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
