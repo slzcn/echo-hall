@@ -2339,9 +2339,14 @@ function pickZhVoice(){
   return _voiceCache;
 }
 if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCache=null; pickZhVoice(); }; pickZhVoice(); }catch(e){} }
-function playSong(lyric, sid, el, onEnd){
+async function playSong(lyric, sid, el, onEnd){
   stopVoice(); stopSong();
   const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
+  // 安卓 Chrome: AudioContext 初始 suspended, resume() 异步。带超时保护地等它 running,
+  // 但绝不无限阻塞(某些安卓 resume Promise 迟迟不 resolve, 若死等会导致整首歌哑掉——完全没声)。
+  // 最多等 ~250ms, 之后无论如何都继续排音符(t0 起始缓冲会给调度留余量)。
+  try{ ctx.resume&&ctx.resume(); }catch(e){}
+  for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(e){} }
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
@@ -2355,7 +2360,7 @@ function playSong(lyric, sid, el, onEnd){
   vComp.threshold.value=-18; vComp.ratio.value=3; vComp.attack.value=0.004; vComp.release.value=0.18;
   voiceBus.connect(vComp).connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
-  const t0=ctx.currentTime+0.12;
+  const t0=ctx.currentTime+0.18;   // 起始缓冲(安卓音频调度延迟更大, 留足余量防开头削音)
   const totalDur=chars.length*step + spb*2;
   curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null };
   if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
@@ -2421,6 +2426,9 @@ function playSong(lyric, sid, el, onEnd){
 document.addEventListener('click',e=>{
   const btn=e.target.closest('.song-play'); if(!btn) return;
   const card=btn.closest('.song-card'); if(!card) return;
+  // 安卓关键: 在用户手势的同步上下文里立即触发 AudioContext resume(), WebAudio 才解锁
+  try{ if(typeof AudioEngine!=='undefined') AudioEngine.resume(); }catch(_){}
+  try{ const c=ac(); if(c&&c.state==='suspended') c.resume(); }catch(_){}
   if(curSong && curSong.el===card){ stopSong(); return; }
   playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
 });
