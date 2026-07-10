@@ -378,7 +378,8 @@
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
   .vplay .vp-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--cyan);background:rgba(10,12,24,.5);
     color:var(--cyan);cursor:pointer;font-size:12px;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
-  .vplay .vp-btn:hover{background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
+  .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
+  .vplay.playing .vp-btn{color:#04060c;background:var(--cyan)}
   .vplay .vp-bars{display:flex;gap:2px;align-items:center;height:18px;color:var(--cyan)}
   .vplay .vp-bars i{width:3px;border-radius:2px;background:currentColor;opacity:.55}
   .vplay.playing .vp-bars i{animation:vbar .9s ease-in-out infinite}
