@@ -2320,9 +2320,11 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
-  // v5: 回滚到 BiquadFilter 共振峰音色(用户自检验证浏览器支持), 更像人声。
-  // 加法合成音色偏电子, 主人反馈"啊不像"。主人浏览器 BiquadFilter/DynamicsCompressor
-  // 自检 ②③④ 全有声, 之前"没人声"是伴奏盖过主唱, 不是节点兼容。
+  // v6【实锤修复安卓"伴奏有声人声没"】: 代码复现证实——安卓 resume 时序下 t 可能<currentTime,
+  // setValueAtTime(负/过期时间) 会抛 "Time must be non-negative" 异常 → 整条包络静音(人声消失)。
+  // 伴奏 kick 用 exponentialRamp 快释放, 异常点凑巧没触发所以有声。
+  // 修法: 强制所有时间点不早于 currentTime+0.03, 杜绝过期(正常音符不受影响, 只顶起真过期的)。
+  const tmin=ctx.currentTime+0.03; if(t<tmin) t=tmin;
   const oscs=[];
   const gliss=Math.min(0.035,dur*0.18);
   const src=ctx.createOscillator(); src.type=wave==='sine'?'triangle':(wave||'sawtooth');
