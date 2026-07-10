@@ -3329,7 +3329,12 @@ sb.auth.onAuthStateChange((ev,session)=>{
     myUid=session.user.id; resyncMsgOwnership();
     if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
-      // 一并查身份档案 + 账号信息(username/email/role), 缓存到 me, 避免顶部@用户名缺失
+      // 先恢复现场(进房只需 myUid[已就绪] + 本地缓存 me), 不等 DB 查询, 避免 hall 骨架空等数秒
+      if(location.hash) history.replaceState(null,'',location.pathname+location.search);
+      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
+        authHandled=true; resumeAfterAuth();
+      }
+      // 身份档案 + 账号信息(username/email/role)后台补齐, 缓存到 me, 避免顶部@用户名缺失
       const [{ data:prof }, { data:acc }] = await Promise.all([
         sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
         sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
@@ -3339,11 +3344,6 @@ sb.auth.onAuthStateChange((ev,session)=>{
       if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
       saveIdentity();
       paintIdentity();
-      if(location.hash) history.replaceState(null,'',location.pathname+location.search);
-      // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
-      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
-        authHandled=true; resumeAfterAuth();
-      }
     },0);
   }
 });
@@ -3354,6 +3354,10 @@ sb.auth.onAuthStateChange((ev,session)=>{
     const { data:{ session } } = await sb.auth.getSession();
     if(session?.user?.email && !myUid){
       myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; me.registered=true; }
+      // 先恢复现场再补 DB 资料(同 onAuthStateChange 路径, 避免 hall 骨架空等)
+      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
+        authHandled=true; resumeAfterAuth();
+      }
       const [{ data:prof }, { data:acc }] = await Promise.all([
         sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
         sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
@@ -3362,13 +3366,12 @@ sb.auth.onAuthStateChange((ev,session)=>{
       else { me=me||{}; me.registered=true; }
       if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
       saveIdentity(); paintIdentity();
-      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
-        authHandled=true; resumeAfterAuth();
-      }
     }
-    // 兜底: 预绘了 hall 但 session 实际无效(未就绪/过期), 没进恢复流程 → 回落入场页, 不卡空骨架
-    if(!authHandled && $('#hall').classList.contains('on') && !curRoom){ goScene('enter'); }
-  }catch(e){ console.warn('session restore', e); if(!authHandled && $('#hall').classList.contains('on') && !curRoom) goScene('enter'); }
+  }catch(e){ console.warn('session restore', e); }
+  // 兜底: 预绘了 hall 但迟迟没进恢复流程(session 真失效/过期) → 回落入场页, 不卡空骨架。
+  // 必须延时: onAuthStateChange 把 resumeAfterAuth 塞进 setTimeout(0), 若此处同步回落会把预绘的 hall
+  // 立刻打回 enter, 等 setTimeout 跑完又跳回 hall(实测刷新后 enter→10s→hall 的严重抖动)。给 auth 就绪留足时间。
+  setTimeout(()=>{ if(!authHandled && !curRoom && $('#hall').classList.contains('on')) goScene('enter'); }, 4000);
 })();
 </script>
 </body>
