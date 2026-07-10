@@ -2361,6 +2361,7 @@ function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').cl
 let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
 async function openMe(){
   const body=$('#meBody');
+  if(!me){ if(typeof loadOrRollIdentity==='function') loadOrRollIdentity(); if(!me) return; }
   const isBound = !!(me && me.registered);
   const isSuper = me && me.role==='super';
   const acctKnown = me.email !== undefined; // email/username 已缓存过
@@ -2395,13 +2396,18 @@ async function openMe(){
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
   bindMeActions(isBound);
   // 后台静默刷新(不阻塞首屏)
+  if(!myUid){ $('#meRoomsList').innerHTML='<div class="empty-hint">身份加载中，请稍后重开</div>'; $('#meMsgsList').innerHTML='<div class="empty-hint">—</div>'; return; }
   const tasks=[
     sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
     sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
   ];
   if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
-  const [msgsRes, roomsRes, accRes] = await Promise.all(tasks);
-  const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
+  let msgsRes,roomsRes,accRes;
+  try{ [msgsRes, roomsRes, accRes] = await Promise.all(tasks); }
+  catch(e){ console.warn('openMe query',e); $('#meRoomsList').innerHTML='<div class="empty-hint">加载失败，下拉重试</div>'; $('#meMsgsList').innerHTML='<div class="empty-hint">加载失败</div>'; return; }
+  if(msgsRes?.error) console.warn('msgs',msgsRes.error);
+  if(roomsRes?.error) console.warn('rooms',roomsRes.error);
+  const myMsgs=msgsRes?.data||[], myRooms=roomsRes?.data||[];
   _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
   // 账号信息首次读到后缓存(username+email+role), 之后打开直接显示
   if(isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
@@ -2499,6 +2505,7 @@ async function logoutIdentity(bound){
   try{ await sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem(LS_ID); }catch(e){}
   myUid=null; me=null;
+  _meCache={ rooms:null, msgs:null };   // 清个人空间缓存, 换身份后不残留旧数据
   closeMe();
   // 重新生成一个身份并回到入场页
   loadOrRollIdentity(); paintIdentity();
