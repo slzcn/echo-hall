@@ -409,11 +409,7 @@
   .song-tray .st-chip .sn{font-size:11.5px;font-weight:700;margin-top:3px}
   .song-tray .st-chip .sd{font-size:9.5px;color:var(--dim);margin-top:1px}
   .song-tray .st-foot{display:flex;align-items:center;gap:8px;margin-top:10px}
-  .song-tray .st-try{padding:10px 14px;border:1px solid var(--line2);border-radius:10px;background:rgba(10,12,24,.5);color:var(--ink);
-    font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap}
-  .song-tray .st-try:hover{border-color:var(--cyan);color:var(--cyan)}
-  .song-tray .st-try.playing{border-color:var(--magenta);color:var(--magenta)}
-  .song-tray .st-send{flex:1;padding:10px 18px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;
+  .song-tray .st-send{flex:1;padding:11px 18px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;
     cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.15s}
   .song-tray .st-send:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(255,60,172,.3)}
 
@@ -2121,7 +2117,7 @@ async function sendSong(lyric, sid){
   if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
-// 曲风选择托盘：复用底部主输入框 #cin 的文字(主流程), 只负责选曲风/试听/发送(配角)
+// 曲风选择托盘：复用底部主输入框 #cin 的文字(主流程), 只负责选曲风 + 发送(配角)
 let songSel=SONG_STYLES[0].id;
 function renderSongTray(){
   $('#songTray').innerHTML=`
@@ -2129,30 +2125,20 @@ function renderSongTray(){
     <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}">
       <div class="se">${s.emoji}</div><div class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</div>
       <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>
-    <div class="st-foot"><button class="st-try" id="songTryBtn">🎧 试听</button><button class="st-send" id="songSendBtn">🚀 发送神曲</button></div>`;
+    <div class="st-foot"><button class="st-send" id="songSendBtn">🚀 发送神曲</button></div>`;
   $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
     $('#songTray').querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
-    const ly=$('#cin').value.trim();
-    if(ly) playSong(ly, songSel, null);   // 切曲风即试听主输入框内容
-    else { toast('先在下面输入框打字'); $('#cin').focus(); }
   });
-  $('#songTryBtn').onclick=e=>{ e.stopPropagation();
-    const btn=e.currentTarget;
-    if(curSong){ stopSong(); return; }   // stopSong 会触发 onEnd 复位按钮
-    const ly=$('#cin').value.trim(); if(!ly){ toast('先在下面输入框打字'); $('#cin').focus(); return; }
-    btn.classList.add('playing'); btn.textContent='⏹ 停止';
-    playSong(ly, songSel, null, ()=>{ btn.classList.remove('playing'); btn.textContent='🎧 试听'; });
-  };
-  $('#songSendBtn').onclick=e=>{ e.stopPropagation(); stopSong(); sendSong($('#cin').value, songSel); };
+  $('#songSendBtn').onclick=e=>{ e.stopPropagation(); sendSong($('#cin').value, songSel); };
   updateSongTrayState();
 }
-// 托盘与主输入框联动: 提示文案 + 试听/发送可用性随 #cin 内容变化
+// 托盘与主输入框联动: 提示文案 + 发送可用性随 #cin 内容变化
 function updateSongTrayState(){
   if(!$('#songTray').classList.contains('on')) return;
   const ly=$('#cin').value.trim();
   const hint=$('#songHint'); if(hint) hint.textContent = ly ? '🎵 选个曲风，把这句话唱出来' : '👇 先在下面输入框打字，再选曲风';
-  ['#songTryBtn','#songSendBtn'].forEach(sel=>{ const b=$(sel); if(b){ b.disabled=!ly; b.style.opacity=ly?'':'.45'; b.style.cursor=ly?'':'not-allowed'; } });
+  const b=$('#songSendBtn'); if(b){ b.disabled=!ly; b.style.opacity=ly?'':'.45'; b.style.cursor=ly?'':'not-allowed'; }
 }
 function closeSongTray(){ $('#songTray').classList.remove('on'); stopSong(); }
 function openSongTray(){
