@@ -436,7 +436,7 @@ async function loadRooms(){
 
 // 语音/神曲消息渲染
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
-const SONG_STYLE_NAMES={dj:'蹦迪DJ',shen:'神曲喊麦',kid:'儿歌',gufeng:'古风',disco:'迪斯科','8bit':'电玩'};
+const SONG_STYLE_NAMES={dj:'蹦迪DJ',shen:'神曲喊麦',kid:'儿歌',gufeng:'古风',disco:'迪斯科','8bit':'电玩',lofi:'慵懒Lo-Fi'};
 function voiceOrText(m){
   const src=String(m.text||'');
   if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
