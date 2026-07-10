@@ -2335,7 +2335,13 @@ function playSong(lyric, sid, el, onEnd){
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
-  const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);  // 主唱为元音合成, 音量恒定
+  const master=ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
+  // 双总线: 伴奏压低(drumBus) + 主唱提高并加压缩(voiceBus) → 让唱声清晰浮在伴奏之上(修"听不出在唱")
+  const drumBus=ctx.createGain(); drumBus.gain.value=0.42; drumBus.connect(master);   // 伴奏整体压到 42%
+  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.0;
+  const vComp=ctx.createDynamicsCompressor();                                          // 轻压缩稳住主唱, 更"顶"
+  vComp.threshold.value=-18; vComp.ratio.value=3; vComp.attack.value=0.004; vComp.release.value=0.18;
+  voiceBus.connect(vComp).connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.12;
   const totalDur=chars.length*step + spb*2;
@@ -2348,19 +2354,19 @@ function playSong(lyric, sid, el, onEnd){
     for(let beat=0;beat<4;beat++){
       const t=bt+beat*spb;
       if(st.groove==='lofi'){                                    // lo-fi: 稀疏柔鼓, 只 1/3 拍落鼓, 弱 hat, 不打 snare
-        if(beat===0||beat===2) curSong.oscs.push(kick(ctx,master,t));
-        curSong.oscs.push(hat(ctx,master,t));
-        curSong.oscs.push(tone(ctx,master,NOTE(root-12),t,spb*0.9,st.bass,0.18));
+        if(beat===0||beat===2) curSong.oscs.push(kick(ctx,drumBus,t));
+        curSong.oscs.push(hat(ctx,drumBus,t));
+        curSong.oscs.push(tone(ctx,drumBus,NOTE(root-12),t,spb*0.9,st.bass,0.18));
         continue;
       }
-      if(st.groove==='four') curSong.oscs.push(kick(ctx,master,t));
-      else if(beat%2===0) curSong.oscs.push(kick(ctx,master,t));
-      if(beat%2===1) curSong.oscs.push(snare(ctx,master,t));
-      curSong.oscs.push(hat(ctx,master,t)); curSong.oscs.push(hat(ctx,master,t+spb/2));
-      curSong.oscs.push(tone(ctx,master,NOTE(root-12),t,spb*0.85,st.bass,0.22));
+      if(st.groove==='four') curSong.oscs.push(kick(ctx,drumBus,t));
+      else if(beat%2===0) curSong.oscs.push(kick(ctx,drumBus,t));
+      if(beat%2===1) curSong.oscs.push(snare(ctx,drumBus,t));
+      curSong.oscs.push(hat(ctx,drumBus,t)); curSong.oscs.push(hat(ctx,drumBus,t+spb/2));
+      curSong.oscs.push(tone(ctx,drumBus,NOTE(root-12),t,spb*0.85,st.bass,0.22));
     }
     const padWave = st.wave==='square'?'triangle':st.wave;   // 方波做和弦垫太刺, 降级三角; 其余用曲风波形
-    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,padWave,0.045)));
+    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,drumBus,NOTE(root+iv),bt,barLen*0.95,padWave,0.045)));
   }
   // 主唱(v2)：共振峰元音哼唱作为主角, 音高真正跟旋律走(在"唱"而非"念"); TTS 降级为轻声跟读垫
   const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
@@ -2370,14 +2376,14 @@ function playSong(lyric, sid, el, onEnd){
     const semi=st.base+scaleSemi(st.scale,deg);
     const delay=Math.max(0,(t-ctx.currentTime)*1000);
     // 元音哼唱=主唱(gain 0.3), 跟着 motif 走音高, 带八度和声+颤音, 每套曲风波形音色各异
-    singVoice(ctx,master,NOTE(semi+12),t,step*1.05,charVowel(ch),0.3,st.wave).forEach(o=>curSong.oscs.push(o));
+    singVoice(ctx,voiceBus,NOTE(semi+12),t,step*1.05,charVowel(ch),0.7,st.wave).forEach(o=>curSong.oscs.push(o));
     const chEl=chEls[i];
     if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, delay));
   });
   // 结尾甩音"哟~"(上滑收尾, 洗脑记忆点)
   const endT=t0+chars.length*step;
   const endSemi=st.base+scaleSemi(st.scale,st.motif[0])+12;
-  singVoice(ctx,master,NOTE(endSemi+12),endT,spb*1.3,'o',0.26,st.wave).forEach(o=>curSong.oscs.push(o));
+  singVoice(ctx,voiceBus,NOTE(endSemi+12),endT,spb*1.3,'o',0.6,st.wave).forEach(o=>curSong.oscs.push(o));
   // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
   // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
   if(hasTTS){
