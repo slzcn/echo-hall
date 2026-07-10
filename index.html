@@ -586,6 +586,10 @@
     /* 聊天页(用 body.hall-on 而非 :has, 兼容不支持:has的iOS WebView): 满高+顶对齐, 输入框贴键盘 */
     body.hall-on .stage{padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
     #hall{width:100%;height:100dvh;height:var(--appvh,100dvh);border-radius:0;border:none}
+    /* 键盘弹起: #hall 固定贴到可视区(visualViewport)顶部, 高度=可视高, 页面不再被iOS顶跑 */
+    body.kb-open{position:fixed;inset:0;width:100%;overflow:hidden}
+    body.kb-open .stage{height:100dvh}
+    body.kb-open #hall{position:fixed;left:0;right:0;top:var(--kb-top,0);height:var(--appvh,100dvh);margin:0;z-index:10}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -3040,8 +3044,18 @@ function syncViewportH(){
   const vv = window.visualViewport;
   const h = vv ? vv.height : window.innerHeight;
   document.documentElement.style.setProperty('--appvh', h + 'px');
-  // 键盘弹起后确保输入框可见
-  if(document.activeElement && document.activeElement.id==='cin') scrollStream();
+  // 键盘是否弹起: 可视高比窗口明显变矮(>120px)判为键盘开
+  const kbOpen = vv ? (window.innerHeight - vv.height > 120) : false;
+  const inHall = document.body.classList.contains('hall-on');
+  if(kbOpen && inHall){
+    // 把 #hall 固定钉到可视区顶部, 抵消 iOS 自动上滚, 页面不再"跳走"
+    document.documentElement.style.setProperty('--kb-top', (vv.offsetTop||0)+'px');
+    document.body.classList.add('kb-open');
+    window.scrollTo(0,0);
+    if(document.activeElement && document.activeElement.id==='cin') scrollStream();
+  } else {
+    document.body.classList.remove('kb-open');
+  }
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize', syncViewportH);
