@@ -420,7 +420,7 @@
     display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
   .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
   .song-play{padding-left:2px}                                                  /* ▶ 右移补偿居中 */
-  .song-card.playing .song-play{padding-left:0}  /* ⏸ 与 ▶ 同款描边, 仅符号变, 不加底色 */
+  .song-card.playing .song-play{padding-left:0;background:color-mix(in srgb,var(--sc,var(--magenta)) 20%,transparent)}  /* ⏸ 用曲风色淡底, 与曲风一致 */
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
   .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
