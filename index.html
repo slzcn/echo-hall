@@ -925,7 +925,7 @@ const EH_CONFIG_DEFAULT = {
     composerPlaceholder:'说点什么… 打个 / 看命令',
     voidPlaceholder:'说给虚空… 匿名，5分钟后消散 🕳️',
     // 命令帮助
-    cmdSing:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵',
+    cmdSing:'/sing 文字 → 变洗脑神曲（随机曲风）🎵',
     cmdWhisper:'/whisper @昵称 悄悄话（仅对方可见）',
     // 主要按钮
     btnCreateRoom:'生 成 房 间', btnEnterRoom:'进 入 房 间',
@@ -2571,7 +2571,7 @@ const SLASH_CMDS=[
   {c:'/flip',  d:'抛硬币，正面还是反面'},
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
-  {c:'/sing',  d:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵'},
+  {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
