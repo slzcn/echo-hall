@@ -301,6 +301,18 @@
   .void-bar .vb-txt{flex:1}
   .void-bar .vb-x{cursor:pointer;color:var(--violet);opacity:.8;padding:2px 8px;border:1px solid rgba(139,92,255,.4);border-radius:7px;font-size:11px}
   .void-bar .vb-x:hover{opacity:1;background:rgba(139,92,255,.15)}
+  /* 神曲模式提示条 */
+  .song-bar{display:none;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--line);
+    background:rgba(255,60,172,.1);font-size:12px;color:var(--magenta);flex-shrink:0}
+  .song-bar.on{display:flex}
+  .song-bar .sb-ic{font-size:14px}
+  .song-bar .sb-txt{flex:1}
+  .song-bar .sb-chg,.song-bar .sb-x{cursor:pointer;opacity:.85;padding:2px 8px;border:1px solid rgba(255,60,172,.4);border-radius:7px;font-size:11px}
+  .song-bar .sb-chg:hover,.song-bar .sb-x:hover{opacity:1;background:rgba(255,60,172,.15)}
+  /* 神曲模式输入框风格 */
+  .composer.song-mode .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.12)}
+  .composer.song-mode .cin{color:var(--magenta);font-weight:600}
+  .composer.song-mode .cin::placeholder{color:var(--magenta);opacity:.6}
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
   .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 14px;transition:.2s}
@@ -418,10 +430,6 @@
   .song-tray .st-chip .se{font-size:20px}
   .song-tray .st-chip .sn{font-size:11.5px;font-weight:700;margin-top:3px}
   .song-tray .st-chip .sd{font-size:9.5px;color:var(--dim);margin-top:1px}
-  .song-tray .st-foot{display:flex;align-items:center;gap:8px;margin-top:10px}
-  .song-tray .st-send{flex:1;padding:11px 18px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;
-    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.15s}
-  .song-tray .st-send:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(255,60,172,.3)}
 
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
@@ -664,6 +672,10 @@
     <!-- 虚空模式提示条(开启后显示, 可随手关) -->
     <div class="void-bar" id="voidBar">
       <span class="vb-ic">🕳️</span><span class="vb-txt">虚空模式 · 匿名发送，5 分钟后消散</span><span class="vb-x" id="voidBarX">退出</span>
+    </div>
+    <!-- 神曲模式提示条(选了曲风后显示; 点条身换曲风, 点退出回普通) -->
+    <div class="song-bar" id="songBar">
+      <span class="sb-ic">🎵</span><span class="sb-txt" id="songBarTxt">神曲模式</span><span class="sb-chg" id="songBarChg">换曲风</span><span class="sb-x" id="songBarX">退出</span>
     </div>
     <div class="composer">
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
@@ -1780,6 +1792,8 @@ async function send(){
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
   let kind='msg';
   if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
+  // 神曲模式: 走神曲发送(把这句话唱出来), 不落普通文本
+  if(songMode && kind==='msg'){ const ly=text; resetInput(); await sendSong(ly, songSel); return; }
   // 引用的目标还是本地临时 id(原消息尚未落库/落库失败)时，不带 reply_to，避免整条发送失败
   const replyId = replyTo && !String(replyTo.id).startsWith('local_') ? replyTo.id : null;
   // 虚空模式: 匿名 + 限时消散(act/whisper 不走虚空)
@@ -1807,10 +1821,11 @@ async function send(){
 // 虚空模式开关
 function setVoidMode(on){
   voidMode=on;
+  if(on && songMode) setSongMode(false);   // 与神曲互斥
   $('#voidBar').classList.toggle('on',on);
   $('#pmVoid').classList.toggle('on',on);
   const cin=$('#cin');
-  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 打个 / 看命令';
+  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : (songMode ? cin.placeholder : '说点什么… 打个 / 看命令');
 }
 function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; hideSlash(); syncSendBtn(); }
 // 输入框空↔有字: 切换 麦克风/发送 按钮(微信式)
@@ -2147,44 +2162,56 @@ async function sendSong(lyric, sid){
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
-  resetInput(); closeSongTray();
+  closeSongTray();
   // 本地立即试听(发送者刚有手势, 允许自动播放)
   if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
-// 曲风选择托盘：复用底部主输入框 #cin 的文字(主流程), 只负责选曲风 + 发送(配角)
+// 曲风选择托盘：选一个曲风即进入"神曲模式"(收起托盘, 输入框变神曲风格), 之后走主发送键发出
 let songSel=SONG_STYLES[0].id;
+let songMode=false;
 function renderSongTray(){
   $('#songTray').innerHTML=`
-    <div class="st-h" id="songHint"></div>
+    <div class="st-h">选个曲风，接下来输入的话会被唱出来 🎵</div>
     <div class="st-grid">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}">
       <div class="se">${s.emoji}</div><div class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</div>
-      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>
-    <div class="st-foot"><button class="st-send" id="songSendBtn">🚀 发送神曲</button></div>`;
+      <div class="sd">${s.bpm} BPM</div></div>`).join('')}</div>`;
   $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
-    $('#songTray').querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
+    closeSongTray();
+    setSongMode(true);            // 选了曲风 → 进神曲模式
+    $('#cin').focus();
   });
-  $('#songSendBtn').onclick=e=>{ e.stopPropagation(); sendSong($('#cin').value, songSel); };
-  updateSongTrayState();
 }
-// 托盘与主输入框联动: 提示文案 + 发送可用性随 #cin 内容变化
-function updateSongTrayState(){
-  if(!$('#songTray').classList.contains('on')) return;
-  const ly=$('#cin').value.trim();
-  const hint=$('#songHint'); if(hint) hint.textContent = ly ? '🎵 选个曲风，把这句话唱出来' : '👇 先在下面输入框打字，再选曲风';
-  const b=$('#songSendBtn'); if(b){ b.disabled=!ly; b.style.opacity=ly?'':'.45'; b.style.cursor=ly?'':'not-allowed'; }
+// 神曲模式开关(与虚空互斥); 顶部提示条显示当前曲风
+function setSongMode(on){
+  songMode=on;
+  if(on && voidMode) setVoidMode(false);   // 互斥
+  $('.composer').classList.toggle('song-mode',on);
+  $('#songBar').classList.toggle('on',on);
+  $('#pmSong').classList.toggle('on',on);
+  const cin=$('#cin');
+  if(on){
+    const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
+    const bt=$('#songBarTxt'); if(bt) bt.textContent=`神曲模式 · ${st.emoji} ${st.name}`;
+    cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
+  } else {
+    cin.placeholder = voidMode ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 打个 / 看命令';
+  }
+  syncSendBtn();
 }
 function closeSongTray(){ $('#songTray').classList.remove('on'); stopSong(); }
 function openSongTray(){
   $('#emojiTray').classList.remove('on');
   renderSongTray(); $('#songTray').classList.add('on');
 }
-// 点托盘或整个 composer(含主输入框)都不关托盘, 只有点别处才关 —— 这样能边开托盘边在主框改字
+// 点托盘或整个 composer(含主输入框)都不关托盘, 只有点别处才关
 document.addEventListener('click',e=>{ if(!e.target.closest('#songTray') && !e.target.closest('.composer')) closeSongTray(); });
 $('#songTray').addEventListener('click',e=>e.stopPropagation());
+$('#songBarChg').onclick=e=>{ e.stopPropagation(); openSongTray(); };   // 换曲风
+$('#songBarX').onclick=e=>{ e.stopPropagation(); setSongMode(false); };  // 退出神曲
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
 
 // ============ 多情绪回声 落库 ============
@@ -2417,6 +2444,7 @@ async function leaveRoom(){
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
   if(voidMode) setVoidMode(false);   // 离开房间关掉虚空模式
+  if(songMode) setSongMode(false);   // 离开房间关掉神曲模式
   try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
@@ -2862,7 +2890,6 @@ cin.addEventListener('input',()=>{
     _inputRaf=0;
     cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
     syncSendBtn();
-    updateSongTrayState();   // 神曲托盘开着时, 随打字实时更新提示/按钮
     const v=cin.value;
     if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
   });
@@ -2883,7 +2910,7 @@ $('#plusBtn').onclick=e=>{ e.stopPropagation();
 };
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ setVoidMode(!voidMode); closePlusMenu(); if(voidMode) $('#cin').focus(); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); openSongTray(); };
+$('#pmSong').onclick=()=>{ closePlusMenu(); if(songMode) setSongMode(false); else openSongTray(); };
 $('#voidBarX').onclick=()=>setVoidMode(false);
 document.addEventListener('click',closePlusMenu);
 
