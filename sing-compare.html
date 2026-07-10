@@ -36,6 +36,12 @@
   <button class="tbtn" id="tbtn">▶ 用 TTS 唱一遍</button>
 </div>
 
+<div class="box" style="border-color:#a86">
+  <h3>🇨️ 方案 C+TTS：合体唱</h3>
+  <div class="tag">C 元音哼旋律当伴唱 + TTS 念歌词当咬字, 两个同时跑</div>
+  <button style="background:#c84;display:block;width:100%;padding:15px;margin:8px 0;font-size:17px;border:none;border-radius:10px;font-weight:bold;color:#fff" id="ctbtn">▶ 用 C+TTS 合体唱</button>
+</div>
+
 <button class="sbtn" id="stop">⏹ 停止</button>
 <div id="log">点按钮后这里显示状态…</div>
 
@@ -81,6 +87,27 @@ function singC_one(ctx,dest,freq,t,dur,vowel){
   var lg=ctx.createGain();lg.gain.setValueAtTime(0,t);lg.gain.setValueAtTime(0,t+Math.min(0.12,dur*0.4));lg.gain.linearRampToValueAtTime(freq*0.005,t+dur);
   lfo.start(t);lfo.stop(t+dur+0.05);curOscs.push(lfo);
 }
+function singCMelody(ctx,master,lyr){
+  var t0=ctx.currentTime+0.08, step=0.42;
+  lyr.forEach(function(ch,i){
+    var semi=MOTIF[i%MOTIF.length];
+    singC_one(ctx,master,NOTE(semi),t0+i*step,step*1.05,charVowel(ch));
+  });
+  return lyr.length*step;
+}
+function speakTTS(lyr,rate,pitch){
+  if(!window.speechSynthesis||!window.SpeechSynthesisUtterance){log('❌ 不支持 TTS','err');return false;}
+  var vs=speechSynthesis.getVoices();
+  var zh=vs.filter(function(v){return /zh|cn|chinese|中文|普通/i.test(v.lang+v.name);});
+  log('系统语音数='+vs.length+' 中文语音数='+zh.length, zh.length?'ok':'warn');
+  var u=new SpeechSynthesisUtterance(lyr);
+  if(zh.length)u.voice=zh[0];
+  u.lang='zh-CN'; u.rate=rate; u.pitch=pitch;
+  u.onstart=function(){log('▶ TTS 开始念','ok');};
+  u.onend=function(){log('✅ TTS 念完','ok');};
+  u.onerror=function(e){log('❌ TTS: '+e.error,'err');};
+  speechSynthesis.speak(u); return true;
+}
 document.getElementById('cbtn').onclick=function(){
   clr(); stopAll(); log('🅰️ 方案C 采样元音唱…');
   try{
@@ -119,6 +146,18 @@ document.getElementById('tbtn').onclick=function(){
   }catch(e){log('❌ '+e.message,'err');}
 };
 
+document.getElementById('ctbtn').onclick=function(){
+  clr(); stopAll(); log('🇨 C+TTS 合体唱…');
+  try{
+    var ctx=getCtx(); log('ctx.state='+ctx.state,ctx.state==='running'?'ok':'warn');
+    var lyr=document.getElementById('lyric').value.replace(/\s/g,'').split('').slice(0,20);
+    if(!lyr.length){log('歌词空','err');return;}
+    var master=ctx.createGain();master.gain.value=0.9;master.connect(ctx.destination);
+    var dur=singCMelody(ctx,master,lyr);         // C 元音哼旋律
+    speakTTS(lyr.join(''),0.6,1.3);              // TTS 同步念歌词(必须在手势内)
+    log('✅ C伴唱+TTS咬字 同时跑. 合体好听吗?','ok');
+  }catch(e){log('❌ '+e.message,'err');}
+};
 document.getElementById('stop').onclick=function(){stopAll();clr();log('已停止');};
 if(window.speechSynthesis){speechSynthesis.onvoiceschanged=function(){};speechSynthesis.getVoices();}
 </script>
