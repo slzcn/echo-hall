@@ -150,8 +150,8 @@
     cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.18s}
   .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
   .me-btn.ic svg{width:18px;height:18px}
-  .me-btn.me-avatar{border:1.5px solid var(--cyan);background:rgba(40,230,216,.08);box-shadow:0 0 10px rgba(40,230,216,.18)}
-  .me-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 16px rgba(40,230,216,.4);transform:translateY(-1px)}
+  .me-btn.me-avatar,.tool-btn.me-avatar{border:1.5px solid var(--cyan);background:rgba(40,230,216,.08);box-shadow:0 0 10px rgba(40,230,216,.18);font-size:18px}
+  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 16px rgba(40,230,216,.4);transform:translateY(-1px)}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -663,6 +663,7 @@
         <div class="tool-btn ic" id="bgmBtnHall" title="氛围音乐"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div>
         <div class="tool-btn ic" id="skinBtnHall" title="皮肤"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.6"/><circle cx="17.5" cy="10.5" r="1.6"/><circle cx="8.5" cy="7.5" r="1.6"/><circle cx="6.5" cy="12.5" r="1.6"/><path d="M12 2C6.5 2 2 6 2 11c0 3 2 5 5 5 1.5 0 1.8 1 1.2 2-.4.7-.2 2 1.3 2h.5c5 0 10-3.5 10-9C20 5.5 16 2 12 2z"/></svg></div>
         <div class="gear ic" id="gearBtn" title="房间设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H8a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H22a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间">🦊</div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
     </div>
@@ -875,6 +876,7 @@ function paintIdentity(){
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
   // 正式账号 vs 临时身份: 更新标签 + 换一个按钮(临时才可换)
   const tag=$('#idTag'), rr=$('#rerollBtn');
   if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; }
@@ -2876,6 +2878,7 @@ async function saveProfile(){
   // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
   toast('形象已更新'); closeModal();
 }
 
@@ -2904,6 +2907,7 @@ $('#enterBtn').onclick=async()=>{
 $('#backBtn').onclick=()=>backToLobby();
 $('#gearBtn').onclick=()=>openGear();
 $('#meBtn').onclick=()=>openMe();
+$('#meBtnHall')&&($('#meBtnHall').onclick=()=>openMe());
 $('#lobbyName').onclick=()=>openMe();
 $('#meDx').onclick=()=>closeMe(); $('#meMask').onclick=()=>closeMe();
 $('#gearDx').onclick=()=>closeGear(); $('#gearMask').onclick=()=>closeGear();
