@@ -255,11 +255,11 @@
   .pav .av-ic::after{content:"";position:absolute;inset:-2.5px;border-radius:13px;border:1.5px solid var(--pav-c,var(--cyan));opacity:.35;transition:.25s}
   .pav:hover .av-ic{transform:translateY(-2px)}
   .pav:hover .av-ic::after{opacity:.7;inset:-3.5px}
-  .pav .nm{font-size:9.5px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  .pav .nm{font-size:9.5px;line-height:12px;height:12px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
   .pav.me .nm{color:var(--cyan);font-weight:600}
   .pav-skel{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;pointer-events:none}
   .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,rgba(120,140,200,.10),rgba(120,140,200,.20),rgba(120,140,200,.10));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
-  .pav-skel .sk-nm{width:30px;height:8px;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
+  .pav-skel .sk-nm{width:30px;height:8px;margin:2px 0;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
   @keyframes skel-pulse{0%{background-position:200% 0;opacity:.6}50%{opacity:1}100%{background-position:-200% 0;opacity:.6}}
   .pav.me .av-ic::before{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel-solid);z-index:1}
