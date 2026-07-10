@@ -223,6 +223,9 @@
   .tool-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:18px;flex-shrink:0;user-select:none}
   @media(hover:hover){ .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)} }
+  /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
+  .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
+  .tool-btn.active,.me-btn.active,.gear.active{color:var(--cyan);border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,transparent)}
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
@@ -1250,19 +1253,23 @@ function applyRoomTheme(room){
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
   const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
-  const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); });
+  const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); });
   buildMenu(menu); bind(menu);
   const btn=$('#skinBtn');
-  if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); };
+  // 菜单开→按钮保持选中态, 关→取消
+  const syncSkinActive=()=>{ if(btn) btn.classList.toggle('active', menu.classList.contains('on')); const bh=$('#skinBtnHall'), mh=$('#skinMenuHall'); if(bh&&mh) bh.classList.toggle('active', mh.classList.contains('on')); };
+  window.syncSkinActive=syncSkinActive;
+  if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); syncSkinActive(); };
   // 聊天页版皮肤菜单
   const menuHall=$('#skinMenuHall');
   const btnHall=$('#skinBtnHall');
   if(menuHall){ buildMenu(menuHall); bind(menuHall); }
-  if(btnHall && menuHall) btnHall.onclick=(e)=>{ e.stopPropagation(); menuHall.classList.toggle('on'); };
+  if(btnHall && menuHall) btnHall.onclick=(e)=>{ e.stopPropagation(); menuHall.classList.toggle('on'); syncSkinActive(); };
   // 全局关闭菜单
   document.addEventListener('click',e=>{
     if(menu && !menu.contains(e.target) && e.target!==btn) menu.classList.remove('on');
     if(menuHall && !menuHall.contains(e.target) && e.target!==btnHall) menuHall.classList.remove('on');
+    syncSkinActive();
   });
   // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
   const bhall=$('#bgmBtnHall');
@@ -2510,9 +2517,9 @@ async function openGear(){
     await sb.from('eh_rooms').delete().eq('id',curRoom.id);
     toast('房间已解散'); closeGear(); backToLobby();
   };
-  $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on');
+  $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on'); $('#gearBtn').classList.add('active');
 }
-function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); }
+function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); $('#gearBtn').classList.remove('active'); }
 
 // ============ 个人空间抽屉 ============
 let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
@@ -2551,6 +2558,7 @@ async function openMe(){
     <button class="dbtn danger" id="meLogout" style="width:100%">${isBound?'退出登录':'退出 / 换个身份'}</button>
     <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;text-align:center">${isBound?'退出后聊天记录仍与账号关联，重新登录即可找回。':'退出会清除本设备的临时身份（消息仍留存）。'}</div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
+  $('#meBtn')&&$('#meBtn').classList.add('active'); $('#meBtnHall')&&$('#meBtnHall').classList.add('active');
   bindMeActions(isBound);
   // ↻ 按钮点击 → 强制刷新对应区域(用户主动)
   $('#meMsgsRefresh')&&($('#meMsgsRefresh').onclick=()=>refreshMeData('msgs',isBound,acctKnown));
@@ -2693,7 +2701,7 @@ async function logoutIdentity(bound){
   goScene('enter');
   toast(bound?'已退出登录':'已换新身份');
 }
-function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
+function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
 function backToLobby(){ AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
