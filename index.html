@@ -1626,11 +1626,32 @@ function bindRoomCards(box){
 // ============ 进入房间 ============
 const SNAP_TTL=30000;   // 快照有效期 30s
 // 刷新页面后恢复上次所在房间(进大厅后调, 仅当有记录)
-function restoreLastRoom(){
-  try{
-    const s=localStorage.getItem('eh_last_room'); if(!s) return;
-    const r=JSON.parse(s); if(r && r.id) enterRoom(r);
-  }catch(e){}
+function lastRoom(){ try{ const s=localStorage.getItem('eh_last_room'); const r=s&&JSON.parse(s); return (r&&r.id)?r:null; }catch(e){ return null; } }
+// 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
+function resumeAfterAuth(){
+  const r=lastRoom();
+  if(r){ renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间
+  else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
+}
+function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
+// 读持久化的 supabase session 里的 user(判断是否已登录正式账号, 用于刷新时同步预绘)
+function persistedSessionUser(){
+  try{ const raw=localStorage.getItem('sb-'+SB_URL.split('//')[1].split('.')[0]+'-auth-token');
+    if(!raw) return null; const j=JSON.parse(raw); return j?.user||j?.currentSession?.user||null; }catch(e){ return null; }
+}
+// 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
+// 仅当有 last_room + 已登录正式账号(有邮箱、非匿名)时预绘; 随后异步 restore 会补真实数据。
+function preRestoreScene(){
+  const r=lastRoom(); if(!r) return false;
+  const u=persistedSessionUser(); if(!u || !u.email || u.is_anonymous===true) return false;
+  const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
+    const rc = r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||'#28E6D8') : (r.kind==='public'?'#4DE38A':'#8B5CFF');
+    hi.style.setProperty('--room-c', rc); }
+  const kindLabel = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
+  const nt=$('#hallNameTxt'); if(nt) nt.innerHTML=`${esc(r.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  const pr=$('#presence'); if(pr) pr.innerHTML=presenceSkeleton(3);
+  goScene('hall'); setConn(false,'连接中');
+  return true;
 }
 async function enterRoom(room){
   curRoom = room;
@@ -3285,6 +3306,8 @@ syncViewportH();
 // ============ 启动 ============
 loadOrRollIdentity();
 paintIdentity();
+// 同步预绘: 上次在房间 + 本地已有正式账号session → 直接落 hall 骨架, 不闪 enter/lobby(真实数据随后异步补)
+try{ preRestoreScene(); }catch(e){}
 typeSub();
 // 邮箱验证回跳: URL 带 ?ehverify=<token> → 调 /verify-email 标记已验证
 (function handleEmailVerify(){
@@ -3322,9 +3345,8 @@ sb.auth.onAuthStateChange((ev,session)=>{
       paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
       // 正式账号(有邮箱session)恢复即自动进大厅, 不停在入场页(修: 刷新后卡入场且显"临时身份"的bug)
-      if(!authHandled && $('#enter').classList.contains('on')){
-        authHandled=true; if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
-        restoreLastRoom();  // 刷新前在某房间→自动恢复进房
+      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
+        authHandled=true; resumeAfterAuth();
       }
     },0);
   }
@@ -3344,11 +3366,13 @@ sb.auth.onAuthStateChange((ev,session)=>{
       else { me=me||{}; me.registered=true; }
       if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
       saveIdentity(); paintIdentity();
-      if(!authHandled && $('#enter').classList.contains('on')){
-        authHandled=true; if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); restoreLastRoom();
+      if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
+        authHandled=true; resumeAfterAuth();
       }
     }
-  }catch(e){ console.warn('session restore', e); }
+    // 兜底: 预绘了 hall 但 session 实际无效(未就绪/过期), 没进恢复流程 → 回落入场页, 不卡空骨架
+    if(!authHandled && $('#hall').classList.contains('on') && !curRoom){ goScene('enter'); }
+  }catch(e){ console.warn('session restore', e); if(!authHandled && $('#hall').classList.contains('on') && !curRoom) goScene('enter'); }
 })();
 </script>
 </body>
