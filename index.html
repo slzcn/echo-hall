@@ -820,6 +820,8 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
 const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🐆','✨','🐙','🦌','🐦','🐈‍⬛','🐬','🐆','🦔','🦋'];
+// 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
+const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
 const LS_ID = 'eh_identity_v2';
 
@@ -838,6 +840,7 @@ function rollIdentity(){
 // 已存身份的 emoji 与名字末尾动物不匹配时, 用名字推导正确 emoji(修老用户脏数据)
 function reconcileEmoji(){
   if(!me || !me.name || !me.emoji) return false;
+  if(me.registered) return false; // 正式账号形象为自主选择, 不自动纠正
   for(let i=0;i<ANI.length;i++){
     if(me.name.endsWith(ANI[i])){
       if(me.emoji !== EMO[i]){ me.emoji = EMO[i]; return true; }
@@ -2762,7 +2765,7 @@ function openProfileEditor(){
   // 随机昵称按钮(复用词库), 昵称与登录无关可随意换
   $('#profDice').onclick=()=>{ $('#profName').value=rand(ADJ)+rand(ANI); $('#profName').focus(); };
   // emoji 选择器(当前高亮在首位)
-  const emos=[_profEmoji,...EMO.filter(e=>e!==_profEmoji)];
+  const emos=[_profEmoji,...EMO_ALL.filter(e=>e!==_profEmoji)];
   $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
   $('#profEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ _profEmoji=b.textContent; $('#profEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
   // 颜色选择器
