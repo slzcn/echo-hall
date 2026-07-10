@@ -579,7 +579,8 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    .stage:has(#hall.on){padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
+    /* 聊天页(用 body.hall-on 而非 :has, 兼容不支持:has的iOS WebView): 满高+顶对齐, 输入框贴键盘 */
+    body.hall-on .stage{padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
     #hall{width:100%;height:100dvh;height:var(--appvh,100dvh);border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
@@ -1288,7 +1289,7 @@ function initThemeUI(){
   applyTheme(currentTheme());
   initBgmUI();
 }
-function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); }
+function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall'); }
 
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
