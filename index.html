@@ -2091,8 +2091,8 @@ const VOWELS={ a:[800,1150,2800], o:[500,900,2400], e:[500,1700,2500], i:[320,23
 const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
-function singVoice(ctx,dest,freq,t,dur,vowel,gain){
-  const src=ctx.createOscillator(); src.type='sawtooth';
+function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
+  const src=ctx.createOscillator(); src.type=wave||'sawtooth';   // 按曲风波形: 正弦柔/三角圆/方波尖/锯齿亮
   src.frequency.setValueAtTime(freq*0.94,t); src.frequency.linearRampToValueAtTime(freq,t+0.07); // 上滑起音，像"唱"
   const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;                                       // 颤音(vibrato)
   const lfoG=ctx.createGain(); lfoG.gain.value=freq*0.015; lfo.connect(lfoG).connect(src.frequency);
@@ -2155,7 +2155,8 @@ function playSong(lyric, sid, el, onEnd){
       curSong.oscs.push(hat(ctx,master,t)); curSong.oscs.push(hat(ctx,master,t+spb/2));
       curSong.oscs.push(tone(ctx,master,NOTE(root-12),t,spb*0.85,st.bass,0.22));
     }
-    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,'triangle',0.045)));
+    const padWave = st.wave==='square'?'triangle':st.wave;   // 方波做和弦垫太刺, 降级三角; 其余用曲风波形
+    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,padWave,0.045)));
   }
   // 主唱：优先用系统 TTS 真正"念出"整句(按曲风调 语速/音高), 元音共振峰做和声垫在下面
   const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
@@ -2165,8 +2166,8 @@ function playSong(lyric, sid, el, onEnd){
     const t=t0+i*step, deg=st.motif[i%st.motif.length];
     const semi=st.base+scaleSemi(st.scale,deg);
     const delay=Math.max(0,(t-ctx.currentTime)*1000);
-    // 元音哼唱: TTS 可用时压低当和声垫, 否则作为主旋律
-    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),hasTTS?0.11:0.24).forEach(o=>curSong.oscs.push(o));
+    // 元音哼唱(按曲风波形, 音色各异): TTS 可用时压低当和声垫, 否则作为主旋律
+    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),hasTTS?0.14:0.26,st.wave).forEach(o=>curSong.oscs.push(o));
     const chEl=chEls[i];
     if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, delay));
   });
