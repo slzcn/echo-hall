@@ -1194,7 +1194,7 @@ async function ensureAuth(){
     if(error){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
   }
-  myUid = uid; me.id = uid; saveIdentity();
+  myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
   // upsert 到 eh_users
   const isAnon = !session?.user?.email;
   await sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:isAnon, last_seen:new Date().toISOString() });
@@ -1917,6 +1917,8 @@ function buildMsgEl(m){
   const dispName = isVoid ? (isMe ? m.name+'（虚空）' : m.name) : m.name;
   el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'');
   el.dataset.mid=m.id;
+  if(m.user_id!=null) el.dataset.uid=m.user_id;   // 存发信人uid, myUid就绪后可回补左右归属(修:登录态未就绪时渲染的自己消息卡左边)
+  if(isVoid) el.dataset.void='1';
   const isVoice = m.kind==='voice';
   const isSong = m.kind==='song';
   el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=dispName;
@@ -1948,6 +1950,19 @@ function buildMsgEl(m){
   // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
   attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
   return el;
+}
+// myUid 变化(登录态迟到就绪/换身份)后, 回补已渲染消息的左右归属 + 虚空本人后缀。
+// 修: enterRoom 里 ensureAuth 若在 session 恢复前跑, 会拿到临时匿名uid渲染历史, 自己的消息被判成"别人"卡左边;
+// 真session到达后 myUid 修正, 但旧DOM不会自动重判, 故这里显式回补。
+function resyncMsgOwnership(){
+  if(!myUid) return;
+  document.querySelectorAll('#stream .msg[data-uid]').forEach(el=>{
+    const isMe = el.dataset.uid===myUid;
+    el.classList.toggle('me', isMe);
+    if(el.dataset.void){   // 虚空消息本人后缀"（虚空）"随归属回补
+      const nm=el.querySelector('.nm'); if(nm){ const base=nm.textContent.replace(/（虚空）$/,''); nm.textContent=isMe?base+'（虚空）':base; }
+    }
+  });
 }
 // 虚空消息给非本人看的匿名代号: 用 user_id hash 到固定代号(同一人同名, 不同人不同名), 不暴露真实身份
 function voidNameFor(m){
@@ -3048,7 +3063,7 @@ async function doLogin(){
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:loginEmail, password });
   btn.disabled=false; btn.textContent='登 录';
   if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
-  myUid=sess.user.id;
+  myUid=sess.user.id; resyncMsgOwnership();
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
   me = prof && prof.name
     ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
@@ -3303,7 +3318,7 @@ const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.h
 // 故这里只做同步赋值, 异步部分用 setTimeout defer 到回调外执行。
 sb.auth.onAuthStateChange((ev,session)=>{
   if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
-    myUid=session.user.id;
+    myUid=session.user.id; resyncMsgOwnership();
     if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
       // 一并查身份档案 + 账号信息(username/email/role), 缓存到 me, 避免顶部@用户名缺失
@@ -3331,7 +3346,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
   try{
     const { data:{ session } } = await sb.auth.getSession();
     if(session?.user?.email && !myUid){
-      myUid=session.user.id; if(me){ me.id=myUid; me.registered=true; }
+      myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; me.registered=true; }
       const [{ data:prof }, { data:acc }] = await Promise.all([
         sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
         sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
