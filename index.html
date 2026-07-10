@@ -405,20 +405,20 @@
   .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
   .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
 
-  /* 曲风选择托盘 —— 轻量小色条(一行胶囊, 自动换行) */
-  .song-tray{position:absolute;bottom:72px;left:16px;right:16px;max-width:440px;background:var(--panel-solid);
-    border:1px solid var(--line2);border-radius:14px;padding:10px;display:none;z-index:34;box-shadow:0 20px 50px rgba(0,0,0,.5)}
-  .song-tray.on{display:block}
-  .song-tray .st-h{font-size:11.5px;color:var(--dim);margin:0 2px 8px;letter-spacing:.5px}
-  .song-tray .st-row{display:flex;flex-wrap:wrap;gap:6px}
-  .song-tray .st-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:16px;
-    border:1px solid var(--line2);background:rgba(10,12,24,.5);cursor:pointer;transition:.15s;font-size:12.5px;font-weight:600;
-    color:var(--ink);--sc:var(--magenta)}
-  .song-tray .st-chip .se{font-size:14px}
-  .song-tray .st-chip:hover{border-color:var(--sc);transform:translateY(-1px)}
-  .song-tray .st-chip.on{border-color:var(--sc);background:rgba(255,255,255,.06);box-shadow:0 0 0 1px var(--sc) inset}
+  /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
+  .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
+    background:rgba(255,60,172,.06);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+  .song-strip::-webkit-scrollbar{height:0}
+  .song-strip.on{display:flex}
+  .song-strip .ss-lb{font-size:11px;color:var(--magenta);flex-shrink:0;margin-right:2px}
+  .song-strip .st-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;flex-shrink:0;
+    border:1px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.15s;font-size:12px;font-weight:600;
+    color:var(--sub);--sc:var(--magenta)}
+  .song-strip .st-chip .se{font-size:13px}
+  .song-strip .st-chip:hover{border-color:var(--sc);color:var(--ink)}
+  .song-strip .st-chip.on{border-color:var(--sc);color:var(--ink);background:rgba(255,255,255,.06);box-shadow:0 0 0 1px var(--sc) inset}
   @supports (background:color-mix(in srgb,red 10%,transparent)){
-    .song-tray .st-chip.on{background:color-mix(in srgb,var(--sc) 16%,transparent)}
+    .song-strip .st-chip.on{background:color-mix(in srgb,var(--sc) 16%,transparent)}
   }
 
   /* 斜杠命令菜单 */
@@ -658,6 +658,8 @@
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
+    <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
+    <div class="song-strip" id="songStrip"></div>
     <div class="composer">
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
       <div class="cin-wrap">
@@ -673,7 +675,6 @@
         <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b>文字变神曲</b><i>把输入的话唱出来</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
-      <div class="song-tray" id="songTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
     </div>
   </div>
@@ -1826,6 +1827,9 @@ function setMode(mode){
   $('#pmVoid').classList.toggle('on', voidMode);
   $('#pmVoice').classList.toggle('on', voiceMode);
   $('#pmSong').classList.toggle('on', songMode);
+  // 神曲: 显示曲风细色条
+  const strip=$('#songStrip');
+  if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
   // 占位文案
   const cin=$('#cin');
   if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; }
@@ -2173,36 +2177,31 @@ async function sendSong(lyric, sid){
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
-  closeSongTray();
   // 本地立即试听(发送者刚有手势, 允许自动播放)
   if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
-// 曲风选择托盘：选一个曲风即进入"神曲模式"(收起托盘, ＋变🎵, 输入框变神曲风格), 主发送键发出
+// 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
 let songSel=SONG_STYLES[0].id;
 let songMode=false;
 function setSongMode(on){ setMode(on?'song':'none'); }
-function renderSongTray(){
-  $('#songTray').innerHTML=`
-    <div class="st-h">选个曲风，接下来输入的话会被唱出来 🎵</div>
-    <div class="st-row">${SONG_STYLES.map(s=>`<div class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
-      <span class="se">${s.emoji}</span><span class="sn" style="color:${safeColor(s.color)}">${esc(s.name)}</span></div>`).join('')}</div>`;
-  $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
+// 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
+function renderSongStrip(){
+  const strip=$('#songStrip'); if(!strip) return;
+  strip.innerHTML=`<span class="ss-lb">🎵 曲风</span>`+SONG_STYLES.map(s=>
+    `<span class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
+      <span class="se">${s.emoji}</span>${esc(s.name)}</span>`).join('');
+  strip.querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
-    closeSongTray();
-    setMode('song');              // 选了曲风 → 进神曲模式
+    strip.querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
+    // 更新输入框占位为当前曲风, 保持神曲模式
+    const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
+    $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
+    try{ if(curRoom) $('#cin').focus(); }catch(_){}
   });
 }
-function closeSongTray(){ $('#songTray').classList.remove('on'); }
-function openSongTray(){
-  $('#emojiTray').classList.remove('on');
-  renderSongTray(); $('#songTray').classList.add('on');
-}
-// 点托盘或整个 composer 都不关托盘, 只有点别处才关
-document.addEventListener('click',e=>{ if(!e.target.closest('#songTray') && !e.target.closest('.composer')) closeSongTray(); });
-$('#songTray').addEventListener('click',e=>e.stopPropagation());
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
 
 // ============ 多情绪回声 落库 ============
@@ -2896,13 +2895,13 @@ function closePlusMenu(){ $('#plusMenu').classList.remove('on'); if(curMode==='n
 $('#plusBtn').onclick=e=>{ e.stopPropagation();
   if(curMode!=='none'){ setMode('none'); return; }   // 当前有模式 → 点＋退出
   const open=!$('#plusMenu').classList.contains('on');
-  $('#emojiTray').classList.remove('on'); closeSongTray();
+  $('#emojiTray').classList.remove('on');
   $('#plusMenu').classList.toggle('on',open); $('#plusBtn').classList.toggle('on',open);
 };
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); if(songMode) setMode('none'); else openSongTray(); };
+$('#pmSong').onclick=()=>{ closePlusMenu(); setMode('song'); };   // 直接进神曲(默认曲风), 换曲风用细色条
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
