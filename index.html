@@ -345,9 +345,19 @@
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
 
-  /* 语音消息 · 按住说话 */
-  .mic-btn{touch-action:none}
-  .composer.recording .mic-btn{background:var(--magenta);color:#fff;box-shadow:0 0 18px var(--magenta);transform:scale(1.1)}
+  /* 语音消息 · 微信式：语音/键盘切换键 + 按住说话长条 */
+  .voice-toggle{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;
+    transition:.15s;user-select:none;color:var(--sub);border:1px solid var(--line)}
+  .voice-toggle:hover{border-color:var(--cyan);color:var(--cyan)}
+  .composer.voice-mode .voice-toggle{border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  /* 语音模式下: 隐藏输入框与表情, 显示"按住说话"长条 */
+  .hold-talk{display:none;flex:1;align-items:center;justify-content:center;min-height:42px;font-size:14px;font-weight:600;
+    color:var(--sub);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
+  .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
+  .composer.voice-mode .hold-talk{display:flex}
+  .composer.voice-mode .cin-wrap{cursor:pointer}
+  .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.15)}
+  .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
   .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;
     background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
   .rec-overlay.on{display:flex}
@@ -556,8 +566,7 @@
     .priv-actions{flex-direction:column}
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
-    .plus-btn,.mic-btn{width:40px;font-size:24px}
-    .mic-btn{font-size:20px}
+    .plus-btn,.voice-toggle{width:40px;font-size:23px}
     .cin-emoji{width:34px;font-size:19px}
     .composer{gap:5px;padding-left:8px;padding-right:8px}
     .song-tray .st-grid{grid-template-columns:repeat(3,1fr)}
@@ -658,11 +667,12 @@
     </div>
     <div class="composer">
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
+      <div class="voice-toggle" id="voiceToggle" title="切换语音/键盘">🎙️</div>
       <div class="cin-wrap">
         <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1"></textarea>
         <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
+        <div class="hold-talk" id="holdTalk">按住 说话</div>
       </div>
-      <div class="emoji-btn mic-btn" id="micBtn" title="按住说话">🎤</div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 特殊发送方式 -->
       <div class="plus-menu" id="plusMenu">
@@ -1803,9 +1813,9 @@ function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px
 // 输入框空↔有字: 切换 麦克风/发送 按钮(微信式)
 function syncSendBtn(){
   const has=!!$('#cin').value.trim();
-  const go=$('#goBtn'), mic=$('#micBtn');
-  if(go) go.style.display = has?'grid':'none';
-  if(mic) mic.style.display = has?'none':'grid';
+  const go=$('#goBtn');
+  // 语音模式下永不显示发送键(靠"按住说话"发); 键盘模式有字才显示
+  if(go) go.style.display = (!voiceMode && has)?'grid':'none';
 }
 
 // ============ 语音消息(MediaRecorder 录音 → Supabase Storage → kind='voice') ============
@@ -1909,13 +1919,24 @@ async function sendVoice(blob, secs){
   optimistic.id=row.id;
   if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
 }
-// 按住说话：pointerdown 开始录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
-const micBtn=$('#micBtn');
-micBtn.addEventListener('pointerdown',e=>{
+// 语音/键盘 切换(微信式): 点🎙️进语音模式(输入框变"按住说话"长条), 再点切回
+let voiceMode=false;
+function setVoiceMode(on){
+  voiceMode=on;
+  $('.composer').classList.toggle('voice-mode',on);
+  if(on){ hideSlash(); $('#emojiTray').classList.remove('on'); }
+  else { setTimeout(()=>{ try{$('#cin').focus();}catch(e){} },0); }
+  syncSendBtn();
+}
+$('#voiceToggle').onclick=()=>setVoiceMode(!voiceMode);
+// 按住"说话"长条录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
+const holdTalk=$('#holdTalk');
+holdTalk.addEventListener('pointerdown',e=>{
   e.preventDefault();
   if(recorder || recActive) return;
   recActive=true; recStartY=e.clientY;
-  try{ micBtn.setPointerCapture(e.pointerId); }catch(_){}
+  try{ holdTalk.setPointerCapture(e.pointerId); }catch(_){}
+  holdTalk.textContent='松开发送 · 上滑取消';
   startRec();
 });
 window.addEventListener('pointermove',e=>{ if(!recActive) return; setRecCancel((recStartY-e.clientY)>90); });
@@ -1923,12 +1944,13 @@ function micRelease(){
   if(!recActive) return;
   recActive=false;
   recWanted=true;                 // 松手即发(除非已标记取消)
+  holdTalk.textContent='按住 说话';
   if(recorder) stopRec();         // 授权仍在进行(recorder 未就绪)时，startRec 会因 recActive=false 自行放弃
   else { clearInterval(recTimer); recTimer=null; stopWave(); hideRecUI(); }
 }
 window.addEventListener('pointerup',micRelease);
 window.addEventListener('pointercancel',micRelease);
-if(!REC_MIME || !navigator.mediaDevices?.getUserMedia) $('#micBtn').style.display='none';
+if(!REC_MIME || !navigator.mediaDevices?.getUserMedia) $('#voiceToggle').style.display='none';
 
 // ============ 神曲(文字→洗脑歌曲, Web Audio 合成节拍 + 语音合成"唱"字) ============
 // 消息编码: kind='song', text='曲风id|歌词'。曲风白名单校验, 不认识则整体当纯文本(向后兼容)。
