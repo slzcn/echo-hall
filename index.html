@@ -1635,11 +1635,11 @@ function resumeAfterAuth(){
 }
 function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
 // 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
-// 判据用本地 me.registered(正式账号标记, loadOrRollIdentity 已同步读出) —— 不解析 supabase 内部存储
-// (其格式在不同版本会 base64/分片, JSON.parse 会失败). 若 session 实际已失效, 靠后面的兜底回落 enter。
+// 判据: 有 last_room + 本地 me.id(曾登录过, 无论正式/临时账号 —— 临时匿名 session 也持久化)。
+// 不解析 supabase 内部存储(其格式在不同版本会 base64/分片, JSON.parse 会失败)。session 若实际失效, 靠兜底回落 enter。
 function preRestoreScene(){
   const r=lastRoom(); if(!r) return false;
-  if(!me || !me.registered) return false;
+  if(!me || !me.id) return false;
   const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
     const rc = r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||'#28E6D8') : (r.kind==='public'?'#4DE38A':'#8B5CFF');
     hi.style.setProperty('--room-c', rc); }
@@ -3335,25 +3335,27 @@ const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.h
 // ⚠️ onAuthStateChange 回调里绝不能直接 await sb.* 请求(GoTrue 会死锁, 表现为登录后所有请求卡住)。
 // 故这里只做同步赋值, 异步部分用 setTimeout defer 到回调外执行。
 sb.auth.onAuthStateChange((ev,session)=>{
-  if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
+  if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user){
+    const isReg = !!session.user.email;   // 有邮箱=正式账号; 匿名临时身份没有
     myUid=session.user.id; resyncMsgOwnership();
-    if(me) { me.id=myUid; me.registered=true; }
+    if(me) { me.id=myUid; if(isReg) me.registered=true; }
     setTimeout(async ()=>{
       // 先恢复现场(进房只需 myUid[已就绪] + 本地缓存 me), 不等 DB 查询, 避免 hall 骨架空等数秒
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
       if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
         authHandled=true; resumeAfterAuth();
       }
-      // 身份档案 + 账号信息(username/email/role)后台补齐, 缓存到 me, 避免顶部@用户名缺失
-      const [{ data:prof }, { data:acc }] = await Promise.all([
-        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
-      ]);
-      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
-      else { me = me||{}; me.registered=true; }
-      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
-      saveIdentity();
-      paintIdentity();
+      // 正式账号补齐身份档案 + 账号信息; 临时账号只需保底档案(不查 eh_accounts)
+      if(isReg){
+        const [{ data:prof }, { data:acc }] = await Promise.all([
+          sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+          sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
+        ]);
+        if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+        else { me = me||{}; me.registered=true; }
+        if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
+        saveIdentity(); paintIdentity();
+      }
     },0);
   }
 });
@@ -3362,20 +3364,23 @@ sb.auth.onAuthStateChange((ev,session)=>{
 (async()=>{
   try{
     const { data:{ session } } = await sb.auth.getSession();
-    if(session?.user?.email && !myUid){
-      myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; me.registered=true; }
+    if(session?.user && !myUid){
+      const isReg = !!session.user.email;
+      myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; if(isReg) me.registered=true; }
       // 先恢复现场再补 DB 资料(同 onAuthStateChange 路径, 避免 hall 骨架空等)
       if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
         authHandled=true; resumeAfterAuth();
       }
-      const [{ data:prof }, { data:acc }] = await Promise.all([
-        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
-      ]);
-      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
-      else { me=me||{}; me.registered=true; }
-      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
-      saveIdentity(); paintIdentity();
+      if(isReg){
+        const [{ data:prof }, { data:acc }] = await Promise.all([
+          sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+          sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
+        ]);
+        if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+        else { me=me||{}; me.registered=true; }
+        if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
+        saveIdentity(); paintIdentity();
+      }
     }
   }catch(e){ console.warn('session restore', e); }
   // 兜底: 预绘了 hall 但迟迟没进恢复流程(session 真失效/过期) → 回落入场页, 不卡空骨架。
