@@ -18,13 +18,45 @@
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#5B6688;
     --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
     --grid:rgba(80,120,255,.05);
+    --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
     --glow-cyan:0 0 24px rgba(40,230,216,.5); --glow-mag:0 0 24px rgba(255,60,172,.5);
   }
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden}
+  /* ===== 皮肤: 蒸汽波(粉紫日落) ===== */
+  html[data-theme="vapor"]{
+    --bg:#160a1f; --bg2:#22103a; --panel:rgba(40,18,60,.72); --panel-solid:#241035;
+    --line:rgba(255,120,200,.18); --line2:rgba(255,120,200,.32);
+    --ink:#FFE8F6; --sub:#D9A8D0; --dim:#8A6A96;
+    --cyan:#38E1D0; --magenta:#FF5FA2; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0;
+    --grid:rgba(255,120,220,.06);
+    --glow-cyan:0 0 24px rgba(255,95,162,.5); --glow-mag:0 0 26px rgba(179,107,255,.55);
+  }
+  /* ===== 皮肤: 暗夜极简(纯黑金) ===== */
+  html[data-theme="mono"]{
+    --bg:#000000; --bg2:#0a0a0c; --panel:rgba(16,16,20,.82); --panel-solid:#0e0e12;
+    --line:rgba(210,180,120,.16); --line2:rgba(210,180,120,.3);
+    --ink:#F4F1E9; --sub:#B8B0A0; --dim:#6E685C;
+    --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96;
+    --grid:rgba(210,180,120,.035);
+    --glow-cyan:0 0 20px rgba(233,200,119,.4); --glow-mag:0 0 20px rgba(233,200,119,.4);
+  }
+  /* ===== 皮肤: 极光渐变(蓝绿流光) ===== */
+  html[data-theme="aurora"]{
+    --bg:#04121a; --bg2:#062230; --panel:rgba(10,40,52,.7); --panel-solid:#08202c;
+    --line:rgba(90,220,200,.18); --line2:rgba(90,220,200,.32);
+    --ink:#E6FBF6; --sub:#9BD4CC; --dim:#5A8A84;
+    --cyan:#2EF0C8; --magenta:#5AD1FF; --violet:#7CE0B0; --amber:#8CE6D0; --green:#3EE89A;
+    --grid:rgba(80,220,255,.05);
+    --glow-cyan:0 0 26px rgba(46,240,200,.55); --glow-mag:0 0 24px rgba(90,209,255,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
+  html{width:100%}
+  /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
+     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
-    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;position:relative;
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
+    position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
@@ -45,7 +77,7 @@
 
   /* ============ 场景1：入场 ============ */
   #enter{align-items:center;justify-content:center;flex-direction:column}
-  .enter-card{width:min(440px,92vw);padding:38px 34px;text-align:center;position:relative;overflow:hidden}
+  .enter-card{width:min(var(--card-max),92vw);padding:38px 34px;text-align:center;position:relative;overflow:hidden}
   .enter-card::before{content:"";position:absolute;inset:0;border-radius:18px;padding:1px;
     background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
@@ -69,6 +101,9 @@
   .reroll:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .reroll:active{transform:scale(.94)}
   .opt-email{font-size:11.5px;color:var(--dim);cursor:pointer;margin-bottom:14px;transition:.15s;user-select:none}
+  .vbadge{font-size:10px;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+  .vbadge.ok{background:rgba(77,227,138,.15);color:var(--green)}
+  .vbadge.no{background:rgba(255,184,77,.15);color:var(--amber)}
   .opt-email:hover{color:var(--cyan)}
   .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
   .opt-email-box.on{max-height:70px;margin-bottom:16px}
@@ -95,7 +130,7 @@
   .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .fld-hint{font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.5}
   /* 通用确认弹层 */
-  .confirm-box{width:min(340px,88vw);padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
+  .confirm-box{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
   .confirm-title{font-size:17px;font-weight:800;margin-bottom:10px;letter-spacing:.5px}
   .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
   .confirm-btns{display:flex;gap:10px}
@@ -109,14 +144,17 @@
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
   /* ============ 场景2：大厅 ============ */
-  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto}
-  .lobby-head{text-align:center;position:relative;width:100%;max-width:760px}
+  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
+  .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
   .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
-  .me-btn{position:absolute;top:0;right:0;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;
-    cursor:pointer;border:1px solid var(--line);background:var(--panel);transition:.18s}
-  .me-btn:hover{border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .me-btn{position:absolute;top:0;right:0;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
+    cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.18s}
+  .me-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  .me-btn.ic svg{width:18px;height:18px}
+  .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
+  .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--cyan);box-shadow:0 0 12px -3px var(--cyan);transform:translateY(-1px)}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -125,10 +163,10 @@
   .skin-opt .dot{width:13px;height:13px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
   .skin-opt .ck{margin-left:auto;opacity:0;font-size:12px}
   .skin-opt.active .ck{opacity:1;color:var(--cyan)}
-  .sec-label{width:min(760px,94vw);font-size:11.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;
+  .sec-label{width:100%;max-width:var(--content-max);font-size:11.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;
     display:flex;align-items:center;gap:8px;margin-top:4px}
   .sec-label::after{content:"";flex:1;height:1px;background:var(--line)}
-  .channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;width:min(760px,94vw)}
+  .channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;width:100%;max-width:var(--content-max)}
   .ch{padding:20px 18px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
     border:1px solid var(--line);background:var(--panel)}
   .ch:hover{transform:translateY(-4px);border-color:var(--ch-c);box-shadow:0 14px 40px rgba(0,0,0,.4)}
@@ -147,15 +185,15 @@
   .ch .tagk{position:absolute;top:12px;right:12px;font-size:9px;padding:2px 7px;border-radius:6px;letter-spacing:1px;
     background:rgba(255,255,255,.06);color:var(--dim)}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
-  .empty-hint{width:min(760px,94vw);text-align:center;color:var(--dim);font-size:12px;padding:8px}
+  .empty-hint{width:100%;max-width:var(--content-max);text-align:center;color:var(--dim);font-size:12px;padding:8px}
 
-  .priv-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;width:min(760px,94vw)}
+  .priv-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;width:100%;max-width:var(--content-max)}
   .priv-btn{padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
     background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
   .priv-btn:hover{transform:translateY(-2px)}
   .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:var(--glow-mag)}
-  .my-rooms{display:flex;flex-direction:column;gap:8px;width:min(760px,94vw)}
+  .my-rooms{display:flex;flex-direction:column;gap:8px;width:100%;max-width:var(--content-max)}
   .rm{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;cursor:pointer;
     background:var(--panel);border:1px solid var(--line);transition:.18s}
   .rm:hover{border-color:var(--violet);transform:translateX(3px)}
@@ -166,24 +204,38 @@
   .rm .rm-arr{color:var(--dim)}
 
   /* ============ 场景3：聊天厅 ============ */
-  #hall{flex-direction:column;width:min(900px,96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
-  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+  #hall{flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
+  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
   .back:hover{color:var(--cyan);border-color:var(--cyan)}
-  .hall-ti{flex:1;min-width:0}
-  .hall-ti h3{font-size:15.5px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .hall-ti h3 .hall-emoji{font-size:22px;flex-shrink:0;line-height:1}
+  .hall-ti{flex:1;min-width:0;display:flex;align-items:center;gap:11px}
+  .hall-icon{font-size:34px;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;width:40px;text-align:center}
+  .tcol{flex:1;min-width:0}
+  .hall-ti h3{font-size:15.5px;font-weight:700;letter-spacing:.5px;line-height:1.25;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hall-ti .cnt{font-size:11px;color:var(--dim);margin-top:2px}
+  .hall-ti .cnt{display:flex;align-items:center;gap:6px}
   .hall-ti .cnt b{color:var(--sub)}
-  .gear{width:34px;height:34px;border-radius:9px;display:none;place-items:center;cursor:pointer;color:var(--sub);
-    border:1px solid var(--line);transition:.15s;flex-shrink:0;font-size:16px}
+  .cnt-led{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:.3s}
+  .cnt-led.live{background:var(--cyan);box-shadow:0 0 8px var(--cyan),0 0 3px var(--cyan);animation:connpulse 2s ease-in-out infinite}
+  .gear{width:36px;height:36px;border-radius:10px;display:none;place-items:center;cursor:pointer;color:var(--sub);
+    border:1px solid var(--line);background:var(--panel);transition:.18s;flex-shrink:0;font-size:18px}
   .gear.show{display:grid}
-  .gear:hover{color:var(--amber);border-color:var(--amber)}
-  .conn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);white-space:nowrap}
-  .conn .led{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:.3s}
-  .conn.live .led{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-  .conn.live{color:var(--cyan)}
+  .gear:hover{color:var(--amber);border-color:var(--amber);box-shadow:0 0 20px color-mix(in srgb,var(--amber) 40%,transparent)}
+  @keyframes connpulse{0%,100%{opacity:1}50%{opacity:.55}}
+  .hall-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .tool-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
+    border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:18px;flex-shrink:0;user-select:none}
+  .tool-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+  /* 触屏点后短暂禁用指针, 强制脱落 :hover, 不再粘住 */
+  .nohover{pointer-events:none!important}
+  /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
+  .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
+  .tool-btn.active,.me-btn.active{color:var(--cyan);border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,transparent)}
+  .gear.active{color:var(--amber);border-color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent)}  /* 齿轮用琥珀主色, 与其 hover 一致 */
+  .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
+  .gear.ic{place-items:center}
+  .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
 
   .presence{display:flex;gap:12px;padding:10px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0}
   .presence::-webkit-scrollbar{height:0}
@@ -197,6 +249,10 @@
   .pav:hover .av-ic::after{opacity:.7;inset:-3.5px}
   .pav .nm{font-size:9.5px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
   .pav.me .nm{color:var(--cyan);font-weight:600}
+  .pav-skel{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;pointer-events:none}
+  .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,rgba(120,140,200,.10),rgba(120,140,200,.20),rgba(120,140,200,.10));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
+  .pav-skel .sk-nm{width:30px;height:8px;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
+  @keyframes skel-pulse{0%{background-position:200% 0;opacity:.6}50%{opacity:1}100%{background-position:-200% 0;opacity:.6}}
   .pav.me .av-ic::before{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel-solid);z-index:1}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
@@ -217,7 +273,7 @@
   .msg .tm{font-size:10px;color:var(--dim)}
   .msg .reply-ref{font-size:11px;color:var(--dim);border-left:2px solid var(--line2);padding:2px 8px;margin:2px 0;
     background:rgba(255,255,255,.02);border-radius:0 6px 6px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;
+  .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;overflow-wrap:anywhere;max-width:100%;
     background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
     -webkit-user-select:none;user-select:none}
   .msg.me{flex-direction:row-reverse}
@@ -226,11 +282,18 @@
   .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent));border-color:var(--line2)}
   .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
-  .msg .echo{position:absolute;right:-8px;bottom:-10px;background:var(--panel-solid);border:1px solid var(--line2);
-    border-radius:10px;padding:1px 7px;font-size:11px;cursor:pointer;user-select:none;transition:.15s;color:var(--sub);opacity:0}
-  .msg:hover .echo,.msg .echo.has{opacity:1}
-  .msg .echo:hover{border-color:var(--magenta);color:var(--magenta)}
-  .msg .echo.has{color:var(--magenta);border-color:color-mix(in srgb,var(--magenta) 40%,transparent)}
+  /* 回声徽章条: 消息下方一排各情绪计数 */
+  .echo-bar{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .echo-bar.empty{display:none}
+  .msg.me .echo-bar{justify-content:flex-end}
+  .ec-pill{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:2px 8px;border-radius:11px;cursor:pointer;
+    background:var(--panel-solid);border:1px solid var(--line2);color:var(--sub);transition:.15s;user-select:none;line-height:1.4}
+  .ec-pill b{font-weight:700;font-size:11px}
+  .ec-pill:hover{transform:translateY(-1px);border-color:var(--cyan)}
+  .ec-pill.mine{background:rgba(40,230,216,.12);border-color:var(--cyan);color:var(--cyan)}
+  /* 消息达阈值共鸣时的高亮脉冲 */
+  .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
+  @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
@@ -250,24 +313,134 @@
   .reply-preview .rp-x{cursor:pointer;color:var(--dim);padding:2px 6px}
   .reply-preview .rp-x:hover{color:var(--magenta)}
 
-  .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
-  .cin-wrap{flex:1;display:flex;align-items:center;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 6px 2px 14px;transition:.2s}
-  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
+  /* 虚空模式输入框风格 */
+  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,92,255,.12)}
+  .composer.void-mode .cin{color:var(--violet)}
+  .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.6}
+  /* 神曲模式输入框风格 */
+  .composer.song-mode .cin-wrap{border-color:var(--song-c,var(--magenta));box-shadow:0 0 0 3px color-mix(in srgb,var(--song-c,var(--magenta)) 14%,transparent)}
+  .composer.song-mode .cin{color:var(--song-c,var(--magenta));font-weight:600}
+  .composer.song-mode .cin::placeholder{color:var(--song-c,var(--magenta));opacity:.6}
+
+  .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
+  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
+  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
-  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
-    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px color-mix(in srgb,var(--cyan) 25%,transparent)}
+  /* 输入框内表情按钮(略小, 贴右) */
+  .cin-emoji{width:38px;height:42px;font-size:20px}
+  /* ＋ 花样按钮 */
+  .plus-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:10px;
+    transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
+  .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  /* ＋处于某模式时: 显该模式图标(不旋转), 高亮提示"可退出" */
+  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
+  .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:rgba(139,92,255,.16);box-shadow:0 0 12px -3px var(--violet)}
+  .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
+  /* ＋ 花样菜单 */
+  .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+    padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5);min-width:220px}
+  .plus-menu.on{display:flex}
+  .pm-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:.12s}
+  .pm-item:hover{background:rgba(255,255,255,.06)}
+  .pm-item .pm-ic{font-size:22px;width:26px;text-align:center}
+  .pm-item .pm-tx{display:flex;flex-direction:column;gap:1px}
+  .pm-item .pm-tx b{font-size:13px;font-weight:700}
+  .pm-item .pm-tx i{font-size:11px;color:var(--dim);font-style:normal}
+  .pm-item.on{background:rgba(139,92,255,.15)}
+  /* 虚空消息气泡: 无名/紫调/虚线/倒计时 */
+  .msg.void .av{background:rgba(139,92,255,.12)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px rgba(139,92,255,.4)!important}
+  .msg.void .nm{color:var(--violet)!important;font-style:italic}
+  .msg.void .txt{background:rgba(139,92,255,.07);border-color:rgba(139,92,255,.3);border-style:dashed}
+  .msg.void .vexp{font-size:10px;color:var(--violet);opacity:.8;margin-left:8px}
+  .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
+  @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
+  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;place-items:center;
+    background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:#04060c}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
-  .go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
-  .emoji-tray{position:absolute;bottom:72px;right:70px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+  .emoji-tray{position:absolute;bottom:72px;right:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px rgba(0,0,0,.5)}
   .emoji-tray.on{display:grid}
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
+
+  /* 语音消息 · 按住说话长条(语音模式下输入框变身) */
+  /* 语音模式下: 隐藏输入框与表情, 显示"按住说话"长条 */
+  .hold-talk{display:none;flex:1;align-items:center;justify-content:center;min-height:42px;font-size:14px;font-weight:600;
+    color:var(--cyan);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
+  .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
+  .composer.voice-mode .hold-talk{display:flex}
+  .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--cyan)}
+  .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.15)}
+  .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
+  .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
+  .rec-overlay.on{display:flex}
+  .rec-panel{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 40px;border-radius:22px;
+    background:var(--panel-solid);border:1px solid var(--line2);box-shadow:0 24px 60px rgba(0,0,0,.6);transition:.2s}
+  .rec-panel.cancel{border-color:var(--magenta);background:rgba(60,10,30,.9)}
+  .rec-wave{display:flex;align-items:center;gap:4px;height:52px}
+  .rec-wave i{width:5px;border-radius:3px;background:linear-gradient(var(--cyan),var(--magenta));height:10px;transition:height .09s ease-out}
+  .rec-panel.cancel .rec-wave i{background:var(--dim)}
+  .rec-time{font-size:24px;font-weight:800;letter-spacing:1px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .rec-tip{font-size:12.5px;color:var(--sub);letter-spacing:.5px}
+  .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
+  .rec-panel.cancel .rec-time{color:var(--magenta)}
+  .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
+  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--cyan);background:rgba(10,12,24,.5);
+    color:var(--cyan);cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
+  .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
+  .vplay .vp-btn{padding-left:2px}                 /* ▶ 视觉偏左, 右移补偿居中 */
+  .vplay.playing .vp-btn{padding-left:0}  /* ⏸ 与 ▶ 同款描边, 仅符号变, 不加底色 */
+  .vplay .vp-bars{display:flex;gap:2px;align-items:center;height:18px;color:var(--cyan)}
+  .vplay .vp-bars i{width:3px;border-radius:2px;background:currentColor;opacity:.55}
+  .vplay.playing .vp-bars i{animation:vbar .9s ease-in-out infinite}
+  .vplay.playing .vp-bars i:nth-child(2n){animation-delay:.2s}
+  .vplay.playing .vp-bars i:nth-child(3n){animation-delay:.4s}
+  @keyframes vbar{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1.15)}}
+  .vplay .vp-t{font-size:11px;color:var(--dim);min-width:30px}
+
+  /* 神曲消息 */
+  .song-card{display:inline-flex;align-items:center;gap:10px;min-width:170px;max-width:100%;vertical-align:middle;
+    padding:2px 2px 2px 0}
+  .song-play{width:30px;height:30px;flex-shrink:0;border-radius:50%;border:1px solid var(--sc,var(--magenta));cursor:pointer;font-size:12px;line-height:1;
+    display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
+  .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
+  .song-play{padding-left:2px}                                                  /* ▶ 右移补偿居中 */
+  .song-card.playing .song-play{padding-left:0}  /* ⏸ 与 ▶ 同款描边, 仅符号变, 不加底色 */
+  .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
+  .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
+  .song-lyric .sl-ch.sung{color:var(--ink)}
+  .song-lyric .sl-ch.on{color:var(--sc,var(--cyan));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
+  .song-eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:2px}
+  .song-eq i{width:2.5px;height:5px;border-radius:1px;background:currentColor;opacity:.7}
+  .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
+  .song-card.playing .song-eq i:nth-child(2){animation-delay:.15s}
+  .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
+  .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
+
+  /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
+  .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
+    background:rgba(255,60,172,.06);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+  .song-strip::-webkit-scrollbar{height:0}
+  .song-strip.on{display:flex}
+  .song-strip .ss-lb{font-size:11px;color:var(--magenta);flex-shrink:0;margin-right:2px}
+  .song-strip .st-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;flex-shrink:0;
+    border:1px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.15s;font-size:12px;font-weight:600;
+    color:var(--sub);--sc:var(--magenta)}
+  .song-strip .st-chip .se{font-size:13px}
+  .song-strip .st-chip:hover{border-color:var(--sc);color:var(--ink)}
+  .song-strip .st-chip.on{border-color:var(--sc);color:var(--ink);background:rgba(255,255,255,.06);box-shadow:0 0 0 1px var(--sc) inset}
+  @supports (background:color-mix(in srgb,red 10%,transparent)){
+    .song-strip .st-chip.on{background:color-mix(in srgb,var(--sc) 16%,transparent)}
+  }
 
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
@@ -280,12 +453,19 @@
 
   /* 长按互动环 */
   .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:6px;display:none;gap:2px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
+    padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
   .act-ring.on{display:flex}
-  .act-ring button{background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
+  .act-ring .ar-echoes{display:flex;gap:2px}
+  .act-ring .ar-echo{background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 8px;border-radius:10px;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:46px}
+  .act-ring .ar-echo .ai{font-size:20px}
+  .act-ring .ar-echo .al{font-size:10px;color:var(--sub)}
+  .act-ring .ar-echo:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
+  .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
+  .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
     border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
-  .act-ring button .ai{font-size:18px}
-  .act-ring button:hover{background:rgba(255,255,255,.08)}
+  .act-ring .ar-actions .ai{font-size:18px}
+  .act-ring .ar-actions button:hover{background:rgba(255,255,255,.08)}
 
   /* 粒子/共鸣 */
   #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
@@ -305,10 +485,10 @@
   #toast.on{transform:translateX(-50%) translateY(0)}
 
   /* ============ 弹窗 & 抽屉 ============ */
-  .modal-mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);
+  .modal-mask{position:fixed;inset:0;z-index:95;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);
     display:none;align-items:center;justify-content:center;padding:20px}
   .modal-mask.on{display:flex}
-  .modal{width:min(400px,92vw);max-height:90dvh;overflow-y:auto;padding:28px 26px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
+  .modal{width:100%;max-width:400px;max-height:90dvh;overflow-y:auto;padding:28px 26px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
   .modal-x{position:absolute;top:16px;right:18px;color:var(--dim);cursor:pointer;font-size:16px;transition:.15s;z-index:2}
   .modal-x:hover{color:var(--magenta)}
   .modal h3{font-size:20px;font-weight:800;margin-bottom:8px;letter-spacing:.5px}
@@ -366,11 +546,12 @@
   .me-hero .mh-badge.anon{background:rgba(120,140,220,.12);color:var(--sub)}
   .me-btns{display:flex;gap:8px;margin-top:14px;width:100%}
   .me-btns .dbtn{margin-top:0;flex:1}
-  .me-stats{display:flex;gap:10px;margin-bottom:14px}
-  .me-stat{flex:1;background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;cursor:default}
-  .me-stat .n{font-size:20px;font-weight:800;color:var(--cyan)}
-  .me-stat .l{font-size:10.5px;color:var(--dim);margin-top:3px}
-  .dsec .dl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  .dsec .dl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .dsec .dl .dl-n{font-size:10px;color:var(--dim);background:rgba(120,140,220,.12);border-radius:20px;padding:1px 8px;font-weight:600;letter-spacing:0}
+  .dsec .dl .dl-refresh{margin-left:auto;font-size:13px;color:var(--dim);cursor:pointer;padding:2px 6px;border-radius:6px;transition:.15s;user-select:none;letter-spacing:0}
+  .dsec .dl .dl-refresh:hover{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .dsec .dl .dl-refresh.spinning{animation:dl-spin .8s linear infinite;pointer-events:none;color:var(--cyan)}
+  @keyframes dl-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .dcard{background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:12px;padding:14px}
   .drow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;border-bottom:1px solid var(--line)}
   .drow:last-child{border-bottom:none}
@@ -380,17 +561,28 @@
     font-family:inherit;font-size:13px;cursor:pointer;transition:.15s;margin-top:8px}
   .dbtn:hover{border-color:var(--cyan);color:var(--cyan)}
   .dbtn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
-  .mlist{display:flex;flex-direction:column;gap:6px}
-  .mitem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:rgba(10,12,24,.4)}
-  .mitem .mi-av{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
-  .mitem .mi-nm{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mitem .mi-role{font-size:9px;padding:2px 6px;border-radius:5px;background:rgba(255,184,77,.15);color:var(--amber)}
-  .mitem .mi-kick{font-size:11px;color:var(--dim);cursor:pointer;padding:2px 6px}
+  /* 我的房间: 两列网格, 整卡可点 */
+  .mlist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mitem{display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:11px;background:rgba(10,12,24,.5);
+    border:1px solid var(--line);transition:.15s;min-width:0}
+  .mitem.mitem-go{cursor:pointer}
+  .mitem.mitem-go:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 22px -10px var(--cyan)}
+  .mitem .mi-av{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:16px;flex-shrink:0;
+    background:rgba(120,140,220,.1)}
+  .mitem .mi-nm{flex:1;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .mitem .mi-role{font-size:8.5px;padding:2px 6px;border-radius:5px;background:rgba(255,184,77,.15);color:var(--amber);flex-shrink:0}
+  .mitem .mi-kick{font-size:11px;color:var(--dim);cursor:pointer;padding:2px 6px;flex-shrink:0}
   .mitem .mi-kick:hover{color:var(--magenta)}
+  .mlist .empty-hint{grid-column:1/-1}
+  /* 房主成员管理列表沿用竖排单列 */
+  .member-list{display:flex;flex-direction:column;gap:6px}
+  .member-list .mitem{cursor:default}
+  .member-list .mitem:hover{transform:none;box-shadow:none;border-color:var(--line)}
 
   @media(max-width:600px){
     .title{font-size:30px}
-    .stage:has(#hall.on){padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
+    /* 聊天页(用 body.hall-on 而非 :has, 兼容不支持:has的iOS WebView): 满高+顶对齐, 输入框贴键盘 */
+    body.hall-on .stage{padding:0;height:100dvh;height:var(--appvh,100dvh);align-items:stretch}
     #hall{width:100%;height:100dvh;height:var(--appvh,100dvh);border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
@@ -398,6 +590,10 @@
     .priv-actions{flex-direction:column}
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
+    .plus-btn{width:40px;font-size:23px}
+    .cin-emoji{width:34px;font-size:19px}
+    .composer{gap:5px;padding-left:8px;padding-right:8px}
+    .song-lyric{max-width:150px}
     .enter-card{padding:32px 22px}
     .modal{padding:24px 20px}
   }
@@ -449,9 +645,8 @@
     <div class="lobby-head">
       <h2>回声厅</h2>
       <p>以 <span class="you" id="lobbyName">—</span> 的身份 · 点名字看个人空间</p>
-      <div class="me-btn" id="bgmBtn" title="氛围音乐" style="right:92px">🔊</div>
-      <div class="me-btn" id="skinBtn" title="皮肤" style="right:52px">🎨</div>
-      <div class="me-btn" id="meBtn" title="个人空间">🦊</div>
+      <div class="me-btn" id="skinBtn" title="皮肤" style="right:48px">🎨</div>
+      <div class="me-btn me-avatar" id="meBtn" title="个人空间">🦊</div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
     <div class="sec-label">官方频道</div>
@@ -472,11 +667,19 @@
     <div class="hall-top">
       <div class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
       <div class="hall-ti">
-        <h3 id="hallName">—</h3>
-        <div class="cnt" id="hallCnt">连接中…</div>
+        <div class="hall-icon" id="hallIcon">🌐</div>
+        <div class="tcol">
+          <h3 id="hallName"><span id="hallNameTxt">—</span></h3>
+          <div class="cnt" id="hallCnt">连接中…</div>
+        </div>
       </div>
-      <div class="gear" id="gearBtn">⚙</div>
-      <div class="conn" id="conn"><span class="led"></span><span id="connTxt">连接中</span></div>
+      <div class="hall-tools">
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
+        <div class="tool-btn" id="skinBtnHall" title="皮肤">🎨</div>
+        <div class="gear" id="gearBtn" title="房间设置">⚙️</div>
+        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间">🦊</div>
+      </div>
+      <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
@@ -484,21 +687,40 @@
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
-    <div class="composer">
-      <div class="emoji-btn" id="emojiBtn">😊</div>
+    <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
+    <div class="song-strip" id="songStrip"></div>
+    <form class="composer" onsubmit="return false" autocomplete="off" spellcheck="false">
+      <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
       <div class="cin-wrap">
-        <textarea class="cin" id="cin" placeholder="说点什么… 试试打个 /" rows="1"></textarea>
+        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
+        <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
+        <div class="hold-talk" id="holdTalk">按住 说话</div>
       </div>
-      <button class="go" id="goBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <!-- ＋ 花样菜单: 三种特殊发言方式 -->
+      <div class="plus-menu" id="plusMenu">
+        <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b>语音留声</b><i>按住录音，松手发送</i></span></div>
+        <div class="pm-item" id="pmVoid"><span class="pm-ic">🕳️</span><span class="pm-tx"><b>说给虚空</b><i>匿名 · 5分钟后消散</i></span></div>
+        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b>文字神曲</b><i>把输入的话，唱出来</i></span></div>
+      </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
-    </div>
+    </form>
   </div>
 
 </div>
 
 <!-- 长按互动环 -->
 <div class="act-ring" id="actRing"></div>
+
+<!-- 语音录制浮层(按住说话) -->
+<div class="rec-overlay" id="recOverlay">
+  <div class="rec-panel" id="recPanel">
+    <div class="rec-wave" id="recWave"></div>
+    <div class="rec-time" id="recTime">0:00</div>
+    <div class="rec-tip" id="recTip">松开发送 · 上滑取消</div>
+  </div>
+</div>
 
 <!-- ===== 弹窗：建房 / 入房 / 绑定 ===== -->
 <div class="modal-mask" id="modalMask">
@@ -554,8 +776,12 @@
     <div class="modal-body" id="mEmail" style="display:none">
       <h3>邮箱设置</h3>
       <p class="modal-sub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld" id="curEmailRow"><span>当前邮箱</span>
+      <label class="fld" id="curEmailRow"><span>当前邮箱 <span id="emailVerifyBadge"></span></span>
         <input id="curEmail" type="email" disabled style="opacity:.6"></label>
+      <div id="verifyRow" style="display:none;margin:-6px 0 14px">
+        <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
+        <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
+      </div>
       <label class="fld"><span id="newEmailLabel">新邮箱</span>
         <input id="newEmail" type="email" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
@@ -735,7 +961,9 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 // ---- 身份 ----
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
-const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🐙','🦩','🦚'];
+const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🐆','✨','🐙','🦌','🐦','🐈‍⬛','🐬','🐆','🦔','🦋'];
+// 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
+const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
 const LS_ID = 'eh_identity_v2';
 
@@ -743,12 +971,25 @@ let me = null;      // {id(uid), name, emoji, color}
 let myUid = null;
 
 function loadOrRollIdentity(){
-  try{ const s=localStorage.getItem(LS_ID); if(s){ me=JSON.parse(s); return; } }catch(e){}
+  try{ const s=localStorage.getItem(LS_ID); if(s){ me=JSON.parse(s); if(reconcileEmoji()){ saveIdentity(); } return; } }catch(e){}
   rollIdentity();
 }
 function rollIdentity(){
-  me = { id: me?.id||null, name: rand(ADJ)+rand(ANI), emoji: rand(EMO), color: rand(COLORS) };
+  const ai = Math.floor(Math.random()*ANI.length); // 同一下标决定动物名+emoji, 防错位
+  me = { id: me?.id||null, name: rand(ADJ)+ANI[ai], emoji: EMO[ai], color: rand(COLORS) };
   saveIdentity(); paintIdentity();
+}
+// 已存身份的 emoji 与名字末尾动物不匹配时, 用名字推导正确 emoji(修老用户脏数据)
+function reconcileEmoji(){
+  if(!me || !me.name || !me.emoji) return false;
+  if(me.registered) return false; // 正式账号形象为自主选择, 不自动纠正
+  for(let i=0;i<ANI.length;i++){
+    if(me.name.endsWith(ANI[i])){
+      if(me.emoji !== EMO[i]){ me.emoji = EMO[i]; return true; }
+      return false;
+    }
+  }
+  return false;
 }
 function saveIdentity(){ try{ localStorage.setItem(LS_ID, JSON.stringify(me)); }catch(e){} }
 function paintIdentity(){
@@ -758,10 +999,11 @@ function paintIdentity(){
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
-  // 正式账号 vs 临时身份: 更新标签 + 换一个按钮(临时才可换)
-  const tag=$('#idTag'), rr=$('#rerollBtn');
-  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; }
-  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; }
+  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
+  // 正式账号 vs 临时身份: 更新标签 + 主按钮文案 + 换一个按钮(临时才可换)
+  const tag=$('#idTag'), rr=$('#rerollBtn'), eb=$('#enterBtn');
+  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入'; }
+  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; if(eb) eb.textContent='匿 名 进 入'; }
 }
 
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
@@ -800,59 +1042,191 @@ const LS_BGM='eh_bgm';
 // 官方房 BGM 氛围 → 引用集中配置 EH_CONFIG(见文件顶部)
 const ROOM_BGM=EH_CONFIG.roomBgm;
 const AudioEngine=(function(){
-  let ctx=null, nodes=[], timer=null, cur=null, master=null;
-  function ensure(){ if(!ctx){ try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);}catch(e){ctx=null;} } return ctx; }
-  function clearNodes(){ nodes.forEach(n=>{try{n.stop&&n.stop();}catch(e){} try{n.disconnect&&n.disconnect();}catch(e){}}); nodes=[]; if(timer){clearInterval(timer);timer=null;} }
+  let ctx=null, master=null, running=false, cur=null;
+  let scheduler=null, nextTime=0, curStep=0;
+  let voices=[]; // 活跃振荡器/增益列表, 便于 stop 时清理
+  function ensure(){
+    if(!ctx){
+      try{
+        ctx=new (window.AudioContext||window.webkitAudioContext)();
+        master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);
+      }catch(e){ ctx=null; }
+    }
+    return ctx;
+  }
+  function midiHz(m){ return _mtof(m); }
+  function playTone(t, freq, dur, wave, vol, cutoff, attack, release, opts){
+    if(!ctx) return;
+    opts=opts||{};
+    const dest=ctx.createGain(); dest.gain.value=1; dest.connect(master);
+    function mkOsc(detune){
+      const o=ctx.createOscillator(); o.type=wave; o.frequency.value=freq;
+      if(detune) o.detune.value=detune;
+      const g=ctx.createGain(); g.gain.value=0;
+      const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=cutoff||3000;
+      o.connect(lp); lp.connect(g); g.connect(dest);
+      const a=attack||0.005, r=release||0.15;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(vol, t+a);
+      g.gain.setValueAtTime(vol, t+Math.max(a, dur-r));
+      g.gain.linearRampToValueAtTime(0.0001, t+dur+r);
+      o.start(t); o.stop(t+dur+r+0.05);
+      voices.push(o,g,lp);
+    }
+    mkOsc(0);
+    if(opts.dualOsc) mkOsc(opts.detune||7);
+    if(opts.echo){
+      // 简易模拟延迟: 定时补一个弱化 osc
+      const et=t+opts.echoDelay;
+      const eo=ctx.createOscillator(); eo.type=wave; eo.frequency.value=freq;
+      const eg=ctx.createGain(); eg.gain.value=0;
+      const elp=ctx.createBiquadFilter(); elp.type='lowpass'; elp.frequency.value=(cutoff||3000)*0.7;
+      eo.connect(elp); elp.connect(eg); eg.connect(dest);
+      const ea=attack||0.005, er=release||0.15, ev=vol*(opts.echoGain||0.4);
+      eg.gain.setValueAtTime(0,et);
+      eg.gain.linearRampToValueAtTime(ev, et+ea);
+      eg.gain.setValueAtTime(ev, et+Math.max(ea, dur-er));
+      eg.gain.linearRampToValueAtTime(0.0001, et+dur+er);
+      eo.start(et); eo.stop(et+dur+er+0.05);
+      voices.push(eo,eg,elp);
+    }
+  }
+  function playKick(t, vol){
+    if(!ctx) return;
+    const o=ctx.createOscillator(); o.type='sine';
+    const g=ctx.createGain(); g.gain.value=0;
+    o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40, t+0.15);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.28);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.35);
+    voices.push(o,g);
+  }
+  function playHat(t, vol){
+    if(!ctx) return;
+    // 白噪短促: 用 bufferSource
+    const len=Math.floor(ctx.sampleRate*0.05);
+    const buf=ctx.createBuffer(1,len,ctx.sampleRate);
+    const ch=buf.getChannelData(0);
+    for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*(1-i/len);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=6000;
+    const g=ctx.createGain(); g.gain.value=vol;
+    src.connect(hp); hp.connect(g); g.connect(master);
+    src.start(t); src.stop(t+0.06);
+    voices.push(src,g,hp);
+  }
   function playCfg(cfg){
     if(!ensure()) return;
-    clearNodes(); cur=cfg;
+    stopInternal(false);
+    cur=cfg;
     try{ ctx.resume&&ctx.resume(); }catch(e){}
-    // 和弦垫音: 每个音程一个振荡器 + 慢 LFO 微颤 + 低通滤波
-    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=cfg.cut; lp.connect(master); nodes.push(lp);
-    cfg.chord.forEach((semi,i)=>{
-      const o=ctx.createOscillator(); o.type=cfg.wave;
-      o.frequency.value=cfg.root*Math.pow(2,semi/12);
-      const g=ctx.createGain(); g.gain.value=(i===0?0.10:0.05);
-      // 慢 LFO 让音量轻微起伏, 更"活"
-      const lfo=ctx.createOscillator(); lfo.frequency.value=0.05+i*0.02;
-      const lg=ctx.createGain(); lg.gain.value=0.02; lfo.connect(lg); lg.connect(g.gain);
-      o.connect(g); g.connect(lp); o.start(); lfo.start();
-      nodes.push(o,g,lfo,lg);
-    });
-    // 律动脉冲(可选): 定时给根音一个短促点缀, 增加节奏感
-    if(cfg.pulse>0){
-      timer=setInterval(()=>{
-        if(!ctx||ctx.state!=='running') return;
-        const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=cfg.root*2;
-        const g=ctx.createGain(); const t=ctx.currentTime;
-        g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.06,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
-        o.connect(g); g.connect(master); o.start(t); o.stop(t+0.55);
-      }, cfg.pulse);
-    }
+    running=true;
+    const stepSec=60/cfg.bpm/cfg.stepSubdiv;   // 1 步秒数
+    const totalSteps=cfg.steps*cfg.loopBars;   // 一个 loop 总步数
+    curStep=0; nextTime=ctx.currentTime+0.1;
     // 淡入
-    const t=ctx.currentTime; master.gain.cancelScheduledValues(t);
-    master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0.7,t+1.2);
+    const t0=ctx.currentTime;
+    master.gain.cancelScheduledValues(t0);
+    master.gain.setValueAtTime(master.gain.value,t0);
+    master.gain.linearRampToValueAtTime(0.75, t0+1.2);
+    // 调度器: 每 25ms 检查, 提前 200ms 排音符
+    function tick(){
+      if(!running) return;
+      while(nextTime < ctx.currentTime+0.2){
+        scheduleStep(cfg, curStep, nextTime, stepSec);
+        curStep=(curStep+1)%totalSteps;
+        nextTime += stepSec;
+      }
+      scheduler=setTimeout(tick, 25);
+    }
+    tick();
+  }
+  function scheduleStep(cfg, step, t, stepSec){
+    const L=cfg.layers;
+    // lead
+    if(L.lead && L.lead.notes){
+      const m=L.lead.notes[step];
+      if(m){
+        // 音符持续到下一个非 0 音符
+        let dur=stepSec;
+        for(let i=1;i<8;i++){
+          const nxt=L.lead.notes[(step+i)%L.lead.notes.length];
+          if(nxt) break;
+          dur+=stepSec;
+        }
+        playTone(t, midiHz(m), dur*0.9, L.lead.wave, L.lead.vol, L.lead.cutoff,
+          L.lead.attack, L.lead.release, {dualOsc:L.lead.dualOsc, detune:L.lead.detune, echo:L.lead.echo, echoDelay:L.lead.echoDelay, echoGain:L.lead.echoGain});
+      }
+    }
+    // bass
+    if(L.bass && L.bass.notes){
+      const m=L.bass.notes[step];
+      if(m){
+        playTone(t, midiHz(m), stepSec*0.85, L.bass.wave, L.bass.vol, L.bass.cutoff,
+          L.bass.attack, L.bass.release, {});
+      }
+    }
+    // pad: 每小节第 0 步触发新和弦, 长度=1小节
+    if(L.pad && L.pad.chords){
+      if(step % cfg.steps === 0){
+        const barIdx=Math.floor(step/cfg.steps)%L.pad.chords.length;
+        const chord=L.pad.chords[barIdx];
+        const dur=stepSec*cfg.steps;
+        chord.forEach(m=>{
+          playTone(t, midiHz(m), dur, L.pad.wave, L.pad.vol/chord.length, L.pad.cutoff,
+            L.pad.attack, L.pad.release, {});
+        });
+      }
+    }
+    // kick pattern
+    if(L.kick && L.kick.pattern){
+      if(L.kick.pattern[step % L.kick.pattern.length]) playKick(t, L.kick.vol);
+    }
+    // hat 每 N 步
+    if(L.hat && L.hat.everyStep){
+      if(step % L.hat.everyStep === 0) playHat(t, L.hat.vol);
+    }
+  }
+  function stopInternal(fade){
+    running=false;
+    if(scheduler){ clearTimeout(scheduler); scheduler=null; }
+    if(ctx && master && fade){
+      const t=ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(master.gain.value, t);
+      master.gain.linearRampToValueAtTime(0, t+0.6);
+    }
+    setTimeout(()=>{
+      voices.forEach(n=>{ try{n.stop&&n.stop();}catch(e){} try{n.disconnect&&n.disconnect();}catch(e){} });
+      voices=[];
+    }, fade?700:0);
+    cur=null;
   }
   return {
     start(cfg){ if(!bgmOn()) return; playCfg(cfg); },
-    stop(){ if(ctx&&master){ const t=ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0,t+0.6); } setTimeout(clearNodes,700); cur=null; },
+    stop(){ stopInternal(true); },
     resume(){ if(ctx){ try{ctx.resume();}catch(e){} } },
     playing(){ return !!cur; },
-    curName(){ return cur?cur:null; },
+    curName(){ return cur?cur.name:null; },
+    // 闪避: 神曲播放时把 BGM 压低, 结束再恢复(仅在 BGM 正在播时生效; 0.75 与 v2 淡入基准一致)
+    duck(on){ if(!ctx||!master||!cur) return; const t=ctx.currentTime;
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t);
+      master.gain.linearRampToValueAtTime(on?0.14:0.75, t+0.25); },
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b=$('#bgmBtn'); if(b) b.textContent=on?'🔊':'🔇'; if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   if(!bgmOn()) return;
   if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
-  else AudioEngine.stop();  // 公开/私密房暂无专属 BGM
+  else AudioEngine.stop();
 }
 function initBgmUI(){
-  const b=$('#bgmBtn'); if(!b) return;
-  b.textContent=bgmOn()?'🔊':'🔇';
-  b.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+  const b2=$('#bgmBtnHall'); if(!b2) return;
+  b2.textContent=bgmOn()?'🔊':'🔇'; b2.classList.toggle('muted',!bgmOn());
+  b2.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
 }
+
 
 const LS_THEME='eh_theme', LS_THEME_LOCK='eh_theme_lock';
 function applyTheme(id){
@@ -876,16 +1250,36 @@ function applyRoomTheme(room){
 }
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
-  menu.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
-  menu.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); menu.classList.remove('on'); });
+  const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
+  const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); });
+  buildMenu(menu); bind(menu);
   const btn=$('#skinBtn');
-  if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); };
-  document.addEventListener('click',e=>{ if(!menu.contains(e.target) && e.target!==btn) menu.classList.remove('on'); });
+  // 菜单开→按钮保持选中态, 关→取消
+  const syncSkinActive=()=>{ if(btn) btn.classList.toggle('active', menu.classList.contains('on')); const bh=$('#skinBtnHall'), mh=$('#skinMenuHall'); if(bh&&mh) bh.classList.toggle('active', mh.classList.contains('on')); };
+  window.syncSkinActive=syncSkinActive;
+  if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); syncSkinActive(); };
+  // 聊天页版皮肤菜单
+  const menuHall=$('#skinMenuHall');
+  const btnHall=$('#skinBtnHall');
+  if(menuHall){ buildMenu(menuHall); bind(menuHall); }
+  if(btnHall && menuHall) btnHall.onclick=(e)=>{ e.stopPropagation(); menuHall.classList.toggle('on'); syncSkinActive(); };
+  // 全局关闭菜单
+  document.addEventListener('click',e=>{
+    if(menu && !menu.contains(e.target) && e.target!==btn) menu.classList.remove('on');
+    if(menuHall && !menuHall.contains(e.target) && e.target!==btnHall) menuHall.classList.remove('on');
+    syncSkinActive();
+  });
+  // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
+  const bhall=$('#bgmBtnHall');
+  if(bhall){
+    bhall.textContent=bgmOn()?'🔊':'🔇';
+    bhall.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+  }
   applyTheme(currentTheme());
   initBgmUI();
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
-function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); }
+function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall'); }
 
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
@@ -893,8 +1287,22 @@ let msgChan = null;        // Realtime postgres_changes 频道
 let presChan = null;       // Realtime presence 频道
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
-let echoState = {};        // message_id -> {count, mine}
+let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
+const VOID_TTL = 5*60*1000;   // 虚空消息存活 5 分钟
+const VOID_NAMES = ['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'];
+let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
 const HISTORY_PAGE = 60;
+// 五种回声情绪: 共鸣/动容/脑电/困惑/观测
+const ECHO_KINDS = [
+  {e:'🔥', label:'共鸣'},
+  {e:'💧', label:'动容'},
+  {e:'⚡', label:'脑电'},
+  {e:'🌀', label:'困惑'},
+  {e:'👁', label:'观测'},
+];
+const ECHO_EMOJIS = ECHO_KINDS.map(k=>k.e);
+const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
+const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
@@ -957,8 +1365,8 @@ function readKnownOnline(cardEl){
 // 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
 function optimisticCnt(room){
   const k=room&&room.knownOnline;
-  if(k!=null && k>=0){ const n=k+1; return `~ <b>${n}</b> 人在线`; }
-  return '连接中…';
+  if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
+  return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
 // 异步填充卡片动态数据: 在线人数 + 最新消息预览 + 活跃时间
 async function fillRoomStats(box, rid){
@@ -974,8 +1382,9 @@ async function fillRoomStats(box, rid){
   const prev=card.querySelector('[data-prev]'), tm=card.querySelector('.tm');
   if(last){
     prev.classList.remove('empty');
-    const txt = last.kind==='act' ? '✦ '+last.text : (last.kind==='proj'?'📽️ 投影':last.text);
-    prev.innerHTML=`<b>${esc(last.name)}:</b> ${esc(String(txt).slice(0,40))}`;
+    const txt = msgPreview(last);
+    const nm = last.anon ? '🕳️ 某个回声' : esc(last.name)+':';
+    prev.innerHTML=`<b>${nm}</b> ${esc(String(txt).slice(0,40))}`;
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
     prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
@@ -1042,17 +1451,19 @@ function restoreLastRoom(){
 }
 async function enterRoom(room){
   curRoom = room;
+  stopVoice(); stopSong();
   // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
   try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){}
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
-  $('#hallName').innerHTML=`<span class="hall-emoji">${safeEmoji(room.emoji)}</span> ${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
+  { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(room.emoji)||'💬'; }
+  $('#hallNameTxt').innerHTML=`${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
   clearReply();
   if(snapHit){
     // 秒还原已渲染消息 + 滚动位置状态
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
-    $('#presence').innerHTML=''; $('#hallCnt').innerHTML=optimisticCnt(room);
+    $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
@@ -1071,7 +1482,7 @@ async function enterRoom(room){
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
   $('#hallCnt').innerHTML=optimisticCnt(room);
-  $('#presence').innerHTML='';
+  $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
 
   await ensureAuth();
@@ -1177,6 +1588,7 @@ function subscribeMessages(rid){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
       if(m.user_id===myUid) return; // 自己的已乐观上屏
+      if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过，防重复投递
       // 投影：触发全屏飞幕，不进消息流
       if(m.kind==='proj'){ projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
@@ -1188,7 +1600,7 @@ function subscribeMessages(rid){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
       // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
       if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
-      applyEchoRealtime(p.new.message_id, p.new.user_id);
+      applyEchoRealtime(p.new.message_id, p.new.user_id, p.new.emoji);
     })
     .subscribe();
 }
@@ -1221,8 +1633,17 @@ async function beat(extra){
 const presenceMap = new Map();   // user_id → DOM 节点
 let lastUsersSnapshot = [];       // 供 renderTyping 复用
 
+// 在线列表骨架占位: 进房到 presence 数据回来期间撑住高度, 消除闪烁
+function presenceSkeleton(n){
+  n=Math.max(1,Math.min(n||3,8));
+  let s='';
+  for(let i=0;i<n;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>';
+  return s;
+}
 function renderPresenceAvatars(users){
   const container=$('#presence');
+  // 首次真实渲染前, 清掉进房时的骨架占位
+  container.querySelectorAll('.pav-skel').forEach(el=>el.remove());
   const seen=new Set();
   users.forEach((p,idx)=>{
     seen.add(p.user_id);
@@ -1248,7 +1669,7 @@ function renderPresenceAvatars(users){
   // 清理离开的人
   presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
   const kindLabel = curRoom && curRoom.kind==='private'?'名成员在线':'人在线';
-  $('#hallCnt').innerHTML=`<b>${users.length}</b> ${kindLabel}`;
+  $('#hallCnt').innerHTML=`<span class="cnt-led live" id="cntLed"></span><b>${users.length}</b> ${kindLabel}`;
 }
 
 function renderTyping(users){
@@ -1288,10 +1709,13 @@ async function leavePresence(){
   if(curRoom && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 }
 
-function setConn(live,txt){ const el=$('#conn'); el.classList.toggle('live',live); $('#connTxt').textContent=live?'实时在线':(txt||'连接中'); }
+function setConn(live,txt){ const el=$('#cntLed'); if(el){ el.classList.toggle('live',live); el.title=live?'实时在线':(txt||'连接中'); } }
 
 // ============ 消息渲染 ============
-const isEmojiOnly = t => /^(\p{Emoji_Presentation}|\p{Emoji}️|\s)+$/u.test(t||'') && (t||'').length<=12;
+// Unicode property 正则在个别旧引擎不可用，编译失败则整体降级为"从不是纯 emoji"
+let EMOJI_ONLY_RE=null;
+try{ EMOJI_ONLY_RE=new RegExp('^(\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F|\\s)+$','u'); }catch(e){}
+const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'').length<=12;
 function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
 function buildMsgEl(m){
@@ -1302,31 +1726,64 @@ function buildMsgEl(m){
     el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   const el=document.createElement('div');
-  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
+  const isVoid = !!m.anon;
+  // 虚空消息: 名字在数据层已是匿名代号; 本人后缀"（虚空）"便于自认
+  const dispName = isVoid ? (isMe ? m.name+'（虚空）' : m.name) : m.name;
+  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'');
   el.dataset.mid=m.id;
-  el.dataset.text=m.text; el.dataset.name=m.name;
+  const isVoice = m.kind==='voice';
+  const isSong = m.kind==='song';
+  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=dispName;
+  if(isVoid && m.expires_at){ el.dataset.exp=m.expires_at; }
   // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
   if(m.reply_to){
     const ref = m._replyRef || refFromDom(m.reply_to);
     replyHtml=`<div class="reply-ref" data-ref="${m.reply_to}">↳ ${esc(ref||'查看原消息')}</div>`;
   }
-  // 自己发的消息不显示 echo 入口(不能给自己点赞)
-  const echoHtml = isMe ? '' : `<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span>`;
+  // 回声徽章条: 显示已有的各情绪计数(点已有徽章可加/撤自己的); 长按消息弹环加新情绪
+  const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
+  const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
+  const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
+  const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   el.innerHTML=`
-    <div class="av" style="background:${safeColor(m.color)}22;color:${safeColor(m.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(m.color)}">${safeEmoji(m.emoji) || '👤'}</div>
+    <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avIc}</div>
     <div class="body">
-      <div class="meta"><span class="nm" style="color:${safeColor(m.color)}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
+      <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
-      <div class="txt">${esc(m.text)}${echoHtml}</div>
+      <div class="txt">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):esc(m.text))}</div>
+      ${echoHtml}
     </div>`;
   const txtEl=el.querySelector('.txt');
-  const echoEl=el.querySelector('.echo');
-  if(echoEl){ if(echoState[m.id]?.count) echoEl.classList.add('has'); echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); }; }
+  paintEcho(m.id, el);
+  if(isVoid && m.expires_at) scheduleVoidFade(el, m.expires_at);
   // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
-  attachLongPress(txtEl, m);
+  // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
+  attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
   return el;
+}
+// 虚空消息给非本人看的匿名代号: 用 user_id hash 到固定代号(同一人同名, 不同人不同名), 不暴露真实身份
+function voidNameFor(m){
+  let h=0; const s=String(m.user_id||m.id||'');
+  for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; }
+  return VOID_NAMES[h%VOID_NAMES.length];
+}
+// 虚空消息倒计时 + 到点淡出移除
+function scheduleVoidFade(el, expIso){
+  const exp=new Date(expIso).getTime();
+  const badge=el.querySelector('.vexp');
+  const tick=()=>{
+    const left=exp-Date.now();
+    if(left<=0){
+      if(badge) badge.textContent='· 消散';
+      el.classList.add('fading'); setTimeout(()=>el.remove(),1200);
+      return;
+    }
+    if(badge){ const mm=Math.floor(left/60000), ss=Math.floor((left%60000)/1000); badge.textContent=`· ${mm}:${String(ss).padStart(2,'0')} 后消散`; }
+    el._voidT=setTimeout(tick, left>60000?15000:1000);
+  };
+  tick();
 }
 // 从已渲染消息 DOM 里取某条的原文(名字:内容)
 function refFromDom(mid){
@@ -1336,8 +1793,8 @@ function refFromDom(mid){
 }
 // 引用原文本地取不到时，查库补上
 async function fillReplyRef(el, mid){
-  const { data } = await sb.from('eh_messages').select('name,text').eq('id',mid).maybeSingle();
-  if(data){ const r=el.querySelector('.reply-ref'); if(r) r.textContent='↳ '+(data.name?data.name+'：':'')+data.text; }
+  const { data } = await sb.from('eh_messages').select('name,text,anon,user_id').eq('id',mid).maybeSingle();
+  if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+data.text; } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
 function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
@@ -1350,55 +1807,504 @@ async function send(){
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
   let kind='msg';
   if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
-  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind, reply_to: replyTo?.id||null };
+  // 神曲模式: 走神曲发送(把这句话唱出来), 不落普通文本
+  if(songMode && kind==='msg'){ const ly=text; resetInput(); await sendSong(ly, songSel); return; }
+  // 引用的目标还是本地临时 id(原消息尚未落库/落库失败)时，不带 reply_to，避免整条发送失败
+  const replyId = replyTo && !String(replyTo.id).startsWith('local_') ? replyTo.id : null;
+  // 虚空模式: 匿名 + 限时消散(act/whisper 不走虚空)
+  const useVoid = voidMode && kind==='msg';
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind, reply_to: replyId };
+  if(useVoid){
+    payload.anon=true;
+    payload.expires_at=new Date(Date.now()+VOID_TTL).toISOString();
+    // 数据层就不落真实昵称/头像/色: 存匿名代号(据uid确定性生成)+中性紫, 避免raw行泄露身份
+    payload.name = voidNameFor({user_id:myUid});
+    payload.emoji = '🕳️';
+    payload.color = '#8B5CFF';
+  }
   // 乐观上屏
   const optimistic={...payload, id:'local_'+Date.now(), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
+  // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('send',error); toast('发送失败'); }
-  else if(data){ el && (el.dataset.mid=data.id); }
+  // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
+  else if(data){ optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; } }
 }
-function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; $('#goBtn').disabled=true; hideSlash(); }
+// 虚空模式开关(统一走 setMode; 保留函数名兼容旧调用)
+function setVoidMode(on){ setMode(on?'void':'none'); }
+// ============ 统一发言模式: none / void / voice / song ============
+// ＋号是唯一入口: 选某模式→＋变该模式图标+输入框切风格; 再点该图标(＋位置)→退出复原。三者互斥。
+let curMode='none';
+const MODE_ICON={ void:'🕳️', voice:'🎙️', song:'🎵' };
+function setMode(mode){
+  if(mode===curMode) mode='none';        // 再点当前模式 = 退出
+  // 先退出旧模式的副作用
+  if(curMode==='voice' && mode!=='voice'){ if(recActive) micRelease(); }
+  curMode=mode;
+  voidMode = mode==='void';
+  voiceMode = mode==='voice';
+  songMode = mode==='song';
+  const composer=$('.composer');
+  composer.classList.toggle('void-mode', voidMode);
+  composer.classList.toggle('voice-mode', voiceMode);
+  composer.classList.toggle('song-mode', songMode);
+  // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
+  const pb=$('#plusBtn');
+  pb.textContent = mode==='none' ? '＋' : MODE_ICON[mode];
+  pb.classList.toggle('mode-on', mode!=='none');
+  pb.title = mode==='none' ? '更多花样' : '退出当前模式';
+  // 菜单项高亮
+  $('#pmVoid').classList.toggle('on', voidMode);
+  $('#pmVoice').classList.toggle('on', voiceMode);
+  $('#pmSong').classList.toggle('on', songMode);
+  // 神曲: 显示曲风细色条
+  const strip=$('#songStrip');
+  if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
+  // 占位文案 + 神曲模式跟随当前曲风色
+  const cin=$('#cin');
+  if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; composer.style.setProperty('--song-c', safeColor(st.color)); }
+  else { composer.style.removeProperty('--song-c'); }
+  if(voidMode){ cin.placeholder='说给虚空… 匿名，5分钟后消散 🕳️'; }
+  else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
+  else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
+  if(!voiceMode) setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
+  syncSendBtn();
+}
+function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; hideSlash(); syncSendBtn(); }
+// 输入框空↔有字: 切换 麦克风/发送 按钮(微信式)
+function syncSendBtn(){
+  const has=!!$('#cin').value.trim();
+  const go=$('#goBtn');
+  // 语音模式下永不显示发送键(靠"按住说话"发); 键盘模式有字才显示
+  if(go) go.style.display = (!voiceMode && has)?'grid':'none';
+}
 
-// ============ echo(🔥) 落库 ============
-async function toggleEcho(mid){
-  if(String(mid).startsWith('local_')) return;
-  const st=echoState[mid]||{count:0,mine:false};
-  if(st.mine){
-    st.count=Math.max(0,st.count-1); st.mine=false; echoState[mid]=st; paintEcho(mid);
-    await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid);
-  } else {
-    st.count++; st.mine=true; echoState[mid]=st; paintEcho(mid); burst('🔥',6);
-    await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid});
+// ============ 语音消息(MediaRecorder 录音 → Supabase Storage → kind='voice') ============
+const VOICE_BUCKET='eh-voice', VOICE_MAX_SEC=30;
+const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
+const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
+let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
+let waveRAF=null, recAnalyser=null;
+function fmtDur(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+// 播放器 HTML(只信任本站语音桶/本地 blob 的地址，其余按纯文本展示，防伪造 URL)
+function voiceHtml(src){
+  src=String(src||'');
+  if(!src.startsWith(VOICE_URL_PREFIX) && !src.startsWith('blob:')) return esc(src);
+  const dur=(src.match(/#dur=(\d+)/)||[])[1];
+  const bars=Array.from({length:9},()=>`<i style="height:${5+Math.floor(secureRand()*13)}px"></i>`).join('');
+  return `<span class="vplay" data-src="${esc(src)}"><button class="vp-btn">▶</button><span class="vp-bars">${bars}</span><span class="vp-t">${dur?fmtDur(+dur):''}</span></span>`;
+}
+// 全局单实例播放：播放新的自动停旧的
+let vAudio=null, vPlayEl=null;
+function stopVoice(){
+  if(vAudio){ try{vAudio.pause();}catch(e){} vAudio=null; }
+  try{ if(typeof AudioEngine!=='undefined') AudioEngine.duck(false); }catch(e){} // 恢复 BGM 音量
+  if(vPlayEl){ vPlayEl.classList.remove('playing'); const b=vPlayEl.querySelector('.vp-btn'); if(b) b.textContent='▶'; vPlayEl=null; }
+}
+// 整个语音条都可点(不只那个小 ▶ 圆钮), 符合"点一下就播"的直觉
+document.addEventListener('click',e=>{
+  const wrap=e.target.closest('.vplay'); if(!wrap) return;
+  const btn=wrap.querySelector('.vp-btn');
+  if(wrap===vPlayEl){ stopVoice(); return; } // 再点当前正在播的 → 停
+  stopVoice();
+  try{ if(typeof AudioEngine!=='undefined'){ AudioEngine.resume(); AudioEngine.duck(true); } }catch(e){} // 激活音频上下文+压低BGM
+  const src=(wrap.dataset.src||'').split('#')[0];
+  if(!src){ toast('语音地址缺失'); return; }
+  const a=new Audio(src);
+  vAudio=a; vPlayEl=wrap;
+  wrap.classList.add('playing'); if(btn) btn.textContent='⏸';
+  a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
+  a.onerror=()=>{ if(vPlayEl===wrap){ toast('语音加载失败，可能已过期'); stopVoice(); } };
+  a.play().then(()=>{}).catch(err=>{
+    // NotAllowedError=浏览器拦自动播放(极少见于真实点击); 其它=网络/解码
+    const msg = (err&&err.name==='NotAllowedError') ? '被浏览器拦截，请再点一次' : '播放失败，请重试';
+    toast(msg); if(vPlayEl===wrap) stopVoice();
+  });
+});
+async function startRec(){
+  if(!curRoom || recorder) return;
+  if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ toast('此浏览器不支持录音'); recActive=false; return; }
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ toast('需要麦克风权限才能发语音'); recActive=false; return; }
+  if(!recActive){ stream.getTracks().forEach(t=>t.stop()); return; } // 授权期间已松手，放弃
+  recChunks=[]; recSec=0; recWanted=false; recCanceled=false;
+  try{ recorder=new MediaRecorder(stream,{mimeType:REC_MIME,audioBitsPerSecond:24000}); }
+  catch(e){ stream.getTracks().forEach(t=>t.stop()); toast('录音初始化失败'); return; }
+  recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
+  recorder.onstop=()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    stopWave(); hideRecUI();
+    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC));
+    else if(recWanted && !recCanceled && recSec<1) toast('说话时间太短');
+    recorder=null; recChunks=[];
+  };
+  recorder.start(250);
+  showRecUI(stream);
+  recTimer=setInterval(()=>{ recSec++; updateRecTime();
+    if(recSec>=VOICE_MAX_SEC){ recWanted=true; stopRec(); } },1000);
+}
+function stopRec(){ clearInterval(recTimer); recTimer=null; if(recorder && recorder.state!=='inactive') recorder.stop(); }
+function showRecUI(stream){
+  document.querySelector('.composer').classList.add('recording');
+  const panel=$('#recPanel'); panel.classList.remove('cancel');
+  $('#recTip').textContent='松开发送 · 上滑取消';
+  $('#recWave').innerHTML=Array.from({length:24},()=>'<i></i>').join('');
+  $('#recOverlay').classList.add('on'); updateRecTime(); startWave(stream);
+}
+function hideRecUI(){ document.querySelector('.composer').classList.remove('recording'); $('#recOverlay').classList.remove('on'); }
+function updateRecTime(){ $('#recTime').textContent=fmtDur(recSec); }
+function setRecCancel(on){ if(recCanceled===on) return; recCanceled=on; $('#recPanel').classList.toggle('cancel',on); $('#recTip').textContent=on?'松开手指 · 取消发送':'松开发送 · 上滑取消'; }
+function startWave(stream){
+  try{
+    const ctx=ac(); if(!ctx) return;
+    const src=ctx.createMediaStreamSource(stream);
+    recAnalyser=ctx.createAnalyser(); recAnalyser.fftSize=64; src.connect(recAnalyser);
+    const data=new Uint8Array(recAnalyser.frequencyBinCount);
+    const bars=[...$('#recWave').querySelectorAll('i')];
+    const loop=()=>{ if(!recAnalyser) return; recAnalyser.getByteFrequencyData(data);
+      bars.forEach((b,i)=>{ const v=data[(i*2)%data.length]/255; b.style.height=(8+v*44)+'px'; });
+      waveRAF=requestAnimationFrame(loop); };
+    loop();
+  }catch(e){}
+}
+function stopWave(){ if(waveRAF) cancelAnimationFrame(waveRAF); waveRAF=null; recAnalyser=null; }
+async function sendVoice(blob, secs){
+  if(!curRoom || !myUid) return;
+  if(blob.size>950*1024){ toast('录音太长，发送失败'); return; }
+  const ext=REC_MIME.includes('mp4')?'m4a':'webm';
+  // 乐观上屏：先用本地 blob 播放
+  const localUrl=URL.createObjectURL(blob)+'#dur='+secs;
+  const optimistic={id:'local_'+Date.now(),room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:localUrl,kind:'voice',created_at:new Date().toISOString()};
+  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+  const path=`${curRoom.id}/${myUid}-${Date.now()}.${ext}`;
+  const { error:upErr }=await sb.storage.from(VOICE_BUCKET).upload(path, blob, { contentType: blob.type||'audio/webm' });
+  if(upErr){ console.warn('voice upload',upErr);
+    toast(/bucket|not.*found/i.test(upErr.message||'')?'语音存储未配置(缺 eh-voice 桶)':'语音上传失败');
+    if(el) el.remove(); return; }
+  const { data:pub }=sb.storage.from(VOICE_BUCKET).getPublicUrl(path);
+  const url=pub.publicUrl+'#dur='+secs;
+  const { data:row, error }=await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:url,kind:'voice'}).select('id').single();
+  if(error){ console.warn('voice send',error); toast('语音发送失败'); if(el) el.remove(); return; }
+  // 回填真实 id 与正式 URL(与文本消息同理)
+  optimistic.id=row.id;
+  if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
+}
+// 语音模式(统一走 setMode)
+let voiceMode=false;
+function setVoiceMode(on){ setMode(on?'voice':'none'); }
+// 按住"说话"长条录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
+const holdTalk=$('#holdTalk');
+holdTalk.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(recorder || recActive) return;
+  recActive=true; recStartY=e.clientY;
+  try{ holdTalk.setPointerCapture(e.pointerId); }catch(_){}
+  holdTalk.textContent='松开发送 · 上滑取消';
+  startRec();
+});
+window.addEventListener('pointermove',e=>{ if(!recActive) return; setRecCancel((recStartY-e.clientY)>90); });
+function micRelease(){
+  if(!recActive) return;
+  recActive=false;
+  recWanted=true;                 // 松手即发(除非已标记取消)
+  holdTalk.textContent='按住 说话';
+  if(recorder) stopRec();         // 授权仍在进行(recorder 未就绪)时，startRec 会因 recActive=false 自行放弃
+  else { clearInterval(recTimer); recTimer=null; stopWave(); hideRecUI(); }
+}
+window.addEventListener('pointerup',micRelease);
+window.addEventListener('pointercancel',micRelease);
+if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ const p=$('#pmVoice'); if(p) p.style.display='none'; }
+
+// ============ 神曲(文字→洗脑歌曲, Web Audio 合成节拍 + 语音合成"唱"字) ============
+// 消息编码: kind='song', text='曲风id|歌词'。曲风白名单校验, 不认识则整体当纯文本(向后兼容)。
+const SCALE={
+  majP:[0,2,4,7,9],       // 大调五声(欢快)
+  minP:[0,3,5,7,10],      // 小调五声(蓝调/洗脑)
+  major:[0,2,4,5,7,9,11],
+  minor:[0,2,3,5,7,8,10],
+};
+// motif=旋律动机(反复出现→洗脑), chords=每小节根音(半音), groove=鼓型
+const SONG_STYLES=[
+  { id:'dj',    name:'蹦迪DJ',  emoji:'🕺', color:'#28E6D8', bpm:128, bpc:0.5, base:3,  scale:SCALE.minP,
+    motif:[0,0,2,0,3,2,1,0], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.35,pitch:1.0,spread:0.14} },
+  { id:'shen',  name:'神曲喊麦', emoji:'🎤', color:'#FF3CAC', bpm:95,  bpc:0.5, base:-2, scale:SCALE.minor,
+    motif:[0,0,0,2,3,2,0,-1], chords:[0,0,5,3], wave:'square', bass:'sawtooth', groove:'boom', tts:{rate:1.5,pitch:0.7,spread:0.10} },
+  { id:'kid',   name:'儿歌',    emoji:'🧸', color:'#FFB84D', bpm:112, bpc:0.5, base:5,  scale:SCALE.major,
+    motif:[0,2,4,4,2,0,2,4], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.6,spread:0.16} },
+  { id:'gufeng',name:'古风',    emoji:'🏮', color:'#8B5CFF', bpm:82,  bpc:1.0, base:0,  scale:SCALE.majP,
+    motif:[0,1,2,1,0,2,3,2], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.15,spread:0.12} },
+  { id:'disco', name:'迪斯科',  emoji:'🪩', color:'#4DE38A', bpm:116, bpc:0.5, base:3,  scale:SCALE.major,
+    motif:[0,2,4,2,5,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1,spread:0.14} },
+  { id:'8bit',  name:'电玩',    emoji:'👾', color:'#5B8CFF', bpm:144, bpc:0.5, base:0,  scale:SCALE.minP,
+    motif:[0,2,4,3,2,4,1,0], chords:[0,3,-2,5], wave:'square', bass:'square', groove:'four', tts:{rate:1.4,pitch:1.35,spread:0.18} },
+];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
+function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); return scale[((deg%n)+n)%n]+12*oct; }
+function parseSong(text){
+  const t=String(text||''), i=t.indexOf('|');
+  if(i>0){ const sid=t.slice(0,i); if(SONG_STYLES.some(s=>s.id===sid)) return { sid, lyric:t.slice(i+1) }; }
+  return { sid:SONG_STYLES[0].id, lyric:t };
+}
+// 消息在"列表预览"里的纯文本呈现: 语音/神曲不能暴露 URL/内部编码
+function msgPreview(m){
+  if(!m) return '';
+  switch(m.kind){
+    case 'act':   return '✦ '+m.text;
+    case 'proj':  return '📽️ 投影';
+    case 'voice': return '🎤 语音消息';
+    case 'song':  return '🎵 '+parseSong(m.text).lyric;
+    default:      return m.text||'';
   }
 }
-function applyEchoRealtime(mid, who){
-  if(who===myUid) return;
-  const st=echoState[mid]||{count:0,mine:false}; st.count++; echoState[mid]=st; paintEcho(mid);
-  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst('🔥',4);
+function songHtml(text){
+  const { sid, lyric }=parseSong(text);
+  const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+  // 逐字包 span → 播放时卡拉OK高亮
+  const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
+  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:${safeColor(st.color)}">
+    <button class="song-play" title="播放">▶</button>
+    <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
+      <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
+    <span class="song-lyric">${chs}</span></span></span>`;
 }
-function paintEcho(mid){
-  const echoEl=document.querySelector(`.echo[data-mid="${mid}"]`); if(!echoEl) return;
-  const st=echoState[mid]||{count:0}; echoEl.querySelector('.ec').textContent=st.count;
-  echoEl.classList.toggle('has', st.count>0);
-  echoEl.style.transform='scale(1.3)'; setTimeout(()=>echoEl.style.transform='',150);
+
+// Web Audio 基础
+let audioCtx=null;
+function ac(){
+  if(!audioCtx){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; audioCtx=new C(); }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+let noiseBuf=null;
+function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
+function tone(ctx,dest,freq,t,dur,type,gain){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(gain,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(dest); o.start(t); o.stop(t+dur+0.05); return o;
+}
+function kick(ctx,dest,t){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.11); g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16); o.connect(g).connect(dest); o.start(t); o.stop(t+0.2); return o; }
+function hat(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7000; const g=ctx.createGain(); g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05); s.connect(hp).connect(g).connect(dest); s.start(t); s.stop(t+0.07); return s; }
+function snare(ctx,dest,t){ const s=ctx.createBufferSource(); s.buffer=noise(ctx); const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; const g=ctx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18); s.connect(bp).connect(g).connect(dest); s.start(t); s.stop(t+0.2); return s; }
+
+// ---- 共振峰(formant)人声合成：真正"唱"出旋律的元音，而非断续念字 ----
+const VOWELS={ a:[800,1150,2800], o:[500,900,2400], e:[500,1700,2500], i:[320,2300,3000], u:[320,800,2500] };
+const VOWEL_KEYS=['a','o','e','i','u'];
+// 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
+function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
+function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
+  const src=ctx.createOscillator(); src.type=wave||'sawtooth';   // 按曲风波形: 正弦柔/三角圆/方波尖/锯齿亮
+  src.frequency.setValueAtTime(freq*0.94,t); src.frequency.linearRampToValueAtTime(freq,t+0.07); // 上滑起音，像"唱"
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;                                       // 颤音(vibrato)
+  const lfoG=ctx.createGain(); lfoG.gain.value=freq*0.015; lfo.connect(lfoG).connect(src.frequency);
+  const env=ctx.createGain();
+  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
+  env.gain.setValueAtTime(gain*0.9,t+dur*0.65); env.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.32];
+  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?7:9;
+    const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
+  env.connect(dest);
+  src.start(t); src.stop(t+dur+0.05); lfo.start(t); lfo.stop(t+dur+0.05);
+  return [src,lfo];
+}
+
+let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el,onEnd}
+function stopSong(){
+  if(!curSong) return;
+  AudioEngine.duck(false);   // 恢复官方房 BGM 音量
+  const s=curSong; curSong=null;
+  s.timeouts.forEach(clearTimeout);
+  s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
+  try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
+  try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+  if(s.el){ s.el.classList.remove('playing'); const b=s.el.querySelector('.song-play'); if(b) b.textContent='▶'; s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
+  if(s.onEnd) try{ s.onEnd(); }catch(e){}
+}
+// 选一个中文嗓音(有则用, 提升"唱字"清晰度)
+let _voiceCache=null;
+function pickZhVoice(){
+  if(!window.speechSynthesis) return null;
+  if(_voiceCache!==null) return _voiceCache;
+  const vs=speechSynthesis.getVoices()||[];
+  _voiceCache = vs.find(v=>/zh[-_]?CN|Chinese|普通话|中文/i.test(v.lang+' '+v.name))
+             || vs.find(v=>/^zh/i.test(v.lang)) || null;
+  return _voiceCache;
+}
+if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCache=null; pickZhVoice(); }; pickZhVoice(); }catch(e){} }
+function playSong(lyric, sid, el, onEnd){
+  stopVoice(); stopSong();
+  const ctx=ac(); if(!ctx){ toast('此浏览器不支持音频合成'); return; }
+  const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
+  if(!chars.length){ toast('没有可唱的内容'); return; }
+  AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
+  const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
+  const master=ctx.createGain(); master.gain.value=hasTTS?0.6:0.85; master.connect(ctx.destination);  // 有唱词时压低伴奏, 让字清楚
+  const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
+  const t0=ctx.currentTime+0.12;
+  const totalDur=chars.length*step + spb*2;
+  curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null };
+  if(el){ el.classList.add('playing'); const b=el.querySelector('.song-play'); if(b) b.textContent='⏸'; el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
+  // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
+  const bars=Math.ceil(totalDur/barLen);
+  for(let b=0;b<bars;b++){
+    const bt=t0+b*barLen, root=st.base+st.chords[b%st.chords.length];
+    for(let beat=0;beat<4;beat++){
+      const t=bt+beat*spb;
+      if(st.groove==='four') curSong.oscs.push(kick(ctx,master,t));
+      else if(beat%2===0) curSong.oscs.push(kick(ctx,master,t));
+      if(beat%2===1) curSong.oscs.push(snare(ctx,master,t));
+      curSong.oscs.push(hat(ctx,master,t)); curSong.oscs.push(hat(ctx,master,t+spb/2));
+      curSong.oscs.push(tone(ctx,master,NOTE(root-12),t,spb*0.85,st.bass,0.22));
+    }
+    const padWave = st.wave==='square'?'triangle':st.wave;   // 方波做和弦垫太刺, 降级三角; 其余用曲风波形
+    [0,4,7].forEach(iv=>curSong.oscs.push(tone(ctx,master,NOTE(root+iv),bt,barLen*0.95,padWave,0.045)));
+  }
+  // 主唱：优先用系统 TTS 真正"念出"整句(按曲风调 语速/音高), 元音共振峰做和声垫在下面
+  const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
+  const zhVoice = hasTTS ? pickZhVoice() : null;
+  chars.forEach((ch,i)=>{
+    const t=t0+i*step, deg=st.motif[i%st.motif.length];
+    const semi=st.base+scaleSemi(st.scale,deg);
+    const delay=Math.max(0,(t-ctx.currentTime)*1000);
+    // 元音哼唱(按曲风波形, 音色各异): TTS 可用时压得很低当和声垫(让人声唱词突出), 否则作为主旋律
+    singVoice(ctx,master,NOTE(semi+12),t,step*0.95,charVowel(ch),hasTTS?0.08:0.26,st.wave).forEach(o=>curSong.oscs.push(o));
+    const chEl=chEls[i];
+    if(chEl) curSong.timeouts.push(setTimeout(()=>{ chEl.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); }, delay));
+  });
+  // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
+  // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
+  if(hasTTS){
+    const fullText=chars.join('');
+    const rate=clamp(st.tts?.rate??1.1, 0.7, 1.6);
+    const pitch=clamp(st.tts?.pitch??1.0, 0.4, 2);
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(fullText);
+      u.lang='zh-CN'; if(zhVoice) u.voice=zhVoice;
+      u.rate=rate; u.pitch=pitch; u.volume=1;
+      curSong._tts=u;
+      speechSynthesis.speak(u);
+      // Chrome 有时 speak 后卡在 paused, resume 兜底
+      setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
+    }catch(e){}
+  }
+  // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
+  const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
+  curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
+}
+// 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.song-play'); if(!btn) return;
+  const card=btn.closest('.song-card'); if(!card) return;
+  if(curSong && curSong.el===card){ stopSong(); return; }
+  playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
+});
+
+async function sendSong(lyric, sid){
+  if(!curRoom || !myUid) return;
+  lyric=String(lyric||'').trim().slice(0,60);
+  if(!lyric){ toast('先打点字，让它唱出来'); return; }
+  if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
+  const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
+  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+  // 本地立即试听(发送者刚有手势, 允许自动播放)
+  if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
+  const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
+  if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
+  optimistic.id=row.id; if(el) el.dataset.mid=row.id;
+}
+// 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
+let songSel=SONG_STYLES[0].id;
+let songMode=false;
+function setSongMode(on){ setMode(on?'song':'none'); }
+// 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
+function renderSongStrip(){
+  const strip=$('#songStrip'); if(!strip) return;
+  strip.innerHTML=`<span class="ss-lb">🎵 曲风</span>`+SONG_STYLES.map(s=>
+    `<span class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
+      <span class="se">${s.emoji}</span>${esc(s.name)}</span>`).join('');
+  strip.querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
+    songSel=c.dataset.sid;
+    strip.querySelectorAll('.st-chip').forEach(x=>x.classList.toggle('on',x===c));
+    // 更新输入框占位 + 主题色为当前曲风, 保持神曲模式
+    const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
+    $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
+    $('.composer').style.setProperty('--song-c', safeColor(st.color));
+    try{ if(curRoom) $('#cin').focus(); }catch(_){}
+  });
+}
+if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
+
+// ============ 多情绪回声 落库 ============
+// echoState[mid] = { '🔥':{count,mine}, ... }
+function ecOf(mid){ return echoState[mid] || (echoState[mid]={}); }
+async function toggleEcho(mid, emoji){
+  if(String(mid).startsWith('local_')) return;
+  emoji = emoji || '🔥';
+  const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
+  if(st.mine){
+    st.count=Math.max(0,st.count-1); st.mine=false; paintEcho(mid);
+    await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid).eq('emoji',emoji);
+  } else {
+    st.count++; st.mine=true; paintEcho(mid); burst(emoji,6);
+    checkResonance(mid, emoji, st.count);
+    await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid,emoji});
+  }
+}
+function applyEchoRealtime(mid, who, emoji){
+  emoji = emoji || '🔥';
+  const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
+  if(who===myUid){ return; }  // 自己的已乐观更新
+  st.count++; paintEcho(mid);
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst(emoji,4);
+  checkResonance(mid, emoji, st.count);
+}
+// 渲染某条消息的回声徽章条(只显示 count>0 的情绪)
+function paintEcho(mid, scope){
+  const bar = (scope||document).querySelector(`.echo-bar[data-mid="${mid}"]`)
+           || document.querySelector(`.echo-bar[data-mid="${mid}"]`);
+  if(!bar) return;
+  const map=echoState[mid]||{};
+  const active=ECHO_EMOJIS.filter(e=>map[e]&&map[e].count>0);
+  bar.innerHTML=active.map(e=>{
+    const st=map[e];
+    return `<span class="ec-pill${st.mine?' mine':''}" data-e="${e}">${e}<b>${st.count}</b></span>`;
+  }).join('');
+  bar.classList.toggle('empty', active.length===0);
+  bar.querySelectorAll('.ec-pill').forEach(p=>p.onclick=(ev)=>{ ev.stopPropagation(); toggleEcho(mid, p.dataset.e); });
 }
 async function fetchEchoes(ids){
   if(!ids || !ids.length) return;
-  const { data } = await sb.from('eh_message_echoes').select('message_id,user_id').in('message_id',ids);
-  (data||[]).forEach(e=>{ const st=echoState[e.message_id]||{count:0,mine:false}; st.count++; if(e.user_id===myUid) st.mine=true; echoState[e.message_id]=st; });
+  const { data } = await sb.from('eh_message_echoes').select('message_id,user_id,emoji').in('message_id',ids);
+  (data||[]).forEach(e=>{ const map=ecOf(e.message_id); const st=map[e.emoji]||(map[e.emoji]={count:0,mine:false}); st.count++; if(e.user_id===myUid) st.mine=true; });
   ids.forEach(id=>{ if(echoState[id]) paintEcho(id); });
+}
+// 共鸣涟漪: 某条消息某情绪达阈值 → 全房视觉涟漪(复用 resonance 层 + 粒子)
+function checkResonance(mid, emoji, count){
+  if(count < RESONANCE_THRESHOLD) return;
+  const key=mid+emoji; if(resonatedMsgs.has(key)) return; resonatedMsgs.add(key);
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`);
+  const color = el ? (el.querySelector('.nm')?.style.color||'#FF3CAC') : '#FF3CAC';
+  triggerResonance(emoji, color, `✨ 一条消息响彻回声厅 ${emoji}`);
+  if(el){ el.classList.add('resonated'); setTimeout(()=>el.classList.remove('resonated'),1600); }
 }
 
 // ============ 斜杠命令 ============
 const SLASH_CMDS=[
   {c:'/me',    d:'以动作形式说话，如 /me 跳了段舞'},
   {c:'/dice',  d:'掷一颗骰子 🎲'},
-  {c:'/flip',  d:'抛硬币，正면还是反面'},
+  {c:'/flip',  d:'抛硬币，正面还是反面'},
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
+  {c:'/sing',  d:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -1406,15 +2312,22 @@ async function handleSlash(text){
   if(cmd==='/dice'){ const n=1+Math.floor(secureRand()*6); await sendSystemAct(`掷出了 🎲 ${n} 点`); return true; }
   if(cmd==='/flip'){ const r=secureRand()<0.5?'正面 🪙':'反面 🪙'; await sendSystemAct(`抛硬币：${r}`); return true; }
   if(cmd==='/echo'){ burst('🎆',24); burst('✨',20); await sendSystemAct('放了一串烟花 🎆'); return true; }
+  if(cmd==='/sing'||cmd==='/唱'){
+    if(!arg){ toast('用法：/sing 要唱的文字'); return true; }
+    await sendSong(arg, rand(SONG_STYLES).id); return true;
+  }
   if(cmd==='/whisper'){
     const mName=arg.match(/^@?(\S+)\s+(.+)$/);
     if(!mName){ toast('用法：/whisper @昵称 内容'); return true; }
     const target=await findMemberByName(mName[1]);
     if(!target){ toast('没找到这个人（需在本房在线）'); return true; }
-    await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id});
-    // 本地也显示一条
-    const el=buildMsgEl({id:'local_'+Date.now(),user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id,created_at:new Date().toISOString()});
+    const wPayload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:mName[2],kind:'whisper',to_user:target.user_id};
+    // 本地先显示一条
+    const wLocal={...wPayload,id:'local_'+Date.now(),created_at:new Date().toISOString()};
+    const el=buildMsgEl(wLocal);
     if(el){ $('#stream').appendChild(el); scrollStream(); }
+    const { data:wRow }=await sb.from('eh_messages').insert(wPayload).select('id').single();
+    if(wRow){ wLocal.id=wRow.id; if(el) el.dataset.mid=wRow.id; }
     return true;
   }
   return false; // 非命令，按普通消息发
@@ -1458,24 +2371,33 @@ function attachLongPress(el, m){
 function showActRing(x,y,m){
   const ring=$('#actRing');
   const isMine = m.user_id===myUid;
-  // 自己的消息不能给自己点回声
+  const mid = isNaN(+m.id)?m.id:+m.id;
+  // 自己的消息不能给自己点回声, 但仍可回复/投影
+  const echoRow = isMine ? '' : `<div class="ar-echoes">${ECHO_KINDS.map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span><span class="al">${k.label}</span></button>`).join('')}</div>`;
   ring.innerHTML=`
-    ${isMine?'':'<button data-a="echo"><span class="ai">🔥</span>回声</button>'}
-    <button data-a="reply"><span class="ai">↳</span>回复</button>
-    <button data-a="project"><span class="ai">📽️</span>投影</button>`;
-  const eb=ring.querySelector('[data-a="echo"]'); if(eb) eb.onclick=()=>{ toggleEcho(isNaN(+m.id)?m.id:+m.id); hideActRing(); };
+    ${echoRow}
+    <div class="ar-actions">
+      <button data-a="reply"><span class="ai">↳</span>回复</button>
+      <button data-a="project"><span class="ai">📽️</span>投影</button>
+    </div>`;
+  ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=()=>{ toggleEcho(mid, b.dataset.e); hideActRing(); });
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
   ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
   ring.classList.add('on');
-  const rw=ring.offsetWidth||200, rh=ring.offsetHeight||56;
+  const rw=ring.offsetWidth||240, rh=ring.offsetHeight||100;
   ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
-  ring.style.top=Math.max(8,y-rh-10)+'px';
+  ring.style.top=Math.max(8,Math.min(y-rh-10, innerHeight-rh-8))+'px';
 }
 function hideActRing(){ $('#actRing').classList.remove('on'); }
 document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
 
 // 引用回复
-function startReply(m){ replyTo={id:isNaN(+m.id)?m.id:+m.id, name:m.name, text:m.text}; $('#rpTxt').textContent=`回复 ${m.name}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus(); }
+function startReply(m){
+  // 虚空匿名消息: 引用时也用匿名代号, 不泄露真名
+  const nm = m.anon ? (m.user_id===myUid ? m.name+'（虚空）' : voidNameFor(m)) : m.name;
+  replyTo={id:isNaN(+m.id)?m.id:+m.id, name:nm, text:m.text};
+  $('#rpTxt').textContent=`回复 ${nm}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus();
+}
 function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); }
 
 // 投影弹幕：本地飞 + 广播(kind='proj'消息)，让房里所有人都看到
@@ -1500,10 +2422,10 @@ function maybeResonate(m){
   resoWindow[key]=(resoWindow[key]||[]).filter(t=>now-t<4000); resoWindow[key].push(now);
   if(resoWindow[key].length>=3){ triggerResonance(key,m.color); resoWindow[key]=[]; }
 }
-function triggerResonance(emoji,color){
+function triggerResonance(emoji,color,msg){
   const r=$('#resonance');
   r.style.background=`radial-gradient(circle at 50% 60%, ${safeColor(color,'#FF3CAC')}44, transparent 70%)`;
-  r.classList.add('on'); burst(emoji,40); toast(`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
+  r.classList.add('on'); burst(emoji,40); toast(msg||`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
   setTimeout(()=>r.classList.remove('on'),1200);
 }
 
@@ -1538,6 +2460,8 @@ function ehConfirm(msg, title){
 
 // ============ 离开房间 ============
 async function leaveRoom(){
+  stopVoice(); stopSong();
+  if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
   // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
   if(curRoom){
     try{ roomSnap={ rid:curRoom.id, html:$('#stream').innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() }; }catch(e){ roomSnap=null; }
@@ -1548,13 +2472,19 @@ async function leaveRoom(){
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
+  if(curMode!=='none') setMode('none');   // 离开房间退出所有发言模式(虚空/语音/神曲)
   try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
 // ============ 房主设置抽屉 ============
 async function openGear(){
   if(!curRoom || curRoom.role!=='owner') return;
-  const { data:members } = await sb.from('eh_members').select('user_id,name,emoji,color,role').eq('room_id',curRoom.id);
+  // 进房时 room 对象不带 topic，这里补拉一次，否则保存会把已有公告清空
+  const [{ data:members },{ data:roomRow }] = await Promise.all([
+    sb.from('eh_members').select('user_id,name,emoji,color,role').eq('room_id',curRoom.id),
+    sb.from('eh_rooms').select('name,topic').eq('id',curRoom.id).maybeSingle(),
+  ]);
+  if(roomRow){ if(roomRow.name) curRoom.name=roomRow.name; curRoom.topic=roomRow.topic||''; }
   const body=$('#gearBody');
   body.innerHTML=`
     <div class="dsec"><div class="dl">房间信息</div>
@@ -1564,7 +2494,7 @@ async function openGear(){
         <button class="dbtn" id="gSaveBtn">保存修改</button>
       </div></div>
     <div class="dsec"><div class="dl">成员 (${(members||[]).length})</div>
-      <div class="mlist">${(members||[]).map(mm=>`
+      <div class="member-list">${(members||[]).map(mm=>`
         <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;color:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
           <span class="mi-nm">${esc(mm.name)}</span>
           ${mm.role==='owner'?'<span class="mi-role">房主</span>':(mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
@@ -1577,7 +2507,8 @@ async function openGear(){
     const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
     if(error){ toast('保存失败'); return; }
     curRoom.name=name; curRoom.topic=topic;
-    $('#hallName').innerHTML=`<span class="hall-emoji">${safeEmoji(curRoom.emoji)}</span> ${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
+    { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
+    $('#hallNameTxt').innerHTML=`${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
     toast('已保存'); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
@@ -1590,14 +2521,15 @@ async function openGear(){
     await sb.from('eh_rooms').delete().eq('id',curRoom.id);
     toast('房间已解散'); closeGear(); backToLobby();
   };
-  $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on');
+  $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on'); $('#gearBtn').classList.add('active');
 }
-function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); }
+function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); $('#gearBtn').classList.remove('active'); }
 
 // ============ 个人空间抽屉 ============
 let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
 async function openMe(){
   const body=$('#meBody');
+  if(!me){ if(typeof loadOrRollIdentity==='function') loadOrRollIdentity(); if(!me) return; }
   const isBound = !!(me && me.registered);
   const isSuper = me && me.role==='super';
   const acctKnown = me.email !== undefined; // email/username 已缓存过
@@ -1611,9 +2543,8 @@ async function openMe(){
     ? `${username?'@'+esc(username)+' · ':''}${badge}`
     : `无需注册 · ${badge}`;
   const c=safeColor(me.color);
-  // 已缓存过统计则直接显数字, 否则占位
-  const roomsN = _meCache.rooms ? _meCache.rooms.length : '·';
-  const msgsN  = _meCache.msgs  ? _meCache.msgs.length  : '·';
+  const roomsN = _meCache.rooms ? _meCache.rooms.length : null;
+  const msgsN  = _meCache.msgs  ? _meCache.msgs.length  : null;
   body.innerHTML=`
     <div class="me-hero">
       <div class="mh-av" style="--mh-c:${c}">${safeEmoji(me.emoji)}</div>
@@ -1624,45 +2555,72 @@ async function openMe(){
         ${isBound?'<button class="dbtn" id="meEmail">✉️ 邮箱</button>':'<button class="dbtn" id="meReg">✨ 注册</button>'}
       </div>
     </div>
-    <div class="me-stats">
-      <div class="me-stat" id="meStatRooms"><div class="n">${roomsN}</div><div class="l">加入的房间</div></div>
-      <div class="me-stat" id="meStatMsgs"><div class="n">${msgsN}</div><div class="l">发过的消息</div></div>
-    </div>
-    <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间</div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
-    <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言</div>
+    <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
       <div class="dcard" style="max-height:180px;overflow-y:auto" id="meMsgsList">${_meCache.msgs?renderMyMsgList(_meCache.msgs):'<div class="empty-hint">加载中…</div>'}</div></div>
     <button class="dbtn danger" id="meLogout" style="width:100%">${isBound?'退出登录':'退出 / 换个身份'}</button>
     <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;text-align:center">${isBound?'退出后聊天记录仍与账号关联，重新登录即可找回。':'退出会清除本设备的临时身份（消息仍留存）。'}</div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
+  $('#meBtn')&&$('#meBtn').classList.add('active'); $('#meBtnHall')&&$('#meBtnHall').classList.add('active');
   bindMeActions(isBound);
-  // 后台静默刷新(不阻塞首屏)
-  const tasks=[
-    sb.from('eh_messages').select('text,created_at').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
-    sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
-  ];
-  if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role').eq('auth_uid',myUid).maybeSingle());
-  const [msgsRes, roomsRes, accRes] = await Promise.all(tasks);
-  const myMsgs=msgsRes.data||[], myRooms=roomsRes.data||[];
-  _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
-  // 账号信息首次读到后缓存(username+email+role), 之后打开直接显示
-  if(isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; saveIdentity();
-    // 补上顶部 @用户名 + 正确徽章(首屏可能没有)
+  // ↻ 按钮点击 → 强制刷新对应区域(用户主动)
+  $('#meMsgsRefresh')&&($('#meMsgsRefresh').onclick=()=>refreshMeData('msgs',isBound,acctKnown));
+  $('#meRoomsRefresh')&&($('#meRoomsRefresh').onclick=()=>refreshMeData('rooms',isBound,acctKnown));
+  // 首次打开自动刷一次(即使有缓存, 也无条件覆盖为最新)
+  refreshMeData('all',isBound,acctKnown);
+}
+// 抽出的刷新函数, ↻ 按钮和 openMe 复用. scope: 'all'|'msgs'|'rooms'
+async function refreshMeData(scope, isBound, acctKnown){
+  if(!myUid){ $('#meRoomsList').innerHTML='<div class="empty-hint">身份加载中，请稍后重开</div>'; $('#meMsgsList').innerHTML='<div class="empty-hint">—</div>'; return; }
+  const wantMsgs = scope==='all'||scope==='msgs';
+  const wantRooms = scope==='all'||scope==='rooms';
+  // 转圈提示
+  if(wantMsgs) $('#meMsgsRefresh')?.classList.add('spinning');
+  if(wantRooms) $('#meRoomsRefresh')?.classList.add('spinning');
+  const tasks=[];
+  if(wantMsgs) tasks.push(sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20));
+  else tasks.push(Promise.resolve(null));
+  if(wantRooms) tasks.push(sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50));
+  else tasks.push(Promise.resolve(null));
+  if(scope==='all' && isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
+  let msgsRes,roomsRes,accRes;
+  try{ [msgsRes,roomsRes,accRes] = await Promise.all(tasks); }
+  catch(e){
+    console.warn('refreshMeData',e);
+    if(wantMsgs) $('#meMsgsList').innerHTML='<div class="empty-hint">加载失败，点↻重试</div>';
+    if(wantRooms) $('#meRoomsList').innerHTML='<div class="empty-hint">加载失败，点↻重试</div>';
+    $('#meMsgsRefresh')?.classList.remove('spinning');
+    $('#meRoomsRefresh')?.classList.remove('spinning');
+    return;
+  }
+  if(msgsRes?.error) console.warn('msgs',msgsRes.error);
+  if(roomsRes?.error) console.warn('rooms',roomsRes.error);
+  const setN=(sel,label,n)=>{ let e=$(sel); if(!e){ const dl=$(label); if(dl){ e=document.createElement('span'); e.className='dl-n'; e.id=sel.slice(1); dl.appendChild(e); } } if(e) e.textContent=n; };
+  if(wantMsgs && msgsRes){
+    const myMsgs=msgsRes?.data||[]; _meCache.msgs=myMsgs;
+    setN('#meMsgsN','#meMsgsLabel',myMsgs.length);
+    $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+  }
+  if(wantRooms && roomsRes){
+    const myRooms=roomsRes?.data||[]; _meCache.rooms=myRooms;
+    setN('#meRoomsN','#meRoomsLabel',myRooms.length);
+    $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
+  }
+  // 账号信息首次读到后缓存
+  if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
     const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : '<span class="mh-badge reg">正式账号</span>';
     if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
   }
-  // 刷新统计数字 + 我的房间(可点进房) + 最近发言
-  $('#meStatRooms').querySelector('.n').textContent=myRooms.length;
-  $('#meStatMsgs').querySelector('.n').textContent=myMsgs.length;
-  $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
-  $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+  // 停止转圈, 至少显示 300ms 让用户看到反馈
+  setTimeout(()=>{ $('#meMsgsRefresh')?.classList.remove('spinning'); $('#meRoomsRefresh')?.classList.remove('spinning'); }, 300);
 }
 // 列表渲染 helper(供首屏缓存 + 刷新复用)
 function renderMyRoomList(rooms){
   return (rooms||[]).map(r=>{const rm=r.eh_rooms||{};return `
-    <div class="mitem mitem-go" data-rid="${r.room_id}" data-nm="${esc(rm.name||'')}" data-em="${safeEmoji(rm.emoji)||'🔒'}" data-kind="${rm.kind||'public'}" style="cursor:pointer">
+    <div class="mitem mitem-go" data-rid="${r.room_id}" data-nm="${esc(rm.name||'')}" data-em="${safeEmoji(rm.emoji)||'🔒'}" data-kind="${rm.kind||'public'}">
     <div class="mi-av">${safeEmoji(rm.emoji)||'🔒'}</div><span class="mi-nm">${esc(rm.name||'—')}</span>
-    ${r.role==='owner'?'<span class="mi-role">房主</span>':'<span class="mi-go">进入 →</span>'}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
+    ${r.role==='owner'?'<span class="mi-role">房主</span>':''}</div>`;}).join('')||'<div class="empty-hint">还没加入任何房间</div>';
 }
 // 绑定"我的房间"列表点击进房
 function bindMyRoomClicks(){
@@ -1671,7 +2629,7 @@ function bindMyRoomClicks(){
   });
 }
 function renderMyMsgList(msgs){
-  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(m.text)}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
+  return (msgs||[]).map(m=>`<div class="drow"><span class="dv" style="text-align:left">${esc(msgPreview(m))}</span><span class="dk" style="min-width:auto;font-size:10px">${fmtTime(m.created_at)}</span></div>`).join('')||'<div class="empty-hint">还没发过消息</div>';
 }
 // 绑定个人空间的按钮动作(reroll/注册/邮箱/登出)
 function bindMeActions(isBound){
@@ -1690,7 +2648,39 @@ function bindMeEmail(){
     $('#curEmailRow').style.display = has?'block':'none';
     if(has) $('#curEmail').value=realEmail;
     $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
+    renderEmailVerifyUI();
   },50); };
+}
+// 邮箱验证状态 UI: 徽章 + 发送验证按钮(有邮箱且未验证时显示)
+function renderEmailVerifyUI(){
+  const has=!!(me.email);
+  const verified=!!me.emailVerified;
+  const badge=$('#emailVerifyBadge'), row=$('#verifyRow'), hint=$('#verifyHint');
+  if(!badge||!row) return;
+  if(!has){ badge.innerHTML=''; row.style.display='none'; return; }
+  badge.innerHTML = verified ? '<span class="vbadge ok">✓ 已验证</span>' : '<span class="vbadge no">未验证</span>';
+  row.style.display = verified ? 'none' : 'block';
+  if(hint) hint.textContent='';
+  const sb2=$('#sendVerifyBtn'); if(sb2){ sb2.disabled=false; sb2.textContent='✉️ 发送验证邮件'; }
+}
+// 发送邮箱验证: 调 eh-auth /send-verify。SMTP 未配时后端降级返回验证链接, 前台直接给本人点。
+async function sendVerifyEmail(){
+  const btn=$('#sendVerifyBtn'); if(!btn) return;
+  btn.disabled=true; btn.textContent='发送中…';
+  const { data:{ session } }=await sb.auth.getSession();
+  if(!session){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; toast('请先登录'); return; }
+  const r=await fetch(EH_AUTH_FN+'/send-verify',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({origin:location.origin+location.pathname.replace(/\/[^/]*$/,'')}) });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok || !j.ok){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; $('#verifyHint').textContent=j.error||'发送失败'; return; }
+  if(j.already){ me.emailVerified=true; saveIdentity(); renderEmailVerifyUI(); toast('邮箱已验证'); return; }
+  // SMTP 未配: sent=false, 后端返回验证链接。给本人一个可点的链接(过渡方案)。
+  if(j.sent===false && j.link){
+    btn.style.display='none';
+    $('#verifyHint').innerHTML='邮件投递暂未开通，先用下面的链接完成验证（同一浏览器打开即可）：<br><a href="'+j.link+'" style="color:var(--cyan);word-break:break-all">点此立即验证 →</a>';
+  } else {
+    btn.textContent='✓ 已发送';
+    $('#verifyHint').textContent='验证邮件已发送到 '+(j.email||me.email)+'，请查收并点击链接。';
+  }
 }
 // 邮箱首次读到后, 重渲染 meRegSlot(从"读取中"变成真实态)
 function rebindEmailSlot(){
@@ -1708,16 +2698,17 @@ async function logoutIdentity(bound){
   try{ await sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem(LS_ID); }catch(e){}
   myUid=null; me=null;
+  _meCache={ rooms:null, msgs:null };   // 清个人空间缓存, 换身份后不残留旧数据
   closeMe();
   // 重新生成一个身份并回到入场页
   loadOrRollIdentity(); paintIdentity();
   goScene('enter');
   toast(bound?'已退出登录':'已换新身份');
 }
-function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); }
+function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ AudioEngine.stop(); applyTheme(themeLocked()?currentTheme():currentTheme());
+function backToLobby(){ AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
@@ -1866,7 +2857,8 @@ async function changeEmail(){
   const j=await r.json().catch(()=>({}));
   btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
   if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
-  toast('邮箱已更新'); closeModal();
+  me.email=email; me.emailVerified=false; saveIdentity();  // 换邮箱→需重新验证
+  toast('邮箱已更新，请验证'); closeModal();
 }
 // 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
 let _profEmoji, _profColor;
@@ -1877,7 +2869,7 @@ function openProfileEditor(){
   // 随机昵称按钮(复用词库), 昵称与登录无关可随意换
   $('#profDice').onclick=()=>{ $('#profName').value=rand(ADJ)+rand(ANI); $('#profName').focus(); };
   // emoji 选择器(当前高亮在首位)
-  const emos=[_profEmoji,...EMO.filter(e=>e!==_profEmoji)];
+  const emos=[_profEmoji,...EMO_ALL.filter(e=>e!==_profEmoji)];
   $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
   $('#profEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ _profEmoji=b.textContent; $('#profEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
   // 颜色选择器
@@ -1899,6 +2891,7 @@ async function saveProfile(){
   // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
+  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
   toast('形象已更新'); closeModal();
 }
 
@@ -1916,6 +2909,7 @@ $('#toReset').onclick=(e)=>{ e.stopPropagation(); openModal('mReset'); };
 $('#doRegBtn').onclick=()=>doRegister();
 $('#doResetBtn').onclick=()=>doReset();
 $('#doEmailBtn').onclick=()=>changeEmail();
+$('#sendVerifyBtn').onclick=()=>sendVerifyEmail();
 $('#doProfBtn').onclick=()=>saveProfile();
 $('#enterBtn').onclick=async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
@@ -1926,9 +2920,17 @@ $('#enterBtn').onclick=async()=>{
 $('#backBtn').onclick=()=>backToLobby();
 $('#gearBtn').onclick=()=>openGear();
 $('#meBtn').onclick=()=>openMe();
+$('#meBtnHall')&&($('#meBtnHall').onclick=()=>openMe());
 $('#lobbyName').onclick=()=>openMe();
 $('#meDx').onclick=()=>closeMe(); $('#meMask').onclick=()=>closeMe();
 $('#gearDx').onclick=()=>closeGear(); $('#gearMask').onclick=()=>closeGear();
+// 触屏: 点顶栏按钮(且非触发式设备)后短暂禁指针, 让粘住的 :hover 脱落。
+// 用 click(在 onclick 之后, 不阻塞功能); 仅 coarse pointer(触屏)执行, 鼠标不受影响。
+if(window.matchMedia && matchMedia('(hover:none)').matches){
+  document.querySelectorAll('.tool-btn,.me-btn,.gear').forEach(b=>{
+    b.addEventListener('click',()=>{ setTimeout(()=>{ b.classList.add('nohover'); setTimeout(()=>b.classList.remove('nohover'),260); },0); });
+  });
+}
 
 $('#createRoomBtn').onclick=()=>openModal('mCreate');
 $('#joinRoomBtn').onclick=()=>openModal('mJoin');
@@ -1950,7 +2952,7 @@ cin.addEventListener('input',()=>{
   if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
     _inputRaf=0;
     cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
-    $('#goBtn').disabled=!cin.value.trim();
+    syncSendBtn();
     const v=cin.value;
     if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
   });
@@ -1961,6 +2963,20 @@ cin.addEventListener('input',()=>{
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
+syncSendBtn();  // 初始：空输入→显示麦克风
+// ＋ 花样菜单：虚空 / 语音 / 神曲。有模式时 ＋变模式图标, 点它=退出; 无模式时=展开菜单
+function closePlusMenu(){ $('#plusMenu').classList.remove('on'); if(curMode==='none') $('#plusBtn').classList.remove('on'); }
+$('#plusBtn').onclick=e=>{ e.stopPropagation();
+  if(curMode!=='none'){ setMode('none'); return; }   // 当前有模式 → 点＋退出
+  const open=!$('#plusMenu').classList.contains('on');
+  $('#emojiTray').classList.remove('on');
+  $('#plusMenu').classList.toggle('on',open); $('#plusBtn').classList.toggle('on',open);
+};
+$('#plusMenu').addEventListener('click',e=>e.stopPropagation());
+$('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
+$('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
+$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secureRand()*SONG_STYLES.length)].id; setMode('song'); };   // 随机挑个曲风进神曲, 换曲风用细色条
+document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
@@ -1995,6 +3011,20 @@ syncViewportH();
 loadOrRollIdentity();
 paintIdentity();
 typeSub();
+// 邮箱验证回跳: URL 带 ?ehverify=<token> → 调 /verify-email 标记已验证
+(function handleEmailVerify(){
+  const m=/[?&]ehverify=([a-f0-9]+)/i.exec(location.search||'');
+  if(!m) return;
+  const token=m[1];
+  // 清掉 URL 上的 token(避免重复/泄露), 不刷新页面
+  const clean=location.pathname+location.search.replace(/([?&])ehverify=[a-f0-9]+/i,'$1').replace(/[?&]$/,'').replace(/\?&/,'?');
+  history.replaceState(null,'',clean);
+  fetch(EH_AUTH_FN+'/verify-email',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token}) })
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.ok){ if(me){ me.emailVerified=true; saveIdentity(); } toast('✓ 邮箱验证成功'); }
+      else toast(j&&j.error||'验证失败');
+    }).catch(()=>toast('验证失败'));
+})();
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
 const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
@@ -2008,11 +3038,11 @@ sb.auth.onAuthStateChange((ev,session)=>{
       // 一并查身份档案 + 账号信息(username/email/role), 缓存到 me, 避免顶部@用户名缺失
       const [{ data:prof }, { data:acc }] = await Promise.all([
         sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-        sb.from('eh_accounts').select('username,email,role').eq('auth_uid',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
       ]);
       if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
       else { me = me||{}; me.registered=true; }
-      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
       saveIdentity();
       paintIdentity();
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
