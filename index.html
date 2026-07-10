@@ -256,11 +256,18 @@
   .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,rgba(40,230,216,.14),rgba(139,92,255,.14));border-color:var(--line2)}
   .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
-  .msg .echo{position:absolute;right:-8px;bottom:-10px;background:var(--panel-solid);border:1px solid var(--line2);
-    border-radius:10px;padding:1px 7px;font-size:11px;cursor:pointer;user-select:none;transition:.15s;color:var(--sub);opacity:0}
-  .msg:hover .echo,.msg .echo.has{opacity:1}
-  .msg .echo:hover{border-color:var(--magenta);color:var(--magenta)}
-  .msg .echo.has{color:var(--magenta);border-color:rgba(255,60,172,.4)}
+  /* 回声徽章条: 消息下方一排各情绪计数 */
+  .echo-bar{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .echo-bar.empty{display:none}
+  .msg.me .echo-bar{justify-content:flex-end}
+  .ec-pill{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:2px 8px;border-radius:11px;cursor:pointer;
+    background:var(--panel-solid);border:1px solid var(--line2);color:var(--sub);transition:.15s;user-select:none;line-height:1.4}
+  .ec-pill b{font-weight:700;font-size:11px}
+  .ec-pill:hover{transform:translateY(-1px);border-color:var(--cyan)}
+  .ec-pill.mine{background:rgba(40,230,216,.12);border-color:var(--cyan);color:var(--cyan)}
+  /* 消息达阈值共鸣时的高亮脉冲 */
+  .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
+  @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
@@ -288,6 +295,19 @@
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
+  /* 虚空模式按钮 */
+  .void-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:21px;cursor:pointer;border-radius:10px;transition:.18s;user-select:none;opacity:.55}
+  .void-btn:hover{background:rgba(139,92,255,.1);opacity:1}
+  .void-btn.on{opacity:1;background:rgba(139,92,255,.18);box-shadow:inset 0 0 0 1.5px var(--violet),0 0 14px -4px var(--violet)}
+  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,92,255,.12)}
+  .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.75}
+  /* 虚空消息气泡: 无名/紫调/虚线/倒计时 */
+  .msg.void .av{background:rgba(139,92,255,.12)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px rgba(139,92,255,.4)!important}
+  .msg.void .nm{color:var(--violet)!important;font-style:italic}
+  .msg.void .txt{background:rgba(139,92,255,.07);border-color:rgba(139,92,255,.3);border-style:dashed}
+  .msg.void .vexp{font-size:10px;color:var(--violet);opacity:.8;margin-left:8px}
+  .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
+  @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:#04060c}
@@ -310,12 +330,19 @@
 
   /* 长按互动环 */
   .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:6px;display:none;gap:2px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
+    padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
   .act-ring.on{display:flex}
-  .act-ring button{background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
+  .act-ring .ar-echoes{display:flex;gap:2px}
+  .act-ring .ar-echo{background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 8px;border-radius:10px;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:46px}
+  .act-ring .ar-echo .ai{font-size:20px}
+  .act-ring .ar-echo .al{font-size:10px;color:var(--sub)}
+  .act-ring .ar-echo:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
+  .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
+  .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
     border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
-  .act-ring button .ai{font-size:18px}
-  .act-ring button:hover{background:rgba(255,255,255,.08)}
+  .act-ring .ar-actions .ai{font-size:18px}
+  .act-ring .ar-actions button:hover{background:rgba(255,255,255,.08)}
 
   /* 粒子/共鸣 */
   #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
@@ -515,6 +542,7 @@
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
     <div class="composer">
+      <div class="void-btn" id="voidBtn" title="说给虚空：匿名 · 5分钟后消散">🕳️</div>
       <div class="emoji-btn" id="emojiBtn">😊</div>
       <div class="cin-wrap">
         <textarea class="cin" id="cin" placeholder="说点什么… 试试打个 /" rows="1"></textarea>
@@ -826,8 +854,22 @@ let msgChan = null;        // Realtime postgres_changes 频道
 let presChan = null;       // Realtime presence 频道
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
-let echoState = {};        // message_id -> {count, mine}
+let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
+const VOID_TTL = 5*60*1000;   // 虚空消息存活 5 分钟
+const VOID_NAMES = ['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'];
+let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
 const HISTORY_PAGE = 60;
+// 五种回声情绪: 共鸣/动容/脑电/困惑/观测
+const ECHO_KINDS = [
+  {e:'🔥', label:'共鸣'},
+  {e:'💧', label:'动容'},
+  {e:'⚡', label:'脑电'},
+  {e:'🌀', label:'困惑'},
+  {e:'👁', label:'观测'},
+];
+const ECHO_EMOJIS = ECHO_KINDS.map(k=>k.e);
+const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
+const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = {'闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC'};
@@ -908,7 +950,8 @@ async function fillRoomStats(box, rid){
   if(last){
     prev.classList.remove('empty');
     const txt = last.kind==='act' ? '✦ '+last.text : (last.kind==='proj'?'📽️ 投影':last.text);
-    prev.innerHTML=`<b>${esc(last.name)}:</b> ${esc(String(txt).slice(0,40))}`;
+    const nm = last.anon ? '🕳️ 某个回声' : esc(last.name)+':';
+    prev.innerHTML=`<b>${nm}</b> ${esc(String(txt).slice(0,40))}`;
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
     prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
@@ -1121,7 +1164,7 @@ function subscribeMessages(rid){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
       // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
       if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
-      applyEchoRealtime(p.new.message_id, p.new.user_id);
+      applyEchoRealtime(p.new.message_id, p.new.user_id, p.new.emoji);
     })
     .subscribe();
 }
@@ -1235,31 +1278,61 @@ function buildMsgEl(m){
     el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   const el=document.createElement('div');
-  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'');
+  const isVoid = !!m.anon;
+  // 虚空消息: 名字在数据层已是匿名代号; 本人后缀"（虚空）"便于自认
+  const dispName = isVoid ? (isMe ? m.name+'（虚空）' : m.name) : m.name;
+  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'');
   el.dataset.mid=m.id;
-  el.dataset.text=m.text; el.dataset.name=m.name;
+  el.dataset.text=m.text; el.dataset.name=dispName;
+  if(isVoid && m.expires_at){ el.dataset.exp=m.expires_at; }
   // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
   if(m.reply_to){
     const ref = m._replyRef || refFromDom(m.reply_to);
     replyHtml=`<div class="reply-ref" data-ref="${m.reply_to}">↳ ${esc(ref||'查看原消息')}</div>`;
   }
-  // 自己发的消息不显示 echo 入口(不能给自己点赞)
-  const echoHtml = isMe ? '' : `<span class="echo" data-mid="${m.id}">🔥 <span class="ec">${echoState[m.id]?.count||0}</span></span>`;
+  // 回声徽章条: 显示已有的各情绪计数(点已有徽章可加/撤自己的); 长按消息弹环加新情绪
+  const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
+  const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
+  const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
+  const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   el.innerHTML=`
-    <div class="av" style="background:${safeColor(m.color)}22;color:${safeColor(m.color)};box-shadow:inset 0 0 0 1.5px ${safeColor(m.color)}">${safeEmoji(m.emoji) || '👤'}</div>
+    <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avIc}</div>
     <div class="body">
-      <div class="meta"><span class="nm" style="color:${safeColor(m.color)}">${esc(m.name)}</span><span class="tm">${fmtTime(m.created_at)}</span></div>
+      <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
-      <div class="txt">${esc(m.text)}${echoHtml}</div>
+      <div class="txt">${esc(m.text)}</div>
+      ${echoHtml}
     </div>`;
   const txtEl=el.querySelector('.txt');
-  const echoEl=el.querySelector('.echo');
-  if(echoEl){ if(echoState[m.id]?.count) echoEl.classList.add('has'); echoEl.onclick=(e)=>{ e.stopPropagation(); toggleEcho(m.id); }; }
+  paintEcho(m.id, el);
+  if(isVoid && m.expires_at) scheduleVoidFade(el, m.expires_at);
   // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   attachLongPress(txtEl, m);
   return el;
+}
+// 虚空消息给非本人看的匿名代号: 用 user_id hash 到固定代号(同一人同名, 不同人不同名), 不暴露真实身份
+function voidNameFor(m){
+  let h=0; const s=String(m.user_id||m.id||'');
+  for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; }
+  return VOID_NAMES[h%VOID_NAMES.length];
+}
+// 虚空消息倒计时 + 到点淡出移除
+function scheduleVoidFade(el, expIso){
+  const exp=new Date(expIso).getTime();
+  const badge=el.querySelector('.vexp');
+  const tick=()=>{
+    const left=exp-Date.now();
+    if(left<=0){
+      if(badge) badge.textContent='· 消散';
+      el.classList.add('fading'); setTimeout(()=>el.remove(),1200);
+      return;
+    }
+    if(badge){ const mm=Math.floor(left/60000), ss=Math.floor((left%60000)/1000); badge.textContent=`· ${mm}:${String(ss).padStart(2,'0')} 后消散`; }
+    el._voidT=setTimeout(tick, left>60000?15000:1000);
+  };
+  tick();
 }
 // 从已渲染消息 DOM 里取某条的原文(名字:内容)
 function refFromDom(mid){
@@ -1269,8 +1342,8 @@ function refFromDom(mid){
 }
 // 引用原文本地取不到时，查库补上
 async function fillReplyRef(el, mid){
-  const { data } = await sb.from('eh_messages').select('name,text').eq('id',mid).maybeSingle();
-  if(data){ const r=el.querySelector('.reply-ref'); if(r) r.textContent='↳ '+(data.name?data.name+'：':'')+data.text; }
+  const { data } = await sb.from('eh_messages').select('name,text,anon,user_id').eq('id',mid).maybeSingle();
+  if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+data.text; } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
 function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
@@ -1283,46 +1356,89 @@ async function send(){
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
   let kind='msg';
   if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
+  // 虚空模式: 匿名 + 限时消散(act/whisper 不走虚空)
+  const useVoid = voidMode && kind==='msg';
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind, reply_to: replyTo?.id||null };
+  if(useVoid){
+    payload.anon=true;
+    payload.expires_at=new Date(Date.now()+VOID_TTL).toISOString();
+    // 数据层就不落真实昵称/头像/色: 存匿名代号(据uid确定性生成)+中性紫, 避免raw行泄露身份
+    payload.name = voidNameFor({user_id:myUid});
+    payload.emoji = '🕳️';
+    payload.color = '#8B5CFF';
+  }
   // 乐观上屏
   const optimistic={...payload, id:'local_'+Date.now(), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
+  if(useVoid) setVoidMode(false);  // 虚空是单次的, 发完自动关
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('send',error); toast('发送失败'); }
-  else if(data){ el && (el.dataset.mid=data.id); }
+  else if(data){ if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; } }
+}
+// 虚空模式开关
+function setVoidMode(on){
+  voidMode=on;
+  $('#voidBtn').classList.toggle('on',on);
+  $('.composer').classList.toggle('void-mode',on);
+  const cin=$('#cin');
+  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 试试打个 /';
 }
 function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; $('#goBtn').disabled=true; hideSlash(); }
 
-// ============ echo(🔥) 落库 ============
-async function toggleEcho(mid){
+// ============ 多情绪回声 落库 ============
+// echoState[mid] = { '🔥':{count,mine}, ... }
+function ecOf(mid){ return echoState[mid] || (echoState[mid]={}); }
+async function toggleEcho(mid, emoji){
   if(String(mid).startsWith('local_')) return;
-  const st=echoState[mid]||{count:0,mine:false};
+  emoji = emoji || '🔥';
+  const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
   if(st.mine){
-    st.count=Math.max(0,st.count-1); st.mine=false; echoState[mid]=st; paintEcho(mid);
-    await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid);
+    st.count=Math.max(0,st.count-1); st.mine=false; paintEcho(mid);
+    await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid).eq('emoji',emoji);
   } else {
-    st.count++; st.mine=true; echoState[mid]=st; paintEcho(mid); burst('🔥',6);
-    await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid});
+    st.count++; st.mine=true; paintEcho(mid); burst(emoji,6);
+    checkResonance(mid, emoji, st.count);
+    await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid,emoji});
   }
 }
-function applyEchoRealtime(mid, who){
-  if(who===myUid) return;
-  const st=echoState[mid]||{count:0,mine:false}; st.count++; echoState[mid]=st; paintEcho(mid);
-  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst('🔥',4);
+function applyEchoRealtime(mid, who, emoji){
+  emoji = emoji || '🔥';
+  const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
+  if(who===myUid){ return; }  // 自己的已乐观更新
+  st.count++; paintEcho(mid);
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst(emoji,4);
+  checkResonance(mid, emoji, st.count);
 }
-function paintEcho(mid){
-  const echoEl=document.querySelector(`.echo[data-mid="${mid}"]`); if(!echoEl) return;
-  const st=echoState[mid]||{count:0}; echoEl.querySelector('.ec').textContent=st.count;
-  echoEl.classList.toggle('has', st.count>0);
-  echoEl.style.transform='scale(1.3)'; setTimeout(()=>echoEl.style.transform='',150);
+// 渲染某条消息的回声徽章条(只显示 count>0 的情绪)
+function paintEcho(mid, scope){
+  const bar = (scope||document).querySelector(`.echo-bar[data-mid="${mid}"]`)
+           || document.querySelector(`.echo-bar[data-mid="${mid}"]`);
+  if(!bar) return;
+  const map=echoState[mid]||{};
+  const active=ECHO_EMOJIS.filter(e=>map[e]&&map[e].count>0);
+  bar.innerHTML=active.map(e=>{
+    const st=map[e];
+    return `<span class="ec-pill${st.mine?' mine':''}" data-e="${e}">${e}<b>${st.count}</b></span>`;
+  }).join('');
+  bar.classList.toggle('empty', active.length===0);
+  bar.querySelectorAll('.ec-pill').forEach(p=>p.onclick=(ev)=>{ ev.stopPropagation(); toggleEcho(mid, p.dataset.e); });
 }
 async function fetchEchoes(ids){
   if(!ids || !ids.length) return;
-  const { data } = await sb.from('eh_message_echoes').select('message_id,user_id').in('message_id',ids);
-  (data||[]).forEach(e=>{ const st=echoState[e.message_id]||{count:0,mine:false}; st.count++; if(e.user_id===myUid) st.mine=true; echoState[e.message_id]=st; });
+  const { data } = await sb.from('eh_message_echoes').select('message_id,user_id,emoji').in('message_id',ids);
+  (data||[]).forEach(e=>{ const map=ecOf(e.message_id); const st=map[e.emoji]||(map[e.emoji]={count:0,mine:false}); st.count++; if(e.user_id===myUid) st.mine=true; });
   ids.forEach(id=>{ if(echoState[id]) paintEcho(id); });
+}
+// 共鸣涟漪: 某条消息某情绪达阈值 → 全房视觉涟漪(复用 resonance 层 + 粒子)
+function checkResonance(mid, emoji, count){
+  if(count < RESONANCE_THRESHOLD) return;
+  const key=mid+emoji; if(resonatedMsgs.has(key)) return; resonatedMsgs.add(key);
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`);
+  const color = el ? (el.querySelector('.nm')?.style.color||'#FF3CAC') : '#FF3CAC';
+  triggerResonance(emoji, color, `✨ 一条消息响彻回声厅 ${emoji}`);
+  if(el){ el.classList.add('resonated'); setTimeout(()=>el.classList.remove('resonated'),1600); }
 }
 
 // ============ 斜杠命令 ============
@@ -1391,24 +1507,33 @@ function attachLongPress(el, m){
 function showActRing(x,y,m){
   const ring=$('#actRing');
   const isMine = m.user_id===myUid;
-  // 自己的消息不能给自己点回声
+  const mid = isNaN(+m.id)?m.id:+m.id;
+  // 自己的消息不能给自己点回声, 但仍可回复/投影
+  const echoRow = isMine ? '' : `<div class="ar-echoes">${ECHO_KINDS.map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span><span class="al">${k.label}</span></button>`).join('')}</div>`;
   ring.innerHTML=`
-    ${isMine?'':'<button data-a="echo"><span class="ai">🔥</span>回声</button>'}
-    <button data-a="reply"><span class="ai">↳</span>回复</button>
-    <button data-a="project"><span class="ai">📽️</span>投影</button>`;
-  const eb=ring.querySelector('[data-a="echo"]'); if(eb) eb.onclick=()=>{ toggleEcho(isNaN(+m.id)?m.id:+m.id); hideActRing(); };
+    ${echoRow}
+    <div class="ar-actions">
+      <button data-a="reply"><span class="ai">↳</span>回复</button>
+      <button data-a="project"><span class="ai">📽️</span>投影</button>
+    </div>`;
+  ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=()=>{ toggleEcho(mid, b.dataset.e); hideActRing(); });
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
   ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
   ring.classList.add('on');
-  const rw=ring.offsetWidth||200, rh=ring.offsetHeight||56;
+  const rw=ring.offsetWidth||240, rh=ring.offsetHeight||100;
   ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
-  ring.style.top=Math.max(8,y-rh-10)+'px';
+  ring.style.top=Math.max(8,Math.min(y-rh-10, innerHeight-rh-8))+'px';
 }
 function hideActRing(){ $('#actRing').classList.remove('on'); }
 document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
 
 // 引用回复
-function startReply(m){ replyTo={id:isNaN(+m.id)?m.id:+m.id, name:m.name, text:m.text}; $('#rpTxt').textContent=`回复 ${m.name}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus(); }
+function startReply(m){
+  // 虚空匿名消息: 引用时也用匿名代号, 不泄露真名
+  const nm = m.anon ? (m.user_id===myUid ? m.name+'（虚空）' : voidNameFor(m)) : m.name;
+  replyTo={id:isNaN(+m.id)?m.id:+m.id, name:nm, text:m.text};
+  $('#rpTxt').textContent=`回复 ${nm}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus();
+}
 function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); }
 
 // 投影弹幕：本地飞 + 广播(kind='proj'消息)，让房里所有人都看到
@@ -1433,10 +1558,10 @@ function maybeResonate(m){
   resoWindow[key]=(resoWindow[key]||[]).filter(t=>now-t<4000); resoWindow[key].push(now);
   if(resoWindow[key].length>=3){ triggerResonance(key,m.color); resoWindow[key]=[]; }
 }
-function triggerResonance(emoji,color){
+function triggerResonance(emoji,color,msg){
   const r=$('#resonance');
   r.style.background=`radial-gradient(circle at 50% 60%, ${safeColor(color,'#FF3CAC')}44, transparent 70%)`;
-  r.classList.add('on'); burst(emoji,40); toast(`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
+  r.classList.add('on'); burst(emoji,40); toast(msg||`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
   setTimeout(()=>r.classList.remove('on'),1200);
 }
 
@@ -1481,6 +1606,7 @@ async function leaveRoom(){
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
+  if(voidMode) setVoidMode(false);   // 离开房间关掉虚空模式
   try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
@@ -1928,6 +2054,8 @@ cin.addEventListener('input',()=>{
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
+// 虚空模式切换
+$('#voidBtn').onclick=()=>{ setVoidMode(!voidMode); if(voidMode) $('#cin').focus(); };
 
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨','🎉','💯','🚀','🌈','🌙','⭐','🍺','☕','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧'];
