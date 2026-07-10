@@ -419,8 +419,13 @@
   .song-play{width:30px;height:30px;flex-shrink:0;border-radius:50%;border:1px solid var(--sc,var(--magenta));cursor:pointer;font-size:12px;line-height:1;
     display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
   .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
-  .song-play{padding-left:2px}                                                  /* ▶ 右移补偿居中 */
-  .song-card.playing .song-play{padding-left:0;background:color-mix(in srgb,var(--sc,var(--magenta)) 20%,transparent)}  /* ⏸ 用曲风色淡底, 与曲风一致 */
+  .song-card.playing .song-play{background:color-mix(in srgb,var(--sc,var(--magenta)) 20%,transparent)}
+  /* 播放/暂停图标用纯CSS画(不用emoji字符, 全平台跟随color): 默认三角, .playing 两竖条 */
+  .pglyph{display:inline-block;width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;
+    border-color:transparent transparent transparent currentColor;margin-left:2px}
+  .playing .pglyph{width:9px;height:11px;border:0;margin:0;position:relative;background:none}
+  .playing .pglyph::before,.playing .pglyph::after{content:"";position:absolute;top:0;width:3px;height:11px;background:currentColor;border-radius:1px}
+  .playing .pglyph::before{left:0}.playing .pglyph::after{right:0}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
   .song-lyric{font-size:13.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
@@ -2076,14 +2081,14 @@ function voiceHtml(src){
   if(!src.startsWith(VOICE_URL_PREFIX) && !src.startsWith('blob:')) return esc(src);
   const dur=(src.match(/#dur=(\d+)/)||[])[1];
   const bars=Array.from({length:9},()=>`<i style="height:${5+Math.floor(secureRand()*13)}px"></i>`).join('');
-  return `<span class="vplay" data-src="${esc(src)}"><button class="vp-btn">▶︎</button><span class="vp-bars">${bars}</span><span class="vp-t">${dur?fmtDur(+dur):''}</span></span>`;
+  return `<span class="vplay" data-src="${esc(src)}"><button class="vp-btn"><span class="pglyph"></span></button><span class="vp-bars">${bars}</span><span class="vp-t">${dur?fmtDur(+dur):''}</span></span>`;
 }
 // 全局单实例播放：播放新的自动停旧的
 let vAudio=null, vPlayEl=null;
 function stopVoice(){
   if(vAudio){ try{vAudio.pause();}catch(e){} vAudio=null; }
   try{ if(typeof AudioEngine!=='undefined') AudioEngine.duck(false); }catch(e){} // 恢复 BGM 音量
-  if(vPlayEl){ vPlayEl.classList.remove('playing'); const b=vPlayEl.querySelector('.vp-btn'); if(b) b.textContent='▶︎'; vPlayEl=null; }
+  if(vPlayEl){ vPlayEl.classList.remove('playing'); vPlayEl=null; }
 }
 // 整个语音条都可点(不只那个小 ▶ 圆钮), 符合"点一下就播"的直觉
 document.addEventListener('click',e=>{
@@ -2096,7 +2101,7 @@ document.addEventListener('click',e=>{
   if(!src){ toast(EH_CONFIG.text.err_voiceUrl); return; }
   const a=new Audio(src);
   vAudio=a; vPlayEl=wrap;
-  wrap.classList.add('playing'); if(btn) btn.textContent='⏸︎';
+  wrap.classList.add('playing');
   a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
   a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };
   a.play().then(()=>{}).catch(err=>{
@@ -2251,7 +2256,7 @@ function songHtml(text){
   // 逐字包 span → 播放时卡拉OK高亮
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
   return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:${safeColor(st.color)}">
-    <button class="song-play" title="播放">▶︎</button>
+    <button class="song-play" title="播放"><span class="pglyph"></span></button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
     <span class="song-lyric">${chs}</span></span></span>`;
@@ -2320,7 +2325,7 @@ function stopSong(){
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
   try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
   try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
-  if(s.el){ s.el.classList.remove('playing'); const b=s.el.querySelector('.song-play'); if(b) b.textContent='▶︎'; s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
+  if(s.el){ s.el.classList.remove('playing'); s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
   if(s.onEnd) try{ s.onEnd(); }catch(e){}
 }
 // 选一个中文嗓音(有则用, 提升"唱字"清晰度)
@@ -2353,7 +2358,7 @@ function playSong(lyric, sid, el, onEnd){
   const t0=ctx.currentTime+0.12;
   const totalDur=chars.length*step + spb*2;
   curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null };
-  if(el){ el.classList.add('playing'); const b=el.querySelector('.song-play'); if(b) b.textContent='⏸︎'; el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
+  if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
   // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
   const bars=Math.ceil(totalDur/barLen);
   for(let b=0;b<bars;b++){
