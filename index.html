@@ -199,7 +199,7 @@
 
   /* ============ 场景3：聊天厅 ============ */
   #hall{flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
-  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
   .back:hover{color:var(--cyan);border-color:var(--cyan)}
@@ -211,10 +211,14 @@
     border:1px solid var(--line);transition:.15s;flex-shrink:0;font-size:16px}
   .gear.show{display:grid}
   .gear:hover{color:var(--amber);border-color:var(--amber)}
-  .conn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);white-space:nowrap}
-  .conn .led{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:.3s}
-  .conn.live .led{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-  .conn.live{color:var(--cyan)}
+  .conn{display:flex;align-items:center;justify-content:center;width:22px;height:34px;cursor:default}
+  .conn .led{width:9px;height:9px;border-radius:50%;background:var(--dim);transition:.3s;box-shadow:0 0 0 rgba(40,230,216,0)}
+  .conn.live .led{background:var(--cyan);box-shadow:0 0 10px var(--cyan),0 0 4px var(--cyan)}
+  .hall-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .tool-btn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
+    border:1px solid var(--line);background:var(--panel);transition:.18s;font-size:16px;flex-shrink:0;user-select:none}
+  .tool-btn:hover{color:var(--cyan);border-color:var(--cyan)}
+  .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
 
   .presence{display:flex;gap:12px;padding:10px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0}
   .presence::-webkit-scrollbar{height:0}
@@ -606,8 +610,13 @@
         <h3 id="hallName">—</h3>
         <div class="cnt" id="hallCnt">连接中…</div>
       </div>
-      <div class="gear" id="gearBtn">⚙</div>
-      <div class="conn" id="conn"><span class="led"></span><span id="connTxt">连接中</span></div>
+      <div class="hall-tools">
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐">🔊</div>
+        <div class="tool-btn" id="skinBtnHall" title="皮肤">🎨</div>
+        <div class="gear" id="gearBtn" title="房间设置">⚙</div>
+        <div class="conn" id="conn" title="连接中"><span class="led"></span></div>
+      </div>
+      <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
@@ -1133,7 +1142,7 @@ const AudioEngine=(function(){
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b=$('#bgmBtn'); if(b) b.textContent=on?'🔊':'🔇'; if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b=$('#bgmBtn'); if(b) b.textContent=on?'🔊':'🔇'; const b2=$('#bgmBtnHall'); if(b2) b2.textContent=on?'🔊':'🔇'; if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   if(!bgmOn()) return;
   if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
@@ -1168,11 +1177,27 @@ function applyRoomTheme(room){
 }
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
-  menu.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
-  menu.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); menu.classList.remove('on'); });
+  const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck">✓</span></div>`).join('');
+  const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); });
+  buildMenu(menu); bind(menu);
   const btn=$('#skinBtn');
   if(btn) btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('on'); };
-  document.addEventListener('click',e=>{ if(!menu.contains(e.target) && e.target!==btn) menu.classList.remove('on'); });
+  // 聊天页版皮肤菜单
+  const menuHall=$('#skinMenuHall');
+  const btnHall=$('#skinBtnHall');
+  if(menuHall){ buildMenu(menuHall); bind(menuHall); }
+  if(btnHall && menuHall) btnHall.onclick=(e)=>{ e.stopPropagation(); menuHall.classList.toggle('on'); };
+  // 全局关闭菜单
+  document.addEventListener('click',e=>{
+    if(menu && !menu.contains(e.target) && e.target!==btn) menu.classList.remove('on');
+    if(menuHall && !menuHall.contains(e.target) && e.target!==btnHall) menuHall.classList.remove('on');
+  });
+  // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
+  const bhall=$('#bgmBtnHall');
+  if(bhall){
+    bhall.textContent=bgmOn()?'🔊':'🔇';
+    bhall.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+  }
   applyTheme(currentTheme());
   initBgmUI();
 }
@@ -1596,7 +1621,7 @@ async function leavePresence(){
   if(curRoom && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 }
 
-function setConn(live,txt){ const el=$('#conn'); el.classList.toggle('live',live); $('#connTxt').textContent=live?'实时在线':(txt||'连接中'); }
+function setConn(live,txt){ const el=$('#conn'); if(!el) return; el.classList.toggle('live',live); el.title=live?'实时在线':(txt||'连接中'); }
 
 // ============ 消息渲染 ============
 // Unicode property 正则在个别旧引擎不可用，编译失败则整体降级为"从不是纯 emoji"
