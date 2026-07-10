@@ -6,112 +6,197 @@
 <title>回声厅 · 后台</title>
 <style>
   :root{
-    --bg:#07080d; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
+    --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#5B6688;
     --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
+    --grid:rgba(80,120,255,.05);
     --glow-cyan:0 0 24px rgba(40,230,216,.5);
   }
+  /* 皮肤(与前台共用 localStorage eh_theme) */
+  html[data-theme="vapor"]{ --bg:#160a1f; --bg2:#22103a; --panel:rgba(40,18,60,.72); --panel-solid:#241035;
+    --line:rgba(255,120,200,.18); --line2:rgba(255,120,200,.32); --ink:#FFE8F6; --sub:#D9A8D0; --dim:#8A6A96;
+    --cyan:#38E1D0; --magenta:#FF5FA2; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --grid:rgba(255,120,220,.06); }
+  html[data-theme="mono"]{ --bg:#000; --bg2:#0a0a0c; --panel:rgba(16,16,20,.82); --panel-solid:#0e0e12;
+    --line:rgba(210,180,120,.16); --line2:rgba(210,180,120,.3); --ink:#F4F1E9; --sub:#B8B0A0; --dim:#6E685C;
+    --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96; --grid:rgba(210,180,120,.035); }
+  html[data-theme="aurora"]{ --bg:#04121a; --bg2:#062230; --panel:rgba(10,40,52,.7); --panel-solid:#08202c;
+    --line:rgba(90,220,200,.18); --line2:rgba(90,220,200,.32); --ink:#E6FBF6; --sub:#9BD4CC; --dim:#5A8A84;
+    --cyan:#2EF0C8; --magenta:#5AD1FF; --violet:#7CE0B0; --amber:#8CE6D0; --green:#3EE89A; --grid:rgba(80,220,255,.05); }
+
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{overscroll-behavior:none}
   body{font-family:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
-    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;
-    background-image:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(139,92,255,.12),transparent 70%)}
-  .wrap{max-width:860px;margin:0 auto;padding:24px 20px 60px}
-  .glass{background:var(--panel);backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:16px}
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:100dvh;
+    background-image:radial-gradient(ellipse 60% 50% at 50% 0%,color-mix(in srgb,var(--violet) 14%,transparent),transparent 70%);transition:background .3s}
+  /* 背景细网格(与前台一致的赛博感) */
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 55%,transparent 100%)}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 18px 60px;position:relative;z-index:1}
+  .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);
+    border:1px solid var(--line);border-radius:16px}
   a{color:var(--cyan)}
 
-  /* 登录 */
-  #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-  .auth-card{width:min(420px,92vw);padding:34px 30px;position:relative}
-  .auth-card h1{font-size:26px;font-weight:800;letter-spacing:1px;text-align:center;
-    background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  /* ===== 登录 ===== */
+  #auth{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;z-index:1}
+  .auth-card{width:min(420px,92vw);padding:36px 30px;position:relative;overflow:hidden;animation:pop .4s cubic-bezier(.2,.9,.3,1.3)}
+  .auth-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1px;
+    background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
+  .auth-logo{text-align:center;font-size:11px;letter-spacing:6px;color:var(--cyan);font-weight:600;margin-bottom:4px}
+  .auth-card h1{font-size:25px;font-weight:800;letter-spacing:1px;text-align:center;
+    background:linear-gradient(120deg,var(--ink),var(--cyan) 45%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
   .auth-card .sub{text-align:center;color:var(--sub);font-size:12.5px;margin:8px 0 24px}
-  .fld{display:block;margin-bottom:16px}
-  .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px}
-  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+  .fld{display:block;margin-bottom:15px}
+  .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
+  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.55);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
-  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,230,216,.1)}
-  .btn{width:100%;padding:13px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:1px;
-    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--violet));transition:.2s;box-shadow:0 8px 30px rgba(40,230,216,.2)}
-  .btn:hover{transform:translateY(-2px)} .btn:disabled{opacity:.5;cursor:wait}
-  .toggle{text-align:center;margin-top:16px;font-size:12.5px;color:var(--sub)}
-  .toggle b{color:var(--cyan);cursor:pointer}
+  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 12%,transparent)}
+  .btn{width:100%;padding:13px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:2px;
+    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--violet));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 22%,transparent)}
+  .btn:hover{transform:translateY(-2px)} .btn:active{transform:translateY(0) scale(.99)} .btn:disabled{opacity:.55;cursor:wait;transform:none}
   .err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:8px;text-align:center}
-  .badge-super{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,60,172,.15);color:var(--magenta)}
-  .badge-normal{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(120,140,220,.15);color:var(--sub)}
+  .auth-note{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6;text-align:center}
 
-  /* 后台主体 */
+  /* ===== 顶栏 ===== */
   #panel{display:none}
-  .top{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}
-  .top h1{font-size:22px;font-weight:800;letter-spacing:1px}
-  .top .who{margin-left:auto;font-size:12.5px;color:var(--sub);display:flex;align-items:center;gap:10px}
-  .logout{cursor:pointer;color:var(--dim);border:1px solid var(--line);padding:6px 12px;border-radius:9px;transition:.15s}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .top h1{font-size:21px;font-weight:800;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+  .top h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  .top .who{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sub)}
+  .icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.15s;user-select:none;position:relative}
+  .icon-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .logout{cursor:pointer;color:var(--dim);border:1px solid var(--line);padding:7px 13px;border-radius:9px;transition:.15s;font-size:12.5px}
   .logout:hover{color:var(--magenta);border-color:var(--magenta)}
-  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .badge-super,.badge-normal{font-size:10px;padding:2px 9px;border-radius:6px;font-weight:600}
+  .badge-super{background:color-mix(in srgb,var(--magenta) 16%,transparent);color:var(--magenta)}
+  .badge-normal{background:color-mix(in srgb,var(--sub) 16%,transparent);color:var(--sub)}
+  /* 皮肤菜单 */
+  .skin-menu{position:absolute;top:44px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:13px;
+    padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 16px 44px rgba(0,0,0,.55);min-width:150px}
+  .skin-menu.on{display:flex}
+  .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.12s}
+  .skin-opt:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+  .skin-opt.active{color:var(--ink)}
+  .skin-opt .sw{width:13px;height:13px;border-radius:50%;flex:0 0 auto}
+  .skin-opt .ck{margin-left:auto;opacity:0;color:var(--cyan)}
+  .skin-opt.active .ck{opacity:1}
+
+  /* ===== tabs ===== */
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
   .tab{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--sub);
     cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
-  .tab.on{background:var(--violet);color:#fff;border-color:var(--violet)}
+  .tab.on{background:var(--violet);color:#fff;border-color:var(--violet);box-shadow:0 6px 18px color-mix(in srgb,var(--violet) 30%,transparent)}
   .tab:not(.on):hover{border-color:var(--cyan);color:var(--cyan)}
-  .page{display:none} .page.on{display:block}
+  .page{display:none;animation:fade .25s ease} .page.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:20px}
-  .kpi{padding:18px;border-radius:14px}
-  .kpi .n{font-size:28px;font-weight:800;color:var(--cyan)}
-  .kpi .l{font-size:11.5px;color:var(--sub);margin-top:4px}
+  /* ===== KPI ===== */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{padding:16px 18px;border-radius:14px;position:relative;overflow:hidden;transition:.2s;--kc:var(--cyan)}
+  .kpi:hover{transform:translateY(-3px);border-color:var(--kc)}
+  .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc);opacity:.85}
+  .kpi .ic{font-size:17px;opacity:.9}
+  .kpi .n{font-size:27px;font-weight:800;color:var(--kc);line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:11.5px;color:var(--sub);margin-top:3px}
+
+  /* ===== card / table ===== */
   .card{padding:18px;border-radius:14px;margin-bottom:16px}
-  .card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line);
-    display:flex;justify-content:space-between;align-items:center}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .card h3 .hint{font-size:11px;color:var(--dim);font-weight:400}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
-  th{color:var(--dim);font-weight:600;font-size:11px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:11px;letter-spacing:.3px}
   td{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
   .roomrow{cursor:pointer;transition:.12s}
-  .roomrow:hover td{background:rgba(40,230,216,.06)}
-  .k-tag{font-size:9px;padding:2px 6px;border-radius:5px}
-  .k-official{background:rgba(40,230,216,.15);color:var(--cyan)}
-  .k-public{background:rgba(77,227,138,.15);color:var(--green)}
-  .k-private{background:rgba(255,60,172,.15);color:var(--magenta)}
-  .k-arch{background:rgba(120,140,220,.1);color:var(--dim)}
-  .msgline{padding:8px 10px;border-radius:9px;background:rgba(10,12,24,.4);margin-bottom:6px;font-size:12.5px}
+  .roomrow:hover td{background:color-mix(in srgb,var(--cyan) 7%,transparent)}
+  .roomrow td:first-child{border-radius:8px 0 0 8px}.roomrow td:last-child{border-radius:0 8px 8px 0}
+  .k-tag{font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600}
+  .k-official{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
+  .k-public{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}
+  .k-private{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
+  .k-arch{background:color-mix(in srgb,var(--sub) 12%,transparent);color:var(--dim)}
+  .msgline{padding:9px 11px;border-radius:9px;background:rgba(10,12,24,.4);margin-bottom:6px;font-size:12.5px}
   .msgline .mm-nm{font-weight:700}
   .msgline .mm-tm{font-size:10px;color:var(--dim);margin-left:8px}
   .mini-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
     font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
   .mini-btn:hover{border-color:var(--cyan);color:var(--cyan)}
   .mini-btn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
-  .inline-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-  .inline-form input{padding:9px 12px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
-    color:var(--ink);font-family:inherit;font-size:13px;outline:none}
-  .inline-form input:focus{border-color:var(--cyan)}
-  .empty{color:var(--dim);font-size:12.5px;padding:20px;text-align:center}
-  #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:60;
-    background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;
-    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none}
+  .inline-form{display:flex;gap:8px;flex-wrap:wrap}
+  .inline-form input{flex:1;min-width:160px;padding:10px 13px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.55);
+    color:var(--ink);font-family:inherit;font-size:14px;outline:none;transition:.15s}
+  .inline-form input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .empty{color:var(--dim);font-size:12.5px;padding:26px;text-align:center}
+  .note-box{font-size:12.5px;color:var(--sub);line-height:1.9}
+  .note-box b{color:var(--ink)}
+
+  /* ===== 骨架屏 ===== */
+  .sk{position:relative;overflow:hidden;background:rgba(120,140,220,.08);border-radius:8px}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cyan) 10%,transparent),transparent);animation:shim 1.3s infinite}
+  @keyframes shim{100%{transform:translateX(100%)}}
+  .sk-kpi{height:88px;border-radius:14px}
+  .sk-row{height:38px;margin-bottom:6px}
+
+  /* ===== 确认弹层 ===== */
+  .mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+  .mask.on{display:flex}
+  .confirm{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;animation:pop .28s cubic-bezier(.2,.9,.3,1.3)}
+  .confirm .ct{font-size:17px;font-weight:800;margin-bottom:10px}
+  .confirm .cm{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .confirm .cbtns{display:flex;gap:10px}
+  .confirm button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
+  .cf-no{background:rgba(10,12,24,.5);color:var(--sub)}
+  .cf-no:hover{color:var(--ink)}
+  .cf-yes{background:linear-gradient(120deg,var(--magenta),var(--violet));color:#fff;border:none}
+  .cf-yes:hover{transform:translateY(-1px)}
+
+  #toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);z-index:90;
+    background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;max-width:90vw;
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
   #toast.on{transform:translateX(-50%) translateY(0)}
-  @media(max-width:600px){ th:nth-child(4),td:nth-child(4){display:none} }
+
+  @media(max-width:600px){
+    .wrap{padding:16px 12px 50px}
+    th:nth-child(4),td:nth-child(4){display:none}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px}
+    .kpi .n{font-size:23px}
+  }
 </style>
 </head>
 <body>
+<script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <div id="toast"></div>
 
-<!-- 登录(统一账号: 与前台同一套账号密码) -->
+<!-- 登录 -->
 <div id="auth">
   <div class="glass auth-card">
+    <div class="auth-logo">◢◤ CONSOLE ◢◤</div>
     <h1>回声厅 · 后台</h1>
-    <div class="sub" id="authSub">管理员登录 · 与前台同一账号</div>
+    <div class="sub">管理员登录 · 与前台同一账号</div>
     <div class="err" id="authErr"></div>
     <label class="fld"><span>账号</span><input id="username" autocomplete="username" placeholder="用户名 或 邮箱"></label>
     <label class="fld"><span>密码</span><input id="password" type="password" autocomplete="current-password" placeholder="密码"></label>
     <button class="btn" id="authBtn">登 录</button>
-    <div class="toggle" style="font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6">只有被设为管理员的账号能进入后台。<br>没有账号请先到前台注册。</div>
+    <div class="auth-note">只有被设为管理员的账号能进入后台。<br>没有账号请先到前台注册。</div>
   </div>
 </div>
 
-<!-- 后台面板 -->
+<!-- 面板 -->
 <div id="panel"><div class="wrap">
   <div class="top">
-    <h1>回声厅控制台</h1>
-    <div class="who"><span id="whoName">—</span><span id="whoRole"></span><span class="logout" id="logoutBtn">退出</span></div>
+    <h1><span class="dot"></span>回声厅控制台</h1>
+    <div class="who">
+      <span id="whoName">—</span><span id="whoRole"></span>
+      <div class="icon-btn" id="skinBtn" title="皮肤">🎨<div class="skin-menu" id="skinMenu"></div></div>
+      <span class="logout" id="logoutBtn">退出</span>
+    </div>
   </div>
   <div class="tabs">
     <div class="tab on" data-page="overview">概览</div>
@@ -122,16 +207,16 @@
   <div class="page on" id="p-overview">
     <div class="kpis" id="kpis"></div>
     <div class="glass card"><h3>说明</h3>
-      <div style="font-size:12.5px;color:var(--sub);line-height:1.8">
-        · 公开消息（官方+公开房）默认保留 3 个月，每天自动清理超期。<br>
-        · 普通管理员只能查看公开房间记录；超级管理员可查看全站（含私密房）。<br>
+      <div class="note-box">
+        · 公开消息（官方 + 公开房）默认保留 <b>3 个月</b>，每天自动清理超期。<br>
+        · <b>普通管理员</b>只能查看公开房间记录；<b>超级管理员</b>可查看全站（含私密房）。<br>
         · 私密房消息永久保留，不自动清理。
       </div>
     </div>
   </div>
 
   <div class="page" id="p-rooms">
-    <div class="glass card"><h3>房间列表 <span style="font-size:11px;color:var(--dim)" id="roomsHint"></span></h3>
+    <div class="glass card"><h3>房间列表 <span class="hint" id="roomsHint"></span></h3>
       <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th></tr></thead><tbody id="roomsTbody"></tbody></table>
     </div>
     <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
@@ -142,15 +227,21 @@
   <div class="page" id="p-admins">
     <div class="glass card"><h3>任命管理员</h3>
       <div class="inline-form">
-        <input id="newAdminUser" placeholder="对方的前台用户名">
+        <input id="newAdminUser" placeholder="对方的前台用户名" autocomplete="off">
         <button class="mini-btn" id="addAdminBtn">设为管理员</button>
       </div>
-      <div style="font-size:11.5px;color:var(--dim);margin-top:8px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:10px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
     </div>
     <div class="glass card"><h3>管理员列表</h3>
       <table><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table>
     </div>
   </div>
+</div></div>
+
+<!-- 确认弹层 -->
+<div class="mask" id="cmask"><div class="glass confirm">
+  <div class="ct" id="ctitle">确认操作</div><div class="cm" id="cmsg"></div>
+  <div class="cbtns"><button class="cf-no" id="cno">取消</button><button class="cf-yes" id="cyes">确定</button></div>
 </div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -161,11 +252,33 @@ const FN=SB_URL+'/functions/v1/eh-admin-api';
 const AUTH_FN=SB_URL+'/functions/v1/eh-auth';
 const sb=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true}});
 const $=s=>document.querySelector(s);
-const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const safeColor=(c,def='#98A3C7')=>(typeof c==='string'&&/^#[0-9a-fA-F]{3,8}$/.test(c))?c:def;const safeEmoji=e=>esc((e||'').slice(0,8));
+const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeColor=(c,def='#98A3C7')=>(typeof c==='string'&&/^#[0-9a-fA-F]{3,8}$/.test(c))?c:def;
+const safeEmoji=e=>esc((e||'').slice(0,8));
 let meAdmin=null;
 
 let toastT;
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+// 赛博确认弹层(替代原生 confirm)
+function confirmBox(msg,title){
+  return new Promise(res=>{
+    $('#ctitle').textContent=title||'确认操作'; $('#cmsg').textContent=msg; $('#cmask').classList.add('on');
+    const done=v=>{ $('#cmask').classList.remove('on'); $('#cyes').onclick=$('#cno').onclick=null; res(v); };
+    $('#cyes').onclick=()=>done(true); $('#cno').onclick=()=>done(false);
+    $('#cmask').onclick=e=>{ if(e.target===$('#cmask')) done(false); };
+  });
+}
+
+// ===== 皮肤(与前台共用 localStorage eh_theme) =====
+const SKINS=[['cyber','赛博青','#28E6D8'],['vapor','蒸汽波','#FF5FA2'],['mono','暗夜金','#E9C877'],['aurora','极光','#2EF0C8']];
+function curTheme(){ try{ return localStorage.getItem('eh_theme')||'cyber'; }catch(e){ return 'cyber'; } }
+function applyTheme(id){ if(id==='cyber') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',id);
+  try{ localStorage.setItem('eh_theme',id); }catch(e){} renderSkinMenu(); }
+function renderSkinMenu(){ const cur=curTheme();
+  $('#skinMenu').innerHTML=SKINS.map(([id,nm,c])=>`<div class="skin-opt${id===cur?' active':''}" data-skin="${id}"><span class="sw" style="background:${c}"></span>${nm}<span class="ck">✓</span></div>`).join('');
+  $('#skinMenu').querySelectorAll('.skin-opt').forEach(el=>el.onclick=e=>{ e.stopPropagation(); applyTheme(el.dataset.skin); }); }
+$('#skinBtn').onclick=e=>{ e.stopPropagation(); $('#skinMenu').classList.toggle('on'); };
+document.addEventListener('click',()=>$('#skinMenu').classList.remove('on'));
 
 // 调 eh-admin-api，带当前 Supabase 登录 token
 async function api(path,{method='GET',body}={}){
@@ -177,12 +290,12 @@ async function api(path,{method='GET',body}={}){
   return {ok:r.ok,status:r.status,body:j};
 }
 
-// 登录: 账号(用户名/邮箱)→resolve登录邮箱→signInWithPassword→/me验管理员角色
+// 登录
 async function doAuth(){
   const account=$('#username').value.trim(), password=$('#password').value;
   $('#authErr').textContent='';
   if(!account||!password){ $('#authErr').textContent='请填写账号和密码'; return; }
-  const btn=$('#authBtn'); btn.disabled=true;
+  const btn=$('#authBtn'); btn.disabled=true; const oldTxt=btn.textContent; btn.textContent='登 录 中…';
   try{
     const rz=await (await fetch(AUTH_FN+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account})})).json();
     if(!rz.loginEmail){ $('#authErr').textContent='账号不存在'; return; }
@@ -191,7 +304,8 @@ async function doAuth(){
     const ok=await loadMe();
     if(!ok){ $('#authErr').textContent='该账号没有后台权限'; await sb.auth.signOut(); return; }
     enterPanel();
-  } finally { btn.disabled=false; }
+  } catch(e){ $('#authErr').textContent='网络异常，请重试'; }
+  finally { btn.disabled=false; btn.textContent=oldTxt; }
 }
 
 function enterPanel(){
@@ -199,10 +313,10 @@ function enterPanel(){
   $('#whoName').textContent=meAdmin.username;
   $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
   $('#adminsTab').style.display=meAdmin.role==='super'?'block':'none';
+  renderSkinMenu();
   loadOverview(); loadRooms();
 }
 
-// 取当前登录账号的后台角色; 非 admin/super 返回 false
 async function loadMe(){
   const res=await api('/me');
   if(!res.ok) return false;
@@ -211,33 +325,44 @@ async function loadMe(){
   return true;
 }
 
+// ===== 概览(缓存 + 骨架屏) =====
+const KPI_META=[['users','用户','👥','var(--cyan)'],['rooms_official','官方频道','📡','var(--violet)'],
+  ['rooms_public','公开房','🌐','var(--green)'],['rooms_private','私密房','🔒','var(--magenta)'],
+  ['rooms_public_archived','已归档','🗄️','var(--sub)'],['messages','消息总数','💬','var(--amber)']];
+let statsCache=null;
+function paintKpis(s){
+  $('#kpis').innerHTML=KPI_META.map(([k,l,ic,c])=>`<div class="glass kpi" style="--kc:${c}"><div class="ic">${ic}</div><div class="n">${s[k]??'—'}</div><div class="l">${l}</div></div>`).join('');
+}
 async function loadOverview(){
-  const res=await api('/stats'); if(!res.ok) return;
-  const s=res.body;
-  $('#kpis').innerHTML=[
-    ['用户',s.users],['官方频道',s.rooms_official],['公开房',s.rooms_public],
-    ['私密房',s.rooms_private],['已归档公开房',s.rooms_public_archived],['消息总数',s.messages]
-  ].map(([l,n])=>`<div class="glass kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  if(statsCache) paintKpis(statsCache);                                  // 缓存秒显
+  else $('#kpis').innerHTML=Array(6).fill('<div class="sk sk-kpi"></div>').join('');  // 骨架屏
+  const res=await api('/stats'); if(!res.ok){ if(!statsCache) $('#kpis').innerHTML='<div class="empty">加载失败</div>'; return; }
+  statsCache=res.body; paintKpis(statsCache);
 }
 
-let roomsCache=[];
-async function loadRooms(){
-  const res=await api('/rooms'); if(!res.ok) return;
-  roomsCache=res.body.rooms||[];
+// ===== 房间列表(缓存 + 骨架屏) =====
+let roomsCache=null;
+function paintRooms(rooms){
   $('#roomsHint').textContent=meAdmin.role==='super'?'（超管：全站含私密）':'（仅公开房）';
-  $('#roomsTbody').innerHTML=roomsCache.map(r=>{
+  $('#roomsTbody').innerHTML=rooms.map(r=>{
     const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
     const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
     return `<tr class="roomrow" data-rid="${r.id}" data-nm="${esc(r.name)}">
-      <td>${safeEmoji(r.emoji) || ''} ${esc(r.name)}</td>
+      <td>${safeEmoji(r.emoji)||''} ${esc(r.name)}</td>
       <td><span class="k-tag k-${r.kind}">${kt}</span></td>
       <td>${arch||'—'}</td>
       <td>${(r.created_at||'').slice(0,10)}</td></tr>`;
   }).join('')||'<tr><td colspan="4" class="empty">没有房间</td></tr>';
   $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=()=>loadMessages(el.dataset.rid,el.dataset.nm));
 }
+async function loadRooms(){
+  if(roomsCache) paintRooms(roomsCache);
+  else $('#roomsTbody').innerHTML='<tr><td colspan="4" style="padding:0;border:none">'+Array(4).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
+  const res=await api('/rooms'); if(!res.ok){ if(!roomsCache) $('#roomsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
+  roomsCache=res.body.rooms||[]; paintRooms(roomsCache);
+}
 
-// 语音消息渲染为播放器；只信任本站语音桶的地址，其余按纯文本展示
+// 语音/神曲消息渲染
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
 const SONG_STYLE_NAMES={dj:'蹦迪DJ',shen:'神曲喊麦',kid:'儿歌',gufeng:'古风',disco:'迪斯科','8bit':'电玩'};
 function voiceOrText(m){
@@ -247,59 +372,72 @@ function voiceOrText(m){
   if(m.kind==='song'){
     const i=src.indexOf('|'), sid=i>0?src.slice(0,i):'';
     const lyric=i>0 && SONG_STYLE_NAMES[sid]?src.slice(i+1):src;
-    const style=SONG_STYLE_NAMES[sid]?`<span style="color:var(--cyan)">[${SONG_STYLE_NAMES[sid]}] </span>`:'';
+    const style=SONG_STYLE_NAMES[sid]?`<span style="color:var(--magenta)">[🎵${SONG_STYLE_NAMES[sid]}] </span>`:'';
     return style+esc(lyric);
   }
   return esc(m.text);
 }
 async function loadMessages(rid,name){
-  const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
   $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
+  $('#msgList').innerHTML=Array(6).fill('<div class="sk sk-row" style="height:44px"></div>').join('');
+  $('#msgCard').scrollIntoView({behavior:'smooth'});
+  const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
   if(!res.ok){ $('#msgList').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
   const msgs=(res.body.messages||[]).slice().reverse();
-  $('#msgList').innerHTML=msgs.map(m=>`<div class="msgline">
-    <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji) || ''} ${esc(m.name)}</span>
+  // 大列表用 fragment 一次性插入, 避免多次 reflow
+  const html=msgs.map(m=>`<div class="msgline">
+    <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji)||''} ${esc(m.name)}</span>
     <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
     ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
     ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
-    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎤语音</span>':''}
-    <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('')||'<div class="empty">这个房间还没有消息</div>';
-  $('#msgCard').scrollIntoView({behavior:'smooth'});
+    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎙️语音</span>':''}
+    ${m.kind==='song'?'<span style="color:var(--magenta);font-size:10px"> 🎵神曲</span>':''}
+    <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('');
+  $('#msgList').innerHTML=html||'<div class="empty">这个房间还没有消息</div>';
 }
 $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
 
-async function loadAdmins(){
-  const res=await api('/admins'); if(!res.ok) return;
-  $('#adminsTbody').innerHTML=(res.body.admins||[]).map(a=>{
+// ===== 管理员(缓存 + 骨架屏) =====
+let adminsCache=null;
+function paintAdmins(admins){
+  $('#adminsTbody').innerHTML=admins.map(a=>{
     const isMe=a.auth_uid===meAdmin.uid;
     let ops='';
-    if(a.role!=='super'){
-      ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
-    } else if(isMe){ ops='<span style="color:var(--dim)">（你）</span>'; }
+    if(a.role!=='super') ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
+    else if(isMe) ops='<span style="color:var(--dim)">（你）</span>';
     return `<tr><td>${esc(a.username)}</td>
       <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'管理员'}</span></td>
       <td>${(a.created_at||'').replace('T',' ').slice(0,16)}</td>
       <td>${ops}</td></tr>`;
-  }).join('');
+  }).join('')||'<tr><td colspan="4" class="empty">暂无管理员</td></tr>';
   $('#adminsTbody').querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('撤销该管理员的后台权限？(其前台账号保留)')) return;
+    if(!await confirmBox('撤销该管理员的后台权限？其前台账号保留。','撤销管理员')) return;
     const r=await api('/revoke',{method:'POST',body:{auth_uid:b.dataset.revoke}});
-    toast(r.ok?'已撤销':(r.body?.error||'失败')); loadAdmins();
+    toast(r.ok?'已撤销':(r.body?.error||'失败')); adminsCache=null; loadAdmins();
   });
   $('#adminsTbody').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('转让超管身份给该管理员？你将降为普通管理员。')) return;
+    if(!await confirmBox('转让超管身份给该管理员？你将降为普通管理员。','转让超管')) return;
     const r=await api('/transfer',{method:'POST',body:{id:b.dataset.transfer}});
-    if(r.ok){ toast('已转让，你已降为普管'); await loadMe(); enterPanel(); }
+    if(r.ok){ toast('已转让，你已降为普管'); adminsCache=null; await loadMe(); enterPanel(); }
     else toast(r.body?.error||'失败');
   });
+}
+async function loadAdmins(){
+  if(adminsCache) paintAdmins(adminsCache);
+  else $('#adminsTbody').innerHTML='<tr><td colspan="4" style="padding:0;border:none">'+Array(3).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
+  const res=await api('/admins'); if(!res.ok){ if(!adminsCache) $('#adminsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
+  adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
 }
 $('#addAdminBtn').onclick=async()=>{
   const username=$('#newAdminUser').value.trim();
   if(!username){ toast('请输入用户名'); return; }
+  const btn=$('#addAdminBtn'); btn.disabled=true;
   const r=await api('/appoint',{method:'POST',body:{username}});
-  if(r.ok){ toast('已设为管理员'); $('#newAdminUser').value=''; loadAdmins(); }
+  btn.disabled=false;
+  if(r.ok){ toast('已设为管理员'); $('#newAdminUser').value=''; adminsCache=null; loadAdmins(); }
   else toast(r.body?.error||'失败');
 };
+$('#newAdminUser').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#addAdminBtn').click(); });
 
 // tabs
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
@@ -308,12 +446,14 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   $('#p-'+t.dataset.page).classList.add('on');
   if(t.dataset.page==='admins') loadAdmins();
   if(t.dataset.page==='rooms') loadRooms();
+  if(t.dataset.page==='overview') loadOverview();
 });
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
-$('#logoutBtn').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+$('#username').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#password').focus(); });
+$('#logoutBtn').onclick=async()=>{ if(!await confirmBox('确定退出登录？','退出')) return; await sb.auth.signOut(); location.reload(); };
 
-// 启动: 若已有登录 session 且是管理员, 直接进后台
+// 启动
 (async()=>{
   const { data:{ session } } = await sb.auth.getSession();
   if(session && await loadMe()){ enterPanel(); }
