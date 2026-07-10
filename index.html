@@ -3215,8 +3215,22 @@ document.addEventListener('click',closePlusMenu);
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨️','🎉','💯','🚀','🌈','🌙','⭐️','🍺','☕️','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧️'];
 $('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
+// 表情按钮/托盘用 mousedown+preventDefault: 不让焦点转移到它们, 也不主动 focus 输入框,
+// 这样点表情不会顶起/唤起系统输入法(想打字再自己点输入框)
+$('#emojiBtn').addEventListener('mousedown',e=>e.preventDefault());
 $('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
-$('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus(); });
+$('#emojiTray').querySelectorAll('b').forEach(b=>{
+  b.addEventListener('mousedown',e=>e.preventDefault());   // 阻止聚焦→不弹键盘
+  b.onclick=e=>{ e.stopPropagation();
+    // 在光标处插入(无光标则追加), 不调用 focus, 避免唤起输入法
+    const ins=b.textContent, st=cin.selectionStart, en=cin.selectionEnd;
+    if(typeof st==='number' && document.activeElement===cin){
+      cin.value=cin.value.slice(0,st)+ins+cin.value.slice(en);
+      cin.selectionStart=cin.selectionEnd=st+ins.length;
+    } else { cin.value+=ins; }
+    cin.dispatchEvent(new Event('input'));
+  };
+});
 document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
 
 window.addEventListener('beforeunload',()=>{
