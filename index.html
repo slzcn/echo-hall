@@ -823,7 +823,7 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 // ---- 身份 ----
 const ADJ = ['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'];
 const ANI = ['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'];
-const EMO = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🐙','🦩','🦚'];
+const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🐆','✨','🐙','🦌','🐦','🐈‍⬛','🐬','🐆','🦔','🦋'];
 const COLORS = ['#28E6D8','#FF3CAC','#8B5CFF','#FFB84D','#4DE38A','#5B8CFF','#FF6B6B','#B980FF','#38D9E6','#FFD24D'];
 const LS_ID = 'eh_identity_v2';
 
@@ -831,12 +831,24 @@ let me = null;      // {id(uid), name, emoji, color}
 let myUid = null;
 
 function loadOrRollIdentity(){
-  try{ const s=localStorage.getItem(LS_ID); if(s){ me=JSON.parse(s); return; } }catch(e){}
+  try{ const s=localStorage.getItem(LS_ID); if(s){ me=JSON.parse(s); if(reconcileEmoji()){ saveIdentity(); } return; } }catch(e){}
   rollIdentity();
 }
 function rollIdentity(){
-  me = { id: me?.id||null, name: rand(ADJ)+rand(ANI), emoji: rand(EMO), color: rand(COLORS) };
+  const ai = Math.floor(Math.random()*ANI.length); // 同一下标决定动物名+emoji, 防错位
+  me = { id: me?.id||null, name: rand(ADJ)+ANI[ai], emoji: EMO[ai], color: rand(COLORS) };
   saveIdentity(); paintIdentity();
+}
+// 已存身份的 emoji 与名字末尾动物不匹配时, 用名字推导正确 emoji(修老用户脏数据)
+function reconcileEmoji(){
+  if(!me || !me.name || !me.emoji) return false;
+  for(let i=0;i<ANI.length;i++){
+    if(me.name.endsWith(ANI[i])){
+      if(me.emoji !== EMO[i]){ me.emoji = EMO[i]; return true; }
+      return false;
+    }
+  }
+  return false;
 }
 function saveIdentity(){ try{ localStorage.setItem(LS_ID, JSON.stringify(me)); }catch(e){} }
 function paintIdentity(){
