@@ -171,18 +171,18 @@
   .sec-label .priv-btn{order:2}   /* 私密房操作按钮排到分隔线右侧 */
   .channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;width:100%;max-width:var(--content-max)}
   /* 频道卡: 图标在左, 名字/介绍/状态跟在右侧(横排) */
-  .ch{padding:16px 18px;border-radius:14px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
+  .ch{padding:18px 20px;border-radius:14px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
     border:1px solid var(--line);background:var(--panel);
-    display:grid;grid-template-columns:auto 1fr;column-gap:13px;align-items:center}
+    display:grid;grid-template-columns:auto 1fr;column-gap:15px;align-items:center}
   .ch:hover{transform:translateY(-3px);border-color:var(--ch-c);box-shadow:0 12px 32px rgba(0,0,0,.4)}
   .ch::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ch-c);opacity:.8}
-  .ch .icon{grid-row:1/3;font-size:30px;width:46px;height:46px;display:grid;place-items:center;border-radius:12px;
+  .ch .icon{grid-row:1/3;font-size:30px;width:48px;height:48px;display:grid;place-items:center;border-radius:12px;
     background:color-mix(in srgb,var(--ch-c) 12%,transparent);margin:0}
-  .ch h3{grid-column:2;font-size:15.5px;font-weight:700;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ch .desc{grid-column:2;font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.45;
+  .ch h3{grid-column:2;font-size:15.5px;font-weight:700;letter-spacing:.3px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch .desc{grid-column:2;font-size:11.5px;color:var(--sub);margin-top:4px;line-height:1.5;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:0}
   /* 状态行(在线数·时间·预览)整卡通栏放第二行 */
-  .ch .live{grid-column:1/3;display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--ch-c)}
+  .ch .live{grid-column:1/3;display:flex;align-items:center;gap:6px;margin-top:13px;font-size:11.5px;color:var(--ch-c)}
   .ch .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ch-c);box-shadow:0 0 8px var(--ch-c);animation:pulse 1.6s infinite}
   .ch .live .cnt{font-weight:700}
   .ch .live .tm{color:var(--dim);margin-left:auto;font-weight:400}
@@ -341,7 +341,7 @@
   /* 输入框内表情按钮(略小, 贴右) */
   .cin-emoji{width:38px;height:42px;font-size:20px}
   /* ＋ 花样按钮 */
-  .plus-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:10px;
+  .plus-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:11px;
     transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
   .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
   .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
@@ -605,7 +605,7 @@
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
-    .plus-btn{width:40px;font-size:23px}
+    .plus-btn{width:46px;height:46px;font-size:23px}
     .cin-emoji{width:34px;font-size:19px}
     .composer{gap:5px;padding-left:8px;padding-right:8px}
     .song-lyric{max-width:150px}
