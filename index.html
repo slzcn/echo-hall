@@ -2354,13 +2354,14 @@ async function playSong(lyric, sid, el, onEnd){
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
-  const master=ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
+  const master=ctx.createGain(); master.gain.value=0.8; master.connect(ctx.destination);
   // 双总线: 伴奏压低(drumBus) + 主唱提高并加压缩(voiceBus) → 让唱声清晰浮在伴奏之上(修"听不出在唱")
   const drumBus=ctx.createGain(); drumBus.gain.value=0.42; drumBus.connect(master);   // 伴奏整体压到 42%
-  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.0;
-  const vComp=ctx.createDynamicsCompressor();                                          // 轻压缩稳住主唱, 更"顶"
-  vComp.threshold.value=-18; vComp.ratio.value=3; vComp.attack.value=0.004; vComp.release.value=0.18;
-  voiceBus.connect(vComp).connect(master);
+  // 主唱总线直连 master(gain 1.3 补偿). 不用 DynamicsCompressor:
+  // 国产浏览器(小米/QQ 等基于旧内核)对 DynamicsCompressor 支持有bug, 会把主唱信号压没/断掉
+  // → 安卓表现"有伴奏没人声"(伴奏走master不经压缩器正常). 已改纯 GainNode, 全平台兼容.
+  const voiceBus=ctx.createGain(); voiceBus.gain.value=0.95;
+  voiceBus.connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.18;   // 起始缓冲(安卓音频调度延迟更大, 留足余量防开头削音)
   const totalDur=chars.length*step + spb*2;
