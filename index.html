@@ -3250,6 +3250,27 @@ sb.auth.onAuthStateChange((ev,session)=>{
     },0);
   }
 });
+// 兜底: onAuthStateChange 的 INITIAL_SESSION 在部分环境(webview/旧版)不稳定,
+// 启动时主动查一次 session, 有则手动触发恢复(与上面同逻辑), 防刷新后登录态"丢失"。
+(async()=>{
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session?.user?.email && !myUid){
+      myUid=session.user.id; if(me){ me.id=myUid; me.registered=true; }
+      const [{ data:prof }, { data:acc }] = await Promise.all([
+        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
+      ]);
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+      else { me=me||{}; me.registered=true; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
+      saveIdentity(); paintIdentity();
+      if(!authHandled && $('#enter').classList.contains('on')){
+        authHandled=true; if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); restoreLastRoom();
+      }
+    }
+  }catch(e){ console.warn('session restore', e); }
+})();
 </script>
 </body>
 </html>
