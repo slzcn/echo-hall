@@ -233,6 +233,10 @@
   .pav:hover .av-ic::after{opacity:.7;inset:-3.5px}
   .pav .nm{font-size:9.5px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
   .pav.me .nm{color:var(--cyan);font-weight:600}
+  .pav-skel{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;pointer-events:none}
+  .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,rgba(120,140,200,.10),rgba(120,140,200,.20),rgba(120,140,200,.10));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
+  .pav-skel .sk-nm{width:30px;height:8px;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
+  @keyframes skel-pulse{0%{background-position:200% 0;opacity:.6}50%{opacity:1}100%{background-position:-200% 0;opacity:.6}}
   .pav.me .av-ic::before{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel-solid);z-index:1}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
@@ -525,6 +529,10 @@
   .me-btns .dbtn{margin-top:0;flex:1}
   .dsec .dl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:7px}
   .dsec .dl .dl-n{font-size:10px;color:var(--dim);background:rgba(120,140,220,.12);border-radius:20px;padding:1px 8px;font-weight:600;letter-spacing:0}
+  .dsec .dl .dl-refresh{margin-left:auto;font-size:13px;color:var(--dim);cursor:pointer;padding:2px 6px;border-radius:6px;transition:.15s;user-select:none;letter-spacing:0}
+  .dsec .dl .dl-refresh:hover{color:var(--cyan);background:rgba(40,230,216,.08)}
+  .dsec .dl .dl-refresh.spinning{animation:dl-spin .8s linear infinite;pointer-events:none;color:var(--cyan)}
+  @keyframes dl-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .dcard{background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:12px;padding:14px}
   .drow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;border-bottom:1px solid var(--line)}
   .drow:last-child{border-bottom:none}
@@ -1437,7 +1445,7 @@ async function enterRoom(room){
   if(snapHit){
     // 秒还原已渲染消息 + 滚动位置状态
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
-    $('#presence').innerHTML=''; $('#hallCnt').innerHTML=optimisticCnt(room);
+    $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
@@ -1456,7 +1464,7 @@ async function enterRoom(room){
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
   $('#hallCnt').innerHTML=optimisticCnt(room);
-  $('#presence').innerHTML='';
+  $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
 
   await ensureAuth();
@@ -1607,8 +1615,17 @@ async function beat(extra){
 const presenceMap = new Map();   // user_id → DOM 节点
 let lastUsersSnapshot = [];       // 供 renderTyping 复用
 
+// 在线列表骨架占位: 进房到 presence 数据回来期间撑住高度, 消除闪烁
+function presenceSkeleton(n){
+  n=Math.max(1,Math.min(n||3,8));
+  let s='';
+  for(let i=0;i<n;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>';
+  return s;
+}
 function renderPresenceAvatars(users){
   const container=$('#presence');
+  // 首次真实渲染前, 清掉进房时的骨架占位
+  container.querySelectorAll('.pav-skel').forEach(el=>el.remove());
   const seen=new Set();
   users.forEach((p,idx)=>{
     seen.add(p.user_id);
@@ -2515,40 +2532,64 @@ async function openMe(){
         ${isBound?'<button class="dbtn" id="meEmail">✉️ 邮箱</button>':'<button class="dbtn" id="meReg">✨ 注册</button>'}
       </div>
     </div>
-    <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}</div>
+    <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
-    <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}</div>
+    <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
       <div class="dcard" style="max-height:180px;overflow-y:auto" id="meMsgsList">${_meCache.msgs?renderMyMsgList(_meCache.msgs):'<div class="empty-hint">加载中…</div>'}</div></div>
     <button class="dbtn danger" id="meLogout" style="width:100%">${isBound?'退出登录':'退出 / 换个身份'}</button>
     <div class="note" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;text-align:center">${isBound?'退出后聊天记录仍与账号关联，重新登录即可找回。':'退出会清除本设备的临时身份（消息仍留存）。'}</div>`;
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on');
   bindMeActions(isBound);
-  // 后台静默刷新(不阻塞首屏)
+  // ↻ 按钮点击 → 强制刷新对应区域(用户主动)
+  $('#meMsgsRefresh')&&($('#meMsgsRefresh').onclick=()=>refreshMeData('msgs',isBound,acctKnown));
+  $('#meRoomsRefresh')&&($('#meRoomsRefresh').onclick=()=>refreshMeData('rooms',isBound,acctKnown));
+  // 首次打开自动刷一次(即使有缓存, 也无条件覆盖为最新)
+  refreshMeData('all',isBound,acctKnown);
+}
+// 抽出的刷新函数, ↻ 按钮和 openMe 复用. scope: 'all'|'msgs'|'rooms'
+async function refreshMeData(scope, isBound, acctKnown){
   if(!myUid){ $('#meRoomsList').innerHTML='<div class="empty-hint">身份加载中，请稍后重开</div>'; $('#meMsgsList').innerHTML='<div class="empty-hint">—</div>'; return; }
-  const tasks=[
-    sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20),
-    sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50),
-  ];
-  if(isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
+  const wantMsgs = scope==='all'||scope==='msgs';
+  const wantRooms = scope==='all'||scope==='rooms';
+  // 转圈提示
+  if(wantMsgs) $('#meMsgsRefresh')?.classList.add('spinning');
+  if(wantRooms) $('#meRoomsRefresh')?.classList.add('spinning');
+  const tasks=[];
+  if(wantMsgs) tasks.push(sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20));
+  else tasks.push(Promise.resolve(null));
+  if(wantRooms) tasks.push(sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50));
+  else tasks.push(Promise.resolve(null));
+  if(scope==='all' && isBound && !acctKnown) tasks.push(sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle());
   let msgsRes,roomsRes,accRes;
-  try{ [msgsRes, roomsRes, accRes] = await Promise.all(tasks); }
-  catch(e){ console.warn('openMe query',e); $('#meRoomsList').innerHTML='<div class="empty-hint">加载失败，下拉重试</div>'; $('#meMsgsList').innerHTML='<div class="empty-hint">加载失败</div>'; return; }
+  try{ [msgsRes,roomsRes,accRes] = await Promise.all(tasks); }
+  catch(e){
+    console.warn('refreshMeData',e);
+    if(wantMsgs) $('#meMsgsList').innerHTML='<div class="empty-hint">加载失败，点↻重试</div>';
+    if(wantRooms) $('#meRoomsList').innerHTML='<div class="empty-hint">加载失败，点↻重试</div>';
+    $('#meMsgsRefresh')?.classList.remove('spinning');
+    $('#meRoomsRefresh')?.classList.remove('spinning');
+    return;
+  }
   if(msgsRes?.error) console.warn('msgs',msgsRes.error);
   if(roomsRes?.error) console.warn('rooms',roomsRes.error);
-  const myMsgs=msgsRes?.data||[], myRooms=roomsRes?.data||[];
-  _meCache.rooms=myRooms; _meCache.msgs=myMsgs;
-  // 账号信息首次读到后缓存(username+email+role), 之后打开直接显示
-  if(isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
-    // 补上顶部 @用户名 + 正确徽章(首屏可能没有)
+  const setN=(sel,label,n)=>{ let e=$(sel); if(!e){ const dl=$(label); if(dl){ e=document.createElement('span'); e.className='dl-n'; e.id=sel.slice(1); dl.appendChild(e); } } if(e) e.textContent=n; };
+  if(wantMsgs && msgsRes){
+    const myMsgs=msgsRes?.data||[]; _meCache.msgs=myMsgs;
+    setN('#meMsgsN','#meMsgsLabel',myMsgs.length);
+    $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+  }
+  if(wantRooms && roomsRes){
+    const myRooms=roomsRes?.data||[]; _meCache.rooms=myRooms;
+    setN('#meRoomsN','#meRoomsLabel',myRooms.length);
+    $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
+  }
+  // 账号信息首次读到后缓存
+  if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
     const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : '<span class="mh-badge reg">正式账号</span>';
     if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
   }
-  // 刷新计数徽章 + 我的房间(可点进房) + 最近发言
-  const setN=(sel,label,n)=>{ let e=$(sel); if(!e){ const dl=$(label); if(dl){ e=document.createElement('span'); e.className='dl-n'; e.id=sel.slice(1); dl.appendChild(e); } } if(e) e.textContent=n; };
-  setN('#meRoomsN','#meRoomsLabel',myRooms.length);
-  setN('#meMsgsN','#meMsgsLabel',myMsgs.length);
-  $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
-  $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
+  // 停止转圈, 至少显示 300ms 让用户看到反馈
+  setTimeout(()=>{ $('#meMsgsRefresh')?.classList.remove('spinning'); $('#meRoomsRefresh')?.classList.remove('spinning'); }, 300);
 }
 // 列表渲染 helper(供首屏缓存 + 刷新复用)
 function renderMyRoomList(rooms){
