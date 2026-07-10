@@ -383,7 +383,7 @@
   .rec-tip{font-size:12.5px;color:var(--sub);letter-spacing:.5px}
   .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
   .rec-panel.cancel .rec-time{color:var(--magenta)}
-  .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle}
+  .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
   .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,12,24,.5);
     color:var(--cyan);cursor:pointer;font-size:11px;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
   .vplay .vp-btn:hover{border-color:var(--cyan);box-shadow:var(--glow-cyan)}
@@ -1854,19 +1854,29 @@ function voiceHtml(src){
 // 全局单实例播放：播放新的自动停旧的
 let vAudio=null, vPlayEl=null;
 function stopVoice(){
-  if(vAudio){ vAudio.pause(); vAudio=null; }
+  if(vAudio){ try{vAudio.pause();}catch(e){} vAudio=null; }
+  try{ if(typeof AudioEngine!=='undefined') AudioEngine.duck(false); }catch(e){} // 恢复 BGM 音量
   if(vPlayEl){ vPlayEl.classList.remove('playing'); const b=vPlayEl.querySelector('.vp-btn'); if(b) b.textContent='▶'; vPlayEl=null; }
 }
+// 整个语音条都可点(不只那个小 ▶ 圆钮), 符合"点一下就播"的直觉
 document.addEventListener('click',e=>{
-  const btn=e.target.closest('.vp-btn'); if(!btn) return;
-  const wrap=btn.closest('.vplay');
-  if(wrap===vPlayEl){ stopVoice(); return; }
+  const wrap=e.target.closest('.vplay'); if(!wrap) return;
+  const btn=wrap.querySelector('.vp-btn');
+  if(wrap===vPlayEl){ stopVoice(); return; } // 再点当前正在播的 → 停
   stopVoice();
-  const a=new Audio(wrap.dataset.src.split('#')[0]);
+  try{ if(typeof AudioEngine!=='undefined'){ AudioEngine.resume(); AudioEngine.duck(true); } }catch(e){} // 激活音频上下文+压低BGM
+  const src=(wrap.dataset.src||'').split('#')[0];
+  if(!src){ toast('语音地址缺失'); return; }
+  const a=new Audio(src);
   vAudio=a; vPlayEl=wrap;
-  wrap.classList.add('playing'); btn.textContent='⏸';
-  a.onended=a.onerror=()=>{ if(vPlayEl===wrap) stopVoice(); };
-  a.play().catch(()=>{ toast('播放失败'); if(vPlayEl===wrap) stopVoice(); });
+  wrap.classList.add('playing'); if(btn) btn.textContent='⏸';
+  a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
+  a.onerror=()=>{ if(vPlayEl===wrap){ toast('语音加载失败，可能已过期'); stopVoice(); } };
+  a.play().then(()=>{}).catch(err=>{
+    // NotAllowedError=浏览器拦自动播放(极少见于真实点击); 其它=网络/解码
+    const msg = (err&&err.name==='NotAllowedError') ? '被浏览器拦截，请再点一次' : '播放失败，请重试';
+    toast(msg); if(vPlayEl===wrap) stopVoice();
+  });
 });
 async function startRec(){
   if(!curRoom || recorder) return;
