@@ -293,22 +293,10 @@
   .reply-preview .rp-x{cursor:pointer;color:var(--dim);padding:2px 6px}
   .reply-preview .rp-x:hover{color:var(--magenta)}
 
-  /* 虚空模式提示条 */
-  .void-bar{display:none;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--line);
-    background:rgba(139,92,255,.1);font-size:12px;color:var(--violet);flex-shrink:0}
-  .void-bar.on{display:flex}
-  .void-bar .vb-ic{font-size:14px}
-  .void-bar .vb-txt{flex:1}
-  .void-bar .vb-x{cursor:pointer;color:var(--violet);opacity:.8;padding:2px 8px;border:1px solid rgba(139,92,255,.4);border-radius:7px;font-size:11px}
-  .void-bar .vb-x:hover{opacity:1;background:rgba(139,92,255,.15)}
-  /* 神曲模式提示条 */
-  .song-bar{display:none;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--line);
-    background:rgba(255,60,172,.1);font-size:12px;color:var(--magenta);flex-shrink:0}
-  .song-bar.on{display:flex}
-  .song-bar .sb-ic{font-size:14px}
-  .song-bar .sb-txt{flex:1}
-  .song-bar .sb-chg,.song-bar .sb-x{cursor:pointer;opacity:.85;padding:2px 8px;border:1px solid rgba(255,60,172,.4);border-radius:7px;font-size:11px}
-  .song-bar .sb-chg:hover,.song-bar .sb-x:hover{opacity:1;background:rgba(255,60,172,.15)}
+  /* 虚空模式输入框风格 */
+  .composer.void-mode .cin-wrap{border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,92,255,.12)}
+  .composer.void-mode .cin{color:var(--violet)}
+  .composer.void-mode .cin::placeholder{color:var(--violet);opacity:.6}
   /* 神曲模式输入框风格 */
   .composer.song-mode .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.12)}
   .composer.song-mode .cin{color:var(--magenta);font-weight:600}
@@ -329,6 +317,10 @@
     transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
   .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
   .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  /* ＋处于某模式时: 显该模式图标(不旋转), 高亮提示"可退出" */
+  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:rgba(40,230,216,.14);box-shadow:0 0 12px -3px var(--cyan)}
+  .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:rgba(139,92,255,.16);box-shadow:0 0 12px -3px var(--violet)}
+  .composer.song-mode .plus-btn.mode-on{border-color:var(--magenta);background:rgba(255,60,172,.16);box-shadow:0 0 12px -3px var(--magenta)}
   /* ＋ 花样菜单 */
   .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5);min-width:220px}
@@ -357,17 +349,13 @@
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
 
-  /* 语音消息 · 微信式：语音/键盘切换键 + 按住说话长条 */
-  .voice-toggle{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;
-    transition:.15s;user-select:none;color:var(--sub);border:1px solid var(--line)}
-  .voice-toggle:hover{border-color:var(--cyan);color:var(--cyan)}
-  .composer.voice-mode .voice-toggle{border-color:var(--cyan);color:var(--cyan);background:rgba(40,230,216,.1)}
+  /* 语音消息 · 按住说话长条(语音模式下输入框变身) */
   /* 语音模式下: 隐藏输入框与表情, 显示"按住说话"长条 */
   .hold-talk{display:none;flex:1;align-items:center;justify-content:center;min-height:42px;font-size:14px;font-weight:600;
-    color:var(--sub);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
+    color:var(--cyan);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
   .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
   .composer.voice-mode .hold-talk{display:flex}
-  .composer.voice-mode .cin-wrap{cursor:pointer}
+  .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--cyan)}
   .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px rgba(255,60,172,.15)}
   .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
   .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;
@@ -574,7 +562,7 @@
     .priv-actions{flex-direction:column}
     .priv-btn{width:100%}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
-    .plus-btn,.voice-toggle{width:40px;font-size:23px}
+    .plus-btn{width:40px;font-size:23px}
     .cin-emoji{width:34px;font-size:19px}
     .composer{gap:5px;padding-left:8px;padding-right:8px}
     .song-tray .st-grid{grid-template-columns:repeat(3,1fr)}
@@ -669,26 +657,18 @@
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
-    <!-- 虚空模式提示条(开启后显示, 可随手关) -->
-    <div class="void-bar" id="voidBar">
-      <span class="vb-ic">🕳️</span><span class="vb-txt">虚空模式 · 匿名发送，5 分钟后消散</span><span class="vb-x" id="voidBarX">退出</span>
-    </div>
-    <!-- 神曲模式提示条(选了曲风后显示; 点条身换曲风, 点退出回普通) -->
-    <div class="song-bar" id="songBar">
-      <span class="sb-ic">🎵</span><span class="sb-txt" id="songBarTxt">神曲模式</span><span class="sb-chg" id="songBarChg">换曲风</span><span class="sb-x" id="songBarX">退出</span>
-    </div>
     <div class="composer">
       <div class="plus-btn" id="plusBtn" title="更多花样">＋</div>
-      <div class="voice-toggle" id="voiceToggle" title="切换语音/键盘">🎙️</div>
       <div class="cin-wrap">
         <textarea class="cin" id="cin" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情">😊</div>
         <div class="hold-talk" id="holdTalk">按住 说话</div>
       </div>
       <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
-      <!-- ＋ 花样菜单: 特殊发送方式 -->
+      <!-- ＋ 花样菜单: 三种特殊发言方式 -->
       <div class="plus-menu" id="plusMenu">
         <div class="pm-item" id="pmVoid"><span class="pm-ic">🕳️</span><span class="pm-tx"><b>说给虚空</b><i>匿名 · 5 分钟后消散</i></span></div>
+        <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b>语音说话</b><i>按住录音，松手发送</i></span></div>
         <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b>文字变神曲</b><i>把输入的话唱出来</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
@@ -1818,14 +1798,41 @@ async function send(){
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
   else if(data){ optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; } }
 }
-// 虚空模式开关
-function setVoidMode(on){
-  voidMode=on;
-  if(on && songMode) setSongMode(false);   // 与神曲互斥
-  $('#voidBar').classList.toggle('on',on);
-  $('#pmVoid').classList.toggle('on',on);
+// 虚空模式开关(统一走 setMode; 保留函数名兼容旧调用)
+function setVoidMode(on){ setMode(on?'void':'none'); }
+// ============ 统一发言模式: none / void / voice / song ============
+// ＋号是唯一入口: 选某模式→＋变该模式图标+输入框切风格; 再点该图标(＋位置)→退出复原。三者互斥。
+let curMode='none';
+const MODE_ICON={ void:'🕳️', voice:'🎙️', song:'🎵' };
+function setMode(mode){
+  if(mode===curMode) mode='none';        // 再点当前模式 = 退出
+  // 先退出旧模式的副作用
+  if(curMode==='voice' && mode!=='voice'){ if(recActive) micRelease(); }
+  curMode=mode;
+  voidMode = mode==='void';
+  voiceMode = mode==='voice';
+  songMode = mode==='song';
+  const composer=$('.composer');
+  composer.classList.toggle('void-mode', voidMode);
+  composer.classList.toggle('voice-mode', voiceMode);
+  composer.classList.toggle('song-mode', songMode);
+  // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
+  const pb=$('#plusBtn');
+  pb.textContent = mode==='none' ? '＋' : MODE_ICON[mode];
+  pb.classList.toggle('mode-on', mode!=='none');
+  pb.title = mode==='none' ? '更多花样' : '退出当前模式';
+  // 菜单项高亮
+  $('#pmVoid').classList.toggle('on', voidMode);
+  $('#pmVoice').classList.toggle('on', voiceMode);
+  $('#pmSong').classList.toggle('on', songMode);
+  // 占位文案
   const cin=$('#cin');
-  cin.placeholder = on ? '说给虚空… 匿名，5 分钟后消散 🕳️' : (songMode ? cin.placeholder : '说点什么… 打个 / 看命令');
+  if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; }
+  else if(voidMode){ cin.placeholder='说给虚空… 匿名，5 分钟后消散 🕳️'; }
+  else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
+  else { cin.placeholder='说点什么… 打个 / 看命令'; }
+  if(!voiceMode) setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
+  syncSendBtn();
 }
 function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; hideSlash(); syncSendBtn(); }
 // 输入框空↔有字: 切换 麦克风/发送 按钮(微信式)
@@ -1947,16 +1954,9 @@ async function sendVoice(blob, secs){
   optimistic.id=row.id;
   if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
 }
-// 语音/键盘 切换(微信式): 点🎙️进语音模式(输入框变"按住说话"长条), 再点切回
+// 语音模式(统一走 setMode)
 let voiceMode=false;
-function setVoiceMode(on){
-  voiceMode=on;
-  $('.composer').classList.toggle('voice-mode',on);
-  if(on){ hideSlash(); $('#emojiTray').classList.remove('on'); }
-  else { setTimeout(()=>{ try{$('#cin').focus();}catch(e){} },0); }
-  syncSendBtn();
-}
-$('#voiceToggle').onclick=()=>setVoiceMode(!voiceMode);
+function setVoiceMode(on){ setMode(on?'voice':'none'); }
 // 按住"说话"长条录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
 const holdTalk=$('#holdTalk');
 holdTalk.addEventListener('pointerdown',e=>{
@@ -1978,7 +1978,7 @@ function micRelease(){
 }
 window.addEventListener('pointerup',micRelease);
 window.addEventListener('pointercancel',micRelease);
-if(!REC_MIME || !navigator.mediaDevices?.getUserMedia) $('#voiceToggle').style.display='none';
+if(!REC_MIME || !navigator.mediaDevices?.getUserMedia){ const p=$('#pmVoice'); if(p) p.style.display='none'; }
 
 // ============ 神曲(文字→洗脑歌曲, Web Audio 合成节拍 + 语音合成"唱"字) ============
 // 消息编码: kind='song', text='曲风id|歌词'。曲风白名单校验, 不认识则整体当纯文本(向后兼容)。
@@ -2179,9 +2179,10 @@ async function sendSong(lyric, sid){
   if(error){ console.warn('song send',error); toast('神曲发送失败'); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
 }
-// 曲风选择托盘：选一个曲风即进入"神曲模式"(收起托盘, 输入框变神曲风格), 之后走主发送键发出
+// 曲风选择托盘：选一个曲风即进入"神曲模式"(收起托盘, ＋变🎵, 输入框变神曲风格), 主发送键发出
 let songSel=SONG_STYLES[0].id;
 let songMode=false;
+function setSongMode(on){ setMode(on?'song':'none'); }
 function renderSongTray(){
   $('#songTray').innerHTML=`
     <div class="st-h">选个曲风，接下来输入的话会被唱出来 🎵</div>
@@ -2191,37 +2192,17 @@ function renderSongTray(){
   $('#songTray').querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
     songSel=c.dataset.sid;
     closeSongTray();
-    setSongMode(true);            // 选了曲风 → 进神曲模式
-    $('#cin').focus();
+    setMode('song');              // 选了曲风 → 进神曲模式
   });
-}
-// 神曲模式开关(与虚空互斥); 顶部提示条显示当前曲风
-function setSongMode(on){
-  songMode=on;
-  if(on && voidMode) setVoidMode(false);   // 互斥
-  $('.composer').classList.toggle('song-mode',on);
-  $('#songBar').classList.toggle('on',on);
-  $('#pmSong').classList.toggle('on',on);
-  const cin=$('#cin');
-  if(on){
-    const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
-    const bt=$('#songBarTxt'); if(bt) bt.textContent=`神曲模式 · ${st.emoji} ${st.name}`;
-    cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
-  } else {
-    cin.placeholder = voidMode ? '说给虚空… 匿名，5 分钟后消散 🕳️' : '说点什么… 打个 / 看命令';
-  }
-  syncSendBtn();
 }
 function closeSongTray(){ $('#songTray').classList.remove('on'); }
 function openSongTray(){
   $('#emojiTray').classList.remove('on');
   renderSongTray(); $('#songTray').classList.add('on');
 }
-// 点托盘或整个 composer(含主输入框)都不关托盘, 只有点别处才关
+// 点托盘或整个 composer 都不关托盘, 只有点别处才关
 document.addEventListener('click',e=>{ if(!e.target.closest('#songTray') && !e.target.closest('.composer')) closeSongTray(); });
 $('#songTray').addEventListener('click',e=>e.stopPropagation());
-$('#songBarChg').onclick=e=>{ e.stopPropagation(); openSongTray(); };   // 换曲风
-$('#songBarX').onclick=e=>{ e.stopPropagation(); setSongMode(false); };  // 退出神曲
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
 
 // ============ 多情绪回声 落库 ============
@@ -2453,8 +2434,7 @@ async function leaveRoom(){
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
-  if(voidMode) setVoidMode(false);   // 离开房间关掉虚空模式
-  if(songMode) setSongMode(false);   // 离开房间关掉神曲模式
+  if(curMode!=='none') setMode('none');   // 离开房间退出所有发言模式(虚空/语音/神曲)
   try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
@@ -2911,17 +2891,18 @@ cin.addEventListener('input',()=>{
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
 syncSendBtn();  // 初始：空输入→显示麦克风
-// ＋ 花样菜单：虚空 / 神曲
-function closePlusMenu(){ $('#plusMenu').classList.remove('on'); $('#plusBtn').classList.remove('on'); }
+// ＋ 花样菜单：虚空 / 语音 / 神曲。有模式时 ＋变模式图标, 点它=退出; 无模式时=展开菜单
+function closePlusMenu(){ $('#plusMenu').classList.remove('on'); if(curMode==='none') $('#plusBtn').classList.remove('on'); }
 $('#plusBtn').onclick=e=>{ e.stopPropagation();
+  if(curMode!=='none'){ setMode('none'); return; }   // 当前有模式 → 点＋退出
   const open=!$('#plusMenu').classList.contains('on');
   $('#emojiTray').classList.remove('on'); closeSongTray();
   $('#plusMenu').classList.toggle('on',open); $('#plusBtn').classList.toggle('on',open);
 };
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
-$('#pmVoid').onclick=()=>{ setVoidMode(!voidMode); closePlusMenu(); if(voidMode) $('#cin').focus(); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); if(songMode) setSongMode(false); else openSongTray(); };
-$('#voidBarX').onclick=()=>setVoidMode(false);
+$('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
+$('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
+$('#pmSong').onclick=()=>{ closePlusMenu(); if(songMode) setMode('none'); else openSongTray(); };
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
