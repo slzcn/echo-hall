@@ -1664,7 +1664,7 @@ async function renderPublic(soft){
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
     <div class="tagk">公开</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
-    <div class="desc">${esc(r.topic||'')}</div>
+    <div class="desc">${esc(r.topic||autoTopic(r.name))}</div>
     <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
     <div class="preview empty" data-prev>加载中…</div></div>`).join('');
   bindRoomCards(box);
@@ -3166,6 +3166,22 @@ function closeModal(){ $('#modalMask').classList.remove('on'); }
 
 // 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
+// 公开房自动介绍: 按房名套一句(长度对齐官方房~10-16字)。房名做哈希选模板, 同名恒定同句, 显得像特意写的。
+function autoTopic(name){
+  const n=(name||'').trim().slice(0,10);
+  const tpl=[
+    `关于「${n}」，想说的都能说`,
+    `聊聊${n}，看谁懂你`,
+    `${n}爱好者的聚集地`,
+    `为${n}而来的人，都在这`,
+    `${n}，此刻正热闹`,
+    `喜欢${n}？进来唠两句`,
+    `${n}的一切，都可以聊`,
+    `围绕${n}，随便扯`,
+  ];
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
+  return tpl[h%tpl.length];
+}
 async function createRoom(){
   const name=$('#roomNameIn').value.trim();
   if(!name){ toast(EH_CONFIG.text.warn_needRoomName); return; }
@@ -3173,7 +3189,8 @@ async function createRoom(){
   const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
   let room=null;
   if(pickedKind==='public'){
-    const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'public',owner:myUid}).select('id,name,emoji').single();
+    const topic=autoTopic(name);   // 公开房没填介绍→按房名自动生成一句(长度参考官方房)
+    const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'public',owner:myUid,topic}).select('id,name,emoji,topic').single();
     if(!error) room={...data,kind:'public'};
     else { console.warn(error); }
   } else {
