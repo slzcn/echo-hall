@@ -2181,16 +2181,17 @@ function renderPresenceAvatars(users){
       if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
       return;
     }
-    const c=safeColor(p.color);
     const isMe=p.user_id===myUid;
+    // 灵魂头像色跟房间强调色(与消息头像/AI角标统一); 真人访客保持自己的个性色
+    const isSoul=soulUidSet.has(p.user_id);
+    const c=isSoul ? soulThemeColor(safeColor(p.color)) : safeColor(p.color);
     const div=document.createElement('div');
     div.className='pav'+(isMe?' me':'');
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
     if(!isMe && p.name){ div.dataset.atname=p.name; }
     // 灵魂在光墙也带 AI 角标(与消息头像一致)
-    const isSoul=soulUidSet.has(p.user_id);
-    if(isSoul) div.style.setProperty('--soul-c', soulThemeColor(c));
+    if(isSoul) div.style.setProperty('--soul-c', c);
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
     div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
     div.dataset.sig=sig+'|'+(isSoul?'ai':'');
