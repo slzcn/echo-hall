@@ -387,9 +387,9 @@
   .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
   @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
   /* ===== 灵魂居民 Soul：AI 徽标 + 呼吸光环 + 思考指示器 ===== */
-  /* AI 角标：头像右下角一行小字"AI"(无背景无描边，纯小字) */
-  .msg.soul .av .soul-dot{position:absolute;right:-6px;bottom:-6px;font-size:8px;line-height:1;font-weight:800;letter-spacing:.3px;
-    font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 3px var(--panel-solid),0 0 3px var(--panel-solid);z-index:2}
+  /* AI 角标：浮在头像内部右下角一行小字"AI"(无背景无描边，纯小字) */
+  .msg.soul .av .soul-dot{position:absolute;right:1px;bottom:0px;font-size:8px;line-height:1;font-weight:800;letter-spacing:.2px;
+    font-style:normal;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.7);z-index:2;pointer-events:none}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
     border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
