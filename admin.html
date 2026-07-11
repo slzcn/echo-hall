@@ -136,6 +136,49 @@
   .note-box{font-size:12.5px;color:var(--sub);line-height:1.9}
   .note-box b{color:var(--ink)}
 
+  /* ===== 灵魂工坊 ===== */
+  .sw-souls{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+  .sw-soul{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,12,24,.4)}
+  .sw-soul .av{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;flex-shrink:0}
+  .sw-soul .info{flex:1;min-width:0}
+  .sw-soul .nm{font-weight:700;font-size:14px}
+  .sw-soul .meta{font-size:11px;color:var(--dim);margin-top:2px}
+  .sw-soul .ops{display:flex;gap:6px;flex-wrap:wrap}
+  .sw-switch{position:relative;width:42px;height:23px;border-radius:12px;background:var(--line2);cursor:pointer;transition:.2s;flex-shrink:0}
+  .sw-switch.on{background:var(--green)}
+  .sw-switch::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s}
+  .sw-switch.on::after{left:21px}
+  .persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+  .persona-card{padding:14px;border-radius:13px;border:1.5px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.18s}
+  .persona-card:hover{border-color:var(--cyan);transform:translateY(-2px)}
+  .persona-card.sel{border-color:var(--pc);box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 18%,transparent)}
+  .persona-card .pc-ic{font-size:28px;margin-bottom:6px}
+  .persona-card .pc-nm{font-weight:700;font-size:14px;color:var(--pc)}
+  .persona-card .pc-tag{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4}
+  .persona-card .pc-traits{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .persona-card .pc-traits span{font-size:9px;padding:2px 7px;border-radius:5px;background:color-mix(in srgb,var(--pc) 14%,transparent);color:var(--pc)}
+  .sw-form{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+  .sw-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .sw-fld{flex:1;min-width:120px}
+  .sw-fld label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:5px;font-weight:600}
+  .sw-fld input[type=text],.sw-fld input[type=number],.sw-fld textarea{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.55);color:var(--ink);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box}
+  .sw-fld input:focus,.sw-fld textarea:focus{border-color:var(--cyan)}
+  .sw-fld textarea{resize:vertical;line-height:1.6}
+  .sw-caps{display:flex;gap:8px;flex-wrap:wrap}
+  .sw-cap{padding:7px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12.5px;transition:.15s;user-select:none}
+  .sw-cap.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .sw-range{display:flex;align-items:center;gap:10px}
+  .sw-range input[type=range]{flex:1;accent-color:var(--violet)}
+  .sw-range .val{font-size:12px;color:var(--violet);font-weight:700;min-width:54px;text-align:right}
+  .sw-preview{margin-top:16px;padding:14px;border-radius:12px;background:rgba(10,12,24,.5);border:1px solid var(--line)}
+  .sw-preview .pv-out{margin-top:10px;padding:11px 13px;border-radius:10px;background:color-mix(in srgb,var(--violet) 8%,transparent);border:1px solid color-mix(in srgb,var(--violet) 25%,transparent);font-size:13px;line-height:1.6;color:var(--ink);min-height:20px;white-space:pre-wrap}
+  .sw-preview .pv-out.dim{color:var(--dim)}
+  .sw-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .sw-btn{padding:11px 22px;border-radius:11px;border:none;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:.18s}
+  .sw-btn.primary{background:linear-gradient(120deg,var(--violet),var(--magenta));color:#fff}
+  .sw-btn.ghost{background:none;border:1px solid var(--line2);color:var(--sub)}
+  .sw-btn:disabled{opacity:.5;cursor:not-allowed}
+
   /* ===== 骨架屏 ===== */
   .sk{position:relative;overflow:hidden;background:rgba(120,140,220,.08);border-radius:8px}
   .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
@@ -233,10 +276,13 @@
 
   <div class="page" id="p-rooms">
     <div class="glass card"><h3>房间列表 <span class="hint" id="roomsHint"></span></h3>
-      <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th></tr></thead><tbody id="roomsTbody"></tbody></table>
+      <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th><th>灵魂</th></tr></thead><tbody id="roomsTbody"></tbody></table>
     </div>
     <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
       <div id="msgList"></div>
+    </div>
+    <div class="glass card" id="soulCard" style="display:none"><h3><span id="soulTitle">灵魂工坊</span><button class="mini-btn" id="soulBack">← 返回列表</button></h3>
+      <div id="soulWorkshop"></div>
     </div>
   </div>
 
@@ -423,14 +469,16 @@ function paintRooms(rooms){
       <td>${safeEmoji(r.emoji)||''} ${esc(r.name)}</td>
       <td><span class="k-tag k-${r.kind}">${kt}</span></td>
       <td>${arch||'—'}</td>
-      <td>${(r.created_at||'').slice(0,10)}</td></tr>`;
-  }).join('')||'<tr><td colspan="4" class="empty">没有房间</td></tr>';
-  $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=()=>loadMessages(el.dataset.rid,el.dataset.nm));
+      <td>${(r.created_at||'').slice(0,10)}</td>
+      <td><button class="mini-btn soul-open" data-rid="${r.id}" data-nm="${esc(r.name)}" style="border-color:var(--violet);color:var(--violet)">🌟 工坊</button></td></tr>`;
+  }).join('')||'<tr><td colspan="5" class="empty">没有房间</td></tr>';
+  $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=(e)=>{ if(e.target.closest('.soul-open')) return; loadMessages(el.dataset.rid,el.dataset.nm); });
+  $('#roomsTbody').querySelectorAll('.soul-open').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openWorkshop(b.dataset.rid, b.dataset.nm); });
 }
 async function loadRooms(){
   if(roomsCache) paintRooms(roomsCache);
-  else $('#roomsTbody').innerHTML='<tr><td colspan="4" style="padding:0;border:none">'+Array(4).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
-  const res=await api('/rooms'); if(!res.ok){ if(!roomsCache) $('#roomsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
+  else $('#roomsTbody').innerHTML='<tr><td colspan="5" style="padding:0;border:none">'+Array(4).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
+  const res=await api('/rooms'); if(!res.ok){ if(!roomsCache) $('#roomsTbody').innerHTML='<tr><td colspan="5" class="empty">加载失败</td></tr>'; return; }
   roomsCache=res.body.rooms||[]; paintRooms(roomsCache);
 }
 
@@ -468,6 +516,202 @@ async function loadMessages(rid,name){
   $('#msgList').innerHTML=html||'<div class="empty">这个房间还没有消息</div>';
 }
 $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
+
+// ============================================================
+//  🌟 灵魂工坊 —— 5 原型卡 + 微调 + 试聊
+// ============================================================
+// persona 定义(与前端 eh-souls.default.js 对齐; 工坊只需展示用字段)
+const SW_PERSONAS=[
+  { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#8B5CFF', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
+    caps:{voice:true,song:true,emoji:false}, welcomes:['来了啊，坐，这个点还醒着的都是自己人。','欢迎回到深夜频率，要不要我给你放一首？'] },
+  { id:'sunny', name:'小暖', emoji:'☀️', color:'#FFB84D', tag:'元气妹 · 活泼秒回，爱发表情', traits:['元气','秒回','玩梗'],
+    caps:{voice:true,song:true,emoji:true}, welcomes:['哇你来啦！！等你好久了(才没有~) 😆','欢迎欢迎～快说说今天有什么好玩的！'] },
+  { id:'comedian', name:'老K', emoji:'🎭', color:'#FF3CAC', tag:'段子手 · 毒舌但暖，反差萌', traits:['毒舌','整活','反差萌'],
+    caps:{voice:false,song:true,emoji:true}, welcomes:['哟，稀客。就差你没来了，现在齐活。','欢迎欢迎，本房笑点承包商已就位。'] },
+  { id:'listener', name:'回音', emoji:'🕳️', color:'#28E6D8', tag:'树洞灵 · 极致共情，少评判', traits:['共情','倾听','不说教'],
+    caps:{voice:true,song:false,emoji:false}, welcomes:['你来了。这里很安全，想说什么都可以，不想说也没关系。','我在。你不用急着开口，我会一直在这儿。'] },
+  { id:'nerd', name:'图灵', emoji:'⚡', color:'#4DE38A', tag:'知识控 · 理性爱科普，讲冷知识', traits:['理性','科普','冷知识'],
+    caps:{voice:false,song:false,emoji:false}, welcomes:['欢迎。今天想聊点什么——技术、脑洞，还是纯粹的冷知识？','新成员接入。有任何好奇的问题，随时问。'] },
+];
+const PERSONA_LABEL={night_dj:'深夜DJ',sunny:'元气妹',comedian:'段子手',listener:'树洞灵',nerd:'知识控',custom:'自定义'};
+const EMOTION_LABEL={calm:'平静',happy:'开心',caring:'关切',excited:'兴奋'};
+
+let swRoom=null;          // {id,name}
+let swEditing=null;       // 正在编辑的灵魂对象(新建时为草稿)
+let swSouls=[];           // 该房现有灵魂
+
+async function openWorkshop(rid,name){
+  swRoom={id:rid,name};
+  $('#msgCard').style.display='none';
+  $('#soulCard').style.display='block';
+  $('#soulTitle').textContent='🌟 灵魂工坊 · '+name;
+  $('#soulCard').scrollIntoView({behavior:'smooth'});
+  swEditing=null;
+  $('#soulWorkshop').innerHTML='<div class="sk sk-row" style="height:60px"></div>';
+  const res=await api('/souls?room_id='+encodeURIComponent(rid));
+  if(!res.ok){ $('#soulWorkshop').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`; return; }
+  swSouls=res.body.souls||[];
+  renderWorkshop();
+}
+$('#soulBack').onclick=()=>{ $('#soulCard').style.display='none'; swEditing=null; };
+
+function renderWorkshop(){
+  if(swEditing){ renderSoulForm(); return; }
+  // 列表视图: 现有灵魂 + 新建入口
+  let html='<div class="sw-souls">';
+  if(swSouls.length){
+    html+=swSouls.map(s=>{
+      const persona=PERSONA_LABEL[s.persona]||s.persona;
+      const emo=EMOTION_LABEL[s.emotion]||s.emotion;
+      return `<div class="sw-soul">
+        <div class="av" style="background:${s.color}22;color:${s.color};box-shadow:inset 0 0 0 1.5px ${s.color}">${safeEmoji(s.emoji)}</div>
+        <div class="info"><div class="nm" style="color:${s.color}">${esc(s.name)}</div>
+          <div class="meta">${persona} · 情绪:${emo} · 发言${s.msgs_sent||0}条 · 触发${s.triggers||0}次</div></div>
+        <div class="ops">
+          <button class="mini-btn" data-edit="${s.id}">编辑</button>
+          <button class="mini-btn danger" data-del="${s.id}">删除</button>
+        </div>
+        <div class="sw-switch ${s.enabled?'on':''}" data-toggle="${s.id}" title="${s.enabled?'已启用':'已停用'}"></div>
+      </div>`;
+    }).join('');
+  } else {
+    html+='<div class="empty">这个房间还没有灵魂居民。选一个原型，让它住进来 👇</div>';
+  }
+  html+='</div>';
+  html+='<h3 style="font-size:13px;color:var(--sub);margin:8px 0 4px">＋ 添加灵魂 · 选一个人格原型</h3>';
+  html+='<div class="persona-grid">'+SW_PERSONAS.map(p=>`
+    <div class="persona-card" data-persona="${p.id}" style="--pc:${p.color}">
+      <div class="pc-ic">${p.emoji}</div>
+      <div class="pc-nm">${p.name}</div>
+      <div class="pc-tag">${esc(p.tag)}</div>
+      <div class="pc-traits">${p.traits.map(t=>`<span>${esc(t)}</span>`).join('')}</div>
+    </div>`).join('')+'</div>';
+  $('#soulWorkshop').innerHTML=html;
+  // 绑定
+  $('#soulWorkshop').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ swEditing=swSouls.find(s=>String(s.id)===b.dataset.edit); renderSoulForm(); });
+  $('#soulWorkshop').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delSoul(b.dataset.del));
+  $('#soulWorkshop').querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggleSoul(b.dataset.toggle));
+  $('#soulWorkshop').querySelectorAll('.persona-card').forEach(c=>c.onclick=()=>{
+    const p=SW_PERSONAS.find(x=>x.id===c.dataset.persona);
+    swEditing={ id:null, persona:p.id, name:p.name, emoji:p.emoji, color:p.color, system_prompt:null,
+      intensity:55, icebreak_min:8, caps:{...p.caps}, welcomes:[...p.welcomes], enabled:true, _defaults:p };
+    renderSoulForm();
+  });
+}
+
+function renderSoulForm(){
+  const s=swEditing; const isNew=!s.id;
+  const caps=s.caps||{voice:true,song:true,emoji:true};
+  $('#soulWorkshop').innerHTML=`
+    <div class="sw-form">
+      <div style="font-size:12.5px;color:var(--dim)">${isNew?'新建灵魂':'编辑灵魂'} · 原型 <b style="color:${s.color}">${PERSONA_LABEL[s.persona]||s.persona}</b></div>
+      <div class="sw-row">
+        <div class="sw-fld" style="flex:2"><label>名字</label><input type="text" id="sf-name" value="${esc(s.name)}" maxlength="40"></div>
+        <div class="sw-fld" style="flex:0 0 80px"><label>头像</label><input type="text" id="sf-emoji" value="${esc(s.emoji)}" maxlength="8"></div>
+        <div class="sw-fld" style="flex:0 0 110px"><label>主题色</label><input type="text" id="sf-color" value="${esc(s.color)}"></div>
+      </div>
+      <div class="sw-fld"><label>性格强度(含蓄 ← → 话痨)：<span id="sf-int-v" style="color:var(--violet)">${s.intensity}</span></label>
+        <div class="sw-range"><span style="font-size:11px;color:var(--dim)">含蓄</span>
+          <input type="range" id="sf-intensity" min="0" max="100" value="${s.intensity}">
+          <span style="font-size:11px;color:var(--dim)">话痨</span></div>
+      </div>
+      <div class="sw-row">
+        <div class="sw-fld"><label>破冰间隔(冷场多少分钟后主动抛话题)</label>
+          <input type="number" id="sf-icebreak" value="${s.icebreak_min}" min="1" max="120"></div>
+      </div>
+      <div class="sw-fld"><label>开放能力(文字恒开)</label>
+        <div class="sw-caps">
+          <div class="sw-cap on" style="opacity:.6;cursor:default">💬 文字</div>
+          <div class="sw-cap ${caps.voice?'on':''}" data-cap="voice">🎙️ 语音</div>
+          <div class="sw-cap ${caps.song?'on':''}" data-cap="song">🎵 神曲</div>
+          <div class="sw-cap ${caps.emoji?'on':''}" data-cap="emoji">✨ 表情刷屏</div>
+        </div>
+      </div>
+      <div class="sw-fld"><label>欢迎语(每行一条，迎宾时随机挑)</label>
+        <textarea id="sf-welcomes" rows="3">${esc((s.welcomes||[]).join('\n'))}</textarea></div>
+      <div class="sw-fld"><label>自定义 system_prompt(高级，留空则用原型默认人设)</label>
+        <textarea id="sf-sysprompt" rows="4" placeholder="留空即用「${PERSONA_LABEL[s.persona]}」的默认人设内核">${esc(s.system_prompt||'')}</textarea></div>
+
+      <div class="sw-preview">
+        <label style="font-size:12px;color:var(--sub);font-weight:600">🧪 试聊预览</label>
+        <div class="sw-row" style="margin-top:8px">
+          <div class="sw-fld"><input type="text" id="sf-try" placeholder="发一句话，看它怎么回…"></div>
+          <button class="sw-btn ghost" id="sf-try-btn" style="padding:9px 18px">试聊</button>
+        </div>
+        <div class="pv-out dim" id="sf-pv">回应会显示在这里（需核心大脑 eh-soul 已部署）</div>
+      </div>
+
+      <div class="sw-actions">
+        <button class="sw-btn primary" id="sf-save">${isNew?'🌟 让它住进来':'💾 保存修改'}</button>
+        <button class="sw-btn ghost" id="sf-cancel">取消</button>
+      </div>
+    </div>`;
+  // 绑定交互
+  $('#sf-intensity').oninput=e=>$('#sf-int-v').textContent=e.target.value;
+  $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
+  $('#sf-cancel').onclick=()=>{ swEditing=null; renderWorkshop(); };
+  $('#sf-save').onclick=saveSoul;
+  $('#sf-try-btn').onclick=trySoul;
+  $('#sf-try').addEventListener('keydown',e=>{ if(e.key==='Enter') trySoul(); });
+}
+
+function collectSoulForm(){
+  const caps={voice:false,song:false,emoji:false};
+  $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>{ if(c.classList.contains('on')) caps[c.dataset.cap]=true; });
+  const welcomes=$('#sf-welcomes').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const sp=$('#sf-sysprompt').value.trim();
+  return {
+    id: swEditing.id||undefined,
+    room_id: swRoom.id,
+    persona: swEditing.persona,
+    name: $('#sf-name').value.trim(),
+    emoji: $('#sf-emoji').value.trim(),
+    color: $('#sf-color').value.trim(),
+    intensity: parseInt($('#sf-intensity').value)||55,
+    icebreak_min: parseInt($('#sf-icebreak').value)||8,
+    caps, welcomes,
+    system_prompt: sp||null,
+    enabled: swEditing.enabled!==false,
+  };
+}
+
+async function saveSoul(){
+  const body=collectSoulForm();
+  if(!body.name){ toast('给灵魂起个名字'); return; }
+  const btn=$('#sf-save'); btn.disabled=true; const t=btn.textContent; btn.textContent='保存中…';
+  const res=await api('/soul-save',{method:'POST',body});
+  btn.disabled=false; btn.textContent=t;
+  if(!res.ok){ toast(res.body?.error||'保存失败'); return; }
+  toast(body.id?'已保存':'灵魂已住进房间 🌟');
+  swEditing=null;
+  await openWorkshop(swRoom.id, swRoom.name);
+}
+
+async function toggleSoul(id){
+  const s=swSouls.find(x=>String(x.id)===String(id)); if(!s) return;
+  const res=await api('/soul-toggle',{method:'POST',body:{id,enabled:!s.enabled}});
+  if(!res.ok){ toast(res.body?.error||'操作失败'); return; }
+  s.enabled=!s.enabled; renderWorkshop();
+}
+
+async function delSoul(id){
+  const s=swSouls.find(x=>String(x.id)===String(id));
+  if(!await confirmBox(`确定让「${s?.name||'这个灵魂'}」离开房间？它发过的消息会保留。`,'删除灵魂')) return;
+  const res=await api('/soul-delete',{method:'POST',body:{id}});
+  if(!res.ok){ toast(res.body?.error||'删除失败'); return; }
+  toast('灵魂已离开');
+  await openWorkshop(swRoom.id, swRoom.name);
+}
+
+async function trySoul(){
+  const text=$('#sf-try').value.trim(); if(!text) return;
+  const pv=$('#sf-pv'); pv.className='pv-out dim'; pv.textContent='灵魂正在思考…';
+  const soul=collectSoulForm();
+  const res=await api('/soul-preview',{method:'POST',body:{soul,text}});
+  if(!res.ok){ pv.className='pv-out dim'; pv.textContent='⚠️ '+(res.body?.error||'试聊暂不可用'); return; }
+  pv.className='pv-out'; pv.textContent=res.body?.reply||res.body?.text||'(无回应)';
+}
+
 
 // ===== 管理员(缓存 + 骨架屏) =====
 let adminsCache=null;

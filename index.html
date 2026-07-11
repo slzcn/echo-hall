@@ -386,6 +386,35 @@
   .msg.void .vexp{font-size:10px;color:var(--violet);opacity:.8;margin-left:8px}
   .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
   @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
+  /* ===== 灵魂居民 Soul：AI 徽标 + 呼吸光环 + 思考指示器 ===== */
+  .msg.soul .soul-badge{font-size:9px;font-weight:800;letter-spacing:.5px;padding:1px 6px;border-radius:8px;
+    color:var(--soul-c,var(--violet));border:1px solid color-mix(in srgb,var(--soul-c,var(--violet)) 45%,transparent);
+    background:color-mix(in srgb,var(--soul-c,var(--violet)) 12%,transparent);white-space:nowrap;line-height:1.5;
+    text-shadow:0 0 8px color-mix(in srgb,var(--soul-c,var(--violet)) 60%,transparent)}
+  .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
+  .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
+    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
+    animation:soulHalo 3.2s ease-in-out infinite}
+  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  @keyframes soulHalo{0%,100%{opacity:.3;inset:-2px;box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
+    50%{opacity:.85;inset:-4px;box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
+  .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
+  /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
+  .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
+  .soul-thinking .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:2px;
+    position:relative;animation:soulBreathe 2s ease-in-out infinite;
+    background:color-mix(in srgb,var(--soul-c,var(--violet)) 14%,transparent);color:var(--soul-c,var(--violet));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}
+  .soul-thinking .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
+    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 50%,transparent);animation:soulHalo 2s ease-in-out infinite}
+  .soul-thinking .tk{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .soul-thinking .tk-label{font-size:12px;color:var(--soul-c,var(--violet));opacity:.85}
+  .soul-thinking .tk-dots{display:inline-flex;gap:3px}
+  .soul-thinking .tk-dots i{width:5px;height:5px;border-radius:50%;background:var(--soul-c,var(--violet));display:inline-block;
+    animation:tkDot 1.2s ease-in-out infinite;box-shadow:0 0 6px color-mix(in srgb,var(--soul-c,var(--violet)) 70%,transparent)}
+  .soul-thinking .tk-dots i:nth-child(2){animation-delay:.18s}
+  .soul-thinking .tk-dots i:nth-child(3){animation-delay:.36s}
+  @keyframes tkDot{0%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:#04060c}
@@ -1829,7 +1858,8 @@ async function enterRoom(room){
     const [ , memRes] = await Promise.all([
       sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
       setupPresence(room),
-      refreshSnapshotTail(room)       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
+      refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
+      loadRoomSouls(room.id)           // 拉本房灵魂居民(展示层)
     ]);
     room.role = memRes?.data?.role || 'member';
     $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
@@ -1850,7 +1880,8 @@ async function enterRoom(room){
   await joinAsMember(room);
   const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-    setupPresence(room) ];
+    setupPresence(room),
+    loadRoomSouls(room.id) ];
   const [ , memRes] = await Promise.all(tasks);
   room.role = memRes?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
@@ -1951,6 +1982,8 @@ function subscribeMessages(rid){
       if(m.kind==='proj'){ projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
+      // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
+      if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
       maybeResonate(m);
       if(isEmojiOnly(m.text)) burst(m.text);
@@ -2085,9 +2118,10 @@ function buildMsgEl(m){
   }
   const el=document.createElement('div');
   const isVoid = !!m.anon;
+  const isBot = !!m.is_bot;   // 灵魂居民发的消息 → 带 AI 徽标 + 呼吸光环
   // 虚空消息: 名字在数据层已是匿名代号; 本人后缀"（虚空）"便于自认
   const dispName = isVoid ? (isMe ? m.name+'（虚空）' : m.name) : m.name;
-  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'');
+  el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'')+(isBot?' soul':'');
   el.dataset.mid=m.id;
   if(m.user_id!=null) el.dataset.uid=m.user_id;   // 存发信人uid, myUid就绪后可回补左右归属(修:登录态未就绪时渲染的自己消息卡左边)
   if(isVoid) el.dataset.void='1';
@@ -2106,14 +2140,18 @@ function buildMsgEl(m){
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
   const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
+  // 灵魂签名：昵称旁一枚 AI 徽标(呼吸光环由 .msg.soul .av 的 CSS 接管)
+  const soulBadge = isBot ? `<span class="soul-badge" title="灵魂居民">✦ AI</span>` : '';
   el.innerHTML=`
     <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avIc}</div>
     <div class="body">
-      <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
+      <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span>${soulBadge}<span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
       <div class="txt">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):esc(m.text))}</div>
       ${echoHtml}
     </div>`;
+  // 呼吸光环要用灵魂主题色驱动阴影 → 写成 CSS 变量供 keyframes 引用
+  if(isBot){ el.style.setProperty('--soul-c', avColor); }
   const txtEl=el.querySelector('.txt');
   paintEcho(m.id, el);
   if(isVoid && m.expires_at) scheduleVoidFade(el, m.expires_at);
@@ -2177,6 +2215,34 @@ async function fillReplyRef(el, mid){
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
 function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
+
+// ============ 灵魂居民 Soul (前端展示层) ============
+// 进房拉本房启用中的灵魂(仅展示字段)：驱动 is_bot 兜底识别 + 未来工坊入口。
+let roomSouls = [];              // [{auth_uid,name,emoji,color,persona,emotion}]
+let soulUidSet = new Set();      // 快速判断某 uid 是不是灵魂(历史旧消息 is_bot 缺失时兜底)
+async function loadRoomSouls(rid){
+  roomSouls=[]; soulUidSet=new Set();
+  try{
+    const { data } = await sb.rpc('eh_room_souls',{ rid });
+    roomSouls = data||[];
+    soulUidSet = new Set(roomSouls.map(s=>s.auth_uid));
+  }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
+}
+// 显示某灵魂"正在思考…"的占位气泡(乐观提示，真实回应到达后由 removeSoulThinking 撤掉)
+function showSoulThinking(soul){
+  if(!soul) return;
+  removeSoulThinking(soul.auth_uid);
+  const el=document.createElement('div');
+  el.className='soul-thinking'; el.dataset.soul=soul.auth_uid;
+  el.style.setProperty('--soul-c', safeColor(soul.color));
+  el.innerHTML=`<div class="av">${safeEmoji(soul.emoji)||'✦'}</div>
+    <div class="tk"><span class="tk-label">${esc(soul.name)} 正在思考</span>
+    <span class="tk-dots"><i></i><i></i><i></i></span></div>`;
+  $('#stream').appendChild(el); scrollStream();
+}
+function removeSoulThinking(uid){
+  document.querySelectorAll('.soul-thinking'+(uid?`[data-soul="${uid}"]`:'')).forEach(el=>el.remove());
+}
 
 // ============ 发送 ============
 async function send(){
