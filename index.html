@@ -3932,6 +3932,20 @@ on('loginToggle','click',()=>{
 });
 on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
 on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
+// 填完账密自动提交：账号+密码都有值时(尤其密码管理器一次性自填两框)防抖 350ms 后自动登录。
+// 防重触发: 登录中/已登录/两框任一空 都不触发; 手动清空/编辑重新计时。
+let _autoSubmitTimer=null;
+function maybeAutoSubmit(){
+  clearTimeout(_autoSubmitTimer);
+  const la=$('#loginAccount'), lp=$('#loginPassword'), btn=$('#loginBtn');
+  if(!la||!lp||myUid) return;
+  const acc=la.value.trim(), pw=lp.value;
+  if(acc.length>=2 && pw.length>=6 && !(btn&&btn.disabled)){
+    _autoSubmitTimer=setTimeout(()=>{ if(!myUid && la.value.trim() && lp.value){ doLogin(); } }, 350);
+  }
+}
+on('loginAccount','input',maybeAutoSubmit);
+on('loginPassword','input',maybeAutoSubmit);
 on('toReg','click',()=>openModal('mReg'));
 on('toReset','click',(e)=>{ e.stopPropagation(); openModal('mReset'); });
 on('doRegBtn','click',()=>doRegister());
