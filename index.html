@@ -2584,7 +2584,14 @@ function setMode(mode){
   if(voidMode){ cin.placeholder=EH_CONFIG.text.voidPlaceholder; }
   else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
   else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
-  if(!voiceMode) setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
+  // 聚焦策略: 进入 void/song 模式才聚焦(马上要打字); 退出模式(none)不聚焦,
+  // 反而主动 blur 收起键盘——否则点"取消/退出"会把焦点抢回输入框, 触发输入法弹出。
+  // voice 模式从不聚焦(是录音不是打字)。
+  if(mode==='void' || mode==='song'){
+    setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
+  } else if(mode==='none'){
+    try{ $('#cin').blur(); }catch(e){}
+  }
   syncSendBtn();
 }
 function resetInput(){ const inp=$('#cin'); inp.value=''; inp.style.height='42px'; hideSlash(); hideAt(); syncSendBtn(); }
