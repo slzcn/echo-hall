@@ -919,12 +919,94 @@ const EH_CONFIG_DEFAULT = {
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
   // 官方房卡片兜底强调色
   officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC' },
-  // 官方房 BGM 氛围(root:根音Hz chord:半音程 wave:波形 pulse:律动ms cut:低通Hz)
+  // 官方房 BGM(分层合成器格式: bpm/steps/loopBars/layers.lead|bass|pad|kick|hat)
+  //  闲聊广场: C大调五声 8-bit pop / 深夜电台: Fm7 蒸汽波lo-fi无鼓 / 技术黑话: Am极简techno / 虚空回音: E lydian ambient铃音
   roomBgm: {
-    '闲聊广场':{ root:220,    chord:[0,4,7,11], wave:'triangle', pulse:2400, cut:1400, name:'明亮合成 pad' },
-    '深夜电台':{ root:146.83, chord:[0,3,7,10], wave:'sine',     pulse:0,    cut:900,  name:'蒸汽波暖垫' },
-    '技术黑话':{ root:98,     chord:[0,7,12],   wave:'sawtooth', pulse:3200, cut:560,  name:'极简低频 drone' },
-    '虚空回音':{ root:329.63, chord:[0,5,7,12], wave:'sine',     pulse:1600, cut:2600, name:'空灵铃音' },
+    '闲聊广场':{
+      name:'8-bit 明亮 pop',
+      bpm:108, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'square', vol:0.09, cutoff:2400, attack:0.005, release:0.12,
+          notes:[
+            72,0,76,0, 79,0,76,72, 74,0,72,0, 67,0,69,0,
+            76,0,79,0, 84,0,79,76, 74,72,0,74, 76,0,0,0,
+            72,74,76,79, 76,74,72,0, 67,69,72,74, 72,0,67,0,
+            76,79,76,72, 74,72,69,67, 72,0,0,0, 0,0,0,0,
+          ]},
+        bass:{ wave:'triangle', vol:0.11, cutoff:900, attack:0.005, release:0.18,
+          notes:[
+            48,52,55,52, 48,52,55,52, 48,52,55,52, 48,52,55,52,
+            53,57,60,57, 53,57,60,57, 53,57,60,57, 53,57,60,57,
+            50,53,57,53, 50,53,57,53, 50,53,57,53, 50,53,57,53,
+            55,59,62,59, 55,59,62,59, 55,59,62,59, 55,59,62,59,
+          ]},
+        pad:{ wave:'triangle', vol:0.05, cutoff:1200, attack:0.5, release:1.2, sustain:true,
+          chords:[ [60,64,67,72], [65,69,72,77], [62,65,69,74], [67,71,74,79] ]},
+        hat:{ vol:0.03, everyStep:2 },
+      },
+    },
+    '深夜电台':{
+      name:'lo-fi 蒸汽波',
+      bpm:72, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'sine', vol:0.08, cutoff:1600, attack:0.02, release:0.6, detune:8, dualOsc:true,
+          notes:[
+            77,0,0,0, 80,0,77,0, 75,0,73,0, 68,0,70,0,
+            0,73,0,75, 77,0,80,0, 82,0,80,0, 77,0,0,0,
+            75,0,0,73, 70,0,68,0, 68,0,70,0, 73,0,75,0,
+            77,0,80,82, 80,0,77,0, 75,0,73,70, 68,0,0,0,
+          ]},
+        bass:{ wave:'sine', vol:0.14, cutoff:400, attack:0.03, release:0.8,
+          notes:[
+            41,0,0,0, 0,0,0,0, 41,0,0,0, 0,0,0,0,
+            44,0,0,0, 0,0,0,0, 44,0,0,0, 0,0,0,0,
+            46,0,0,0, 0,0,0,0, 46,0,0,0, 0,0,0,0,
+            39,0,0,0, 0,0,0,0, 39,0,0,0, 0,0,0,0,
+          ]},
+        pad:{ wave:'sine', vol:0.06, cutoff:700, attack:1.5, release:2.5, sustain:true,
+          chords:[ [53,56,60,63], [56,60,63,68], [58,63,68,70], [51,56,60,63] ]},
+      },
+    },
+    '技术黑话':{
+      name:'极简 techno drone',
+      bpm:96, steps:16, stepSubdiv:4, loopBars:2,
+      layers:{
+        lead:{ wave:'square', vol:0.06, cutoff:1800, attack:0.002, release:0.06,
+          notes:[
+            69,0,0,0, 72,0,74,0, 76,0,74,72, 69,0,67,0,
+            69,0,72,0, 74,0,76,0, 79,76,74,72, 69,0,0,0,
+          ]},
+        bass:{ wave:'sawtooth', vol:0.10, cutoff:500, attack:0.01, release:0.15,
+          notes:[
+            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
+            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
+          ]},
+        kick:{ vol:0.14, pattern:[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
+        hat:{ vol:0.04, everyStep:2 },
+      },
+    },
+    '虚空回音':{
+      name:'ambient 铃音',
+      bpm:60, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'sine', vol:0.07, cutoff:3200, attack:0.01, release:1.4, echo:true, echoDelay:0.35, echoGain:0.5,
+          notes:[
+            76,0,0,0, 0,0,80,0, 0,0,0,0, 83,0,0,0,
+            0,0,78,0, 0,0,0,0, 82,0,0,0, 0,0,85,0,
+            88,0,0,0, 0,80,0,0, 0,0,78,0, 0,0,0,0,
+            76,0,0,0, 0,0,73,0, 71,0,0,0, 0,0,0,0,
+          ]},
+        bass:{ wave:'sine', vol:0.08, cutoff:300, attack:2.0, release:3.0,
+          notes:[
+            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            42,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            44,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+          ]},
+        pad:{ wave:'sine', vol:0.05, cutoff:2200, attack:2.5, release:4.0, sustain:true,
+          chords:[ [64,68,71,75], [66,70,73,76], [68,71,75,78], [64,68,71,75] ]},
+      },
+    },
   },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
   identityPool: {
@@ -1259,7 +1341,7 @@ const AudioEngine=(function(){
     }
     return ctx;
   }
-  function midiHz(m){ return _mtof(m); }
+  function midiHz(m){ return 440*Math.pow(2,(m-69)/12); }   // MIDI音高→Hz(内联, 原_mtof helper随roomBgm旧格式回退时丢了)
   function playTone(t, freq, dur, wave, vol, cutoff, attack, release, opts){
     if(!ctx) return;
     opts=opts||{};
