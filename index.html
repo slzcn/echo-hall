@@ -526,6 +526,10 @@
     padding:0 4px;border-radius:5px;white-space:nowrap}
   .at-mention.at-soul{color:var(--violet);background:color-mix(in srgb,var(--violet) 14%,transparent)}
   .at-mention.at-me{color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
+  /* 被@强提醒：消息卡脉冲高亮 2s */
+  .msg.mentioned-flash{animation:mentionPulse 2s ease-out}
+  @keyframes mentionPulse{0%{background:color-mix(in srgb,var(--amber) 32%,transparent);border-radius:12px}
+    60%{background:color-mix(in srgb,var(--amber) 14%,transparent)}100%{background:transparent}}
 
   /* 长按互动环 */
   .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
@@ -2003,6 +2007,7 @@ function subscribeMessages(rid){
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
       maybeResonate(m);
       if(isEmojiOnly(m.text)) burst(m.text);
+      notifyIfMentioned(m, el);   // 被 @ → 强提醒
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
@@ -2317,6 +2322,19 @@ function renderAtMenu(){
   menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
 }
 function hideAt(){ _atActive=false; $('#atMenu').classList.remove('on'); }
+// 被 @ 强提醒：收到别人消息里 @了我 → toast + 消息卡脉冲高亮 + 震动
+function notifyIfMentioned(m, el){
+  if(!m || m.user_id===myUid || !me || !me.name) return;
+  const t=String(m.text||'');
+  if(!t.includes('@'+me.name)) return;
+  // toast 横幅
+  const who = m.is_bot ? (safeEmoji(m.emoji)+m.name) : m.name;
+  toast(`💬 ${who} @了你`);
+  // 消息卡脉冲高亮一下
+  if(el){ el.classList.add('mentioned-flash'); setTimeout(()=>el.classList.remove('mentioned-flash'),2000); }
+  // 轻震动(移动端)
+  try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
+}
 function pickAt(i){
   const c=_atList[i]; if(!c) return;
   const inp=$('#cin'); const pos=inp.selectionStart;
@@ -3228,17 +3246,21 @@ async function findMemberByName(name){
 function secureRand(){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296; }
 
 // 斜杠菜单 UI
+let _slashActive=false, _slashSel=0, _slashList=[];
 function renderSlashMenu(filter){
   const menu=$('#slashMenu');
-  const list=SLASH_CMDS.filter(c=>c.c.startsWith(filter));
-  if(!list.length){ hideSlash(); return; }
-  menu.innerHTML=list.map((c,i)=>`<div class="slash-item ${i===0?'sel':''}" data-cmd="${c.c}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
-  menu.querySelectorAll('.slash-item').forEach(el=>el.onclick=()=>{
-    const inp=$('#cin'); inp.value=el.dataset.cmd+' '; inp.focus(); hideSlash(); inp.dispatchEvent(new Event('input'));
-  });
-  menu.classList.add('on');
+  _slashList=SLASH_CMDS.filter(c=>c.c.startsWith(filter));
+  if(!_slashList.length){ hideSlash(); return; }
+  if(_slashSel>=_slashList.length) _slashSel=0;
+  menu.innerHTML=_slashList.map((c,i)=>`<div class="slash-item ${i===_slashSel?'sel':''}" data-i="${i}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
+  menu.querySelectorAll('.slash-item').forEach(el=>el.onclick=()=>pickSlash(+el.dataset.i));
+  menu.classList.add('on'); _slashActive=true;
 }
-function hideSlash(){ $('#slashMenu').classList.remove('on'); }
+function pickSlash(i){
+  const c=_slashList[i]; if(!c) return;
+  const inp=$('#cin'); inp.value=c.c+' '; inp.focus(); hideSlash(); inp.dispatchEvent(new Event('input'));
+}
+function hideSlash(){ $('#slashMenu').classList.remove('on'); _slashActive=false; }
 
 // ============ 长按互动环 ============
 let lpTimer=null;
@@ -3879,7 +3901,7 @@ cin.addEventListener('input',()=>{
     cin.style.height='auto'; cin.style.height=Math.min(Math.max(cin.scrollHeight,42),100)+'px';
     syncSendBtn();
     const v=cin.value;
-    if(v.startsWith('/') && !v.includes(' ')){ renderSlashMenu(v); } else hideSlash();
+    if(v.startsWith('/') && !v.includes(' ')){ _slashSel=0; renderSlashMenu(v); } else hideSlash();
     checkAtTrigger();   // @提及菜单
   });
   // typing_at 保持原节流 1.5s
@@ -3904,6 +3926,13 @@ cin.addEventListener('keydown',e=>{
     if(e.key==='ArrowUp'){ e.preventDefault(); _atSel=(_atSel-1+_atList.length)%_atList.length; renderAtMenu(); return; }
     if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); pickAt(_atSel); return; }
     if(e.key==='Escape'){ e.preventDefault(); hideAt(); return; }
+  }
+  // /命令菜单激活时，同一套键盘导航：上下选/回车Tab确认/Esc关
+  if(_slashActive){
+    if(e.key==='ArrowDown'){ e.preventDefault(); _slashSel=(_slashSel+1)%_slashList.length; renderSlashMenu($('#cin').value); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); _slashSel=(_slashSel-1+_slashList.length)%_slashList.length; renderSlashMenu($('#cin').value); return; }
+    if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); pickSlash(_slashSel); return; }
+    if(e.key==='Escape'){ e.preventDefault(); hideSlash(); return; }
   }
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
 });
