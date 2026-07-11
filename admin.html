@@ -16,13 +16,13 @@
   /* 皮肤(与前台共用 localStorage eh_theme) */
   html[data-theme="vapor"]{ --bg:#160a1f; --bg2:#22103a; --panel:rgba(40,18,60,.72); --panel-solid:#241035;
     --line:rgba(255,120,200,.18); --line2:rgba(255,120,200,.32); --ink:#FFE8F6; --sub:#D9A8D0; --dim:#9B77A8;
-    --cyan:#38E1D0; --magenta:#FF5FA2; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --grid:rgba(255,120,220,.06); }
+    --cyan:#38E1D0; --magenta:#FF3D9A; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --grid:rgba(255,120,220,.06); }
   html[data-theme="mono"]{ --bg:#000; --bg2:#0a0a0c; --panel:rgba(16,16,20,.82); --panel-solid:#0e0e12;
     --line:rgba(210,180,120,.16); --line2:rgba(210,180,120,.3); --ink:#F4F1E9; --sub:#B8B0A0; --dim:#827B6D;
     --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96; --grid:rgba(210,180,120,.035); }
-  html[data-theme="aurora"]{ --bg:#04121a; --bg2:#062230; --panel:rgba(10,40,52,.7); --panel-solid:#08202c;
-    --line:rgba(90,220,200,.18); --line2:rgba(90,220,200,.32); --ink:#E6FBF6; --sub:#9BD4CC; --dim:#5F928C;
-    --cyan:#2EF0C8; --magenta:#FF6EC7; --violet:#A98BFF; --amber:#FFCE6B; --green:#3EE89A; --grid:rgba(80,220,255,.05); }
+  html[data-theme="aurora"]{ --bg:#0d0620; --bg2:#160a30; --panel:rgba(30,16,56,.72); --panel-solid:#1a0e34;
+    --line:rgba(165,92,255,.18); --line2:rgba(165,92,255,.32); --ink:#F2EAFF; --sub:#C4A8E8; --dim:#8A72B0;
+    --cyan:#A55CFF; --magenta:#C77DFF; --violet:#7B4DFF; --amber:#FFCE6B; --green:#9B7BFF; --grid:rgba(140,90,255,.05); }
 
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{overscroll-behavior:none}
@@ -761,13 +761,14 @@ let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTh
 const CFG_DEFAULT = {
   themePalettes:{
     cyber:{"--bg":"#07080d","--bg2":"#0d0f1a","--panel":"rgba(18,21,36,.72)","--panel-solid":"#121524","--line":"rgba(120,140,220,.16)","--line2":"rgba(120,140,220,.28)","--ink":"#EAF0FF","--sub":"#98A3C7","--dim":"#717EA9","--cyan":"#28E6D8","--magenta":"#FF3CAC","--violet":"#8B5CFF","--amber":"#FFB84D","--green":"#4DE38A","--grid":"rgba(80,120,255,.05)","--glow-cyan":"0 0 24px rgba(40,230,216,.5)","--glow-mag":"0 0 24px rgba(255,60,172,.5)"},
-    vapor:{"--bg":"#160a1f","--bg2":"#22103a","--panel":"rgba(40,18,60,.72)","--panel-solid":"#241035","--line":"rgba(255,120,200,.18)","--line2":"rgba(255,120,200,.32)","--ink":"#FFE8F6","--sub":"#D9A8D0","--dim":"#9B77A8","--cyan":"#38E1D0","--magenta":"#FF5FA2","--violet":"#B36BFF","--amber":"#FFC46B","--green":"#66E6B0","--grid":"rgba(255,120,220,.06)","--glow-cyan":"0 0 24px rgba(56,225,208,.5)","--glow-mag":"0 0 26px rgba(255,95,162,.55)"},
+    vapor:{"--bg":"#160a1f","--bg2":"#22103a","--panel":"rgba(40,18,60,.72)","--panel-solid":"#241035","--line":"rgba(255,120,200,.18)","--line2":"rgba(255,120,200,.32)","--ink":"#FFE8F6","--sub":"#D9A8D0","--dim":"#9B77A8","--cyan":"#38E1D0","--magenta":"#FF3D9A","--violet":"#B36BFF","--amber":"#FFC46B","--green":"#66E6B0","--grid":"rgba(255,120,220,.06)","--glow-cyan":"0 0 24px rgba(56,225,208,.5)","--glow-mag":"0 0 26px rgba(255,61,154,.55)"},
     mono:{"--bg":"#000000","--bg2":"#0a0a0c","--panel":"rgba(16,16,20,.82)","--panel-solid":"#0e0e12","--line":"rgba(210,180,120,.16)","--line2":"rgba(210,180,120,.3)","--ink":"#F4F1E9","--sub":"#B8B0A0","--dim":"#827B6D","--cyan":"#E9C877","--magenta":"#E9C877","--violet":"#D8B85C","--amber":"#E9C877","--green":"#C9BE96","--grid":"rgba(210,180,120,.035)","--glow-cyan":"0 0 20px rgba(233,200,119,.4)","--glow-mag":"0 0 20px rgba(233,200,119,.4)"},
-    aurora:{"--bg":"#04121a","--bg2":"#062230","--panel":"rgba(10,40,52,.7)","--panel-solid":"#08202c","--line":"rgba(90,220,200,.18)","--line2":"rgba(90,220,200,.32)","--ink":"#E6FBF6","--sub":"#9BD4CC","--dim":"#5F928C","--cyan":"#2EF0C8","--magenta":"#FF6EC7","--violet":"#A98BFF","--amber":"#FFCE6B","--green":"#3EE89A","--grid":"rgba(80,220,255,.05)","--glow-cyan":"0 0 26px rgba(46,240,200,.55)","--glow-mag":"0 0 24px rgba(255,110,199,.5)"},
+    aurora:{"--bg":"#0d0620","--bg2":"#160a30","--panel":"rgba(30,16,56,.72)","--panel-solid":"#1a0e34","--line":"rgba(165,92,255,.18)","--line2":"rgba(165,92,255,.32)","--ink":"#F2EAFF","--sub":"#C4A8E8","--dim":"#8A72B0","--cyan":"#A55CFF","--magenta":"#C77DFF","--violet":"#7B4DFF","--amber":"#FFCE6B","--green":"#9B7BFF","--grid":"rgba(140,90,255,.05)","--glow-cyan":"0 0 28px rgba(165,92,255,.6)","--glow-mag":"0 0 24px rgba(199,125,255,.5)"},
   },
-  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF5FA2"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#A98BFF"}],
+  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF3D9A"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#A55CFF"}],
   roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"mono","虚空回音":"aurora"},
-  officialFallbackC:{"闲聊广场":"#28E6D8","深夜电台":"#8B5CFF","技术黑话":"#FFB84D","虚空回音":"#FF3CAC"},
+  officialFallbackC:{"闲聊广场":"#28E6D8","深夜电台":"#FF3D9A","技术黑话":"#E9C877","虚空回音":"#A55CFF"},
+  roomKindC:{"public":"#4DE38A","private":"#8B5CFF","official":"#28E6D8"},
   roomBgm:{
     "闲聊广场":{root:220,chord:[0,4,7,11],wave:"triangle",pulse:2400,cut:1400,name:"明亮合成 pad"},
     "深夜电台":{root:146.83,chord:[0,3,7,10],wave:"sine",pulse:0,cut:900,name:"蒸汽波暖垫"},

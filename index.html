@@ -12,6 +12,10 @@
 <style>
   /* ===== 主题配色由 JS 从 EH_CONFIG 动态注入(见 buildThemeCSS/injectThemeCSS) ===== */
   /* 首屏防白屏:仅内联 cyber(默认)关键变量,完整 17 变量 × 4 套由 JS 启动时补全 */
+  /* ⚠️ 维护提示: 下面这份 :root + html[data-theme] 是【首屏兜底CSS】,
+   真正生效的主题色来自 JS EH_CONFIG_DEFAULT.themePalettes (injectThemeCSS 注入覆盖),
+   且可被后台 Supabase eh_config 远程覆盖。改主题色请【同步改两处】: 此处兜底 + themePalettes。
+   两处必须一致, 否则首屏会闪旧色。后台「🎨主题配色」tab 也有一份 CFG_DEFAULT 副本需同步。 */
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
@@ -936,7 +940,7 @@
     if(!enter||!hall) return;
     enter.classList.remove('on'); hall.classList.add('on'); document.body.classList.add('hall-on');
     var hi=document.getElementById('hallIcon'); if(hi){ hi.textContent=r.emoji||'💬';
-      var rc = r.kind==='public'?'#4DE38A':(r.kind==='private'?'#8B5CFF':'#28E6D8');
+      var rc = (typeof roomAccentC==='function') ? roomAccentC(r) : (r.kind==='public'?'#4DE38A':(r.kind==='private'?'#8B5CFF':'#28E6D8'));
       hi.style.setProperty('--room-c', rc); }
     var nt=document.getElementById('hallNameTxt'); if(nt){
       var kl = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
@@ -969,8 +973,8 @@ const EH_CONFIG_DEFAULT = {
       '--bg':'#160a1f','--bg2':'#22103a','--panel':'rgba(40,18,60,.72)','--panel-solid':'#241035',
       '--line':'rgba(255,120,200,.18)','--line2':'rgba(255,120,200,.32)',
       '--ink':'#FFE8F6','--sub':'#D9A8D0','--dim':'#9B77A8',
-      '--cyan':'#38E1D0','--magenta':'#FF5FA2','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0','--accent':'#FF5FA2',
-      '--grid':'rgba(255,120,220,.06)','--glow-cyan':'0 0 24px rgba(56,225,208,.5)','--glow-mag':'0 0 26px rgba(255,95,162,.55)',
+      '--cyan':'#38E1D0','--magenta':'#FF3D9A','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0','--accent':'#FF3D9A',
+      '--grid':'rgba(255,120,220,.06)','--glow-cyan':'0 0 24px rgba(56,225,208,.5)','--glow-mag':'0 0 26px rgba(255,61,154,.55)',
     },
     mono: {
       '--bg':'#000000','--bg2':'#0a0a0c','--panel':'rgba(16,16,20,.82)','--panel-solid':'#0e0e12',
@@ -980,11 +984,11 @@ const EH_CONFIG_DEFAULT = {
       '--grid':'rgba(210,180,120,.035)','--glow-cyan':'0 0 20px rgba(233,200,119,.4)','--glow-mag':'0 0 20px rgba(233,200,119,.4)',
     },
     aurora: {
-      '--bg':'#04121a','--bg2':'#062230','--panel':'rgba(10,40,52,.7)','--panel-solid':'#08202c',
-      '--line':'rgba(90,220,200,.18)','--line2':'rgba(90,220,200,.32)',
-      '--ink':'#E6FBF6','--sub':'#9BD4CC','--dim':'#5F928C',
-      '--cyan':'#2EF0C8','--magenta':'#FF6EC7','--violet':'#A98BFF','--amber':'#FFCE6B','--green':'#3EE89A','--accent':'#2EF0C8',
-      '--grid':'rgba(80,220,255,.05)','--glow-cyan':'0 0 26px rgba(46,240,200,.55)','--glow-mag':'0 0 24px rgba(255,110,199,.5)',
+      '--bg':'#0d0620','--bg2':'#160a30','--panel':'rgba(30,16,56,.72)','--panel-solid':'#1a0e34',
+      '--line':'rgba(165,92,255,.18)','--line2':'rgba(165,92,255,.32)',
+      '--ink':'#F2EAFF','--sub':'#C4A8E8','--dim':'#8A72B0',
+      '--cyan':'#A55CFF','--magenta':'#C77DFF','--violet':'#7B4DFF','--amber':'#FFCE6B','--green':'#9B7BFF','--accent':'#A55CFF',
+      '--grid':'rgba(140,90,255,.05)','--glow-cyan':'0 0 28px rgba(165,92,255,.6)','--glow-mag':'0 0 24px rgba(199,125,255,.5)',
     },
   },
   // 主题元数据(下拉菜单:id/名称/圆点色)
@@ -998,6 +1002,8 @@ const EH_CONFIG_DEFAULT = {
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
   // 官方房卡片兜底强调色
   officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#FF3D9A','技术黑话':'#E9C877','虚空回音':'#A55CFF' },
+  // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
+  roomKindC: { public:'#4DE38A', private:'#8B5CFF', official:'#28E6D8' },
   // 官方房 BGM(分层合成器格式: bpm/steps/loopBars/layers.lead|bass|pad|kick|hat)
   //  闲聊广场: C大调五声 8-bit pop / 深夜电台: Fm7 蒸汽波lo-fi无鼓 / 技术黑话: Am极简techno / 虚空回音: E lydian ambient铃音
   roomBgm: {
@@ -1281,7 +1287,7 @@ async function loadRemoteConfig(){
       const map={}; data.forEach(r=>{ map[r.key]=r.value; });
       // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
       // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-      ['themePalettes','themes','roomTheme','officialFallbackC','roomBgm','text','identityPool'].forEach(k=>{
+      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool'].forEach(k=>{
         if(!map[k]) return;
         const dst=EH_CONFIG[k];
         if(Array.isArray(dst)){
@@ -1682,6 +1688,9 @@ const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防�
 
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
+const ROOM_KIND_C = EH_CONFIG.roomKindC || { public:'#4DE38A', private:'#8B5CFF', official:'#28E6D8' };
+// 统一取房间强调色: 官方按名查表, 公开/私密按类型查 roomKindC
+function roomAccentC(r){ return r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||ROOM_KIND_C.official) : (ROOM_KIND_C[r.kind]||ROOM_KIND_C.official); }
 let _themeUIInit=false;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
@@ -1702,7 +1711,7 @@ async function renderOfficial(soft){
   if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
   box.innerHTML=(data||[]).map(r=>{
-    const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
+    const c=roomAccentC(r);
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
       <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
@@ -1854,7 +1863,7 @@ function preRestoreScene(){
   const r=lastRoom(); if(!r) return false;
   if(!me || !me.id) return false;
   const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
-    const rc = r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||'#28E6D8') : (r.kind==='public'?'#4DE38A':'#8B5CFF');
+    const rc = roomAccentC(r);
     hi.style.setProperty('--room-c', rc); }
   const kindLabel = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
   const nt=$('#hallNameTxt'); if(nt) nt.innerHTML=`${esc(r.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
@@ -1873,7 +1882,7 @@ async function enterRoom(room){
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
   { const _hi=$('#hallIcon'); if(_hi){ _hi.textContent=safeEmoji(room.emoji)||'💬';
     // 与列表页同款: 图标底色取房间主题色(官方按名/公开绿/私密紫)
-    const rc = room.kind==='official' ? (OFFICIAL_FALLBACK_C[room.name]||'#28E6D8') : (room.kind==='public'?'#4DE38A':'#8B5CFF');
+    const rc = roomAccentC(room);
     _hi.style.setProperty('--room-c', rc); } }
   $('#hallNameTxt').innerHTML=`${esc(room.name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${kindLabel}</span>`;
   clearReply();
