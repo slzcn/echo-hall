@@ -365,7 +365,7 @@
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block}
   .cin::placeholder{color:var(--dim)}
-  .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
+  .emoji-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
   /* 输入框内表情按钮(正方形, 垂直居中对齐输入行, 略小) */
   .cin-emoji{width:40px;height:40px;font-size:20px;align-self:center}
@@ -425,7 +425,7 @@
   .soul-thinking .tk-dots i:nth-child(2){animation-delay:.18s}
   .soul-thinking .tk-dots i:nth-child(3){animation-delay:.36s}
   @keyframes tkDot{0%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
-  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;place-items:center;
+  .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:#04060c}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
