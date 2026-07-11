@@ -2010,7 +2010,12 @@ function subscribeMessages(rid){
       const el=document.querySelector(`.msg[data-mid="${m.id}"] .txt`);
       if(!el) return;
       // 神曲/emoji 定稿由 kind 决定,流式中途都是纯文本,直接 esc+@高亮更新
-      if(m.kind==='song'){ el.innerHTML=songHtml(m.text); }
+      // 定稿时 kind 从占位的 msg 变成了 song/act(神曲/动作) → 整条重建成对应样式
+      const bubble=document.querySelector(`.msg[data-mid="${m.id}"]`);
+      if(!m.streaming && (m.kind==='song'||m.kind==='act') && bubble){
+        if(soulUidSet.has(m.user_id)) m.is_bot=true;
+        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); }
+      } else if(m.kind==='song'){ el.innerHTML=songHtml(m.text); }
       else if(m.kind==='voice'){ /* 语音不流式 */ }
       else { el.innerHTML=renderAtMentions(esc(m.text||'')); }
       // 生成完(streaming=false)时,若是纯emoji放个粒子
