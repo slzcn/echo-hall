@@ -1731,9 +1731,11 @@ function roomAccentC(r){
 }
 // 官方房灵魂色永久=房间主题色(前端强制联动, 与列表卡片同理念); 私密/公开房仍用后台设的 soul.color
 function soulThemeColor(fallback){
+  // 机器人(灵魂)色永久联动【所在房间的强调色】: 官方房→主题accent, 公开/私密房→roomKindC对应色
+  // 与列表卡片同一套取色逻辑(roomAccentC), 整站一致; 后台单独设的 soul.color 仅在此取色失败时兜底
   try{
-    if(curRoom && curRoom.kind==='official'){
-      const c=themeAccentOf(curRoom.name);
+    if(curRoom && curRoom.kind){
+      const c=roomAccentC(curRoom);
       if(c) return c;
     }
   }catch(e){}
