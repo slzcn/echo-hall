@@ -2458,6 +2458,7 @@ function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const 
 // 走 Supabase Edge Function 代理 mimo TTS, 返回 base64 PCM(s16le 24k mono)。
 // 成功→前端解码播真人嗓念字层(替代系统 speechSynthesis 机械音); 失败/超时→调用方走原兜底。
 const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
+window.EH_DISABLE_TTS_FALLBACK = true;   // 临时开关: 禁用系统TTS兜底, 只听 mimo 真人嗓(验证后改回 false 恢复兜底)
 // PCM(base64, s16le/24k/mono) → AudioBuffer
 function pcm16ToBuffer(ctx, b64, sr){
   const bin=atob(b64); const n=bin.length; const bytes=new Uint8Array(n);
@@ -2636,6 +2637,7 @@ async function playSong(lyric, sid, el, onEnd){
   let mifyHandled=false;
   // 系统 TTS 兜底函数(原逻辑封装, 供 mify 失败时调用)
   function fallbackSysTTS(){
+    if(window.EH_DISABLE_TTS_FALLBACK) return;   // 临时: 禁用系统TTS兜底(便于纯听mimo真人嗓)
     if(mifyHandled) return;
     if(!hasTTS) return;
     const rate=clamp(st.tts?.rate??1.1, 0.7, 1.6);
