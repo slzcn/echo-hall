@@ -665,8 +665,8 @@
       <div class="login-collapse" id="loginCollapse">
         <form class="login-form" id="loginForm" onsubmit="return false">
           <div class="login-row">
-            <input id="loginAccount" name="username" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
-            <input id="loginPassword" type="text" name="password" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
+            <input id="loginAccount" name="username" autocomplete="username" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
+            <input id="loginPassword" type="password" name="password" autocomplete="current-password" data-txt-ph="loginPwdPh" placeholder="密码">
           </div>
           <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
           <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
@@ -3412,11 +3412,9 @@ on('rerollBtn','click',()=>rollIdentity());
 on('loginToggle','click',()=>{
   const c=$('#loginCollapse'); if(!c) return; const open=c.classList.toggle('on');
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
-  // 未点登录前 password 字段以 type=text 存在(iOS 不会对其弹 Face ID/密码填充);
-  // 点开时才切成真正的 password + 开启自动填充, 关闭时切回避免下次进页面又被扫到
-  const pw=$('#loginPassword'), ac=$('#loginAccount');
-  if(open){ pw.type='password'; pw.autocomplete='current-password'; ac.autocomplete='username'; setTimeout(()=>ac.focus(),200); }
-  else { pw.type='text'; pw.autocomplete='off'; ac.autocomplete='off'; }
+  // 密码框始终是真正的 type=password + 标准 autocomplete, 浏览器/密码管理器才会记住并自动填充。
+  // (不再用 type=text 骗过 iOS 自填充条——那会连带砸掉记住密码; iOS 聊天输入框的误填充由其独立 form 隔离)
+  if(open) setTimeout(()=>$('#loginAccount').focus(),200);
 });
 on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
 on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
