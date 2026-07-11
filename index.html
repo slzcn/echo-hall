@@ -144,8 +144,8 @@
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
   /* ============ 场景2：大厅 ============ */
-  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:18px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
-  #lobby .sec-label{margin-top:6px}
+  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
+  #lobby .sec-label{margin-top:10px}
   .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
@@ -168,7 +168,6 @@
     display:flex;align-items:center;gap:10px}
   .sec-label .sl-t{flex-shrink:0}
   .sec-label::after{content:"";order:1;flex:1;height:1px;background:var(--line)}
-  .sec-label .priv-btn{order:2}   /* 私密房操作按钮排到分隔线右侧 */
   .channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;width:100%;max-width:var(--content-max)}
   /* 频道卡: 图标在左, 名字/介绍/状态跟在右侧(横排) */
   .ch{padding:18px 20px;border-radius:14px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
@@ -194,18 +193,25 @@
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
   .empty-hint{width:100%;max-width:var(--content-max);text-align:center;color:var(--dim);font-size:12px;padding:8px}
 
-  .priv-btn{flex-shrink:0;padding:5px 12px;border-radius:9px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
-    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--sub);transition:.15s;letter-spacing:.3px}
-  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan)}
-  .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta)}
-  .priv-btn:active{transform:scale(.94)}
+  /* 私密房操作区: 独立一行大按钮(恢复精简前版本, 不再挤进分隔线) */
+  .priv-actions{display:flex;gap:10px;width:100%;max-width:var(--content-max)}
+  .priv-btn{flex:1;padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
+  .priv-btn:hover{transform:translateY(-2px)}
+  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 20px color-mix(in srgb,var(--cyan) 30%,transparent)}
+  .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:0 0 20px color-mix(in srgb,var(--magenta) 30%,transparent)}
+  .priv-btn:active{transform:scale(.97)}
   .my-rooms{display:flex;flex-direction:column;gap:8px;width:100%;max-width:var(--content-max)}
   .rm{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;cursor:pointer;
     background:var(--panel);border:1px solid var(--line);transition:.18s}
   .rm:hover{border-color:var(--violet);transform:translateX(3px)}
   .rm .rm-ic{font-size:22px}
   .rm .rm-nm{flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
+  .rm .rm-code{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);letter-spacing:1px;cursor:pointer;
+    padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:rgba(10,12,24,.4);transition:.15s;flex-shrink:0}
+  .rm .rm-code:hover{color:var(--violet);border-color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent)}
+  .rm .rm-code .rm-copy-ic{width:12px;height:12px;opacity:.7}
+  .rm .rm-code.copied{color:var(--green);border-color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
   .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--violet) 15%,transparent);color:var(--violet)}
   .rm .rm-arr{color:var(--dim)}
 
@@ -261,6 +267,19 @@
   .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,rgba(120,140,200,.10),rgba(120,140,200,.20),rgba(120,140,200,.10));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
   .pav-skel .sk-nm{width:30px;height:8px;margin:2px 0;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
   @keyframes skel-pulse{0%{background-position:200% 0;opacity:.6}50%{opacity:1}100%{background-position:-200% 0;opacity:.6}}
+  /* 大厅频道卡骨架屏(慢网先占位, 结构与 .ch 一致, 避免全空白 + 数据到达时不跳版) */
+  .ch-skel{padding:18px 20px;border-radius:14px;border:1px solid var(--line);background:var(--panel);position:relative;overflow:hidden;
+    display:grid;grid-template-columns:auto 1fr;column-gap:15px;align-items:center;pointer-events:none}
+  .ch-skel::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(120,140,200,.18)}
+  .ch-skel .sk-b{background:linear-gradient(90deg,rgba(120,140,200,.08),rgba(120,140,200,.18),rgba(120,140,200,.08));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:8px}
+  .ch-skel .sk-icon{grid-row:1/3;width:48px;height:48px;border-radius:12px}
+  .ch-skel .sk-h{grid-column:2;height:15px;width:42%;border-radius:5px}
+  .ch-skel .sk-d{grid-column:2;height:11px;width:66%;margin-top:6px;border-radius:5px}
+  .ch-skel .sk-l{grid-column:1/3;height:11px;width:50%;margin-top:13px;border-radius:5px}
+  .rm-skel{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:var(--panel);pointer-events:none}
+  .rm-skel .sk-b{background:linear-gradient(90deg,rgba(120,140,200,.08),rgba(120,140,200,.18),rgba(120,140,200,.08));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:6px}
+  .rm-skel .sk-ric{width:22px;height:22px;border-radius:7px;flex-shrink:0}
+  .rm-skel .sk-rnm{height:13px;width:40%;flex:none}
   .pav.me .av-ic::before{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel-solid);z-index:1}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
@@ -669,9 +688,10 @@
     <div class="sec-label"><span class="sl-t" data-txt="hallPublic">🌐 公开房间</span></div>
     <div class="channels" id="publicRooms"></div>
     <div class="empty-hint" id="publicEmpty" data-txt="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
-    <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房</span>
-      <button class="priv-btn create" id="createRoomBtn" data-txt="lobbyCreateBtn">＋ 创建</button>
-      <button class="priv-btn join" id="joinRoomBtn" data-txt="lobbyJoinBtn">🔑 加入</button>
+    <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房间</span></div>
+    <div class="priv-actions">
+      <button class="priv-btn create" id="createRoomBtn" data-txt="lobbyCreateBtn">＋ 创建房间</button>
+      <button class="priv-btn join" id="joinRoomBtn" data-txt="lobbyJoinBtn">🔑 邀请码加入</button>
     </div>
     <div class="my-rooms" id="myRooms"></div>
     <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
@@ -919,12 +939,94 @@ const EH_CONFIG_DEFAULT = {
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
   // 官方房卡片兜底强调色
   officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#8B5CFF','技术黑话':'#FFB84D','虚空回音':'#FF3CAC' },
-  // 官方房 BGM 氛围(root:根音Hz chord:半音程 wave:波形 pulse:律动ms cut:低通Hz)
+  // 官方房 BGM(分层合成器格式: bpm/steps/loopBars/layers.lead|bass|pad|kick|hat)
+  //  闲聊广场: C大调五声 8-bit pop / 深夜电台: Fm7 蒸汽波lo-fi无鼓 / 技术黑话: Am极简techno / 虚空回音: E lydian ambient铃音
   roomBgm: {
-    '闲聊广场':{ root:220,    chord:[0,4,7,11], wave:'triangle', pulse:2400, cut:1400, name:'明亮合成 pad' },
-    '深夜电台':{ root:146.83, chord:[0,3,7,10], wave:'sine',     pulse:0,    cut:900,  name:'蒸汽波暖垫' },
-    '技术黑话':{ root:98,     chord:[0,7,12],   wave:'sawtooth', pulse:3200, cut:560,  name:'极简低频 drone' },
-    '虚空回音':{ root:329.63, chord:[0,5,7,12], wave:'sine',     pulse:1600, cut:2600, name:'空灵铃音' },
+    '闲聊广场':{
+      name:'8-bit 明亮 pop',
+      bpm:108, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'square', vol:0.09, cutoff:2400, attack:0.005, release:0.12,
+          notes:[
+            72,0,76,0, 79,0,76,72, 74,0,72,0, 67,0,69,0,
+            76,0,79,0, 84,0,79,76, 74,72,0,74, 76,0,0,0,
+            72,74,76,79, 76,74,72,0, 67,69,72,74, 72,0,67,0,
+            76,79,76,72, 74,72,69,67, 72,0,0,0, 0,0,0,0,
+          ]},
+        bass:{ wave:'triangle', vol:0.11, cutoff:900, attack:0.005, release:0.18,
+          notes:[
+            48,52,55,52, 48,52,55,52, 48,52,55,52, 48,52,55,52,
+            53,57,60,57, 53,57,60,57, 53,57,60,57, 53,57,60,57,
+            50,53,57,53, 50,53,57,53, 50,53,57,53, 50,53,57,53,
+            55,59,62,59, 55,59,62,59, 55,59,62,59, 55,59,62,59,
+          ]},
+        pad:{ wave:'triangle', vol:0.05, cutoff:1200, attack:0.5, release:1.2, sustain:true,
+          chords:[ [60,64,67,72], [65,69,72,77], [62,65,69,74], [67,71,74,79] ]},
+        hat:{ vol:0.03, everyStep:2 },
+      },
+    },
+    '深夜电台':{
+      name:'lo-fi 蒸汽波',
+      bpm:72, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'sine', vol:0.08, cutoff:1600, attack:0.02, release:0.6, detune:8, dualOsc:true,
+          notes:[
+            77,0,0,0, 80,0,77,0, 75,0,73,0, 68,0,70,0,
+            0,73,0,75, 77,0,80,0, 82,0,80,0, 77,0,0,0,
+            75,0,0,73, 70,0,68,0, 68,0,70,0, 73,0,75,0,
+            77,0,80,82, 80,0,77,0, 75,0,73,70, 68,0,0,0,
+          ]},
+        bass:{ wave:'sine', vol:0.14, cutoff:400, attack:0.03, release:0.8,
+          notes:[
+            41,0,0,0, 0,0,0,0, 41,0,0,0, 0,0,0,0,
+            44,0,0,0, 0,0,0,0, 44,0,0,0, 0,0,0,0,
+            46,0,0,0, 0,0,0,0, 46,0,0,0, 0,0,0,0,
+            39,0,0,0, 0,0,0,0, 39,0,0,0, 0,0,0,0,
+          ]},
+        pad:{ wave:'sine', vol:0.06, cutoff:700, attack:1.5, release:2.5, sustain:true,
+          chords:[ [53,56,60,63], [56,60,63,68], [58,63,68,70], [51,56,60,63] ]},
+      },
+    },
+    '技术黑话':{
+      name:'极简 techno drone',
+      bpm:96, steps:16, stepSubdiv:4, loopBars:2,
+      layers:{
+        lead:{ wave:'square', vol:0.06, cutoff:1800, attack:0.002, release:0.06,
+          notes:[
+            69,0,0,0, 72,0,74,0, 76,0,74,72, 69,0,67,0,
+            69,0,72,0, 74,0,76,0, 79,76,74,72, 69,0,0,0,
+          ]},
+        bass:{ wave:'sawtooth', vol:0.10, cutoff:500, attack:0.01, release:0.15,
+          notes:[
+            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
+            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
+          ]},
+        kick:{ vol:0.14, pattern:[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
+        hat:{ vol:0.04, everyStep:2 },
+      },
+    },
+    '虚空回音':{
+      name:'ambient 铃音',
+      bpm:60, steps:16, stepSubdiv:4, loopBars:4,
+      layers:{
+        lead:{ wave:'sine', vol:0.07, cutoff:3200, attack:0.01, release:1.4, echo:true, echoDelay:0.35, echoGain:0.5,
+          notes:[
+            76,0,0,0, 0,0,80,0, 0,0,0,0, 83,0,0,0,
+            0,0,78,0, 0,0,0,0, 82,0,0,0, 0,0,85,0,
+            88,0,0,0, 0,80,0,0, 0,0,78,0, 0,0,0,0,
+            76,0,0,0, 0,0,73,0, 71,0,0,0, 0,0,0,0,
+          ]},
+        bass:{ wave:'sine', vol:0.08, cutoff:300, attack:2.0, release:3.0,
+          notes:[
+            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            42,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            44,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+          ]},
+        pad:{ wave:'sine', vol:0.05, cutoff:2200, attack:2.5, release:4.0, sustain:true,
+          chords:[ [64,68,71,75], [66,70,73,76], [68,71,75,78], [64,68,71,75] ]},
+      },
+    },
   },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
   identityPool: {
@@ -941,7 +1043,7 @@ const EH_CONFIG_DEFAULT = {
     entrySlogan:'临时身份 · 无需注册',
     entryBtn:'匿 名 进 入',
     // 大厅
-    hallOfficial:'📡 官方频道', hallPublic:'🌐 公开房间', hallPrivate:'🔒 私密房',
+    hallOfficial:'📡 官方频道', hallPublic:'🌐 公开房间', hallPrivate:'🔒 私密房间',
     // 互动模式(标题+副标题)
     modeVoiceTitle:'语音留声', modeVoiceSub:'按住录音，松手发送',
     modeVoidTitle:'说给虚空', modeVoidSub:'匿名 · 5分钟后消散',
@@ -1259,7 +1361,7 @@ const AudioEngine=(function(){
     }
     return ctx;
   }
-  function midiHz(m){ return _mtof(m); }
+  function midiHz(m){ return 440*Math.pow(2,(m-69)/12); }   // MIDI音高→Hz(内联, 原_mtof helper随roomBgm旧格式回退时丢了)
   function playTone(t, freq, dur, wave, vol, cutoff, attack, release, opts){
     if(!ctx) return;
     opts=opts||{};
@@ -1322,6 +1424,9 @@ const AudioEngine=(function(){
   }
   function playCfg(cfg){
     if(!ensure()) return;
+    // 防御: 该合成器要求分层格式(bpm/steps/loopBars/layers). 若拿到旧简单格式(root/chord/wave)或缺字段,
+    // 直接静默跳过, 绝不让 BGM 配置不匹配把进房流程(startRoomBGM 在 enterRoom 里同步调)带崩。
+    if(!cfg || !cfg.layers || !cfg.bpm || !cfg.steps || !cfg.loopBars){ stopInternal(false); return; }
     stopInternal(false);
     cur=cfg;
     try{ ctx.resume&&ctx.resume(); }catch(e){}
@@ -1422,9 +1527,11 @@ const AudioEngine=(function(){
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
-  if(!bgmOn()) return;
-  if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
-  else AudioEngine.stop();
+  try{
+    if(!bgmOn()) return;
+    if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
+    else AudioEngine.stop();
+  }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
 function initBgmUI(){
   const b2=$('#bgmBtnHall'); if(!b2) return;
@@ -1519,6 +1626,9 @@ async function renderLobby(soft){
   $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color;
   await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
 }
+// 频道卡骨架(慢网先占位): 结构与 .ch 一致
+function chSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="ch-skel"><div class="sk-b sk-icon"></div><div class="sk-b sk-h"></div><div class="sk-b sk-d"></div><div class="sk-b sk-l"></div></div>'; return s; }
+function rmSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="rm-skel"><div class="sk-b sk-ric"></div><div class="sk-b sk-rnm"></div></div>'; return s; }
 async function renderOfficial(soft){
   const box=$('#channels');
   // soft 刷新: 卡片 DOM 已在则只静默刷新在线数/预览，不清空重建(消除返回闪烁)
@@ -1527,11 +1637,12 @@ async function renderOfficial(soft){
     prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'official'})));
     return;
   }
+  if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
   box.innerHTML=(data||[]).map(r=>{
     const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
-      <div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
+      <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
       <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
       <div class="preview empty" data-prev>加载中…</div></div>`;
@@ -1547,12 +1658,13 @@ async function renderPublic(soft){
     prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'public'})));
     return;
   }
+  if(!box.children.length) box.innerHTML=chSkel(2);   // 慢网先占位
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:#4DE38A">
     <div class="tagk">公开</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
-    <div class="desc">${esc(r.topic||'')}</div>
+    <div class="desc">${esc(r.topic||autoTopic(r.name))}</div>
     <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
     <div class="preview empty" data-prev>加载中…</div></div>`).join('');
   bindRoomCards(box);
@@ -1604,6 +1716,7 @@ async function renderMyRooms(soft){
     prefetchAll([...boxE.querySelectorAll('.rm[data-rid]')].map(c=>({id:c.dataset.rid,kind:'private'})));
     return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
   }
+  if(!boxE.children.length) boxE.innerHTML=rmSkel(2);   // 慢网先占位
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
   const box=$('#myRooms'); const pe=$('#privEmpty');
   if(!data || !data.length){ box.innerHTML=''; if(pe) pe.style.display='block'; return; }
@@ -1611,11 +1724,24 @@ async function renderMyRooms(soft){
   box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="private">
     <span class="rm-ic">${safeEmoji(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
-    <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
+    ${r.invite_code?`<span class="rm-code" data-code="${esc(r.invite_code)}" title="点击复制邀请码">${esc(r.invite_code)}<svg class="rm-copy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span>`:''}<span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private',knownOnline:readKnownOnline(el)}));
+  box.querySelectorAll('.rm-code[data-code]').forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); copyInvite(el.dataset.code, el); });
   prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
 }
-// 进房预取缓存: 列表渲染后主动预取 + 悬停补充，点进去瞬间显示
+// 复制邀请码: 优先 clipboard API, 失败降级 execCommand(webview/非安全上下文兜底), 复制成功给卡片短暂反馈
+function copyInvite(code, el){
+  const done=()=>{ if(el){ el.classList.add('copied'); setTimeout(()=>el.classList.remove('copied'),1200); } toast(EH_CONFIG.text.ok_codeCopied||'邀请码已复制'); };
+  const fail=()=>toast(EH_CONFIG.text.err_copyFail||'复制失败，请手动长按');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(done, ()=>fallbackCopy(code)?done():fail());
+  } else { fallbackCopy(code)?done():fail(); }
+}
+function fallbackCopy(text){
+  try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.cssText='position:fixed;top:-999px;opacity:0';
+    document.body.appendChild(ta); ta.select(); const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
+  }catch(e){ return false; }
+}
 const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
 const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
@@ -3105,6 +3231,22 @@ function closeModal(){ $('#modalMask').classList.remove('on'); }
 
 // 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
+// 公开房自动介绍: 按房名套一句(长度对齐官方房~10-16字)。房名做哈希选模板, 同名恒定同句, 显得像特意写的。
+function autoTopic(name){
+  const n=(name||'').trim().slice(0,10);
+  const tpl=[
+    `关于「${n}」，想说的都能说`,
+    `聊聊${n}，看谁懂你`,
+    `${n}爱好者的聚集地`,
+    `为${n}而来的人，都在这`,
+    `${n}，此刻正热闹`,
+    `喜欢${n}？进来唠两句`,
+    `${n}的一切，都可以聊`,
+    `围绕${n}，随便扯`,
+  ];
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
+  return tpl[h%tpl.length];
+}
 async function createRoom(){
   const name=$('#roomNameIn').value.trim();
   if(!name){ toast(EH_CONFIG.text.warn_needRoomName); return; }
@@ -3112,7 +3254,8 @@ async function createRoom(){
   const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
   let room=null;
   if(pickedKind==='public'){
-    const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'public',owner:myUid}).select('id,name,emoji').single();
+    const topic=autoTopic(name);   // 公开房没填介绍→按房名自动生成一句(长度参考官方房)
+    const { data, error }=await sb.from('eh_rooms').insert({name,emoji:pickedEmoji,kind:'public',owner:myUid,topic}).select('id,name,emoji,topic').single();
     if(!error) room={...data,kind:'public'};
     else { console.warn(error); }
   } else {
