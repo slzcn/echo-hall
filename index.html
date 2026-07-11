@@ -738,7 +738,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0456';
+  var BUILD_VER='20260712-0501';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3921,7 +3921,7 @@ async function openGear(){
   };
   $('#gearMask').classList.add('on'); $('#gearDrawer').classList.add('on'); $('#gearBtn').classList.add('active'); ehArm();
 }
-function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); $('#gearBtn').classList.remove('active'); }
+function closeGear(){ try{ if($('#gearMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); $('#gearBtn').classList.remove('active'); }
 
 // ============ 个人空间抽屉 ============
 // 缓存持久化: 首页/列表页秒显靠的是"缓存先显+后台刷新"。个人空间同理——把上次查到的
@@ -4118,7 +4118,7 @@ async function logoutIdentity(bound){
   goScene('enter');
   toast(bound?'已退出登录':'已换新身份');
 }
-function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
+function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
 function backToLobby(){ try{ EhSfx.play('back'); }catch(e){} AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
@@ -4194,7 +4194,7 @@ function renderEmojiPick(){
   $('#roomEmojiPick').innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
   $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ pickedEmoji=b.textContent; $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 }
-function closeModal(){ $('#modalMask').classList.remove('on'); }
+function closeModal(){ try{ if($('#modalMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#modalMask').classList.remove('on'); }
 
 // 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
@@ -4445,7 +4445,7 @@ try{
     if(!el) return; ehRipple(el,e);
   },{capture:true,passive:true});
   document.addEventListener('click',function(e){
-    const el=e.target.closest('.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.code-copy,.modal-x,.dx');
+    const el=e.target.closest('.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.code-copy');
     if(!el || el.closest('#goBtn,#confirmYes,#confirmNo')) return;
     try{ EhSfx.playClick(); }catch(_){ }
   },{capture:true,passive:true});
