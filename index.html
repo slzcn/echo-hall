@@ -2518,6 +2518,9 @@ function buildMsgEl(m){
   const txtEl=el.querySelector('.txt');
   paintEcho(m.id, el);
   if(isVoid && m.expires_at) scheduleVoidFade(el, m.expires_at);
+  // 灵魂迎宾/破冰语(is_bot + expires_at, 非虚空): 到期时若无人互动(没贴表情/没被回复)则淡出隐藏,
+  // 防进房全是欢迎语堆积。有互动则保留(转永久)。
+  else if(isBot && m.expires_at) scheduleWelcomeFade(el, m);
   // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
@@ -2564,6 +2567,29 @@ function scheduleVoidFade(el, expIso){
     el._voidT=setTimeout(tick, left>60000?15000:1000);
   };
   tick();
+}
+// 某条消息是否被互动过: 有回声徽章(echoState) 或 被别的消息引用回复
+function msgHasInteraction(mid){
+  const map=echoState[mid];
+  if(map && Object.keys(map).some(e=>map[e]&&map[e].count>0)) return true;   // 有人贴表情
+  if(document.querySelector(`.msg .reply-ref[data-ref="${mid}"]`)) return true; // 被回复引用
+  return false;
+}
+// 灵魂迎宾/破冰语过期淡出: 到期检查互动, 无互动才隐藏(有互动则保留)。方案B: 只前端隐藏, 不删库。
+function scheduleWelcomeFade(el, m){
+  const exp=new Date(m.expires_at).getTime();
+  const tick=()=>{
+    if(!el.isConnected) return;
+    const left=exp-Date.now();
+    if(left<=0){
+      if(msgHasInteraction(m.id)) return;   // 被互动过 → 保留, 不再管
+      el.classList.add('fading'); setTimeout(()=>{ if(el.isConnected && !msgHasInteraction(m.id)) el.style.display='none'; }, 1200);
+      return;
+    }
+    el._welT=setTimeout(tick, Math.min(left, 30000)+50);
+  };
+  // 首次延后 1.5s: 进房时 echoes 批量 fetch 是异步的, 立即判定会误把"有互动的过期消息"当无互动隐藏。
+  el._welT=setTimeout(tick, 1500);
 }
 // 从已渲染消息 DOM 里取某条的原文(名字:内容)
 function refFromDom(mid){
