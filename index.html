@@ -1701,12 +1701,13 @@ const VOID_NAMES = EH_CONFIG.identityPool.voidNames;
 let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
 const HISTORY_PAGE = 60;
 // 五种回声情绪: 共鸣/动容/脑电/困惑/观测
+// 消息反应: 用全球通用款(点赞/爱心/笑/举手同意/观望), 一眼懂, 类似 +1/yes 语义
 const ECHO_KINDS = [
-  {e:'🔥', label:'共鸣'},
-  {e:'💧', label:'动容'},
-  {e:'⚡', label:'脑电'},
-  {e:'🌀', label:'困惑'},
-  {e:'👁', label:'观测'},
+  {e:'👍', label:'赞'},
+  {e:'❤️', label:'爱了'},
+  {e:'😂', label:'哈哈'},
+  {e:'🙌', label:'+1'},
+  {e:'👀', label:'关注'},
 ];
 const ECHO_EMOJIS = ECHO_KINDS.map(k=>k.e);
 const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
@@ -3418,7 +3419,9 @@ function paintEcho(mid, scope){
            || document.querySelector(`.echo-bar[data-mid="${mid}"]`);
   if(!bar) return;
   const map=echoState[mid]||{};
-  const active=ECHO_EMOJIS.filter(e=>map[e]&&map[e].count>0);
+  // 渲染 echoState 里实际有的所有表情, 不再限定 ECHO_EMOJIS 白名单——
+  // 否则机器人/他人贴的白名单外表情(如 🙋)存了数据却显示不出(计数痕迹丢失的真因)。
+  const active=Object.keys(map).filter(e=>map[e]&&map[e].count>0);
   bar.innerHTML=active.map(e=>{
     const st=map[e];
     return `<span class="ec-pill${st.mine?' mine':''}" data-e="${e}">${e}<b>${st.count}</b></span>`;
@@ -3522,14 +3525,18 @@ function showActRing(x,y,m){
   const isMine = m.user_id===myUid;
   const mid = isNaN(+m.id)?m.id:+m.id;
   // 自己的消息不能给自己点回声, 但仍可回复/投影
-  const echoRow = isMine ? '' : `<div class="ar-echoes">${ECHO_KINDS.map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span><span class="al">${k.label}</span></button>`).join('')}</div>`;
+  const echoRow = isMine ? '' : `<div class="ar-echoes">${ECHO_KINDS.map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span><span class="al">${k.label}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span><span class="al">更多</span></button></div>`;
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
       <button data-a="reply"><span class="ai">↳</span>回复</button>
       <button data-a="project"><span class="ai">📽️</span>投影</button>
     </div>`;
-  ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=()=>{ toggleEcho(mid, b.dataset.e); hideActRing(); });
+  ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=(e)=>{
+    e.stopPropagation();   // 别冒泡到 document 的关闭监听(否则刚开的托盘立即被关)
+    if(b.dataset.more){ hideActRing(); openEchoTray(mid); return; }   // ➕ → 打开全表情托盘贴反应
+    toggleEcho(mid, b.dataset.e); hideActRing();
+  });
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
   ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
   ring.classList.add('on');
@@ -4272,13 +4279,18 @@ const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤
 $('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
 // 表情按钮/托盘用 mousedown+preventDefault: 不让焦点转移到它们, 也不主动 focus 输入框,
 // 这样点表情不会顶起/唤起系统输入法(想打字再自己点输入框)
+// _echoTarget: 非空时托盘处于"给某条消息贴反应"模式(反应环点➕进入); 空则默认"插入输入框"模式
+let _echoTarget=null;
+function openEchoTray(mid){ _echoTarget=mid; $('#emojiTray').classList.add('on'); }
 $('#emojiBtn').addEventListener('mousedown',e=>e.preventDefault());
-$('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
+$('#emojiBtn').onclick=e=>{ e.stopPropagation(); _echoTarget=null; $('#emojiTray').classList.toggle('on'); };  // 从😊进=插入模式
 $('#emojiTray').querySelectorAll('b').forEach(b=>{
   b.addEventListener('mousedown',e=>e.preventDefault());   // 阻止聚焦→不弹键盘
   b.onclick=e=>{ e.stopPropagation();
-    // 在光标处插入(无光标则追加), 不调用 focus, 避免唤起输入法
-    const ins=b.textContent, st=cin.selectionStart, en=cin.selectionEnd;
+    const ins=b.textContent;
+    if(_echoTarget!=null){ toggleEcho(_echoTarget, ins); _echoTarget=null; $('#emojiTray').classList.remove('on'); return; }  // 贴反应模式
+    // 默认: 在光标处插入(无光标则追加), 不调用 focus, 避免唤起输入法
+    const st=cin.selectionStart, en=cin.selectionEnd;
     if(typeof st==='number' && document.activeElement===cin){
       cin.value=cin.value.slice(0,st)+ins+cin.value.slice(en);
       cin.selectionStart=cin.selectionEnd=st+ins.length;
@@ -4286,7 +4298,7 @@ $('#emojiTray').querySelectorAll('b').forEach(b=>{
     cin.dispatchEvent(new Event('input'));
   };
 });
-document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
+document.addEventListener('click',()=>{ $('#emojiTray').classList.remove('on'); _echoTarget=null; });
 
 window.addEventListener('beforeunload',()=>{
   // 尽力删除自己的在线行(用 sendBeacon 式的同步兜底：直接 fire-and-forget)
