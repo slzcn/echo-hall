@@ -2092,7 +2092,9 @@ function renderPresenceAvatars(users){
       if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
       return;
     }
-    // 需要新建或重建
+    // 需要新建或重建。灵魂身份跟随最新(名字/头像/色),覆盖 presence 里的旧快照
+    const soulLatest = soulUidSet.has(p.user_id) ? roomSouls.find(x=>x.auth_uid===p.user_id) : null;
+    if(soulLatest){ p={...p, name:soulLatest.name, emoji:soulLatest.emoji, color:soulLatest.color}; }
     const c=safeColor(p.color);
     const isMe=p.user_id===myUid;
     const div=document.createElement('div');
@@ -2162,6 +2164,12 @@ const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'')
 function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
 function buildMsgEl(m){
+  // 灵魂身份跟随最新: 消息存的是发送时的 name/emoji/color 快照, 但灵魂是固定住户,
+  // 改了配置后历史消息也该用最新身份(名字/头像/色) → 用 roomSouls 覆盖旧快照。
+  if(m.user_id && soulUidSet.has(m.user_id)){
+    const s=roomSouls.find(x=>x.auth_uid===m.user_id);
+    if(s){ m={...m, name:s.name, emoji:s.emoji, color:s.color}; }
+  }
   const isMe = m.user_id===myUid;
   if(m.kind==='proj') return null;   // 投影是瞬时飞幕，不进消息流
   if(m.kind==='act'){
