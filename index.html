@@ -1340,7 +1340,13 @@ const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
     const safeEmoji = (e) => esc((e||'').slice(0,8));
     // 头像内 emoji 渲染: 🕳️ 黑洞字形自带偏下(主体压下半、上方留白多),头像里看着往下沉,
     // 给它单独上移 2px 校正; 其他 emoji 字形居中, 原样输出。
-    const avEmoji = (e) => (e && e.indexOf('🕳')>-1) ? `<span style="display:inline-block;transform:translateY(-3px)">${e}</span>` : e;
+    // 部分 emoji 字形锚点偏下(🕳️黑洞/🌙月亮), 在头像框里看着下沉 → 各自上移校正; 其它 emoji 原样
+    const avEmoji = (e) => {
+      if(!e) return e;
+      if(e.indexOf('🕳')>-1) return `<span style="display:inline-block;transform:translateY(-3px)">${e}</span>`;
+      if(e.indexOf('🌙')>-1) return `<span style="display:inline-block;transform:translateY(-2px)">${e}</span>`;
+      return e;
+    };
 const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 
 // ---- 身份 ----
