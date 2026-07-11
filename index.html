@@ -2524,23 +2524,24 @@ function fetchMifyVoice(text, timeoutMs, style){
 
 // ============ 真人嗓预取缓存(根治延迟) ============
 // 策略: 发送瞬间/打字停顿时就异步预合成, 存缓存; 播放时命中则 0 延迟直接播。
-const EH_VOICE_CACHE=new Map();   // key: style+'\u0001'+text  -> {b64,sr,ts}
-const EH_VOICE_CACHE_MAX=24;
+const EH_VOICE_CACHE=new Map();   // key: style+'\u0001'+text  -> {b64,sr,ts,pin}
+const EH_VOICE_CACHE_MAX=60;
 function voiceCacheKey(text,style){ return (style||'default')+'\u0001'+String(text).slice(0,60); }
 function getCachedVoice(text,style){ const k=voiceCacheKey(text,style); const v=EH_VOICE_CACHE.get(k); if(v){ v.ts=Date.now(); } return v||null; }
-function putCachedVoice(text,style,data){
+function putCachedVoice(text,style,data,pin){
   const k=voiceCacheKey(text,style);
-  EH_VOICE_CACHE.set(k,{...data,ts:Date.now()});
-  // 超上限淘汰最旧
+  const prev=EH_VOICE_CACHE.get(k);
+  EH_VOICE_CACHE.set(k,{...data,ts:Date.now(),pin: pin||(prev&&prev.pin)||false});
+  // 超上限淘汰最旧(铉住的预置词不淘汰)
   if(EH_VOICE_CACHE.size>EH_VOICE_CACHE_MAX){
     let oldK=null,oldT=Infinity;
-    for(const [kk,vv] of EH_VOICE_CACHE){ if(vv.ts<oldT){ oldT=vv.ts; oldK=kk; } }
+    for(const [kk,vv] of EH_VOICE_CACHE){ if(!vv.pin && vv.ts<oldT){ oldT=vv.ts; oldK=kk; } }
     if(oldK) EH_VOICE_CACHE.delete(oldK);
   }
 }
-// 预取: 不阻塞, 成功存缓存。已有缓存则跳过。
+// 预取: 不阻塞, 成功存缓存。已有缓存则跳过。pin=true 时铉住不被 LRU 淘汰(预置词用)。
 let _prefetchInflight=new Set();
-function prefetchVoice(text,style){
+function prefetchVoice(text,style,pin){
   text=String(text||'').trim().slice(0,60);
   if(!text) return;
   const k=voiceCacheKey(text,style);
@@ -2548,7 +2549,7 @@ function prefetchVoice(text,style){
   _prefetchInflight.add(k);
   fetchMifyVoice(text, 8000, style).then(res=>{
     _prefetchInflight.delete(k);
-    if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr});
+    if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr},pin);
   }).catch(()=>{ _prefetchInflight.delete(k); });
 }
 
@@ -2556,14 +2557,13 @@ function prefetchVoice(text,style){
 const EH_HOT_PHRASES=['哈哈哈','哈啰','你好','晚安','早安','没欻','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
 let _prewarmedStyles=new Set();
 function prewarmHotPhrases(){
-  // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样; 只预热用户当前选的风)
+  // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样)
   const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
   const style=st.ttsStyle||'default';
   if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
-  // 预热前 5 句常用词(错峰, 避免一次灼开 API)
-  EH_HOT_PHRASES.slice(0,5).forEach((p,i)=>{
-    setTimeout(()=>{ try{ prefetchVoice(p, style); }catch(_){} }, 1000+i*1400);
-  });
+  // 并发预热全部预置词, pin=true 铉住不被用户输入的词挤出缓存(预置词永远即时)。
+  // 预置词短, 并发 ~2s 全部备好, 远比错峰 10s 快。
+  EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
 }
 
 function tone(ctx,dest,freq,t,dur,type,gain){
