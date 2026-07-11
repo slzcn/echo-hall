@@ -1710,6 +1710,24 @@ const ECHO_KINDS = [
   {e:'👀', label:'关注'},
 ];
 const ECHO_EMOJIS = ECHO_KINDS.map(k=>k.e);
+// 反应环最近使用: 贴过的表情记进 localStorage(最新在前、去重), 渲染反应环时优先显示,
+// 不足 5 个用默认款补齐 → 常用表情自动沉淀到快捷位。
+const LS_ECHO_MRU='eh_echo_mru';
+function loadEchoMru(){ try{ const a=JSON.parse(localStorage.getItem(LS_ECHO_MRU)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function pushEchoMru(emoji){
+  if(!emoji) return;
+  let a=loadEchoMru().filter(e=>e!==emoji); a.unshift(emoji); a=a.slice(0,5);
+  try{ localStorage.setItem(LS_ECHO_MRU, JSON.stringify(a)); }catch(e){}
+}
+// 反应环当前要显示的 5 个: 最近用过的在前, 用默认款补足到 5(去重)
+function echoQuickList(){
+  const mru=loadEchoMru();
+  const seen=new Set(), out=[];
+  const push=(e,label)=>{ if(e&&!seen.has(e)){ seen.add(e); out.push({e,label:label||''}); } };
+  mru.forEach(e=>push(e, (ECHO_KINDS.find(k=>k.e===e)||{}).label));
+  ECHO_KINDS.forEach(k=>push(k.e,k.label));
+  return out.slice(0,5);
+}
 const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
@@ -3402,6 +3420,7 @@ async function toggleEcho(mid, emoji){
     await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid).eq('emoji',emoji);
   } else {
     st.count++; st.mine=true; paintEcho(mid); burst(emoji,6);
+    pushEchoMru(emoji);   // 记入"最近使用", 下次反应环优先显示这个表情
     checkResonance(mid, emoji, st.count);
     await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid,emoji});
   }
@@ -3526,7 +3545,7 @@ function showActRing(x,y,m){
   const isMine = m.user_id===myUid;
   const mid = isNaN(+m.id)?m.id:+m.id;
   // 自己的消息不能给自己点回声, 但仍可回复/投影
-  const echoRow = isMine ? '' : `<div class="ar-echoes">${ECHO_KINDS.map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span><span class="al">${k.label}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span><span class="al">更多</span></button></div>`;
+  const echoRow = isMine ? '' : `<div class="ar-echoes">${echoQuickList().map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span>${k.label?`<span class="al">${k.label}</span>`:''}</button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span><span class="al">更多</span></button></div>`;
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
