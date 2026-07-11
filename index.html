@@ -1825,7 +1825,10 @@ async function fillRoomStats(box, rid){
     prev.classList.remove('empty');
     const txt = msgPreview(last);
     const nm = last.anon ? '🕳️ 某个回声' : esc(last.name)+':';
-    prev.innerHTML=`<b>${nm}</b> ${esc(String(txt).slice(0,40))}`;
+    // 预览发送者名字色跟房间强调色(与卡片--ch-c统一); 匿名回声不着色
+    let nmC='';
+    try{ if(!last.anon){ const rc=roomAccentC({name:card.dataset.nm,kind:card.dataset.kind||'official'}); if(rc) nmC=` style="color:${rc}"`; } }catch(e){}
+    prev.innerHTML=`<b${nmC}>${nm}</b> ${esc(String(txt).slice(0,40))}`;
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
     prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
