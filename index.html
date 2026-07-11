@@ -3548,7 +3548,7 @@ function showActRing(x,y,m){
   const isMine = m.user_id===myUid;
   const mid = isNaN(+m.id)?m.id:+m.id;
   // 自己的消息不能给自己点回声, 但仍可回复/投影
-  const echoRow = isMine ? '' : `<div class="ar-echoes">${echoQuickList().map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span>${k.label?`<span class="al">${k.label}</span>`:''}</button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span><span class="al">更多</span></button></div>`;
+  const echoRow = isMine ? '' : `<div class="ar-echoes">${echoQuickList().map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span></button></div>`;
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
