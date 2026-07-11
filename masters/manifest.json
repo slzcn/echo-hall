@@ -1,5 +1,5 @@
 {
-  "version": "20260711",
+  "version": "20260711b",
   "items": [
     {
       "id": "dj_1",
@@ -225,6 +225,51 @@
       "prompt": "Playful Kids, Ukulele, Happy, 俏皮儿歌, 快乐",
       "introEnd": 8.64722727,
       "duration": 26.204
+    },
+    {
+      "id": "rnb_1",
+      "sid": "rnb",
+      "url": "masters/rnb_1.mp3",
+      "styleName": "冰霞柔情R&B",
+      "prompt": "R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情",
+      "duration": 109.587,
+      "introEnd": 8.0
+    },
+    {
+      "id": "rnb_2",
+      "sid": "rnb",
+      "url": "masters/rnb_2.mp3",
+      "styleName": "冰霞柔情R&B",
+      "prompt": "Contemporary R&B, Warm Vocal, Silky, Modern, 都市 R&B, 丝滑",
+      "duration": 67.199,
+      "introEnd": 8.0
+    },
+    {
+      "id": "rnb_3",
+      "sid": "rnb",
+      "url": "masters/rnb_3.mp3",
+      "styleName": "冰霞柔情R&B",
+      "prompt": "Neo-Soul, Groove, Chill, Retro, 新灵魂, 慵懒律动",
+      "duration": 45.058,
+      "introEnd": 8.0
+    },
+    {
+      "id": "rnb_4",
+      "sid": "rnb",
+      "url": "masters/rnb_4.mp3",
+      "styleName": "冰霞柔情R&B",
+      "prompt": "R&B Ballad, Piano, Emotional, Late Night, R&B 情歌, 夜深情浓",
+      "duration": 112.315,
+      "introEnd": 8.0
+    },
+    {
+      "id": "rnb_5",
+      "sid": "rnb",
+      "url": "masters/rnb_5.mp3",
+      "styleName": "冰霞柔情R&B",
+      "prompt": "Chill R&B, Electronic, Ambient, Dreamy, 冷 R&B, 梦幻迷离",
+      "duration": 54.753,
+      "introEnd": 8.0
     }
   ]
 }
