@@ -2289,7 +2289,8 @@ function buildMsgEl(m){
   // 回声徽章条: 显示已有的各情绪计数(点已有徽章可加/撤自己的); 长按消息弹环加新情绪
   const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
-  const avColor = isVoid ? '#8B5CFF' : soulThemeColor(safeColor(m.color));
+  // 颜色: 灵魂(机器人)才联动房间主题色; 真人一律用自己的身份色(m.color), 别被房间色染掉
+  const avColor = isVoid ? '#8B5CFF' : (isBot ? soulThemeColor(safeColor(m.color)) : safeColor(m.color));
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
