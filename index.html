@@ -2475,8 +2475,8 @@ function renderAtMentions(escHtml){
     const re=new RegExp('@'+enm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
     const isSoul=soulNames.has(nm);
     const cls='at-mention'+(nm===myName?' at-me':(isSoul?' at-soul':''));
-    // @灵魂 用它自己的配色(老K橙红/图灵琥珀…), 而非写死紫色; @真人/@我 走 CSS(主题/amber)
-    const style=isSoul && soulColorByName[nm] ? ` style="--at-c:${soulColorByName[nm]}"` : '';
+    // @灵魂 色跟房间主题(soulThemeColor, 与消息头像/光墙/角标统一), 取色失败兜底灵魂自身色; @真人/@我 走 CSS(主题/amber)
+    const style=isSoul ? ` style="--at-c:${soulThemeColor(soulColorByName[nm]||'')}"` : '';
     out=out.replace(re, '<span class="'+cls+'"'+style+'>@'+enm+'</span>');
   }
   return out;
