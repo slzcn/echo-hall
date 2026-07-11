@@ -554,6 +554,20 @@
   @keyframes mentionPulse{0%{background:color-mix(in srgb,var(--amber) 32%,transparent);border-radius:12px}
     60%{background:color-mix(in srgb,var(--amber) 14%,transparent)}100%{background:transparent}}
 
+  /* 操作音效配套视觉反馈：轻涟漪 / 消息光效 / 回声弹跳 */
+  .eh-ripple{position:absolute;border-radius:50%;pointer-events:none;z-index:3;background:radial-gradient(circle,color-mix(in srgb,var(--accent,var(--cyan)) 42%,transparent) 0%,transparent 68%);transform:translate(-50%,-50%) scale(.18);opacity:.75;animation:ehRipple .55s ease-out forwards;mix-blend-mode:screen}
+  @keyframes ehRipple{to{transform:translate(-50%,-50%) scale(1.8);opacity:0}}
+  .msg.fx-send{animation:msgSendPop .46s cubic-bezier(.2,.9,.25,1.25)}
+  @keyframes msgSendPop{0%{transform:translateY(8px) scale(.985);filter:brightness(1.35);box-shadow:0 0 0 color-mix(in srgb,var(--accent,var(--cyan)) 0%,transparent)}70%{transform:translateY(0) scale(1.012);filter:brightness(1.08);box-shadow:0 0 24px color-mix(in srgb,var(--accent,var(--cyan)) 18%,transparent)}100%{transform:none;filter:none;box-shadow:none}}
+  .msg.fx-in{animation:msgInGlow .52s ease-out}
+  @keyframes msgInGlow{0%{transform:translateY(6px);opacity:.78}55%{filter:brightness(1.16)}100%{transform:none;opacity:1;filter:none}}
+  .msg.fx-soul .av{animation:soulSpeakPulse 1.2s ease-out}
+  @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 currentColor}65%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 13px transparent}100%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 transparent}}
+  .msg.fx-mention{animation:mentionPulse 2s ease-out, msgMentionNudge .55s ease-out}
+  @keyframes msgMentionNudge{0%,100%{transform:none}18%{transform:translateX(3px)}36%{transform:translateX(-2px)}54%{transform:translateX(1px)}}
+  .ec-pill.fx-echo,.echo-bar .ec-pill.fx-echo{animation:echoPop .5s cubic-bezier(.2,.9,.25,1.25)}
+  @keyframes echoPop{0%{transform:scale(.84);filter:brightness(1.5)}65%{transform:scale(1.18);box-shadow:0 0 16px color-mix(in srgb,var(--accent,var(--cyan)) 25%,transparent)}100%{transform:scale(1);filter:none;box-shadow:none}}
+
   /* 长按互动环 */
   .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
@@ -716,7 +730,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0428';
+  var BUILD_VER='20260712-0448';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1500,6 +1514,81 @@ const LS_BGM='eh_bgm';
 // 每官方房一套氛围: 根音(Hz)/和弦音程/音色波形/律动(ms,0=纯pad无脉冲)/滤波截止
 // 官方房 BGM 氛围 → 引用集中配置 EH_CONFIG(见文件顶部)
 const ROOM_BGM=EH_CONFIG.roomBgm;
+// EH 操作音效：轻量 Web Audio 合成，不依赖外部音频文件；音色偏聊天/空间感，避免 VC 答题那种强游戏化。
+const EhSfx=(function(){
+  let ctx=null, master=null, enabled=true, lastClickAt=0;
+  const VOL=.38;
+  function ensure(){
+    if(!ctx){
+      try{
+        try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+        ctx=new (window.AudioContext||window.webkitAudioContext)();
+        master=ctx.createGain(); master.gain.value=VOL;
+        const comp=ctx.createDynamicsCompressor();
+        comp.threshold.setValueAtTime(-8,ctx.currentTime); comp.knee.setValueAtTime(10,ctx.currentTime);
+        comp.ratio.setValueAtTime(4,ctx.currentTime); comp.attack.setValueAtTime(.004,ctx.currentTime); comp.release.setValueAtTime(.12,ctx.currentTime);
+        master.connect(comp); comp.connect(ctx.destination);
+      }catch(e){ ctx=null; }
+    }
+    if(ctx && ctx.state!=='running'){ try{ctx.resume();}catch(e){} }
+    return ctx;
+  }
+  function tone(freq,start,dur,type,peak,glideTo){
+    if(!ctx||!master) return;
+    const t0=ctx.currentTime+start, o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(24,glideTo),t0+dur);
+    g.gain.setValueAtTime(.0001,t0);
+    g.gain.exponentialRampToValueAtTime(peak||.18,t0+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0+dur+.03);
+    o.onended=function(){ try{o.disconnect();g.disconnect();}catch(e){} };
+  }
+  const lib={
+    click(){ tone(1180,0,.045,'triangle',.17); tone(1760,.012,.04,'sine',.09); },
+    enter(){ tone(392,0,.16,'sine',.18); tone(587,.055,.18,'triangle',.16); tone(784,.12,.22,'sine',.13); },
+    send(){ tone(880,0,.075,'triangle',.18); tone(1320,.024,.07,'sine',.10); },
+    receive(){ tone(660,0,.07,'sine',.11); tone(990,.032,.06,'triangle',.075); },
+    soul(){ tone(523,0,.16,'sine',.13); tone(784,.055,.18,'triangle',.11); tone(1175,.13,.24,'sine',.08); },
+    echo(){ tone(1320,0,.05,'sine',.13); tone(880,.028,.08,'triangle',.08,720); },
+    mention(){ tone(988,0,.09,'triangle',.18); tone(1480,.07,.12,'sine',.12); },
+    void(){ tone(220,0,.22,'sine',.16,130); tone(440,.04,.18,'triangle',.08,300); },
+    error(){ tone(360,0,.12,'sine',.16,260); tone(220,.09,.18,'triangle',.13,160); }
+  };
+  function unlock(){ ensure(); }
+  function play(name){
+    if(!enabled) return;
+    if(!ensure()) return;
+    const fn=lib[name]||lib.click;
+    const emit=()=>{ try{fn();}catch(e){} };
+    if(ctx.state!=='running'){
+      try{ctx.resume();}catch(e){}
+      let n=0;(function wait(){ if(ctx.state==='running'||n++>16) emit(); else setTimeout(wait,18); })();
+    }else emit();
+    try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error'].includes(name)) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
+  }
+  function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
+  try{
+    ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true}));
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ctx&&ctx.state!=='running') ctx.resume(); },{passive:true});
+  }catch(e){}
+  return {play,playClick,setEnabled(v){enabled=!!v},isEnabled(){return enabled},unlock};
+})();
+window.EhSfx=EhSfx;
+function ehFx(el, cls, ms){ if(!el) return; try{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(()=>el.classList.remove(cls),ms||650); }catch(e){} }
+function ehRipple(el, ev){
+  try{
+    if(!el || el.dataset.noRipple==='1') return;
+    const r=el.getBoundingClientRect(); if(!r.width||!r.height) return;
+    if(getComputedStyle(el).position==='static') el.style.position='relative';
+    if(getComputedStyle(el).overflow==='visible') el.style.overflow='hidden';
+    const sp=document.createElement('span'); sp.className='eh-ripple';
+    const x=(ev&&ev.clientX?ev.clientX-r.left:r.width/2), y=(ev&&ev.clientY?ev.clientY-r.top:r.height/2);
+    const d=Math.max(r.width,r.height)*1.35; sp.style.width=sp.style.height=d+'px'; sp.style.left=x+'px'; sp.style.top=y+'px';
+    el.appendChild(sp); setTimeout(()=>sp.remove(),620);
+  }catch(e){}
+}
+
 const AudioEngine=(function(){
   let ctx=null, master=null, running=false, cur=null;
   let scheduler=null, nextTime=0, curStep=0;
@@ -1677,7 +1766,7 @@ const AudioEngine=(function(){
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   try{
     if(!bgmOn()) return;
@@ -1701,6 +1790,7 @@ function applyTheme(id){
 }
 // 用户手动选皮肤 → 全站生效 + 锁定(进官方房不再自动覆盖)
 function pickTheme(id){
+  try{ EhSfx.playClick(); }catch(e){}
   try{ localStorage.setItem(LS_THEME,id); localStorage.setItem(LS_THEME_LOCK,'1'); }catch(e){}
   applyTheme(id);
 }
@@ -2021,6 +2111,7 @@ function preRestoreScene(){
   return true;
 }
 async function enterRoom(room){
+  try{ EhSfx.play('enter'); }catch(e){}
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
   curRoom = room;
   stopVoice(); stopSong();
@@ -2175,7 +2266,7 @@ function subscribeMessages(rid){
       if(m.kind==='whisper' && m.to_user!==myUid) return;
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
       if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
-      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
+      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
       if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
@@ -2639,7 +2730,8 @@ function notifyIfMentioned(m, el){
   const who = m.is_bot ? (safeEmoji(m.emoji)+m.name) : m.name;
   toast(`💬 ${who} @了你`);
   // 消息卡脉冲高亮一下
-  if(el){ el.classList.add('mentioned-flash'); setTimeout(()=>el.classList.remove('mentioned-flash'),2000); }
+  if(el){ el.classList.add('mentioned-flash'); ehFx(el,'fx-mention',2000); setTimeout(()=>el.classList.remove('mentioned-flash'),2000); }
+  try{ EhSfx.play('mention'); }catch(e){}
   // 轻震动(移动端)
   try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
 }
@@ -2695,7 +2787,8 @@ async function send(){
   }
   // 乐观上屏
   const optimistic={...payload, id:'local_'+Date.now(), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
-  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); ehFx(el,'fx-send',650); }
+  try{ EhSfx.play(useVoid?'void':'send'); }catch(e){}
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
   // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
@@ -3501,6 +3594,8 @@ if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(
 // echoState[mid] = { '🔥':{count,mine}, ... }
 function ecOf(mid){ return echoState[mid] || (echoState[mid]={}); }
 async function toggleEcho(mid, emoji){
+  try{ EhSfx.play('echo'); }catch(e){}
+  try{ const _pill=document.querySelector(`.ec-pill[data-mid="${mid}"][data-e="${emoji||'🔥'}"]`); ehFx(_pill,'fx-echo',520); }catch(e){}
   if(String(mid).startsWith('local_')) return;
   emoji = emoji || '🔥';
   const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
@@ -3519,6 +3614,7 @@ function applyEchoRealtime(mid, who, emoji){
   const map=ecOf(mid); const st=map[emoji]||(map[emoji]={count:0,mine:false});
   if(who===myUid){ return; }  // 自己的已乐观更新
   st.count++; paintEcho(mid);
+  try{ const _pill=document.querySelector(`.ec-pill[data-mid="${mid}"][data-e="${emoji}"]`); ehFx(_pill,'fx-echo',520); }catch(e){}
   const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(el) burst(emoji,4);
   checkResonance(mid, emoji, st.count);
 }
@@ -3713,7 +3809,7 @@ function burst(str,count=10){
 
 // ============ toast ============
 let toastT=null;
-function toast(msg){ const t=$('#toast'); t.innerHTML=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+function toast(msg){ const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(String(msg||''))){ try{ EhSfx.play('error'); }catch(e){} } t.innerHTML=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
 // 赛博风确认弹层，返回 Promise<boolean>，替代原生 confirm()
 function ehConfirm(msg, title){
   return new Promise(res=>{
@@ -4309,6 +4405,19 @@ if(window.matchMedia && matchMedia('(hover:none)').matches){
     b.addEventListener('click',()=>{ setTimeout(()=>{ b.classList.add('nohover'); setTimeout(()=>b.classList.remove('nohover'),260); },0); });
   });
 }
+
+// 全局交互反馈：按钮/卡片/菜单项轻涟漪；通用按钮给极轻点击音，关键动作在业务函数里播专属音效。
+try{
+  document.addEventListener('pointerdown',function(e){
+    const el=e.target.closest('button,.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.rm,.rm-code,.ec-pill,.ar-echo,.ar-actions button,.code-copy,.modal-x,.dx');
+    if(!el) return; ehRipple(el,e);
+  },{capture:true,passive:true});
+  document.addEventListener('click',function(e){
+    const el=e.target.closest('.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.code-copy,.modal-x,.dx');
+    if(!el || el.closest('#goBtn,#confirmYes,#confirmNo')) return;
+    try{ EhSfx.playClick(); }catch(_){ }
+  },{capture:true,passive:true});
+}catch(e){}
 
 on('createRoomBtn','click',()=>openModal('mCreate'));
 on('joinRoomBtn','click',()=>openModal('mJoin'));
