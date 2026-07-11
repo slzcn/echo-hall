@@ -2557,6 +2557,34 @@ function prefetchVoice(text,style,pin){
 
 // ============ 常用短语预热(页面加载后就预合成, 发常见词直接命中) ============
 const EH_HOT_PHRASES=['哈哈哈','哈喽','你好','晚安','早安','没歇','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
+// ============ 静态预生成真人嗓(随页面异步加载, 固定词零网络瞬时) ============
+// 预烤好的 mp3 固定词音频放 assets/eh_preset_<style>.json, 页面加载后后台下载+解码存缓存。
+// 命中 = 真人嗓 0 网络延迟。与哼唱动态增益互补: 固定词真人嗓瞬时, 任意词哼唱兜底。
+let _staticPresetsLoaded=false;
+async function loadStaticPresets(){
+  if(_staticPresetsLoaded) return; _staticPresetsLoaded=true;
+  const STYLES_TO_LOAD=['sao'];   // 先上默认神曲风, 验证 OK 再扩展其他曲风
+  for(const style of STYLES_TO_LOAD){
+    try{
+      const r=await fetch('assets/eh_preset_'+style+'.json', {cache:'force-cache'});
+      if(!r.ok) continue;
+      const pack=await r.json();
+      if(pack.fmt!=='mp3' || !pack.p) continue;
+      const ctx=ac();
+      for(const [word, mp3b64] of Object.entries(pack.p)){
+        try{
+          const bin=atob(mp3b64);
+          const u8=new Uint8Array(bin.length);
+          for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+          const buf=await ctx.decodeAudioData(u8.buffer);
+          const k=voiceCacheKey(word, style);
+          EH_VOICE_CACHE.set(k, {mp3buf:buf, ts:Date.now(), pin:true});
+        }catch(_){}
+      }
+      _prewarmedStyles.add(style);   // 标记此风已备, 避免重复网络预热
+    }catch(_){}
+  }
+}
 let _prewarmedStyles=new Set();
 function prewarmHotPhrases(){
   // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样)
@@ -2570,11 +2598,14 @@ function prewarmHotPhrases(){
 // 进房就预热默认神曲风(shen)的预置词——让预热窗口提前到用户浏览/打字时, 点神曲时已备好。
 // 延 2s 避开进房时的订阅/拉消息网络高峰。
 function _prewarmRoomEnter(){
+  // 优先加载静态预生成真人嗓(零网络瞬时); 加载完会把 sao 风标进 _prewarmedStyles。
+  try{ loadStaticPresets(); }catch(_){}
   setTimeout(()=>{
     try{
       const st=SONG_STYLES.find(s=>s.id==='shen')||SONG_STYLES[0];
       const style=st.ttsStyle||'default';
       if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
+      // 静态未覆盖的风才走网络预热
       EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
     }catch(_){}
   }, 2000);
@@ -2746,7 +2777,7 @@ async function playSong(lyric, sid, el, onEnd){
   const ttsStyle=st.ttsStyle||'default';
   const playRate=clamp(st.playRate??1.0, 0.7, 1.5);
   const cached=getCachedVoice(fullText, ttsStyle);
-  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr, _cached:true})
+  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr, mp3buf:cached.mp3buf, _cached:true})
                             : fetchMifyVoice(fullText, 4500, ttsStyle);
   voiceReady.then(res=>{
     // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
@@ -2755,11 +2786,12 @@ async function playSong(lyric, sid, el, onEnd){
       if(res && res.b64 && !res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
       return;
     }
-    if(res && res.b64){
+    if(res && (res.b64 || res.mp3buf)){
       // 未命中则写入缓存(下次 0 延迟)
       if(!res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
       try{
-        const buf=pcm16ToBuffer(ctx, res.b64, res.sr);
+        // 静态预置词命中: 已预解码的 mp3 AudioBuffer 直接用(0 解码耗时); 否则解 PCM
+        const buf = res.mp3buf ? res.mp3buf : pcm16ToBuffer(ctx, res.b64, res.sr);
         const src=ctx.createBufferSource(); src.buffer=buf;
         src.playbackRate.value=playRate;
         // 真人嗓直接挂 master(不走 voiceBus 的 1.6 倍放大), gain 0.9 防剔顶
