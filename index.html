@@ -2691,13 +2691,18 @@ function setMode(mode){
   if(voidMode){ cin.placeholder=EH_CONFIG.text.voidPlaceholder; }
   else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
   else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
-  // 聚焦策略: 进入 void/song 模式才聚焦(马上要打字); 退出模式(none)不聚焦,
-  // 反而主动 blur 收起键盘——否则点"取消/退出"会把焦点抢回输入框, 触发输入法弹出。
-  // voice 模式从不聚焦(是录音不是打字)。
+  // ── 统一键盘策略(三模式 × 进入/退出, 跨 iOS/安卓一致)──
+  //   虚空/神曲 = 打字模式: 进入弹键盘、退出收键盘
+  //   语音 = 录音模式: 全程不碰键盘
+  // ⚠️ iOS 铁律: focus() 只有在用户手势的【同步】调用栈里才能唤起键盘; 放进 setTimeout
+  //   会被 iOS 拦截→安卓弹、iOS 不弹(即"两平台不一样"的根因)。setMode 由 onclick 同步调用,
+  //   故这里必须【同步】focus, 不能 setTimeout defer。
+  const cin2=$('#cin');
   if(mode==='void' || mode==='song'){
-    setTimeout(()=>{ try{ if(curRoom) $('#cin').focus(); }catch(e){} },0);
-  } else if(mode==='none'){
-    try{ $('#cin').blur(); }catch(e){}
+    try{ if(curRoom) cin2.focus(); }catch(e){}       // 同步聚焦→两平台都弹键盘
+  } else {
+    // none(退出) 或 voice(录音): 一律收键盘, 主动 blur
+    try{ cin2.blur(); }catch(e){}
   }
   syncSendBtn();
 }
