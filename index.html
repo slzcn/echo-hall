@@ -341,11 +341,12 @@
 
   /* "正在输入"改浮层: absolute 悬浮在输入框上方, 不占据布局(不挤压/遮挡消息流),
      宽度自适应内容(不铺满整行), 小圆角半透明胶囊, 贴左显示 */
-  .typing-bar{position:absolute;left:14px;bottom:calc(100% + 6px);width:max-content;max-width:calc(100% - 28px);
-    padding:4px 12px;font-size:11.5px;color:var(--accent,var(--cyan));display:flex;align-items:center;gap:6px;
-    background:color-mix(in srgb,var(--panel-solid) 92%,transparent);border:1px solid var(--line);border-radius:12px;
-    box-shadow:0 4px 16px -6px rgba(0,0,0,.5);opacity:0;transform:translateY(4px);pointer-events:none;
-    transition:opacity .18s,transform .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5}
+  /* 简洁: 无边框/背景/阴影, 只留文字+动画点浮在输入框上方 */
+  .typing-bar{position:absolute;left:16px;bottom:calc(100% + 4px);width:max-content;max-width:calc(100% - 32px);
+    font-size:11.5px;color:var(--accent,var(--cyan));display:flex;align-items:center;gap:6px;
+    opacity:0;transform:translateY(4px);pointer-events:none;
+    transition:opacity .18s,transform .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5;
+    text-shadow:0 1px 4px rgba(0,0,0,.6)}
   .typing-bar.on{opacity:1;transform:translateY(0)}
   .typing-bar .d{display:inline-flex;gap:3px}
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bounce 1.2s infinite}
@@ -2258,8 +2259,10 @@ function subscribeMessages(rid){
   msgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
-      if(m.user_id===myUid) return; // 自己的已乐观上屏
-      if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过，防重复投递
+      // 去重靠"真实 id 是否已在 DOM"(本浏览器发的消息 insert 后回填了真实 id, 故被挡)。
+      // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
+      // 这样同 id 多端发言能互相同步, 且 buildMsgEl 里 isMe=user_id===myUid 让它仍显示在"我的"位置(右侧)。
+      if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id)，防重复
       // 投影：触发全屏飞幕，不进消息流
       if(m.kind==='proj'){ projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
@@ -2786,8 +2789,9 @@ async function send(){
     payload.color = '#8B5CFF';
   }
   // 乐观上屏
-  const optimistic={...payload, id:'local_'+Date.now(), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
-  const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); ehFx(el,'fx-send',650); }
+  const localId='local_'+Date.now();
+  const optimistic={...payload, id:localId, created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
+  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream(); ehFx(el,'fx-send',650); }
   try{ EhSfx.play(useVoid?'void':'send'); }catch(e){}
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
@@ -2795,7 +2799,12 @@ async function send(){
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('send',error); toast(EH_CONFIG.text.err_sendFail); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
-  else if(data){ optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; } }
+  // 竞态兜底: 若 realtime 抢先用真实 id 渲染了同一条(另建了 DOM), 这里回填时先删掉重复
+  else if(data){
+    const dup=document.querySelector(`.msg[data-mid="${data.id}"]`);
+    if(dup && dup!==el) dup.remove();   // realtime 已渲染同条 → 删它, 保留乐观这条并回填
+    optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; }
+  }
 }
 // 虚空模式开关(统一走 setMode; 保留函数名兼容旧调用)
 function setVoidMode(on){ setMode(on?'void':'none'); }
@@ -3593,6 +3602,15 @@ if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(
 // ============ 多情绪回声 落库 ============
 // echoState[mid] = { '🔥':{count,mine}, ... }
 function ecOf(mid){ return echoState[mid] || (echoState[mid]={}); }
+// 贴 react/徽章后消息可能变高, 若它靠近底部会被输入框挡住 → 向上滚一点让它完整可见。
+// 仅当该消息底边已超出可视区(或很贴边)时才滚, 不打扰正在回看历史的用户。
+function ensureMsgVisible(mid){
+  const el=document.querySelector(`.msg[data-mid="${mid}"]`); if(!el) return;
+  const s=$('#stream'); if(!s) return;
+  const sr=s.getBoundingClientRect(), er=el.getBoundingClientRect();
+  // 消息底边超出 stream 底边(被挡/露不全) → 滚到刚好露全, 留 8px 余量
+  if(er.bottom > sr.bottom - 8){ s.scrollTop += (er.bottom - sr.bottom) + 8; }
+}
 async function toggleEcho(mid, emoji){
   try{ EhSfx.play('echo'); }catch(e){}
   try{ const _pill=document.querySelector(`.ec-pill[data-mid="${mid}"][data-e="${emoji||'🔥'}"]`); ehFx(_pill,'fx-echo',520); }catch(e){}
@@ -3604,6 +3622,7 @@ async function toggleEcho(mid, emoji){
     await sb.from('eh_message_echoes').delete().eq('message_id',mid).eq('user_id',myUid).eq('emoji',emoji);
   } else {
     st.count++; st.mine=true; paintEcho(mid); burst(emoji,6);
+    requestAnimationFrame(()=>ensureMsgVisible(mid));   // 徽章渲染后再量高度滚动
     pushEchoMru(emoji);   // 记入"最近使用", 下次反应环优先显示这个表情
     checkResonance(mid, emoji, st.count);
     await sb.from('eh_message_echoes').insert({message_id:mid,user_id:myUid,emoji});
