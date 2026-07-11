@@ -663,12 +663,14 @@
       <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
       <div class="auth-divider clickable" id="loginToggle"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
-        <div class="login-row">
-          <input id="loginAccount" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
-          <input id="loginPassword" type="text" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
-        </div>
-        <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
-        <button class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
+        <form class="login-form" id="loginForm" onsubmit="return false">
+          <div class="login-row">
+            <input id="loginAccount" name="username" autocomplete="username" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
+            <input id="loginPassword" type="password" name="password" autocomplete="current-password" data-txt-ph="loginPwdPh" placeholder="密码">
+          </div>
+          <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
+          <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
+        </form>
         <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" data-txt="loginForgot">忘记密码</b></div>
       </div>
     </div>
@@ -3341,7 +3343,18 @@ async function doLogin(){
     ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
     : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
   saveIdentity(); paintIdentity();
+  saveCredential(account, password);   // 显式交给浏览器密码管理器保存(SPA无页面跳转, 不能只靠自动气泡)
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
+}
+// SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
+// 不依赖"提交后跳转"触发的自动保存气泡——本站登录后靠JS切场景、表单DOM不消失, 那种气泡常不弹。
+function saveCredential(id, pw){
+  try{
+    if(window.PasswordCredential && navigator.credentials && navigator.credentials.store){
+      const cred=new window.PasswordCredential({ id, password:pw, name:id });
+      navigator.credentials.store(cred).catch(()=>{});
+    }
+  }catch(e){}
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
 async function doRegister(){
@@ -3361,6 +3374,7 @@ async function doRegister(){
   myUid=sess.user.id;
   // 用注册的用户名更新前台昵称 + 缓存 username/registered(个人空间首屏直显@用户名)
   me.name=username; me.id=myUid; me.username=username; me.registered=true; me.email=me.email||''; saveIdentity(); paintIdentity();
+  saveCredential(username, password);   // 注册即登录, 一并交浏览器保存
   await sb.from('eh_users').update({ name:username, is_anonymous:false }).eq('id',myUid);
   toast(EH_CONFIG.text.ok_regDone); closeModal(); goScene('lobby'); renderLobby();
 }
@@ -3430,13 +3444,11 @@ on('rerollBtn','click',()=>rollIdentity());
 on('loginToggle','click',()=>{
   const c=$('#loginCollapse'); if(!c) return; const open=c.classList.toggle('on');
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
-  // 未点登录前 password 字段以 type=text 存在(iOS 不会对其弹 Face ID/密码填充);
-  // 点开时才切成真正的 password + 开启自动填充, 关闭时切回避免下次进页面又被扫到
-  const pw=$('#loginPassword'), ac=$('#loginAccount');
-  if(open){ pw.type='password'; pw.autocomplete='current-password'; ac.autocomplete='username'; setTimeout(()=>ac.focus(),200); }
-  else { pw.type='text'; pw.autocomplete='off'; ac.autocomplete='off'; }
+  // 密码框始终是真正的 type=password + 标准 autocomplete, 浏览器/密码管理器才会记住并自动填充。
+  // (不再用 type=text 骗过 iOS 自填充条——那会连带砸掉记住密码; iOS 聊天输入框的误填充由其独立 form 隔离)
+  if(open) setTimeout(()=>$('#loginAccount').focus(),200);
 });
-on('loginBtn','click',()=>doLogin());
+on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
 on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
 on('toReg','click',()=>openModal('mReg'));
 on('toReset','click',(e)=>{ e.stopPropagation(); openModal('mReset'); });
