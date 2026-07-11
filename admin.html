@@ -484,7 +484,7 @@ async function loadRooms(){
 
 // 语音/神曲消息渲染
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
-const SONG_STYLE_NAMES={dj:'DJ',jazz:'爵士',funk:'Funk',gufeng:'古风',kid:'卡通',shen:'神曲喊麦',disco:'迪斯科','8bit':'电玩',lofi:'慵懒Lo-Fi'};
+const SONG_STYLE_NAMES={dj:'DJ·烈焰红唇',jazz:'爵士·威士忌之吻',funk:'Funk·荧光心跳',gufeng:'古风·午夜绸缎',kid:'卡通·暧昧微醺',shen:'神曲喊麦',disco:'迪斯科','8bit':'电玩',lofi:'慵懒Lo-Fi'};
 function voiceOrText(m){
   const src=String(m.text||'');
   if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
