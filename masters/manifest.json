@@ -1,0 +1,230 @@
+{
+  "version": "20260711",
+  "items": [
+    {
+      "id": "dj_1",
+      "sid": "dj",
+      "styleName": "蹦迪DJ",
+      "url": "masters/dj_1.mp3",
+      "prompt": "EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏",
+      "introEnd": 16.0,
+      "duration": 49.865
+    },
+    {
+      "id": "dj_2",
+      "sid": "dj",
+      "styleName": "蹦迪DJ",
+      "url": "masters/dj_2.mp3",
+      "prompt": "Future Bass, Synth, Drop, Energetic, 未来贝斯, 炸场",
+      "introEnd": 14.118312780000002,
+      "duration": 42.783
+    },
+    {
+      "id": "dj_3",
+      "sid": "dj",
+      "styleName": "蹦迪DJ",
+      "url": "masters/dj_3.mp3",
+      "prompt": "Big Room House, Festival, Powerful Kick, 电音节, 大鼓点",
+      "introEnd": 15.60868584,
+      "duration": 47.299
+    },
+    {
+      "id": "dj_4",
+      "sid": "dj",
+      "styleName": "蹦迪DJ",
+      "url": "masters/dj_4.mp3",
+      "prompt": "Chinese EDM, Guzheng Synth Fusion, Energetic, 国风电子, 炸场",
+      "introEnd": 16.0,
+      "duration": 50.666
+    },
+    {
+      "id": "dj_5",
+      "sid": "dj",
+      "styleName": "蹦迪DJ",
+      "url": "masters/dj_5.mp3",
+      "prompt": "Progressive House, Melodic, Uplifting, 旋律电子, 律动",
+      "introEnd": 15.92668308,
+      "duration": 48.263
+    },
+    {
+      "id": "funk_1",
+      "sid": "funk",
+      "styleName": "Funk",
+      "url": "masters/funk_1.mp3",
+      "prompt": "Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动",
+      "introEnd": 16.0,
+      "duration": 66.99
+    },
+    {
+      "id": "funk_2",
+      "sid": "funk",
+      "styleName": "Funk",
+      "url": "masters/funk_2.mp3",
+      "prompt": "Disco Funk, 70s, Wah Guitar, Dancefloor, 迪斯科放克, 舞池",
+      "introEnd": 16.0,
+      "duration": 51.862
+    },
+    {
+      "id": "funk_3",
+      "sid": "funk",
+      "styleName": "Funk",
+      "url": "masters/funk_3.mp3",
+      "prompt": "Electro Funk, Synth Bass, Retro, 电子放克, 复古",
+      "introEnd": 16.0,
+      "duration": 56.552
+    },
+    {
+      "id": "funk_4",
+      "sid": "funk",
+      "styleName": "Funk",
+      "url": "masters/funk_4.mp3",
+      "prompt": "Nu Disco, Modern, Groovy Bass, 新迪斯科, 现代律动",
+      "introEnd": 16.0,
+      "duration": 49.818
+    },
+    {
+      "id": "funk_5",
+      "sid": "funk",
+      "styleName": "Funk",
+      "url": "masters/funk_5.mp3",
+      "prompt": "Chiptune Funk, 8bit Synth, Playful, 芯片放克, 俏皮电玩",
+      "introEnd": 16.0,
+      "duration": 49.342
+    },
+    {
+      "id": "gufeng_1",
+      "sid": "gufeng",
+      "styleName": "古风",
+      "url": "masters/gufeng_1.mp3",
+      "prompt": "Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美",
+      "introEnd": 16.0,
+      "duration": 52.14
+    },
+    {
+      "id": "gufeng_2",
+      "sid": "gufeng",
+      "styleName": "古风",
+      "url": "masters/gufeng_2.mp3",
+      "prompt": "Guofeng Pop, Erhu, Modern Beat, 古风流行, 现代节奏",
+      "introEnd": 16.0,
+      "duration": 50.178
+    },
+    {
+      "id": "gufeng_3",
+      "sid": "gufeng",
+      "styleName": "古风",
+      "url": "masters/gufeng_3.mp3",
+      "prompt": "Ancient Chinese, Pipa, Ethereal, 古典, 空灵悠远",
+      "introEnd": 16.0,
+      "duration": 71.726
+    },
+    {
+      "id": "gufeng_4",
+      "sid": "gufeng",
+      "styleName": "古风",
+      "url": "masters/gufeng_4.mp3",
+      "prompt": "Guofeng Electronic, Guzheng Synth, Epic, 古风电子, 大气",
+      "introEnd": 16.0,
+      "duration": 60.987
+    },
+    {
+      "id": "gufeng_5",
+      "sid": "gufeng",
+      "styleName": "古风",
+      "url": "masters/gufeng_5.mp3",
+      "prompt": "Xianxia, Bamboo Flute, Serene, 仙侠古风, 幽远",
+      "introEnd": 16.0,
+      "duration": 58.828
+    },
+    {
+      "id": "jazz_1",
+      "sid": "jazz",
+      "styleName": "爵士",
+      "url": "masters/jazz_1.mp3",
+      "prompt": "Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松",
+      "introEnd": 16.0,
+      "duration": 55.438
+    },
+    {
+      "id": "jazz_2",
+      "sid": "jazz",
+      "styleName": "爵士",
+      "url": "masters/jazz_2.mp3",
+      "prompt": "Bossa Nova, Relaxed, Guitar, Warm, 巴萨诺瓦, 温暖",
+      "introEnd": 16.0,
+      "duration": 48.785
+    },
+    {
+      "id": "jazz_3",
+      "sid": "jazz",
+      "styleName": "爵士",
+      "url": "masters/jazz_3.mp3",
+      "prompt": "Swing Jazz, Upbeat, Piano, Brass, 摇摆爵士, 欢快",
+      "introEnd": 16.0,
+      "duration": 49.667
+    },
+    {
+      "id": "jazz_4",
+      "sid": "jazz",
+      "styleName": "爵士",
+      "url": "masters/jazz_4.mp3",
+      "prompt": "Jazz Funk, Groovy, Electric Piano, 爵士放克, 律动",
+      "introEnd": 14.80411416,
+      "duration": 44.861
+    },
+    {
+      "id": "jazz_5",
+      "sid": "jazz",
+      "styleName": "爵士",
+      "url": "masters/jazz_5.mp3",
+      "prompt": "Cafe Jazz, Cozy, Soft Piano, 咖啡馆爵士, 惬意",
+      "introEnd": 12.716059950000002,
+      "duration": 38.534
+    },
+    {
+      "id": "kid_1",
+      "sid": "kid",
+      "styleName": "卡通",
+      "url": "masters/kid_1.mp3",
+      "prompt": "Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声",
+      "introEnd": 16.0,
+      "duration": 48.948
+    },
+    {
+      "id": "kid_2",
+      "sid": "kid",
+      "styleName": "卡通",
+      "url": "masters/kid_2.mp3",
+      "prompt": "Nursery Rhyme, Piano, Choir, Warm, 幼儿园儿歌, 温暖",
+      "introEnd": 14.106819210000001,
+      "duration": 42.748
+    },
+    {
+      "id": "kid_3",
+      "sid": "kid",
+      "styleName": "卡通",
+      "url": "masters/kid_3.mp3",
+      "prompt": "Cartoon Theme, Xylophone Bells, Bouncy, 卡通片头, 跳跃",
+      "introEnd": 15.2025687,
+      "duration": 46.068
+    },
+    {
+      "id": "kid_4",
+      "sid": "kid",
+      "styleName": "卡通",
+      "url": "masters/kid_4.mp3",
+      "prompt": "Children Pop, Guitar, Sunny, Simple Melody, 童谣, 阳光",
+      "introEnd": 10.47092244,
+      "duration": 31.73
+    },
+    {
+      "id": "kid_5",
+      "sid": "kid",
+      "styleName": "卡通",
+      "url": "masters/kid_5.mp3",
+      "prompt": "Playful Kids, Ukulele, Happy, 俏皮儿歌, 快乐",
+      "introEnd": 8.64722727,
+      "duration": 26.204
+    }
+  ]
+}

@@ -2577,20 +2577,21 @@ const SCALE={
 // motif=旋律动机(反复出现→洗脑), chords=每小节根音(半音), groove=鼓型
 // v2: 主唱改为共振峰哼唱(音高真跟旋律走), TTS 降为可选轻声跟读垫; motif 做"钩子+变奏"更洗脑; 新增 慵懒Lo-Fi 曲风
 const SONG_STYLES=[
-  { id:'dj',    name:'蹦迪DJ',  emoji:'🕺', color:'#28E6D8', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
-    motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12 },
-  { id:'shen',  name:'神曲喊麦', emoji:'🎤', color:'#FF3CAC', bpm:92,  bpc:0.5, base:-2, scale:SCALE.minor,
-    motif:[0,0,0,3,2,0,-2,0], chords:[0,0,5,3], wave:'square', bass:'sawtooth', groove:'boom', tts:{rate:1.45,pitch:0.75}, ttsStyle:'sao', playRate:1.15 },
-  { id:'kid',   name:'儿歌',    emoji:'🧸', color:'#FFB84D', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
-    motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18 },
-  { id:'gufeng',name:'古风',    emoji:'🏮', color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
-    motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96 },
-  { id:'disco', name:'迪斯科',  emoji:'🪩', color:'#4DE38A', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
-    motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1 },
-  { id:'8bit',  name:'电玩',    emoji:'👾', color:'#5B8CFF', bpm:140, bpc:0.5, base:0,  scale:SCALE.minP,
-    motif:[0,3,5,3,7,5,3,0], chords:[0,3,-2,5], wave:'square', bass:'square', groove:'four', tts:{rate:1.4,pitch:1.3}, ttsStyle:'qiaopi', playRate:1.22 },
-  { id:'lofi',  name:'慵懒Lo-Fi', emoji:'🌙', color:'#9BD4CC', bpm:82, bpc:0.5, base:-4, scale:SCALE.minP,
-    motif:[0,2,3,2,0,-2,0,3], chords:[0,3,5,3], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:0.9,pitch:0.95}, ttsStyle:'lazy', playRate:0.92 },
+  { id:'dj',    name:'DJ',    emoji:'🕺', color:'#28E6D8', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
+    motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12,
+    coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
+  { id:'jazz',  name:'爵士',  emoji:'🎷', color:'#D9A441', bpm:92,  bpc:0.5, base:-2, scale:SCALE.major,
+    motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3], wave:'sine', bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy', playRate:0.95,
+    coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
+  { id:'funk',  name:'Funk',  emoji:'🪩', color:'#4DE38A', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
+    motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1,
+    coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
+  { id:'gufeng',name:'古风',  emoji:'🏮', color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
+    motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96,
+    coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
+  { id:'kid',   name:'卡通',  emoji:'🧸', color:'#FFB84D', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
+    motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18,
+    coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
 ];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
@@ -2636,6 +2637,70 @@ function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const 
 // 走 Supabase Edge Function 代理 mimo TTS, 返回 base64 PCM(s16le 24k mono)。
 // 成功→前端解码播真人嗓念字层(替代系统 speechSynthesis 机械音); 失败/超时→调用方走原兜底。
 const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
+const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
+const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711';
+let EH_MASTER_MANIFEST=null;
+async function loadMasterManifest(){
+  if(EH_MASTER_MANIFEST) return EH_MASTER_MANIFEST;
+  const r=await fetch(EH_MASTER_MANIFEST_URL,{cache:'force-cache'});
+  const j=await r.json(); EH_MASTER_MANIFEST=j; return j;
+}
+function pickMasterForStyle(sid){
+  const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
+  const pool=items.filter(x=>x.sid===sid);
+  return pool.length ? pool[Math.floor(secureRand()*pool.length)] : null;
+}
+async function decodeMp3ArrayBuffer(ctx, ab){
+  const copy=ab.slice(0);
+  return await new Promise((res,rej)=>ctx.decodeAudioData(copy,res,rej));
+}
+function b64ToArrayBuffer(b64){
+  const bin=atob(b64); const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return bytes.buffer;
+}
+async function tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st){
+  try{ await loadMasterManifest(); }catch(e){ console.warn('master manifest',e); return false; }
+  const master=pickMasterForStyle(sid); if(!master) return false;
+  const masterUrl=new URL(master.url, location.href).href;
+  let buf;
+  try{
+    const ab=await (await fetch(masterUrl,{cache:'force-cache'})).arrayBuffer();
+    buf=await decodeMp3ArrayBuffer(ctx,ab);
+  }catch(e){ console.warn('master load',e); return false; }
+  AudioEngine.duck(true);
+  const main=ctx.createGain(); main.gain.value=0.85; main.connect(ctx.destination);
+  const gMaster=ctx.createGain(); gMaster.gain.value=1.0; gMaster.connect(main);
+  const src=ctx.createBufferSource(); src.buffer=buf; src.connect(gMaster);
+  const startAt=ctx.currentTime+0.06; src.start(startAt);
+  curSong={ ctx, master:main, oscs:[src], timeouts:[], el:el||null, onEnd:onEnd||null, _cover:true };
+  if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
+  // 粗略卡拉OK：先随母版节奏逐字点亮，cover接入后仍保留。
+  const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
+  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
+  const step=Math.max(0.28, Math.min(0.55, (master.duration||buf.duration)/Math.max(12,chars.length+6)));
+  chars.forEach((ch,i)=>{ const delay=(1.2+i*step)*1000; const ce=chEls[i]; if(ce) curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); },delay)); });
+  curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(1,buf.duration+0.5)*1000));
+  // 后台翻唱：回来后按当前母版播放进度对齐 offset，1.5s xfade 切入。
+  fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterUrl, lyric, prompt:master.prompt||st.coverPrompt||''})})
+    .then(r=>r.json()).then(async res=>{
+      if(!curSong || curSong.ctx!==ctx || !curSong._cover || !res || !res.coverMp3_b64) return;
+      const coverBuf=await decodeMp3ArrayBuffer(ctx,b64ToArrayBuffer(res.coverMp3_b64));
+      if(!curSong || curSong.ctx!==ctx || !curSong._cover) return;
+      const now=ctx.currentTime+0.05;
+      const elapsed=Math.max(0, ctx.currentTime-startAt);
+      const offset=Math.min(Math.max(0, elapsed), Math.max(0,coverBuf.duration-0.4));
+      const gCover=ctx.createGain(); gCover.gain.setValueAtTime(0.0001,now); gCover.gain.linearRampToValueAtTime(1.0,now+1.5); gCover.connect(main);
+      try{ gMaster.gain.cancelScheduledValues(now); gMaster.gain.setValueAtTime(gMaster.gain.value,now); gMaster.gain.linearRampToValueAtTime(0.0001,now+1.5); }catch(_){ }
+      const csrc=ctx.createBufferSource(); csrc.buffer=coverBuf; csrc.connect(gCover); csrc.start(now,offset);
+      curSong.oscs.push(csrc);
+      curSong.timeouts.push(setTimeout(()=>{ try{ src.stop(); }catch(_){} },1700));
+      const remain=Math.max(0.5, coverBuf.duration-offset+1.8);
+      curSong.timeouts.push(setTimeout(()=>stopSong(), remain*1000));
+      console.log('cover xfade', {master:master.id, trace:res.trace, offset});
+    }).catch(e=>console.warn('cover fetch',e));
+  return true;
+}
 window.EH_DISABLE_TTS_FALLBACK = true;   // 临时开关: 禁用系统TTS兜底, 只听 mimo 真人嗓(验证后改回 false 恢复兜底)
 // PCM(base64, s16le/24k/mono) → AudioBuffer
 function pcm16ToBuffer(ctx, b64, sr){
@@ -2864,6 +2929,8 @@ async function playSong(lyric, sid, el, onEnd){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
+  // 主路径：MiniMax 母版真歌 + cover 翻唱。失败时自动降级到原 WebAudio 哼唱路径。
+  try{ if(await tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st)) return; }catch(e){ console.warn('cover path fallback',e); }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
