@@ -2660,8 +2660,9 @@ async function playSong(lyric, sid, el, onEnd){
       try{
         const buf=pcm16ToBuffer(ctx, res.b64, res.sr);
         const src=ctx.createBufferSource(); src.buffer=buf;
-        const vg=ctx.createGain(); vg.gain.value=1.15;   // 真人嗓念字, 略高于哼唱垫但不盖过
-        src.connect(vg); vg.connect(voiceBus);
+        // 真人嗓 PCM 原始 peak 已近 0.94, 直接挂 master(不走 voiceBus 的 1.6倍放大), gain 取 0.85 预留安全余量防剔顶。
+        const vg=ctx.createGain(); vg.gain.value=0.85;
+        src.connect(vg); vg.connect(master);
         // 对齐到最近的拍点起播(避免落在半拍显乱); 到达通常已过 t0 约2s
         const now=ctx.currentTime;
         const startAt=Math.max(now+0.02, t0);
