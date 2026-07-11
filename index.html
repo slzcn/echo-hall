@@ -1143,6 +1143,17 @@ const EH_CONFIG_DEFAULT = {
     animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猫头鹰','蝙蝠','章鱼','麋鹿','企鹅','黑猫','海豚','老虎','刺猬','蝴蝶'],
     voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员'],
   },
+  // 运行参数(后台 eh_config 可覆盖; 代码里一律实时读 EH_CONFIG.tuning.xxx, 不在启动时固化为 const)
+  tuning: {
+    publicRecentLimit: 500,   // 公开/官方房进房拉取的最近消息条数(RPC 上限同步放开)
+    historyPage: 60,          // 私密房每页加载条数(「加载更早」翻页步长)
+    prefetchN: 48,            // 列表页悬停/进房预取的消息条数
+    prefetchTtlMs: 60000,     // 预取缓存有效期(ms)
+    voidTtlMs: 300000,        // 虚空消息存活时长(ms, 5分钟)
+    onlineWindowMs: 35000,    // 在线判定窗口: 多久内有心跳算在线(ms)
+    resonanceThreshold: 5,    // 单条消息某情绪回声达到此数触发全房共鸣
+    voiceMaxSec: 30,          // 语音留声最大时长(秒)
+  },
   // 界面文案(后台可配) —— 第一类运营高频文案
   text: {
     // 空状态/提示
@@ -1331,7 +1342,7 @@ async function loadRemoteConfig(){
       const map={}; data.forEach(r=>{ map[r.key]=r.value; });
       // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
       // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool'].forEach(k=>{
+      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning'].forEach(k=>{
         if(!map[k]) return;
         const dst=EH_CONFIG[k];
         if(Array.isArray(dst)){
@@ -1743,10 +1754,13 @@ let presChan = null;       // Realtime presence 频道
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
 let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
-const VOID_TTL = 5*60*1000;   // 虚空消息存活 5 分钟
+// 运行参数实时读取器: 从 EH_CONFIG.tuning 取(后台 eh_config 可覆盖), 带兜底默认值。
+// 用函数而非 const, 因 loadRemoteConfig 是异步的, 启动时固化 const 会拿不到远程值。
+const TUNE=(k,def)=>{ const v=EH_CONFIG.tuning&&EH_CONFIG.tuning[k]; return (typeof v==='number'&&!isNaN(v))?v:def; };
+const VOID_TTL = ()=>TUNE('voidTtlMs',300000);   // 虚空消息存活时长(ms)
 const VOID_NAMES = EH_CONFIG.identityPool.voidNames;
 let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
-const HISTORY_PAGE = 60;
+const HISTORY_PAGE = ()=>TUNE('historyPage',60);   // 私密房每页条数
 // 五种回声情绪: 共鸣/动容/脑电/困惑/观测
 // 消息反应: 用全球通用款(点赞/爱心/笑/举手同意/观望), 一眼懂, 类似 +1/yes 语义
 const ECHO_KINDS = [
@@ -1775,7 +1789,7 @@ function echoQuickList(){
   ECHO_KINDS.forEach(k=>push(k.e,k.label));
   return out.slice(0,4);
 }
-const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
+const RESONANCE_THRESHOLD = ()=>TUNE('resonanceThreshold',5);   // 共鸣触发阈值(后台可配)
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
 // ============ 大厅渲染 ============
@@ -1938,15 +1952,15 @@ function fallbackCopy(text){
     document.body.appendChild(ta); ta.select(); const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
   }catch(e){ return false; }
 }
-const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
-const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
+const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
+const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(后台可配)
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
 const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
 let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
 // 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
 function prefetchSouls(rid){
   const hit=soulsCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL) return hit.p;
+  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return hit.p;
   const p = sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]).catch(()=>[]);
   soulsCache[rid] = { at:Date.now(), p };
   return p;
@@ -1954,13 +1968,13 @@ function prefetchSouls(rid){
 function prefetchRoom(rid, kind){
   prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
   const hit=prefetchCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL) return;   // 命中且未过期
+  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return;   // 命中且未过期
   let p;
   if(kind==='official' || kind==='public'){
-    p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N }).then(({data})=>data||[]).catch(()=>[]);
+    p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N() }).then(({data})=>data||[]).catch(()=>[]);
   } else {
     // 私密房: 我的房间都是已加入的，直查最近(成员RLS放行)
-    p = sb.from('eh_messages').select('*').eq('room_id',rid).order('id',{ascending:false}).limit(PREFETCH_N)
+    p = sb.from('eh_messages').select('*').eq('room_id',rid).order('id',{ascending:false}).limit(PREFETCH_N())
           .then(({data})=>data||[]).catch(()=>[]);
   }
   prefetchCache[rid] = { at:Date.now(), p };
@@ -2071,8 +2085,8 @@ async function refreshSnapshotTail(room){
   try{
     const isPublic = room.kind==='official' || room.kind==='public';
     let rows;
-    if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:HISTORY_PAGE}); rows=(data||[]).slice().reverse(); }
-    else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE); rows=(data||[]).slice().reverse(); }
+    if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:TUNE('publicRecentLimit',500)}); rows=(data||[]).slice().reverse(); }
+    else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE()); rows=(data||[]).slice().reverse(); }
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
     rows.forEach(m=>{
@@ -2102,27 +2116,27 @@ async function loadHistory(first){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
     const hit=prefetchCache[curRoom.id];
-    if(first && hit && Date.now()-hit.at < PREFETCH_TTL){ data = await hit.p; delete prefetchCache[curRoom.id]; }
-    else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:100 })); }
+    if(first && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){ data = await hit.p; delete prefetchCache[curRoom.id]; }
+    else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:TUNE('publicRecentLimit',500) })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
     // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
     const hit=prefetchCache[curRoom.id];
-    if(first && !oldestId && hit && Date.now()-hit.at < PREFETCH_TTL){
+    if(first && !oldestId && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
       const data = await hit.p; delete prefetchCache[curRoom.id];
       rows = (data||[]).slice().reverse();
       if(rows.length){ oldestId = rows[0].id; }
     } else {
-      let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE);
+      let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE());
       if(oldestId) q = q.lt('id', oldestId);
       const { data } = await q;
       rows = (data||[]).slice().reverse();
       if(rows.length){ oldestId = rows[0].id; }
     }
   }
-  // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶100，无更多)
-  const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE || rows.length===PREFETCH_N);
+  // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶, 无更多)
+  const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   const frag=document.createDocumentFragment();
@@ -2201,7 +2215,7 @@ function subscribeMessages(rid){
 
 // ---- 在线状态(用 eh_presence 表 + postgres_changes；不用 Realtime Presence，
 //      因该项目 realtime.messages 广播通道鉴权不通，postgres_changes 才可靠) ----
-const ONLINE_WINDOW = 35000;   // 35s 内有心跳算在线
+const ONLINE_WINDOW = ()=>TUNE('onlineWindowMs',35000);   // 在线判定窗口(后台可配)
 let heartbeatTimer = null;
 async function setupPresence(room){
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
@@ -2299,7 +2313,7 @@ function renderTyping(users){
 
 async function refreshPresence(){
   if(!curRoom) return;
-  const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const since = new Date(Date.now()-ONLINE_WINDOW()).toISOString();
   let data=null;
   try{ ({ data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since)); }
   catch(e){ console.warn('presence query', e); }   // 查询失败也别让文字卡"连接中",下面用本地兜底至少显示"我"
@@ -2469,7 +2483,7 @@ async function loadRoomSouls(rid){
   roomSouls=[]; soulUidSet=new Set();
   const applyData=(data)=>{ roomSouls=data||[]; soulUidSet=new Set(roomSouls.map(s=>s.auth_uid)); refreshRenderedSoulIdentity(); };
   const hit=soulsCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL){
+  if(hit && Date.now()-hit.at < PREFETCH_TTL()){
     // 列表页已预取 → 秒用缓存(进房不再等 eh_room_souls RPC 往返)
     try{ applyData(await hit.p); }catch(e){}
     // 后台静默校正一次: 灵魂列表几乎不变, 但保证"后台开/关机器人"能最终生效(关掉的不再返回)。
@@ -2673,7 +2687,7 @@ async function send(){
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind, reply_to: replyId };
   if(useVoid){
     payload.anon=true;
-    payload.expires_at=new Date(Date.now()+VOID_TTL).toISOString();
+    payload.expires_at=new Date(Date.now()+VOID_TTL()).toISOString();
     // 数据层就不落真实昵称/头像/色: 存匿名代号(据uid确定性生成)+中性紫, 避免raw行泄露身份
     payload.name = voidNameFor({user_id:myUid});
     payload.emoji = '🕳️';
@@ -2755,7 +2769,7 @@ function syncSendBtn(){
 }
 
 // ============ 语音消息(MediaRecorder 录音 → Supabase Storage → kind='voice') ============
-const VOICE_BUCKET='eh-voice', VOICE_MAX_SEC=30;
+const VOICE_BUCKET='eh-voice'; const VOICE_MAX_SEC=()=>TUNE('voiceMaxSec',30);
 const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
 const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
 let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
@@ -2810,14 +2824,14 @@ async function startRec(){
   recorder.onstop=()=>{
     stream.getTracks().forEach(t=>t.stop());
     stopWave(); hideRecUI();
-    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC));
+    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC()));
     else if(recWanted && !recCanceled && recSec<1) toast(EH_CONFIG.text.err_recTooShort);
     recorder=null; recChunks=[];
   };
   recorder.start(250);
   showRecUI(stream);
   recTimer=setInterval(()=>{ recSec++; updateRecTime();
-    if(recSec>=VOICE_MAX_SEC){ recWanted=true; stopRec(); } },1000);
+    if(recSec>=VOICE_MAX_SEC()){ recWanted=true; stopRec(); } },1000);
 }
 function stopRec(){ clearInterval(recTimer); recTimer=null; if(recorder && recorder.state!=='inactive') recorder.stop(); }
 function showRecUI(stream){
@@ -3532,7 +3546,7 @@ async function fetchEchoes(ids){
 }
 // 共鸣涟漪: 某条消息某情绪达阈值 → 全房视觉涟漪(复用 resonance 层 + 粒子)
 function checkResonance(mid, emoji, count){
-  if(count < RESONANCE_THRESHOLD) return;
+  if(count < RESONANCE_THRESHOLD()) return;
   const key=mid+emoji; if(resonatedMsgs.has(key)) return; resonatedMsgs.add(key);
   const el=document.querySelector(`.msg[data-mid="${mid}"]`);
   const color = el ? (el.querySelector('.nm')?.style.color||'#FF3CAC') : '#FF3CAC';
@@ -3583,7 +3597,7 @@ async function sendSystemAct(text){
 }
 async function findMemberByName(name){
   if(!curRoom) return null;
-  const since=new Date(Date.now()-ONLINE_WINDOW).toISOString();
+  const since=new Date(Date.now()-ONLINE_WINDOW()).toISOString();
   const { data } = await sb.from('eh_presence').select('user_id,name').eq('room_id',curRoom.id).gte('last_seen',since);
   return (data||[]).find(u=>u.name===name) || (data||[]).find(u=>u.name.includes(name)) || null;
 }
