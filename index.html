@@ -304,6 +304,8 @@
   .msg{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
   @keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
   .msg .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:2px;position:relative}
+  .msg .av[data-atname]{cursor:pointer}
+  .msg .av[data-atname]:active{transform:scale(.9)}
   .msg .body{flex:1;min-width:0}
   .msg .meta{display:flex;align-items:baseline;gap:8px}
   .msg .nm{font-size:13px;font-weight:700}
@@ -2380,8 +2382,10 @@ function buildMsgEl(m){
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
+  // 点消息头像 → @ 该发送者(与在线光墙头像一致)。排除: 自己、虚空匿名(@会泄露身份)
+  const avAt = (!isMe && !isVoid && m.name) ? ` data-atname="${esc(m.name)}" title="点击 @${esc(m.name)}"` : '';
   el.innerHTML=`
-    <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}</div>
+    <div class="av"${avAt} style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}</div>
     <div class="body">
       <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
@@ -2575,10 +2579,12 @@ function insertAtName(name){
   syncSendBtn();
   try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
 }
-// 事件委托：点在线光墙头像 → @ 那个人(灵魂或真人都行)
+// 事件委托：点头像 → @ 那个人。两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
 document.addEventListener('click',e=>{
-  const pav=e.target.closest('#presence .pav'); if(!pav) return;
-  const nm=pav.dataset.atname; if(nm) insertAtName(nm);
+  const pav=e.target.closest('#presence .pav');
+  if(pav){ const nm=pav.dataset.atname; if(nm) insertAtName(nm); return; }
+  const av=e.target.closest('.msg .av[data-atname]');
+  if(av){ const nm=av.dataset.atname; if(nm) insertAtName(nm); }
 });
 // 本地打字机：把灵魂消息逐字吐进 .txt(好看,零成本,不走网关流式)
 // 用字素簇切分(保 emoji 完整),每帧吐 1-2 字,@高亮在收尾时统一渲染
