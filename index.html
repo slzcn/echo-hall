@@ -529,14 +529,14 @@
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:36;box-shadow:0 20px 50px rgba(0,0,0,.5);max-height:240px;overflow-y:auto}
   .at-menu.on{display:block}
   .at-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;cursor:pointer;transition:.12s}
-  .at-item:hover,.at-item.sel{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
+  .at-item:hover,.at-item.sel{background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent)}
   .at-item .ai-av{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
   .at-item .ai-nm{font-size:13px;font-weight:600}
   .at-item .ai-tag{font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:auto;letter-spacing:.5px}
   /* 消息正文里的 @提及高亮标签 */
-  .at-mention{color:var(--cyan);font-weight:600;background:color-mix(in srgb,var(--cyan) 12%,transparent);
+  .at-mention{color:var(--accent,var(--cyan));font-weight:600;background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);
     padding:0 4px;border-radius:5px;white-space:nowrap}
-  .at-mention.at-soul{color:var(--violet);background:color-mix(in srgb,var(--violet) 14%,transparent)}
+  .at-mention.at-soul{color:var(--at-c,var(--violet));background:color-mix(in srgb,var(--at-c,var(--violet)) 14%,transparent)}
   .at-mention.at-me{color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
   /* 被@强提醒：消息卡脉冲高亮 2s */
   .msg.mentioned-flash{animation:mentionPulse 2s ease-out}
@@ -2434,13 +2434,17 @@ function renderAtMentions(escHtml){
   // 名字可能含特殊字符,先 esc 再按长度降序(避免短名先吞掉长名的前缀)
   const names=[...cands.map(c=>c.name), myName].filter(Boolean).sort((a,b)=>b.length-a.length);
   const soulNames=new Set(cands.filter(c=>c.isSoul).map(c=>c.name));
+  const soulColorByName={}; cands.forEach(c=>{ if(c.isSoul) soulColorByName[c.name]=safeColor(c.color); });
   let out=escHtml;
   for(const nm of names){
     const enm=esc(nm);
     // 匹配 @名字(名字用转义后的字面量),g 全局
     const re=new RegExp('@'+enm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
-    const cls='at-mention'+(nm===myName?' at-me':(soulNames.has(nm)?' at-soul':''));
-    out=out.replace(re, '<span class="'+cls+'">@'+enm+'</span>');
+    const isSoul=soulNames.has(nm);
+    const cls='at-mention'+(nm===myName?' at-me':(isSoul?' at-soul':''));
+    // @灵魂 用它自己的配色(老K橙红/图灵琥珀…), 而非写死紫色; @真人/@我 走 CSS(主题/amber)
+    const style=isSoul && soulColorByName[nm] ? ` style="--at-c:${soulColorByName[nm]}"` : '';
+    out=out.replace(re, '<span class="'+cls+'"'+style+'>@'+enm+'</span>');
   }
   return out;
 }
@@ -2462,7 +2466,7 @@ function renderAtMenu(){
   menu.innerHTML=_atList.map((c,i)=>`<div class="at-item${i===_atSel?' sel':''}" data-i="${i}">
     <div class="ai-av" style="background:${safeColor(c.color)}22;color:${safeColor(c.color)}">${safeEmoji(c.emoji)||(c.isSoul?'✦':'👤')}</div>
     <span class="ai-nm">${esc(c.name)}</span>
-    ${c.isSoul?'<span class="ai-tag" style="color:var(--violet);background:color-mix(in srgb,var(--violet) 16%,transparent)">✦AI</span>':''}
+    ${c.isSoul?`<span class="ai-tag" style="color:${safeColor(c.color)};background:color-mix(in srgb,${safeColor(c.color)} 16%,transparent)">✦AI</span>`:''}
   </div>`).join('');
   menu.classList.add('on');
   menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
