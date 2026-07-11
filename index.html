@@ -709,7 +709,7 @@
 <script>
 /* 版本自愈: 页面内嵌 BUILD_VER, 拉不缓存的 ver.txt 比对, 不一致=有新版→带新v重载一次(sessionStorage防循环) */
 (function(){
-  var BUILD_VER='20260712-0335';
+  var BUILD_VER='20260712-0345';
   try{
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(t){
       if(!t) return;
@@ -3580,8 +3580,8 @@ function showActRing(x,y,m){
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
-      <button data-a="reply"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v1"/></svg></span>回复</button>
-      <button data-a="project"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M22 8l-5 4 5 4V8z"/></svg></span>投影</button>
+      <button data-a="reply"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 4 12l5 6"/><path d="M4 12h9a7 7 0 0 1 7 7v0"/></svg></span>回复</button>
+      <button data-a="project"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M10 11l4 1-4 1z" fill="currentColor" stroke="none"/></svg></span>投影</button>
     </div>`;
   ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();   // 别冒泡到 document 的关闭监听(否则刚开的托盘立即被关)
