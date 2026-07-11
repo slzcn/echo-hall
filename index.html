@@ -2705,6 +2705,9 @@ const SONG_STYLES=[
   { id:'kid',   name:'卡通',  sub:'暧昧微醺', subEn:'Blush Tease', emoji:'🧸', color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
     motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18,
     coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
+  { id:'rnb',   name:'R&B',   sub:'冰霞柔情', subEn:'Frost Soul', emoji:'🎙️', color:'#28E6D8', bpm:76,  bpc:0.5, base:-2, scale:SCALE.major,
+    motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy', playRate:0.92,
+    coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
 ];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
