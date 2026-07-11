@@ -367,8 +367,9 @@
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
-  /* 输入框内表情按钮(正方形, 垂直居中对齐输入行, 略小) */
-  .cin-emoji{width:40px;height:40px;font-size:20px;align-self:center}
+  /* 输入框内表情按钮: 顶部对齐, 按钮40高emoji居中在20px处, 恰好落在单行文字首行中心
+     (textarea padding-top8 + 行高一半12 = 20px), 与文字/选出的表情同一水平线; 多行时也停在首行。 */
+  .cin-emoji{width:40px;height:40px;font-size:20px;align-self:flex-start}
   /* ＋ 花样按钮 */
   .plus-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:11px;
     transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
