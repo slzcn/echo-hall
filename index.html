@@ -207,7 +207,11 @@
   .rm:hover{border-color:var(--violet);transform:translateX(3px)}
   .rm .rm-ic{font-size:22px}
   .rm .rm-nm{flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rm .rm-code{font-size:11px;color:var(--dim);letter-spacing:1px}
+  .rm .rm-code{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);letter-spacing:1px;cursor:pointer;
+    padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:rgba(10,12,24,.4);transition:.15s;flex-shrink:0}
+  .rm .rm-code:hover{color:var(--violet);border-color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent)}
+  .rm .rm-code .rm-copy-ic{width:12px;height:12px;opacity:.7}
+  .rm .rm-code.copied{color:var(--green);border-color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
   .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--violet) 15%,transparent);color:var(--violet)}
   .rm .rm-arr{color:var(--dim)}
 
@@ -684,7 +688,7 @@
     <div class="sec-label"><span class="sl-t" data-txt="hallPublic">🌐 公开房间</span></div>
     <div class="channels" id="publicRooms"></div>
     <div class="empty-hint" id="publicEmpty" data-txt="publicEmpty" style="display:none">还没有公开房，建一个吧</div>
-    <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房</span></div>
+    <div class="sec-label"><span class="sl-t" data-txt="hallPrivate">🔒 私密房间</span></div>
     <div class="priv-actions">
       <button class="priv-btn create" id="createRoomBtn" data-txt="lobbyCreateBtn">＋ 创建房间</button>
       <button class="priv-btn join" id="joinRoomBtn" data-txt="lobbyJoinBtn">🔑 邀请码加入</button>
@@ -1039,7 +1043,7 @@ const EH_CONFIG_DEFAULT = {
     entrySlogan:'临时身份 · 无需注册',
     entryBtn:'匿 名 进 入',
     // 大厅
-    hallOfficial:'📡 官方频道', hallPublic:'🌐 公开房间', hallPrivate:'🔒 私密房',
+    hallOfficial:'📡 官方频道', hallPublic:'🌐 公开房间', hallPrivate:'🔒 私密房间',
     // 互动模式(标题+副标题)
     modeVoiceTitle:'语音留声', modeVoiceSub:'按住录音，松手发送',
     modeVoidTitle:'说给虚空', modeVoidSub:'匿名 · 5分钟后消散',
@@ -1638,7 +1642,7 @@ async function renderOfficial(soft){
   box.innerHTML=(data||[]).map(r=>{
     const c=OFFICIAL_FALLBACK_C[r.name]||'#28E6D8';
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
-      <div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
+      <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
       <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
       <div class="preview empty" data-prev>加载中…</div></div>`;
@@ -1720,11 +1724,24 @@ async function renderMyRooms(soft){
   box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="private">
     <span class="rm-ic">${safeEmoji(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
     ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
-    <span class="rm-code">${r.invite_code||''}</span><span class="rm-arr">→</span></div>`).join('');
+    ${r.invite_code?`<span class="rm-code" data-code="${esc(r.invite_code)}" title="点击复制邀请码">${esc(r.invite_code)}<svg class="rm-copy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span>`:''}<span class="rm-arr">→</span></div>`).join('');
   box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private',knownOnline:readKnownOnline(el)}));
+  box.querySelectorAll('.rm-code[data-code]').forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); copyInvite(el.dataset.code, el); });
   prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
 }
-// 进房预取缓存: 列表渲染后主动预取 + 悬停补充，点进去瞬间显示
+// 复制邀请码: 优先 clipboard API, 失败降级 execCommand(webview/非安全上下文兜底), 复制成功给卡片短暂反馈
+function copyInvite(code, el){
+  const done=()=>{ if(el){ el.classList.add('copied'); setTimeout(()=>el.classList.remove('copied'),1200); } toast(EH_CONFIG.text.ok_codeCopied||'邀请码已复制'); };
+  const fail=()=>toast(EH_CONFIG.text.err_copyFail||'复制失败，请手动长按');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(done, ()=>fallbackCopy(code)?done():fail());
+  } else { fallbackCopy(code)?done():fail(); }
+}
+function fallbackCopy(text){
+  try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.cssText='position:fixed;top:-999px;opacity:0';
+    document.body.appendChild(ta); ta.select(); const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
+  }catch(e){ return false; }
+}
 const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
 const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
