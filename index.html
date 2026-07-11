@@ -2004,6 +2004,19 @@ function subscribeMessages(rid){
       maybeResonate(m);
       if(isEmojiOnly(m.text)) burst(m.text);
     })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
+      // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
+      const m=p.new; if(m.user_id===myUid) return;
+      const el=document.querySelector(`.msg[data-mid="${m.id}"] .txt`);
+      if(!el) return;
+      // 神曲/emoji 定稿由 kind 决定,流式中途都是纯文本,直接 esc+@高亮更新
+      if(m.kind==='song'){ el.innerHTML=songHtml(m.text); }
+      else if(m.kind==='voice'){ /* 语音不流式 */ }
+      else { el.innerHTML=renderAtMentions(esc(m.text||'')); }
+      // 生成完(streaming=false)时,若是纯emoji放个粒子
+      if(!m.streaming && isEmojiOnly(m.text)) burst(m.text);
+      const s=$('#stream'); if(s.scrollHeight-s.scrollTop-s.clientHeight<120) scrollStream();
+    })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_message_echoes'}, p=>{
       // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
       if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
