@@ -1932,17 +1932,17 @@ async function enterRoom(room){
     try{ _prewarmRoomEnter(); }catch(_){}
     roomSnap=null;
     await ensureAuth();
-    subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息
+    subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
     await joinAsMember(room);
-    const [ , memRes] = await Promise.all([
+    // allSettled: 任一查询失败也不拖垮其余(避免一次网络抖动 → Promise.all reject → 卡"连接中")
+    const [memRes] = await Promise.allSettled([
       sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
       setupPresence(room),
       refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
       loadRoomSouls(room.id)           // 拉本房灵魂居民(展示层)
     ]);
-    room.role = memRes?.data?.role || 'member';
+    room.role = memRes?.value?.data?.role || 'member';
     $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
-    setConn(true);
     return;
   }
   // ---- 无快照: 原全量流程 ----
@@ -1953,7 +1953,7 @@ async function enterRoom(room){
   try{ _prewarmRoomEnter(); }catch(_){}
 
   await ensureAuth();
-  subscribeMessages(room.id);
+  subscribeMessages(room.id);   // 连接灯由其 subscribe 状态驱动
   const isPublic = room.kind==='official' || room.kind==='public';
   const histP = isPublic ? loadHistory(true) : null;
   await joinAsMember(room);
@@ -1961,10 +1961,11 @@ async function enterRoom(room){
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
     setupPresence(room),
     loadRoomSouls(room.id) ];
-  const [ , memRes] = await Promise.all(tasks);
-  room.role = memRes?.data?.role || 'member';
+  // allSettled: 单个失败不拖垮全流程,不再因一次抖动卡死在"连接中"
+  const results = await Promise.allSettled(tasks);
+  const memRes = results[1];
+  room.role = memRes?.value?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
-  setConn(true);
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
 }
 
@@ -2093,7 +2094,12 @@ function subscribeMessages(rid){
       if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
       applyEchoRealtime(p.new.message_id, p.new.user_id, p.new.emoji);
     })
-    .subscribe();
+    // 连接指示灯由 realtime 通道真实状态驱动(而非"一批一次性查询有没有 resolve")。
+    // SUBSCRIBED=真的连上了; 掉线/出错/超时→回落"连接中",Supabase 会自动重连,重连成功再置亮。
+    .subscribe((status)=>{
+      if(status==='SUBSCRIBED') setConn(true);
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED') setConn(false,'连接中');
+    });
 }
 
 // ---- 在线状态(用 eh_presence 表 + postgres_changes；不用 Realtime Presence，
