@@ -1729,6 +1729,16 @@ function roomAccentC(r){
   }
   return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
 }
+// 官方房灵魂色永久=房间主题色(前端强制联动, 与列表卡片同理念); 私密/公开房仍用后台设的 soul.color
+function soulThemeColor(fallback){
+  try{
+    if(curRoom && curRoom.kind==='official'){
+      const c=themeAccentOf(curRoom.name);
+      if(c) return c;
+    }
+  }catch(e){}
+  return fallback;
+}
 let _themeUIInit=false;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
@@ -2164,7 +2174,7 @@ function renderPresenceAvatars(users){
     if(!isMe && p.name){ div.dataset.atname=p.name; }
     // 灵魂在光墙也带 AI 角标(与消息头像一致)
     const isSoul=soulUidSet.has(p.user_id);
-    if(isSoul) div.style.setProperty('--soul-c', c);
+    if(isSoul) div.style.setProperty('--soul-c', soulThemeColor(c));
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
     div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
     div.dataset.sig=sig+'|'+(isSoul?'ai':'');
@@ -2258,7 +2268,7 @@ function buildMsgEl(m){
   // 回声徽章条: 显示已有的各情绪计数(点已有徽章可加/撤自己的); 长按消息弹环加新情绪
   const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
-  const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
+  const avColor = isVoid ? '#8B5CFF' : soulThemeColor(safeColor(m.color));
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
@@ -2357,7 +2367,7 @@ function refreshRenderedSoulIdentity(){
     const uid=el.dataset.uid;
     if(!soulUidSet.has(uid)) return;
     const s=roomSouls.find(x=>x.auth_uid===uid); if(!s) return;
-    const c=safeColor(s.color), ic=safeEmoji(s.emoji)||'👤';
+    const c=soulThemeColor(safeColor(s.color)), ic=safeEmoji(s.emoji)||'👤';
     const av=el.querySelector('.av');
     if(av){
       // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji(走 avEmoji 保黑洞校正)
@@ -2501,7 +2511,7 @@ function showSoulThinking(soul){
   removeSoulThinking(soul.auth_uid);
   const el=document.createElement('div');
   el.className='soul-thinking'; el.dataset.soul=soul.auth_uid;
-  el.style.setProperty('--soul-c', safeColor(soul.color));
+  el.style.setProperty('--soul-c', soulThemeColor(safeColor(soul.color)));
   el.innerHTML=`<div class="av">${safeEmoji(soul.emoji)||'✦'}</div>
     <div class="tk"><span class="tk-label">${esc(soul.name)} 正在思考</span>
     <span class="tk-dots"><i></i><i></i><i></i></span></div>`;
