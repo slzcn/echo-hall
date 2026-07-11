@@ -1319,6 +1319,9 @@ const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
     // 安全过滤：颜色只允许 #hex，非法则回退默认色；emoji 截断+转义防注入
     const safeColor = (c,def='#8B5CFF') => (typeof c==='string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : def;
     const safeEmoji = (e) => esc((e||'').slice(0,8));
+    // 头像内 emoji 渲染: 🕳️ 黑洞字形自带偏下(主体压下半、上方留白多),头像里看着往下沉,
+    // 给它单独上移 2px 校正; 其他 emoji 字形居中, 原样输出。
+    const avEmoji = (e) => (e && e.indexOf('🕳')>-1) ? `<span style="display:inline-block;transform:translateY(-3px)">${e}</span>` : e;
 const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 
 // ---- 身份 ----
@@ -2107,7 +2110,7 @@ function renderPresenceAvatars(users){
     const isSoul=soulUidSet.has(p.user_id);
     if(isSoul) div.style.setProperty('--soul-c', c);
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
-    div.innerHTML=`<div class="av-ic">${safeEmoji(p.emoji)}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
+    div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
     div.dataset.sig=sig+'|'+(isSoul?'ai':'');
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
     presenceMap.set(p.user_id,div);
@@ -2201,10 +2204,10 @@ function buildMsgEl(m){
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
   const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
-  // 灵魂签名：头像右下角一枚 AI 角标(✦)，比昵称旁的文字徽章更干净
+  // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
   el.innerHTML=`
-    <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avIc}${soulDot}</div>
+    <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}</div>
     <div class="body">
       <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
@@ -2301,11 +2304,10 @@ function refreshRenderedSoulIdentity(){
     const c=safeColor(s.color), ic=safeEmoji(s.emoji)||'👤';
     const av=el.querySelector('.av');
     if(av){
-      // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji
+      // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji(走 avEmoji 保黑洞校正)
       const dot=av.querySelector('.soul-dot');
       av.style.background=c+'22'; av.style.color=c; av.style.boxShadow=`inset 0 0 0 1.5px ${c}`;
-      av.firstChild && av.firstChild.nodeType===3 ? (av.firstChild.textContent=ic)
-        : (av.innerHTML=ic+(dot?dot.outerHTML:''));
+      av.innerHTML=avEmoji(ic)+(dot?dot.outerHTML:'');
       el.style.setProperty('--soul-c', c);
     }
     const nm=el.querySelector('.meta .nm');
