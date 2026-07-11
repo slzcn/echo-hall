@@ -256,6 +256,8 @@
   /* 每个成员 = 头像 + 名字, 竖排一列 */
   .pav{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;position:relative;
     animation:popin .4s cubic-bezier(.2,.9,.3,1.4);cursor:default}
+  .pav[data-atname]{cursor:pointer}
+  .pav[data-atname]:active .av-ic{transform:scale(.9)}
   .pav .av-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;position:relative;
     background:color-mix(in srgb,var(--pav-c,var(--cyan)) 12%,transparent);box-shadow:inset 0 0 0 1.5px var(--pav-c,var(--cyan));transition:.25s}
   .pav .av-ic::after{content:"";position:absolute;inset:-2.5px;border-radius:13px;border:1.5px solid var(--pav-c,var(--cyan));opacity:.35;transition:.25s}
@@ -2091,7 +2093,8 @@ function renderPresenceAvatars(users){
     const div=document.createElement('div');
     div.className='pav'+(isMe?' me':'');
     div.style.setProperty('--pav-c', c);
-    div.title=p.name||'';
+    div.title=isMe?'你':('点击 @'+ (p.name||''));
+    if(!isMe && p.name){ div.dataset.atname=p.name; }
     div.innerHTML=`<div class="av-ic">${safeEmoji(p.emoji)}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
     div.dataset.sig=sig;
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
@@ -2323,6 +2326,24 @@ function renderAtMenu(){
   menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
 }
 function hideAt(){ _atActive=false; $('#atMenu').classList.remove('on'); }
+// 点在线光墙的头像 → 往输入框插入 @该用户(快捷@)
+function insertAtName(name){
+  if(!name) return;
+  const inp=$('#cin');
+  const cur=inp.value;
+  // 已经 @过就不重复插
+  if(cur.includes('@'+name+' ')){ inp.focus(); return; }
+  const sep = (cur && !/\s$/.test(cur)) ? ' ' : '';
+  inp.value = cur + sep + '@' + name + ' ';
+  inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+  syncSendBtn();
+  try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+}
+// 事件委托：点在线光墙头像 → @ 那个人(灵魂或真人都行)
+document.addEventListener('click',e=>{
+  const pav=e.target.closest('#presence .pav'); if(!pav) return;
+  const nm=pav.dataset.atname; if(nm) insertAtName(nm);
+});
 // 本地打字机：把灵魂消息逐字吐进 .txt(好看,零成本,不走网关流式)
 // 用字素簇切分(保 emoji 完整),每帧吐 1-2 字,@高亮在收尾时统一渲染
 function typewriterInto(el, fullText){
