@@ -2970,7 +2970,40 @@ let vAudio=null, vPlayEl=null;
 function stopVoice(){
   if(vAudio){ try{vAudio.pause();}catch(e){} vAudio=null; }
   try{ if(typeof AudioEngine!=='undefined') AudioEngine.duck(false); }catch(e){} // 恢复 BGM 音量
+  stopVoiceAvatarPulse();
   if(vPlayEl){ vPlayEl.classList.remove('playing'); vPlayEl=null; }
+}
+// 声波头像: 语音播放时, 把音频接 analyser, 让该消息发送者头像随振幅缩放跳动。
+let _vapRaf=0, _vapAv=null, _vapCtx=null, _vapSrc=null;
+function startVoiceAvatarPulse(wrap, audioEl){
+  const msg=wrap.closest('.msg'); const av=msg&&msg.querySelector('.av'); if(!av) return;
+  const C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+  let ctx; try{ ctx=new C(); }catch(e){ return; }
+  let srcNode, analyser;
+  try{
+    srcNode=ctx.createMediaElementSource(audioEl);
+    analyser=ctx.createAnalyser(); analyser.fftSize=256; analyser.smoothingTimeConstant=0.7;
+    srcNode.connect(analyser); analyser.connect(ctx.destination);   // 仍要连 destination 才出声
+  }catch(e){ try{ctx.close();}catch(_){}
+    return; }   // CORS/接线失败 → 放弃声波(音频照常从 <audio> 出声)
+  _vapCtx=ctx; _vapSrc=srcNode; _vapAv=av;
+  av.style.transition='transform .06s ease-out';
+  const data=new Uint8Array(analyser.frequencyBinCount);
+  const loop=()=>{
+    if(_vapAv!==av) return;
+    analyser.getByteFrequencyData(data);
+    let sum=0; for(let i=0;i<data.length;i++) sum+=data[i];
+    const amp=sum/data.length/255;   // 0~1
+    av.style.transform='scale('+(1+amp*0.28).toFixed(3)+')';
+    av.style.boxShadow='inset 0 0 0 1.5px currentColor, 0 0 '+(6+amp*20).toFixed(0)+'px -2px currentColor';
+    _vapRaf=requestAnimationFrame(loop);
+  };
+  loop();
+}
+function stopVoiceAvatarPulse(){
+  if(_vapRaf) cancelAnimationFrame(_vapRaf); _vapRaf=0;
+  if(_vapAv){ _vapAv.style.transform=''; _vapAv.style.boxShadow=''; _vapAv=null; }
+  if(_vapCtx){ try{ _vapCtx.close(); }catch(e){} _vapCtx=null; _vapSrc=null; }
 }
 // 整个语音条都可点(不只那个小 ▶ 圆钮), 符合"点一下就播"的直觉
 document.addEventListener('click',e=>{
@@ -2982,8 +3015,10 @@ document.addEventListener('click',e=>{
   const src=(wrap.dataset.src||'').split('#')[0];
   if(!src){ toast(EH_CONFIG.text.err_voiceUrl); return; }
   const a=new Audio(src);
+  a.crossOrigin='anonymous';   // 接 analyser 需 CORS(Supabase storage 支持); 失败则跳过声波头像
   vAudio=a; vPlayEl=wrap;
   wrap.classList.add('playing');
+  try{ startVoiceAvatarPulse(wrap, a); }catch(e){}   // 声波头像: 发送者头像随振幅跳动
   a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
   a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };
   a.play().then(()=>{}).catch(err=>{
