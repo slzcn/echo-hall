@@ -3369,7 +3369,7 @@ function renderSongStrip(){
     $('.composer').style.setProperty('--song-c', safeColor(st.color));
     strip.style.setProperty('--strip-c', safeColor(st.color));   // 切曲风: strip 标签+底色也跟随
     try{ prewarmHotPhrases(); }catch(_){}   // 切新曲风也预热该风常用词
-    // 不 focus 输入框: 切曲风只是选风格, 抢焦点会弹出输入法(尤其手机), 让用户自己决定何时打字
+    try{ if(curRoom) $('#cin').focus(); }catch(_){}   // 切完聚焦输入框(主人要:切曲风后自动就绪打字)
   });
 }
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
