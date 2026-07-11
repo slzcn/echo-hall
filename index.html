@@ -704,6 +704,25 @@
 </style>
 </head>
 <body>
+<script>
+/* 版本自愈: 页面内嵌 BUILD_VER, 拉不缓存的 ver.txt 比对, 不一致=有新版→带新v重载一次(sessionStorage防循环) */
+(function(){
+  var BUILD_VER='20260712-0335';
+  try{
+    fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(t){
+      if(!t) return;
+      var latest=t.trim();
+      if(latest && latest!==BUILD_VER){
+        var k='eh_reloaded_'+latest;
+        if(!sessionStorage.getItem(k)){
+          sessionStorage.setItem(k,'1');
+          var u=new URL(location.href); u.searchParams.set('v',latest); location.replace(u.toString());
+        }
+      }
+    }).catch(function(){});
+  }catch(e){}
+})();
+</script>
 <script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
