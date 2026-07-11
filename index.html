@@ -1749,7 +1749,7 @@ async function renderOfficial(soft){
   if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
   const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
   box.innerHTML=(data||[]).map(r=>{
-    const c=roomAccentC(r);
+    const c=roomAccentC({...r,kind:'official'});
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
       <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
       <div class="desc">${esc(r.topic||'')}</div>
