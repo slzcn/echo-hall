@@ -686,6 +686,8 @@
     body.kb-open #hall{position:fixed;left:0;right:0;top:var(--kb-top,0);height:var(--appvh,100dvh);margin:0;z-index:10}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+    /* 键盘弹起时: 底部 safe-area 留白多余(键盘已盖住底部横条区), 压掉让输入框紧贴键盘, 不留空隙 */
+    body.kb-open .composer{padding-bottom:8px}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
