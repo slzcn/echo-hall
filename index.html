@@ -2873,14 +2873,14 @@ function prewarmHotPhrases(){
   // 预置词短, 并发 ~2s 全部备好, 远比错峰 10s 快。
   EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
 }
-// 进房就预热默认神曲风(shen)的预置词——让预热窗口提前到用户浏览/打字时, 点神曲时已备好。
+// 进房就预热默认神曲风(DJ)的预置词——让预热窗口提前到用户浏览/打字时, 点神曲时已备好。
 // 延 2s 避开进房时的订阅/拉消息网络高峰。
 function _prewarmRoomEnter(){
   // 优先加载静态预生成真人嗓(零网络瞬时); 加载完会把 sao 风标进 _prewarmedStyles。
   try{ loadStaticPresets(); }catch(_){}
   setTimeout(()=>{
     try{
-      const st=SONG_STYLES.find(s=>s.id==='shen')||SONG_STYLES[0];
+      const st=SONG_STYLES[0];
       const style=st.ttsStyle||'default';
       if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
       // 静态未覆盖的风才走网络预热
