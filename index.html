@@ -2689,8 +2689,19 @@ const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711';
 let EH_MASTER_MANIFEST=null;
 async function loadMasterManifest(){
   if(EH_MASTER_MANIFEST) return EH_MASTER_MANIFEST;
-  const r=await fetch(EH_MASTER_MANIFEST_URL,{cache:'force-cache'});
-  const j=await r.json(); EH_MASTER_MANIFEST=j; return j;
+  // 双次重试: force-cache 命中旧404时用 reload 重取
+  const tryFetch=async(cache)=>{
+    const r=await fetch(EH_MASTER_MANIFEST_URL,{cache});
+    if(!r.ok) throw new Error('manifest_'+r.status);
+    const ct=r.headers.get('content-type')||'';
+    if(!/json/i.test(ct)) throw new Error('manifest_bad_ct_'+ct);
+    return r.json();
+  };
+  try{ const j=await tryFetch('default'); EH_MASTER_MANIFEST=j; return j; }
+  catch(e1){
+    console.warn('manifest first try failed, reload:', e1.message);
+    const j=await tryFetch('reload'); EH_MASTER_MANIFEST=j; return j;
+  }
 }
 function pickMasterForStyle(sid){
   const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
@@ -2715,7 +2726,9 @@ async function tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st){
   const masterUrl=new URL(master.url, location.href).href;
   let buf;
   try{
-    const ab=await (await fetch(masterUrl,{cache:'force-cache'})).arrayBuffer();
+    const mResp=await fetch(masterUrl,{cache:'default'});
+    if(!mResp.ok) throw new Error('master_'+mResp.status);
+    const ab=await mResp.arrayBuffer();
     buf=await decodeMp3ArrayBuffer(ctx,ab);
     if(!buf || buf.duration<1){ console.warn('cover: master decode empty'); return false; }
   }catch(e){ console.warn('master load',e); return false; }
