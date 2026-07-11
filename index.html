@@ -731,7 +731,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0448';
+  var BUILD_VER='20260712-0452';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1554,7 +1554,8 @@ const EhSfx=(function(){
     echo(){ tone(1320,0,.05,'sine',.13); tone(880,.028,.08,'triangle',.08,720); },
     mention(){ tone(988,0,.09,'triangle',.18); tone(1480,.07,.12,'sine',.12); },
     void(){ tone(220,0,.22,'sine',.16,130); tone(440,.04,.18,'triangle',.08,300); },
-    error(){ tone(360,0,.12,'sine',.16,260); tone(220,.09,.18,'triangle',.13,160); }
+    error(){ tone(360,0,.12,'sine',.16,260); tone(220,.09,.18,'triangle',.13,160); },
+    back(){ tone(660,0,.13,'sine',.15,494); tone(392,.06,.17,'triangle',.11,330); }
   };
   function unlock(){ ensure(); }
   function play(name){
@@ -1566,7 +1567,7 @@ const EhSfx=(function(){
       try{ctx.resume();}catch(e){}
       let n=0;(function wait(){ if(ctx.state==='running'||n++>16) emit(); else setTimeout(wait,18); })();
     }else emit();
-    try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error'].includes(name)) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
+    try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error','back'].includes(name)) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
   }
   function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
   try{
@@ -4108,7 +4109,7 @@ async function logoutIdentity(bound){
 function closeMe(){ $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
+function backToLobby(){ try{ EhSfx.play('back'); }catch(e){} AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
@@ -4428,7 +4429,7 @@ if(window.matchMedia && matchMedia('(hover:none)').matches){
 // 全局交互反馈：按钮/卡片/菜单项轻涟漪；通用按钮给极轻点击音，关键动作在业务函数里播专属音效。
 try{
   document.addEventListener('pointerdown',function(e){
-    const el=e.target.closest('button,.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.rm,.rm-code,.ec-pill,.ar-echo,.ar-actions button,.code-copy,.modal-x,.dx');
+    const el=e.target.closest('button,.btn-primary,.btn-line,.priv-btn,.dbtn,.tool-btn,.me-btn,.plus-btn,.emoji-btn,.skin-opt,.seg .opt,.emoji-pick b,.color-pick i,.st-chip,.slash-item,.at-item,.rm,.rm-code,.ec-pill,.ar-echo,.ar-actions button,.code-copy,.modal-x,.dx,.back');
     if(!el) return; ehRipple(el,e);
   },{capture:true,passive:true});
   document.addEventListener('click',function(e){
