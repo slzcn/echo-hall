@@ -2181,16 +2181,17 @@ function renderPresenceAvatars(users){
     const soulLatest = soulUidSet.has(p.user_id) ? roomSouls.find(x=>x.auth_uid===p.user_id) : null;
     if(soulLatest){ p={...p, name:soulLatest.name, emoji:soulLatest.emoji, color:soulLatest.color}; }
     let el=presenceMap.get(p.user_id);
-    const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+(p.color||'')+'|'+(p.user_id===myUid?'me':'');
+    const isMe=p.user_id===myUid;
+    // 灵魂头像色跟房间强调色(与消息头像/AI角标统一); 真人访客保持自己的个性色
+    const isSoul=soulUidSet.has(p.user_id);
+    const c=isSoul ? soulThemeColor(safeColor(p.color)) : safeColor(p.color);
+    // sig 纳入最终渲染色 c: 换房/换主题致灵魂色变时, sig 变→强制重建头像(否则旧sig命中→卡旧色)
+    const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+c+'|'+(isMe?'me':'')+'|'+(isSoul?'ai':'');
     if(el && el.dataset.sig===sig){
       // 顺序可能变了, 位置对齐一下
       if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
       return;
     }
-    const isMe=p.user_id===myUid;
-    // 灵魂头像色跟房间强调色(与消息头像/AI角标统一); 真人访客保持自己的个性色
-    const isSoul=soulUidSet.has(p.user_id);
-    const c=isSoul ? soulThemeColor(safeColor(p.color)) : safeColor(p.color);
     const div=document.createElement('div');
     div.className='pav'+(isMe?' me':'');
     div.style.setProperty('--pav-c', c);
@@ -2200,7 +2201,7 @@ function renderPresenceAvatars(users){
     if(isSoul) div.style.setProperty('--soul-c', c);
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
     div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
-    div.dataset.sig=sig+'|'+(isSoul?'ai':'');
+    div.dataset.sig=sig;
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
     presenceMap.set(p.user_id,div);
   });
