@@ -2714,40 +2714,47 @@ async function playSong(lyric, sid, el, onEnd){
   const ttsStyle=st.ttsStyle||'default';
   const playRate=clamp(st.playRate??1.0, 0.7, 1.5);
   const cached=getCachedVoice(fullText, ttsStyle);
-  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr})
+  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr, _cached:true})
                             : fetchMifyVoice(fullText, 4500, ttsStyle);
   voiceReady.then(res=>{
     // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
-    if(!curSong || curSong.ctx!==ctx){ return; }
+    if(!curSong || curSong.ctx!==ctx){
+      // 未命中时 fetch 回来都存进缓存, 下次同词同风便命中
+      if(res && res.b64 && !res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
+      return;
+    }
     if(res && res.b64){
+      // 未命中则写入缓存(下次 0 延迟)
+      if(!res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
       try{
         const buf=pcm16ToBuffer(ctx, res.b64, res.sr);
         const src=ctx.createBufferSource(); src.buffer=buf;
-        src.playbackRate.value=playRate;   // 随曲风变速: 快曲风嗓音更快更饽舌, 慢曲风更懒
-        // 真人嗓 PCM 原始 peak 近 0.94, 直接挂 master(不走 voiceBus 的 1.6倍放大), gain 0.9 防剔顶
+        src.playbackRate.value=playRate;
+        // 真人嗓直接挂 master(不走 voiceBus 的 1.6 倍放大), gain 0.9 防剔顶
         const vg=ctx.createGain(); vg.gain.value=0.9;
         src.connect(vg); vg.connect(master);
-        // 关键修复: 真人嗓到货时不硬对齐 t0(短文案 t0 早已过去、歌已停). 从当前时间平滑接入。
+        // 关键根治延迟: 缓存命中则与哼唱同步在 t0 起播(0 延迟); 未命中则回来后从当前时间平滑接入
         const now=ctx.currentTime;
-        const startAt=now+0.03;
+        const startAt=res._cached ? Math.max(t0, now+0.02) : (now+0.03);
         src.start(startAt);
         curSong.oscs.push(src);
         mifyHandled=true;
-        // 真人嗓实际时长(考虑变速); 确保唱完才停歌(短文案也能完整听到)
+        // 若真人嗓比哼唱长, 额外排一个停歌定时(不清旧 timeouts, 保留字高亮动画)
         const realDur=buf.duration/playRate;
         const voiceEnd=startAt + realDur + 0.4;
-        // 清掉旧的 totalDur 停歌定时(避免短歌提前停掉真人嗓), 重新排一个
-        curSong.timeouts.forEach(clearTimeout); curSong.timeouts.length=0;
-        curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(0,(voiceEnd-ctx.currentTime))*1000));
+        const humEnd=t0+totalDur;
+        if(voiceEnd>humEnd){
+          curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(0,(voiceEnd-ctx.currentTime))*1000));
+        }
       }catch(e){ fallbackSysTTS(); }
     } else {
       // mify 失败/超时 → 系统 TTS 兜底
       fallbackSysTTS();
     }
   });
-  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间); 短文案也给真人嗓留足等待窗口(至少 5s 才可能因 totalDur 停歌)
+  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间); 缓存命中时 totalDur 就够, 未命中也给真人嗓留足等待窗口
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
-  const minWait=5.0;   // 给 mify 回来的安全等待(跨境 ~2.2s + 真人嗓时长), 避免短歌提前停掉
+  const minWait = cached ? 0 : 5.0;   // 未命中才给 5s 安全等待窗口
   curSong.timeouts.push(setTimeout(()=>{ if(!mifyHandled) stopSong(); }, (Math.max(totalDur,ttsDur,minWait)+0.4)*1000));
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
