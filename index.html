@@ -663,12 +663,14 @@
       <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
       <div class="auth-divider clickable" id="loginToggle"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
-        <div class="login-row">
-          <input id="loginAccount" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
-          <input id="loginPassword" type="text" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
-        </div>
-        <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
-        <button class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
+        <form class="login-form" id="loginForm" onsubmit="return false">
+          <div class="login-row">
+            <input id="loginAccount" name="username" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱" autocomplete="off">
+            <input id="loginPassword" type="text" name="password" data-txt-ph="loginPwdPh" placeholder="密码" autocomplete="off">
+          </div>
+          <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
+          <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
+        </form>
         <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" data-txt="loginForgot">忘记密码</b></div>
       </div>
     </div>
@@ -3348,7 +3350,7 @@ on('loginToggle','click',()=>{
   if(open){ pw.type='password'; pw.autocomplete='current-password'; ac.autocomplete='username'; setTimeout(()=>ac.focus(),200); }
   else { pw.type='text'; pw.autocomplete='off'; ac.autocomplete='off'; }
 });
-on('loginBtn','click',()=>doLogin());
+on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
 on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
 on('toReg','click',()=>openModal('mReg'));
 on('toReset','click',(e)=>{ e.stopPropagation(); openModal('mReset'); });
