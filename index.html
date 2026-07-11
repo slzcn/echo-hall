@@ -2755,7 +2755,7 @@ function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const 
 // 成功→前端解码播真人嗓念字层(替代系统 speechSynthesis 机械音); 失败/超时→调用方走原兜底。
 const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
-const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711';
+const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711b';
 let EH_MASTER_MANIFEST=null;
 async function loadMasterManifest(){
   if(EH_MASTER_MANIFEST) return EH_MASTER_MANIFEST;
