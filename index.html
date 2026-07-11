@@ -3662,7 +3662,49 @@ sb.auth.onAuthStateChange((ev,session)=>{
   // 必须延时: onAuthStateChange 把 resumeAfterAuth 塞进 setTimeout(0), 若此处同步回落会把预绘的 hall
   // 立刻打回 enter, 等 setTimeout 跑完又跳回 hall(实测刷新后 enter→10s→hall 的严重抖动)。给 auth 就绪留足时间。
   setTimeout(()=>{ if(!authHandled && !curRoom && $('#hall').classList.contains('on')) goScene('enter'); }, 4000);
+  // 无已存 session 且停在入场页时: 静默取浏览器保存的凭据 → 自动登录, 免主人再手点。
+  setTimeout(()=>silentCredentialLogin(), 600);
+  watchAutofillLogin();   // 兜底覆盖只做传统输入框填充、不走 credentials API 的浏览器
 })();
+let _autoLoginFired=false;
+// 路①: Credential Management API 静默拿浏览器已存账密, 有则回填+登录(不弹UI)。
+async function silentCredentialLogin(){
+  try{
+    if(_autoLoginFired || authHandled || myUid) return;
+    if(!$('#enter').classList.contains('on')) return;
+    if(!(navigator.credentials && window.PasswordCredential)) return;
+    const cred = await navigator.credentials.get({ password:true, mediation:'silent' });
+    if(!cred || !cred.id || !cred.password) return;
+    fillAndLogin(cred.id, cred.password);
+  }catch(e){ /* 静默失败, 主人照常手动登录 */ }
+}
+// 路②: 部分浏览器只往输入框"填值"而不走 credentials API。监听密码框被自动填充(值突然出现)→自动登录。
+// 关键: 只对"自动填充"生效, 不能在主人手动逐字输入时途中触发。用 keystroke 标记区分:
+// 一旦主人在账号/密码框敲过键, 就关掉自动登录窗口, 之后完全交给手动+登录按钮。
+function watchAutofillLogin(){
+  const ac=$('#loginAccount'), pw=$('#loginPassword'); if(!ac||!pw) return;
+  let typed=false;
+  const markTyped=()=>{ typed=true; };
+  ac.addEventListener('keydown', markTyped); pw.addEventListener('keydown', markTyped);
+  const tryFill=()=>{
+    if(_autoLoginFired || authHandled || myUid || typed) return true;   // 敲过键=手动, 不自动
+    if(!$('#enter').classList.contains('on')) return false;
+    const a=ac.value.trim(), p=pw.value;
+    if(a && p && p.length>=6){ fillAndLogin(a, p); return true; }
+    return false;
+  };
+  // 轮询 3.5s(自动填充多在页面稳定后一两拍到位), 命中/敲键/超时即停
+  let n=0; const iv=setInterval(()=>{ if(tryFill() || ++n>14 || !$('#enter').classList.contains('on')) clearInterval(iv); }, 250);
+}
+function fillAndLogin(id, pwv){
+  if(_autoLoginFired || authHandled || myUid) return;
+  if(!$('#enter').classList.contains('on')) return;
+  _autoLoginFired=true;
+  const c=$('#loginCollapse'); if(c && !c.classList.contains('on')){ c.classList.add('on'); const sp=$('#loginToggle')?.querySelector('span'); if(sp) sp.textContent='已有账号？收起 ▴'; }
+  $('#loginAccount').value=id; $('#loginPassword').value=pwv;
+  doLogin();
+}
+
 </script>
 </body>
 </html>
