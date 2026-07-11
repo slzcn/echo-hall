@@ -3635,7 +3635,25 @@ sb.auth.onAuthStateChange((ev,session)=>{
   // 必须延时: onAuthStateChange 把 resumeAfterAuth 塞进 setTimeout(0), 若此处同步回落会把预绘的 hall
   // 立刻打回 enter, 等 setTimeout 跑完又跳回 hall(实测刷新后 enter→10s→hall 的严重抖动)。给 auth 就绪留足时间。
   setTimeout(()=>{ if(!authHandled && !curRoom && $('#hall').classList.contains('on')) goScene('enter'); }, 4000);
+  // 无已存 session 且停在入场页时: 静默取浏览器保存的凭据 → 自动登录, 免主人再手点。
+  setTimeout(()=>silentCredentialLogin(), 600);
 })();
+// 用 Credential Management API 静默拿浏览器已存的账号密码, 有则自动填入并登录(不弹任何UI)。
+async function silentCredentialLogin(){
+  try{
+    if(authHandled || myUid) return;                          // 已有正式 session, 不用
+    if(!$('#enter').classList.contains('on')) return;         // 只在入场页触发
+    if(!(navigator.credentials && window.PasswordCredential)) return;
+    const cred = await navigator.credentials.get({ password:true, mediation:'silent' });
+    if(!cred || !cred.id || !cred.password) return;
+    if(authHandled || myUid || !$('#enter').classList.contains('on')) return;  // 期间可能已被 session 恢复接管
+    // 展开登录区 + 回填 + 直接登录
+    const c=$('#loginCollapse'); if(c && !c.classList.contains('on')){ c.classList.add('on'); const sp=$('#loginToggle')?.querySelector('span'); if(sp) sp.textContent='已有账号？收起 ▴'; }
+    $('#loginAccount').value=cred.id; $('#loginPassword').value=cred.password;
+    doLogin();
+  }catch(e){ /* 静默失败, 主人照常手动登录 */ }
+}
+
 </script>
 </body>
 </html>
