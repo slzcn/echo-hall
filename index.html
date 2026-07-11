@@ -2119,9 +2119,15 @@ function buildMsgEl(m){
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
   attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
+  // 神曲卡片一渲染就后台预取真人嗓(根治延迟——不管自己发的还是收到别人的, 点播放时缓存已就绪)
+  if(isSong){
+    try{ const _p=parseSong(m.text); const _st=SONG_STYLES.find(s=>s.id===_p.sid)||SONG_STYLES[0];
+      // 延迟一拍预取(避免初始大批历史消息同时灼 20 个请求), 只预取靠近底部的新卡片
+      setTimeout(()=>{ try{ prefetchVoice(_p.lyric, _st.ttsStyle||'default'); }catch(_){} }, 300);
+    }catch(_){}
+  }
   return el;
 }
-// myUid 变化(登录态迟到就绪/换身份)后, 回补已渲染消息的左右归属 + 虚空本人后缀。
 // 修: enterRoom 里 ensureAuth 若在 session 恢复前跑, 会拿到临时匿名uid渲染历史, 自己的消息被判成"别人"卡左边;
 // 真session到达后 myUid 修正, 但旧DOM不会自动重判, 故这里显式回补。
 function resyncMsgOwnership(){
