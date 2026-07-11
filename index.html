@@ -2663,10 +2663,10 @@ function songHtml(text){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   // 逐字包 span → 播放时卡拉OK高亮
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
-  // 曲风标签色跟随当前主题皮肤(var(--cyan)=每套皮肤的主强调色),切皮肤时自动变色
-  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:var(--cyan)">
+  // 曲风标签色 = 曲风自己的颜色(disco绿/lofi青/shen粉…),每种曲风一个色
+  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:${safeColor(st.color)}">
     <button class="song-play" title="播放"><span class="pglyph"></span></button>
-    <span class="song-meta"><span class="song-style" style="color:var(--cyan)">${st.emoji} ${esc(st.name)}
+    <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
     <span class="song-lyric">${chs}</span></span></span>`;
 }
