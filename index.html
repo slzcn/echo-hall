@@ -2679,7 +2679,8 @@ function setMode(mode){
   composer.classList.toggle('song-mode', songMode);
   // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
   const pb=$('#plusBtn');
-  pb.textContent = mode==='none' ? '＋' : MODE_ICON[mode];
+  // 有模式时显模式图标: 走 avEmoji 校正(🕳️黑洞在按钮里也偏下, 否则不居中); 无模式显 ＋
+  pb.innerHTML = mode==='none' ? '＋' : avEmoji(MODE_ICON[mode]);
   pb.classList.toggle('mode-on', mode!=='none');
   pb.title = mode==='none' ? '更多花样' : '退出当前模式';
   // 菜单项高亮
