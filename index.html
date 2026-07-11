@@ -1390,9 +1390,11 @@ async function ensureAuth(){
     uid = data.user.id;
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
-  // upsert 到 eh_users
+  // upsert 到 eh_users: 只是把身份档案落库, 后续进房/发言都不依赖它当场完成 →
+  // fire-and-forget, 不阻塞"进入→大厅"导航(省一个网络往返的可感知等待)。
   const isAnon = !session?.user?.email;
-  await sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:isAnon, last_seen:new Date().toISOString() });
+  sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:isAnon, last_seen:new Date().toISOString() })
+    .then(({error})=>{ if(error) console.warn('eh_users upsert', error.message); });
   return uid;
 }
 
@@ -4070,9 +4072,13 @@ on('sendVerifyBtn','click',()=>sendVerifyEmail());
 on('doProfBtn','click',()=>saveProfile());
 on('enterBtn','click',async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
+  // 先切大厅并立即铺骨架占位(秒显), 认证在背后跑 → 不再干等网络往返后才切场景
+  goScene('lobby');
+  { const ch=$('#channels'); if(ch && !ch.children.length) ch.innerHTML=chSkel(4);
+    const pr=$('#publicRooms'); if(pr && !pr.children.length) pr.innerHTML=chSkel(2); }
   await ensureAuth();
   btn.disabled=false;
-  goScene('lobby'); renderLobby();
+  renderLobby();
 });
 on('backBtn','click',()=>backToLobby());
 on('gearBtn','click',()=>openGear());
