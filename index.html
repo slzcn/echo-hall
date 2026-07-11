@@ -2644,19 +2644,19 @@ const SCALE={
 // motif=旋律动机(反复出现→洗脑), chords=每小节根音(半音), groove=鼓型
 // v2: 主唱改为共振峰哼唱(音高真跟旋律走), TTS 降为可选轻声跟读垫; motif 做"钩子+变奏"更洗脑; 新增 慵懒Lo-Fi 曲风
 const SONG_STYLES=[
-  { id:'dj',    name:'DJ',    emoji:'🕺', color:'#28E6D8', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
+  { id:'dj',    name:'DJ',    emoji:'🕺', color:'#FF2E63', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
     motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12,
     coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
-  { id:'jazz',  name:'爵士',  emoji:'🎷', color:'#D9A441', bpm:92,  bpc:0.5, base:-2, scale:SCALE.major,
+  { id:'jazz',  name:'爵士',  emoji:'🎷', color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:SCALE.major,
     motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3], wave:'sine', bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy', playRate:0.95,
     coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
-  { id:'funk',  name:'Funk',  emoji:'🪩', color:'#4DE38A', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
+  { id:'funk',  name:'Funk',  emoji:'🪩', color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
     motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1,
     coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
-  { id:'gufeng',name:'古风',  emoji:'🏮', color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
+  { id:'gufeng',name:'古风',  emoji:'🏮', color:'#E63946', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
     motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96,
     coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
-  { id:'kid',   name:'卡通',  emoji:'🧸', color:'#FFB84D', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
+  { id:'kid',   name:'卡通',  emoji:'🧸', color:'#FF8FB1', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
     motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18,
     coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
 ];
