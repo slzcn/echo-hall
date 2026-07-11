@@ -795,7 +795,7 @@ const CFG_DEFAULT = {
     "虚空回音":{root:329.63,chord:[0,5,7,12],wave:"sine",pulse:1600,cut:2600,name:"空灵铃音"},
   },
   identityPool:{adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'],voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员']},
-  tuning:{publicRecentLimit:500,historyPage:60,prefetchN:48,prefetchTtlMs:60000,voidTtlMs:300000,onlineWindowMs:35000,resonanceThreshold:5,voiceMaxSec:30},
+  tuning:{publicRecentLimit:500,historyPage:60,prefetchN:48,prefetchTtlMs:60000,voidTtlMs:300000,onlineWindowMs:35000,resonanceThreshold:5,voiceMaxSec:30,singMode:'ai'},
     text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时身份 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"📡 官方频道",hallPublic:"🌐 公开房间",hallPrivate:"🔒 私密房",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存",loginSwitchId:"↻ 换一个",loginToggleShow:"已有账号？点此登录 ▾",loginUserPh:"用户名 或 邮箱",loginPwdPh:"密码",loginNoAccount:"没有账号？",loginGoReg:"注册一个 →",loginForgot:"忘记密码",lobbyPrivateHint:"凭邀请码加入，或创建一个只有你和朋友的房间",lobbyCreateBtn:"＋ 创建",lobbyJoinBtn:"🔑 加入",titleBgm:"氛围音乐",titleRoomSet:"房间设置",titleProfile:"个人空间",titleSkin:"皮肤",titleMore:"更多花样",titleEmoji:"表情",holdToTalk:"按住 说话",recordingHint:"松开发送 · 上滑取消",createRoomTitle:"创建房间",createRoomSub:"选择房间类型，起个名字。",roomNameLabel:"房间名",roomNamePh:"比如：午夜同好会",roomIconLabel:"图标",inviteShareHint:"把邀请码发给朋友，他们就能进来：",copyBtn:"复制",joinRoomTitle:"用邀请码加入",joinRoomSub:"输入朋友给你的邀请码：",inviteCodeLabel:"邀请码",inviteCodePh:"例如 A3F9K2M7QX",regTitle:"注册账号",regSub:"注册后可跨设备用账号密码登录，保留身份与聊天记录。",regUserLabel:"用户名",regUserPh:"3-20 位，支持中英文",regPwdPh:"至少 6 位",regEmailLabel:"邮箱（选填）",regEmailPh:"用于找回密码，建议填写",forgotTitle:"找回密码",forgotSub:"输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）",forgotEmailPh:"注册时填的邮箱",emailSetTitle:"邮箱设置",emailSetSub:"用于找回密码。绑定用户名/密码登录不受影响。",emailCurLabel:"当前邮箱",emailNewLabel:"新邮箱",editProfileTitle:"编辑形象",editProfileSub:"自定义你的昵称和头像（用户名登录不受影响）。",nickLabel:"昵称",nickPh:"显示给别人看的名字",avatarLabel:"头像",themeColorLabel:"主题色",confirmTitle:"确认操作",cancelBtn:"取消",okBtn:"确定",ok_emailVerified:"✓ 邮箱验证成功",ok_saved:"已保存",ok_kicked:"已踢出",ok_profileUpdated:"形象已更新",ok_roomDissolved:"房间已解散",ok_welcomeBack:"欢迎回来",ok_regDone:"注册成功，已登录",ok_codeCopied:"邀请码已复制",ok_emailUpdated:"邮箱已更新，请验证",ok_resetSent:"若该邮箱已注册，重置链接已发送",err_saveFail:"保存失败",err_sendFail:"发送失败",err_copyFail:"复制失败",err_createRoom:"建房失败",err_recInit:"录音初始化失败",err_recTooLong:"录音太长，发送失败",err_recTooShort:"说话时间太短",err_roomNameEmpty:"房间名不能为空",err_noRecSupport:"此浏览器不支持录音",err_noAudioSupport:"此浏览器不支持音频合成",err_userNotFound:"没找到这个人（需在本房在线）",err_regFail:"注册失败",err_noAccount:"账号不存在",err_wrongPwd:"账号或密码错误",err_initId:"身份初始化失败，刷新重试",err_badCode:"邀请码无效或房间不存在",err_emailFmt:"邮箱格式不对",err_needMic:"需要麦克风权限才能发语音",err_voiceUpload:"语音上传失败",err_voiceSend:"语音发送失败",err_voiceLoad:"语音加载失败，可能已过期",err_voiceUrl:"语音地址缺失",err_voiceBucket:"语音存储未配置(缺 eh-voice 桶)",err_verifyFail:"验证失败",ok_emailAlready:"邮箱已验证",err_singSend:"神曲发送失败",warn_regNeedLogin:"注册成功但登录失败，请回登录页手动登录",warn_needLogin:"请先登录",warn_needCredentials:"请填写账号和密码",warn_needCode:"请输入邀请码",warn_needRoomName:"给房间起个名",warn_browserBlock:"被浏览器拦截，请再点一次",warn_pwdShort:"密码至少 6 位",warn_userShort:"用户名至少 3 位",help_sing:"用法：/sing 要唱的文字",help_whisper:"用法：/whisper @昵称 内容",sing_needText:"先打点字，让它唱出来",sing_noContent:"没有可唱的内容"},
 };
 
@@ -1011,7 +1011,7 @@ $('#textResetBtn')?.addEventListener('click',()=>resetConfigKeys(['text'], loadT
 $('#textSearchInput')?.addEventListener('input',e=>filterText(e.target.value));
 
 // ---- ⚙️ 运行参数 UI ----
-// [key, 中文名, 单位/说明]
+// [key, 中文名, 单位/说明, options?] options 非空=下拉选择(枚举); 空=数字输入
 const TUNING_FIELDS=[
   ['publicRecentLimit','公开房进房显示条数','公开/官方房一次拉最近多少条(上限500)'],
   ['historyPage','私密房每页条数','私密房「加载更早」翻页步长'],
@@ -1021,17 +1021,24 @@ const TUNING_FIELDS=[
   ['onlineWindowMs','在线判定窗口','毫秒, 多久内有心跳算在线'],
   ['resonanceThreshold','共鸣触发阈值','单条消息某表情达到此数触发全房共鸣'],
   ['voiceMaxSec','语音最大时长','秒'],
+  ['singMode','神曲实现方式','ai=大模型真歌合成(发送后后台生成完未可播); legacy=本地合成哼唱+系统念字(零延迟, 不依赖后端)', [['ai','ai —— 大模型真歌'],['legacy','legacy —— 本地合成']]],
 ];
 async function loadTuning(){
   const cfg=await loadConfig();
   const t=(cfg&&cfg.tuning)||CFG_DEFAULT.tuning;
   const def=CFG_DEFAULT.tuning;
   let html='<div style="overflow-x:auto"><table><thead><tr><th>参数</th><th>值</th><th>说明</th></tr></thead><tbody>';
-  TUNING_FIELDS.forEach(([k,label,hint])=>{
+  TUNING_FIELDS.forEach(([k,label,hint,options])=>{
     const cur=(t[k]!=null)?t[k]:def[k];
     const changed=cur!==def[k];
     html+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:10px">改</span>':''}<div style="font-family:monospace;font-size:10px;color:var(--dim)">${k}</div></td>`;
-    html+=`<td><input type="number" data-tune="${k}" value="${cur}" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+    if(options && options.length){
+      // 枚举下拉
+      const opts=options.map(([v,label])=>`<option value="${esc(v)}"${String(v)===String(cur)?' selected':''}>${esc(label)}</option>`).join('');
+      html+=`<td><select data-tune="${k}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none">${opts}</select></td>`;
+    } else {
+      html+=`<td><input type="number" data-tune="${k}" value="${cur}" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+    }
     html+=`<td style="color:var(--dim);font-size:11.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${def[k]}</span></td></tr>`;
   });
   html+='</tbody></table></div>';
@@ -1039,12 +1046,19 @@ async function loadTuning(){
 }
 function collectTuning(){
   const def=CFG_DEFAULT.tuning; const out={};
-  TUNING_FIELDS.forEach(([k])=>{
+  TUNING_FIELDS.forEach(([k,label,hint,options])=>{
     const el=$(`#tuningTable [data-tune="${k}"]`);
-    let v=el?parseInt(el.value,10):NaN;
-    if(isNaN(v)||v<0) v=def[k];                 // 非法回落默认
-    if(k==='publicRecentLimit') v=Math.min(v,500);  // 与 RPC 硬上限一致
-    out[k]=v;
+    if(!el){ out[k]=def[k]; return; }
+    if(options && options.length){
+      // 枚举字符串
+      const v=el.value; const valid=options.some(o=>o[0]===v);
+      out[k]=valid?v:def[k];
+    } else {
+      let v=parseInt(el.value,10);
+      if(isNaN(v)||v<0) v=def[k];
+      if(k==='publicRecentLimit') v=Math.min(v,500);
+      out[k]=v;
+    }
   });
   return out;
 }

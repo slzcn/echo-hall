@@ -515,6 +515,21 @@
   .song-card.playing .song-eq i:nth-child(2){animation-delay:.15s}
   .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
   .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
+  /* AI 模式神曲生成中(“发送中”心智模型) */
+  .song-card.pending{opacity:.75}
+  .song-card.pending .song-play{cursor:wait;border-color:var(--sub);background:transparent}
+  .song-card.pending .song-play:hover{background:transparent;box-shadow:none}
+  .song-spinner{display:inline-block;width:12px;height:12px;border:1.5px solid transparent;border-top-color:var(--sc,var(--magenta));border-radius:50%;animation:songSpin .8s linear infinite}
+  @keyframes songSpin{to{transform:rotate(360deg)}}
+  /* pending 时 EQ 轻微起伏（“处理中”信号） */
+  .song-card.pending .song-eq i{animation:vbarSlow 1.6s ease-in-out infinite;opacity:.55}
+  .song-card.pending .song-eq i:nth-child(2){animation-delay:.2s}
+  .song-card.pending .song-eq i:nth-child(3){animation-delay:.4s}
+  .song-card.pending .song-eq i:nth-child(4){animation-delay:.6s}
+  @keyframes vbarSlow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(.75)}}
+  /* “归队”疬呼吸高亮：刚生成好的卡片0.6s微光，标记新到货 */
+  .song-card.arrived{animation:songArrive 1.6s ease-out 2}
+  @keyframes songArrive{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--sc,var(--magenta)) 45%,transparent)}70%{box-shadow:0 0 0 8px color-mix(in srgb,var(--sc,var(--magenta)) 0%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
 
   /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
   .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
@@ -787,7 +802,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0506';
+  var BUILD_VER='20260712-0640';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2203,7 +2218,6 @@ async function enterRoom(room){
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
-    try{ _prewarmRoomEnter(); }catch(_){}
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
@@ -2224,7 +2238,6 @@ async function enterRoom(room){
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
-  try{ _prewarmRoomEnter(); }catch(_){}
 
   await ensureAuth();
   subscribeMessages(room.id);   // 连接灯由其 subscribe 状态驱动
@@ -2350,7 +2363,9 @@ function subscribeMessages(rid){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
-      const m=p.new; if(m.user_id===myUid) return;
+      const m=p.new;
+      // song UPDATE (神曲生成完回写) 不跺“自己发的不重放”——发送者自己也需要“归队”动效
+      if(m.user_id===myUid && m.kind!=='song') return;
       const el=document.querySelector(`.msg[data-mid="${m.id}"] .txt`);
       if(!el) return;
       // 神曲/emoji 定稿由 kind 决定,流式中途都是纯文本,直接 esc+@高亮更新
@@ -2358,8 +2373,14 @@ function subscribeMessages(rid){
       const bubble=document.querySelector(`.msg[data-mid="${m.id}"]`);
       if(!m.streaming && (m.kind==='song'||m.kind==='act') && bubble){
         if(soulUidSet.has(m.user_id)) m.is_bot=true;
-        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); }
-      } else if(m.kind==='song'){ el.innerHTML=songHtml(m.text); }
+        // song “归队”: 旧卡片 pending → 新卡片 ready 时加呢呼吸高亮
+        let wasPending=false;
+        if(m.kind==='song'){ const oldCard=bubble.querySelector('.song-card'); wasPending=oldCard && oldCard.classList.contains('pending'); }
+        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); if(wasPending){ const nc=fresh.querySelector('.song-card'); if(nc && !nc.classList.contains('pending')){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'), 3400); } } }
+      } else if(m.kind==='song'){
+        // 少见分支：bubble 不存在 才走这里
+        el.innerHTML=songHtml(m.text);
+      }
       else if(m.kind==='voice'){ /* 语音不流式 */ }
       else { el.innerHTML=renderAtMentions(esc(m.text||'')); }
       // 生成完(streaming=false)时,若是纯emoji放个粒子
@@ -2591,13 +2612,6 @@ function buildMsgEl(m){
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
   attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
-  // 神曲卡片一渲染就后台预取真人嗓(根治延迟——不管自己发的还是收到别人的, 点播放时缓存已就绪)
-  if(isSong){
-    try{ const _p=parseSong(m.text); const _st=SONG_STYLES.find(s=>s.id===_p.sid)||SONG_STYLES[0];
-      // 尽早触发: 50ms 仅让本帧渲染完(避免阻塞列表 rAF), 不到 300ms
-      setTimeout(()=>{ try{ prefetchVoice(_p.lyric, _st.ttsStyle||'default'); }catch(_){} }, 50);
-    }catch(_){}
-  }
   return el;
 }
 // 修: enterRoom 里 ensureAuth 若在 session 恢复前跑, 会拿到临时匿名uid渲染历史, 自己的消息被判成"别人"卡左边;
@@ -2922,8 +2936,6 @@ function setMode(mode){
   voidMode = mode==='void';
   voiceMode = mode==='voice';
   songMode = mode==='song';
-  // 神曲模式首次启用: 预热常用短语(发常见词直接 0 延迟命中)
-  if(songMode){ try{ prewarmHotPhrases(); }catch(_){} }
   const composer=$('.composer');
   composer.classList.toggle('void-mode', voidMode);
   composer.classList.toggle('voice-mode', voiceMode);
@@ -3177,10 +3189,28 @@ const SONG_STYLES=[
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
 function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); return scale[((deg%n)+n)%n]+12*oct; }
+// 神曲消息 text 编码(AI模式扩展): sid|lyric  或  sid|lyric|songUrl|chorusStart|chorusEnd
+// - 老格式(仅 sid|lyric): legacy 模式播 / AI 模式生成中
+// - 新格式(带 URL): AI 模式已生成完, 服务器上有现成音频
+// lyric 里若含 | 会做 URL 编码存(encodeURIComponent), 读时 decodeURIComponent 回来
 function parseSong(text){
-  const t=String(text||''), i=t.indexOf('|');
-  if(i>0){ const sid=t.slice(0,i); if(SONG_STYLES.some(s=>s.id===sid)) return { sid, lyric:t.slice(i+1) }; }
-  return { sid:SONG_STYLES[0].id, lyric:t };
+  const t=String(text||''); const parts=t.split('|');
+  if(parts.length>=2 && SONG_STYLES.some(s=>s.id===parts[0])){
+    const sid=parts[0];
+    // 兼容旧格式: parts.length==2 时 parts[1] 直接是明文 lyric
+    // 新格式: parts.length>=5 时 parts[1] 是 encodeURIComponent 过的
+    let lyric=parts[1];
+    if(parts.length>=5){ try{ lyric=decodeURIComponent(parts[1]); }catch(_){} }
+    const songUrl=parts[2]||''; const chStart=parseFloat(parts[3]||'0')||0; const chEnd=parseFloat(parts[4]||'0')||0;
+    return { sid, lyric, songUrl, chorusStart:chStart, chorusEnd:chEnd, ready:!!songUrl };
+  }
+  return { sid:SONG_STYLES[0].id, lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
+}
+// 编码回 text 字段(存库/发送用)
+function encodeSong(sid, lyric, songUrl, chStart, chEnd){
+  const ly=String(lyric||'').slice(0,60);
+  if(!songUrl) return sid+'|'+ly;   // 生成中/legacy: 保持老格式(向后兼容)
+  return [sid, encodeURIComponent(ly), songUrl, String(chStart||0), String(chEnd||0)].join('|');
 }
 // 消息在"列表预览"里的纯文本呈现: 语音/神曲不能暴露 URL/内部编码
 function msgPreview(m){
@@ -3194,13 +3224,20 @@ function msgPreview(m){
   }
 }
 function songHtml(text){
-  const { sid, lyric }=parseSong(text);
+  const p=parseSong(text);
+  const { sid, lyric, songUrl, chorusStart, chorusEnd, ready }=p;
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   // 逐字包 span → 播放时卡拉OK高亮
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
-  // 曲风标签色 = 曲风自己的颜色(disco绿/lofi青/shen粉…),每种曲风一个色
-  return `<span class="song-card" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" style="--sc:${safeColor(st.color)}">
-    <button class="song-play" title="播放"><span class="pglyph"></span></button>
+  // AI 模式下的生成中态: 播放按钮变 spinner + 卡片挂 pending class
+  const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
+  const pending = singMode==='ai' && !ready;   // legacy 模式下永远是可播放态(本地合成不用等)
+  const pendCls = pending ? ' pending' : '';
+  const btnInner = pending ? '<span class="song-spinner"></span>' : '<span class="pglyph"></span>';
+  const btnTitle = pending ? '神曲生成中…' : '播放';
+  // 曲风标签色 = 曲风自己的颜色
+  return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
+    <button class="song-play" title="${btnTitle}">${btnInner}</button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
     <span class="song-lyric">${chs}</span></span></span>`;
@@ -3215,10 +3252,6 @@ function ac(){
 }
 let noiseBuf=null;
 function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
-// ============ mify 真人嗓 TTS (主方案) ============
-// 走 Supabase Edge Function 代理 mimo TTS, 返回 base64 PCM(s16le 24k mono)。
-// 成功→前端解码播真人嗓念字层(替代系统 speechSynthesis 机械音); 失败/超时→调用方走原兜底。
-const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
 const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711b';
 let EH_MASTER_MANIFEST=null;
@@ -3238,11 +3271,6 @@ async function loadMasterManifest(){
     const j=await tryFetch('reload'); EH_MASTER_MANIFEST=j; return j;
   }
 }
-function pickMasterForStyle(sid){
-  const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
-  const pool=items.filter(x=>x.sid===sid);
-  return pool.length ? pool[Math.floor(secureRand()*pool.length)] : null;
-}
 async function decodeMp3ArrayBuffer(ctx, ab){
   const copy=ab.slice(0);
   return await new Promise((res,rej)=>ctx.decodeAudioData(copy,res,rej));
@@ -3252,194 +3280,13 @@ function b64ToArrayBuffer(b64){
   for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
   return bytes.buffer;
 }
-async function tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st){
-  // 关键: 进来先确保 AudioContext 真正 running, 避免 async 拿走手势后 start() 静音
-  try{ if(ctx.state!=='running'){ await ctx.resume(); } }catch(_){}
-  if(ctx.state!=='running'){ console.warn('cover: ctx still not running, state='+ctx.state); return false; }
-  try{ await loadMasterManifest(); }catch(e){ console.warn('master manifest',e); return false; }
-  const master=pickMasterForStyle(sid); if(!master) return false;
-  const masterUrl=new URL(master.url, location.href).href;
-  let buf;
-  try{
-    const mResp=await fetch(masterUrl,{cache:'default'});
-    if(!mResp.ok) throw new Error('master_'+mResp.status);
-    const ab=await mResp.arrayBuffer();
-    buf=await decodeMp3ArrayBuffer(ctx,ab);
-    if(!buf || buf.duration<1){ console.warn('cover: master decode empty'); return false; }
-  }catch(e){ console.warn('master load',e); return false; }
-  AudioEngine.duck(true);
-  const main=ctx.createGain(); main.gain.value=0.85; main.connect(ctx.destination);
-  const gMaster=ctx.createGain(); gMaster.gain.value=1.0; gMaster.connect(main);
-  const src=ctx.createBufferSource(); src.buffer=buf; src.connect(gMaster);
-  const startAt=ctx.currentTime+0.06; src.start(startAt);
-  curSong={ ctx, master:main, oscs:[src], timeouts:[], el:el||null, onEnd:onEnd||null, _cover:true };
-  if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
-  // 粗略卡拉OK：先随母版节奏逐字点亮，cover接入后仍保留。
-  const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
-  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
-  const step=Math.max(0.28, Math.min(0.55, (master.duration||buf.duration)/Math.max(12,chars.length+6)));
-  chars.forEach((ch,i)=>{ const delay=(1.2+i*step)*1000; const ce=chEls[i]; if(ce) curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const prev=chEls[i-1]; if(prev) prev.classList.remove('on'); },delay)); });
-  curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(1,buf.duration+0.5)*1000));
-  // 后台翻唱：回来后按当前母版播放进度对齐 offset，1.5s xfade 切入。
-  fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterUrl, lyric, prompt:master.prompt||st.coverPrompt||''})})
-    .then(r=>r.json()).then(async res=>{
-      if(!curSong || curSong.ctx!==ctx || !curSong._cover || !res || !res.coverMp3_b64) return;
-      const coverBuf=await decodeMp3ArrayBuffer(ctx,b64ToArrayBuffer(res.coverMp3_b64));
-      if(!curSong || curSong.ctx!==ctx || !curSong._cover) return;
-      const now=ctx.currentTime+0.05;
-      const elapsed=Math.max(0, ctx.currentTime-startAt);
-      const offset=Math.min(Math.max(0, elapsed), Math.max(0,coverBuf.duration-0.4));
-      const gCover=ctx.createGain(); gCover.gain.setValueAtTime(0.0001,now); gCover.gain.linearRampToValueAtTime(1.0,now+1.5); gCover.connect(main);
-      try{ gMaster.gain.cancelScheduledValues(now); gMaster.gain.setValueAtTime(gMaster.gain.value,now); gMaster.gain.linearRampToValueAtTime(0.0001,now+1.5); }catch(_){ }
-      const csrc=ctx.createBufferSource(); csrc.buffer=coverBuf; csrc.connect(gCover); csrc.start(now,offset);
-      curSong.oscs.push(csrc);
-      curSong.timeouts.push(setTimeout(()=>{ try{ src.stop(); }catch(_){} },1700));
-      const remain=Math.max(0.5, coverBuf.duration-offset+1.8);
-      curSong.timeouts.push(setTimeout(()=>stopSong(), remain*1000));
-      console.log('cover xfade', {master:master.id, trace:res.trace, offset});
-    }).catch(e=>console.warn('cover fetch',e));
-  return true;
-}
-window.EH_DISABLE_TTS_FALLBACK = true;   // 临时开关: 禁用系统TTS兜底, 只听 mimo 真人嗓(验证后改回 false 恢复兜底)
-// PCM(base64, s16le/24k/mono) → AudioBuffer
-function pcm16ToBuffer(ctx, b64, sr){
-  const bin=atob(b64); const n=bin.length; const bytes=new Uint8Array(n);
-  for(let i=0;i<n;i++) bytes[i]=bin.charCodeAt(i);
-  const view=new DataView(bytes.buffer);
-  const srcSamples=Math.floor(n/2);
-  const srcSR=sr||24000;
-  const dstSR=ctx.sampleRate;
-  // 写入 ctx 采样率的 buffer, 需重采样(部分浏览器对 sourceBuffer.sampleRate 与 ctx.sampleRate 不一致的 buffer 不自动重采样, 直接变啌)
-  if(srcSR===dstSR){
-    const buf=ctx.createBuffer(1, srcSamples, dstSR);
-    const ch=buf.getChannelData(0);
-    for(let i=0;i<srcSamples;i++){ ch[i]=view.getInt16(i*2, true)/32768; }
-    return buf;
-  }
-  const ratio=dstSR/srcSR;
-  const dstSamples=Math.round(srcSamples*ratio);
-  const buf=ctx.createBuffer(1, dstSamples, dstSR);
-  const ch=buf.getChannelData(0);
-  // 线性插值重采样(精度够用, TTS 语音没必要上 Sinc)
-  for(let i=0;i<dstSamples;i++){
-    const srcPos=i/ratio;
-    const i0=Math.floor(srcPos);
-    const i1=Math.min(i0+1, srcSamples-1);
-    const t=srcPos-i0;
-    const s0=view.getInt16(i0*2, true)/32768;
-    const s1=view.getInt16(i1*2, true)/32768;
-    ch[i]=s0*(1-t)+s1*t;
-  }
-  return buf;
-}
-// 请求 mify 真人嗓; 带超时。成功 resolve {buffer}; 失败/超时 resolve null(调用方据此走兜底)。
-function fetchMifyVoice(text, timeoutMs, style){
-  return new Promise((resolve)=>{
-    let done=false;
-    const to=setTimeout(()=>{ if(!done){ done=true; resolve(null); } }, timeoutMs||3500);
-    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
-    if(ctl) setTimeout(()=>{ try{ctl.abort();}catch(e){} }, (timeoutMs||3500)+200);
-    fetch(EH_SING_TTS_FN, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:String(text).slice(0,60), style:style||'default'}),
-      signal: ctl?ctl.signal:undefined
-    }).then(r=>r.ok?r.json():null).then(j=>{
-      if(done) return; done=true; clearTimeout(to);
-      if(j&&j.ok&&j.audio){
-        try{ const cx=ac(); resolve({ b64:j.audio, sr:j.sample_rate||24000 }); }
-        catch(e){ resolve(null); }
-      } else resolve(null);
-    }).catch(()=>{ if(!done){ done=true; clearTimeout(to); resolve(null); } });
-  });
-}
 
-// ============ 真人嗓预取缓存(根治延迟) ============
-// 策略: 发送瞬间/打字停顿时就异步预合成, 存缓存; 播放时命中则 0 延迟直接播。
-const EH_VOICE_CACHE=new Map();   // key: style+'\u0001'+text  -> {b64,sr,ts,pin}
-const EH_VOICE_CACHE_MAX=60;
-function voiceCacheKey(text,style){ return (style||'default')+'\u0001'+String(text).slice(0,60); }
-function getCachedVoice(text,style){ const k=voiceCacheKey(text,style); const v=EH_VOICE_CACHE.get(k); if(v){ v.ts=Date.now(); } return v||null; }
-function putCachedVoice(text,style,data,pin){
-  const k=voiceCacheKey(text,style);
-  const prev=EH_VOICE_CACHE.get(k);
-  EH_VOICE_CACHE.set(k,{...data,ts:Date.now(),pin: pin||(prev&&prev.pin)||false});
-  // 超上限淘汰最旧(铉住的预置词不淘汰)
-  if(EH_VOICE_CACHE.size>EH_VOICE_CACHE_MAX){
-    let oldK=null,oldT=Infinity;
-    for(const [kk,vv] of EH_VOICE_CACHE){ if(!vv.pin && vv.ts<oldT){ oldT=vv.ts; oldK=kk; } }
-    if(oldK) EH_VOICE_CACHE.delete(oldK);
-  }
-}
 // 预取: 不阻塞, 成功存缓存。已有缓存则跳过。pin=true 时铉住不被 LRU 淘汰(预置词用)。
 let _prefetchInflight=new Set();
-function prefetchVoice(text,style,pin){
-  text=String(text||'').trim().slice(0,60);
-  if(!text) return;
-  const k=voiceCacheKey(text,style);
-  if(EH_VOICE_CACHE.has(k) || _prefetchInflight.has(k)) return;
-  _prefetchInflight.add(k);
-  fetchMifyVoice(text, 8000, style).then(res=>{
-    _prefetchInflight.delete(k);
-    if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr},pin);
-  }).catch(()=>{ _prefetchInflight.delete(k); });
-}
-
-// ============ 常用短语预热(页面加载后就预合成, 发常见词直接命中) ============
-const EH_HOT_PHRASES=['哈哈哈','哈喽','你好','晚安','早安','没歇','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
 // ============ 静态预生成真人嗓(随页面异步加载, 固定词零网络瞬时) ============
 // 预烤好的 mp3 固定词音频放 assets/eh_preset_<style>.json, 页面加载后后台下载+解码存缓存。
 // 命中 = 真人嗓 0 网络延迟。与哼唱动态增益互补: 固定词真人嗓瞬时, 任意词哼唱兜底。
 let _staticPresetsLoaded=false;
-async function loadStaticPresets(){
-  if(_staticPresetsLoaded) return; _staticPresetsLoaded=true;
-  const STYLES_TO_LOAD=['sao'];   // 先上默认神曲风, 验证 OK 再扩展其他曲风
-  for(const style of STYLES_TO_LOAD){
-    try{
-      const r=await fetch('assets/eh_preset_'+style+'.json', {cache:'force-cache'});
-      if(!r.ok) continue;
-      const pack=await r.json();
-      if(pack.fmt!=='mp3' || !pack.p) continue;
-      const ctx=ac();
-      for(const [word, mp3b64] of Object.entries(pack.p)){
-        try{
-          const bin=atob(mp3b64);
-          const u8=new Uint8Array(bin.length);
-          for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-          const buf=await ctx.decodeAudioData(u8.buffer);
-          const k=voiceCacheKey(word, style);
-          EH_VOICE_CACHE.set(k, {mp3buf:buf, ts:Date.now(), pin:true});
-        }catch(_){}
-      }
-      _prewarmedStyles.add(style);   // 标记此风已备, 避免重复网络预热
-    }catch(_){}
-  }
-}
-let _prewarmedStyles=new Set();
-function prewarmHotPhrases(){
-  // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样)
-  const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
-  const style=st.ttsStyle||'default';
-  if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
-  // 并发预热全部预置词, pin=true 铉住不被用户输入的词挤出缓存(预置词永远即时)。
-  // 预置词短, 并发 ~2s 全部备好, 远比错峰 10s 快。
-  EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
-}
-// 进房就预热默认神曲风(DJ)的预置词——让预热窗口提前到用户浏览/打字时, 点神曲时已备好。
-// 延 2s 避开进房时的订阅/拉消息网络高峰。
-function _prewarmRoomEnter(){
-  // 优先加载静态预生成真人嗓(零网络瞬时); 加载完会把 sao 风标进 _prewarmedStyles。
-  try{ loadStaticPresets(); }catch(_){}
-  setTimeout(()=>{
-    try{
-      const st=SONG_STYLES[0];
-      const style=st.ttsStyle||'default';
-      if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
-      // 静态未覆盖的风才走网络预热
-      EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
-    }catch(_){}
-  }, 2000);
-}
 
 function tone(ctx,dest,freq,t,dur,type,gain){
   const o=ctx.createOscillator(), g=ctx.createGain();
@@ -3517,7 +3364,60 @@ function pickZhVoice(){
   return _voiceCache;
 }
 if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCache=null; pickZhVoice(); }; pickZhVoice(); }catch(e){} }
+// 神曲播放 dispatcher: 根据 singMode 分发到 legacy(本地合成)/ai(拉URL播高潮)
 async function playSong(lyric, sid, el, onEnd){
+  const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
+  // AI 模式且卡片上有 songUrl → 走服务器音频, 从 chorus 起播
+  if(singMode==='ai' && el && el.dataset && el.dataset.url){
+    return playSongAI(el, onEnd);
+  }
+  // 否则(legacy 或 AI-未生成好)走本地合成
+  return playSongLegacy(lyric, sid, el, onEnd);
+}
+
+// AI 模式播放: 服务器音频, 从 chorus 段起播 + 段内匀速跑马灯
+async function playSongAI(el, onEnd){
+  stopVoice(); stopSong();
+  const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
+  try{ ctx.resume&&ctx.resume(); }catch(_){}
+  for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(_){} }
+  const url=el.dataset.url;
+  const chS=parseFloat(el.dataset.cs||'0')||0;
+  const chE=parseFloat(el.dataset.ce||'0')||0;
+  const lyric=el.dataset.lyric||'';
+  try{
+    AudioEngine.duck(true);
+    const resp=await fetch(url); if(!resp.ok) throw new Error('fetch '+resp.status);
+    const ab=await resp.arrayBuffer();
+    const buf=await new Promise((res,rej)=>ctx.decodeAudioData(ab.slice(0),res,rej));
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const g=ctx.createGain(); g.gain.value=0.95;
+    src.connect(g); g.connect(ctx.destination);
+    const chorusDur=Math.max(1, chE-chS);
+    const offset=Math.max(0, Math.min(chS, buf.duration-0.2));
+    const dur=Math.min(chorusDur, buf.duration-offset);
+    const now=ctx.currentTime+0.05;
+    src.start(now, offset, dur);
+    curSong={ ctx, master:g, oscs:[src], timeouts:[], el, onEnd:onEnd||null, _ai:true };
+    if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
+    // 跑马灯: chorus 时长 ÷ 字数 匀速点亮
+    const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
+    if(chEls.length){
+      const per=dur/chEls.length;
+      chEls.forEach((ce,i)=>{ const at=(now-ctx.currentTime + i*per)*1000; curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,at))); });
+    }
+    src.onended=()=>{ if(curSong && curSong.ctx===ctx) stopSong(); };
+    // 兜底停歌
+    curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.ctx===ctx) stopSong(); }, (dur+0.6)*1000));
+  }catch(e){
+    console.warn('playSongAI',e);
+    AudioEngine.duck(false);
+    toast('播放失败');
+  }
+}
+
+// legacy 模式播放: 纯本地 Web Audio 合成 + 元音哼唱 + 系统 TTS (还原 526771a v9 纯设备版)
+async function playSongLegacy(lyric, sid, el, onEnd){
   stopVoice(); stopSong();
   const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
   // 安卓 Chrome: AudioContext 初始 suspended, resume() 异步。带超时保护地等它 running,
@@ -3528,8 +3428,6 @@ async function playSong(lyric, sid, el, onEnd){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
-  // 主路径：MiniMax 母版真歌 + cover 翻唱。失败时自动降级到原 WebAudio 哼唱路径。
-  try{ if(await tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st)) return; }catch(e){ console.warn('cover path fallback',e); }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
@@ -3538,8 +3436,6 @@ async function playSong(lyric, sid, el, onEnd){
   // 主唱总线直连 master(gain 1.3 补偿). 不用 DynamicsCompressor:
   // 国产浏览器(小米/QQ 等基于旧内核)对 DynamicsCompressor 支持有bug, 会把主唱信号压没/断掉
   // → 安卓表现"有伴奏没人声"(伴奏走master不经压缩器正常). 已改纯 GainNode, 全平台兼容.
-  // 主唱总线: 初始声量高(1.6=“主角”), 真人嗓到货后 ramp 降低(0.75=“背景长音”), 让真人嗓无缝接管主唱。
-  // 关键根治“任何词即时”—— fetch 空窗期哼唱就是主唱(声量够大), 不是以前的“背景塔型"。
   const voiceBus=ctx.createGain(); voiceBus.gain.value=1.6;
   voiceBus.connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
@@ -3584,94 +3480,26 @@ async function playSong(lyric, sid, el, onEnd){
   const endT=t0+chars.length*step;
   const endSemi=st.base+scaleSemi(st.scale,st.motif[0])+12;
   singVoice(ctx,voiceBus,NOTE(endSemi),endT,spb*1.3,'o',0.6,st.wave).forEach(o=>curSong.oscs.push(o));
-  // 主唱层念字: 优先 mify 真人嗓(主方案), 超时/失败降级系统 speechSynthesis(兜底)。
-  // mify 异步获取, 到达后用 Web Audio 接 voiceBus 播放; 期间哼唱+伴奏已在唱, 真人嗓作为跟唱叠入。
-  const fullText=chars.join('');
-  let mifyHandled=false;
-  // 系统 TTS 兜底函数(原逻辑封装, 供 mify 失败时调用)
-  function fallbackSysTTS(){
-    if(window.EH_DISABLE_TTS_FALLBACK) return;   // 临时: 禁用系统TTS兜底(便于纯听mimo真人嗓)
-    if(mifyHandled) return;
-    if(!hasTTS) return;
+  // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
+  // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
+  if(hasTTS){
+    const fullText=chars.join('');
     const rate=clamp(st.tts?.rate??1.1, 0.7, 1.6);
     const pitch=clamp(st.tts?.pitch??1.0, 0.4, 2);
     try{
       speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(fullText);
       u.lang='zh-CN'; if(zhVoice) u.voice=zhVoice;
-      u.rate=rate; u.pitch=pitch; u.volume=0.35;   // 轻声跟读垫, 不抢共振峰主唱
-      if(curSong) curSong._tts=u;
+      u.rate=rate; u.pitch=pitch; u.volume=0.35;   // v2: TTS 降为轻声跟读垫, 不抢共振峰主唱
+      curSong._tts=u;
       speechSynthesis.speak(u);
+      // Chrome 有时 speak 后卡在 paused, resume 兜底
       setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
     }catch(e){}
   }
-  // 主方案: 优先用预取缓存(0 延迟), 未命中才现场请求。按曲风传 style 音色。
-  const ttsStyle=st.ttsStyle||'default';
-  const playRate=clamp(st.playRate??1.0, 0.7, 1.5);
-  const cached=getCachedVoice(fullText, ttsStyle);
-  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr, mp3buf:cached.mp3buf, _cached:true})
-                            : fetchMifyVoice(fullText, 4500, ttsStyle);
-  voiceReady.then(res=>{
-    // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
-    if(!curSong || curSong.ctx!==ctx){
-      // 未命中时 fetch 回来都存进缓存, 下次同词同风便命中
-      if(res && res.b64 && !res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
-      return;
-    }
-    if(res && (res.b64 || res.mp3buf)){
-      // 未命中则写入缓存(下次 0 延迟)
-      if(!res._cached){ try{ putCachedVoice(fullText, ttsStyle, {b64:res.b64, sr:res.sr}); }catch(_){} }
-      try{
-        // 静态预置词命中: 已预解码的 mp3 AudioBuffer 直接用(0 解码耗时); 否则解 PCM
-        const buf = res.mp3buf ? res.mp3buf : pcm16ToBuffer(ctx, res.b64, res.sr);
-        const src=ctx.createBufferSource(); src.buffer=buf;
-        src.playbackRate.value=playRate;
-        // 真人嗓直接挂 master(不走 voiceBus 的 1.6 倍放大), gain 0.9 防剔顶
-        const vg=ctx.createGain(); vg.gain.value=0.9;
-        src.connect(vg); vg.connect(master);
-        // 关键根治延迟: 缓存命中则与哼唱同步在 t0 起播(0 延迟); 未命中则回来后从当前时间平滑接入
-        const now=ctx.currentTime;
-        const startAt=res._cached ? Math.max(t0, now+0.02) : (now+0.03);
-        src.start(startAt);
-        curSong.oscs.push(src);
-        mifyHandled=true;
-        // 真人嗓接管后, 将哼唱从“主角” ramp 降至“背景”(1.6→0.75), 让真人嗓成主唱+哼唱做和声。
-        // 200ms 平滑过渡, 避免突然窜鸭。
-        try{
-          voiceBus.gain.cancelScheduledValues(startAt);
-          voiceBus.gain.setValueAtTime(voiceBus.gain.value, startAt);
-          voiceBus.gain.linearRampToValueAtTime(0.75, startAt+0.2);
-        }catch(_){}
-        const realDur=buf.duration/playRate;   // 真人嗓实际播放时长
-        // 【修词曲同步】真人嗓命中 → 字高亮改跟真人嗓的实际语速(而非哼唱固定 step)。
-        // 清掉原按哼唱 step 排的字高亮 timeout, 按 realDur 均分重排, 让"词"跟着真正在唱的走。
-        if(chEls.length){
-          const perChar=realDur/chEls.length;   // 每字分到的真人嗓时长
-          // 清旧字高亮(只清字的, 不动停歌 timeout — 停歌下面重排)
-          if(curSong._charTimers) curSong._charTimers.forEach(clearTimeout);
-          curSong._charTimers=[];
-          chEls.forEach((ce,i)=>{
-            const at=(startAt - ctx.currentTime + i*perChar)*1000;
-            curSong._charTimers.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,at)));
-          });
-          curSong.timeouts.push(...curSong._charTimers);
-        }
-        // 【修提前停止】真人嗓命中后, 停歌取"真人嗓结束"与"哼唱/伴奏结束"的较晚者,
-        // 避免真人嗓短时提前砍掉还在播的哼唱伴奏, 也避免真人嗓长时被旧兜底砍掉。
-        const voiceEnd=startAt + realDur + 0.5;   // +0.5 让尾音播完
-        const humEnd=t0+totalDur;                 // 哼唱+甩音"哟~"结束
-        const stopAt=Math.max(voiceEnd, humEnd);
-        curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.ctx===ctx) stopSong(); }, Math.max(0,(stopAt-ctx.currentTime))*1000));
-      }catch(e){ fallbackSysTTS(); }
-    } else {
-      // mify 失败/超时 → 系统 TTS 兜底
-      fallbackSysTTS();
-    }
-  });
-  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间); 缓存命中时 totalDur 就够, 未命中也给真人嗓留足等待窗口
+  // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
-  const minWait = cached ? 0 : 5.0;   // 未命中才给 5s 安全等待窗口
-  curSong.timeouts.push(setTimeout(()=>{ if(!mifyHandled) stopSong(); }, (Math.max(totalDur,ttsDur,minWait)+0.4)*1000));
+  curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
 document.addEventListener('click',e=>{
@@ -3690,6 +3518,17 @@ document.addEventListener('click',e=>{
       wsrc.connect(c.destination); wsrc.start(0);
     }
   }catch(_){}
+  if(card.classList.contains('pending')){
+    // 养底: pending 卡片被点（发送者关页/断网导致生成中断）→ 点击者补触发一次生成
+    const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
+    if(mid && !_EH_SONG_GENERATING.has(String(mid))){
+      toast('神曲重新生成中…');
+      generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
+    } else {
+      toast('神曲生成中…');
+    }
+    return;
+  }
   if(curSong && curSong.el===card){ stopSong(); return; }
   playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
 });
@@ -3699,16 +3538,76 @@ async function sendSong(lyric, sid){
   lyric=String(lyric||'').trim().slice(0,60);
   if(!lyric){ toast(EH_CONFIG.text.sing_needText); return; }
   if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
-  // 根治延迟: 发送瞬间立即预取真人嗓(播放时已在缓存中)
-  try{ const _st=SONG_STYLES.find(s=>s.id===sid); prefetchVoice(lyric, _st&&_st.ttsStyle||'default'); }catch(_){}
-  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
+  const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
+  // legacy 模式: 消息立即发出、本地即时试听(无需生成)
+  if(singMode==='legacy'){
+    const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:encodeSong(sid,lyric), kind:'song' };
+    const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
+    const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
+    if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
+    const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
+    optimistic.id=row.id; if(el) el.dataset.mid=row.id;
+    return;
+  }
+  // AI 模式: 消息立即发出(pending 态) → 后台异步生成 → 上传 → PATCH text 回写 → realtime 广播归队
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:encodeSong(sid,lyric), kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
-  // 本地立即试听(发送者刚有手势, 允许自动播放)
-  if(el){ const card=el.querySelector('.song-card'); if(card) playSong(lyric, sid, card); }
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
-  if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); if(curSong&&curSong.el===el) stopSong(); return; }
+  if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
+  // 后台生成(不 await, 让用户可以继续聊天/其他操作)
+  generateAndPersistSong(row.id, lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
+}
+
+// 生成 + 上传 + 回写 消息 text 字段(附带兜底: 谁触发到"未完成"卡片就由谁重生成一次)
+const _EH_SONG_GENERATING=new Set();   // 记录正在生成的 mid, 防重复触发
+async function generateAndPersistSong(mid, lyric, sid, el){
+  if(!mid || _EH_SONG_GENERATING.has(mid)) return;
+  _EH_SONG_GENERATING.add(mid);
+  try{
+    const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
+    // 挑一首同曲风母版当参考
+    let masterUrl='';
+    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) masterUrl=new URL(pool[Math.floor(Math.random()*pool.length)].url, location.href).href; }catch(_){}
+    if(!masterUrl){ throw new Error('no master for sid '+sid); }
+    // 调 Edge Function 生成(37s 左右)
+    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterUrl,lyric,prompt:st.coverPrompt||''})});
+    if(!resp.ok) throw new Error('cover HTTP '+resp.status);
+    const res=await resp.json();
+    if(!res.ok || !res.coverMp3_b64) throw new Error('cover no audio');
+    // 解析 chorus 段(structure 是 JSON 字符串)
+    let chS=0, chE=0;
+    try{
+      const struct=typeof res.structure==='string' ? JSON.parse(res.structure) : (res.structure||{});
+      const segs=struct.segments||[];
+      const chorus=segs.find(x=>String(x.label).toLowerCase().includes('chorus'));
+      if(chorus){ chS=chorus.start||0; chE=chorus.end||0; }
+      else if(segs.length){ const last=segs[segs.length-1]; chS=last.start||0; chE=last.end||0; }
+    }catch(_){}
+    // 兜底: 没有 chorus 时用全歌
+    if(chE<=chS){ chS=0; chE=res.cover_duration||0; }
+    // b64 → Blob → 上传 eh-song 桶
+    const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    const blob=new Blob([bytes],{type:'audio/mpeg'});
+    const path=`songs/${curRoom.id}/${mid}_${Date.now()}.mp3`;
+    const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:false});
+    if(up.error) throw new Error('upload '+up.error.message);
+    const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
+    const songUrl=pub.publicUrl;
+    // 回写消息 text 字段(带 URL + chorus 起止)→ realtime 会广播 UPDATE, 触发所有客户端卡片归队
+    const newText=encodeSong(sid, lyric, songUrl, chS, chE);
+    const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid);
+    if(upd.error){ console.warn('song patch',upd.error); }
+    console.log('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
+  }catch(e){
+    console.warn('generateSong fail',e);
+    toast(EH_CONFIG.text.err_singSend||'神曲生成失败');
+  }finally{
+    _EH_SONG_GENERATING.delete(mid);
+  }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
 let songSel=SONG_STYLES[0].id;
@@ -3730,7 +3629,6 @@ function renderSongStrip(){
     $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
     $('.composer').style.setProperty('--song-c', safeColor(st.color));
     strip.style.setProperty('--strip-c', safeColor(st.color));   // 切曲风: strip 标签+底色也跟随
-    try{ prewarmHotPhrases(); }catch(_){}   // 切新曲风也预热该风常用词
     try{ if(curRoom) $('#cin').focus(); }catch(_){}   // 切完聚焦输入框(主人要:切曲风后自动就绪打字)
   });
 }
@@ -4652,16 +4550,6 @@ cin.addEventListener('input',()=>{
     try{ const r=cin.getBoundingClientRect(); window.EhFx&&EhFx.typeSpark(r.right-18, r.top+r.height/2, 2); }catch(e){}
   }
   cin._lastLen=v.length;
-  // 神曲模式: 打字停顿 150ms 后后台预合成真人嗓(缩短至 150ms——容忍多一次预取也要确保发送时已命中)
-  if(songMode){
-    clearTimeout(cin._prefetchTimer);
-    const ly=v.trim().slice(0,60);
-    if(ly.length>=1){
-      cin._prefetchTimer=setTimeout(()=>{
-        try{ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; prefetchVoice(ly, st.ttsStyle||'default'); }catch(_){}
-      }, 150);
-    }
-  }
 });
 cin.addEventListener('keydown',e=>{
   // @菜单激活时，方向键/回车/Tab 选中，Esc 关闭 —— 优先于发送
