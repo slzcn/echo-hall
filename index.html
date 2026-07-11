@@ -2119,15 +2119,18 @@ let heartbeatTimer = null;
 async function setupPresence(room){
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
   clearInterval(heartbeatTimer);
-  // 立即写一条自己的心跳
-  await beat();
+  // 写自己的心跳。★不要 await：beat 的 upsert 若卡住/超时会把后面的 refreshPresence 也堵死,
+  //   导致"N 人在线"文字永远刷不出来、卡在"连接中…"(led 走另一条路已亮,故只文字卡)。
+  //   心跳成功与否不该阻塞人数显示 → fire-and-forget,失败自己 warn。
+  beat().catch(e=>console.warn('beat', e));
   // 订阅本房 presence 变化 → 刷新光墙
   presChan = sb.channel('room-pres:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>schedulePresenceRefresh())
     .subscribe();
-  await refreshPresence();
+  // 人数/光墙立即刷(不等心跳)。refreshPresence 自己兜底把"我"算进在线, 至少显示 1 人。
+  await refreshPresence().catch(e=>console.warn('refreshPresence', e));
   // 心跳 + 清理定时器
-  heartbeatTimer = setInterval(async()=>{ await beat(); refreshPresence(); }, 15000);
+  heartbeatTimer = setInterval(async()=>{ beat().catch(()=>{}); refreshPresence().catch(()=>{}); }, 15000);
 }
 async function beat(extra){
   if(!curRoom) return;
@@ -2184,7 +2187,10 @@ function renderPresenceAvatars(users){
   // 清理离开的人
   presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
   const kindLabel = curRoom && curRoom.kind==='private'?'名成员在线':'人在线';
-  $('#hallCnt').innerHTML=`<span class="cnt-led live" id="cntLed"></span><b>${users.length}</b> ${kindLabel}`;
+  // led 亮灭由 realtime 通道状态(setConn)驱动,这里重建 hallCnt 时沿用当前 led 状态,
+  // 不硬写 live——否则 presence 一刷就强点亮,掩盖真实断线。
+  const wasLive = $('#cntLed')?.classList.contains('live') ? ' live' : '';
+  $('#hallCnt').innerHTML=`<span class="cnt-led${wasLive}" id="cntLed"></span><b>${users.length}</b> ${kindLabel}`;
 }
 
 function renderTyping(users){
@@ -2198,7 +2204,9 @@ function renderTyping(users){
 async function refreshPresence(){
   if(!curRoom) return;
   const since = new Date(Date.now()-ONLINE_WINDOW).toISOString();
-  const { data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since);
+  let data=null;
+  try{ ({ data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since)); }
+  catch(e){ console.warn('presence query', e); }   // 查询失败也别让文字卡"连接中",下面用本地兜底至少显示"我"
   let users=(data||[]).slice();
   if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
   users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
