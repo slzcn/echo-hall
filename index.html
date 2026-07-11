@@ -3634,7 +3634,15 @@ async function openGear(){
 function closeGear(){ $('#gearMask').classList.remove('on'); $('#gearDrawer').classList.remove('on'); $('#gearBtn').classList.remove('active'); }
 
 // ============ 个人空间抽屉 ============
-let _meCache = { rooms:null, msgs:null };  // 上次查询结果, 二次打开先用缓存秒显
+// 缓存持久化: 首页/列表页秒显靠的是"缓存先显+后台刷新"。个人空间同理——把上次查到的
+// 房间/发言存 localStorage, 下次打开(哪怕刷新过页面)先秒显旧数据, 再后台刷新覆盖,
+// 不再对着"加载中…"干等一个网络往返。
+const LS_ME_CACHE='eh_me_cache_v1';
+let _meCache = (function(){
+  try{ const c=JSON.parse(localStorage.getItem(LS_ME_CACHE)||'null'); if(c&&typeof c==='object') return {rooms:c.rooms||null, msgs:c.msgs||null}; }catch(e){}
+  return { rooms:null, msgs:null };
+})();
+function saveMeCache(){ try{ localStorage.setItem(LS_ME_CACHE, JSON.stringify({rooms:_meCache.rooms, msgs:_meCache.msgs})); }catch(e){} }
 async function openMe(){
   const body=$('#meBody');
   if(!me){ if(typeof loadOrRollIdentity==='function') loadOrRollIdentity(); if(!me) return; }
@@ -3706,12 +3714,12 @@ async function refreshMeData(scope, isBound, acctKnown){
   if(roomsRes?.error) console.warn('rooms',roomsRes.error);
   const setN=(sel,label,n)=>{ let e=$(sel); if(!e){ const dl=$(label); if(dl){ e=document.createElement('span'); e.className='dl-n'; e.id=sel.slice(1); dl.appendChild(e); } } if(e) e.textContent=n; };
   if(wantMsgs && msgsRes){
-    const myMsgs=msgsRes?.data||[]; _meCache.msgs=myMsgs;
+    const myMsgs=msgsRes?.data||[]; _meCache.msgs=myMsgs; saveMeCache();
     setN('#meMsgsN','#meMsgsLabel',myMsgs.length);
     $('#meMsgsList').innerHTML=renderMyMsgList(myMsgs);
   }
   if(wantRooms && roomsRes){
-    const myRooms=roomsRes?.data||[]; _meCache.rooms=myRooms;
+    const myRooms=roomsRes?.data||[]; _meCache.rooms=myRooms; saveMeCache();
     setN('#meRoomsN','#meRoomsLabel',myRooms.length);
     $('#meRoomsList').innerHTML=renderMyRoomList(myRooms); bindMyRoomClicks();
   }
@@ -3807,6 +3815,7 @@ async function logoutIdentity(bound){
   try{ localStorage.removeItem(LS_ID); }catch(e){}
   myUid=null; me=null;
   _meCache={ rooms:null, msgs:null };   // 清个人空间缓存, 换身份后不残留旧数据
+  try{ localStorage.removeItem(LS_ME_CACHE); }catch(e){}   // 连持久化缓存一起清, 否则新身份秒显旧数据
   closeMe();
   // 清空登录框 + 收起, 退出后不残留账密(改为点击时才拉取)
   const la=$('#loginAccount'), lp=$('#loginPassword'), lc=$('#loginCollapse');
