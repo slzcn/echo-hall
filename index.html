@@ -716,7 +716,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0355';
+  var BUILD_VER='20260712-0428';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1798,17 +1798,20 @@ function roomAccentC(r){
   }
   return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
 }
-// 官方房灵魂色永久=房间主题色(前端强制联动, 与列表卡片同理念); 私密/公开房仍用后台设的 soul.color
-function soulThemeColor(fallback){
-  // 机器人(灵魂)色永久联动【所在房间的强调色】: 官方房→主题accent, 公开/私密房→roomKindC对应色
-  // 与列表卡片同一套取色逻辑(roomAccentC), 整站一致; 后台单独设的 soul.color 仅在此取色失败时兜底
+// 灵魂取色优先级: 后台专属色(custom, 合法非空 hex) > 所在房间强调色 > fallback 兜底
+// custom 传灵魂原始 color(可能为空/null/非法); 后台留空 => 回落房间色, 与列表卡片一致
+function soulThemeColor(custom, fallback){
+  // 1. 后台配了专属色(合法 hex) → 最高优先, 哪里都用它(含大厅)
+  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
+  // 2. 否则跟所在房间强调色(与房间卡片同一套 roomAccentC)
   try{
     if(curRoom && curRoom.kind){
       const c=roomAccentC(curRoom);
       if(c) return c;
     }
   }catch(e){}
-  return fallback;
+  // 3. 再兜底
+  return fallback || ROOM_KIND_C.official;
 }
 let _themeUIInit=false;
 async function renderLobby(soft){
@@ -2249,7 +2252,7 @@ function renderPresenceAvatars(users){
     const isMe=p.user_id===myUid;
     // 灵魂头像色跟房间强调色(与消息头像/AI角标统一); 真人访客保持自己的个性色
     const isSoul=soulUidSet.has(p.user_id);
-    const c=isSoul ? soulThemeColor(safeColor(p.color)) : safeColor(p.color);
+    const c=isSoul ? soulThemeColor(p.color, safeColor(p.color)) : safeColor(p.color);
     // sig 纳入最终渲染色 c: 换房/换主题致灵魂色变时, sig 变→强制重建头像(否则旧sig命中→卡旧色)
     const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+c+'|'+(isMe?'me':'')+'|'+(isSoul?'ai':'');
     if(el && el.dataset.sig===sig){
@@ -2378,7 +2381,7 @@ function buildMsgEl(m){
   const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
   // 颜色: 灵魂(机器人)才联动房间主题色; 真人一律用自己的身份色(m.color), 别被房间色染掉
-  const avColor = isVoid ? '#8B5CFF' : (isBot ? soulThemeColor(safeColor(m.color)) : safeColor(m.color));
+  const avColor = isVoid ? '#8B5CFF' : (isBot ? soulThemeColor(m.color, safeColor(m.color)) : safeColor(m.color));
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
@@ -2493,7 +2496,7 @@ function refreshRenderedSoulIdentity(){
     const uid=el.dataset.uid;
     if(!soulUidSet.has(uid)) return;
     const s=roomSouls.find(x=>x.auth_uid===uid); if(!s) return;
-    const c=soulThemeColor(safeColor(s.color)), ic=safeEmoji(s.emoji)||'👤';
+    const c=soulThemeColor(s.color, safeColor(s.color)), ic=safeEmoji(s.emoji)||'👤';
     const av=el.querySelector('.av');
     if(av){
       // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji(走 avEmoji 保黑洞校正)
@@ -2643,7 +2646,7 @@ function showSoulThinking(soul){
   removeSoulThinking(soul.auth_uid);
   const el=document.createElement('div');
   el.className='soul-thinking'; el.dataset.soul=soul.auth_uid;
-  el.style.setProperty('--soul-c', soulThemeColor(safeColor(soul.color)));
+  el.style.setProperty('--soul-c', soulThemeColor(soul.color, safeColor(soul.color)));
   el.innerHTML=`<div class="av">${safeEmoji(soul.emoji)||'✦'}</div>
     <div class="tk"><span class="tk-label">${esc(soul.name)} 正在思考</span>
     <span class="tk-dots"><i></i><i></i><i></i></span></div>`;
