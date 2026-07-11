@@ -361,7 +361,7 @@
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
   .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
-  .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .cin-wrap:focus-within{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block}
   .cin::placeholder{color:var(--dim)}
@@ -372,10 +372,10 @@
   /* ＋ 花样按钮 */
   .plus-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:300;cursor:pointer;border-radius:11px;
     transition:.2s;user-select:none;color:var(--sub);border:1px solid var(--line)}
-  .plus-btn:hover{border-color:var(--cyan);color:var(--cyan)}
-  .plus-btn.on{transform:rotate(45deg);border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .plus-btn:hover{border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan))}
+  .plus-btn.on{transform:rotate(45deg);border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   /* ＋处于某模式时: 显该模式图标(不旋转), 高亮提示"可退出" */
-  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--cyan);color:var(--ink);background:color-mix(in srgb,var(--cyan) 14%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
+  .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--accent,var(--cyan));color:var(--ink);background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent);box-shadow:0 0 12px -3px var(--accent,var(--cyan))}
   .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:color-mix(in srgb,var(--violet) 16%,transparent);box-shadow:0 0 12px -3px var(--violet)}
   .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
   /* ＋ 花样菜单 */
@@ -441,7 +441,7 @@
     color:var(--cyan);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
   .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
   .composer.voice-mode .hold-talk{display:flex}
-  .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--cyan)}
+  .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--accent,var(--cyan))}
   .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px color-mix(in srgb,var(--magenta) 15%,transparent)}
   .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
   .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;pointer-events:none;
