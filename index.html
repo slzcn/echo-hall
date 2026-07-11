@@ -3323,7 +3323,18 @@ async function doLogin(){
     ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
     : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
   saveIdentity(); paintIdentity();
+  saveCredential(account, password);   // 显式交给浏览器密码管理器保存(SPA无页面跳转, 不能只靠自动气泡)
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
+}
+// SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
+// 不依赖"提交后跳转"触发的自动保存气泡——本站登录后靠JS切场景、表单DOM不消失, 那种气泡常不弹。
+function saveCredential(id, pw){
+  try{
+    if(window.PasswordCredential && navigator.credentials && navigator.credentials.store){
+      const cred=new window.PasswordCredential({ id, password:pw, name:id });
+      navigator.credentials.store(cred).catch(()=>{});
+    }
+  }catch(e){}
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
 async function doRegister(){
@@ -3343,6 +3354,7 @@ async function doRegister(){
   myUid=sess.user.id;
   // 用注册的用户名更新前台昵称 + 缓存 username/registered(个人空间首屏直显@用户名)
   me.name=username; me.id=myUid; me.username=username; me.registered=true; me.email=me.email||''; saveIdentity(); paintIdentity();
+  saveCredential(username, password);   // 注册即登录, 一并交浏览器保存
   await sb.from('eh_users').update({ name:username, is_anonymous:false }).eq('id',myUid);
   toast(EH_CONFIG.text.ok_regDone); closeModal(); goScene('lobby'); renderLobby();
 }
