@@ -2005,6 +2005,8 @@ function subscribeMessages(rid){
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
       if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); scrollStream(); }
+      // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
+      if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
       if(isEmojiOnly(m.text)) burst(m.text);
       notifyIfMentioned(m, el);   // 被 @ → 强提醒
@@ -2322,6 +2324,33 @@ function renderAtMenu(){
   menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
 }
 function hideAt(){ _atActive=false; $('#atMenu').classList.remove('on'); }
+// 本地打字机：把灵魂消息逐字吐进 .txt(好看,零成本,不走网关流式)
+// 用字素簇切分(保 emoji 完整),每帧吐 1-2 字,@高亮在收尾时统一渲染
+function typewriterInto(el, fullText){
+  const txt=el.querySelector('.txt'); if(!txt || !fullText) return;
+  let chars;
+  try{ const seg=new Intl.Segmenter('zh',{granularity:'grapheme'}); chars=[...seg.segment(fullText)].map(s=>s.segment); }
+  catch(e){ chars=[...fullText]; }
+  if(chars.length<=1){ txt.innerHTML=renderAtMentions(esc(fullText)); return; }
+  txt.textContent='';
+  let i=0;
+  // 速度:短句快、长句稍快封顶,总时长控制在 ~0.4~2.2s
+  const per=Math.max(18, Math.min(55, 1600/chars.length));
+  const stream=$('#stream');
+  const tick=()=>{
+    if(!el.isConnected){ return; }               // 消息被移除(切房等)→ 停
+    i+=Math.random()<0.35?2:1;                   // 偶尔一次吐2字,更像打字节奏
+    if(i>=chars.length){
+      txt.innerHTML=renderAtMentions(esc(fullText));  // 收尾:完整+@高亮
+      if(stream.scrollHeight-stream.scrollTop-stream.clientHeight<160) scrollStream();
+      return;
+    }
+    txt.textContent=chars.slice(0,i).join('');
+    if(stream.scrollHeight-stream.scrollTop-stream.clientHeight<160) scrollStream();
+    el._twTimer=setTimeout(tick, per);
+  };
+  el._twTimer=setTimeout(tick, per);
+}
 // 被 @ 强提醒：收到别人消息里 @了我 → toast + 消息卡脉冲高亮 + 震动
 function notifyIfMentioned(m, el){
   if(!m || m.user_id===myUid || !me || !me.name) return;
