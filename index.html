@@ -1864,8 +1864,18 @@ function fallbackCopy(text){
 const PREFETCH_N = 48;         // 预取约1-2屏(主人:不用全部，回看随刷随加载)
 const PREFETCH_TTL = 60000;    // 缓存60s，超时重拉避免看太旧
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
+const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
 let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
+// 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
+function prefetchSouls(rid){
+  const hit=soulsCache[rid];
+  if(hit && Date.now()-hit.at < PREFETCH_TTL) return hit.p;
+  const p = sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]).catch(()=>[]);
+  soulsCache[rid] = { at:Date.now(), p };
+  return p;
+}
 function prefetchRoom(rid, kind){
+  prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
   const hit=prefetchCache[rid];
   if(hit && Date.now()-hit.at < PREFETCH_TTL) return;   // 命中且未过期
   let p;
@@ -2360,12 +2370,26 @@ let roomSouls = [];              // [{auth_uid,name,emoji,color,persona,emotion}
 let soulUidSet = new Set();      // 快速判断某 uid 是不是灵魂(历史旧消息 is_bot 缺失时兜底)
 async function loadRoomSouls(rid){
   roomSouls=[]; soulUidSet=new Set();
+  const applyData=(data)=>{ roomSouls=data||[]; soulUidSet=new Set(roomSouls.map(s=>s.auth_uid)); refreshRenderedSoulIdentity(); };
+  const hit=soulsCache[rid];
+  if(hit && Date.now()-hit.at < PREFETCH_TTL){
+    // 列表页已预取 → 秒用缓存(进房不再等 eh_room_souls RPC 往返)
+    try{ applyData(await hit.p); }catch(e){}
+    // 后台静默校正一次: 灵魂列表几乎不变, 但保证"后台开/关机器人"能最终生效(关掉的不再返回)。
+    // ★只在拿到"确定的"结果(数组, 含空数组=后台确实全关)时才覆盖; RPC 异常/null 不动缓存,
+    //   避免一次网络抖动把正确的灵魂列表清空。
+    sb.rpc('eh_room_souls',{ rid }).then(({data,error})=>{
+      if(error || !Array.isArray(data)) return;   // 抖动/失败 → 保留缓存,不覆盖
+      if(rid===(curRoom&&curRoom.id)){ soulsCache[rid]={at:Date.now(),p:Promise.resolve(data)}; applyData(data); }
+    }).catch(()=>{});
+    return;
+  }
+  // 未预取: 走原路, 并回填缓存供二次进房复用
   try{
-    const { data } = await sb.rpc('eh_room_souls',{ rid });
-    roomSouls = data||[];
-    soulUidSet = new Set(roomSouls.map(s=>s.auth_uid));
+    const p = sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]);
+    soulsCache[rid]={ at:Date.now(), p };
+    applyData(await p);
   }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
-  refreshRenderedSoulIdentity();   // 回补: 历史消息/快照可能在 soulUidSet 就绪前已渲染(用了旧快照)
 }
 // 灵魂改了名字/头像/色后, 已渲染在 DOM 的历史消息还带旧快照 → 用最新身份就地回补。
 // (buildMsgEl 会覆盖新渲染的消息, 但进房时 loadHistory 可能早于 loadRoomSouls 完成, 快照路径更是直接贴旧 HTML。)
