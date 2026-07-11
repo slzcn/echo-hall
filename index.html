@@ -553,7 +553,8 @@
   .act-ring .ar-echoes{display:flex;gap:2px}
   .act-ring .ar-echo{background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 8px;border-radius:10px;
     cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:46px}
-  .act-ring .ar-echo .ai{font-size:20px}
+  /* emoji 各自字形高度/基线不一(👍❤️😂 渲染尺寸有别), 给固定高度盒子+居中, 消除高低不平 */
+  .act-ring .ar-echo .ai{font-size:20px;height:24px;line-height:24px;display:flex;align-items:center;justify-content:center}
   .act-ring .ar-echo .al{font-size:10px;color:var(--sub)}
   .act-ring .ar-echo:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
   .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
@@ -1716,7 +1717,7 @@ const LS_ECHO_MRU='eh_echo_mru';
 function loadEchoMru(){ try{ const a=JSON.parse(localStorage.getItem(LS_ECHO_MRU)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
 function pushEchoMru(emoji){
   if(!emoji) return;
-  let a=loadEchoMru().filter(e=>e!==emoji); a.unshift(emoji); a=a.slice(0,5);
+  let a=loadEchoMru().filter(e=>e!==emoji); a.unshift(emoji); a=a.slice(0,4);
   try{ localStorage.setItem(LS_ECHO_MRU, JSON.stringify(a)); }catch(e){}
 }
 // 反应环当前要显示的 5 个: 最近用过的在前, 用默认款补足到 5(去重)
@@ -1726,7 +1727,7 @@ function echoQuickList(){
   const push=(e,label)=>{ if(e&&!seen.has(e)){ seen.add(e); out.push({e,label:label||''}); } };
   mru.forEach(e=>push(e, (ECHO_KINDS.find(k=>k.e===e)||{}).label));
   ECHO_KINDS.forEach(k=>push(k.e,k.label));
-  return out.slice(0,5);
+  return out.slice(0,4);
 }
 const RESONANCE_THRESHOLD = 5;   // 单条消息某情绪回声达到此数 → 触发全房共鸣涟漪
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
