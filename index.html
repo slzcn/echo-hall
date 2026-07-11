@@ -2466,10 +2466,30 @@ function pcm16ToBuffer(ctx, b64, sr){
   const bin=atob(b64); const n=bin.length; const bytes=new Uint8Array(n);
   for(let i=0;i<n;i++) bytes[i]=bin.charCodeAt(i);
   const view=new DataView(bytes.buffer);
-  const samples=Math.floor(n/2);
-  const buf=ctx.createBuffer(1, samples, sr||24000);
+  const srcSamples=Math.floor(n/2);
+  const srcSR=sr||24000;
+  const dstSR=ctx.sampleRate;
+  // 写入 ctx 采样率的 buffer, 需重采样(部分浏览器对 sourceBuffer.sampleRate 与 ctx.sampleRate 不一致的 buffer 不自动重采样, 直接变啌)
+  if(srcSR===dstSR){
+    const buf=ctx.createBuffer(1, srcSamples, dstSR);
+    const ch=buf.getChannelData(0);
+    for(let i=0;i<srcSamples;i++){ ch[i]=view.getInt16(i*2, true)/32768; }
+    return buf;
+  }
+  const ratio=dstSR/srcSR;
+  const dstSamples=Math.round(srcSamples*ratio);
+  const buf=ctx.createBuffer(1, dstSamples, dstSR);
   const ch=buf.getChannelData(0);
-  for(let i=0;i<samples;i++){ ch[i]=view.getInt16(i*2, true)/32768; }
+  // 线性插值重采样(精度够用, TTS 语音没必要上 Sinc)
+  for(let i=0;i<dstSamples;i++){
+    const srcPos=i/ratio;
+    const i0=Math.floor(srcPos);
+    const i1=Math.min(i0+1, srcSamples-1);
+    const t=srcPos-i0;
+    const s0=view.getInt16(i0*2, true)/32768;
+    const s1=view.getInt16(i1*2, true)/32768;
+    ch[i]=s0*(1-t)+s1*t;
+  }
   return buf;
 }
 // 请求 mify 真人嗓; 带超时。成功 resolve {buffer}; 失败/超时 resolve null(调用方据此走兜底)。
