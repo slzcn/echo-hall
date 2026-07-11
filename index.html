@@ -2707,6 +2707,9 @@ function b64ToArrayBuffer(b64){
   return bytes.buffer;
 }
 async function tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st){
+  // 关键: 进来先确保 AudioContext 真正 running, 避免 async 拿走手势后 start() 静音
+  try{ if(ctx.state!=='running'){ await ctx.resume(); } }catch(_){}
+  if(ctx.state!=='running'){ console.warn('cover: ctx still not running, state='+ctx.state); return false; }
   try{ await loadMasterManifest(); }catch(e){ console.warn('master manifest',e); return false; }
   const master=pickMasterForStyle(sid); if(!master) return false;
   const masterUrl=new URL(master.url, location.href).href;
@@ -2714,6 +2717,7 @@ async function tryPlayCoverSong(ctx, lyric, sid, el, onEnd, st){
   try{
     const ab=await (await fetch(masterUrl,{cache:'force-cache'})).arrayBuffer();
     buf=await decodeMp3ArrayBuffer(ctx,ab);
+    if(!buf || buf.duration<1){ console.warn('cover: master decode empty'); return false; }
   }catch(e){ console.warn('master load',e); return false; }
   AudioEngine.duck(true);
   const main=ctx.createGain(); main.gain.value=0.85; main.connect(ctx.destination);
@@ -3125,9 +3129,19 @@ async function playSong(lyric, sid, el, onEnd){
 document.addEventListener('click',e=>{
   const btn=e.target.closest('.song-play'); if(!btn) return;
   const card=btn.closest('.song-card'); if(!card) return;
-  // 安卓关键: 在用户手势的同步上下文里立即触发 AudioContext resume(), WebAudio 才解锁
+  // 音频解锁铁律: 用户手势的"同步"tick里立刻resume + 播一个静音tick, 让AudioContext真正跑起来
+  // 一旦跑起来, 后面async里的start()才有声(iOS Safari/Chrome autoplay policy)
   try{ if(typeof AudioEngine!=='undefined') AudioEngine.resume(); }catch(_){}
-  try{ const c=ac(); if(c&&c.state==='suspended') c.resume(); }catch(_){}
+  try{
+    const c=ac();
+    if(c){
+      if(c.state==='suspended') c.resume();
+      // 同步预热: 一个近零长度的静音buffer, start(0), 强制引擎进入running态
+      const wb=c.createBuffer(1,1,22050);
+      const wsrc=c.createBufferSource(); wsrc.buffer=wb;
+      wsrc.connect(c.destination); wsrc.start(0);
+    }
+  }catch(_){}
   if(curSong && curSong.el===card){ stopSong(); return; }
   playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
 });
