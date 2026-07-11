@@ -2339,6 +2339,14 @@ function buildMsgEl(m){
     const s=roomSouls.find(x=>x.auth_uid===m.user_id);
     if(s){ m={...m, name:s.name, emoji:s.emoji, color:s.color}; }
   }
+  // 前端纵深防御: 灵魂控制标记([REACT:x]/[SONG:x]/[EMOJI]/[ACT]/[PROJ])万一以文本外泄
+  //(worker 已修但历史库里那条 "[REACT:😏]" 还在), 渲染前清掉, 不让标记字面显示给用户。
+  //  只清普通文字消息(kind=msg/无kind); song/voice 的 text 是有意义的编码, 不动。
+  if((!m.kind || m.kind==='msg') && typeof m.text==='string' && /\[(REACT:|SONG:|EMOJI|ACT|PROJ)/i.test(m.text)){
+    const cleaned=m.text.replace(/\[(SONG:[a-z0-9]+|EMOJI|ACT|PROJ|REACT:[^\]]*)\]/ig,'').trim();
+    if(!cleaned) return null;   // 整条就是个标记(如 "[REACT:😏]")→清空后不渲染这条空气泡
+    m={...m, text:cleaned};
+  }
   const isMe = m.user_id===myUid;
   if(m.kind==='proj') return null;   // 投影是瞬时飞幕，不进消息流
   if(m.kind==='act'){
