@@ -432,8 +432,8 @@
   .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
   .song-lyric .sl-ch.sung{color:var(--ink)}
   .song-lyric .sl-ch.on{color:var(--sc,var(--cyan));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
-  .song-eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:2px}
-  .song-eq i{width:2.5px;height:5px;border-radius:1px;background:currentColor;opacity:.7}
+  .song-eq{display:inline-flex;gap:2px;align-items:center;height:12px;margin-left:2px}
+  .song-eq i{width:2.5px;height:8px;border-radius:1px;background:currentColor;opacity:.7;transform:scaleY(.5);transform-origin:center}
   .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
   .song-card.playing .song-eq i:nth-child(2){animation-delay:.15s}
   .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
@@ -2295,28 +2295,37 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
-  // v3 更像人声哼唱: 声源=声带(锯齿/三角)经元音共振峰(甲醛滤波), 加胸声正弦垫厚实, 温和颤音
+  // v4 加法合成(绝不用 BiquadFilter): 国产浏览器(小米/QQ 旧内核)对 bandpass 滤波器组合
+  // 支持有bug, 会把主唱滤没 → 有伴奏没人声。改为纯 Oscillator 叠加共振峰谐波塑造元音,
+  // 只用 OscillatorNode + GainNode 这两种最基础节点, 全平台兼容。
   const oscs=[];
-  const gliss=Math.min(0.035,dur*0.18);   // 起音上滑更短, 音更快"落定"到目标音高(不飘)
-  // 声带源(谐波丰富 → 经共振峰塑形成元音)
-  const src=ctx.createOscillator(); src.type=wave==='sine'?'triangle':(wave||'sawtooth');
-  src.frequency.setValueAtTime(freq*0.97,t); src.frequency.linearRampToValueAtTime(freq,t+gliss);
-  // 温和颤音: 延迟 0.12s 后才起(先稳稳唱出音), 深度小, 更自然
-  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;
-  const lfoG=ctx.createGain(); lfoG.gain.setValueAtTime(0.0001,t); lfoG.gain.setValueAtTime(0.0001,t+Math.min(0.12,dur*0.4)); lfoG.gain.linearRampToValueAtTime(freq*0.006,t+dur);
-  lfo.connect(lfoG).connect(src.frequency);
-  // ADSR: 柔起音(像人开口), 长 sustain, 渐弱收尾(连贯)
+  const gliss=Math.min(0.035,dur*0.18);
+  // 主 ADSR 包络: 柔起音 + 长 sustain + 渐弱收尾(连贯像唱)
   const env=ctx.createGain();
   env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
   env.gain.setValueAtTime(gain,t+dur*0.55); env.gain.linearRampToValueAtTime(gain*0.7,t+dur*0.9); env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
-  // 元音共振峰(Q 降低 → 宽峰更像人声, 不像扫频电子音)
-  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.35];
-  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?4:6;
-    const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
   env.connect(dest);
-  src.start(t); src.stop(t+dur+0.06); lfo.start(t); lfo.stop(t+dur+0.06);
-  oscs.push(src,lfo);
-  // 胸声垫: 基频正弦(不经滤波)加厚底 → 声音更饱满温暖, 不尖细
+  // 温和颤音: 延迟起(先稳稳唱出音)+ 深度小
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;
+  const lfoG=ctx.createGain(); lfoG.gain.setValueAtTime(0.0001,t); lfoG.gain.setValueAtTime(0.0001,t+Math.min(0.12,dur*0.4)); lfoG.gain.linearRampToValueAtTime(freq*0.006,t+dur);
+  // 基频 + 谐波: 用一串正弦谐波叠加, 每条谐波音量按"离共振峰越近越响"加权 → 塑造元音音色
+  const F=VOWELS[vowel]||VOWELS.a;   // 该元音的 3 个共振峰频率
+  const nH=Math.min(12, Math.floor(3600/freq));   // 谐波数(到~3.6kHz, 覆盖人声主要能量)
+  function fWeight(hz){ // 谐波频率 hz 离最近共振峰越近 → 权重越高(高斯窗), 模拟共振峰包络
+    let w=0.06; F.forEach((cf,i)=>{ const bw=[110,130,170][i]||150; const a=[1.0,0.65,0.4][i]; w=Math.max(w, a*Math.exp(-Math.pow((hz-cf)/bw,2))); }); return w;
+  }
+  for(let n=1;n<=nH;n++){
+    const hz=freq*n; if(hz>4000) break;
+    const w=fWeight(hz); if(w<0.05) continue;   // 太弱的谐波跳过省节点
+    const o=ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(hz*0.97,t); o.frequency.linearRampToValueAtTime(hz,t+gliss);
+    if(n===1) lfo.connect(lfoG).connect(o.frequency);   // 颤音挂基频
+    const g=ctx.createGain(); g.gain.value=w*(n===1?1.0:0.85)*0.4;   // 基频略突出; *0.4 防谐波叠加爆音
+    o.connect(g).connect(env);
+    o.start(t); o.stop(t+dur+0.06); oscs.push(o);
+  }
+  lfo.start(t); lfo.stop(t+dur+0.06); oscs.push(lfo);
+  // 胸声垫: 基频正弦加厚底 → 声音饱满温暖
   const chest=ctx.createOscillator(); chest.type='sine'; chest.frequency.setValueAtTime(freq*0.97,t); chest.frequency.linearRampToValueAtTime(freq,t+gliss);
   const cg=ctx.createGain(); cg.gain.setValueAtTime(0.0001,t); cg.gain.linearRampToValueAtTime(gain*0.5,t+0.05); cg.gain.setValueAtTime(gain*0.5,t+dur*0.6); cg.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
   chest.connect(cg).connect(dest); chest.start(t); chest.stop(t+dur+0.06); oscs.push(chest);
@@ -2665,7 +2674,11 @@ function triggerResonance(emoji,color,msg){
 
 // ============ emoji 粒子 ============
 function burst(str,count=10){
-  const chars=[...(str||'')].filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars.push('✨');
+  // 按"字素簇"切分, 保住 ❤️ 的变体选择器(FE0F)/ZWJ 组合, 否则拆散后 ❤ 丢变体→渲染成单色白心
+  let chars;
+  try{ const seg=new Intl.Segmenter('zh',{granularity:'grapheme'}); chars=[...seg.segment(str||'')].map(s=>s.segment); }
+  catch(e){ chars=[...(str||'')]; }
+  chars=chars.filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars.push('✨️');
   const layer=$('#particles');
   for(let i=0;i<count;i++){
     const p=document.createElement('div'); p.className='particle'; p.textContent=rand(chars);
@@ -3222,8 +3235,22 @@ document.addEventListener('click',closePlusMenu);
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨️','🎉','💯','🚀','🌈','🌙','⭐️','🍺','☕️','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧️'];
 $('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
+// 表情按钮/托盘用 mousedown+preventDefault: 不让焦点转移到它们, 也不主动 focus 输入框,
+// 这样点表情不会顶起/唤起系统输入法(想打字再自己点输入框)
+$('#emojiBtn').addEventListener('mousedown',e=>e.preventDefault());
 $('#emojiBtn').onclick=e=>{ e.stopPropagation(); $('#emojiTray').classList.toggle('on'); };
-$('#emojiTray').querySelectorAll('b').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cin.value+=b.textContent; cin.dispatchEvent(new Event('input')); cin.focus(); });
+$('#emojiTray').querySelectorAll('b').forEach(b=>{
+  b.addEventListener('mousedown',e=>e.preventDefault());   // 阻止聚焦→不弹键盘
+  b.onclick=e=>{ e.stopPropagation();
+    // 在光标处插入(无光标则追加), 不调用 focus, 避免唤起输入法
+    const ins=b.textContent, st=cin.selectionStart, en=cin.selectionEnd;
+    if(typeof st==='number' && document.activeElement===cin){
+      cin.value=cin.value.slice(0,st)+ins+cin.value.slice(en);
+      cin.selectionStart=cin.selectionEnd=st+ins.length;
+    } else { cin.value+=ins; }
+    cin.dispatchEvent(new Event('input'));
+  };
+});
 document.addEventListener('click',()=>$('#emojiTray').classList.remove('on'));
 
 window.addEventListener('beforeunload',()=>{
