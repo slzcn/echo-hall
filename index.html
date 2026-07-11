@@ -387,9 +387,9 @@
   .msg.void.fading{animation:voidFade 1.2s ease-out forwards}
   @keyframes voidFade{to{opacity:0;transform:translateY(-8px) scale(.96);filter:blur(3px)}}
   /* ===== 灵魂居民 Soul：AI 徽标 + 呼吸光环 + 思考指示器 ===== */
-  /* AI 角标：头像右下角一枚发光小圆点(✦)，标识灵魂身份 */
-  .msg.soul .av .soul-dot{position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:50%;
-    display:grid;place-items:center;font-size:8px;line-height:1;font-weight:900;color:#fff;
+  /* AI 角标：头像右下角一枚"AI"小胶囊，标识灵魂身份 */
+  .msg.soul .av .soul-dot{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:13px;padding:0 3px;border-radius:7px;
+    display:grid;place-items:center;font-size:8px;line-height:1;font-weight:900;letter-spacing:.3px;color:#fff;font-style:normal;
     background:var(--soul-c,var(--violet));box-shadow:0 0 0 2px var(--panel-solid),0 0 8px color-mix(in srgb,var(--soul-c,var(--violet)) 70%,transparent);z-index:2}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
@@ -2170,7 +2170,7 @@ function buildMsgEl(m){
   const avColor = isVoid ? '#8B5CFF' : safeColor(m.color);
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一枚 AI 角标(✦)，比昵称旁的文字徽章更干净
-  const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">✦</span>` : '';
+  const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
   el.innerHTML=`
     <div class="av" style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avIc}${soulDot}</div>
     <div class="body">
