@@ -1362,7 +1362,7 @@ const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
     // 部分 emoji 字形锚点偏下(🕳️黑洞/🌙月亮), 在头像框里看着下沉 → 各自上移校正; 其它 emoji 原样
     const avEmoji = (e) => {
       if(!e) return e;
-      if(e.indexOf('🕳')>-1) return `<span style="display:inline-block;transform:translateY(-3px)">${e}</span>`;
+      if(e.indexOf('🕳')>-1) return `<span style="display:inline-block;transform:translateY(-4px)">${e}</span>`;
       if(e.indexOf('🌙')>-1) return `<span style="display:inline-block;transform:translateY(-2px)">${e}</span>`;
       return e;
     };
