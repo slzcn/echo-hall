@@ -334,7 +334,7 @@
   .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
-    line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block}
+    line-height:1.5;max-height:100px;height:42px;min-height:42px;padding:9px 0;display:block}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:44px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
@@ -843,31 +843,6 @@
   <div class="drawer-body" id="gearBody"></div>
 </div>
 
-<script>
-// ⚡ 首帧防闪: 在阻塞的 supabase 库脚本之前同步决定初始场景。
-// 真机上 supabase.min.js 下载/解析要数秒, 期间浏览器已把默认 #enter 画出来 → 刷新闪首页。
-// 这里 HTML 解析时立即读 localStorage: 曾登录(eh_identity_v2.id)+上次在房(eh_last_room) → 直接切 hall 骨架。
-// 不依赖任何库/函数, 纯 DOM。真实数据/失效回落由后面主脚本的 resumeAfterAuth / 兜底接管。
-(function(){
-  try{
-    var id=JSON.parse(localStorage.getItem('eh_identity_v2')||'null');
-    var r=JSON.parse(localStorage.getItem('eh_last_room')||'null');
-    if(!id||!id.id||!r||!r.id) return;
-    var enter=document.getElementById('enter'), hall=document.getElementById('hall');
-    if(!enter||!hall) return;
-    enter.classList.remove('on'); hall.classList.add('on'); document.body.classList.add('hall-on');
-    var hi=document.getElementById('hallIcon'); if(hi){ hi.textContent=r.emoji||'💬';
-      var rc = r.kind==='public'?'#4DE38A':(r.kind==='private'?'#8B5CFF':'#28E6D8');
-      hi.style.setProperty('--room-c', rc); }
-    var nt=document.getElementById('hallNameTxt'); if(nt){
-      var kl = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
-      nt.innerHTML = (r.name||'').replace(/[<>&]/g,'')+' <span style="font-size:11px;color:var(--dim);font-weight:400">· '+kl+'</span>'; }
-    var pr=document.getElementById('presence');
-    if(pr){ var s=''; for(var i=0;i<3;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>'; pr.innerHTML=s; }
-    window.__preHall=true;   // 标记已预绘, 主脚本 preRestoreScene 不必重复
-  }catch(e){}
-})();
-</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ============================================================
@@ -950,7 +925,7 @@ const EH_CONFIG_DEFAULT = {
     composerPlaceholder:'说点什么… 打个 / 看命令',
     voidPlaceholder:'说给虚空… 匿名，5分钟后消散 🕳️',
     // 命令帮助
-    cmdSing:'/sing 文字 → 变洗脑神曲（随机曲风）🎵',
+    cmdSing:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵',
     cmdWhisper:'/whisper @昵称 悄悄话（仅对方可见）',
     // 主要按钮
     btnCreateRoom:'生 成 房 间', btnEnterRoom:'进 入 房 间',
@@ -1660,11 +1635,11 @@ function resumeAfterAuth(){
 }
 function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
 // 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
-// 判据: 有 last_room + 本地 me.id(曾登录过, 无论正式/临时账号 —— 临时匿名 session 也持久化)。
-// 不解析 supabase 内部存储(其格式在不同版本会 base64/分片, JSON.parse 会失败)。session 若实际失效, 靠兜底回落 enter。
+// 判据用本地 me.registered(正式账号标记, loadOrRollIdentity 已同步读出) —— 不解析 supabase 内部存储
+// (其格式在不同版本会 base64/分片, JSON.parse 会失败). 若 session 实际已失效, 靠后面的兜底回落 enter。
 function preRestoreScene(){
   const r=lastRoom(); if(!r) return false;
-  if(!me || !me.id) return false;
+  if(!me || !me.registered) return false;
   const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
     const rc = r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||'#28E6D8') : (r.kind==='public'?'#4DE38A':'#8B5CFF');
     hi.style.setProperty('--room-c', rc); }
@@ -2328,43 +2303,6 @@ function ac(){
 }
 let noiseBuf=null;
 function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
-// ============ mify 真人嗓 TTS (主方案) ============
-// 走 Supabase Edge Function 代理 mimo TTS, 返回 base64 PCM(s16le 24k mono)。
-// 成功→前端解码播真人嗓念字层(替代系统 speechSynthesis 机械音); 失败/超时→调用方走原兜底。
-const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
-// PCM(base64, s16le/24k/mono) → AudioBuffer
-function pcm16ToBuffer(ctx, b64, sr){
-  const bin=atob(b64); const n=bin.length; const bytes=new Uint8Array(n);
-  for(let i=0;i<n;i++) bytes[i]=bin.charCodeAt(i);
-  const view=new DataView(bytes.buffer);
-  const samples=Math.floor(n/2);
-  const buf=ctx.createBuffer(1, samples, sr||24000);
-  const ch=buf.getChannelData(0);
-  for(let i=0;i<samples;i++){ ch[i]=view.getInt16(i*2, true)/32768; }
-  return buf;
-}
-// 请求 mify 真人嗓; 带超时。成功 resolve {buffer}; 失败/超时 resolve null(调用方据此走兜底)。
-function fetchMifyVoice(text, timeoutMs){
-  return new Promise((resolve)=>{
-    let done=false;
-    const to=setTimeout(()=>{ if(!done){ done=true; resolve(null); } }, timeoutMs||3500);
-    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
-    if(ctl) setTimeout(()=>{ try{ctl.abort();}catch(e){} }, (timeoutMs||3500)+200);
-    fetch(EH_SING_TTS_FN, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:String(text).slice(0,60)}),
-      signal: ctl?ctl.signal:undefined
-    }).then(r=>r.ok?r.json():null).then(j=>{
-      if(done) return; done=true; clearTimeout(to);
-      if(j&&j.ok&&j.audio){
-        try{ const cx=ac(); resolve({ b64:j.audio, sr:j.sample_rate||24000 }); }
-        catch(e){ resolve(null); }
-      } else resolve(null);
-    }).catch(()=>{ if(!done){ done=true; clearTimeout(to); resolve(null); } });
-  });
-}
-
 function tone(ctx,dest,freq,t,dur,type,gain){
   const o=ctx.createOscillator(), g=ctx.createGain();
   o.type=type; o.frequency.value=freq;
@@ -2382,39 +2320,31 @@ const VOWEL_KEYS=['a','o','e','i','u'];
 // 汉字→稳定元音(同字同元音)，唱出来是"啊哦伊呜"的洗脑哼唱
 function charVowel(ch){ let s=0; for(const c of ch) s+=c.codePointAt(0); return VOWEL_KEYS[s%VOWEL_KEYS.length]; }
 function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
-  // v9【采样元音·加法合成·安卓兼容】保 v7 iOS 好听音色, 仅去掉谐波 frequency ramp(安卓杀手).
-  // 比 v3~v6 的 3 个 bandpass 更平滑饱满、更像人声哼唱(不是电子音)。
-  // 保留 v6 过期时间保护(安卓 setValueAtTime 传过期时间抛异常→整轨静音的实锤修复)。
+  // v6【实锤修复安卓"伴奏有声人声没"】: 代码复现证实——安卓 resume 时序下 t 可能<currentTime,
+  // setValueAtTime(负/过期时间) 会抛 "Time must be non-negative" 异常 → 整条包络静音(人声消失)。
+  // 伴奏 kick 用 exponentialRamp 快释放, 异常点凑巧没触发所以有声。
+  // 修法: 强制所有时间点不早于 currentTime+0.03, 杜绝过期(正常音符不受影响, 只顶起真过期的)。
   const tmin=ctx.currentTime+0.03; if(t<tmin) t=tmin;
   const oscs=[];
   const gliss=Math.min(0.035,dur*0.18);
-  const F=VOWELS[vowel]||VOWELS.a;
-  // 共用包络: 柔起音→保持→尾部渐弱(像人声的气口)
+  const src=ctx.createOscillator(); src.type=wave==='sine'?'triangle':(wave||'sawtooth');
+  src.frequency.setValueAtTime(freq*0.97,t); src.frequency.linearRampToValueAtTime(freq,t+gliss);
+  const lfo=ctx.createOscillator(); lfo.frequency.value=5.5;
+  const lfoG=ctx.createGain(); lfoG.gain.setValueAtTime(0.0001,t); lfoG.gain.setValueAtTime(0.0001,t+Math.min(0.12,dur*0.4)); lfoG.gain.linearRampToValueAtTime(freq*0.006,t+dur);
+  lfo.connect(lfoG).connect(src.frequency);
   const env=ctx.createGain();
-  env.gain.setValueAtTime(0.0001,t);
-  env.gain.linearRampToValueAtTime(gain,t+0.06);
-  env.gain.setValueAtTime(gain,t+dur*0.55);
-  env.gain.linearRampToValueAtTime(gain*0.72,t+dur*0.9);
-  env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.03);
+  env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(gain,t+0.05);
+  env.gain.setValueAtTime(gain,t+dur*0.55); env.gain.linearRampToValueAtTime(gain*0.7,t+dur*0.9); env.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
+  const F=VOWELS[vowel]||VOWELS.a, fg=[1.0,0.6,0.35];
+  F.forEach((f,i)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=i===0?4:6;
+    const g=ctx.createGain(); g.gain.value=fg[i]; src.connect(bp).connect(g).connect(env); });
   env.connect(dest);
-  // 加法合成: 每个谐波音量按 3 个共振峰(高斯窗)加权, 得到该元音的音色
-  const nH=Math.min(20,Math.floor(3800/freq));
-  for(let n=1;n<=nH;n++){
-    const hz=freq*n; if(hz>4200)break;
-    let w=0.04;
-    for(let k=0;k<3;k++){ const bw=[120,140,190][k],a=[1,0.6,0.38][k]; w=Math.max(w,a*Math.exp(-Math.pow((hz-F[k])/bw,2))); }
-    if(w<0.045) continue;
-    const o=ctx.createOscillator(); o.type='sine';
-    o.frequency.value=hz;   // v9: 安卓兼容——去掉 frequency ramp(安卓内核对"高频osc+frequency ramp"会哑). iOS音色不受影响.
-    const g=ctx.createGain(); g.gain.value=w*(n===1?0.9:0.7)*0.42;
-    o.connect(g).connect(env); o.start(t); o.stop(t+dur+0.06); oscs.push(o);
-  }
-  // 颤音: 基频轻微上下摆(人声的自然抖动), 延后进入更自然
-  const lfo=ctx.createOscillator(); lfo.frequency.value=5.3;
-  const lfoG=ctx.createGain();
-  lfoG.gain.setValueAtTime(0,t); lfoG.gain.setValueAtTime(0,t+Math.min(0.12,dur*0.4));
-  lfoG.gain.linearRampToValueAtTime(freq*0.005,t+dur);
-  lfo.start(t); lfo.stop(t+dur+0.06); oscs.push(lfo);
+  src.start(t); src.stop(t+dur+0.06); lfo.start(t); lfo.stop(t+dur+0.06);
+  oscs.push(src,lfo);
+  // 胸声垫: 基频正弦加厚底 → 声音饱满温暖
+  const chest=ctx.createOscillator(); chest.type='sine'; chest.frequency.setValueAtTime(freq*0.97,t); chest.frequency.linearRampToValueAtTime(freq,t+gliss);
+  const cg=ctx.createGain(); cg.gain.setValueAtTime(0.0001,t); cg.gain.linearRampToValueAtTime(gain*0.5,t+0.05); cg.gain.setValueAtTime(gain*0.5,t+dur*0.6); cg.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.02);
+  chest.connect(cg).connect(dest); chest.start(t); chest.stop(t+dur+0.06); oscs.push(chest);
   return oscs;
 }
 
@@ -2454,13 +2384,13 @@ async function playSong(lyric, sid, el, onEnd){
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
-  const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
+  const master=ctx.createGain(); master.gain.value=0.75; master.connect(ctx.destination);
   // 双总线: 伴奏压低(drumBus) + 主唱提高并加压缩(voiceBus) → 让唱声清晰浮在伴奏之上(修"听不出在唱")
   const drumBus=ctx.createGain(); drumBus.gain.value=0.22; drumBus.connect(master);   // v5: 伴奏狠压到22%让主唱明显浮出
   // 主唱总线直连 master(gain 1.3 补偿). 不用 DynamicsCompressor:
   // 国产浏览器(小米/QQ 等基于旧内核)对 DynamicsCompressor 支持有bug, 会把主唱信号压没/断掉
   // → 安卓表现"有伴奏没人声"(伴奏走master不经压缩器正常). 已改纯 GainNode, 全平台兼容.
-  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.6;
+  const voiceBus=ctx.createGain(); voiceBus.gain.value=1.15;
   voiceBus.connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.18;   // 起始缓冲(安卓音频调度延迟更大, 留足余量防开头削音)
@@ -2504,54 +2434,26 @@ async function playSong(lyric, sid, el, onEnd){
   const endT=t0+chars.length*step;
   const endSemi=st.base+scaleSemi(st.scale,st.motif[0])+12;
   singVoice(ctx,voiceBus,NOTE(endSemi),endT,spb*1.3,'o',0.6,st.wave).forEach(o=>curSong.oscs.push(o));
-  // 主唱层念字: 优先 mify 真人嗓(主方案), 超时/失败降级系统 speechSynthesis(兜底)。
-  // mify 异步获取, 到达后用 Web Audio 接 voiceBus 播放; 期间哼唱+伴奏已在唱, 真人嗓作为跟唱叠入。
-  const fullText=chars.join('');
-  let mifyHandled=false;
-  // 系统 TTS 兜底函数(原逻辑封装, 供 mify 失败时调用)
-  function fallbackSysTTS(){
-    if(mifyHandled) return;
-    if(!hasTTS) return;
+  // TTS 整句"唱词": 必须同步在用户手势里 speak(), 放进 setTimeout 会脱离手势→移动端静默失败。
+  // 故这里立即念出(与鼓点差~120ms可忽略), 语速取曲风自然值(过快会含糊)。
+  if(hasTTS){
+    const fullText=chars.join('');
     const rate=clamp(st.tts?.rate??1.1, 0.7, 1.6);
     const pitch=clamp(st.tts?.pitch??1.0, 0.4, 2);
     try{
       speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(fullText);
       u.lang='zh-CN'; if(zhVoice) u.voice=zhVoice;
-      u.rate=rate; u.pitch=pitch; u.volume=0.35;   // 轻声跟读垫, 不抢共振峰主唱
-      if(curSong) curSong._tts=u;
+      u.rate=rate; u.pitch=pitch; u.volume=0.35;   // v2: TTS 降为轻声跟读垫, 不抢共振峰主唱
+      curSong._tts=u;
       speechSynthesis.speak(u);
+      // Chrome 有时 speak 后卡在 paused, resume 兜底
       setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
     }catch(e){}
   }
-  // 主方案: 并行请求 mify 真人嗓(不阻塞哼唱/伴奏已起播)。超时 3.5s。
-  fetchMifyVoice(fullText, 3500).then(res=>{
-    // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
-    if(!curSong || curSong.ctx!==ctx){ return; }
-    if(res && res.b64){
-      try{
-        const buf=pcm16ToBuffer(ctx, res.b64, res.sr);
-        const src=ctx.createBufferSource(); src.buffer=buf;
-        const vg=ctx.createGain(); vg.gain.value=1.15;   // 真人嗓念字, 略高于哼唱垫但不盖过
-        src.connect(vg); vg.connect(voiceBus);
-        // 对齐到最近的拍点起播(避免落在半拍显乱); 到达通常已过 t0 约2s
-        const now=ctx.currentTime;
-        const startAt=Math.max(now+0.02, t0);
-        src.start(startAt);
-        curSong.oscs.push(src);
-        mifyHandled=true;
-        // 真人嗓可能比原 totalDur 长, 顺延结束时间
-        const voiceEnd=startAt + buf.duration + 0.3;
-        curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(0,(voiceEnd-ctx.currentTime))*1000));
-      }catch(e){ fallbackSysTTS(); }
-    } else {
-      // mify 失败/超时 → 系统 TTS 兜底(但此时哼唱可能已近尾声, 仍尽力念)
-      fallbackSysTTS();
-    }
-  });
-  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间)
+  // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
-  curSong.timeouts.push(setTimeout(()=>{ if(!mifyHandled) stopSong(); }, (Math.max(totalDur,ttsDur)+0.4)*1000));
+  curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
 document.addEventListener('click',e=>{
@@ -2661,7 +2563,7 @@ const SLASH_CMDS=[
   {c:'/flip',  d:'抛硬币，正面还是反面'},
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
-  {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
+  {c:'/sing',  d:'/sing 文字 → 变一首洗脑神曲（随机曲风）🎵'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -3425,27 +3327,25 @@ const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.h
 // ⚠️ onAuthStateChange 回调里绝不能直接 await sb.* 请求(GoTrue 会死锁, 表现为登录后所有请求卡住)。
 // 故这里只做同步赋值, 异步部分用 setTimeout defer 到回调外执行。
 sb.auth.onAuthStateChange((ev,session)=>{
-  if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user){
-    const isReg = !!session.user.email;   // 有邮箱=正式账号; 匿名临时身份没有
+  if((ev==='SIGNED_IN'||ev==='INITIAL_SESSION') && session?.user?.email){
     myUid=session.user.id; resyncMsgOwnership();
-    if(me) { me.id=myUid; if(isReg) me.registered=true; }
+    if(me) { me.id=myUid; me.registered=true; }
     setTimeout(async ()=>{
       // 先恢复现场(进房只需 myUid[已就绪] + 本地缓存 me), 不等 DB 查询, 避免 hall 骨架空等数秒
       if(location.hash) history.replaceState(null,'',location.pathname+location.search);
       if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
         authHandled=true; resumeAfterAuth();
       }
-      // 正式账号补齐身份档案 + 账号信息; 临时账号只需保底档案(不查 eh_accounts)
-      if(isReg){
-        const [{ data:prof }, { data:acc }] = await Promise.all([
-          sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-          sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
-        ]);
-        if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
-        else { me = me||{}; me.registered=true; }
-        if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
-        saveIdentity(); paintIdentity();
-      }
+      // 身份档案 + 账号信息(username/email/role)后台补齐, 缓存到 me, 避免顶部@用户名缺失
+      const [{ data:prof }, { data:acc }] = await Promise.all([
+        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
+      ]);
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+      else { me = me||{}; me.registered=true; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
+      saveIdentity();
+      paintIdentity();
     },0);
   }
 });
@@ -3454,23 +3354,20 @@ sb.auth.onAuthStateChange((ev,session)=>{
 (async()=>{
   try{
     const { data:{ session } } = await sb.auth.getSession();
-    if(session?.user && !myUid){
-      const isReg = !!session.user.email;
-      myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; if(isReg) me.registered=true; }
+    if(session?.user?.email && !myUid){
+      myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; me.registered=true; }
       // 先恢复现场再补 DB 资料(同 onAuthStateChange 路径, 避免 hall 骨架空等)
       if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
         authHandled=true; resumeAfterAuth();
       }
-      if(isReg){
-        const [{ data:prof }, { data:acc }] = await Promise.all([
-          sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
-          sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
-        ]);
-        if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
-        else { me=me||{}; me.registered=true; }
-        if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
-        saveIdentity(); paintIdentity();
-      }
+      const [{ data:prof }, { data:acc }] = await Promise.all([
+        sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
+        sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
+      ]);
+      if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+      else { me=me||{}; me.registered=true; }
+      if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
+      saveIdentity(); paintIdentity();
     }
   }catch(e){ console.warn('session restore', e); }
   // 兜底: 预绘了 hall 但迟迟没进恢复流程(session 真失效/过期) → 回落入场页, 不卡空骨架。
