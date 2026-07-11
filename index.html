@@ -495,10 +495,10 @@
 
   /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
   .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
-    background:color-mix(in srgb,var(--magenta) 6%,transparent);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+    background:color-mix(in srgb,var(--strip-c,var(--magenta)) 6%,transparent);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;transition:background .2s}
   .song-strip::-webkit-scrollbar{height:0}
   .song-strip.on{display:flex}
-  .song-strip .ss-lb{font-size:11px;color:var(--magenta);flex-shrink:0;margin-right:2px}
+  .song-strip .ss-lb{font-size:11px;color:var(--strip-c,var(--magenta));flex-shrink:0;margin-right:2px;transition:color .2s}
   .song-strip .st-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;flex-shrink:0;
     border:1px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.15s;font-size:12px;font-weight:600;
     color:var(--sub);--sc:var(--magenta)}
@@ -3220,6 +3220,8 @@ function setSongMode(on){ setMode(on?'song':'none'); }
 // 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
 function renderSongStrip(){
   const strip=$('#songStrip'); if(!strip) return;
+  const cur=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
+  strip.style.setProperty('--strip-c', safeColor(cur.color));   // 整条 strip 跟随当前曲风色(标签+底色)
   strip.innerHTML=`<span class="ss-lb">🎵 曲风</span>`+SONG_STYLES.map(s=>
     `<span class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
       <span class="se">${s.emoji}</span>${esc(s.name)}</span>`).join('');
@@ -3230,6 +3232,7 @@ function renderSongStrip(){
     const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
     $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
     $('.composer').style.setProperty('--song-c', safeColor(st.color));
+    strip.style.setProperty('--strip-c', safeColor(st.color));   // 切曲风: strip 标签+底色也跟随
     try{ prewarmHotPhrases(); }catch(_){}   // 切新曲风也预热该风常用词
     try{ if(curRoom) $('#cin').focus(); }catch(_){}
   });
