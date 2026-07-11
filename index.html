@@ -2085,6 +2085,10 @@ function renderPresenceAvatars(users){
   const seen=new Set();
   users.forEach((p,idx)=>{
     seen.add(p.user_id);
+    // 灵魂身份跟随最新(名字/头像/色),覆盖 presence 里的旧快照。必须在 sig 前做,
+    // 否则灵魂改色而 presence 快照未变时 sig 不变 → 跳过重建 → 拿不到新色。
+    const soulLatest = soulUidSet.has(p.user_id) ? roomSouls.find(x=>x.auth_uid===p.user_id) : null;
+    if(soulLatest){ p={...p, name:soulLatest.name, emoji:soulLatest.emoji, color:soulLatest.color}; }
     let el=presenceMap.get(p.user_id);
     const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+(p.color||'')+'|'+(p.user_id===myUid?'me':'');
     if(el && el.dataset.sig===sig){
@@ -2092,9 +2096,6 @@ function renderPresenceAvatars(users){
       if(container.children[idx]!==el) container.insertBefore(el, container.children[idx]||null);
       return;
     }
-    // 需要新建或重建。灵魂身份跟随最新(名字/头像/色),覆盖 presence 里的旧快照
-    const soulLatest = soulUidSet.has(p.user_id) ? roomSouls.find(x=>x.auth_uid===p.user_id) : null;
-    if(soulLatest){ p={...p, name:soulLatest.name, emoji:soulLatest.emoji, color:soulLatest.color}; }
     const c=safeColor(p.color);
     const isMe=p.user_id===myUid;
     const div=document.createElement('div');
@@ -2287,7 +2288,31 @@ async function loadRoomSouls(rid){
     roomSouls = data||[];
     soulUidSet = new Set(roomSouls.map(s=>s.auth_uid));
   }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
+  refreshRenderedSoulIdentity();   // 回补: 历史消息/快照可能在 soulUidSet 就绪前已渲染(用了旧快照)
 }
+// 灵魂改了名字/头像/色后, 已渲染在 DOM 的历史消息还带旧快照 → 用最新身份就地回补。
+// (buildMsgEl 会覆盖新渲染的消息, 但进房时 loadHistory 可能早于 loadRoomSouls 完成, 快照路径更是直接贴旧 HTML。)
+function refreshRenderedSoulIdentity(){
+  if(!soulUidSet || !soulUidSet.size) return;
+  document.querySelectorAll('#stream .msg[data-uid]').forEach(el=>{
+    const uid=el.dataset.uid;
+    if(!soulUidSet.has(uid)) return;
+    const s=roomSouls.find(x=>x.auth_uid===uid); if(!s) return;
+    const c=safeColor(s.color), ic=safeEmoji(s.emoji)||'👤';
+    const av=el.querySelector('.av');
+    if(av){
+      // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji
+      const dot=av.querySelector('.soul-dot');
+      av.style.background=c+'22'; av.style.color=c; av.style.boxShadow=`inset 0 0 0 1.5px ${c}`;
+      av.firstChild && av.firstChild.nodeType===3 ? (av.firstChild.textContent=ic)
+        : (av.innerHTML=ic+(dot?dot.outerHTML:''));
+      el.style.setProperty('--soul-c', c);
+    }
+    const nm=el.querySelector('.meta .nm');
+    if(nm){ nm.style.color=c; nm.textContent=s.name; }
+  });
+}
+
 
 // ============ @提及 功能(真人+灵魂通用) ============
 // 可@的对象 = 在线真人 + 本房灵魂(排除自己)。返回 [{name,emoji,color,isSoul}]
