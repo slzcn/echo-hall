@@ -608,7 +608,7 @@ function renderSoulForm(){
       <div class="sw-row">
         <div class="sw-fld" style="flex:2"><label>名字</label><input type="text" id="sf-name" value="${esc(s.name)}" maxlength="40"></div>
         <div class="sw-fld" style="flex:0 0 80px"><label>头像</label><input type="text" id="sf-emoji" value="${esc(s.emoji)}" maxlength="8"></div>
-        <div class="sw-fld" style="flex:0 0 110px"><label>主题色</label><input type="text" id="sf-color" value="${esc(s.color)}"></div>
+        <div class="sw-fld" style="flex:0 0 150px"><label>主题色</label><div style="display:flex;align-items:center;gap:7px"><input type="color" id="sf-color-pick" value="${/^#[0-9a-fA-F]{6}$/.test(s.color)?s.color:'#8B5CFF'}" style="width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;flex:0 0 auto"><input type="text" id="sf-color" value="${esc(s.color)}" placeholder="#8B5CFF" style="flex:1;min-width:0"></div></div>
       </div>
       <div class="sw-fld"><label>性格强度(含蓄 ← → 话痨)：<span id="sf-int-v" style="color:var(--violet)">${s.intensity}</span></label>
         <div class="sw-range"><span style="font-size:11px;color:var(--dim)">含蓄</span>
@@ -650,6 +650,12 @@ function renderSoulForm(){
   $('#sf-intensity').oninput=e=>$('#sf-int-v').textContent=e.target.value;
   $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
   $('#sf-cancel').onclick=()=>{ swEditing=null; renderWorkshop(); };
+  // 主题色: 取色器↔文本框双向联动
+  const _cp=$('#sf-color-pick'), _ct=$('#sf-color');
+  if(_cp&&_ct){
+    _cp.oninput=()=>{ _ct.value=_cp.value; };
+    _ct.oninput=()=>{ if(/^#[0-9a-fA-F]{6}$/.test(_ct.value.trim())) _cp.value=_ct.value.trim(); };
+  }
   $('#sf-save').onclick=saveSoul;
   $('#sf-try-btn').onclick=trySoul;
   $('#sf-try').addEventListener('keydown',e=>{ if(e.key==='Enter') trySoul(); });
