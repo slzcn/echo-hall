@@ -2976,13 +2976,26 @@ async function playSong(lyric, sid, el, onEnd){
           voiceBus.gain.setValueAtTime(voiceBus.gain.value, startAt);
           voiceBus.gain.linearRampToValueAtTime(0.75, startAt+0.2);
         }catch(_){}
-        // 若真人嗓比哼唱长, 额外排一个停歌定时(不清旧 timeouts, 保留字高亮动画)
-        const realDur=buf.duration/playRate;
-        const voiceEnd=startAt + realDur + 0.4;
-        const humEnd=t0+totalDur;
-        if(voiceEnd>humEnd){
-          curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(0,(voiceEnd-ctx.currentTime))*1000));
+        const realDur=buf.duration/playRate;   // 真人嗓实际播放时长
+        // 【修词曲同步】真人嗓命中 → 字高亮改跟真人嗓的实际语速(而非哼唱固定 step)。
+        // 清掉原按哼唱 step 排的字高亮 timeout, 按 realDur 均分重排, 让"词"跟着真正在唱的走。
+        if(chEls.length){
+          const perChar=realDur/chEls.length;   // 每字分到的真人嗓时长
+          // 清旧字高亮(只清字的, 不动停歌 timeout — 停歌下面重排)
+          if(curSong._charTimers) curSong._charTimers.forEach(clearTimeout);
+          curSong._charTimers=[];
+          chEls.forEach((ce,i)=>{
+            const at=(startAt - ctx.currentTime + i*perChar)*1000;
+            curSong._charTimers.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,at)));
+          });
+          curSong.timeouts.push(...curSong._charTimers);
         }
+        // 【修提前停止】真人嗓命中后, 停歌取"真人嗓结束"与"哼唱/伴奏结束"的较晚者,
+        // 避免真人嗓短时提前砍掉还在播的哼唱伴奏, 也避免真人嗓长时被旧兜底砍掉。
+        const voiceEnd=startAt + realDur + 0.5;   // +0.5 让尾音播完
+        const humEnd=t0+totalDur;                 // 哼唱+甩音"哟~"结束
+        const stopAt=Math.max(voiceEnd, humEnd);
+        curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.ctx===ctx) stopSong(); }, Math.max(0,(stopAt-ctx.currentTime))*1000));
       }catch(e){ fallbackSysTTS(); }
     } else {
       // mify 失败/超时 → 系统 TTS 兜底
