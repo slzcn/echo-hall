@@ -420,6 +420,13 @@
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
   @keyframes soulHalo{0%,100%{opacity:.3;inset:-2px;box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
     50%{opacity:.85;inset:-4px;box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
+  /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
+  .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
+  .pav.soul-av .av-ic::after{animation:pavHalo 3.6s ease-in-out infinite}
+  .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
+  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
+  @keyframes pavHalo{0%,100%{opacity:.3;box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent)}
+    50%{opacity:.8;box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}}
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -2370,7 +2377,7 @@ function renderPresenceAvatars(users){
       return;
     }
     const div=document.createElement('div');
-    div.className='pav'+(isMe?' me':'');
+    div.className='pav'+(isMe?' me':'')+(isSoul?' soul-av':'');   // soul-av: 灵魂头像带"呼吸=活跃度"动画
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
     if(!isMe && p.name){ div.dataset.atname=p.name; }
@@ -2404,6 +2411,10 @@ function renderTyping(users){
     $('#typingTxt').textContent=txt; bar.classList.add('on');
   }
   else bar.classList.remove('on');
+  // 呼吸=活跃度: 正在输入/思考(typing_at 3.5s内)的灵魂 → 头像急促呼吸(soul-live), 否则平稳。
+  // 单独 toggle class 不进 sig, 不重建 DOM, 呼吸加速平滑过渡。
+  const liveUids=new Set(users.filter(p=>soulUidSet.has(p.user_id) && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
+  presenceMap.forEach((el,uid)=>{ if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', liveUids.has(uid)); });
 }
 
 async function refreshPresence(){
