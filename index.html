@@ -731,7 +731,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0452';
+  var BUILD_VER='20260712-0456';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3836,7 +3836,8 @@ function ehConfirm(msg, title){
     $('#confirmTitle').textContent = title||'确认操作';
     $('#confirmMsg').textContent = msg;
     $('#confirmMask').classList.add('on');
-    const done=(v)=>{ $('#confirmMask').classList.remove('on'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
+    try{ EhSfx.play('click'); }catch(e){}   // 弹层出现提示音
+    const done=(v)=>{ try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
     $('#confirmYes').onclick=()=>done(true);
     $('#confirmNo').onclick=()=>done(false);
     $('#confirmMask').onclick=(e)=>{ if(e.target===$('#confirmMask')) done(false); };
