@@ -770,6 +770,17 @@
   @media(prefers-reduced-motion:reduce){
     .cursor-trail,.type-spark,#warp,#soundwave,.mood-aura{display:none!important}
   }
+  /* 名场面(回声墙) */
+  .wall-modal{max-width:440px}
+  .wall-list{max-height:56vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .wall-item{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(10,12,24,.4);position:relative}
+  .wall-item .wi-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .wall-item .wi-nm{font-size:12.5px;font-weight:700}
+  .wall-item .wi-rank{margin-left:auto;font-size:11px;color:var(--dim)}
+  .wall-item .wi-txt{font-size:14px;line-height:1.5;color:var(--ink);word-break:break-word}
+  .wall-item .wi-echoes{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+  .wall-item .wi-pill{font-size:11.5px;padding:1px 8px;border-radius:8px;background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);color:var(--accent,var(--cyan))}
+  .wall-empty{text-align:center;color:var(--dim);font-size:13px;padding:30px 0}
 </style>
 </head>
 <body>
@@ -878,6 +889,7 @@
         </div>
       </div>
       <div class="hall-tools">
+        <div class="tool-btn" id="wallBtn" title="名场面 · 本房高共鸣消息">✨</div>
         <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm">🔊</div>
         <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="gear" id="gearBtn" title="房间设置" data-txt-title="titleRoomSet">⚙️</div>
@@ -1016,6 +1028,16 @@
       <button class="cf-cancel" id="confirmNo" data-txt="cancelBtn">取消</button>
       <button class="cf-ok" id="confirmYes" data-txt="okBtn">确定</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== 名场面(回声墙): 本房高共鸣消息 ===== -->
+<div class="modal-mask" id="wallMask">
+  <div class="glass modal wall-modal">
+    <div class="modal-x" id="wallX">✕</div>
+    <h2 class="modal-title">✨ 名场面</h2>
+    <p class="modal-sub">这个房间里被大家共鸣最多的消息</p>
+    <div id="wallList" class="wall-list"></div>
   </div>
 </div>
 
@@ -4251,6 +4273,7 @@ function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({
 // 从最上层往下判定"这次返回该关掉谁"
 function navTopLayer(){
   if($('#recOverlay')?.classList.contains('on')) return 'rec';
+  if($('#wallMask')?.classList.contains('on')) return 'wall';
   if($('#modalMask')?.classList.contains('on')) return 'modal';
   if($('#meMask')?.classList.contains('on')) return 'me';
   if($('#gearMask')?.classList.contains('on')) return 'gear';
@@ -4264,6 +4287,7 @@ function navTopLayer(){
 function navConsume(layer){
   switch(layer){
     case 'rec': if(recActive){ recCanceled=true; setRecCancel(true); micRelease(); } break;
+    case 'wall': $('#wallMask')?.classList.remove('on'); break;
     case 'modal': closeModal(); break;
     case 'me': closeMe(); break;
     case 'gear': closeGear(); break;
@@ -4538,6 +4562,35 @@ on('enterBtn','click',async()=>{
 });
 on('backBtn','click',()=>backToLobby());
 on('gearBtn','click',()=>openGear());
+on('wallBtn','click',()=>openWall());
+on('wallX','click',()=>$('#wallMask').classList.remove('on'));
+on('wallMask','click',e=>{ if(e.target===$('#wallMask')) $('#wallMask').classList.remove('on'); });
+// 名场面(回声墙): 从当前房已加载消息里, 按回声(echo)总数排出高共鸣消息 top8
+function openWall(){
+  const mask=$('#wallMask'), box=$('#wallList'); if(!mask||!box) return;
+  ehArm();
+  const items=[];
+  document.querySelectorAll('#stream .msg[data-mid]').forEach(el=>{
+    const mid=el.dataset.mid; if(String(mid).startsWith('local_')) return;
+    const map=echoState[mid]; if(!map) return;
+    let total=0; const pills=[];
+    Object.keys(map).forEach(e=>{ const c=map[e]&&map[e].count||0; if(c>0){ total+=c; pills.push(e+' '+c); } });
+    if(total<=0) return;
+    const nm=el.querySelector('.meta .nm'), txt=el.querySelector('.txt');
+    items.push({ total, pills, name:nm?nm.textContent:'', color:nm?nm.style.color:'', text:txt?txt.textContent.trim().slice(0,120):'' });
+  });
+  items.sort((a,b)=>b.total-a.total);
+  const top=items.slice(0,8);
+  box.innerHTML = top.length ? top.map((it,i)=>`
+    <div class="wall-item">
+      <div class="wi-top"><span class="wi-nm" style="color:${esc(it.color||'var(--ink)')}">${esc(it.name)}</span>
+        <span class="wi-rank">#${i+1} · ${it.total} 共鸣</span></div>
+      <div class="wi-txt">${esc(it.text)}</div>
+      <div class="wi-echoes">${it.pills.map(p=>`<span class="wi-pill">${esc(p)}</span>`).join('')}</div>
+    </div>`).join('')
+    : '<div class="wall-empty">还没有高共鸣的消息～<br>长按消息贴表情，热门的会留在这里</div>';
+  mask.classList.add('on');
+}
 on('meBtn','click',()=>openMe());
 on('meBtnHall','click',()=>openMe());
 if($('#lobbyName')) on('lobbyName','click',()=>openMe());
