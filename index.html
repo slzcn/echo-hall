@@ -337,9 +337,14 @@
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
 
-  /* 平时高度为0不占位(否则透明的空条压住 stream 最后一条消息, 露半截在输入框后); 有人输入才展开 */
-  .typing-bar{height:0;padding:0 18px;font-size:11.5px;color:var(--accent,var(--cyan));flex-shrink:0;display:flex;align-items:center;gap:6px;opacity:0;overflow:hidden;transition:height .2s,opacity .2s}
-  .typing-bar.on{height:20px;opacity:1}
+  /* "正在输入"改浮层: absolute 悬浮在输入框上方, 不占据布局(不挤压/遮挡消息流),
+     宽度自适应内容(不铺满整行), 小圆角半透明胶囊, 贴左显示 */
+  .typing-bar{position:absolute;left:14px;bottom:calc(100% + 6px);width:max-content;max-width:calc(100% - 28px);
+    padding:4px 12px;font-size:11.5px;color:var(--accent,var(--cyan));display:flex;align-items:center;gap:6px;
+    background:color-mix(in srgb,var(--panel-solid) 92%,transparent);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 4px 16px -6px rgba(0,0,0,.5);opacity:0;transform:translateY(4px);pointer-events:none;
+    transition:opacity .18s,transform .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5}
+  .typing-bar.on{opacity:1;transform:translateY(0)}
   .typing-bar .d{display:inline-flex;gap:3px}
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bounce 1.2s infinite}
   .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
@@ -808,13 +813,13 @@
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
-    <div class="typing-bar" id="typingBar"><span id="typingTxt"></span><span class="d"><i></i><i></i><i></i></span></div>
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
     <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
     <div class="song-strip" id="songStrip"></div>
     <form class="composer" onsubmit="return false" autocomplete="off" spellcheck="false">
+      <div class="typing-bar" id="typingBar"><span id="typingTxt"></span><span class="d"><i></i><i></i><i></i></span></div>
       <div class="plus-btn" id="plusBtn" title="更多花样" data-txt-title="titleMore">＋</div>
       <div class="cin-wrap">
         <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情" data-txt-title="titleEmoji">😊</div>
