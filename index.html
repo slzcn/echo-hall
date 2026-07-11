@@ -1322,6 +1322,9 @@ const AudioEngine=(function(){
   }
   function playCfg(cfg){
     if(!ensure()) return;
+    // 防御: 该合成器要求分层格式(bpm/steps/loopBars/layers). 若拿到旧简单格式(root/chord/wave)或缺字段,
+    // 直接静默跳过, 绝不让 BGM 配置不匹配把进房流程(startRoomBGM 在 enterRoom 里同步调)带崩。
+    if(!cfg || !cfg.layers || !cfg.bpm || !cfg.steps || !cfg.loopBars){ stopInternal(false); return; }
     stopInternal(false);
     cur=cfg;
     try{ ctx.resume&&ctx.resume(); }catch(e){}
@@ -1422,9 +1425,11 @@ const AudioEngine=(function(){
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
-  if(!bgmOn()) return;
-  if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
-  else AudioEngine.stop();
+  try{
+    if(!bgmOn()) return;
+    if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
+    else AudioEngine.stop();
+  }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
 function initBgmUI(){
   const b2=$('#bgmBtnHall'); if(!b2) return;
