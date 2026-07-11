@@ -2281,7 +2281,14 @@ function renderTyping(users){
   const now=Date.now();
   const typers=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.name);
   const bar=$('#typingBar');
-  if(typers.length){ $('#typingTxt').textContent=typers.length===1?`${typers[0]} 正在输入`:`${typers.length} 人正在输入`; bar.classList.add('on'); }
+  if(typers.length){
+    // 文案: 1人"XX 正在输入"; 2人"甲、乙 正在输入"; ≥3人"甲、乙、丙等N人正在输入"(最多列3名防超长, 胶囊再兜底ellipsis)
+    let txt;
+    if(typers.length===1) txt=`${typers[0]} 正在输入`;
+    else if(typers.length===2) txt=`${typers[0]}、${typers[1]} 正在输入`;
+    else txt=`${typers.slice(0,3).join('、')}等${typers.length}人正在输入`;
+    $('#typingTxt').textContent=txt; bar.classList.add('on');
+  }
   else bar.classList.remove('on');
 }
 
