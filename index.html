@@ -20,7 +20,7 @@
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#717EA9;
-    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
+    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A; --accent:#28E6D8;
     --grid:rgba(80,120,255,.05);
     --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
     --glow-cyan:0 0 24px rgba(40,230,216,.5); --glow-mag:0 0 24px rgba(255,60,172,.5);
@@ -30,7 +30,7 @@
     --bg:#160a1f; --bg2:#22103a; --panel:rgba(40,18,60,.72); --panel-solid:#241035;
     --line:rgba(255,120,200,.18); --line2:rgba(255,120,200,.32);
     --ink:#FFE8F6; --sub:#D9A8D0; --dim:#9B77A8;
-    --cyan:#38E1D0; --magenta:#FF3D9A; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0;
+    --cyan:#38E1D0; --magenta:#FF3D9A; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --accent:#FF3D9A;
     --grid:rgba(255,120,220,.06);
     --glow-cyan:0 0 24px rgba(56,225,208,.5); --glow-mag:0 0 26px rgba(255,61,154,.55);
   }
@@ -39,7 +39,7 @@
     --bg:#000000; --bg2:#0a0a0c; --panel:rgba(16,16,20,.82); --panel-solid:#0e0e12;
     --line:rgba(210,180,120,.16); --line2:rgba(210,180,120,.3);
     --ink:#F4F1E9; --sub:#B8B0A0; --dim:#827B6D;
-    --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96;
+    --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96; --accent:#E9C877;
     --grid:rgba(210,180,120,.035);
     --glow-cyan:0 0 20px rgba(233,200,119,.4); --glow-mag:0 0 20px rgba(233,200,119,.4);
   }
@@ -48,7 +48,7 @@
     --bg:#0d0620; --bg2:#160a30; --panel:rgba(30,16,56,.72); --panel-solid:#1a0e34;
     --line:rgba(165,92,255,.18); --line2:rgba(165,92,255,.32);
     --ink:#F2EAFF; --sub:#C4A8E8; --dim:#8A72B0;
-    --cyan:#A55CFF; --magenta:#C77DFF; --violet:#7B4DFF; --amber:#FFCE6B; --green:#9B7BFF;
+    --cyan:#A55CFF; --magenta:#C77DFF; --violet:#7B4DFF; --amber:#FFCE6B; --green:#9B7BFF; --accent:#A55CFF;
     --grid:rgba(140,90,255,.05);
     --glow-cyan:0 0 28px rgba(165,92,255,.6); --glow-mag:0 0 24px rgba(199,125,255,.5);
   }
@@ -1690,7 +1690,22 @@ const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防�
 const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
 const ROOM_KIND_C = EH_CONFIG.roomKindC || { public:'#4DE38A', private:'#8B5CFF', official:'#28E6D8' };
 // 统一取房间强调色: 官方按名查表, 公开/私密按类型查 roomKindC
-function roomAccentC(r){ return r.kind==='official' ? (OFFICIAL_FALLBACK_C[r.name]||ROOM_KIND_C.official) : (ROOM_KIND_C[r.kind]||ROOM_KIND_C.official); }
+// 取官方房主题的 --accent (从注入的 style#eh-theme-vars 读, 真跟主题走; 失败降级 officialFallbackC)
+function themeAccentOf(roomName){
+  try{
+    const themeId = (EH_CONFIG.roomTheme||{})[roomName];
+    if(!themeId) return null;
+    const pal = (EH_CONFIG.themePalettes||{})[themeId];
+    if(pal && pal['--accent']) return pal['--accent'];
+  }catch(_){}
+  return null;
+}
+function roomAccentC(r){
+  if(r.kind==='official'){
+    return themeAccentOf(r.name) || OFFICIAL_FALLBACK_C[r.name] || ROOM_KIND_C.official;
+  }
+  return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
+}
 let _themeUIInit=false;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
