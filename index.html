@@ -313,6 +313,8 @@
   .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;overflow-wrap:anywhere;max-width:100%;
     background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
     -webkit-user-select:none;user-select:none}
+  /* 纯表情消息: 放大、去气泡背景/边框(同 iMessage/微信), 让"发出来的表情"在消息流里明显留底 */
+  .msg .txt.emoji-only{font-size:34px;line-height:1.2;background:none;border:none;padding:2px 0}
   .msg.me{flex-direction:row-reverse}
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
@@ -2303,7 +2305,7 @@ function buildMsgEl(m){
     <div class="body">
       <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
-      <div class="txt">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):renderAtMentions(esc(m.text)))}</div>
+      <div class="txt${(!isVoice && !isSong && isEmojiOnly(m.text)) ? ' emoji-only':''}">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):renderAtMentions(esc(m.text)))}</div>
       ${echoHtml}
     </div>`;
   // 呼吸光环要用灵魂主题色驱动阴影 → 写成 CSS 变量供 keyframes 引用
