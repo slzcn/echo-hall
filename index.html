@@ -1821,6 +1821,7 @@ async function enterRoom(room){
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
+    try{ _prewarmRoomEnter(); }catch(_){}
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息
@@ -1840,6 +1841,7 @@ async function enterRoom(room){
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
+  try{ _prewarmRoomEnter(); }catch(_){}
 
   await ensureAuth();
   subscribeMessages(room.id);
@@ -2554,7 +2556,7 @@ function prefetchVoice(text,style,pin){
 }
 
 // ============ 常用短语预热(页面加载后就预合成, 发常见词直接命中) ============
-const EH_HOT_PHRASES=['哈哈哈','哈啰','你好','晚安','早安','没欻','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
+const EH_HOT_PHRASES=['哈哈哈','哈喽','你好','晚安','早安','没歇','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
 let _prewarmedStyles=new Set();
 function prewarmHotPhrases(){
   // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样)
@@ -2564,6 +2566,18 @@ function prewarmHotPhrases(){
   // 并发预热全部预置词, pin=true 铉住不被用户输入的词挤出缓存(预置词永远即时)。
   // 预置词短, 并发 ~2s 全部备好, 远比错峰 10s 快。
   EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
+}
+// 进房就预热默认神曲风(shen)的预置词——让预热窗口提前到用户浏览/打字时, 点神曲时已备好。
+// 延 2s 避开进房时的订阅/拉消息网络高峰。
+function _prewarmRoomEnter(){
+  setTimeout(()=>{
+    try{
+      const st=SONG_STYLES.find(s=>s.id==='shen')||SONG_STYLES[0];
+      const style=st.ttsStyle||'default';
+      if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
+      EH_HOT_PHRASES.forEach(p=>{ try{ prefetchVoice(p, style, true); }catch(_){} });
+    }catch(_){}
+  }, 2000);
 }
 
 function tone(ctx,dest,freq,t,dur,type,gain){
