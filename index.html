@@ -2514,6 +2514,36 @@ function fetchMifyVoice(text, timeoutMs, style){
   });
 }
 
+// ============ 真人嗓预取缓存(根治延迟) ============
+// 策略: 发送瞬间/打字停顿时就异步预合成, 存缓存; 播放时命中则 0 延迟直接播。
+const EH_VOICE_CACHE=new Map();   // key: style+'\u0001'+text  -> {b64,sr,ts}
+const EH_VOICE_CACHE_MAX=24;
+function voiceCacheKey(text,style){ return (style||'default')+'\u0001'+String(text).slice(0,60); }
+function getCachedVoice(text,style){ const k=voiceCacheKey(text,style); const v=EH_VOICE_CACHE.get(k); if(v){ v.ts=Date.now(); } return v||null; }
+function putCachedVoice(text,style,data){
+  const k=voiceCacheKey(text,style);
+  EH_VOICE_CACHE.set(k,{...data,ts:Date.now()});
+  // 超上限淘汰最旧
+  if(EH_VOICE_CACHE.size>EH_VOICE_CACHE_MAX){
+    let oldK=null,oldT=Infinity;
+    for(const [kk,vv] of EH_VOICE_CACHE){ if(vv.ts<oldT){ oldT=vv.ts; oldK=kk; } }
+    if(oldK) EH_VOICE_CACHE.delete(oldK);
+  }
+}
+// 预取: 不阻塞, 成功存缓存。已有缓存则跳过。
+let _prefetchInflight=new Set();
+function prefetchVoice(text,style){
+  text=String(text||'').trim().slice(0,60);
+  if(!text) return;
+  const k=voiceCacheKey(text,style);
+  if(EH_VOICE_CACHE.has(k) || _prefetchInflight.has(k)) return;
+  _prefetchInflight.add(k);
+  fetchMifyVoice(text, 8000, style).then(res=>{
+    _prefetchInflight.delete(k);
+    if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr});
+  }).catch(()=>{ _prefetchInflight.delete(k); });
+}
+
 function tone(ctx,dest,freq,t,dur,type,gain){
   const o=ctx.createOscillator(), g=ctx.createGain();
   o.type=type; o.frequency.value=freq;
@@ -2674,10 +2704,13 @@ async function playSong(lyric, sid, el, onEnd){
       setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
     }catch(e){}
   }
-  // 主方案: 并行请求 mify 真人嗓(不阻塞哼唱/伴奏已起播)。超时 4.5s。按曲风传 style 音色。
+  // 主方案: 优先用预取缓存(0 延迟), 未命中才现场请求。按曲风传 style 音色。
   const ttsStyle=st.ttsStyle||'default';
   const playRate=clamp(st.playRate??1.0, 0.7, 1.5);
-  fetchMifyVoice(fullText, 4500, ttsStyle).then(res=>{
+  const cached=getCachedVoice(fullText, ttsStyle);
+  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr})
+                            : fetchMifyVoice(fullText, 4500, ttsStyle);
+  voiceReady.then(res=>{
     // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
     if(!curSong || curSong.ctx!==ctx){ return; }
     if(res && res.b64){
@@ -2727,6 +2760,8 @@ async function sendSong(lyric, sid){
   lyric=String(lyric||'').trim().slice(0,60);
   if(!lyric){ toast(EH_CONFIG.text.sing_needText); return; }
   if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
+  // 根治延迟: 发送瞬间立即预取真人嗓(播放时已在缓存中)
+  try{ const _st=SONG_STYLES.find(s=>s.id===sid); prefetchVoice(lyric, _st&&_st.ttsStyle||'default'); }catch(_){}
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
@@ -3513,6 +3548,16 @@ cin.addEventListener('input',()=>{
   const v=cin.value;
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
+  // 神曲模式: 打字停顿 500ms 后后台预合成真人嗓(根治延迟——发送/播放时已在缓存)
+  if(songMode){
+    clearTimeout(cin._prefetchTimer);
+    const ly=v.trim().slice(0,60);
+    if(ly.length>=1){
+      cin._prefetchTimer=setTimeout(()=>{
+        try{ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; prefetchVoice(ly, st.ttsStyle||'default'); }catch(_){}
+      }, 500);
+    }
+  }
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
