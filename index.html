@@ -561,7 +561,9 @@
   .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
   .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
     border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
-  .act-ring .ar-actions .ai{font-size:18px}
+  /* 回复/投影统一用线性SVG图标(灰描边、等大), 不再混用文字符号↳与彩色emoji📽️→风格一致协调 */
+  .act-ring .ar-actions .ai{height:22px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+  .act-ring .ar-actions .ai svg{width:20px;height:20px}
   .act-ring .ar-actions button:hover{background:rgba(255,255,255,.08)}
 
   /* 粒子/共鸣 */
@@ -3578,8 +3580,8 @@ function showActRing(x,y,m){
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
-      <button data-a="reply"><span class="ai">↳</span>回复</button>
-      <button data-a="project"><span class="ai">📽️</span>投影</button>
+      <button data-a="reply"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v1"/></svg></span>回复</button>
+      <button data-a="project"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M22 8l-5 4 5 4V8z"/></svg></span>投影</button>
     </div>`;
   ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();   // 别冒泡到 document 的关闭监听(否则刚开的托盘立即被关)
