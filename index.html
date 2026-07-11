@@ -2122,8 +2122,8 @@ function buildMsgEl(m){
   // 神曲卡片一渲染就后台预取真人嗓(根治延迟——不管自己发的还是收到别人的, 点播放时缓存已就绪)
   if(isSong){
     try{ const _p=parseSong(m.text); const _st=SONG_STYLES.find(s=>s.id===_p.sid)||SONG_STYLES[0];
-      // 延迟一拍预取(避免初始大批历史消息同时灼 20 个请求), 只预取靠近底部的新卡片
-      setTimeout(()=>{ try{ prefetchVoice(_p.lyric, _st.ttsStyle||'default'); }catch(_){} }, 300);
+      // 尽早触发: 50ms 仅让本帧渲染完(避免阻塞列表 rAF), 不到 300ms
+      setTimeout(()=>{ try{ prefetchVoice(_p.lyric, _st.ttsStyle||'default'); }catch(_){} }, 50);
     }catch(_){}
   }
   return el;
@@ -2224,6 +2224,8 @@ function setMode(mode){
   voidMode = mode==='void';
   voiceMode = mode==='voice';
   songMode = mode==='song';
+  // 神曲模式首次启用: 预热常用短语(发常见词直接 0 延迟命中)
+  if(songMode){ try{ prewarmHotPhrases(); }catch(_){} }
   const composer=$('.composer');
   composer.classList.toggle('void-mode', voidMode);
   composer.classList.toggle('voice-mode', voiceMode);
@@ -2548,6 +2550,18 @@ function prefetchVoice(text,style){
     _prefetchInflight.delete(k);
     if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr});
   }).catch(()=>{ _prefetchInflight.delete(k); });
+}
+
+// ============ 常用短语预热(页面加载后就预合成, 发常见词直接命中) ============
+const EH_HOT_PHRASES=['哈哈哈','哈啰','你好','晚安','早安','没欻','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
+let _hotPrewarmed=false;
+function prewarmHotPhrases(){
+  if(_hotPrewarmed) return; _hotPrewarmed=true;
+  // 默认风(shen)预热前 5 句(避免一次灼开 API)
+  const st=SONG_STYLES[0];
+  EH_HOT_PHRASES.slice(0,5).forEach((p,i)=>{
+    setTimeout(()=>{ try{ prefetchVoice(p, st.ttsStyle||'default'); }catch(_){} }, 1200+i*1500);
+  });
 }
 
 function tone(ctx,dest,freq,t,dur,type,gain){
@@ -3567,14 +3581,14 @@ cin.addEventListener('input',()=>{
   const v=cin.value;
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
-  // 神曲模式: 打字停顿 500ms 后后台预合成真人嗓(根治延迟——发送/播放时已在缓存)
+  // 神曲模式: 打字停顿 150ms 后后台预合成真人嗓(缩短至 150ms——容忍多一次预取也要确保发送时已命中)
   if(songMode){
     clearTimeout(cin._prefetchTimer);
     const ly=v.trim().slice(0,60);
     if(ly.length>=1){
       cin._prefetchTimer=setTimeout(()=>{
         try{ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; prefetchVoice(ly, st.ttsStyle||'default'); }catch(_){}
-      }, 500);
+      }, 150);
     }
   }
 });
