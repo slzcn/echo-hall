@@ -287,8 +287,12 @@
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 
   .stream{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px}
-  .stream::-webkit-scrollbar{width:6px}
-  .stream::-webkit-scrollbar-thumb{background:rgba(120,140,220,.25);border-radius:3px}
+  .stream::-webkit-scrollbar{width:5px}
+  .stream::-webkit-scrollbar-track{background:transparent}
+  .stream::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--cyan) 18%,transparent);border-radius:99px;
+    border:1px solid transparent;background-clip:padding-box;transition:.2s}
+  .stream:hover::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--cyan) 40%,transparent);background-clip:padding-box}
+  .stream{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--cyan) 30%,transparent) transparent}
   .load-more{align-self:center;margin:4px 0 10px;padding:6px 16px;border-radius:8px;border:1px solid var(--line2);
     background:none;color:var(--sub);font-family:inherit;font-size:11.5px;cursor:pointer;transition:.15s}
   .load-more:hover{border-color:var(--cyan);color:var(--cyan)}
