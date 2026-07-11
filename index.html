@@ -2554,13 +2554,15 @@ function prefetchVoice(text,style){
 
 // ============ 常用短语预热(页面加载后就预合成, 发常见词直接命中) ============
 const EH_HOT_PHRASES=['哈哈哈','哈啰','你好','晚安','早安','没欻','真的假的','考虑考虑','卡断断','yyds','累了','到家了','开会了','下班'];
-let _hotPrewarmed=false;
+let _prewarmedStyles=new Set();
 function prewarmHotPhrases(){
-  if(_hotPrewarmed) return; _hotPrewarmed=true;
-  // 默认风(shen)预热前 5 句(避免一次灼开 API)
-  const st=SONG_STYLES[0];
+  // 按当前选中曲风预热(不同曲风 ttsStyle 不同, key 不一样; 只预热用户当前选的风)
+  const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
+  const style=st.ttsStyle||'default';
+  if(_prewarmedStyles.has(style)) return; _prewarmedStyles.add(style);
+  // 预热前 5 句常用词(错峰, 避免一次灼开 API)
   EH_HOT_PHRASES.slice(0,5).forEach((p,i)=>{
-    setTimeout(()=>{ try{ prefetchVoice(p, st.ttsStyle||'default'); }catch(_){} }, 1200+i*1500);
+    setTimeout(()=>{ try{ prefetchVoice(p, style); }catch(_){} }, 1000+i*1400);
   });
 }
 
@@ -2815,6 +2817,7 @@ function renderSongStrip(){
     const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
     $('#cin').placeholder=`输入要唱的话… ${st.emoji}${st.name}`;
     $('.composer').style.setProperty('--song-c', safeColor(st.color));
+    try{ prewarmHotPhrases(); }catch(_){}   // 切新曲风也预热该风常用词
     try{ if(curRoom) $('#cin').focus(); }catch(_){}
   });
 }
