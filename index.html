@@ -2675,6 +2675,8 @@ async function playSong(lyric, sid, el, onEnd){
   // 主唱总线直连 master(gain 1.3 补偿). 不用 DynamicsCompressor:
   // 国产浏览器(小米/QQ 等基于旧内核)对 DynamicsCompressor 支持有bug, 会把主唱信号压没/断掉
   // → 安卓表现"有伴奏没人声"(伴奏走master不经压缩器正常). 已改纯 GainNode, 全平台兼容.
+  // 主唱总线: 初始声量高(1.6=“主角”), 真人嗓到货后 ramp 降低(0.75=“背景长音”), 让真人嗓无缝接管主唱。
+  // 关键根治“任何词即时”—— fetch 空窗期哼唱就是主唱(声量够大), 不是以前的“背景塔型"。
   const voiceBus=ctx.createGain(); voiceBus.gain.value=1.6;
   voiceBus.connect(master);
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
@@ -2769,6 +2771,13 @@ async function playSong(lyric, sid, el, onEnd){
         src.start(startAt);
         curSong.oscs.push(src);
         mifyHandled=true;
+        // 真人嗓接管后, 将哼唱从“主角” ramp 降至“背景”(1.6→0.75), 让真人嗓成主唱+哼唱做和声。
+        // 200ms 平滑过渡, 避免突然窜鸭。
+        try{
+          voiceBus.gain.cancelScheduledValues(startAt);
+          voiceBus.gain.setValueAtTime(voiceBus.gain.value, startAt);
+          voiceBus.gain.linearRampToValueAtTime(0.75, startAt+0.2);
+        }catch(_){}
         // 若真人嗓比哼唱长, 额外排一个停歌定时(不清旧 timeouts, 保留字高亮动画)
         const realDur=buf.duration/playRate;
         const voiceEnd=startAt + realDur + 0.4;
