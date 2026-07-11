@@ -4851,7 +4851,7 @@ function fillAndLogin(id, pwv){
       caring:{c:'#8B5CFF',cls:'mood-caring'}, calm:{c:'#28E6D8',cls:''} };
     setInterval(()=>{
       try{
-        if(!document.body.classList.contains('hall-on') || !window.roomSouls || !roomSouls.length){ aura.classList.remove('on'); return; }
+        if(!document.body.classList.contains('hall-on') || typeof roomSouls==='undefined' || !roomSouls.length){ aura.classList.remove('on'); return; }
         // 统计主导情绪
         const cnt={}; roomSouls.forEach(s=>{ const e=s.emotion||'calm'; cnt[e]=(cnt[e]||0)+1; });
         let dom='calm',mx=0; Object.keys(cnt).forEach(e=>{ if(cnt[e]>mx){mx=cnt[e];dom=e;} });
