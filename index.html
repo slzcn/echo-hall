@@ -2402,19 +2402,19 @@ const SCALE={
 // v2: 主唱改为共振峰哼唱(音高真跟旋律走), TTS 降为可选轻声跟读垫; motif 做"钩子+变奏"更洗脑; 新增 慵懒Lo-Fi 曲风
 const SONG_STYLES=[
   { id:'dj',    name:'蹦迪DJ',  emoji:'🕺', color:'#28E6D8', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
-    motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0} },
+    motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12 },
   { id:'shen',  name:'神曲喊麦', emoji:'🎤', color:'#FF3CAC', bpm:92,  bpc:0.5, base:-2, scale:SCALE.minor,
-    motif:[0,0,0,3,2,0,-2,0], chords:[0,0,5,3], wave:'square', bass:'sawtooth', groove:'boom', tts:{rate:1.45,pitch:0.75} },
+    motif:[0,0,0,3,2,0,-2,0], chords:[0,0,5,3], wave:'square', bass:'sawtooth', groove:'boom', tts:{rate:1.45,pitch:0.75}, ttsStyle:'sao', playRate:1.15 },
   { id:'kid',   name:'儿歌',    emoji:'🧸', color:'#FFB84D', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
-    motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5} },
+    motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18 },
   { id:'gufeng',name:'古风',    emoji:'🏮', color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
-    motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1} },
+    motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96 },
   { id:'disco', name:'迪斯科',  emoji:'🪩', color:'#4DE38A', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
-    motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1} },
+    motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1 },
   { id:'8bit',  name:'电玩',    emoji:'👾', color:'#5B8CFF', bpm:140, bpc:0.5, base:0,  scale:SCALE.minP,
-    motif:[0,3,5,3,7,5,3,0], chords:[0,3,-2,5], wave:'square', bass:'square', groove:'four', tts:{rate:1.4,pitch:1.3} },
+    motif:[0,3,5,3,7,5,3,0], chords:[0,3,-2,5], wave:'square', bass:'square', groove:'four', tts:{rate:1.4,pitch:1.3}, ttsStyle:'qiaopi', playRate:1.22 },
   { id:'lofi',  name:'慵懒Lo-Fi', emoji:'🌙', color:'#9BD4CC', bpm:82, bpc:0.5, base:-4, scale:SCALE.minP,
-    motif:[0,2,3,2,0,-2,0,3], chords:[0,3,5,3], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:0.9,pitch:0.95} },
+    motif:[0,2,3,2,0,-2,0,3], chords:[0,3,5,3], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:0.9,pitch:0.95}, ttsStyle:'lazy', playRate:0.92 },
 ];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
@@ -2493,7 +2493,7 @@ function pcm16ToBuffer(ctx, b64, sr){
   return buf;
 }
 // 请求 mify 真人嗓; 带超时。成功 resolve {buffer}; 失败/超时 resolve null(调用方据此走兜底)。
-function fetchMifyVoice(text, timeoutMs){
+function fetchMifyVoice(text, timeoutMs, style){
   return new Promise((resolve)=>{
     let done=false;
     const to=setTimeout(()=>{ if(!done){ done=true; resolve(null); } }, timeoutMs||3500);
@@ -2502,7 +2502,7 @@ function fetchMifyVoice(text, timeoutMs){
     fetch(EH_SING_TTS_FN, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:String(text).slice(0,60)}),
+      body:JSON.stringify({text:String(text).slice(0,60), style:style||'default'}),
       signal: ctl?ctl.signal:undefined
     }).then(r=>r.ok?r.json():null).then(j=>{
       if(done) return; done=true; clearTimeout(to);
@@ -2512,6 +2512,36 @@ function fetchMifyVoice(text, timeoutMs){
       } else resolve(null);
     }).catch(()=>{ if(!done){ done=true; clearTimeout(to); resolve(null); } });
   });
+}
+
+// ============ 真人嗓预取缓存(根治延迟) ============
+// 策略: 发送瞬间/打字停顿时就异步预合成, 存缓存; 播放时命中则 0 延迟直接播。
+const EH_VOICE_CACHE=new Map();   // key: style+'\u0001'+text  -> {b64,sr,ts}
+const EH_VOICE_CACHE_MAX=24;
+function voiceCacheKey(text,style){ return (style||'default')+'\u0001'+String(text).slice(0,60); }
+function getCachedVoice(text,style){ const k=voiceCacheKey(text,style); const v=EH_VOICE_CACHE.get(k); if(v){ v.ts=Date.now(); } return v||null; }
+function putCachedVoice(text,style,data){
+  const k=voiceCacheKey(text,style);
+  EH_VOICE_CACHE.set(k,{...data,ts:Date.now()});
+  // 超上限淘汰最旧
+  if(EH_VOICE_CACHE.size>EH_VOICE_CACHE_MAX){
+    let oldK=null,oldT=Infinity;
+    for(const [kk,vv] of EH_VOICE_CACHE){ if(vv.ts<oldT){ oldT=vv.ts; oldK=kk; } }
+    if(oldK) EH_VOICE_CACHE.delete(oldK);
+  }
+}
+// 预取: 不阻塞, 成功存缓存。已有缓存则跳过。
+let _prefetchInflight=new Set();
+function prefetchVoice(text,style){
+  text=String(text||'').trim().slice(0,60);
+  if(!text) return;
+  const k=voiceCacheKey(text,style);
+  if(EH_VOICE_CACHE.has(k) || _prefetchInflight.has(k)) return;
+  _prefetchInflight.add(k);
+  fetchMifyVoice(text, 8000, style).then(res=>{
+    _prefetchInflight.delete(k);
+    if(res && res.b64) putCachedVoice(text,style,{b64:res.b64,sr:res.sr});
+  }).catch(()=>{ _prefetchInflight.delete(k); });
 }
 
 function tone(ctx,dest,freq,t,dur,type,gain){
@@ -2674,35 +2704,45 @@ async function playSong(lyric, sid, el, onEnd){
       setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
     }catch(e){}
   }
-  // 主方案: 并行请求 mify 真人嗓(不阻塞哼唱/伴奏已起播)。超时 3.5s。
-  fetchMifyVoice(fullText, 3500).then(res=>{
+  // 主方案: 优先用预取缓存(0 延迟), 未命中才现场请求。按曲风传 style 音色。
+  const ttsStyle=st.ttsStyle||'default';
+  const playRate=clamp(st.playRate??1.0, 0.7, 1.5);
+  const cached=getCachedVoice(fullText, ttsStyle);
+  const voiceReady = cached ? Promise.resolve({b64:cached.b64, sr:cached.sr})
+                            : fetchMifyVoice(fullText, 4500, ttsStyle);
+  voiceReady.then(res=>{
     // 若歌已停(用户中途停/切歌), curSong 变了就丢弃
     if(!curSong || curSong.ctx!==ctx){ return; }
     if(res && res.b64){
       try{
         const buf=pcm16ToBuffer(ctx, res.b64, res.sr);
         const src=ctx.createBufferSource(); src.buffer=buf;
-        // 真人嗓 PCM 原始 peak 已近 0.94, 直接挂 master(不走 voiceBus 的 1.6倍放大), gain 取 0.85 预留安全余量防剔顶。
-        const vg=ctx.createGain(); vg.gain.value=0.85;
+        src.playbackRate.value=playRate;   // 随曲风变速: 快曲风嗓音更快更饽舌, 慢曲风更懒
+        // 真人嗓 PCM 原始 peak 近 0.94, 直接挂 master(不走 voiceBus 的 1.6倍放大), gain 0.9 防剔顶
+        const vg=ctx.createGain(); vg.gain.value=0.9;
         src.connect(vg); vg.connect(master);
-        // 对齐到最近的拍点起播(避免落在半拍显乱); 到达通常已过 t0 约2s
+        // 关键修复: 真人嗓到货时不硬对齐 t0(短文案 t0 早已过去、歌已停). 从当前时间平滑接入。
         const now=ctx.currentTime;
-        const startAt=Math.max(now+0.02, t0);
+        const startAt=now+0.03;
         src.start(startAt);
         curSong.oscs.push(src);
         mifyHandled=true;
-        // 真人嗓可能比原 totalDur 长, 顺延结束时间
-        const voiceEnd=startAt + buf.duration + 0.3;
+        // 真人嗓实际时长(考虑变速); 确保唱完才停歌(短文案也能完整听到)
+        const realDur=buf.duration/playRate;
+        const voiceEnd=startAt + realDur + 0.4;
+        // 清掉旧的 totalDur 停歌定时(避免短歌提前停掉真人嗓), 重新排一个
+        curSong.timeouts.forEach(clearTimeout); curSong.timeouts.length=0;
         curSong.timeouts.push(setTimeout(()=>stopSong(), Math.max(0,(voiceEnd-ctx.currentTime))*1000));
       }catch(e){ fallbackSysTTS(); }
     } else {
-      // mify 失败/超时 → 系统 TTS 兜底(但此时哼唱可能已近尾声, 仍尽力念)
+      // mify 失败/超时 → 系统 TTS 兜底
       fallbackSysTTS();
     }
   });
-  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间)
+  // TTS 音频调度(仅在 mify 未接管时用于估算结束时间); 短文案也给真人嗓留足等待窗口(至少 5s 才可能因 totalDur 停歌)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
-  curSong.timeouts.push(setTimeout(()=>{ if(!mifyHandled) stopSong(); }, (Math.max(totalDur,ttsDur)+0.4)*1000));
+  const minWait=5.0;   // 给 mify 回来的安全等待(跨境 ~2.2s + 真人嗓时长), 避免短歌提前停掉
+  curSong.timeouts.push(setTimeout(()=>{ if(!mifyHandled) stopSong(); }, (Math.max(totalDur,ttsDur,minWait)+0.4)*1000));
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
 document.addEventListener('click',e=>{
@@ -2720,6 +2760,8 @@ async function sendSong(lyric, sid){
   lyric=String(lyric||'').trim().slice(0,60);
   if(!lyric){ toast(EH_CONFIG.text.sing_needText); return; }
   if(!SONG_STYLES.some(s=>s.id===sid)) sid=SONG_STYLES[0].id;
+  // 根治延迟: 发送瞬间立即预取真人嗓(播放时已在缓存中)
+  try{ const _st=SONG_STYLES.find(s=>s.id===sid); prefetchVoice(lyric, _st&&_st.ttsStyle||'default'); }catch(_){}
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:sid+'|'+lyric, kind:'song' };
   const optimistic={ ...payload, id:'local_'+Date.now(), created_at:new Date().toISOString() };
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
@@ -3512,6 +3554,16 @@ cin.addEventListener('input',()=>{
   const v=cin.value;
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
+  // 神曲模式: 打字停顿 500ms 后后台预合成真人嗓(根治延迟——发送/播放时已在缓存)
+  if(songMode){
+    clearTimeout(cin._prefetchTimer);
+    const ly=v.trim().slice(0,60);
+    if(ly.length>=1){
+      cin._prefetchTimer=setTimeout(()=>{
+        try{ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; prefetchVoice(ly, st.ttsStyle||'default'); }catch(_){}
+      }, 500);
+    }
+  }
 });
 cin.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 $('#goBtn').onclick=send;
