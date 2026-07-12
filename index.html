@@ -2388,6 +2388,8 @@ async function loadHistory(first){
     if(canLoadMore) addLoadMore();
     // 预热最近几首已生成神曲: 进房看到的歌还没点就预取好, 点击秒播(只拉最新3首省流量)
     try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){}
+    // 扫我自己发的卡住的 pending 神曲: 如果存储桶里已有 mp3 → 直接补 patch, 不重新调 MiniMax
+    try{ resumeStuckPendingSongs().catch(()=>{}); }catch(_){}
   } else {
     const prevH=stream.scrollHeight;
     if(moreBtn) moreBtn.remove();
@@ -3659,6 +3661,37 @@ async function sendSong(lyric, sid){
 
 // 生成 + 上传 + 回写 消息 text 字段(附带兜底: 谁触发到"未完成"卡片就由谁重生成一次)
 const _EH_SONG_GENERATING=new Set();   // 记录正在生成的 mid, 防重复触发
+// 扫已卡住的 pending 神曲(自己发的，上传了但 patch fail 的) → 存储桶中已有 mp3 则直接补回写, 不重调 MiniMax(省额度+快)
+async function resumeStuckPendingSongs(){
+  if(!curRoom || !curRoom.id || !myUid) return;
+  try{
+    // 拉自己发的、本房、kind=song 、没回写 URL 的最近 20 条
+    const { data:rows }=await sb.from('eh_messages').select('id,text').eq('room_id',curRoom.id).eq('user_id',myUid).eq('kind','song').is('streaming',false).order('id',{ascending:false}).limit(20);
+    if(!rows || !rows.length) return;
+    const stuck=rows.filter(m=>{ const t=m.text||''; return t && !t.includes('|http'); });
+    if(!stuck.length) return;
+    for(const m of stuck){
+      const path=`songs/${curRoom.id}/${m.id}.mp3`;
+      // 先 HEAD 存储: mp3 存在 → 直接补 patch
+      const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
+      let ok=false;
+      try{ const r=await fetch(pub.publicUrl, {method:'HEAD'}); ok=r.ok; }catch(_){ ok=false; }
+      if(!ok) continue;   // 没存 → 等下次点击重新生成, 不在这里自动花 MiniMax 额度
+      const parts=(m.text||'').split('|');
+      const sid=parts[0]||'dj';
+      const lyric=decodeURIComponent(parts[1]||'');
+      // chorus 信息丢失(初次生成时在内存) → 用全歌当 chorus(先能听到为主, 精准 chorus 属于优化)
+      const songUrl=pub.publicUrl + '?t=' + Date.now();
+      const newText=encodeSong(sid, lyric, songUrl, 0, 0);
+      const upd=await sb.from('eh_messages').update({text:newText}).eq('id', m.id).select();
+      if(upd.error){ console.warn('[resume song patch]', m.id, upd.error.message); continue; }
+      if(!upd.data || upd.data.length===0){ console.warn('[resume song 0-rows]', m.id); continue; }
+      console.log('[song resumed]', m.id, '(bucket had mp3, patched)');
+    }
+  }catch(e){ console.warn('resumeStuckPendingSongs',e); }
+}
+// 页面可见恢复时也扫一下(处理后台切回前台场景)
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && curRoom) resumeStuckPendingSongs().catch(()=>{}); });
 async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   _EH_SONG_GENERATING.add(mid);
