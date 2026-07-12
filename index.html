@@ -989,6 +989,12 @@
   @media(prefers-reduced-motion:reduce){
     .cursor-trail,.type-spark,#warp,#soundwave,.mood-aura{display:none!important}
   }
+  /* 建私密房时"叫狼姐来"选项 */
+  .wolf-invite{display:flex;align-items:center;gap:8px;margin:12px 0 4px;padding:9px 12px;border-radius:10px;cursor:pointer;
+    background:color-mix(in srgb,var(--magenta,#FF3CAC) 8%,transparent);border:1px solid color-mix(in srgb,var(--magenta,#FF3CAC) 25%,transparent);
+    font-size:12.5px;color:var(--ink);user-select:none;transition:.15s}
+  .wolf-invite:hover{border-color:color-mix(in srgb,var(--magenta,#FF3CAC) 45%,transparent)}
+  .wolf-invite input{width:16px;height:16px;accent-color:var(--magenta,#FF3CAC);flex-shrink:0;cursor:pointer}
   /* 名场面(回声墙) */
   .wall-modal{max-width:440px}
   /* 列表高度: 用 dvh(移动端地址栏收缩不跳变) + clamp 保底, 让它在超小屏/横屏都不溢出;
@@ -1193,6 +1199,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
       <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
       <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
+      <label class="wolf-invite" id="wolfInviteWrap" style="display:none"><input type="checkbox" id="wolfInvite"><span>🐺 叫狼姐来陪你(私密房里她会放开聊)</span></label>
       <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
@@ -4796,9 +4803,17 @@ async function createRoom(){
   // 房主入成员表
   await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
   createdRoom=room;
-  if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; }
-  else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; }
+  const wolfWrap=$('#wolfInviteWrap'), wolfChk=$('#wolfInvite');
+  if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfWrap){ wolfWrap.style.display='flex'; if(wolfChk) wolfChk.checked=false; } }
+  else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; if(wolfWrap) wolfWrap.style.display='none'; }
   openModal('mCreated');
+}
+// 邀请狼姐进私密房: eh_members RLS 只允许插自己, 房主插不了狼姐 → 改在房间打标记 topic='@wolf'
+// (房主可改自己房的 topic), worker(service_role 绕 RLS)扫到标记→自动把狼姐加成员+在此房陪聊。
+async function inviteWolfTo(roomId){
+  if(!roomId) return;
+  try{ await sb.from('eh_rooms').update({topic:'@wolf'}).eq('id',roomId); }
+  catch(e){ console.warn('invite wolf',e); }
 }
 async function joinByCode(){
   const code=$('#codeIn').value.trim().toUpperCase();
@@ -5046,7 +5061,7 @@ on('modalMask','click',e=>{ if(e.target===$('#modalMask')) closeModal(); });
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
 on('doCreateBtn','click',()=>createRoom());
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };
-on('enterCreatedBtn','click',()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); });
+on('enterCreatedBtn','click',async ()=>{ const wolf=$('#wolfInvite'); if(createdRoom && createdRoom.kind==='private' && wolf && wolf.checked){ await inviteWolfTo(createdRoom.id); } closeModal(); if(createdRoom) enterRoom(createdRoom); });
 on('doJoinBtn','click',()=>joinByCode());
 on('codeIn','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
 $('#rpX').onclick=()=>clearReply();
