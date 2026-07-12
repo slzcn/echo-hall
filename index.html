@@ -2671,7 +2671,7 @@ function buildMsgEl(m){
   if(isVoid) el.dataset.void='1';
   const isVoice = m.kind==='voice';
   const isSong = m.kind==='song';
-  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=dispName;
+  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=dispName; el.dataset.kind=m.kind||'msg';
   if(isVoid && m.expires_at){ el.dataset.exp=m.expires_at; }
   // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
@@ -2769,15 +2769,23 @@ function scheduleWelcomeFade(el, m){
   el._welT=setTimeout(tick, 1500);
 }
 // 从已渲染消息 DOM 里取某条的原文(名字:内容)
+// 引用预览文本: 神曲/语音/投影类消息不能直接显 raw text(sid|lyric|url 编码/URL), 用友好标签
+function replyPreviewText(text, kind){
+  if(kind==='song'){ try{ const s=parseSong(text); return '🎵 '+(s.lyric||'神曲'); }catch(_){ return '🎵 神曲'; } }
+  if(kind==='voice') return '🎙️ 语音消息';
+  if(kind==='proj') return '📽️ 投影';
+  return text||'';
+}
 function refFromDom(mid){
   const t=document.querySelector(`.msg[data-mid="${mid}"]`);
   if(!t) return '';
+  // dataset.text 在渲染时已把 song/voice 转成友好文本(🎵.../[语音消息]), 直接用, 不再二次转换
   return (t.dataset.name?t.dataset.name+'：':'')+(t.dataset.text||'');
 }
 // 引用原文本地取不到时，查库补上
 async function fillReplyRef(el, mid){
-  const { data } = await sb.from('eh_messages').select('name,text,anon,user_id').eq('id',mid).maybeSingle();
-  if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+data.text; } }
+  const { data } = await sb.from('eh_messages').select('name,text,anon,user_id,kind').eq('id',mid).maybeSingle();
+  if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+replyPreviewText(data.text, data.kind); } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
 function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; }
@@ -3974,8 +3982,10 @@ document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hid
 function startReply(m){
   // 虚空匿名消息: 引用时也用匿名代号, 不泄露真名
   const nm = m.anon ? (m.user_id===myUid ? m.name+'（虚空）' : voidNameFor(m)) : m.name;
-  replyTo={id:isNaN(+m.id)?m.id:+m.id, name:nm, text:m.text};
-  $('#rpTxt').textContent=`回复 ${nm}：${m.text}`; $('#replyPreview').classList.add('on'); $('#cin').focus();
+  // 神曲/语音/投影引用预览用友好标签, 不显 raw 编码/URL
+  const preview = replyPreviewText(m.text, m.kind);
+  replyTo={id:isNaN(+m.id)?m.id:+m.id, name:nm, text:preview};
+  $('#rpTxt').textContent=`回复 ${nm}：${preview}`; $('#replyPreview').classList.add('on'); $('#cin').focus();
 }
 function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); }
 
