@@ -139,20 +139,20 @@
   .scene.on{display:flex}
   /* ★回到最新按钮: 翻看历史(离底部>阈值)时浮现, 点击平滑回底; 有新消息未读时带角标 */
   .to-latest{position:absolute;right:16px;bottom:96px;z-index:40;
-    display:flex;align-items:center;gap:6px;padding:8px 14px 8px 12px;
+    display:flex;align-items:center;justify-content:center;width:40px;height:40px;
     background:var(--panel-solid,rgba(20,24,38,.94));color:var(--cyan);
-    border:1px solid color-mix(in srgb,var(--cyan) 40%,transparent);border-radius:22px;
+    border:1px solid color-mix(in srgb,var(--cyan) 40%,transparent);border-radius:50%;
     box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04) inset;
-    font-size:13px;font-weight:700;cursor:pointer;user-select:none;
+    cursor:pointer;user-select:none;
     opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
     transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
   .to-latest.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-  .to-latest:hover{transform:translateY(-2px) scale(1.03)}
-  .to-latest:active{transform:translateY(0) scale(.96)}
-  .to-latest .tl-arrow{font-size:14px;line-height:1;transform:translateY(1px)}
-  .to-latest .tl-dot{display:none;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
+  .to-latest:hover{transform:translateY(-2px) scale(1.06)}
+  .to-latest:active{transform:translateY(0) scale(.94)}
+  .to-latest .tl-arrow{font-size:18px;line-height:1;font-weight:700}
+  .to-latest .tl-dot{display:none;position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
     background:var(--magenta,#FF3CAC);color:#fff;font-size:10px;font-weight:800;
-    align-items:center;justify-content:center;line-height:1}
+    align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,rgba(20,24,38,.94))}
   .to-latest.has-new .tl-dot{display:inline-flex}
   .to-latest.has-new{border-color:color-mix(in srgb,var(--magenta,#FF3CAC) 55%,transparent);color:var(--magenta,#FF3CAC)}
   html[data-mode="day"] .to-latest{background:#FFFFFF;color:#2a4b8d;
@@ -902,7 +902,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1730';
+  var BUILD_VER='20260712-1745';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1016,7 +1016,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m===
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
-    <div class="to-latest" id="toLatestBtn" title="回到最新消息"><span class="tl-dot" id="tlDot"></span><span class="tl-arrow">↓</span><span class="tl-label">最新</span></div>
+    <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><span class="tl-arrow">↓</span></div>
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
