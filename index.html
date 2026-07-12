@@ -368,7 +368,7 @@
 
   .msg{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
   @keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .msg .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:2px;position:relative}
+  .msg .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:4px;position:relative}
   .msg .av[data-atname]{cursor:pointer}
   .msg .av[data-atname]:active{transform:scale(.9)}
   .msg .body{flex:1;min-width:0}
@@ -481,7 +481,7 @@
     font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 2px var(--name-halo),0 0 3px var(--name-halo);z-index:3;pointer-events:none}
   .pav .av-ic{position:relative}
   /* 狼姐专属：脑门上贴一个小红色蝴蝶结 🎀(消息头像 + 光墙头像通用) */
-  .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
+  .av-bow{position:absolute;left:50%;top:5px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
