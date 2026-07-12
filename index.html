@@ -52,6 +52,36 @@
     --grid:rgba(140,90,255,.05);
     --glow-cyan:0 0 28px rgba(165,92,255,.6); --glow-mag:0 0 24px rgba(199,125,255,.5);
   }
+  /* ===== 日间模式(亮底): 覆盖底色层, 4 套主题共用亮底; 强调色按主题微调保证亮底对比度 ===== */
+  html[data-mode="day"]{
+    --bg:#F4F6FB; --bg2:#E9EDF6; --panel:rgba(255,255,255,.82); --panel-solid:#FFFFFF;
+    --line:rgba(60,80,140,.14); --line2:rgba(60,80,140,.26);
+    --ink:#1A2036; --sub:#5A6485; --dim:#8890AD;
+    --grid:rgba(60,100,200,.045);
+    --glow-cyan:0 0 18px rgba(40,180,170,.28); --glow-mag:0 0 18px rgba(220,50,140,.28);
+  }
+  /* 青/绿荧光色在亮底下迫色不够 → 日间加深 */
+  html[data-mode="day"]{
+    --cyan:#0FB5A6; --green:#12A85C; --amber:#D98A1F;
+  }
+  html[data-mode="day"][data-theme="vapor"]{
+    --bg:#FBF2F8; --bg2:#F3E4F0; --panel:rgba(255,255,255,.84); --panel-solid:#FFFFFF;
+    --line:rgba(180,60,140,.14); --line2:rgba(180,60,140,.26);
+    --ink:#3A1230; --sub:#8A4878; --dim:#B080A0;
+    --cyan:#12A99A; --magenta:#E01A7D; --violet:#8B3FE0; --amber:#D98A1F; --green:#12A85C; --accent:#E01A7D;
+  }
+  html[data-mode="day"][data-theme="mono"]{
+    --bg:#FBFAF6; --bg2:#F1EFE7; --panel:rgba(255,255,255,.86); --panel-solid:#FFFFFF;
+    --line:rgba(150,120,60,.16); --line2:rgba(150,120,60,.3);
+    --ink:#2A2418; --sub:#726A55; --dim:#9C947D;
+    --cyan:#A6812A; --magenta:#A6812A; --violet:#8F7020; --amber:#A6812A; --green:#8A7A48; --accent:#A6812A;
+  }
+  html[data-mode="day"][data-theme="aurora"]{
+    --bg:#F5F1FC; --bg2:#EBE3F8; --panel:rgba(255,255,255,.84); --panel-solid:#FFFFFF;
+    --line:rgba(120,70,200,.14); --line2:rgba(120,70,200,.28);
+    --ink:#241040; --sub:#6A4C9C; --dim:#9078B8;
+    --cyan:#7B2FD9; --magenta:#9B4DE0; --violet:#6A2FE0; --amber:#D98A1F; --green:#7B4DD9; --accent:#7B2FD9;
+  }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
   html{width:100%}
@@ -168,6 +198,10 @@
   .skin-opt .dot{width:13px;height:13px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
   .skin-opt .ck{margin-left:auto;opacity:0;font-size:12px}
   .skin-opt.active .ck{opacity:1}
+  .mode-row{display:flex;gap:2px;padding:3px;background:var(--bg2);border-radius:10px;margin-bottom:6px}
+  .mode-opt{flex:1;text-align:center;padding:7px 8px;font-size:12px;color:var(--sub);border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .mode-opt:hover{color:var(--ink)}
+  .mode-opt.active{color:var(--ink);background:var(--panel-solid);box-shadow:0 1px 4px rgba(0,0,0,.15)}
   .sec-label{width:100%;max-width:var(--content-max);font-size:12px;color:var(--sub);letter-spacing:.5px;font-weight:700;
     display:flex;align-items:center;gap:10px}
   .sec-label .sl-t{flex-shrink:0}
@@ -830,6 +864,8 @@
 })();
 </script>
 <script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+<script>/* 首屏外观模式: auto(跟随系统深浅色)/day/night, 提前定 data-mode 避免闪白 */
+try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches);if(_day)document.documentElement.setAttribute('data-mode','day');else document.documentElement.setAttribute('data-mode','night');}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
 <div id="particles"></div>
@@ -1870,6 +1906,30 @@ function initBgmUI(){
 
 
 const LS_THEME='eh_theme', LS_THEME_LOCK='eh_theme_lock';
+const LS_MODE='eh_mode';   // 外观模式: auto(跟随系统)/day/night
+function currentMode(){ try{ return localStorage.getItem(LS_MODE)||'auto'; }catch(e){ return 'auto'; } }
+function resolveDay(mode){
+  mode=mode||currentMode();
+  if(mode==='day') return true;
+  if(mode==='night') return false;
+  return !!(window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);  // auto
+}
+function applyMode(mode){
+  const day=resolveDay(mode);
+  document.documentElement.setAttribute('data-mode', day?'day':'night');
+  document.querySelectorAll('.mode-opt').forEach(el=>el.classList.toggle('active', el.dataset.mode===(mode||currentMode())));
+}
+function pickMode(mode){
+  try{ EhSfx.playClick(); }catch(e){}
+  try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
+  applyMode(mode);
+}
+// auto 模式实时跟随系统深浅色切换
+if(window.matchMedia){
+  try{ matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()=>{ if(currentMode()==='auto') applyMode('auto'); }); }catch(e){
+    try{ matchMedia('(prefers-color-scheme: light)').addListener(()=>{ if(currentMode()==='auto') applyMode('auto'); }); }catch(_){}
+  }
+}
 function applyTheme(id){
   if(!THEMES.some(t=>t.id===id)) id='cyber';
   if(id==='cyber') document.documentElement.removeAttribute('data-theme');
@@ -1892,8 +1952,10 @@ function applyRoomTheme(room){
 }
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
-  const buildMenu = m => m.innerHTML=THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck" style="color:${t.dot}">✓</span></div>`).join('');
-  const bind = m => m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); });
+  const modeRow = `<div class="mode-row"><div class="mode-opt" data-mode="auto">自动</div><div class="mode-opt" data-mode="day">日间</div><div class="mode-opt" data-mode="night">夜间</div></div>`;
+  const buildMenu = m => m.innerHTML=modeRow+THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck" style="color:${t.dot}">✓</span></div>`).join('');
+  const bindMode = m => m.querySelectorAll('.mode-opt').forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); pickMode(el.dataset.mode); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) applyMode(currentMode()); });
+  const bind = m => { m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); }); bindMode(m); };
   buildMenu(menu); bind(menu);
   const btn=$('#skinBtn');
   // 菜单开→按钮保持选中态, 关→取消
@@ -1911,6 +1973,7 @@ function initThemeUI(){
     if(menuHall && !menuHall.contains(e.target) && e.target!==btnHall) menuHall.classList.remove('on');
     syncSkinActive();
   });
+  applyMode(currentMode());   // 初始同步外观模式高亮态 + 确保 data-mode 与首屏一致
   // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
   const bhall=$('#bgmBtnHall');
   if(bhall){
