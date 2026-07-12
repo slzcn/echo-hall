@@ -1009,7 +1009,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-2332';
+  var BUILD_VER='20260712-2345';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2315,6 +2315,7 @@ async function refreshSnapshotTail(room){
     let rows;
     if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:TUNE('publicRecentLimit',500)}); rows=(data||[]).slice().reverse(); }
     else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE()); rows=(data||[]).slice().reverse(); }
+    dedupProjInHistory(rows);   // 与 loadHistory 同款去重: 灵魂投影的 proj 与 msg 重复时跳过 proj
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
     rows.forEach(m=>{
@@ -2353,6 +2354,23 @@ async function joinAsMember(room){
 // ---- 历史消息 ----
 // 公开房(官方/public)：走 eh_public_recent(方案B，未进房/匿名也能读最近100条，更快)，不分页。
 // 私密房：走直查(成员RLS，成员只看加入后)，支持"加载更多"分页。
+// 历史 rows 里灵魂投影去重: 灵魂同时发 msg + proj 两条时, 投影 proj 就与 msg 重复,
+// 把这种 proj 标 _skipHist. 真人 broadcastProject 只发 proj 一条(无同内容 msg), 不会被打标, 仍作为历史气泡保留。
+function dedupProjInHistory(rows){
+  if(!Array.isArray(rows) || rows.length<2) return;
+  // 先按 user_id + norm(text) 建包含 msg 的索引(只看非 proj 消息)
+  const msgKeys = new Set();
+  for(const m of rows){
+    if(!m || m.kind==='proj' || !m.user_id || !m.text) continue;
+    msgKeys.add(m.user_id + '\u0001' + String(m.text).trim().slice(0,200));
+  }
+  for(const m of rows){
+    if(!m || m.kind!=='proj' || !m.user_id || !m.text) continue;
+    const key = m.user_id + '\u0001' + String(m.text).trim().slice(0,200);
+    if(msgKeys.has(key)) m._skipHist = true;
+  }
+}
+
 async function loadHistory(first){
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows;
@@ -2381,6 +2399,10 @@ async function loadHistory(first){
   }
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶, 无更多)
   const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
+  // ★灵魂投影去重: 同一句灵魂投影会同时产生 msg 留底 + proj 飞幕两条,
+  //   历史里两条都会变成气泡 → 重复。把"有同内容 msg"的 proj 标 _skipHist,
+  //   buildMsgEl 历史分支遇 _skipHist 跳过。真人 broadcastProject 只发 proj 一条不受影响。
+  dedupProjInHistory(rows);
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   // ★分批渲染铁律: 一次同步构建几百条 msg 的 innerHTML 会阻塞手机主线程好几秒
@@ -2733,7 +2755,11 @@ function buildMsgEl(m, isHistory){
   const isMe = m.user_id===myUid;
   // 投影: 实时收到时走飞幕特效(不进流), 但加载历史时当普通气泡渲染
   // (真人把投影当聊天用, 历史不显示=丢消息), 带个投影小标记区分
+  // ★灵魂投影会同时留底一条 msg + 一条 proj(worker 解析 [PROJ] 后另发), 历史里会重复显示两次
+  //   → loadHistory 里 dedupProjInHistory 已给"有同内容 msg 留底"的 proj 打 _skipHist, 这里跳过它;
+  //   真人投影(broadcastProject 只发 proj 一条, 无 msg 留底)不会被打标, 仍渲染成气泡。
   if(m.kind==='proj' && !isHistory) return null;   // 实时投影是瞬时飞幕，不进消息流
+  if(m.kind==='proj' && isHistory && m._skipHist) return null;   // 历史里与 msg 留底重复的灵魂投影, 去重跳过
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
     el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
