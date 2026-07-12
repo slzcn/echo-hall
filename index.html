@@ -158,6 +158,24 @@
   html[data-mode="day"] .to-latest{background:#FFFFFF;color:#7c88a8;
     border-color:rgba(60,80,140,.18);box-shadow:0 6px 20px -8px rgba(40,60,120,.28)}
   html[data-mode="day"] .to-latest.has-new{color:#d81b8c;border-color:rgba(216,27,140,.4)}
+  /* @我提醒按钮: 被@时浮现在"回到最新"上方, 点击跳到最近一条@我的消息 */
+  .mention-jump{position:absolute;right:16px;bottom:146px;z-index:41;width:40px;height:40px;
+    display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;user-select:none;
+    background:var(--panel-solid,rgba(20,24,38,.9));color:var(--magenta,#FF3CAC);
+    border:1px solid color-mix(in srgb,var(--magenta,#FF3CAC) 45%,transparent);
+    box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--magenta,#FF3CAC);
+    font-size:19px;font-weight:800;line-height:1;
+    opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
+    transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .mention-jump.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;animation:mjPulse 1.8s ease-in-out infinite}
+  .mention-jump:hover{transform:translateY(-2px) scale(1.06)}
+  .mention-jump:active{transform:translateY(0) scale(.94)}
+  .mention-jump .mj-dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
+    background:var(--magenta,#FF3CAC);color:#fff;font-size:10px;font-weight:800;display:none;
+    align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,rgba(20,24,38,.94))}
+  .mention-jump.multi .mj-dot{display:inline-flex}
+  @keyframes mjPulse{0%,100%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--magenta,#FF3CAC)}50%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 22px -2px var(--magenta,#FF3CAC)}}
+  html[data-mode="day"] .mention-jump{background:#FFFFFF;color:#d81b8c;border-color:rgba(216,27,140,.4)}
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
@@ -288,7 +306,7 @@
   .priv-btn{flex:1;padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
     background:var(--card-bg);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
   .priv-btn:hover{transform:translateY(-2px)}
-  .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 20px color-mix(in srgb,var(--cyan) 30%,transparent)}
+  .priv-btn.create:hover{border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan));box-shadow:0 0 20px color-mix(in srgb,var(--accent,var(--cyan)) 30%,transparent)}
   .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:0 0 20px color-mix(in srgb,var(--magenta) 30%,transparent)}
   .priv-btn:active{transform:scale(.97)}
   .my-rooms{display:flex;flex-direction:column;gap:8px;width:100%;max-width:var(--content-max)}
@@ -310,7 +328,7 @@
   .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
-  .back:hover{color:var(--cyan);border-color:var(--cyan)}
+  .back:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan))}
   .hall-ti{flex:1;min-width:0;display:flex;align-items:center;gap:11px}
   /* 聊天室房间图标: 与列表页卡片一致的主题色淡底圆角块 */
   .hall-icon{font-size:22px;line-height:1;flex-shrink:0;display:grid;place-items:center;width:40px;height:40px;border-radius:11px;
@@ -376,7 +394,8 @@
     background:var(--pav-c,var(--cyan));border:1.5px solid var(--panel-solid);z-index:1}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 
-  .stream{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px}
+  .stream{flex:1;overflow-y:auto;padding:16px 18px 26px;display:flex;flex-direction:column;gap:2px;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:auto}
   .stream::-webkit-scrollbar{width:5px}
   .stream::-webkit-scrollbar-track{background:transparent}
   .stream::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--cyan) 18%,transparent);border-radius:99px;
@@ -385,7 +404,7 @@
   .stream{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--cyan) 30%,transparent) transparent}
   .load-more{align-self:center;margin:4px 0 10px;padding:6px 16px;border-radius:8px;border:1px solid var(--line2);
     background:none;color:var(--sub);font-family:inherit;font-size:11.5px;cursor:pointer;transition:.15s}
-  .load-more:hover{border-color:var(--cyan);color:var(--cyan)}
+  .load-more:hover{border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan))}
 
   .msg{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
   @keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -418,8 +437,8 @@
   .ec-pill{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:2px 8px;border-radius:11px;cursor:pointer;
     background:var(--panel-solid);border:1px solid var(--line2);color:var(--sub);transition:.15s;user-select:none;line-height:1.4}
   .ec-pill b{font-weight:700;font-size:11px}
-  .ec-pill:hover{transform:translateY(-1px);border-color:var(--cyan)}
-  .ec-pill.mine{background:color-mix(in srgb,var(--cyan) 12%,transparent);border-color:var(--cyan);color:var(--cyan)}
+  .ec-pill:hover{transform:translateY(-1px);border-color:var(--accent,var(--cyan))}
+  .ec-pill.mine{background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan))}
   /* 消息达阈值共鸣时的高亮脉冲 */
   .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
   @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
@@ -493,7 +512,7 @@
   .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:color-mix(in srgb,var(--violet) 16%,transparent);box-shadow:0 0 12px -3px var(--violet)}
   .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
   /* ＋ 花样菜单 */
-  .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+  .plus-menu{position:absolute;bottom:calc(100% + 10px);left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);min-width:220px}
   .plus-menu.on{display:flex}
   .pm-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:.12s}
@@ -553,8 +572,10 @@
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
   .go svg{width:20px;height:20px;color:var(--btn-ink)}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
-  .emoji-tray{position:absolute;bottom:72px;right:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px var(--shadow-lg)}
+  .emoji-tray{position:absolute;bottom:calc(100% + 10px);right:12px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
+    padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px var(--shadow-lg);
+    max-height:min(46vh,320px);overflow-y:auto;-webkit-overflow-scrolling:touch;animation:trayPop .18s cubic-bezier(.2,1.1,.4,1)}
+  @keyframes trayPop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
   .emoji-tray.on{display:grid}
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
   .emoji-tray b:hover{background:var(--hover);transform:scale(1.2)}
@@ -562,7 +583,7 @@
   /* 语音消息 · 按住说话长条(语音模式下输入框变身) */
   /* 语音模式下: 隐藏输入框与表情, 显示"按住说话"长条 */
   .hold-talk{display:none;flex:1;align-items:center;justify-content:center;min-height:42px;font-size:14px;font-weight:600;
-    color:var(--cyan);user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
+    color:var(--accent,var(--cyan));user-select:none;touch-action:none;cursor:pointer;letter-spacing:1px}
   .composer.voice-mode .cin,.composer.voice-mode .cin-emoji{display:none}
   .composer.voice-mode .hold-talk{display:flex}
   .composer.voice-mode .cin-wrap{cursor:pointer;border-color:var(--accent,var(--cyan))}
@@ -579,14 +600,14 @@
   .rec-panel.cancel .rec-wave i{background:var(--dim)}
   .rec-time{font-size:24px;font-weight:800;letter-spacing:1px;color:var(--ink);font-variant-numeric:tabular-nums}
   .rec-tip{font-size:12.5px;color:var(--sub);letter-spacing:.5px}
-  .rec-caption{font-size:13px;color:var(--cyan);min-height:16px;max-width:240px;text-align:center;line-height:1.4;opacity:.9}
+  .rec-caption{font-size:13px;color:var(--accent,var(--cyan));min-height:16px;max-width:240px;text-align:center;line-height:1.4;opacity:.9}
   .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
   .rec-panel.cancel .rec-time{color:var(--magenta)}
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
   .vcap{display:block;margin-top:5px;font-size:12.5px;color:var(--sub);line-height:1.45;opacity:.85;font-style:italic}
   .vcap::before{content:'“';opacity:.6} .vcap::after{content:'”';opacity:.6}
-  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--cyan);background:var(--card-bg);
-    color:var(--cyan);cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
+  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--accent,var(--cyan));background:var(--card-bg);
+    color:var(--accent,var(--cyan));cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
   .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
   .vplay .vp-btn{padding-left:2px}                 /* ▶ 视觉偏左, 右移补偿居中 */
   .vplay.playing .vp-btn{padding-left:0}  /* ⏸ 与 ▶ 同款描边, 仅符号变, 不加底色 */
@@ -675,7 +696,7 @@
   }
 
   /* 斜杠命令菜单 */
-  .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
+  .slash-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;background:var(--panel-solid);
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px var(--shadow-lg)}
   .slash-menu.on{display:block}
   .slash-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:.12s}
@@ -684,7 +705,7 @@
   .slash-item .sd{font-size:11.5px;color:var(--sub)}
 
   /* @提及菜单(复用 slash-menu 定位)+ 候选项 */
-  .at-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
+  .at-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;background:var(--panel-solid);
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:36;box-shadow:0 20px 50px var(--shadow-lg);max-height:240px;overflow-y:auto}
   .at-menu.on{display:block}
   .at-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;cursor:pointer;transition:.12s}
@@ -1049,6 +1070,8 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m===
     <!-- 神曲谱曲队列条: 有歌在生成且滚出视野时浮现, 点击滚到最近一首(进度不被后续消息刷走) -->
     <div class="song-queue-bar" id="songQueueBar"><span class="sqb-dots" id="sqbDots"></span><span class="sqb-txt" id="sqbTxt"></span></div>
     <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 5 12 10 18 5"></polyline><polyline points="6 15 12 20 18 15"></polyline></svg></div>
+    <!-- @我提醒: 被@时常驻浮现, 点击定位到最近一条@我的消息(多条则轮流) -->
+    <div class="mention-jump" id="mentionJump" title="有人@我 · 点击查看"><span class="mj-dot" id="mjDot"></span><span class="mj-at">@</span></div>
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
@@ -2401,6 +2424,7 @@ async function enterRoom(room){
   }
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
+  _mentionQueue=[]; _mentionIdx=0; updateMentionJump();   // 切房清空@我提醒
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
@@ -2569,7 +2593,7 @@ function subscribeMessages(rid){
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
       if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
-      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
+      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
       if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
@@ -2962,7 +2986,16 @@ async function fillReplyRef(el, mid){
   if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+replyPreviewText(data.text, data.kind); } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
-function scrollStream(){ const s=$('#stream'); s.scrollTop=s.scrollHeight; hideToLatest(); }
+function scrollStream(smooth){
+  const s=$('#stream'); if(!s) return;
+  // 平滑模式(新消息贴底时): 用 rAF 等 DOM 布局完成再滚, 避免"半截跳动"; 硬跳模式(进房/回底)直接到位
+  if(smooth){
+    requestAnimationFrame(()=>{ try{ s.scrollTo({top:s.scrollHeight,behavior:'smooth'}); }catch(_){ s.scrollTop=s.scrollHeight; } });
+  } else {
+    s.scrollTop=s.scrollHeight;
+  }
+  hideToLatest();
+}
 // ★回到最新: 翻看历史时(离底部>阈值)浮现按钮; 贴底自动隐藏
 const TO_LATEST_THRESH=320;   // 离底部超过这么多 px 才算"在翻历史"
 let _unreadCount=0;
@@ -3155,7 +3188,40 @@ function notifyIfMentioned(m, el){
   try{ EhSfx.play('mention'); }catch(e){}
   // 轻震动(移动端)
   try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
+  // 记入@我队列 → 常驻@按钮, 点击可回看(即使被后续消息刷走)
+  if(m.id!=null && !String(m.id).startsWith('local_')) pushMention(m.id);
 }
+// @我提醒队列: 记录被@的消息 id, 点@按钮轮流跳转+高亮
+let _mentionQueue=[];   // 未查看的被@消息 id(新→旧)
+function pushMention(mid){
+  mid=String(mid);
+  _mentionQueue=_mentionQueue.filter(x=>x!==mid); _mentionQueue.unshift(mid);
+  if(_mentionQueue.length>20) _mentionQueue.length=20;
+  updateMentionJump();
+}
+function updateMentionJump(){
+  const b=$('#mentionJump'); if(!b) return;
+  const n=_mentionQueue.length;
+  if(!n){ b.classList.remove('on','multi'); return; }
+  b.classList.add('on'); b.classList.toggle('multi', n>1);
+  const d=$('#mjDot'); if(d) d.textContent = n>9?'9+':String(n);
+}
+let _mentionIdx=0;
+function jumpToMention(){
+  if(!_mentionQueue.length) return;
+  // 轮流跳(最近的先): 每点一次跳下一条
+  const mid=_mentionQueue[_mentionIdx % _mentionQueue.length]; _mentionIdx++;
+  const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
+  if(msg){
+    msg.scrollIntoView({behavior:'smooth',block:'center'});
+    msg.classList.add('mentioned-flash'); setTimeout(()=>msg.classList.remove('mentioned-flash'),2000);
+  } else {
+    toast('那条消息不在当前列表里');
+  }
+  // 全部看过一轮后清空提醒(下次@再攒)
+  if(_mentionIdx % _mentionQueue.length===0){ _mentionQueue=[]; _mentionIdx=0; updateMentionJump(); }
+}
+(function bindMentionJump(){ const b=document.getElementById('mentionJump'); if(b) b.addEventListener('click',jumpToMention); })();
 function pickAt(i){
   const c=_atList[i]; if(!c) return;
   const inp=$('#cin'); const pos=inp.selectionStart;
