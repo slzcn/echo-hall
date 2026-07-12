@@ -906,7 +906,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1755';
+  var BUILD_VER='20260712-1808';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -927,7 +927,8 @@
     }).catch(function(e){ console.warn('[EH自愈] fetch失败', e&&e.message); });
   }
   try{ check('init'); }catch(e){}
-  document.addEventListener('visibilitychange', function(){ if(!document.hidden) check('visible'); });
+  // ★切回前台(visibilitychange)不再触发整页版本 reload——改由主逻辑静默刷新消息内容(无感)。
+  // 版本更新只在 首次加载(init) / 断网恢复(online) 时检查, 避免每次切回都闪页。
   window.addEventListener('online', function(){ check('online'); });
 })();
 </script>
@@ -3901,8 +3902,13 @@ async function resumeStuckPendingSongs(){
     }
   }catch(e){ console.warn('resumeStuckPendingSongs',e); }
 }
-// 页面可见恢复时也扫一下(处理后台切回前台场景)
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && curRoom) resumeStuckPendingSongs().catch(()=>{}); });
+// 页面可见恢复时: (1)静默刷新当前房消息内容——补齐后台期间错过的消息+修空框, 不重载页面(无感); (2)扫神曲 pending
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden || !curRoom) return;
+  // ★无感刷新: 只重拉当前房消息内容 append/补齐到 DOM, 不整页 reload。realtime 订阅由 Supabase 自动重连, 这里补后台期间可能漏掉的 INSERT。
+  try{ refreshSnapshotTail(curRoom); }catch(_){}
+  resumeStuckPendingSongs().catch(()=>{});
+});
 async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   _EH_SONG_GENERATING.add(mid);
