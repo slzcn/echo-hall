@@ -519,6 +519,8 @@
   .song-card.pending{opacity:.75}
   .song-card.pending .song-play{cursor:wait;border-color:var(--sub);background:transparent}
   .song-card.pending .song-play:hover{background:transparent;box-shadow:none}
+  .song-card.loading .song-play{position:relative;cursor:wait}
+  .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
   .song-spinner{display:inline-block;width:12px;height:12px;border:1.5px solid transparent;border-top-color:var(--sc,var(--magenta));border-radius:50%;animation:songSpin .8s linear infinite}
   @keyframes songSpin{to{transform:rotate(360deg)}}
   /* pending 时 EQ 轻微起伏（“处理中”信号） */
@@ -2321,6 +2323,8 @@ async function loadHistory(first){
     stream.appendChild(frag); scrollStream();
     fetchEchoes(rows.map(m=>m.id));
     if(canLoadMore) addLoadMore();
+    // 预热最近几首已生成神曲: 进房看到的歌还没点就预取好, 点击秒播(只拉最新3首省流量)
+    try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){}
   } else {
     const prevH=stream.scrollHeight;
     if(moreBtn) moreBtn.remove();
@@ -2376,7 +2380,7 @@ function subscribeMessages(rid){
         // song “归队”: 旧卡片 pending → 新卡片 ready 时加呢呼吸高亮
         let wasPending=false;
         if(m.kind==='song'){ const oldCard=bubble.querySelector('.song-card'); wasPending=oldCard && oldCard.classList.contains('pending'); }
-        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); if(wasPending){ const nc=fresh.querySelector('.song-card'); if(nc && !nc.classList.contains('pending')){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'), 3400); } } }
+        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); if(wasPending){ const nc=fresh.querySelector('.song-card'); if(nc && !nc.classList.contains('pending')){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'), 3400); try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){} } } }
       } else if(m.kind==='song'){
         // 少见分支：bubble 不存在 才走这里
         el.innerHTML=songHtml(m.text);
@@ -3275,6 +3279,32 @@ async function decodeMp3ArrayBuffer(ctx, ab){
   const copy=ab.slice(0);
   return await new Promise((res,rej)=>ctx.decodeAudioData(copy,res,rej));
 }
+
+// ---- 神曲解码缓存 + 预取预解码：点击后秒播，不重复下载解码整首 ----
+const _EH_SONG_CACHE=new Map();      // url → 已解码 AudioBuffer
+const _EH_SONG_FETCHING=new Map();   // url → 正在预取的 Promise(防并发重复拉)
+async function getSongBuffer(ctx, url){
+  if(!url) return null;
+  const hit=_EH_SONG_CACHE.get(url);
+  if(hit) return hit;
+  if(_EH_SONG_FETCHING.has(url)) return await _EH_SONG_FETCHING.get(url);
+  const job=(async()=>{
+    const resp=await fetch(url); if(!resp.ok) throw new Error('fetch '+resp.status);
+    const ab=await resp.arrayBuffer();
+    const buf=await new Promise((res,rej)=>ctx.decodeAudioData(ab.slice(0),res,rej));
+    _EH_SONG_CACHE.set(url, buf);
+    if(_EH_SONG_CACHE.size>24){ const first=_EH_SONG_CACHE.keys().next().value; _EH_SONG_CACHE.delete(first); } // LRU 粗限
+    return buf;
+  })();
+  _EH_SONG_FETCHING.set(url, job);
+  try{ return await job; } finally{ _EH_SONG_FETCHING.delete(url); }
+}
+// 预取：卡片 ready 时后台静静下载+解码好，用户点击时直接秒播（静默失败，不打扰）
+function prefetchSong(url){
+  if(!url || _EH_SONG_CACHE.has(url) || _EH_SONG_FETCHING.has(url)) return;
+  const ctx=ac(); if(!ctx) return;
+  getSongBuffer(ctx, url).catch(()=>{});
+}
 function b64ToArrayBuffer(b64){
   const bin=atob(b64); const bytes=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
@@ -3387,9 +3417,11 @@ async function playSongAI(el, onEnd){
   const lyric=el.dataset.lyric||'';
   try{
     AudioEngine.duck(true);
-    const resp=await fetch(url); if(!resp.ok) throw new Error('fetch '+resp.status);
-    const ab=await resp.arrayBuffer();
-    const buf=await new Promise((res,rej)=>ctx.decodeAudioData(ab.slice(0),res,rej));
+    // 点击瞬间先给 UI 反馈(避免"点了没反应"): 未命中缓存才显 loading
+    const cached=_EH_SONG_CACHE.has(url);
+    if(el && !cached){ el.classList.add('loading'); }
+    const buf=await getSongBuffer(ctx, url);
+    if(el){ el.classList.remove('loading'); }
     const src=ctx.createBufferSource(); src.buffer=buf;
     const g=ctx.createGain(); g.gain.value=0.95;
     src.connect(g); g.connect(ctx.destination);
@@ -3411,6 +3443,7 @@ async function playSongAI(el, onEnd){
     curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.ctx===ctx) stopSong(); }, (dur+0.6)*1000));
   }catch(e){
     console.warn('playSongAI',e);
+    if(el){ el.classList.remove('loading'); }
     AudioEngine.duck(false);
     toast('播放失败');
   }
