@@ -24,6 +24,19 @@
     --grid:rgba(80,120,255,.05);
     --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
     --glow-cyan:0 0 24px rgba(40,230,216,.5); --glow-mag:0 0 24px rgba(255,60,172,.5);
+    /* 语义化组件变量(夜间基线) —— 日间模式在 html[data-mode="day"] 统一覆盖，绝不再硬编码深色 */
+    --input-bg:rgba(10,12,24,.6);   /* 输入框/表单底 */
+    --input-shadow:none;            /* 日间用内阴影勾轮输入框 */
+    --card-bg:rgba(10,12,24,.5);    /* 卡片/抽屉/菜单项/按钮次级底 */
+    --card-bg-soft:rgba(10,12,24,.4);/* 更淡的卡片底(chip/wall-item) */
+    --mask:rgba(4,6,12,.7);         /* 弹窗/抽屉遮罩 */
+    --hover:var(--hover);  /* hover 高光 */
+    --btn-ink:#04060c;              /* 主按钮文字(渐变底上为深) */
+    --shadow-lg:rgba(0,0,0,.5);     /* 大浮层阴影 */
+    --shadow-md:rgba(0,0,0,.4);
+    --ch-shadow:rgba(0,0,0,.4);     /* 频道卡 hover 阴影 */
+    --name-halo:rgba(0,0,0,.85);    /* soul 名字描边(夜=黑描边让亮字在彩头像上清晰) */
+    --text-halo:rgba(0,0,0,.6);     /* 彩色块上文字阴影 */
   }
   /* ===== 皮肤: 蒸汽波(粉紫日落) ===== */
   html[data-theme="vapor"]{
@@ -63,6 +76,21 @@
   /* 青/绿荧光色在亮底下迫色不够 → 日间加深 */
   html[data-mode="day"]{
     --cyan:#0FB5A6; --green:#12A85C; --amber:#D98A1F;
+  }
+  /* 日间模式组件语义变量覆盖(4 套主题共用): 输入框/按钮/卡片/遮罩/hover 全适配亮底 */
+  html[data-mode="day"]{
+    --input-bg:#FFFFFF;
+    --input-shadow:inset 0 1px 2px rgba(30,50,110,.06);
+    --card-bg:rgba(255,255,255,.72);
+    --card-bg-soft:rgba(255,255,255,.55);
+    --mask:rgba(28,38,66,.32);
+    --hover:rgba(40,70,150,.07);
+    --btn-ink:#FFFFFF;
+    --shadow-lg:rgba(60,80,140,.20);
+    --shadow-md:rgba(60,80,140,.14);
+    --ch-shadow:rgba(60,80,140,.16);
+    --name-halo:rgba(255,255,255,.9);  /* 日间: soul 名字白描边(亮底深字配白边才清晰) */
+    --text-halo:rgba(255,255,255,.7);
   }
   html[data-mode="day"][data-theme="vapor"]{
     --bg:#FBF2F8; --bg2:#F3E4F0; --panel:rgba(255,255,255,.84); --panel-solid:#FFFFFF;
@@ -118,13 +146,13 @@
     -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
   .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
   .title{font-size:38px;font-weight:800;letter-spacing:2px;margin:8px 0 4px;
-    background:linear-gradient(120deg,#fff,var(--cyan) 40%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
+    background:linear-gradient(120deg,var(--ink),var(--cyan) 45%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
     text-shadow:0 0 40px color-mix(in srgb,var(--cyan) 20%,transparent)}
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
   .identity{display:flex;align-items:center;gap:16px;padding:16px;border-radius:14px;
-    background:rgba(10,12,24,.6);border:1px solid var(--line);margin-bottom:20px;text-align:left}
+    background:var(--card-bg);border:1px solid var(--line);margin-bottom:20px;text-align:left}
   .id-av{width:56px;height:56px;border-radius:14px;flex-shrink:0;display:grid;place-items:center;font-size:26px;position:relative;
     transition:.4s cubic-bezier(.2,.9,.3,1.3)}
   .id-info{flex:1;min-width:0}
@@ -141,14 +169,14 @@
   .opt-email:hover{color:var(--cyan)}
   .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
   .opt-email-box.on{max-height:70px;margin-bottom:16px}
-  .opt-email-box input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+  .opt-email-box input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:var(--input-bg);box-shadow:var(--input-shadow);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
   .opt-email-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
-    letter-spacing:2px;cursor:pointer;color:#04060c;position:relative;overflow:hidden;
+    letter-spacing:2px;cursor:pointer;color:var(--btn-ink);position:relative;overflow:hidden;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 25%,transparent)}
   .btn-line{width:100%;padding:12px;border:1px solid var(--line2);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;
-    letter-spacing:2px;cursor:pointer;color:var(--ink);background:rgba(10,12,24,.5);transition:.2s}
+    letter-spacing:2px;cursor:pointer;color:var(--ink);background:var(--card-bg);transition:.2s}
   .btn-line:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-cyan)}
   .btn-line:disabled{opacity:.5;cursor:wait}
   .auth-divider{display:flex;align-items:center;text-align:center;color:var(--dim);font-size:11px;margin:18px 0 14px}
@@ -159,7 +187,7 @@
   .login-collapse{max-height:0;overflow:hidden;transition:max-height .3s ease}
   .login-collapse.on{max-height:280px}
   .login-row{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
-  .login-row input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+  .login-row input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:var(--input-bg);box-shadow:var(--input-shadow);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
   .login-row input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .fld-hint{font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.5}
@@ -169,7 +197,7 @@
   .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
   .confirm-btns{display:flex;gap:10px}
   .confirm-btns button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
-  .cf-cancel{background:rgba(10,12,24,.5);color:var(--sub)}
+  .cf-cancel{background:var(--card-bg);color:var(--sub)}
   .cf-cancel:hover{border-color:var(--line2);color:var(--ink)}
   .cf-ok{background:linear-gradient(120deg,var(--magenta),var(--violet));color:#fff;border:none}
   .cf-ok:hover{transform:translateY(-1px);box-shadow:0 8px 24px color-mix(in srgb,var(--magenta) 30%,transparent)}
@@ -190,11 +218,11 @@
   .me-btn.ic svg{width:18px;height:18px}
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
   .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--accent,var(--cyan));box-shadow:0 0 12px -3px var(--accent,var(--cyan));transform:translateY(-1px)}
-  .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:150px}
+  .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px var(--shadow-lg);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
   .skin-opt:hover{background:var(--panel);color:var(--ink)}
-  .skin-opt.active{color:var(--ink);background:rgba(255,255,255,.05)}
+  .skin-opt.active{color:var(--ink);background:var(--hover)}
   .skin-opt .dot{width:13px;height:13px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
   .skin-opt .ck{margin-left:auto;opacity:0;font-size:12px}
   .skin-opt.active .ck{opacity:1}
@@ -211,7 +239,7 @@
   .ch{padding:18px 20px;border-radius:14px;cursor:pointer;position:relative;overflow:hidden;transition:.22s;
     border:1px solid var(--line);background:var(--panel);
     display:grid;grid-template-columns:auto 1fr;column-gap:15px;align-items:center}
-  .ch:hover{transform:translateY(-3px);border-color:var(--ch-c);box-shadow:0 12px 32px rgba(0,0,0,.4)}
+  .ch:hover{transform:translateY(-3px);border-color:var(--ch-c);box-shadow:0 12px 32px var(--ch-shadow)}
   .ch::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ch-c);opacity:.8}
   .ch .icon{grid-row:1/3;font-size:30px;width:48px;height:48px;display:grid;place-items:center;border-radius:12px;
     background:color-mix(in srgb,var(--ch-c) 12%,transparent);margin:0}
@@ -227,14 +255,14 @@
   .ch .preview b{color:var(--sub);font-weight:600}
   .ch .preview.empty{font-style:italic;opacity:.7}
   .ch .tagk{position:absolute;top:12px;right:12px;font-size:9px;padding:2px 7px;border-radius:6px;letter-spacing:1px;
-    background:rgba(255,255,255,.06);color:var(--dim)}
+    background:var(--hover);color:var(--dim)}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
   .empty-hint{width:100%;max-width:var(--content-max);text-align:center;color:var(--dim);font-size:12px;padding:8px}
 
   /* 私密房操作区: 独立一行大按钮(恢复精简前版本, 不再挤进分隔线) */
   .priv-actions{display:flex;gap:10px;width:100%;max-width:var(--content-max)}
   .priv-btn{flex:1;padding:12px 22px;border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
-    background:rgba(10,12,24,.5);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
+    background:var(--card-bg);border:1px solid var(--line2);color:var(--ink);transition:.18s;letter-spacing:.5px}
   .priv-btn:hover{transform:translateY(-2px)}
   .priv-btn.create:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 20px color-mix(in srgb,var(--cyan) 30%,transparent)}
   .priv-btn.join:hover{border-color:var(--magenta);color:var(--magenta);box-shadow:0 0 20px color-mix(in srgb,var(--magenta) 30%,transparent)}
@@ -246,7 +274,7 @@
   .rm .rm-ic{font-size:22px}
   .rm .rm-nm{flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rm .rm-code{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);letter-spacing:1px;cursor:pointer;
-    padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:rgba(10,12,24,.4);transition:.15s;flex-shrink:0}
+    padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:var(--card-bg-soft);transition:.15s;flex-shrink:0}
   .rm .rm-code:hover{color:var(--violet);border-color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent)}
   .rm .rm-code .rm-copy-ic{width:12px;height:12px;opacity:.7}
   .rm .rm-code.copied{color:var(--green);border-color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
@@ -345,9 +373,9 @@
   .msg .nm{font-size:13px;font-weight:700}
   .msg .tm{font-size:10px;color:var(--dim)}
   .msg .reply-ref{font-size:11px;color:var(--dim);border-left:2px solid var(--line2);padding:2px 8px;margin:2px 0;
-    background:rgba(255,255,255,.02);border-radius:0 6px 6px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    background:var(--hover);border-radius:0 6px 6px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;overflow-wrap:anywhere;max-width:100%;
-    background:rgba(255,255,255,.03);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
+    background:var(--hover);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
     -webkit-user-select:none;user-select:none}
   /* 纯表情消息: 放大、去气泡背景/边框(同 iMessage/微信), 让"发出来的表情"在消息流里明显留底 */
   .msg .txt.emoji-only{font-size:34px;line-height:1.2;background:none;border:none;padding:2px 0}
@@ -380,7 +408,7 @@
     font-size:11.5px;color:var(--accent,var(--cyan));display:flex;align-items:center;gap:6px;
     opacity:0;transform:translateY(4px);pointer-events:none;
     transition:opacity .18s,transform .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5;
-    text-shadow:0 1px 4px rgba(0,0,0,.6)}
+    text-shadow:0 1px 4px var(--text-halo)}
   .typing-bar.on{opacity:1;transform:translateY(0)}
   .typing-bar .d{display:inline-flex;gap:3px}
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bounce 1.2s infinite}
@@ -405,13 +433,13 @@
   .composer.song-mode .cin::placeholder{color:var(--song-c,var(--magenta));opacity:.6}
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative}
-  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:rgba(10,12,24,.6);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
+  .cin-wrap{flex:1;display:flex;align-items:flex-end;min-height:46px;background:var(--input-bg);box-shadow:var(--input-shadow);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .cin{flex:1;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
     line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
-  .emoji-btn:hover{background:rgba(255,255,255,.06);transform:scale(1.15)}
+  .emoji-btn:hover{background:var(--hover);transform:scale(1.15)}
   /* 输入框内表情按钮: 顶部对齐到单行文字首行中心, margin-top 微调下压回文字视觉中线
      (纯几何居中会略偏高, emoji 字形本身也偏上, 故 +3px)。多行时也稳定停在第一行。 */
   .cin-emoji{width:40px;height:40px;font-size:20px;align-self:flex-start;margin-top:2px}
@@ -426,10 +454,10 @@
   .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
   /* ＋ 花样菜单 */
   .plus-menu{position:absolute;bottom:72px;left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5);min-width:220px}
+    padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);min-width:220px}
   .plus-menu.on{display:flex}
   .pm-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:.12s}
-  .pm-item:hover{background:rgba(255,255,255,.06)}
+  .pm-item:hover{background:var(--hover)}
   .pm-item .pm-ic{font-size:22px;width:26px;text-align:center}
   .pm-item .pm-tx{display:flex;flex-direction:column;gap:1px}
   .pm-item .pm-tx b{font-size:13px;font-weight:700}
@@ -445,7 +473,7 @@
   /* ===== 灵魂居民 Soul：AI 徽标 + 呼吸光环 + 思考指示器 ===== */
   /* AI 角标：浮在头像内部右下角一行细小字"AI"(消息头像 + 在线光墙头像通用)，用灵魂自己的配色 */
   .msg.soul .av .soul-dot,.pav .av-ic .soul-dot{position:absolute;right:4px;bottom:3px;font-size:6px;line-height:1;font-weight:600;letter-spacing:0;
-    font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 2px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.7);z-index:3;pointer-events:none}
+    font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 2px var(--name-halo),0 0 3px var(--name-halo);z-index:3;pointer-events:none}
   .pav .av-ic{position:relative}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
@@ -480,13 +508,13 @@
   @keyframes tkDot{0%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 6px 20px rgba(40,230,216,.25)}
-  .go svg{width:20px;height:20px;color:#04060c}
+  .go svg{width:20px;height:20px;color:var(--btn-ink)}
   .go:hover{transform:translateY(-2px) scale(1.05)}.go:active{transform:scale(.95)}
   .emoji-tray{position:absolute;bottom:72px;right:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    padding:10px;display:none;grid-template-columns:repeat(7,1fr);gap:3px;z-index:30;box-shadow:0 20px 50px var(--shadow-lg)}
   .emoji-tray.on{display:grid}
   .emoji-tray b{font-size:22px;cursor:pointer;padding:5px;border-radius:8px;text-align:center;transition:.12s;font-weight:400}
-  .emoji-tray b:hover{background:rgba(255,255,255,.08);transform:scale(1.2)}
+  .emoji-tray b:hover{background:var(--hover);transform:scale(1.2)}
 
   /* 语音消息 · 按住说话长条(语音模式下输入框变身) */
   /* 语音模式下: 隐藏输入框与表情, 显示"按住说话"长条 */
@@ -498,10 +526,10 @@
   .composer.voice-mode.recording .cin-wrap{border-color:var(--magenta);box-shadow:0 0 0 3px color-mix(in srgb,var(--magenta) 15%,transparent)}
   .composer.voice-mode.recording .hold-talk{color:var(--magenta)}
   .rec-overlay{position:fixed;inset:0;z-index:88;display:none;align-items:center;justify-content:center;pointer-events:none;
-    background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(255,60,172,.12),rgba(4,6,12,.55));backdrop-filter:blur(3px)}
+    background:radial-gradient(ellipse 60% 50% at 50% 60%,color-mix(in srgb,var(--magenta) 12%,transparent),var(--mask));backdrop-filter:blur(3px)}
   .rec-overlay.on{display:flex}
   .rec-panel{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 40px;border-radius:22px;
-    background:var(--panel-solid);border:1px solid var(--line2);box-shadow:0 24px 60px rgba(0,0,0,.6);transition:.2s}
+    background:var(--panel-solid);border:1px solid var(--line2);box-shadow:0 24px 60px var(--shadow-lg);transition:.2s}
   .rec-panel.cancel{border-color:var(--magenta);background:rgba(60,10,30,.9)}
   .rec-wave{display:flex;align-items:center;gap:4px;height:52px}
   .rec-wave i{width:5px;border-radius:3px;background:linear-gradient(var(--cyan),var(--magenta));height:10px;transition:height .09s ease-out}
@@ -511,7 +539,7 @@
   .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
   .rec-panel.cancel .rec-time{color:var(--magenta)}
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
-  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--cyan);background:rgba(10,12,24,.5);
+  .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--cyan);background:var(--card-bg);
     color:var(--cyan);cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
   .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
   .vplay .vp-btn{padding-left:2px}                 /* ▶ 视觉偏左, 右移补偿居中 */
@@ -528,7 +556,7 @@
   .song-card{display:inline-flex;align-items:center;gap:10px;min-width:170px;max-width:100%;vertical-align:middle;
     padding:2px 2px 2px 0}
   .song-play{width:30px;height:30px;flex-shrink:0;border-radius:50%;border:1px solid var(--sc,var(--magenta));cursor:pointer;font-size:12px;line-height:1;
-    display:grid;place-items:center;color:var(--sc,var(--magenta));background:rgba(10,12,24,.5);transition:.15s;font-family:inherit}
+    display:grid;place-items:center;color:var(--sc,var(--magenta));background:var(--card-bg);transition:.15s;font-family:inherit}
   .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
   .song-card.playing .song-play{background:color-mix(in srgb,var(--sc,var(--magenta)) 20%,transparent)}
   /* 播放/暂停图标用纯CSS画(不用emoji字符, 全平台跟随color): 默认三角, .playing 两竖条 */
@@ -574,20 +602,20 @@
   .song-strip.on{display:flex}
   .song-strip .ss-lb{font-size:11px;color:var(--strip-c,var(--magenta));flex-shrink:0;margin-right:2px;transition:color .2s}
   .song-strip .st-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;flex-shrink:0;
-    border:1px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.15s;font-size:12px;font-weight:600;
+    border:1px solid var(--line2);background:var(--card-bg-soft);cursor:pointer;transition:.15s;font-size:12px;font-weight:600;
     color:var(--sub);--sc:var(--magenta)}
   .song-strip .st-chip .se{font-size:13px}
   .song-strip .st-chip .st-sub{display:none;font-size:10px;font-weight:600;opacity:.85;margin-left:5px;letter-spacing:.3px}
   .song-strip .st-chip.on .st-sub{display:inline;color:var(--sc)}
   .song-strip .st-chip:hover{border-color:var(--sc);color:var(--ink)}
-  .song-strip .st-chip.on{border-color:var(--sc);color:var(--ink);background:rgba(255,255,255,.06)}
+  .song-strip .st-chip.on{border-color:var(--sc);color:var(--ink);background:var(--hover)}
   @supports (background:color-mix(in srgb,red 10%,transparent)){
     .song-strip .st-chip.on{background:color-mix(in srgb,var(--sc) 16%,transparent)}
   }
 
   /* 斜杠命令菜单 */
   .slash-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
-    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px var(--shadow-lg)}
   .slash-menu.on{display:block}
   .slash-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:.12s}
   .slash-item:hover,.slash-item.sel{background:color-mix(in srgb,var(--cyan) 10%,transparent)}
@@ -596,7 +624,7 @@
 
   /* @提及菜单(复用 slash-menu 定位)+ 候选项 */
   .at-menu{position:absolute;bottom:72px;left:16px;right:16px;max-width:420px;background:var(--panel-solid);
-    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:36;box-shadow:0 20px 50px rgba(0,0,0,.5);max-height:240px;overflow-y:auto}
+    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:36;box-shadow:0 20px 50px var(--shadow-lg);max-height:240px;overflow-y:auto}
   .at-menu.on{display:block}
   .at-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;cursor:pointer;transition:.12s}
   .at-item:hover,.at-item.sel{background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent)}
@@ -629,7 +657,7 @@
 
   /* 长按互动环 */
   .act-ring{position:fixed;z-index:70;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,.6);animation:popin .2s}
+    padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px var(--shadow-lg);animation:popin .2s}
   .act-ring.on{display:flex}
   .act-ring .ar-echoes{display:flex;gap:2px}
   .act-ring .ar-echo{background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 8px;border-radius:10px;
@@ -637,14 +665,14 @@
   /* emoji 各自字形高度/基线不一(👍❤️😂 渲染尺寸有别), 给固定高度盒子+居中, 消除高低不平 */
   .act-ring .ar-echo .ai{font-size:20px;height:24px;line-height:24px;display:flex;align-items:center;justify-content:center}
   .act-ring .ar-echo .al{font-size:10px;color:var(--sub)}
-  .act-ring .ar-echo:hover{background:rgba(255,255,255,.08);transform:translateY(-2px)}
+  .act-ring .ar-echo:hover{background:var(--hover);transform:translateY(-2px)}
   .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
   .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
     border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
   /* 回复/投影统一用线性SVG图标(灰描边、等大), 不再混用文字符号↳与彩色emoji📽️→风格一致协调 */
   .act-ring .ar-actions .ai{height:22px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
   .act-ring .ar-actions .ai svg{width:20px;height:20px}
-  .act-ring .ar-actions button:hover{background:rgba(255,255,255,.08)}
+  .act-ring .ar-actions button:hover{background:var(--hover)}
 
   /* 粒子/共鸣 */
   #particles{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
@@ -660,11 +688,11 @@
 
   #toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:90;
     background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;
-    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;max-width:90vw}
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px var(--shadow-lg);pointer-events:none;white-space:nowrap;max-width:90vw}
   #toast.on{transform:translateX(-50%) translateY(0)}
 
   /* ============ 弹窗 & 抽屉 ============ */
-  .modal-mask{position:fixed;inset:0;z-index:95;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);
+  .modal-mask{position:fixed;inset:0;z-index:95;background:var(--mask);backdrop-filter:blur(4px);
     display:none;align-items:center;justify-content:center;padding:20px}
   .modal-mask.on{display:flex}
   .modal{width:100%;max-width:400px;max-height:90dvh;overflow-y:auto;padding:28px 26px;position:relative;animation:popin .3s cubic-bezier(.2,.9,.3,1.3)}
@@ -674,23 +702,23 @@
   .modal-sub{font-size:12.5px;color:var(--sub);line-height:1.6;margin-bottom:20px}
   .fld{display:block;margin-bottom:16px}
   .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
-  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.6);
+  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:var(--input-bg);box-shadow:var(--input-shadow);
     color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
   .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .seg{display:flex;gap:8px;margin-bottom:16px}
-  .seg .opt{flex:1;padding:12px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.5);cursor:pointer;
+  .seg .opt{flex:1;padding:12px;border-radius:11px;border:1px solid var(--line2);background:var(--card-bg);cursor:pointer;
     text-align:center;transition:.15s}
   .seg .opt.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   .seg .opt .ot{font-size:14px;font-weight:700;margin-bottom:3px}
   .seg .opt .od{font-size:10.5px;color:var(--dim)}
   .emoji-pick{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
   .emoji-pick b{font-size:20px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;font-weight:400;transition:.12s;border:1px solid transparent}
-  .emoji-pick b:hover{background:rgba(255,255,255,.06)}
+  .emoji-pick b:hover{background:var(--hover)}
   .emoji-pick b.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,transparent)}
   .color-pick{display:flex;flex-wrap:wrap;gap:8px}
   .color-pick i{width:30px;height:30px;border-radius:9px;cursor:pointer;transition:.12s;border:2px solid transparent;box-sizing:border-box}
   .color-pick i:hover{transform:scale(1.12)}
-  .color-pick i.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+  .color-pick i.on{border-color:var(--ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--ink) 25%,transparent)}
   .code-box{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;margin-bottom:20px;
     background:color-mix(in srgb,var(--cyan) 8%,transparent);border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent)}
   .code-box #codeVal{flex:1;font-size:26px;font-weight:800;letter-spacing:5px;color:var(--cyan);text-align:center}
@@ -700,7 +728,7 @@
   .modal-err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:10px}
 
   /* 抽屉(个人空间/房主设置) */
-  .drawer-mask{position:fixed;inset:0;z-index:82;background:rgba(4,6,12,.6);backdrop-filter:blur(3px);display:none}
+  .drawer-mask{position:fixed;inset:0;z-index:82;background:var(--mask);backdrop-filter:blur(3px);display:none}
   .drawer-mask.on{display:block}
   .drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,90vw);background:var(--panel-solid);border-left:1px solid var(--line2);
     z-index:83;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1.1);display:flex;flex-direction:column;
@@ -714,7 +742,7 @@
   .dsec{margin-bottom:22px}
   /* 个人空间: 顶部个人卡 + 统计行 + 按钮组 */
   .me-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:22px 16px 20px;
-    background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:16px;margin-bottom:14px}
+    background:var(--card-bg);border:1px solid var(--line);border-radius:16px;margin-bottom:14px}
   .me-hero .mh-av{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font-size:32px;margin-bottom:12px;
     background:color-mix(in srgb,var(--mh-c,var(--cyan)) 12%,transparent);box-shadow:inset 0 0 0 2px var(--mh-c,var(--cyan)),0 0 24px -6px var(--mh-c,var(--cyan))}
   .me-hero .mh-name{font-size:20px;font-weight:800;letter-spacing:.5px}
@@ -731,18 +759,18 @@
   .dsec .dl .dl-refresh:hover{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   .dsec .dl .dl-refresh.spinning{animation:dl-spin .8s linear infinite;pointer-events:none;color:var(--cyan)}
   @keyframes dl-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .dcard{background:rgba(10,12,24,.5);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .dcard{background:var(--card-bg);border:1px solid var(--line);border-radius:12px;padding:14px}
   .drow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;border-bottom:1px solid var(--line)}
   .drow:last-child{border-bottom:none}
   .drow .dk{color:var(--sub);min-width:70px}
   .drow .dv{flex:1;color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis}
-  .dbtn{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line2);background:rgba(10,12,24,.5);color:var(--ink);
+  .dbtn{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line2);background:var(--card-bg);color:var(--ink);
     font-family:inherit;font-size:13px;cursor:pointer;transition:.15s;margin-top:8px}
   .dbtn:hover{border-color:var(--cyan);color:var(--cyan)}
   .dbtn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
   /* 我的房间: 两列网格, 整卡可点 */
   .mlist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .mitem{display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:11px;background:rgba(10,12,24,.5);
+  .mitem{display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:11px;background:var(--card-bg);
     border:1px solid var(--line);transition:.15s;min-width:0}
   .mitem.mitem-go{cursor:pointer}
   .mitem.mitem-go:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 22px -10px var(--cyan)}
@@ -824,7 +852,7 @@
   /* 名场面(回声墙) */
   .wall-modal{max-width:440px}
   .wall-list{max-height:56vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:8px}
-  .wall-item{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(10,12,24,.4);position:relative}
+  .wall-item{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card-bg-soft);position:relative}
   .wall-item .wi-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
   .wall-item .wi-nm{font-size:12.5px;font-weight:700}
   .wall-item .wi-rank{margin-left:auto;font-size:11px;color:var(--dim)}
