@@ -276,6 +276,17 @@
   </div>
 
   <div class="page" id="p-rooms">
+    <div class="glass card">
+      <h3>🔄 重建客户端缓存
+        <button class="mini-btn" id="purgeCacheBtn" style="border-color:var(--magenta);color:var(--magenta)">立即重建全端缓存</button>
+      </h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7">
+        · 在后台<b>删减/修改了聊天记录</b>（如清除违禁信息）后，点这里让所有客户端丢弃本地缓存、重新拉取最新数据。<br>
+        · 客户端有本地缓存（回房秒显快照 + localStorage 消息列表），不重建的话用户可能仍看到<b>已删的旧内容</b>。<br>
+        · 点击后所有在线/后续打开的客户端会在下次进入时<b>自动重建</b>，无需用户手动清缓存。
+        <span id="purgeCacheHint" style="color:var(--cyan)"></span>
+      </div>
+    </div>
     <div class="glass card"><h3>房间列表 <span class="hint" id="roomsHint"></span></h3>
       <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th><th>灵魂</th></tr></thead><tbody id="roomsTbody"></tbody></table>
     </div>
@@ -1063,6 +1074,30 @@ function collectTuning(){
   return out;
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
+
+// ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
+$('#purgeCacheBtn')?.addEventListener('click',async()=>{
+  if(!await confirmBox('确定重建全端客户端缓存吗？\n所有客户端将在下次进入时丢弃本地缓存、重新拉取最新聊天记录。','重建客户端缓存')) return;
+  const btn=$('#purgeCacheBtn'), hint=$('#purgeCacheHint');
+  btn.disabled=true; const old=btn.textContent; btn.textContent='重建中…';
+  try{
+    // 基于后端真实 tuning 值 spread, 只改 cachePurgeAt, 绝不覆盖其他运行参数
+    let cur;
+    try{ const cfg=await loadConfig(); cur=(cfg&&cfg.tuning)?cfg.tuning:null; }catch(_){ cur=null; }
+    if(!cur){ cur=(CFG_CACHE&&CFG_CACHE.tuning)||JSON.parse(JSON.stringify(CFG_DEFAULT.tuning)); }
+    const now=Date.now();
+    const v=Object.assign({}, cur, { cachePurgeAt: now });
+    if(await saveConfigKey('tuning', v)){
+      if(CFG_CACHE) CFG_CACHE.tuning=v;
+      const t=new Date(now); const hh=String(t.getHours()).padStart(2,'0'), mm=String(t.getMinutes()).padStart(2,'0');
+      if(hint) hint.textContent = ' ✓ 已触发重建（'+hh+':'+mm+'），客户端下次进入自动生效';
+      toast('已触发全端缓存重建');
+    }else{
+      toast('重建失败，请重试');
+    }
+  }catch(e){ toast('重建失败: '+(e&&e.message||e)); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+});
 $('#tuningResetBtn')?.addEventListener('click',()=>resetConfigKeys(['tuning'], loadTuning, '运行参数'));
 
 // ---- 🎭 身份随机池 UI ----
