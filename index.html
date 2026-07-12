@@ -3544,7 +3544,8 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
   return oscs;
 }
 
-let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el,onEnd}
+let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el,onEnd,token}
+let _songToken=0;   // 一次性播放令牌: 每次 play 递增, 回调比对 curSong.token 判定"是不是我这首歌"(ctx是全局单例, 拿它当身份形同虚设)
 function stopSong(){
   if(!curSong) return;
   AudioEngine.duck(false);   // 恢复官方房 BGM 音量
@@ -3581,6 +3582,7 @@ async function playSong(lyric, sid, el, onEnd){
 // AI 模式播放: 服务器音频, 从 chorus 段起播 + 段内匀速跑马灯
 async function playSongAI(el, onEnd){
   stopVoice(); stopSong();
+  const myToken=++_songToken;   // 本次播放令牌, 回调比对防旧歌回调停掉新歌
   const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
   try{ ctx.resume&&ctx.resume(); }catch(_){}
   for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(_){} }
@@ -3603,7 +3605,7 @@ async function playSongAI(el, onEnd){
     const dur = (chE>chS) ? Math.min(chE-chS, buf.duration-offset) : (buf.duration-offset);
     const now=ctx.currentTime+0.05;
     src.start(now, offset, dur);
-    curSong={ ctx, master:g, oscs:[src], timeouts:[], el, onEnd:onEnd||null, _ai:true };
+    curSong={ ctx, master:g, oscs:[src], timeouts:[], el, onEnd:onEnd||null, _ai:true, token:myToken };
     if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
     // 跑马灯: chorus 时长 ÷ 字数 匀速点亮
     const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
@@ -3611,9 +3613,9 @@ async function playSongAI(el, onEnd){
       const per=dur/chEls.length;
       chEls.forEach((ce,i)=>{ const at=(now-ctx.currentTime + i*per)*1000; curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,at))); });
     }
-    src.onended=()=>{ if(curSong && curSong.ctx===ctx) stopSong(); };
+    src.onended=()=>{ if(curSong && curSong.token===myToken) stopSong(); };
     // 兜底停歌
-    curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.ctx===ctx) stopSong(); }, (dur+0.6)*1000));
+    curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.token===myToken) stopSong(); }, (dur+0.6)*1000));
   }catch(e){
     console.warn('playSongAI',e);
     if(el){ el.classList.remove('loading'); }
@@ -3625,6 +3627,7 @@ async function playSongAI(el, onEnd){
 // legacy 模式播放: 纯本地 Web Audio 合成 + 元音哼唱 + 系统 TTS (还原 526771a v9 纯设备版)
 async function playSongLegacy(lyric, sid, el, onEnd){
   stopVoice(); stopSong();
+  const myToken=++_songToken;   // 本次播放令牌
   const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
   // 安卓 Chrome: AudioContext 初始 suspended, resume() 异步。带超时保护地等它 running,
   // 但绝不无限阻塞(某些安卓 resume Promise 迟迟不 resolve, 若死等会导致整首歌哑掉——完全没声)。
@@ -3648,7 +3651,7 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   const spb=60/st.bpm, step=spb*st.bpc, barLen=spb*4;
   const t0=ctx.currentTime+0.18;   // 起始缓冲(安卓音频调度延迟更大, 留足余量防开头削音)
   const totalDur=chars.length*step + spb*2;
-  curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null };
+  curSong={ ctx, master, oscs:[], timeouts:[], el:el||null, onEnd:onEnd||null, token:myToken };
   if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
   // 伴奏：逐小节铺鼓 + 贝斯 + 和弦垫
   const bars=Math.ceil(totalDur/barLen);
@@ -3706,7 +3709,7 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   }
   // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
-  curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
+  curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.token===myToken) stopSong(); }, (Math.max(totalDur,ttsDur)+0.4)*1000));
   }catch(err){
     // 合成/调度中途异常(老旧内核 oscillator 抛错等): 恢复 BGM + 停歌清理, 不让卡片卡在 playing 或 BGM 永久压低
     console.warn('playSongLegacy',err);
