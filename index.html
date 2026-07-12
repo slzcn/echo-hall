@@ -385,6 +385,8 @@
   .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent));border-color:var(--line2)}
   .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
+  .msg.projmsg .txt{background:color-mix(in srgb,var(--violet) 8%,var(--card-bg));border-color:color-mix(in srgb,var(--violet) 26%,transparent)}
+  .proj-chip{display:inline-flex;align-items:center;margin-right:6px;padding:1px 6px;border-radius:999px;background:color-mix(in srgb,var(--violet) 12%,transparent);color:var(--violet);font-size:10.5px;font-weight:700;vertical-align:1px}
   /* 回声徽章条: 消息下方一排各情绪计数 */
   .echo-bar{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .echo-bar.empty{display:none}
@@ -866,7 +868,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-0640';
+  var BUILD_VER='20260712-1408';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2360,7 +2362,7 @@ async function refreshSnapshotTail(room){
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
     rows.forEach(m=>{
       if(m && m.id!=null && !stream.querySelector(`.msg[data-mid="${m.id}"]`)){
-        const el=buildMsgEl(m); if(el) stream.appendChild(el);
+        const el=buildMsgEl(m, true); if(el) stream.appendChild(el);
       }
     });
     if(near) scrollStream();   // 原本贴底才自动滚到底，避免打断用户回看
@@ -2409,7 +2411,7 @@ async function loadHistory(first){
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
   const frag=document.createDocumentFragment();
-  rows.forEach(m=>{ const el=buildMsgEl(m); if(el) frag.appendChild(el); });
+  rows.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
   if(first){
     stream.appendChild(frag); scrollStream();
     fetchEchoes(rows.map(m=>m.id));
@@ -2639,7 +2641,7 @@ try{ EMOJI_ONLY_RE=new RegExp('^(\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F|\\s)+
 const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'').length<=12;
 function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
-function buildMsgEl(m){
+function buildMsgEl(m, isHistory){
   // 灵魂身份跟随最新: 消息存的是发送时的 name/emoji/color 快照, 但灵魂是固定住户,
   // 改了配置后历史消息也该用最新身份(名字/头像/色) → 用 roomSouls 覆盖旧快照。
   if(m.user_id && soulUidSet.has(m.user_id)){
@@ -2655,7 +2657,9 @@ function buildMsgEl(m){
     m={...m, text:cleaned};
   }
   const isMe = m.user_id===myUid;
-  if(m.kind==='proj') return null;   // 投影是瞬时飞幕，不进消息流
+  // 投影: 实时收到时走飞幕特效(不进流), 但加载历史时当普通气泡渲染
+  // (真人把投影当聊天用, 历史不显示=丢消息), 带个投影小标记区分
+  if(m.kind==='proj' && !isHistory) return null;   // 实时投影是瞬时飞幕，不进消息流
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
     el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
@@ -2671,7 +2675,9 @@ function buildMsgEl(m){
   if(isVoid) el.dataset.void='1';
   const isVoice = m.kind==='voice';
   const isSong = m.kind==='song';
-  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):m.text); el.dataset.name=dispName; el.dataset.kind=m.kind||'msg';
+  const isProj = m.kind==='proj';
+  if(isProj) el.classList.add('projmsg');
+  el.dataset.text=isVoice?'[语音消息]':(isSong?('🎵'+parseSong(m.text).lyric):(isProj?('📽️ '+m.text):m.text)); el.dataset.name=dispName; el.dataset.kind=m.kind||'msg';
   if(isVoid && m.expires_at){ el.dataset.exp=m.expires_at; }
   // 引用回复：原文优先用本地 _replyRef，否则据 reply_to 从已渲染消息里查(对方也能看到)
   let replyHtml='';
@@ -2694,7 +2700,7 @@ function buildMsgEl(m){
     <div class="body">
       <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
-      <div class="txt${(!isVoice && !isSong && isEmojiOnly(m.text)) ? ' emoji-only':''}">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):renderAtMentions(esc(m.text)))}</div>
+      <div class="txt${(!isVoice && !isSong && !isProj && isEmojiOnly(m.text)) ? ' emoji-only':''}">${isVoice?voiceHtml(m.text):(isSong?songHtml(m.text):(isProj?`<span class="proj-chip">📽️ 投影</span>${renderAtMentions(esc(m.text))}`:renderAtMentions(esc(m.text))))}</div>
       ${echoHtml}
     </div>`;
   // 呼吸光环要用灵魂主题色驱动阴影 → 写成 CSS 变量供 keyframes 引用
@@ -2708,7 +2714,7 @@ function buildMsgEl(m){
   // 若引用原文当时没取到，异步补一次(对方历史里可能靠后加载)
   if(m.reply_to && !m._replyRef && !refFromDom(m.reply_to)) fillReplyRef(el, m.reply_to);
   // 语音/神曲的引用/投影用文字标签，不用原始 URL / 内部编码
-  attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:m));
+  attachLongPress(txtEl, isVoice?{...m,text:'[语音消息]'}:(isSong?{...m,text:'🎵'+parseSong(m.text).lyric}:(isProj?{...m,text:'📽️ '+m.text}:m)));
   return el;
 }
 // 修: enterRoom 里 ensureAuth 若在 session 恢复前跑, 会拿到临时匿名uid渲染历史, 自己的消息被判成"别人"卡左边;
