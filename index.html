@@ -1021,7 +1021,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-0025';
+  var BUILD_VER='20260713-0048';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3928,6 +3928,9 @@ async function playSongLegacy(lyric, sid, el, onEnd){
 document.addEventListener('click',e=>{
   const btn=e.target.closest('.song-play'); if(!btn) return;
   const card=btn.closest('.song-card'); if(!card) return;
+  // ★ 点完立即 blur: 图标按钮不留焦点, 彻底杀死任何浏览器焦点环(黑边)残留
+  // (配合 CSS focus:none 双保险; 有些移动端把触屏点击当 focus-visible, 只能靠 blur 兽底)
+  try{ btn.blur(); }catch(_){}
   // 音频解锁铁律: 用户手势的"同步"tick里立刻resume + 播一个静音tick, 让AudioContext真正跑起来
   // 一旦跑起来, 后面async里的start()才有声(iOS Safari/Chrome autoplay policy)
   try{ if(typeof AudioEngine!=='undefined') AudioEngine.resume(); }catch(_){}
