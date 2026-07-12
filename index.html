@@ -440,6 +440,20 @@
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--accent,var(--cyan));animation:bounce 1.2s infinite}
   .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
   @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+  /* 神曲谱曲队列条: 悬浮在消息流顶部中央, 仅当有歌在谱且滚出视野时显示 */
+  .song-queue-bar{position:absolute;left:50%;top:8px;transform:translateX(-50%) translateY(-6px);z-index:8;
+    display:none;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;cursor:pointer;
+    background:color-mix(in srgb,var(--panel-solid,#12141f) 88%,transparent);backdrop-filter:blur(8px);
+    border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 35%,transparent);
+    box-shadow:0 4px 16px -6px rgba(0,0,0,.55);font-size:11.5px;color:var(--ink,#e8ecf5);
+    opacity:0;transition:opacity .22s,transform .22s;white-space:nowrap}
+  .song-queue-bar.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
+  .song-queue-bar:hover{border-color:color-mix(in srgb,var(--accent,var(--cyan)) 60%,transparent)}
+  .sqb-dots{display:inline-flex;gap:3px;align-items:center}
+  .sqb-dots i{width:6px;height:6px;border-radius:50%;animation:sqbBob 1s ease-in-out infinite}
+  .sqb-dots i:nth-child(2){animation-delay:.16s}.sqb-dots i:nth-child(3){animation-delay:.32s}
+  @keyframes sqbBob{0%,100%{transform:translateY(1px);opacity:.6}50%{transform:translateY(-3px);opacity:1}}
+  .sqb-txt{font-weight:600;letter-spacing:.2px}
 
   /* 回复预览条 */
   .reply-preview{display:none;align-items:center;gap:8px;padding:8px 18px;border-top:1px solid var(--line);
@@ -610,26 +624,37 @@
   .song-card.playing .song-eq i:nth-child(3){animation-delay:.3s}
   .song-card.playing .song-eq i:nth-child(4){animation-delay:.45s}
   /* AI 模式神曲生成中(“发送中”心智模型) */
-  .song-card.pending{opacity:.75}
-  .song-card.pending .song-play{cursor:wait;border-color:var(--sub);background:transparent}
+  .song-card.pending{opacity:.9}
+  .song-card.pending .song-play{cursor:wait;border-color:var(--sc,var(--magenta));background:transparent}
   .song-card.pending .song-play:hover{background:transparent;box-shadow:none}
+  /* 谱曲中: 跳动音符(上下浮动+微透明呼吸), 音乐语义, 替代"加载转圈" */
+  .song-note{display:inline-block;color:var(--sc,var(--magenta));font-size:14px;line-height:1;animation:noteBob 1s ease-in-out infinite}
+  @keyframes noteBob{0%,100%{transform:translateY(1px) rotate(-6deg);opacity:.75}50%{transform:translateY(-2px) rotate(6deg);opacity:1}}
+  /* "谱曲中"文字: 曲风色, 三点省略号跟着流动 */
+  .song-composing{color:var(--sc,var(--magenta));font-size:11px;font-weight:600;letter-spacing:.3px;margin-left:2px;opacity:.9}
+  .song-composing::after{content:'';animation:composeDots 1.4s steps(1,end) infinite}
+  @keyframes composeDots{0%{content:''}25%{content:'·'}50%{content:'··'}75%{content:'···'}100%{content:''}}
   .song-card.failed{opacity:.85}
   .song-card.failed .song-play{cursor:pointer;border-color:var(--magenta);color:var(--magenta)}
   .song-card.failed .song-play::before{content:'↻';font-size:14px}
   .song-card.failed .song-eq i{animation:none;opacity:.3;background:var(--magenta)}
   .song-card.loading .song-play{position:relative;cursor:wait}
   .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
-  .song-spinner{display:inline-block;width:12px;height:12px;border:1.5px solid transparent;border-top-color:var(--sc,var(--magenta));border-radius:50%;animation:songSpin .8s linear infinite}
   @keyframes songSpin{to{transform:rotate(360deg)}}
-  /* pending 时 EQ 轻微起伏（“处理中”信号） */
-  .song-card.pending .song-eq i{animation:vbarSlow 1.6s ease-in-out infinite;opacity:.55}
-  .song-card.pending .song-eq i:nth-child(2){animation-delay:.2s}
-  .song-card.pending .song-eq i:nth-child(3){animation-delay:.4s}
-  .song-card.pending .song-eq i:nth-child(4){animation-delay:.6s}
-  @keyframes vbarSlow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(.75)}}
-  /* “归队”疬呼吸高亮：刚生成好的卡片0.6s微光，标记新到货 */
-  .song-card.arrived{animation:songArrive 1.6s ease-out 2}
+  /* "归队"动效: 刚谱好的歌从"谱曲中"变可播放时, 卡片弹一下 + 主题色光环扩散 + 音符飞入 */
+  .song-card.arrived{animation:songArrive 1.6s ease-out 2, songPop .5s cubic-bezier(.2,1.4,.4,1)}
   @keyframes songArrive{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--sc,var(--magenta)) 45%,transparent)}70%{box-shadow:0 0 0 8px color-mix(in srgb,var(--sc,var(--magenta)) 0%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+  @keyframes songPop{0%{transform:scale(.92)}55%{transform:scale(1.04)}100%{transform:scale(1)}}
+  /* 自绘 tooltip: 替代原生 title(丑且不可控)。data-tip 属性 + 悬停淡入, 主题色描边深底小胶囊 */
+  [data-tip]{position:relative}
+  [data-tip]::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 7px);transform:translateX(-50%) translateY(3px);
+    background:var(--panel-solid,#12141f);color:var(--ink,#e8ecf5);border:1px solid color-mix(in srgb,var(--sc,var(--cyan)) 45%,transparent);
+    padding:4px 8px;border-radius:7px;font-size:11px;line-height:1.2;white-space:nowrap;letter-spacing:.2px;
+    box-shadow:0 4px 14px -4px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .16s,transform .16s;z-index:30}
+  [data-tip]::before{content:'';position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:color-mix(in srgb,var(--sc,var(--cyan)) 45%,transparent);opacity:0;transition:opacity .16s;z-index:30}
+  [data-tip]:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
+  [data-tip]:hover::before{opacity:1}
 
   /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
   .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
@@ -1021,6 +1046,8 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m===
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
+    <!-- 神曲谱曲队列条: 有歌在生成且滚出视野时浮现, 点击滚到最近一首(进度不被后续消息刷走) -->
+    <div class="song-queue-bar" id="songQueueBar"><span class="sqb-dots" id="sqbDots"></span><span class="sqb-txt" id="sqbTxt"></span></div>
     <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 8 12 13 18 8"></polyline><polyline points="6 14 12 19 18 14"></polyline></svg></div>
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
@@ -2483,6 +2510,7 @@ async function loadHistory(first){
     const frag=document.createDocumentFragment();
     head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag); scrollStream();
+    try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 400); }catch(e){}   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
     fetchEchoes(head.map(m=>m.id));
     if(canLoadMore) addLoadMore();
     // 剩余较早消息分批 idle 渲染, 不阻塞首屏
@@ -2548,6 +2576,7 @@ function subscribeMessages(rid){
       if(isEmojiOnly(m.text)) burst(m.text);
       notifyIfMentioned(m, el);   // 被 @ → 强提醒
       try{ trackChatHeat(m); }catch(e){}   // 多人发言声波涟漪
+      if(m.kind==='song') try{ updateSongQueueBar(); }catch(e){}   // 新 pending 神曲 → 刷队列条
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
@@ -2565,6 +2594,7 @@ function subscribeMessages(rid){
         let wasPending=false;
         if(m.kind==='song'){ const oldCard=bubble.querySelector('.song-card'); wasPending=oldCard && oldCard.classList.contains('pending'); }
         const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); if(wasPending){ const nc=fresh.querySelector('.song-card'); if(nc && !nc.classList.contains('pending')){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'), 3400); try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){} } } }
+        try{ updateSongQueueBar(); }catch(e){}   // 一首谱好归位 → 刷队列条(可能减一首或隐藏)
       } else if(m.kind==='song'){
         // 少见分支：bubble 不存在 才走这里
         el.innerHTML=songHtml(m.text);
@@ -2695,6 +2725,43 @@ function renderTyping(users){
   const liveUids=new Set(users.filter(p=>soulUidSet.has(p.user_id) && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
   presenceMap.forEach((el,uid)=>{ if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', liveUids.has(uid)); });
 }
+
+// 神曲谱曲队列条: 汇总 stream 里所有"谱曲中(pending)"神曲, 当有 pending 卡片滚出可视区时,
+// 顶部浮条显示"N首神曲谱曲中"(彩点=各自曲风色), 点它滚到最近一首 → 进度不被后续消息刷走。
+// 全房所有人正在谱的歌都算(你要"队列内容全显示")。生成完卡片就绪, pending消失, 条自动更新/隐藏。
+function updateSongQueueBar(){
+  const bar=$('#songQueueBar'); if(!bar) return;
+  const stream=$('#stream'); if(!stream){ bar.classList.remove('on'); return; }
+  const pend=[...stream.querySelectorAll('.song-card.pending')];
+  if(!pend.length){ bar.classList.remove('on'); _sqbTarget=null; if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } return; }
+  // 是否有 pending 卡片在可视区外(上方或下方)→ 才需要浮条提示(在视野里就不用打扰)
+  // 用 offsetTop 相对 stream 滚动位置判定(比 getBoundingClientRect 在各种布局下更稳)
+  const viewTop=stream.scrollTop, viewBot=viewTop+stream.clientHeight;
+  if(stream.clientHeight<=0){ bar.classList.remove('on'); return; }   // 容器不可见(未进房等)→ 不显示
+  let offscreen=null;
+  for(const c of pend){
+    const msg=c.closest('.msg')||c;
+    const cTop=msg.offsetTop, cBot=cTop+msg.offsetHeight;
+    if(cBot<viewTop+4 || cTop>viewBot-4){ offscreen=c; break; }
+  }
+  if(!offscreen){ bar.classList.remove('on'); _sqbTarget=null; return; }
+  _sqbTarget=(offscreen.closest('.msg')||offscreen);   // 点击滚到最近一个视野外的
+  // 彩点: 每首歌一个曲风色点(最多 5 个防超长)
+  const dots=pend.slice(0,5).map(c=>{ const col=(c.style.getPropertyValue('--sc')||'').trim()||'var(--accent)'; return `<i style="background:${col}"></i>`; }).join('');
+  $('#sqbDots').innerHTML=dots;
+  $('#sqbTxt').textContent = pend.length===1 ? '神曲谱曲中 · 点此查看' : `${pend.length} 首神曲谱曲中 · 点此查看`;
+  bar.classList.add('on');
+  // 兜底轮询: 有 pending 时每 2.5s 复查一次(位置/数量变化), 无 pending 自然停
+  if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 2500); }
+}
+let _sqbTimer=null;
+let _sqbTarget=null;
+(function bindSongQueueBar(){
+  const bar=document.getElementById('songQueueBar');
+  if(bar) bar.addEventListener('click',()=>{ if(_sqbTarget) _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'}); });
+  const stream=document.getElementById('stream');
+  if(stream) stream.addEventListener('scroll',()=>{ requestAnimationFrame(updateSongQueueBar); }, {passive:true});
+})();
 
 async function refreshPresence(){
   if(!curRoom) return;
@@ -3499,17 +3566,19 @@ function songHtml(text){
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   // 逐字包 span → 播放时卡拉OK高亮
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
-  // AI 模式下的生成中态: 播放按钮变 spinner + 卡片挂 pending class
+  // AI 模式下的生成中态: 播放按钮变"谱曲中"(跳动音符), 卡片挂 pending class
   const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
   const pending = singMode==='ai' && !ready;   // legacy 模式下永远是可播放态(本地合成不用等)
   const pendCls = pending ? ' pending' : '';
-  const btnInner = pending ? '<span class="song-spinner"></span>' : '<span class="pglyph"></span>';
-  const btnTitle = pending ? '神曲生成中…' : '播放';
-  // 曲风标签色 = 曲风自己的颜色
+  // 谱曲中: 跳动音符♪(音乐语义, 非"加载"转圈); 就绪: 播放三角
+  const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
+  const btnTip = pending ? 'AI 谱曲中 · 约 40 秒' : '播放';
+  // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
+  const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
-    <button class="song-play" title="${btnTitle}">${btnInner}</button>
+    <button class="song-play" data-tip="${btnTip}">${btnInner}</button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
-      <span class="song-eq"><i></i><i></i><i></i><i></i></span></span>
+      ${metaExtra}</span>
     <span class="song-lyric">${chs}</span></span></span>`;
 }
 
@@ -3832,7 +3901,7 @@ document.addEventListener('click',e=>{
     // pending(生成中断) 或 failed(生成失败) 卡片被点 → 补触发一次生成
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
-      card.classList.remove('failed'); const b=card.querySelector('.song-play'); if(b) b.title='';
+      card.classList.remove('failed'); const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
     } else {
@@ -3868,6 +3937,7 @@ async function sendSong(lyric, sid){
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
+  try{ updateSongQueueBar(); }catch(e){}   // 自己发的 pending 歌进队列条监视
   // 后台生成(不 await, 让用户可以继续聊天/其他操作)。mid 统一 String, 与点击补触发(String(mid))同键防重复生成
   generateAndPersistSong(String(row.id), lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
 }
@@ -3960,7 +4030,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     console.warn('generateSong fail',e);
     toast(EH_CONFIG.text.err_singSend||'神曲生成失败');
     // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
-    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.title='生成失败，点击重试'; } }catch(_){}
+    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='生成失败'; } }catch(_){}
   }finally{
     _EH_SONG_GENERATING.delete(mid);
   }
