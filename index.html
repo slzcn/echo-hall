@@ -881,7 +881,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1640';
+  var BUILD_VER='20260712-1655';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2376,9 +2376,25 @@ async function refreshSnapshotTail(room){
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
     rows.forEach(m=>{
-      if(m && m.id!=null && !stream.querySelector(`.msg[data-mid="${m.id}"]`)){
+      if(!m || m.id==null) return;
+      const exist=stream.querySelector(`.msg[data-mid="${m.id}"]`);
+      if(!exist){
+        // 缺失消息 → 补 append
         const el=buildMsgEl(m, true); if(el) stream.appendChild(el);
+        return;
       }
+      // ★ keep-alive 快照修复铁律: 快照可能是"渲染未完成态"截下来的(分批渲染没跑完/打字机中断),
+      //   DOM 里 data-mid 存在但 .txt 是空框。这类不能跳过, 要用真实 data 原地重建修复空框。
+      try{
+        const kind=exist.dataset.kind||'msg';
+        if(kind==='voice'||kind==='song'||kind==='proj') return;   // 特效消息不判空(内容非纯文本)
+        const t=exist.querySelector('.txt');
+        const hasTxt = t && t.textContent.trim();
+        if(!hasTxt && (m.text||'').trim()){
+          const fresh=buildMsgEl(m, true);
+          if(fresh){ exist.replaceWith(fresh); }
+        }
+      }catch(_){}
     });
     if(near) scrollStream();   // 原本贴底才自动滚到底，避免打断用户回看
   }catch(e){ console.warn('refreshSnapshotTail', e); }
@@ -4182,7 +4198,20 @@ async function leaveRoom(){
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
   // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
   if(curRoom){
-    try{ roomSnap={ rid:curRoom.id, html:$('#stream').innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() }; }catch(e){ roomSnap=null; }
+    try{
+      // ★ 存快照前先修当前 DOM 里的空框(分批渲染未跑完/打字机中断留下的),
+      //   否则快照会把"渲染未完成态"存下来, 回房还原就是空框。用 dataset.text 就地回填。
+      const _st=$('#stream');
+      _st.querySelectorAll('.msg[data-mid]').forEach(el=>{
+        try{
+          const kind=el.dataset.kind||'msg';
+          if(kind==='voice'||kind==='song'||kind==='proj') return;
+          const t=el.querySelector('.txt'); const raw=(el.dataset.text||'').trim();
+          if(t && raw && !t.textContent.trim()){ t.textContent=raw; }
+        }catch(_){}
+      });
+      roomSnap={ rid:curRoom.id, html:_st.innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() };
+    }catch(e){ roomSnap=null; }
   }
   await leavePresence();
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
