@@ -480,6 +480,9 @@
   .msg.soul .av .soul-dot,.pav .av-ic .soul-dot{position:absolute;right:4px;bottom:3px;font-size:6px;line-height:1;font-weight:600;letter-spacing:0;
     font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 2px var(--name-halo),0 0 3px var(--name-halo);z-index:3;pointer-events:none}
   .pav .av-ic{position:relative}
+  /* 狼姐专属：头像左上角一个红色蝴蝶结 🎀 装饰(消息头像 + 光墙头像通用) */
+  .av-bow{position:absolute;left:-5px;top:-6px;font-size:12px;line-height:1;z-index:4;pointer-events:none;
+    filter:drop-shadow(0 0 2px rgba(0,0,0,.5)) drop-shadow(0 0 3px rgba(255,60,120,.55));transform:rotate(-18deg)}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
     border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
@@ -1543,6 +1546,7 @@ try{ injectThemeCSS(); applyTextConfig(); }catch(e){}
 //  回声厅 Echo Hall 2.0 — 全站 Supabase(匿名登录 + RLS + Realtime + Presence)
 // ============================================================
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
+const WOLF_UID = 'ca72217f-7157-47f6-b540-049074bf06dd';   // 狼姐 uid: 头像叠红蝴蝶结🎀专属特判
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
 // supabase 库改 <script defer>(111KB,不阻塞首帧渲染)→ 主脚本解析期它还没执行,
 // 故 sb 延迟创建: 先占位 null, 库就绪后 bootSupabase() 里 createClient + 挂 auth 引导。
@@ -2575,7 +2579,8 @@ function renderPresenceAvatars(users){
     // 灵魂在光墙也带 AI 角标(与消息头像一致)
     if(isSoul) div.style.setProperty('--soul-c', c);
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
-    div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
+    const avBow=(p.user_id===WOLF_UID)?`<span class="av-bow">🎀</span>`:'';   // 狼姐专属红蝴蝶结
+    div.innerHTML=`<div class="av-ic">${avEmoji(safeEmoji(p.emoji))}${soulDot}${avBow}</div><div class="nm">${isMe?'你':esc(p.name||'')}</div>`;
     div.dataset.sig=sig;
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
     presenceMap.set(p.user_id,div);
@@ -2700,10 +2705,11 @@ function buildMsgEl(m, isHistory){
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
+  const avBow = (m.user_id===WOLF_UID) ? `<span class="av-bow">🎀</span>` : '';   // 狼姐专属红蝴蝶结
   // 点消息头像 → @ 该发送者(与在线光墙头像一致)。排除: 自己、虚空匿名(@会泄露身份)
   const avAt = (!isMe && !isVoid && m.name) ? ` data-atname="${esc(m.name)}" title="点击 @${esc(m.name)}"` : '';
   el.innerHTML=`
-    <div class="av"${avAt} style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}</div>
+    <div class="av"${avAt} style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}${avBow}</div>
     <div class="body">
       <div class="meta"><span class="nm" style="color:${avColor}">${esc(dispName)}</span><span class="tm">${fmtTime(m.created_at)}</span>${expHtml}</div>
       ${replyHtml}
