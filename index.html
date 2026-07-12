@@ -2953,10 +2953,11 @@ function refreshRenderedSoulIdentity(){
     const c=soulThemeColor(s.color, safeColor(s.color)), ic=safeEmoji(s.emoji)||'👤';
     const av=el.querySelector('.av');
     if(av){
-      // 保留可能存在的 AI 角标, 只换底色/字色/头像 emoji(走 avEmoji 保黑洞校正)
+      // 保留可能存在的 AI 角标 + 狼姐蝴蝶结, 只换底色/字色/头像 emoji(走 avEmoji 保黑洞校正)
       const dot=av.querySelector('.soul-dot');
+      const bow=av.querySelector('.av-bow');
       av.style.background=c+'22'; av.style.color=c; av.style.boxShadow=`inset 0 0 0 1.5px ${c}`;
-      av.innerHTML=avEmoji(ic)+(dot?dot.outerHTML:'');
+      av.innerHTML=avEmoji(ic)+(dot?dot.outerHTML:'')+(bow?bow.outerHTML:'');
       el.style.setProperty('--soul-c', c);
     }
     const nm=el.querySelector('.meta .nm');
