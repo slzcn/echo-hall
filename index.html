@@ -538,9 +538,12 @@
   .rec-panel.cancel .rec-wave i{background:var(--dim)}
   .rec-time{font-size:24px;font-weight:800;letter-spacing:1px;color:var(--ink);font-variant-numeric:tabular-nums}
   .rec-tip{font-size:12.5px;color:var(--sub);letter-spacing:.5px}
+  .rec-caption{font-size:13px;color:var(--cyan);min-height:16px;max-width:240px;text-align:center;line-height:1.4;opacity:.9}
   .rec-panel.cancel .rec-tip{color:var(--magenta);font-weight:700}
   .rec-panel.cancel .rec-time{color:var(--magenta)}
   .vplay{display:inline-flex;align-items:center;gap:9px;min-width:150px;vertical-align:middle;cursor:pointer}
+  .vcap{display:block;margin-top:5px;font-size:12.5px;color:var(--sub);line-height:1.45;opacity:.85;font-style:italic}
+  .vcap::before{content:'“';opacity:.6} .vcap::after{content:'”';opacity:.6}
   .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--cyan);background:var(--card-bg);
     color:var(--cyan);cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
   .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
@@ -1018,6 +1021,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m===
   <div class="rec-panel" id="recPanel">
     <div class="rec-wave" id="recWave"></div>
     <div class="rec-time" id="recTime">0:00</div>
+    <div class="rec-caption" id="recCaption"></div>
     <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
   </div>
 </div>
@@ -3101,14 +3105,44 @@ const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
 const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
 let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
 let waveRAF=null, recAnalyser=null;
+// 语音转写: 录音同时用浏览器 SpeechRecognition 把话转成文字, 编码进语音消息, 让 AI 灵魂"听得懂"内容
+// (mify 网关是纯文本且在内网, 无法做云端 STT; 不支持的浏览器→无转写, 灵魂退回"发了一条语音"的旧行为)
+const SR_CLASS = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let voiceSR=null, srFinal='', srInterim='';
+function startSR(){
+  srFinal=''; srInterim=''; if(!SR_CLASS) return;
+  try{
+    voiceSR=new SR_CLASS();
+    voiceSR.lang='zh-CN'; voiceSR.continuous=true; voiceSR.interimResults=true;
+    voiceSR.onresult=e=>{
+      let interim='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const r=e.results[i];
+        if(r.isFinal) srFinal+=r[0].transcript; else interim+=r[0].transcript;
+      }
+      srInterim=interim;
+      const cap=$('#recCaption'); if(cap) cap.textContent=(srFinal+srInterim).slice(-40);
+    };
+    voiceSR.onerror=()=>{};   // 网络/权限/no-speech 都静默, 不打断录音
+    voiceSR.start();
+  }catch(e){ voiceSR=null; }
+}
+function stopSR(){
+  if(!voiceSR) return '';
+  try{ voiceSR.stop(); }catch(e){}
+  voiceSR=null;
+  return (srFinal+srInterim).trim().slice(0,180);
+}
 function fmtDur(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
 // 播放器 HTML(只信任本站语音桶/本地 blob 的地址，其余按纯文本展示，防伪造 URL)
 function voiceHtml(src){
   src=String(src||'');
   if(!src.startsWith(VOICE_URL_PREFIX) && !src.startsWith('blob:')) return esc(src);
   const dur=(src.match(/#dur=(\d+)/)||[])[1];
+  let tx=''; const txM=src.match(/[#&]tx=([^&]+)/); if(txM){ try{ tx=decodeURIComponent(txM[1]); }catch(e){ tx=''; } }
   const bars=Array.from({length:9},()=>`<i style="height:${5+Math.floor(secureRand()*13)}px"></i>`).join('');
-  return `<span class="vplay" data-src="${esc(src)}"><button class="vp-btn"><span class="pglyph"></span></button><span class="vp-bars">${bars}</span><span class="vp-t">${dur?fmtDur(+dur):''}</span></span>`;
+  const player=`<span class="vplay" data-src="${esc(src)}"><button class="vp-btn"><span class="pglyph"></span></button><span class="vp-bars">${bars}</span><span class="vp-t">${dur?fmtDur(+dur):''}</span></span>`;
+  return tx ? `${player}<span class="vcap">${esc(tx)}</span>` : player;   // 有转写→附字幕
 }
 // 全局单实例播放：播放新的自动停旧的
 let vAudio=null, vPlayEl=null;
@@ -3185,12 +3219,14 @@ async function startRec(){
   recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop=()=>{
     stream.getTracks().forEach(t=>t.stop());
+    const tx=stopSR();   // 拿到转写文字(不支持/无语音则空)
     stopWave(); hideRecUI();
-    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC()));
+    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC()), recCanceled?'':tx);
     else if(recWanted && !recCanceled && recSec<1) toast(EH_CONFIG.text.err_recTooShort);
     recorder=null; recChunks=[];
   };
   recorder.start(250);
+  startSR();   // 录音同时开转写
   showRecUI(stream);
   recTimer=setInterval(()=>{ recSec++; updateRecTime();
     if(recSec>=VOICE_MAX_SEC()){ recWanted=true; stopRec(); } },1000);
@@ -3220,12 +3256,13 @@ function startWave(stream){
   }catch(e){}
 }
 function stopWave(){ if(waveRAF) cancelAnimationFrame(waveRAF); waveRAF=null; recAnalyser=null; }
-async function sendVoice(blob, secs){
+async function sendVoice(blob, secs, tx){
   if(!curRoom || !myUid) return;
   if(blob.size>950*1024){ toast(EH_CONFIG.text.err_recTooLong); return; }
   const ext=REC_MIME.includes('mp4')?'m4a':'webm';
+  const txTag = tx ? '&tx='+encodeURIComponent(tx) : '';   // 转写编进 text, 让 AI 灵魂听得懂
   // 乐观上屏：先用本地 blob 播放
-  const localUrl=URL.createObjectURL(blob)+'#dur='+secs;
+  const localUrl=URL.createObjectURL(blob)+'#dur='+secs+txTag;
   const optimistic={id:'local_'+Date.now(),room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:localUrl,kind:'voice',created_at:new Date().toISOString()};
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
   const path=`${curRoom.id}/${myUid}-${Date.now()}.${ext}`;
@@ -3234,7 +3271,7 @@ async function sendVoice(blob, secs){
     toast(/bucket|not.*found/i.test(upErr.message||'')?'语音存储未配置(缺 eh-voice 桶)':'语音上传失败');
     if(el) el.remove(); return; }
   const { data:pub }=sb.storage.from(VOICE_BUCKET).getPublicUrl(path);
-  const url=pub.publicUrl+'#dur='+secs;
+  const url=pub.publicUrl+'#dur='+secs+txTag;
   const { data:row, error }=await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:url,kind:'voice'}).select('id').single();
   if(error){ console.warn('voice send',error); toast(EH_CONFIG.text.err_voiceSend); if(el) el.remove(); return; }
   // 回填真实 id 与正式 URL(与文本消息同理)
