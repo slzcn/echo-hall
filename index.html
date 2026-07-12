@@ -3662,6 +3662,7 @@ const _EH_SONG_GENERATING=new Set();   // 记录正在生成的 mid, 防重复�
 async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   _EH_SONG_GENERATING.add(mid);
+  const startRoomId = curRoom && curRoom.id;   // 快照房间id, 防生成中途换房污染 path
   try{
     const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
     // 挑一首同曲风母版当参考
@@ -3688,15 +3689,21 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
     const blob=new Blob([bytes],{type:'audio/mpeg'});
-    const path=`songs/${curRoom.id}/${mid}_${Date.now()}.mp3`;
-    const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:false});
+    // 固定 path(用初始房间id + mid, 不带 ts) → 重试时会覆盖同文件, 不产生垃圾
+    const path=`songs/${startRoomId||'unknown'}/${mid}.mp3`;
+    const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:true});
     if(up.error) throw new Error('upload '+up.error.message);
     const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
-    const songUrl=pub.publicUrl;
-    // 回写消息 text 字段(带 URL + chorus 起止)→ realtime 会广播 UPDATE, 触发所有客户端卡片归队
+    // 加 cache-bust 参数防上传后 CDN 拿到旧缓存(覆写同名文件尤需)
+    const songUrl=pub.publicUrl + '?t=' + Date.now();
+    // 回写消息 text 字段 → 带 .select() 看影响行数, RLS 静默拒/0 行会报错而不是假成功
     const newText=encodeSong(sid, lyric, songUrl, chS, chE);
-    const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid);
-    if(upd.error){ console.warn('song patch',upd.error); }
+    const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
+    if(upd.error){ throw new Error('song patch: '+upd.error.message); }
+    if(!upd.data || upd.data.length===0){
+      // 埞尚很容易遇: RLS 静默拒/mid 不匹配/session 失效 → 0 行无错
+      throw new Error('song patch: 0 rows updated (RLS/session or mid mismatch)');
+    }
     console.log('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
   }catch(e){
     console.warn('generateSong fail',e);
