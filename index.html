@@ -3893,7 +3893,8 @@ function stopSong(){
   const s=curSong; curSong=null;
   s.timeouts.forEach(clearTimeout);
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
-  try{ s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); }catch(e){}
+  try{ if(s.audioEl){ s.audioEl.pause(); s.audioEl.src=''; s.audioEl.load&&s.audioEl.load(); } }catch(e){}   // AI模式<audio>元素: 停+释放
+  try{ if(s.master&&s.ctx) { s.master.gain.cancelScheduledValues(s.ctx.currentTime); s.master.gain.setValueAtTime(0.0001,s.ctx.currentTime); } }catch(e){}
   try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
   if(s.el){ s.el.classList.remove('playing'); s.el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on')); }
   if(s.onEnd) try{ s.onEnd(); }catch(e){}
@@ -3921,48 +3922,59 @@ async function playSong(lyric, sid, el, onEnd){
 }
 
 // AI 模式播放: 服务器音频, 从 chorus 段起播 + 段内匀速跑马灯
-async function playSongAI(el, onEnd){
+// AI 模式播放: 用 <audio> 元素(与语音消息同款可靠路径, 不受 Web Audio 手势静音/decode 兼容坑),
+// 从 chorus 段起播, timeupdate 驱动跑马灯高亮。修"神曲点了没声/没反应/播放失败"三种表现的根因——
+// 原来用 AudioBufferSource: fetch+decodeAudioData 是 async, start() 脱离点击手势→移动端静音;
+// 且 decodeAudioData 在旧内核易失败。改 <audio> 后 play() 就在点击同步链里, 全平台稳。
+function playSongAI(el, onEnd){
   stopVoice(); stopSong();
-  const myToken=++_songToken;   // 本次播放令牌, 回调比对防旧歌回调停掉新歌
-  const ctx=ac(); if(!ctx){ toast(EH_CONFIG.text.err_noAudioSupport); return; }
-  try{ ctx.resume&&ctx.resume(); }catch(_){}
-  for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(_){} }
+  const myToken=++_songToken;
   const url=el.dataset.url;
+  if(!url){ toast('神曲地址缺失'); return; }
   const chS=parseFloat(el.dataset.cs||'0')||0;
   const chE=parseFloat(el.dataset.ce||'0')||0;
-  const lyric=el.dataset.lyric||'';
-  try{
-    AudioEngine.duck(true);
-    // 点击瞬间先给 UI 反馈(避免"点了没反应"): 未命中缓存才显 loading
-    const cached=_EH_SONG_CACHE.has(url);
-    if(el && !cached){ el.classList.add('loading'); }
-    const buf=await getSongBuffer(ctx, url);
-    if(el){ el.classList.remove('loading'); }
-    const src=ctx.createBufferSource(); src.buffer=buf;
-    const g=ctx.createGain(); g.gain.value=0.95;
-    src.connect(g); g.connect(ctx.destination);
-    const offset=Math.max(0, Math.min(chS, buf.duration-0.2));
-    // chorus 有效(chE>chS)→播高潮段; 无效(如 resume 丢了 chorus, 存成 0/0)→播整首, 不要缩成 1 秒
-    const dur = (chE>chS) ? Math.min(chE-chS, buf.duration-offset) : (buf.duration-offset);
-    const now=ctx.currentTime+0.05;
-    src.start(now, offset, dur);
-    curSong={ ctx, master:g, oscs:[src], timeouts:[], el, onEnd:onEnd||null, _ai:true, token:myToken };
-    if(el){ el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung')); }
-    // 跑马灯: chorus 时长 ÷ 字数 匀速点亮
-    const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
-    if(chEls.length){
-      const per=dur/chEls.length;
-      chEls.forEach((ce,i)=>{ const at=(now-ctx.currentTime + i*per)*1000; curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,at))); });
-    }
-    src.onended=()=>{ if(curSong && curSong.token===myToken) stopSong(); };
-    // 兜底停歌
-    curSong.timeouts.push(setTimeout(()=>{ if(curSong && curSong.token===myToken) stopSong(); }, (dur+0.6)*1000));
-  }catch(e){
-    console.warn('playSongAI',e);
-    if(el){ el.classList.remove('loading'); }
-    AudioEngine.duck(false);
-    toast('播放失败');
-  }
+  try{ AudioEngine.duck(true); }catch(_){}
+  el.classList.add('loading');
+  const a=new Audio();
+  a.preload='auto';
+  a.src=url.split('#')[0];
+  const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
+  // 起播: 能定位到 chorus 段就跳过去, 否则从头
+  const startAt=(chE>chS)?chS:0;
+  const endAt=(chE>chS)?chE:0;   // 0=播到自然结束
+  let started=false;
+  const beginMarquee=(dur)=>{
+    if(!chEls.length||!curSong) return;
+    const per=(dur>0?dur:20)/chEls.length;
+    chEls.forEach((ce,i)=>{ curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,i*per*1000))); });
+  };
+  // loadedmetadata 比 canplay 更早触发(拿到 duration 即可 seek 到 chorus), 不死等 canplay
+  const doSeek=()=>{
+    if(curSong&&curSong.token!==myToken) return;
+    if(started) return; started=true;
+    el.classList.remove('loading');
+    try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
+  };
+  a.onloadedmetadata=doSeek;
+  a.oncanplay=doSeek;
+  a.onplaying=()=>{
+    if(!curSong||curSong.token!==myToken) return;
+    el.classList.remove('loading');
+    el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung'));
+    const dur=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
+    beginMarquee(dur);
+  };
+  // 到 chorus 段末尾自动停(播高潮段而非整首)
+  a.ontimeupdate=()=>{ if(endAt>startAt && a.currentTime>=endAt){ if(curSong&&curSong.token===myToken) stopSong(); } };
+  a.onended=()=>{ if(curSong&&curSong.token===myToken) stopSong(); };
+  a.onerror=()=>{ el.classList.remove('loading'); if(curSong&&curSong.token===myToken) stopSong(); toast('神曲播放失败，请重试'); };
+  curSong={ audioEl:a, oscs:[], timeouts:[], el, onEnd:onEnd||null, _ai:true, token:myToken };
+  // play() 在点击同步链里调用 → 不受移动端 autoplay 静音限制(和语音消息一样稳)
+  a.play().then(()=>{}).catch(err=>{
+    el.classList.remove('loading');
+    const msg=(err&&err.name==='NotAllowedError')?'被浏览器拦截，请再点一次':'神曲播放失败，请重试';
+    toast(msg); if(curSong&&curSong.token===myToken) stopSong();
+  });
 }
 
 // legacy 模式播放: 纯本地 Web Audio 合成 + 元音哼唱 + 系统 TTS (还原 526771a v9 纯设备版)
