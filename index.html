@@ -672,6 +672,10 @@
     padding:0 4px;border-radius:5px;white-space:nowrap}
   .at-mention.at-soul{color:var(--at-c,var(--violet));background:color-mix(in srgb,var(--at-c,var(--violet)) 14%,transparent)}
   .at-mention.at-me{color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
+  /* ★日间模式(白底): 暗色主题的霓虹青/紫/琥珀在白底上对比度不足(几乎看不清), 压成可读的深色 */
+  html[data-mode="day"] .at-mention{color:#0C8E82;background:rgba(15,181,166,.14)}
+  html[data-mode="day"] .at-mention.at-me{color:#B87614;background:rgba(217,138,31,.17)}
+  html[data-mode="day"] .at-mention.at-soul{color:color-mix(in srgb,var(--at-c,#8B5CFF) 58%,#141a2e);background:color-mix(in srgb,var(--at-c,#8B5CFF) 13%,transparent)}
   /* 被@强提醒：消息卡脉冲高亮 2s */
   .msg.mentioned-flash{animation:mentionPulse 2s ease-out}
   @keyframes mentionPulse{0%{background:color-mix(in srgb,var(--amber) 32%,transparent);border-radius:12px}
@@ -902,7 +906,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1745';
+  var BUILD_VER='20260712-1755';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
