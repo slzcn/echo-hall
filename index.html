@@ -952,7 +952,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1845';
+  var BUILD_VER='20260712-1900';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -4263,14 +4263,29 @@ function pickSlash(i){
 function hideSlash(){ $('#slashMenu').classList.remove('on'); _slashActive=false; }
 
 // ============ 长按互动环 ============
-let lpTimer=null;
+let lpTimer=null; let _lpStart=null;
+function cancelLongPress(){ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } _lpStart=null; }
 function attachLongPress(el, m){
   const open=(x,y)=>showActRing(x,y,m);
   el.addEventListener('contextmenu',e=>{ e.preventDefault(); open(e.clientX,e.clientY); });
-  el.addEventListener('touchstart',e=>{ lpTimer=setTimeout(()=>{ const t=e.touches[0]; open(t.clientX,t.clientY); },480); },{passive:true});
-  el.addEventListener('touchend',()=>clearTimeout(lpTimer));
-  el.addEventListener('touchmove',()=>clearTimeout(lpTimer));
+  el.addEventListener('touchstart',e=>{
+    // ★ 多指手势(截屏/缩放等)不触发长按菜单——避免手机手势截屏时误弹互动环
+    if(e.touches.length>1){ cancelLongPress(); return; }
+    const t=e.touches[0]; _lpStart={x:t.clientX,y:t.clientY};
+    lpTimer=setTimeout(()=>{ if(_lpStart) open(_lpStart.x,_lpStart.y); },480);
+  },{passive:true});
+  el.addEventListener('touchmove',e=>{
+    // 多指 或 位移超 12px → 当作滞动/手势, 取消长按
+    if(e.touches.length>1){ cancelLongPress(); return; }
+    const t=e.touches[0];
+    if(_lpStart && (Math.abs(t.clientX-_lpStart.x)>12 || Math.abs(t.clientY-_lpStart.y)>12)) cancelLongPress();
+  },{passive:true});
+  el.addEventListener('touchend',cancelLongPress);
+  el.addEventListener('touchcancel',cancelLongPress);
 }
+// ★ 截屏/切后台时系统 UI 介入会让页面失焦/隐藏 → 取消待弹长按 + 关掉已开的互动环，防“截屏误触菜单”
+window.addEventListener('blur',()=>{ cancelLongPress(); try{ hideActRing(); }catch(_){} },{passive:true});
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ cancelLongPress(); try{ hideActRing(); }catch(_){} } });
 function showActRing(x,y,m){
   const ring=$('#actRing');
   const isMine = m.user_id===myUid;
