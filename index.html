@@ -85,6 +85,9 @@
     --card-bg-soft:rgba(255,255,255,.55);
     --mask:rgba(28,38,66,.32);
     --hover:rgba(40,70,150,.07);
+    --bubble-bg:#FFFFFF;                    /* 日间气泡底：不透明白底，防背景网格透出来干扰正文 */
+    --bubble-border:rgba(60,80,140,.22);
+    --bubble-me-bg:linear-gradient(120deg,#EAF7F5,#EFEAFB);   /* 自己气泡: 不透明深度渐变, 深字清楚 */
     --btn-ink:#FFFFFF;
     --shadow-lg:rgba(60,80,140,.20);
     --shadow-md:rgba(60,80,140,.14);
@@ -375,14 +378,14 @@
   .msg .reply-ref{font-size:11px;color:var(--dim);border-left:2px solid var(--line2);padding:2px 8px;margin:2px 0;
     background:var(--hover);border-radius:0 6px 6px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .msg .txt{font-size:14.5px;line-height:1.6;margin-top:3px;color:var(--ink);word-break:break-word;overflow-wrap:anywhere;max-width:100%;
-    background:var(--hover);padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--line);position:relative;
+    background:var(--bubble-bg, var(--hover));padding:8px 12px;border-radius:4px 12px 12px 12px;display:inline-block;border:1px solid var(--bubble-border, var(--line));position:relative;
     -webkit-user-select:none;user-select:none}
   /* 纯表情消息: 放大、去气泡背景/边框(同 iMessage/微信), 让"发出来的表情"在消息流里明显留底 */
   .msg .txt.emoji-only{font-size:34px;line-height:1.2;background:none;border:none;padding:2px 0}
   .msg.me{flex-direction:row-reverse}
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
-  .msg.me .txt{border-radius:12px 4px 12px 12px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent));border-color:var(--line2)}
+  .msg.me .txt{border-radius:12px 4px 12px 12px;background:var(--bubble-me-bg, linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent)));border-color:var(--bubble-border, var(--line2))}
   .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
   .msg.projmsg .txt{background:color-mix(in srgb,var(--violet) 8%,var(--card-bg));border-color:color-mix(in srgb,var(--violet) 26%,transparent)}
@@ -871,7 +874,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1408';
+  var BUILD_VER='20260712-1428';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
