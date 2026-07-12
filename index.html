@@ -989,12 +989,13 @@
   @media(prefers-reduced-motion:reduce){
     .cursor-trail,.type-spark,#warp,#soundwave,.mood-aura{display:none!important}
   }
-  /* 建私密房时"叫狼姐来"选项 */
-  .wolf-invite{display:flex;align-items:center;gap:8px;margin:12px 0 4px;padding:9px 12px;border-radius:10px;cursor:pointer;
+  /* 房间设置里"叫狼姐陪聊"开关(仅私密房) */
+  .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:10px 12px;border-radius:10px;cursor:pointer;
     background:color-mix(in srgb,var(--magenta,#FF3CAC) 8%,transparent);border:1px solid color-mix(in srgb,var(--magenta,#FF3CAC) 25%,transparent);
-    font-size:12.5px;color:var(--ink);user-select:none;transition:.15s}
-  .wolf-invite:hover{border-color:color-mix(in srgb,var(--magenta,#FF3CAC) 45%,transparent)}
-  .wolf-invite input{width:16px;height:16px;accent-color:var(--magenta,#FF3CAC);flex-shrink:0;cursor:pointer}
+    font-size:13px;color:var(--ink);user-select:none;transition:.15s}
+  .wolf-toggle:hover{border-color:color-mix(in srgb,var(--magenta,#FF3CAC) 45%,transparent)}
+  .wolf-toggle i{display:block;font-style:normal;font-size:11px;color:var(--sub);margin-top:2px}
+  .wolf-toggle input{width:18px;height:18px;accent-color:var(--magenta,#FF3CAC);flex-shrink:0;cursor:pointer}
   /* 名场面(回声墙) */
   .wall-modal{max-width:440px}
   /* 列表高度: 用 dvh(移动端地址栏收缩不跳变) + clamp 保底, 让它在超小屏/横屏都不溢出;
@@ -1199,7 +1200,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
       <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
       <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
-      <label class="wolf-invite" id="wolfInviteWrap" style="display:none"><input type="checkbox" id="wolfInvite"><span>🐺 叫狼姐来陪你(私密房里她会放开聊)</span></label>
+      <p class="modal-sub" id="wolfHintCreated" style="display:none;font-size:11.5px;opacity:.8">想让狼姐来陪聊？进房后点右上角 ⚙️ 房间设置开启 🐺</p>
       <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
@@ -4421,13 +4422,19 @@ async function openGear(){
   ]);
   if(roomRow){ if(roomRow.name) curRoom.name=roomRow.name; curRoom.topic=roomRow.topic||''; }
   const body=$('#gearBody');
+  const isPriv = curRoom.kind==='private';
+  const wolfOn = isPriv && (curRoom.topic||'')==='@wolf';   // 私密房用 topic=@wolf 标记"已邀请狼姐"
+  // 私密房: 不显示公告(双人房用不上), 改显示"叫狼姐陪聊"开关; 公开房: 正常显示公告
+  const infoInner = isPriv
+    ? `<label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+       <label class="wolf-toggle"><span>🐺 叫狼姐来陪你 <i>私密房里她会放开撩</i></span><input type="checkbox" id="gWolf" ${wolfOn?'checked':''}></label>
+       <button class="dbtn" id="gSaveBtn">保存修改</button>`
+    : `<label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+       <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
+       <button class="dbtn" id="gSaveBtn">保存修改</button>`;
   body.innerHTML=`
     <div class="dsec"><div class="dl">房间信息</div>
-      <div class="dcard">
-        <label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
-        <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
-        <button class="dbtn" id="gSaveBtn">保存修改</button>
-      </div></div>
+      <div class="dcard">${infoInner}</div></div>
     <div class="dsec"><div class="dl">成员 (${(members||[]).length})</div>
       <div class="member-list">${(members||[]).map(mm=>`
         <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;color:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
@@ -4438,14 +4445,20 @@ async function openGear(){
       <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`;
   applyTextConfig();  // 重新应用文案到引入的动态元素
   $('#gSaveBtn').onclick=async()=>{
-    const name=$('#gRoomName').value.trim(), topic=$('#gRoomTopic').value.trim();
+    const name=$('#gRoomName').value.trim();
     if(!name){ toast(EH_CONFIG.text.err_roomNameEmpty); return; }
+    // 私密房: topic 复用为狼姐标记(@wolf 或空); 公开房: topic 是公告
+    let topic;
+    if(isPriv){ topic = $('#gWolf') && $('#gWolf').checked ? '@wolf' : ''; }
+    else { topic = ($('#gRoomTopic').value||'').trim(); }
     const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
     if(error){ toast(EH_CONFIG.text.err_saveFail); return; }
     curRoom.name=name; curRoom.topic=topic;
+    // 私密房关掉狼姐 → 立刻删她成员行(房主可删; worker 下轮不再驻守)。开启由 worker 扫 @wolf 加成员。
+    if(isPriv && topic!=='@wolf'){ try{ await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id','ca72217f-7157-47f6-b540-049074bf06dd'); }catch(e){} }
     { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
     $('#hallNameTxt').innerHTML=`${esc(name)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
-    toast(EH_CONFIG.text.ok_saved); closeGear();
+    toast(isPriv && topic==='@wolf' ? '已叫狼姐来，稍等她就进房~' : EH_CONFIG.text.ok_saved); closeGear();
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
     if(!await ehConfirm('确定踢出该成员？','踢出成员')) return;
@@ -4803,17 +4816,10 @@ async function createRoom(){
   // 房主入成员表
   await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
   createdRoom=room;
-  const wolfWrap=$('#wolfInviteWrap'), wolfChk=$('#wolfInvite');
-  if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfWrap){ wolfWrap.style.display='flex'; if(wolfChk) wolfChk.checked=false; } }
-  else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; if(wolfWrap) wolfWrap.style.display='none'; }
+  const wolfHint=$('#wolfHintCreated');
+  if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfHint) wolfHint.style.display='block'; }
+  else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; if(wolfHint) wolfHint.style.display='none'; }
   openModal('mCreated');
-}
-// 邀请狼姐进私密房: eh_members RLS 只允许插自己, 房主插不了狼姐 → 改在房间打标记 topic='@wolf'
-// (房主可改自己房的 topic), worker(service_role 绕 RLS)扫到标记→自动把狼姐加成员+在此房陪聊。
-async function inviteWolfTo(roomId){
-  if(!roomId) return;
-  try{ await sb.from('eh_rooms').update({topic:'@wolf'}).eq('id',roomId); }
-  catch(e){ console.warn('invite wolf',e); }
 }
 async function joinByCode(){
   const code=$('#codeIn').value.trim().toUpperCase();
@@ -5061,7 +5067,7 @@ on('modalMask','click',e=>{ if(e.target===$('#modalMask')) closeModal(); });
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
 on('doCreateBtn','click',()=>createRoom());
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };
-on('enterCreatedBtn','click',async ()=>{ const wolf=$('#wolfInvite'); if(createdRoom && createdRoom.kind==='private' && wolf && wolf.checked){ await inviteWolfTo(createdRoom.id); } closeModal(); if(createdRoom) enterRoom(createdRoom); });
+on('enterCreatedBtn','click',()=>{ closeModal(); if(createdRoom) enterRoom(createdRoom); });
 on('doJoinBtn','click',()=>joinByCode());
 on('codeIn','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();joinByCode();} });
 $('#rpX').onclick=()=>clearReply();
