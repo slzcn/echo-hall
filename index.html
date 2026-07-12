@@ -372,6 +372,20 @@
   /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
   .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
   .tool-btn.active,.me-btn.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
+
+  /* BGM 按钮特化: 跟随主题色 + 播放态律动脉冲 + 静音态灰化+斜杠 */
+  #bgmBtnHall{position:relative;overflow:visible}
+  #bgmBtnHall svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  #bgmBtnHall:not(.muted){color:var(--accent,var(--cyan));border-color:color-mix(in srgb,var(--accent,var(--cyan)) 40%,var(--line))}
+  #bgmBtnHall:not(.muted) .bgm-wave-1{animation:bgmWave1 1.2s ease-in-out infinite}
+  #bgmBtnHall:not(.muted) .bgm-wave-2{animation:bgmWave2 1.2s ease-in-out infinite .3s}
+  #bgmBtnHall.muted{color:var(--sub);opacity:.72}
+  #bgmBtnHall.muted .bgm-wave-1,#bgmBtnHall.muted .bgm-wave-2{display:none}
+  #bgmBtnHall .bgm-slash{display:none;stroke:currentColor;stroke-width:2}
+  #bgmBtnHall.muted .bgm-slash{display:inline}
+  @keyframes bgmWave1{0%,100%{opacity:.35;transform:translateX(0)}50%{opacity:1;transform:translateX(.4px)}}
+  @keyframes bgmWave2{0%,100%{opacity:.25;transform:translateX(0)}50%{opacity:.85;transform:translateX(.6px)}}
+  html[data-mode="day"] #bgmBtnHall:not(.muted){color:var(--accent-day,#0C8E82);border-color:color-mix(in srgb,var(--accent-day,#0C8E82) 40%,var(--line))}
   .gear.active{color:var(--amber);border-color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent)}  /* 齿轮用琥珀主色, 与其 hover 一致 */
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
@@ -995,7 +1009,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-2317';
+  var BUILD_VER='20260712-2332';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1101,7 +1115,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       </div>
       <div class="hall-tools">
         <div class="tool-btn" id="wallBtn" title="名场面 · 本房高共鸣消息">✨</div>
-        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm">🔊</div>
+        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 8v8" class="bgm-wave-1"/><path d="M12 6v12M16 8v8M20 10v4" class="bgm-wave-2"/><line class="bgm-slash" x1="4" y1="4" x2="20" y2="20"/></svg></div>
         <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="gear" id="gearBtn" title="房间设置" data-txt-title="titleRoomSet">⚙️</div>
         <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
@@ -1354,91 +1368,16 @@ const EH_CONFIG_DEFAULT = {
   roomKindC: { public:'#4DE38A', private:'#8B5CFF', official:'#28E6D8' },
   // 官方房 BGM(分层合成器格式: bpm/steps/loopBars/layers.lead|bass|pad|kick|hat)
   //  闲聊广场: C大调五声 8-bit pop / 深夜电台: Fm7 蒸汽波lo-fi无鼓 / 技术黑话: Am极简techno / 虚空回音: E lydian ambient铃音
+  // 官方房 BGM(MiniMax music-2.6 生成的真实音频, 存 Supabase Storage/eh-song/bgm/)
+  // 官方房按 name 精确绑; public/private 走 _fallback (支持任意用户建的公共/私密房)
   roomBgm: {
-    '闲聊广场':{
-      name:'8-bit 明亮 pop',
-      bpm:108, steps:16, stepSubdiv:4, loopBars:4,
-      layers:{
-        lead:{ wave:'square', vol:0.09, cutoff:2400, attack:0.005, release:0.12,
-          notes:[
-            72,0,76,0, 79,0,76,72, 74,0,72,0, 67,0,69,0,
-            76,0,79,0, 84,0,79,76, 74,72,0,74, 76,0,0,0,
-            72,74,76,79, 76,74,72,0, 67,69,72,74, 72,0,67,0,
-            76,79,76,72, 74,72,69,67, 72,0,0,0, 0,0,0,0,
-          ]},
-        bass:{ wave:'triangle', vol:0.11, cutoff:900, attack:0.005, release:0.18,
-          notes:[
-            48,52,55,52, 48,52,55,52, 48,52,55,52, 48,52,55,52,
-            53,57,60,57, 53,57,60,57, 53,57,60,57, 53,57,60,57,
-            50,53,57,53, 50,53,57,53, 50,53,57,53, 50,53,57,53,
-            55,59,62,59, 55,59,62,59, 55,59,62,59, 55,59,62,59,
-          ]},
-        pad:{ wave:'triangle', vol:0.05, cutoff:1200, attack:0.5, release:1.2, sustain:true,
-          chords:[ [60,64,67,72], [65,69,72,77], [62,65,69,74], [67,71,74,79] ]},
-        hat:{ vol:0.03, everyStep:2 },
-      },
-    },
-    '深夜电台':{
-      name:'lo-fi 蒸汽波',
-      bpm:72, steps:16, stepSubdiv:4, loopBars:4,
-      layers:{
-        lead:{ wave:'sine', vol:0.08, cutoff:1600, attack:0.02, release:0.6, detune:8, dualOsc:true,
-          notes:[
-            77,0,0,0, 80,0,77,0, 75,0,73,0, 68,0,70,0,
-            0,73,0,75, 77,0,80,0, 82,0,80,0, 77,0,0,0,
-            75,0,0,73, 70,0,68,0, 68,0,70,0, 73,0,75,0,
-            77,0,80,82, 80,0,77,0, 75,0,73,70, 68,0,0,0,
-          ]},
-        bass:{ wave:'sine', vol:0.14, cutoff:400, attack:0.03, release:0.8,
-          notes:[
-            41,0,0,0, 0,0,0,0, 41,0,0,0, 0,0,0,0,
-            44,0,0,0, 0,0,0,0, 44,0,0,0, 0,0,0,0,
-            46,0,0,0, 0,0,0,0, 46,0,0,0, 0,0,0,0,
-            39,0,0,0, 0,0,0,0, 39,0,0,0, 0,0,0,0,
-          ]},
-        pad:{ wave:'sine', vol:0.06, cutoff:700, attack:1.5, release:2.5, sustain:true,
-          chords:[ [53,56,60,63], [56,60,63,68], [58,63,68,70], [51,56,60,63] ]},
-      },
-    },
-    '技术黑话':{
-      name:'极简 techno drone',
-      bpm:96, steps:16, stepSubdiv:4, loopBars:2,
-      layers:{
-        lead:{ wave:'square', vol:0.06, cutoff:1800, attack:0.002, release:0.06,
-          notes:[
-            69,0,0,0, 72,0,74,0, 76,0,74,72, 69,0,67,0,
-            69,0,72,0, 74,0,76,0, 79,76,74,72, 69,0,0,0,
-          ]},
-        bass:{ wave:'sawtooth', vol:0.10, cutoff:500, attack:0.01, release:0.15,
-          notes:[
-            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
-            33,33,0,33, 33,0,33,33, 33,33,0,33, 33,0,33,33,
-          ]},
-        kick:{ vol:0.14, pattern:[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
-        hat:{ vol:0.04, everyStep:2 },
-      },
-    },
-    '虚空回音':{
-      name:'ambient 铃音',
-      bpm:60, steps:16, stepSubdiv:4, loopBars:4,
-      layers:{
-        lead:{ wave:'sine', vol:0.07, cutoff:3200, attack:0.01, release:1.4, echo:true, echoDelay:0.35, echoGain:0.5,
-          notes:[
-            76,0,0,0, 0,0,80,0, 0,0,0,0, 83,0,0,0,
-            0,0,78,0, 0,0,0,0, 82,0,0,0, 0,0,85,0,
-            88,0,0,0, 0,80,0,0, 0,0,78,0, 0,0,0,0,
-            76,0,0,0, 0,0,73,0, 71,0,0,0, 0,0,0,0,
-          ]},
-        bass:{ wave:'sine', vol:0.08, cutoff:300, attack:2.0, release:3.0,
-          notes:[
-            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
-            42,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
-            44,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
-            40,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
-          ]},
-        pad:{ wave:'sine', vol:0.05, cutoff:2200, attack:2.5, release:4.0, sustain:true,
-          chords:[ [64,68,71,75], [66,70,73,76], [68,71,75,78], [64,68,71,75] ]},
-      },
+    '闲聊广场':{ name:'8-bit 明亮 chiptune', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3' },
+    '深夜电台':{ name:'lo-fi 蒸汽波', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
+    '技术黑话':{ name:'极简 techno', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3' },
+    '虚空回音':{ name:'空灵 ambient', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3' },
+    _fallback:{
+      public: { name:'温暖夜晚 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3' },
+      private:{ name:'温馨 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
     },
   },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
@@ -1883,193 +1822,69 @@ function ehRipple(el, ev){
 }
 
 const AudioEngine=(function(){
-  let ctx=null, master=null, running=false, cur=null;
-  let scheduler=null, nextTime=0, curStep=0;
-  let voices=[]; // 活跃振荡器/增益列表, 便于 stop 时清理
+  // 用 HTMLAudioElement 循环播放 mp3 BGM (替代之前的 Web Audio 合成器)
+  // 接口保持不变: start(cfg)/stop()/resume()/playing()/curName()/duck(on)
+  let el=null, cur=null, fadeTimer=null;
+  const VOL_ON=0.55, VOL_DUCK=0.12, FADE_MS=1000;
   function ensure(){
-    if(!ctx){
+    if(!el){
       try{
-        ctx=new (window.AudioContext||window.webkitAudioContext)();
-        master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);
-      }catch(e){ ctx=null; }
+        el=new Audio(); el.loop=true; el.preload='auto'; el.crossOrigin='anonymous';
+        el.volume=0;
+        el.addEventListener('error',()=>{ /* 静默, BGM 非必需, 不阻断房间体验 */ });
+      }catch(e){ el=null; }
     }
-    return ctx;
+    return el;
   }
-  function midiHz(m){ return 440*Math.pow(2,(m-69)/12); }   // MIDI音高→Hz(内联, 原_mtof helper随roomBgm旧格式回退时丢了)
-  function playTone(t, freq, dur, wave, vol, cutoff, attack, release, opts){
-    if(!ctx) return;
-    opts=opts||{};
-    const dest=ctx.createGain(); dest.gain.value=1; dest.connect(master);
-    function mkOsc(detune){
-      const o=ctx.createOscillator(); o.type=wave; o.frequency.value=freq;
-      if(detune) o.detune.value=detune;
-      const g=ctx.createGain(); g.gain.value=0;
-      const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=cutoff||3000;
-      o.connect(lp); lp.connect(g); g.connect(dest);
-      const a=attack||0.005, r=release||0.15;
-      g.gain.setValueAtTime(0,t);
-      g.gain.linearRampToValueAtTime(vol, t+a);
-      g.gain.setValueAtTime(vol, t+Math.max(a, dur-r));
-      g.gain.linearRampToValueAtTime(0.0001, t+dur+r);
-      o.start(t); o.stop(t+dur+r+0.05);
-      voices.push(o,g,lp);
-    }
-    mkOsc(0);
-    if(opts.dualOsc) mkOsc(opts.detune||7);
-    if(opts.echo){
-      // 简易模拟延迟: 定时补一个弱化 osc
-      const et=t+opts.echoDelay;
-      const eo=ctx.createOscillator(); eo.type=wave; eo.frequency.value=freq;
-      const eg=ctx.createGain(); eg.gain.value=0;
-      const elp=ctx.createBiquadFilter(); elp.type='lowpass'; elp.frequency.value=(cutoff||3000)*0.7;
-      eo.connect(elp); elp.connect(eg); eg.connect(dest);
-      const ea=attack||0.005, er=release||0.15, ev=vol*(opts.echoGain||0.4);
-      eg.gain.setValueAtTime(0,et);
-      eg.gain.linearRampToValueAtTime(ev, et+ea);
-      eg.gain.setValueAtTime(ev, et+Math.max(ea, dur-er));
-      eg.gain.linearRampToValueAtTime(0.0001, et+dur+er);
-      eo.start(et); eo.stop(et+dur+er+0.05);
-      voices.push(eo,eg,elp);
-    }
-  }
-  function playKick(t, vol){
-    if(!ctx) return;
-    const o=ctx.createOscillator(); o.type='sine';
-    const g=ctx.createGain(); g.gain.value=0;
-    o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40, t+0.15);
-    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.005);
-    g.gain.exponentialRampToValueAtTime(0.001, t+0.28);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.35);
-    voices.push(o,g);
-  }
-  function playHat(t, vol){
-    if(!ctx) return;
-    // 白噪短促: 用 bufferSource
-    const len=Math.floor(ctx.sampleRate*0.05);
-    const buf=ctx.createBuffer(1,len,ctx.sampleRate);
-    const ch=buf.getChannelData(0);
-    for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*(1-i/len);
-    const src=ctx.createBufferSource(); src.buffer=buf;
-    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=6000;
-    const g=ctx.createGain(); g.gain.value=vol;
-    src.connect(hp); hp.connect(g); g.connect(master);
-    src.start(t); src.stop(t+0.06);
-    voices.push(src,g,hp);
+  function fadeTo(target, ms){
+    if(!el) return;
+    if(fadeTimer){ clearInterval(fadeTimer); fadeTimer=null; }
+    const from=el.volume, to=Math.max(0,Math.min(1,target)), steps=Math.max(1,Math.round(ms/40));
+    let n=0;
+    fadeTimer=setInterval(()=>{
+      n++; const k=n/steps; el.volume=from+(to-from)*k;
+      if(n>=steps){ clearInterval(fadeTimer); fadeTimer=null; el.volume=to; if(to===0){ try{el.pause();}catch(_){}} }
+    },40);
   }
   function playCfg(cfg){
-    if(!ensure()) return;
-    // 防御: 该合成器要求分层格式(bpm/steps/loopBars/layers). 若拿到旧简单格式(root/chord/wave)或缺字段,
-    // 直接静默跳过, 绝不让 BGM 配置不匹配把进房流程(startRoomBGM 在 enterRoom 里同步调)带崩。
-    if(!cfg || !cfg.layers || !cfg.bpm || !cfg.steps || !cfg.loopBars){ stopInternal(false); return; }
-    stopInternal(false);
+    if(!cfg||!cfg.url) return;
+    ensure(); if(!el) return;
+    if(cur && cur.url===cfg.url && !el.paused){ /* 已在播同一首, 恢复音量即可 */ fadeTo(VOL_ON,FADE_MS); cur=cfg; return; }
     cur=cfg;
-    try{ ctx.resume&&ctx.resume(); }catch(e){}
-    running=true;
-    const stepSec=60/cfg.bpm/cfg.stepSubdiv;   // 1 步秒数
-    const totalSteps=cfg.steps*cfg.loopBars;   // 一个 loop 总步数
-    curStep=0; nextTime=ctx.currentTime+0.1;
-    // 淡入
-    const t0=ctx.currentTime;
-    master.gain.cancelScheduledValues(t0);
-    master.gain.setValueAtTime(master.gain.value,t0);
-    master.gain.linearRampToValueAtTime(0.75, t0+1.2);
-    // 调度器: 每 25ms 检查, 提前 200ms 排音符
-    function tick(){
-      if(!running) return;
-      while(nextTime < ctx.currentTime+0.2){
-        scheduleStep(cfg, curStep, nextTime, stepSec);
-        curStep=(curStep+1)%totalSteps;
-        nextTime += stepSec;
-      }
-      scheduler=setTimeout(tick, 25);
-    }
-    tick();
-  }
-  function scheduleStep(cfg, step, t, stepSec){
-    const L=cfg.layers;
-    // lead
-    if(L.lead && L.lead.notes){
-      const m=L.lead.notes[step];
-      if(m){
-        // 音符持续到下一个非 0 音符
-        let dur=stepSec;
-        for(let i=1;i<8;i++){
-          const nxt=L.lead.notes[(step+i)%L.lead.notes.length];
-          if(nxt) break;
-          dur+=stepSec;
-        }
-        playTone(t, midiHz(m), dur*0.9, L.lead.wave, L.lead.vol, L.lead.cutoff,
-          L.lead.attack, L.lead.release, {dualOsc:L.lead.dualOsc, detune:L.lead.detune, echo:L.lead.echo, echoDelay:L.lead.echoDelay, echoGain:L.lead.echoGain});
-      }
-    }
-    // bass
-    if(L.bass && L.bass.notes){
-      const m=L.bass.notes[step];
-      if(m){
-        playTone(t, midiHz(m), stepSec*0.85, L.bass.wave, L.bass.vol, L.bass.cutoff,
-          L.bass.attack, L.bass.release, {});
-      }
-    }
-    // pad: 每小节第 0 步触发新和弦, 长度=1小节
-    if(L.pad && L.pad.chords){
-      if(step % cfg.steps === 0){
-        const barIdx=Math.floor(step/cfg.steps)%L.pad.chords.length;
-        const chord=L.pad.chords[barIdx];
-        const dur=stepSec*cfg.steps;
-        chord.forEach(m=>{
-          playTone(t, midiHz(m), dur, L.pad.wave, L.pad.vol/chord.length, L.pad.cutoff,
-            L.pad.attack, L.pad.release, {});
-        });
-      }
-    }
-    // kick pattern
-    if(L.kick && L.kick.pattern){
-      if(L.kick.pattern[step % L.kick.pattern.length]) playKick(t, L.kick.vol);
-    }
-    // hat 每 N 步
-    if(L.hat && L.hat.everyStep){
-      if(step % L.hat.everyStep === 0) playHat(t, L.hat.vol);
-    }
-  }
-  function stopInternal(fade){
-    running=false;
-    if(scheduler){ clearTimeout(scheduler); scheduler=null; }
-    if(ctx && master && fade){
-      const t=ctx.currentTime;
-      master.gain.cancelScheduledValues(t);
-      master.gain.setValueAtTime(master.gain.value, t);
-      master.gain.linearRampToValueAtTime(0, t+0.6);
-    }
-    setTimeout(()=>{
-      voices.forEach(n=>{ try{n.stop&&n.stop();}catch(e){} try{n.disconnect&&n.disconnect();}catch(e){} });
-      voices=[];
-    }, fade?700:0);
-    cur=null;
+    try{ el.pause(); }catch(_){}
+    el.src=cfg.url;
+    el.volume=0;
+    const pr=el.play();
+    if(pr && pr.catch) pr.catch(()=>{ /* autoplay policy 拦住; 首次交互后由 resume() 再触发 */ });
+    fadeTo(VOL_ON,FADE_MS);
   }
   return {
     start(cfg){ if(!bgmOn()) return; playCfg(cfg); },
-    stop(){ stopInternal(true); },
-    resume(){ if(ctx){ try{ctx.resume();}catch(e){} } },
-    playing(){ return !!cur; },
+    stop(){ if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
+    resume(){ if(!el||!cur) return; if(el.paused){ try{el.play();}catch(_){} } },
+    playing(){ return !!(el && cur && !el.paused); },
     curName(){ return cur?cur.name:null; },
-    // 闪避: 神曲播放时把 BGM 压低, 结束再恢复(仅在 BGM 正在播时生效; 0.75 与 v2 淡入基准一致)
-    duck(on){ if(!ctx||!master||!cur) return; const t=ctx.currentTime;
-      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t);
-      master.gain.linearRampToValueAtTime(on?0.14:0.75, t+0.25); },
+    // 神曲播放时把 BGM 压低, 结束再恢复
+    duck(on){ if(!el||!cur) return; fadeTo(on?VOL_DUCK:VOL_ON, 300); },
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.textContent=on?'🔊':'🔇'; b2.classList.toggle('muted',!on); } try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); const b2=$('#bgmBtnHall'); if(b2){ b2.classList.toggle('muted',!on); } try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
 function startRoomBGM(room){
   try{
     if(!bgmOn()) return;
-    if(room && room.kind==='official' && ROOM_BGM[room.name]) AudioEngine.start(ROOM_BGM[room.name]);
-    else AudioEngine.stop();
+    if(!room){ AudioEngine.stop(); return; }
+    // 官方房按 name 精确绑, 公共/私密房走 _fallback (支持任意用户建的房间)
+    let cfg=null;
+    if(room.kind==='official' && ROOM_BGM[room.name]) cfg=ROOM_BGM[room.name];
+    else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public) cfg=ROOM_BGM._fallback.public;
+    else if(room.kind==='private' && ROOM_BGM._fallback && ROOM_BGM._fallback.private) cfg=ROOM_BGM._fallback.private;
+    if(cfg) AudioEngine.start(cfg); else AudioEngine.stop();
   }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
 function initBgmUI(){
   const b2=$('#bgmBtnHall'); if(!b2) return;
-  b2.textContent=bgmOn()?'🔊':'🔇'; b2.classList.toggle('muted',!bgmOn());
+  b2.classList.toggle('muted',!bgmOn());
   b2.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
 }
 
@@ -2148,7 +1963,6 @@ function initThemeUI(){
   // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
   const bhall=$('#bgmBtnHall');
   if(bhall){
-    bhall.textContent=bgmOn()?'🔊':'🔇';
     bhall.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
   }
   applyTheme(currentTheme());
