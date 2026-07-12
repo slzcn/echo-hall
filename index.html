@@ -480,9 +480,9 @@
   .msg.soul .av .soul-dot,.pav .av-ic .soul-dot{position:absolute;right:4px;bottom:3px;font-size:6px;line-height:1;font-weight:600;letter-spacing:0;
     font-style:normal;color:var(--soul-c,var(--violet));text-shadow:0 0 2px var(--name-halo),0 0 3px var(--name-halo);z-index:3;pointer-events:none}
   .pav .av-ic{position:relative}
-  /* 狼姐专属：头像右上角一个红点(消息头像 + 光墙头像通用) */
-  .av-bow{position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;z-index:4;pointer-events:none;
-    background:#FF3B5C;border:1.5px solid var(--panel-solid,#0b0e1a);box-shadow:0 0 5px 1px rgba(255,59,92,.75)}
+  /* 狼姐专属：脑门上一个极小的红点(消息头像 + 光墙头像通用) */
+  .av-bow{position:absolute;left:50%;top:5px;transform:translateX(-50%);width:3.5px;height:3.5px;border-radius:50%;z-index:4;pointer-events:none;
+    background:#FF3B5C;box-shadow:0 0 3px 0.5px rgba(255,59,92,.85)}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
     border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
