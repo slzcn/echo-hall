@@ -969,7 +969,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1900';
+  var BUILD_VER='20260712-1910';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3146,8 +3146,18 @@ function insertAtName(name){
   if(!name) return;
   const inp=$('#cin');
   const cur=inp.value;
-  // 已经 @过就不重复插
-  if(cur.includes('@'+name+' ')){ inp.focus(); return; }
+  // ★ toggle: 已经 @过该人 → 再点就取消(移除那个 @提及)
+  const tag='@'+name+' ';
+  if(cur.includes(tag)){
+    // 移除首个该 @标签 + 它前导的单个空格(若有), 并把连接处多余空白收拢
+    let v=cur.replace(new RegExp('\\s?'+'@'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s'), ' ');
+    v=v.replace(/\s{2,}/g,' ').replace(/^\s+/,'');
+    inp.value=v;
+    inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+    syncSendBtn();
+    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+    return;
+  }
   const sep = (cur && !/\s$/.test(cur)) ? ' ' : '';
   inp.value = cur + sep + '@' + name + ' ';
   inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
