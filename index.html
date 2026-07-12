@@ -1004,8 +1004,8 @@
 })();
 </script>
 <script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
-<script>/* 首屏外观模式: auto(跟随系统深浅色)/day/night, 提前定 data-mode 避免闪白 */
-try{var _m=localStorage.getItem('eh_mode')||'auto';var _day=(_m==='day')||(_m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches);if(_day)document.documentElement.setAttribute('data-mode','day');else document.documentElement.setAttribute('data-mode','night');}catch(e){}</script>
+<script>/* 首屏外观模式: auto(按本地时间自动日/夜)/day/night, 提前定 data-mode 避免闪白 */
+try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();var _day=(_m==='day')||(_m==='auto'&&_h>=7&&_h<19);if(_day)document.documentElement.setAttribute('data-mode','day');else document.documentElement.setAttribute('data-mode','night');}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
 <div id="particles"></div>
@@ -2061,7 +2061,8 @@ function resolveDay(mode){
   mode=mode||currentMode();
   if(mode==='day') return true;
   if(mode==='night') return false;
-  return !!(window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);  // auto
+  // auto: 按本地时间自动切日/夜——白天 7:00-18:59 日间, 其余时间夜间(符合"自动日间/夜间"字面直觉)
+  try{ const h=new Date().getHours(); return h>=7 && h<19; }catch(e){ return false; }
 }
 function applyMode(mode){
   const day=resolveDay(mode);
@@ -2073,12 +2074,13 @@ function pickMode(mode){
   try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
   applyMode(mode);
 }
-// auto 模式实时跟随系统深浅色切换
-if(window.matchMedia){
-  try{ matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()=>{ if(currentMode()==='auto') applyMode('auto'); }); }catch(e){
-    try{ matchMedia('(prefers-color-scheme: light)').addListener(()=>{ if(currentMode()==='auto') applyMode('auto'); }); }catch(_){}
-  }
-}
+// auto 模式按时间切日/夜: 定时检查, 跨过 7点/19点边界自动切换(当前 data-mode 与应为值不一致才重新 apply, 避免频繁无意义重绘)
+setInterval(()=>{
+  if(currentMode()!=='auto') return;
+  const shouldDay=resolveDay('auto');
+  const isDay=document.documentElement.getAttribute('data-mode')==='day';
+  if(shouldDay!==isDay) applyMode('auto');
+}, 60*1000);
 function applyTheme(id){
   if(!THEMES.some(t=>t.id===id)) id='cyber';
   if(id==='cyber') document.documentElement.removeAttribute('data-theme');
