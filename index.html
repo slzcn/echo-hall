@@ -114,6 +114,11 @@
     --cyan:#7B2FD9; --magenta:#9B4DE0; --violet:#6A2FE0; --amber:#D98A1F; --green:#7B4DD9; --accent:#7B2FD9;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* ★ 禁掉按钮/可交互元素点击后的浏览器默认黑色 focus outline(手机上一点就出一圈黑边),
+     保留 :focus-visible(仅键盘 tab 导航触发, 触屏/鼠标点击不触发) 的主题色描边保无障碍。 */
+  button,[role="button"],.song-play,.tool-btn,.me-btn,.plus-btn,.emoji-btn{outline:none}
+  button:focus,[role="button"]:focus,.song-play:focus{outline:none}
+  button:focus-visible,.song-play:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:2px}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
   html{width:100%}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
@@ -1016,7 +1021,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-0013';
+  var BUILD_VER='20260713-0025';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
