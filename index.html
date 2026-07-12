@@ -592,6 +592,10 @@
   .song-card.pending{opacity:.75}
   .song-card.pending .song-play{cursor:wait;border-color:var(--sub);background:transparent}
   .song-card.pending .song-play:hover{background:transparent;box-shadow:none}
+  .song-card.failed{opacity:.85}
+  .song-card.failed .song-play{cursor:pointer;border-color:var(--magenta);color:var(--magenta)}
+  .song-card.failed .song-play::before{content:'↻';font-size:14px}
+  .song-card.failed .song-eq i{animation:none;opacity:.3;background:var(--magenta)}
   .song-card.loading .song-play{position:relative;cursor:wait}
   .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
   .song-spinner{display:inline-block;width:12px;height:12px;border:1.5px solid transparent;border-top-color:var(--sc,var(--magenta));border-radius:50%;animation:songSpin .8s linear infinite}
@@ -3363,12 +3367,14 @@ function parseSong(text){
   const t=String(text||''); const parts=t.split('|');
   if(parts.length>=2 && SONG_STYLES.some(s=>s.id===parts[0])){
     const sid=parts[0];
-    // 兼容旧格式: parts.length==2 时 parts[1] 直接是明文 lyric
-    // 新格式: parts.length>=5 时 parts[1] 是 encodeURIComponent 过的
-    let lyric=parts[1];
-    if(parts.length>=5){ try{ lyric=decodeURIComponent(parts[1]); }catch(_){} }
-    const songUrl=parts[2]||''; const chStart=parseFloat(parts[3]||'0')||0; const chEnd=parseFloat(parts[4]||'0')||0;
-    return { sid, lyric, songUrl, chorusStart:chStart, chorusEnd:chEnd, ready:!!songUrl };
+    // 5 段新格式: sid|enc(lyric)|url|cs|ce; 其余(2~4 段)=老格式/生成中, lyric 是明文(可能自身含 |, 拼回)
+    if(parts.length>=5){
+      let lyric=parts[1]; try{ lyric=decodeURIComponent(parts[1]); }catch(_){}
+      const songUrl=parts[2]||''; const chStart=parseFloat(parts[3]||'0')||0; const chEnd=parseFloat(parts[4]||'0')||0;
+      return { sid, lyric, songUrl, chorusStart:chStart, chorusEnd:chEnd, ready:!!songUrl };
+    }
+    // 老格式: sid 之后全部当 lyric(含 | 拼回), 无 URL → 未就绪
+    return { sid, lyric:parts.slice(1).join('|'), songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
   }
   return { sid:SONG_STYLES[0].id, lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
 }
@@ -3587,9 +3593,9 @@ async function playSongAI(el, onEnd){
     const src=ctx.createBufferSource(); src.buffer=buf;
     const g=ctx.createGain(); g.gain.value=0.95;
     src.connect(g); g.connect(ctx.destination);
-    const chorusDur=Math.max(1, chE-chS);
     const offset=Math.max(0, Math.min(chS, buf.duration-0.2));
-    const dur=Math.min(chorusDur, buf.duration-offset);
+    // chorus 有效(chE>chS)→播高潮段; 无效(如 resume 丢了 chorus, 存成 0/0)→播整首, 不要缩成 1 秒
+    const dur = (chE>chS) ? Math.min(chE-chS, buf.duration-offset) : (buf.duration-offset);
     const now=ctx.currentTime+0.05;
     src.start(now, offset, dur);
     curSong={ ctx, master:g, oscs:[src], timeouts:[], el, onEnd:onEnd||null, _ai:true };
@@ -3621,9 +3627,10 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   try{ ctx.resume&&ctx.resume(); }catch(e){}
   for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(e){} }
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
-  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,30);
+  const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,60);   // 与 encodeSong 上限/卡片渲染字数一致(原30会漏唱后半)
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
+  try{
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
   // 双总线: 伴奏压低(drumBus) + 主唱提高并加压缩(voiceBus) → 让唱声清晰浮在伴奏之上(修"听不出在唱")
@@ -3695,6 +3702,13 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
   curSong.timeouts.push(setTimeout(()=>stopSong(), (Math.max(totalDur,ttsDur)+0.4)*1000));
+  }catch(err){
+    // 合成/调度中途异常(老旧内核 oscillator 抛错等): 恢复 BGM + 停歌清理, 不让卡片卡在 playing 或 BGM 永久压低
+    console.warn('playSongLegacy',err);
+    try{ AudioEngine.duck(false); }catch(_){}
+    try{ stopSong(); }catch(_){}
+    toast('播放失败');
+  }
 }
 // 点击卡片播放/停止(委托; 只信任白名单曲风, lyric 来自 dataset)
 document.addEventListener('click',e=>{
@@ -3713,10 +3727,11 @@ document.addEventListener('click',e=>{
       wsrc.connect(c.destination); wsrc.start(0);
     }
   }catch(_){}
-  if(card.classList.contains('pending')){
-    // 养底: pending 卡片被点（发送者关页/断网导致生成中断）→ 点击者补触发一次生成
+  if(card.classList.contains('pending') || card.classList.contains('failed')){
+    // pending(生成中断) 或 failed(生成失败) 卡片被点 → 补触发一次生成
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
+      card.classList.remove('failed'); const b=card.querySelector('.song-play'); if(b) b.title='';
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
     } else {
@@ -3752,8 +3767,8 @@ async function sendSong(lyric, sid){
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
   if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); if(el) el.remove(); return; }
   optimistic.id=row.id; if(el) el.dataset.mid=row.id;
-  // 后台生成(不 await, 让用户可以继续聊天/其他操作)
-  generateAndPersistSong(row.id, lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
+  // 后台生成(不 await, 让用户可以继续聊天/其他操作)。mid 统一 String, 与点击补触发(String(mid))同键防重复生成
+  generateAndPersistSong(String(row.id), lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
 }
 
 // 生成 + 上传 + 回写 消息 text 字段(附带兜底: 谁触发到"未完成"卡片就由谁重生成一次)
@@ -3776,7 +3791,7 @@ async function resumeStuckPendingSongs(){
       if(!ok) continue;   // 没存 → 等下次点击重新生成, 不在这里自动花 MiniMax 额度
       const parts=(m.text||'').split('|');
       const sid=parts[0]||'dj';
-      const lyric=decodeURIComponent(parts[1]||'');
+      const lyric=parts.slice(1).join('|');   // 卡住的是老格式(明文, 可能含|), 不 decode(裸%会抛URIError中断整批)
       // chorus 信息丢失(初次生成时在内存) → 用全歌当 chorus(先能听到为主, 精准 chorus 属于优化)
       const songUrl=pub.publicUrl + '?t=' + Date.now();
       const newText=encodeSong(sid, lyric, songUrl, 0, 0);
@@ -3838,6 +3853,8 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   }catch(e){
     console.warn('generateSong fail',e);
     toast(EH_CONFIG.text.err_singSend||'神曲生成失败');
+    // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
+    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.title='生成失败，点击重试'; } }catch(_){}
   }finally{
     _EH_SONG_GENERATING.delete(mid);
   }
