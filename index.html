@@ -660,6 +660,13 @@
   .song-card.failed .song-play{cursor:pointer;border-color:var(--magenta);color:var(--magenta)}
   .song-card.failed .song-play::before{content:'↻';font-size:14px}
   .song-card.failed .song-eq i{animation:none;opacity:.3;background:var(--magenta)}
+  /* 谱曲超时(pending 超 2 分钟仍没好): 琥珀色↻可点重试, 盖住音符跳动 */
+  .song-card.timeout{opacity:.85}
+  .song-card.timeout .song-play{cursor:pointer;border-color:var(--amber,#FFB84D);color:var(--amber,#FFB84D)}
+  .song-card.timeout .song-note{display:none}
+  .song-card.timeout .song-play::before{content:'↻';font-size:14px}
+  .song-card.timeout .song-composing{color:var(--amber,#FFB84D)}
+  .song-card.timeout .song-composing::after{content:'' !important;animation:none}
   .song-card.loading .song-play{position:relative;cursor:wait}
   .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
   @keyframes songSpin{to{transform:rotate(360deg)}}
@@ -2775,11 +2782,38 @@ function updateSongQueueBar(){
   const bar=$('#songQueueBar'); if(!bar) return;
   const stream=$('#stream'); if(!stream){ bar.classList.remove('on'); return; }
   const pend=[...stream.querySelectorAll('.song-card.pending')];
+  // 超时判定: 神曲发出超 SONG_TIMEOUT_MS(120s)仍 pending → worker 兜底也没救回。
+  // 分两级: ①自己发的歌 + 没自动重试过 → 静默自动重试一次(只发送者本人这端做, 避免多观看者重复烧额度)
+  //         ②非自己发的 / 自动重试也超时(240s) → 标记超时, 显示手动"点击重试"
+  const nowMs=Date.now();
+  pend.forEach(c=>{
+    const msg=c.closest('.msg'); if(!msg) return;
+    const ts=parseInt(msg.dataset.songTs||'0',10); if(!ts) return;
+    const age=nowMs-ts;
+    const mid=msg.dataset.mid; const mine=(msg.dataset.uid===myUid);
+    if(c.classList.contains('timeout')) return;   // 已是手动超时态, 不重复处理
+    if(age > SONG_TIMEOUT_MS){
+      // 自己发的 + 还没自动重试 → 自动补一次(去重靠 _EH_SONG_GENERATING)
+      if(mine && !msg.dataset.autoRetried && mid && !_EH_SONG_GENERATING.has(String(mid))){
+        msg.dataset.autoRetried='1'; msg.dataset.songTs=String(nowMs);   // 重置计时, 给自动重试再 120s
+        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent='重新谱曲中';
+        generateAndPersistSong(String(mid), c.dataset.lyric||'', c.dataset.sid||'', msg).catch(e=>console.warn('auto-retry song',e));
+      }
+      // 非自己发的, 或自动重试已过(autoRetried 且又超 120s=总 240s) → 转手动超时态
+      else if(!mine || msg.dataset.autoRetried){
+        c.classList.add('timeout');
+        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent='谱曲超时';
+        const btn=c.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','谱曲超时 · 点击重试');
+      }
+    }
+  });
   if(!pend.length){ bar.classList.remove('on'); _sqbTarget=null; if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } return; }
   // 是否有 pending 卡片在可视区外(上方或下方)→ 才需要浮条提示(在视野里就不用打扰)
   // 用 offsetTop 相对 stream 滚动位置判定(比 getBoundingClientRect 在各种布局下更稳)
+  // 有 pending 就保活轮询(不管在不在视野): 让超时判定持续跑, 在视野内的卡片也能被标记超时
+  if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 2500); }
   const viewTop=stream.scrollTop, viewBot=viewTop+stream.clientHeight;
-  if(stream.clientHeight<=0){ bar.classList.remove('on'); return; }   // 容器不可见(未进房等)→ 不显示
+  if(stream.clientHeight<=0){ bar.classList.remove('on'); return; }   // 容器不可见(未进房等)→ 不显示浮条(但轮询继续判超时)
   let offscreen=null;
   for(const c of pend){
     const msg=c.closest('.msg')||c;
@@ -2793,10 +2827,9 @@ function updateSongQueueBar(){
   $('#sqbDots').innerHTML=dots;
   $('#sqbTxt').textContent = pend.length===1 ? '神曲谱曲中 · 点此查看' : `${pend.length} 首神曲谱曲中 · 点此查看`;
   bar.classList.add('on');
-  // 兜底轮询: 有 pending 时每 2.5s 复查一次(位置/数量变化), 无 pending 自然停
-  if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 2500); }
 }
 let _sqbTimer=null;
+const SONG_TIMEOUT_MS=120000;   // 神曲 pending 超 2 分钟(worker 兜底也没救回)→ 标记超时, 可手动重试
 let _sqbTarget=null;
 (function bindSongQueueBar(){
   const bar=document.getElementById('songQueueBar');
@@ -2875,6 +2908,7 @@ function buildMsgEl(m, isHistory){
   const dispName = isVoid ? (isMe ? m.name+'（虚空）' : m.name) : m.name;
   el.className='msg'+(isMe?' me':'')+(m.kind==='whisper'?' whisper':'')+(isVoid?' void':'')+(isBot?' soul':'');
   el.dataset.mid=m.id;
+  if(m.kind==='song' && m.created_at) el.dataset.songTs=Date.parse(m.created_at)||'';   // 神曲发出时间, 供前端超时判定
   if(m.user_id!=null) el.dataset.uid=m.user_id;   // 存发信人uid, myUid就绪后可回补左右归属(修:登录态未就绪时渲染的自己消息卡左边)
   if(isVoid) el.dataset.void='1';
   const isVoice = m.kind==='voice';
@@ -3991,11 +4025,14 @@ document.addEventListener('click',e=>{
       wsrc.connect(c.destination); wsrc.start(0);
     }
   }catch(_){}
-  if(card.classList.contains('pending') || card.classList.contains('failed')){
-    // pending(生成中断) 或 failed(生成失败) 卡片被点 → 补触发一次生成
+  if(card.classList.contains('pending') || card.classList.contains('failed') || card.classList.contains('timeout')){
+    // pending(生成中断) / failed(失败) / timeout(超时) 卡片被点 → 补触发一次生成
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
-      card.classList.remove('failed'); const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
+      card.classList.remove('failed','timeout');
+      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
+      const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中';
+      if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计 120s 超时
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
     } else {
