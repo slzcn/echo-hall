@@ -881,7 +881,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260712-1520';
+  var BUILD_VER='20260712-1640';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2425,17 +2425,45 @@ async function loadHistory(first){
   const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
-  const frag=document.createDocumentFragment();
-  rows.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
+  // ★分批渲染铁律: 一次同步构建几百条 msg 的 innerHTML 会阻塞手机主线程好几秒
+  //   → 用户看到气泡框但文字"多等一会儿才出来"。改成:
+  //   1) 首屏立即同步渲染最近 N=FIRST_PAINT_N 条(填一屏够看), 用户秒见文字
+  //   2) 剩余较早消息用 requestIdleCallback 分批(每批 IDLE_BATCH 条)追加到顶部, 不阻塞
+  const FIRST_PAINT_N = TUNE('firstPaintN', 60);
+  const IDLE_BATCH = TUNE('idleBatchN', 30);
   if(first){
+    // 首屏: 只取最新 FIRST_PAINT_N 条同步渲染
+    const head = rows.length > FIRST_PAINT_N ? rows.slice(-FIRST_PAINT_N) : rows;
+    const rest = rows.length > FIRST_PAINT_N ? rows.slice(0, rows.length - FIRST_PAINT_N) : [];
+    const frag=document.createDocumentFragment();
+    head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag); scrollStream();
-    fetchEchoes(rows.map(m=>m.id));
+    fetchEchoes(head.map(m=>m.id));
     if(canLoadMore) addLoadMore();
+    // 剩余较早消息分批 idle 渲染, 不阻塞首屏
+    if(rest.length){
+      const schedule = window.requestIdleCallback || (cb=>setTimeout(cb,50));
+      const drainRest = ()=>{
+        if(!rest.length) return;
+        const batch = rest.splice(-IDLE_BATCH);  // 从尾部取(时间上更靠近首屏, 用户往上翻先看到)
+        const prevH = stream.scrollHeight, prevTop = stream.scrollTop;
+        const bfrag = document.createDocumentFragment();
+        batch.forEach(m=>{ const el=buildMsgEl(m, true); if(el) bfrag.appendChild(el); });
+        stream.insertBefore(bfrag, stream.firstChild);
+        // 保持视觉滚动位置不跳(往顶插入内容会顶高)
+        stream.scrollTop = prevTop + (stream.scrollHeight - prevH);
+        fetchEchoes(batch.map(m=>m.id));
+        if(rest.length) schedule(drainRest);
+      };
+      schedule(drainRest);
+    }
     // 预热最近几首已生成神曲: 进房看到的歌还没点就预取好, 点击秒播(只拉最新3首省流量)
     try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){}
     // 扫我自己发的卡住的 pending 神曲: 如果存储桶里已有 mp3 → 直接补 patch, 不重新调 MiniMax
     try{ resumeStuckPendingSongs().catch(()=>{}); }catch(_){}
   } else {
+    const frag=document.createDocumentFragment();
+    rows.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     const prevH=stream.scrollHeight;
     if(moreBtn) moreBtn.remove();
     stream.insertBefore(frag, stream.firstChild);
