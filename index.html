@@ -1083,7 +1083,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0800stripdrag';
+  var BUILD_VER='20260714-0830songtidy';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3491,8 +3491,8 @@ function setMode(mode){
   composer.classList.toggle('song-mode', songMode);
   // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
   const pb=$('#plusBtn');
-  // 有模式时显模式图标: 神曲用可染色音符♪(跟随当前曲风色, 与神曲卡符号统一); 其余走 avEmoji 校正
-  pb.innerHTML = mode==='none' ? '＋' : (mode==='song' ? '<span class="pb-note">♪</span>' : avEmoji(MODE_ICON[mode]));
+  // 有模式时显模式图标(神曲🎵与加号菜单一致); 无模式显 ＋
+  pb.innerHTML = mode==='none' ? '＋' : avEmoji(MODE_ICON[mode]);
   pb.classList.toggle('mode-on', mode!=='none');
   pb.title = mode==='none' ? '更多花样' : '退出当前模式';
   // 菜单项高亮
@@ -4331,7 +4331,7 @@ function renderSongStrip(){
   const strip=$('#songStrip'); if(!strip) return;
   const cur=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
   strip.style.setProperty('--strip-c', safeColor(cur.color));   // 整条 strip 跟随当前曲风色(标签+底色)
-  strip.innerHTML=`<span class="ss-lb">🎵 曲风</span>`+SONG_STYLES.map(s=>
+  strip.innerHTML=`<span class="ss-lb">曲风</span>`+SONG_STYLES.map(s=>
     `<span class="st-chip${s.id===songSel?' on':''}" data-sid="${s.id}" style="--sc:${safeColor(s.color)}">
       <span class="se">${s.emoji}</span><span class="st-nm">${esc(s.name)}</span>${s.sub?`<span class="st-sub">${esc(s.sub)}</span>`:''}</span>`).join('');
   strip.querySelectorAll('.st-chip').forEach(c=>c.onclick=e=>{ e.stopPropagation();
