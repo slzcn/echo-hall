@@ -396,7 +396,7 @@
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
 
-  .presence{display:flex;gap:12px;padding:10px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0}
+  .presence{display:flex;gap:12px;padding:10px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;touch-action:pan-x;overscroll-behavior-x:contain}
   .presence::-webkit-scrollbar{height:0}
   /* 每个成员 = 头像 + 名字, 竖排一列 */
   .pav{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;position:relative;
@@ -738,7 +738,8 @@
 
   /* 神曲曲风细色条(composer 上方一条, 仅神曲模式显示; 横向滚动小胶囊) */
   .song-strip{display:none;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--line);
-    background:color-mix(in srgb,var(--strip-c,var(--magenta)) 6%,transparent);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;transition:background .2s}
+    background:color-mix(in srgb,var(--strip-c,var(--magenta)) 6%,transparent);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;transition:background .2s;
+    touch-action:pan-x;overscroll-behavior-x:contain}   /* pan-x: 允许横滑滚曲风条(祖先是 pan-y 会吞横滑致拖不动+误触边缘返回); contain 防滑到底触发系统返回 */
   .song-strip::-webkit-scrollbar{height:0}
   .song-strip.on{display:flex}
   .song-strip .ss-lb{font-size:11px;color:var(--strip-c,var(--magenta));flex-shrink:0;margin-right:2px;transition:color .2s}
@@ -1039,7 +1040,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0300songsym';
+  var BUILD_VER='20260714-0330strippan';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
