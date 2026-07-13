@@ -1077,7 +1077,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1600roomadmin';
+  var BUILD_VER='20260714-0335songs+roomadmin';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1619,6 +1619,31 @@ const EH_CONFIG_DEFAULT = {
     sing_needText:'先打点字，让它唱出来',
     sing_noContent:'没有可唱的内容',
   },
+  // 神曲曲风池: id/展示/音乐参数完整定义(可后台增删改+拖排序)
+  // scale 存字符串 key(minP/majP/major/minor), 运行时映射到 SCALE 对象
+  songStyles:[
+    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#E63946', bpm:124, bpc:0.5, base:3,  scale:'minP',
+      motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square',   groove:'four', tts:{rate:1.3, pitch:1.0},  ttsStyle:'high',  playRate:1.12,
+      coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
+    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:'major',
+      motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3],  wave:'sine',     bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy',  playRate:0.95,
+      coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
+    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:'major',
+      motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2, pitch:1.1},  ttsStyle:'sweet', playRate:1.1,
+      coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
+    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:'majP',
+      motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3],wave:'sine',    bass:'sine',     groove:'boom', tts:{rate:0.95,pitch:1.1},  ttsStyle:'gu',    playRate:0.96,
+      coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
+    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#28E6D8', bpm:76,  bpc:0.5, base:-2, scale:'major',
+      motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine',    bass:'sine',     groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy',  playRate:0.92,
+      coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
+    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:'major',
+      motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5],  wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5},  ttsStyle:'meng',  playRate:1.18,
+      coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
+    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#F5F0E1', bpm:80,  bpc:0.5, base:0,  scale:'major',
+      motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],  wave:'sine',     bass:'sine',     groove:'lofi', tts:{rate:1.0, pitch:1.0},  ttsStyle:'lazy',  playRate:1.0,
+      coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
+  ],
 };
 // 运行时配置(默认值的深拷贝,loadRemoteConfig 会用 DB 值覆盖)
 const EH_CONFIG = JSON.parse(JSON.stringify(EH_CONFIG_DEFAULT));
@@ -1660,7 +1685,7 @@ async function loadRemoteConfig(){
       const map={}; data.forEach(r=>{ map[r.key]=r.value; });
       // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
       // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning'].forEach(k=>{
+      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
         if(!map[k]) return;
         const dst=EH_CONFIG[k];
         if(Array.isArray(dst)){
@@ -3802,30 +3827,22 @@ const SCALE={
   minor:[0,2,3,5,7,8,10],
 };
 // motif=旋律动机(反复出现→洗脑), chords=每小节根音(半音), groove=鼓型
-// v2: 主唱改为共振峰哼唱(音高真跟旋律走), TTS 降为可选轻声跟读垫; motif 做"钩子+变奏"更洗脑; 新增 慵懒Lo-Fi 曲风
-const SONG_STYLES=[
-  { id:'dj',    name:'DJ',    sub:'烈焰红唇', subEn:'Scarlet Kiss', emoji:'🕺', color:'#E63946', bpm:124, bpc:0.5, base:3,  scale:SCALE.minP,
-    motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12,
-    coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
-  { id:'jazz',  name:'爵士',  sub:'威士忌之吻', subEn:'Whiskey Neat', emoji:'🎷', color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:SCALE.major,
-    motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3], wave:'sine', bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy', playRate:0.95,
-    coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
-  { id:'funk',  name:'Funk',  sub:'荧光心跳', subEn:'Pulse Green', emoji:'🪩', color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:SCALE.major,
-    motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1,
-    coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
-  { id:'gufeng',name:'古风',  sub:'午夜绸缎', subEn:'Midnight Silk', emoji:'🏮', color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:SCALE.majP,
-    motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96,
-    coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
-  { id:'rnb',   name:'R&B',   sub:'冰霞柔情', subEn:'Frost Soul', emoji:'🎙️', color:'#28E6D8', bpm:76,  bpc:0.5, base:-2, scale:SCALE.major,
-    motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy', playRate:0.92,
-    coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
-  { id:'kid',   name:'卡通',  sub:'暧昧微醺', subEn:'Blush Tease', emoji:'🧸', color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:SCALE.major,
-    motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5], wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5}, ttsStyle:'meng', playRate:1.18,
-    coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
-  { id:'acapella', name:'清唱', sub:'月下独吟', subEn:'Moonlit Solo', emoji:'🎤', color:'#F5F0E1', bpm:80, bpc:0.5, base:0, scale:SCALE.major,
-    motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:1.0,pitch:1.0}, ttsStyle:'lazy', playRate:1.0,
-    coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
-];
+// v2: 主唱改为共振峰哼唱(音高真跟旋律走), TTS 降为可选轻声跟读垫; motif 做"钩子+变奏"更洗脑
+// SONG_STYLES 定义在 EH_CONFIG.songStyles (可后台配置), 这里用 Proxy 封装:
+// 1) 读最新的 EH_CONFIG.songStyles (loadRemoteConfig 后台改配置后无需重启)
+// 2) 把 scale 字符串 key(minP/majP/major/minor) 运行时映射为 SCALE 对象
+function _resolveScale(s){ return typeof s==='string' ? (SCALE[s]||SCALE.major) : (Array.isArray(s)?s:SCALE.major); }
+function _shimStyles(){ return (EH_CONFIG.songStyles||[]).map(s=>({...s, scale:_resolveScale(s.scale)})); }
+const SONG_STYLES = new Proxy([], {
+  get(_t, prop){
+    if(prop==='length') return (EH_CONFIG.songStyles||[]).length;
+    const shim = _shimStyles();
+    if(typeof prop==='string' && /^\d+$/.test(prop)) return shim[+prop];
+    if(prop===Symbol.iterator) return shim[Symbol.iterator].bind(shim);
+    const v = shim[prop];
+    return typeof v==='function' ? v.bind(shim) : v;
+  }
+});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const NOTE=semi=>220*Math.pow(2,semi/12);        // 0 半音 = A3(220Hz)
 function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); return scale[((deg%n)+n)%n]+12*oct; }
