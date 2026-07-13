@@ -881,6 +881,10 @@
   .me-hero .mh-sub{font-size:11.5px;color:var(--dim);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
   .me-hero .mh-badge{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
   .me-hero .mh-badge.super{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
+  /* 管理员徽章做成后台入口链接: 外观与原徽章一致, 仅去下划线 + 悬停微亮提示可点 */
+  a.mh-admin-link{text-decoration:none;cursor:pointer;transition:.15s}
+  a.mh-admin-link:hover{background:color-mix(in srgb,var(--magenta) 26%,transparent);box-shadow:0 0 12px -3px var(--magenta)}
+  a.mh-admin-link::after{content:'↗';font-size:8px;margin-left:3px;opacity:.7}
   .me-hero .mh-badge.reg{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
   .me-hero .mh-badge.anon{background:rgba(120,140,220,.12);color:var(--sub)}
   .me-btns{display:flex;gap:8px;margin-top:14px;width:100%}
@@ -4542,11 +4546,14 @@ async function openMe(){
   if(!me){ if(typeof loadOrRollIdentity==='function') loadOrRollIdentity(); if(!me) return; }
   const isBound = !!(me && me.registered);
   const isSuper = me && me.role==='super';
+  const isAdmin = me && (me.role==='super' || me.role==='admin');   // 超管/管理员都可进后台
   const acctKnown = me.email !== undefined; // email/username 已缓存过
   const realEmail = me.email || '';
   const username = me.username || '';
   // 顶部个人卡: 大头像 + 昵称 + (@用户名 · 状态徽章)
-  const badge = isSuper ? '<span class="mh-badge super">超级管理员</span>'
+  // 管理员/超级管理员的徽章包成链接, 新窗口打开管理后台(不改徽章样式, a 继承外观)
+  const roleLabel = isSuper ? '超级管理员' : (me && me.role==='admin' ? '管理员' : '');
+  const badge = isAdmin ? `<a class="mh-badge super mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${roleLabel}</a>`
     : isBound ? '<span class="mh-badge reg">正式账号</span>'
     : '<span class="mh-badge anon">临时身份</span>';
   const subLine = isBound
