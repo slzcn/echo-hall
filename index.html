@@ -2361,12 +2361,18 @@ async function refreshSnapshotTail(room){
     dedupProjInHistory(rows);   // 与 loadHistory 同款去重: 灵魂投影的 proj 与 msg 重复时跳过 proj
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
+    // 当前 DOM 里已渲染的最大 mid: 补拉只接"比它更新的空窗消息"(append到底部)。
+    // 不去碰更早的历史消息——那些由 loadHistory 的 idle 分批渲染负责; 若补拉也去补,
+    // 会和"还在队列里没进DOM"的分批消息撞车→重复渲染(实测见过一条消息×2)。
+    let domMaxMid=0;
+    stream.querySelectorAll('.msg[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
+    let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
       const exist=stream.querySelector(`.msg[data-mid="${m.id}"]`);
       if(!exist){
-        // 缺失消息 → 补 append
-        const el=buildMsgEl(m, true); if(el) stream.appendChild(el);
+        // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
+        if(m.id>domMaxMid){ const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; } }
         return;
       }
       // ★ keep-alive 快照修复铁律: 快照可能是"渲染未完成态"截下来的(分批渲染没跑完/打字机中断),
@@ -2382,7 +2388,7 @@ async function refreshSnapshotTail(room){
         }
       }catch(_){}
     });
-    if(near) ensureBottom();   // 原本贴底才自动滚到底(补进的新消息也精准落底), 避免打断用户回看
+    if(near && appended) ensureBottom();   // 有补进新消息且原本贴底 → 精准落底
   }catch(e){ console.warn('refreshSnapshotTail', e); }
 }
 
