@@ -1083,7 +1083,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0930stripfocus';
+  var BUILD_VER='20260714-1000songfocus';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3499,6 +3499,10 @@ function setMode(mode){
   $('#pmVoid').classList.toggle('on', voidMode);
   $('#pmVoice').classList.toggle('on', voiceMode);
   $('#pmSong').classList.toggle('on', songMode);
+  // ⚠️ iOS 铁律: 进打字模式的 focus 必须最贴近用户手势的同步栈, 且在任何 DOM 重建(renderSongStrip
+  //   会 innerHTML 重建曲风条)之前——否则重建打断同步性, iOS 不弹键盘(主人报"第一次进神曲不弹输入法")。
+  //   故进 void/song 的 focus 提到这里最先做; 退出/语音的 blur 仍在下方。
+  { const cinEarly=$('#cin'); if((mode==='void'||mode==='song') && curRoom){ try{ cinEarly.focus(); }catch(e){} } }
   // 神曲: 显示曲风细色条
   const strip=$('#songStrip');
   if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
@@ -3516,10 +3520,8 @@ function setMode(mode){
   //   会被 iOS 拦截→安卓弹、iOS 不弹(即"两平台不一样"的根因)。setMode 由 onclick 同步调用,
   //   故这里必须【同步】focus, 不能 setTimeout defer。
   const cin2=$('#cin');
-  if(mode==='void' || mode==='song'){
-    try{ if(curRoom) cin2.focus(); }catch(e){}       // 同步聚焦→两平台都弹键盘
-  } else {
-    // none(退出) 或 voice(录音): 一律收键盘, 主动 blur
+  if(mode!=='void' && mode!=='song'){
+    // none(退出) 或 voice(录音): 一律收键盘, 主动 blur。(void/song 的 focus 已在上方提前做)
     try{ cin2.blur(); }catch(e){}
   }
   syncSendBtn();
