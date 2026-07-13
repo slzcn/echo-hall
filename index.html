@@ -1029,7 +1029,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-2330crossroom';
+  var BUILD_VER='20260713-2350xroom2';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2555,6 +2555,9 @@ function subscribeMessages(rid){
   msgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
+      // ★防串房: 只处理"当前所在房 === 本订阅房"的推送。切房时旧 channel 可能还没被
+      //   removeChannel 清掉(非await, 有竞态), 旧房推送会串进新房。双保险: rid匹配 + m.room_id匹配。
+      if(!curRoom || curRoom.id!==rid || m.room_id!==rid) return;
       // 去重靠"真实 id 是否已在 DOM"(本浏览器发的消息 insert 后回填了真实 id, 故被挡)。
       // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
       // 这样同 id 多端发言能互相同步, 且 buildMsgEl 里 isMe=user_id===myUid 让它仍显示在"我的"位置(右侧)。
@@ -2578,6 +2581,7 @@ function subscribeMessages(rid){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
       const m=p.new;
+      if(!curRoom || curRoom.id!==rid || m.room_id!==rid) return;   // 防串房: 旧channel残留推送不处理
       // song UPDATE (神曲生成完回写) 不跺“自己发的不重放”——发送者自己也需要“归队”动效
       if(m.user_id===myUid && m.kind!=='song') return;
       const el=document.querySelector(`.msg[data-mid="${m.id}"] .txt`);
