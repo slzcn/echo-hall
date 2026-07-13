@@ -647,8 +647,7 @@
   .vplay .vp-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--accent,var(--cyan));background:var(--card-bg);
     color:var(--accent,var(--cyan));cursor:pointer;font-size:12px;line-height:1;display:grid;place-items:center;font-family:inherit;transition:.15s;flex-shrink:0}
   .vplay .vp-btn:hover{background:color-mix(in srgb,var(--cyan) 16%,transparent);box-shadow:0 0 12px -3px var(--cyan)}
-  .vplay .vp-btn{padding-left:2px}                 /* ▶ 视觉偏左, 右移补偿居中 */
-  .vplay.playing .vp-btn{padding-left:0}  /* ⏸ 与 ▶ 同款描边, 仅符号变, 不加底色 */
+  /* ★ 不再随 .playing 改 padding, 避免图标横向抖动/闪块; 居中对齐交给 pglyph 内部 */
   .vplay .vp-bars{display:flex;gap:2px;align-items:center;height:18px;color:var(--cyan)}
   .vplay .vp-bars i{width:3px;border-radius:2px;background:currentColor;opacity:.55}
   .vplay.playing .vp-bars i{animation:vbar .9s ease-in-out infinite}
@@ -664,12 +663,17 @@
     display:grid;place-items:center;color:var(--sc,var(--magenta));background:var(--card-bg);transition:.15s;font-family:inherit}
   .song-play:hover{background:color-mix(in srgb,var(--sc,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--sc,var(--magenta))}
   .song-card.playing .song-play{background:color-mix(in srgb,var(--sc,var(--magenta)) 20%,transparent)}
-  /* 播放/暂停图标用纯CSS画(不用emoji字符, 全平台跟随color): 默认三角, .playing 两竖条 */
-  .pglyph{display:inline-block;width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;
-    border-color:transparent transparent transparent currentColor;margin-left:2px}
-  .playing .pglyph{width:9px;height:11px;border:0;margin:0;position:relative;background:none}
-  .playing .pglyph::before,.playing .pglyph::after{content:"";position:absolute;top:0;width:3px;height:11px;background:currentColor;border-radius:1px}
-  .playing .pglyph::before{left:0}.playing .pglyph::after{right:0}
+  /* 播放/暂停图标用纯CSS画(不用emoji字符, 全平台跟随color)。
+     ★ 稳定容器版: 12x12 容器不变, ::before(三角) 与 ::after(两竖条=自身+box-shadow拼右竖) 同时就位,
+     切 .playing 只改 opacity → 不因 border/width 重塑而在暂停区域闪过白/黑色块。 */
+  .pglyph{position:relative;display:inline-block;width:12px;height:12px;margin-left:1px;vertical-align:middle;line-height:0}
+  .pglyph::before,.pglyph::after{content:"";position:absolute;transition:opacity .12s ease}
+  /* 三角 (默认): 高12,底边等腰用 border 拼出;定位居中偏右一点 */
+  .pglyph::before{left:2px;top:0;width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor;opacity:1}
+  /* 两竖条 (暂停态): 一根竖条 + box-shadow 拼出右竖, 一次到位不闪 */
+  .pglyph::after{left:2px;top:.5px;width:3px;height:11px;background:currentColor;border-radius:1px;box-shadow:5px 0 0 currentColor;opacity:0}
+  .playing .pglyph::before{opacity:0}
+  .playing .pglyph::after{opacity:1}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
   .song-lyric{font-size:13.5px;color:var(--sub);max-width:min(240px,72vw);white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
@@ -1025,7 +1029,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-1500flow';
+  var BUILD_VER='20260713-1900playpause';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3452,11 +3456,12 @@ document.addEventListener('click',e=>{
   wrap.classList.add('playing');
   try{ startVoiceAvatarPulse(wrap, a); }catch(e){}   // 声波头像: 发送者头像随振幅跳动
   a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
-  a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };
+  a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };   // 仅当仍在播本条才报错; 主动 stopVoice(vPlayEl 已置空)不弹
   a.play().then(()=>{}).catch(err=>{
-    // NotAllowedError=浏览器拦自动播放(极少见于真实点击); 其它=网络/解码
+    // ★ AbortError = 用户主动暂停/切换打断了 play()(stopVoice 里 pause), 非真实失败, 静默; 已被接管(vPlayEl变了)也静默
+    if((err&&err.name==='AbortError') || vPlayEl!==wrap) return;
     const msg = (err&&err.name==='NotAllowedError') ? '被浏览器拦截，请再点一次' : '播放失败，请重试';
-    toast(msg); if(vPlayEl===wrap) stopVoice();
+    toast(msg); stopVoice();
   });
 });
 async function startRec(){
@@ -3854,13 +3859,16 @@ function playSongAI(el, onEnd){
   // 到 chorus 段末尾自动停(播高潮段而非整首)
   a.ontimeupdate=()=>{ if(endAt>startAt && a.currentTime>=endAt){ if(curSong&&curSong.token===myToken) stopSong(); } };
   a.onended=()=>{ if(curSong&&curSong.token===myToken) stopSong(); };
-  a.onerror=()=>{ el.classList.remove('loading'); if(curSong&&curSong.token===myToken) stopSong(); toast('神曲播放失败，请重试'); };
+  a.onerror=()=>{ el.classList.remove('loading'); if(curSong&&curSong.token===myToken){ stopSong(); toast('神曲播放失败，请重试'); } };   // ★ 仅当仍是本次播放才报错; 主动停止(src='')触发的 error 不弹
   curSong={ audioEl:a, oscs:[], timeouts:[], el, onEnd:onEnd||null, _ai:true, token:myToken };
   // play() 在点击同步链里调用 → 不受移动端 autoplay 静音限制(和语音消息一样稳)
   a.play().then(()=>{}).catch(err=>{
     el.classList.remove('loading');
+    // ★ AbortError = 用户主动暂停/切换打断了 play()(stopSong 里 pause+src=''), 非真实失败, 静默不弹错
+    // 也可能已被新一次播放/停止接管(token 变了) → 同样不弹
+    if((err&&err.name==='AbortError') || !curSong || curSong.token!==myToken) return;
     const msg=(err&&err.name==='NotAllowedError')?'被浏览器拦截，请再点一次':'神曲播放失败，请重试';
-    toast(msg); if(curSong&&curSong.token===myToken) stopSong();
+    toast(msg); stopSong();
   });
 }
 
