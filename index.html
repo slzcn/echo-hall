@@ -1083,7 +1083,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0710godready';
+  var BUILD_VER='20260714-0730menuicon';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1221,7 +1221,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <div class="plus-menu" id="plusMenu">
         <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
         <div class="pm-item" id="pmVoid"><span class="pm-ic"><span style="display:inline-block;transform:translateY(-3px)">🕳️</span></span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
-        <div class="pm-item" id="pmSong"><span class="pm-ic"><span class="pm-note">♪</span></span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
+        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
