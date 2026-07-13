@@ -1075,7 +1075,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1230bgmicon';
+  var BUILD_VER='20260714-1300softrefix';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2446,13 +2446,18 @@ async function enterRoom(room){
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
-function ensureBottom(){
+function ensureBottom(persistent){
   const s=$('#stream'); if(!s) return;
-  let lastH=-1, tries=0;
+  // persistent=true(软刷新用): 更久更稳地贴底——分批渲染/神曲卡/图片会中途暂时稳定再继续长高,
+  //   误判"稳定"就停会导致停在中间/回弹。改成"连续 stableNeed 次高度不变"才认定真稳, 且总时长更长。
+  const maxTries = persistent ? 30 : 8;
+  const gap = persistent ? 100 : 120;
+  const stableNeed = persistent ? 4 : 1;   // 连续几次高度不变才算稳
+  let lastH=-1, tries=0, stable=0;
   const kick=()=>{
     s.scrollTop=s.scrollHeight; hideToLatest();
-    // 高度还在变(异步内容在长)→ 继续贴底, 最多 ~1.2s
-    if(s.scrollHeight!==lastH && tries<8){ lastH=s.scrollHeight; tries++; setTimeout(kick, 120); }
+    if(s.scrollHeight===lastH) stable++; else { stable=0; lastH=s.scrollHeight; }
+    if(stable<stableNeed && tries<maxTries){ tries++; setTimeout(kick, gap); }
   };
   requestAnimationFrame(kick);
 }
@@ -2470,7 +2475,7 @@ async function softRefreshRoom(){
     await loadHistory(true);                     // 重新拉最近消息并渲染(带超时兜底)
     try{ resyncMsgOwnership(); }catch(_){}       // 校正左右归属
     try{ updateSongQueueBar(); }catch(_){}       // 刷神曲生成中态
-    ensureBottom();                              // 回到最新位置
+    ensureBottom(true);                          // 持久贴底(分批渲染/异步撑高期间反复对齐, 防回弹)
     try{ EhSfx.play('tick'); }catch(_){}
     toast('已刷新到最新');
   }catch(e){ console.warn('softRefreshRoom', e); toast('刷新失败, 请重试'); }
