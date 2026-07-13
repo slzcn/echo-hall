@@ -971,6 +971,7 @@
   .member-list{display:flex;flex-direction:column;gap:6px}
   .member-list .mitem{cursor:default}
   .member-list .mitem:hover{transform:none;box-shadow:none;border-color:var(--line)}
+  .mitem-more{padding:8px 12px;font-size:12px;color:var(--dim);text-align:center}
 
   @media(max-width:600px){
     .title{font-size:30px}
@@ -1075,7 +1076,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1330voicechips';
+  var BUILD_VER='20260714-1400roomcfg';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -4777,25 +4778,29 @@ async function openGear(){
         <div class="ro-meta"><div class="ro-nm">${esc(curRoom.name)}</div><div class="ro-kind">${kindLabel} · ${(members||[]).length} 人</div></div></div>
       ${noticeText?`<div class="ro-notice">📢 ${noticeText}</div>`:(isOwner?'':`<div class="ro-notice dim">房主还没设置公告</div>`)}
     </div></div>`;
-  // 房主编辑区(仅房主)
-  const ownerEdit = isOwner ? `<div class="dsec"><div class="dl">编辑</div><div class="dcard">${
-    isPriv
-    ? `<label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
-       <label class="wolf-toggle"><span>🐺 叫狼姐来陪你 <i>私密房里她会放开撩</i></span><input type="checkbox" id="gWolf" ${wolfOn?'checked':''}></label>
-       <button class="dbtn" id="gSaveBtn">保存修改</button>`
-    : `<label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
-       <label class="fld" style="margin-bottom:8px"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>
-       <button class="dbtn" id="gSaveBtn">保存修改</button>`
-  }</div></div>` : '';
-  body.innerHTML=`
-    ${overview}
-    ${ownerEdit}
-    <div class="dsec"><div class="dl">成员 (${(members||[]).length})</div>
-      <div class="member-list">${(members||[]).map(mm=>`
+  // 房主编辑区(仅房主): 统一结构 = 共性(房间名) + 按房型追加特殊项(公告/狼姐开关)。
+  //   公开/官方 → 公告; 私密 → 狼姐开关。特殊项单独一行, 结构一致不再各拼一套。
+  const editExtra = isPriv
+    ? `<label class="wolf-toggle"><span>🐺 叫狼姐来陪你 <i>私密房里她会放开撩</i></span><input type="checkbox" id="gWolf" ${wolfOn?'checked':''}></label>`
+    : `<label class="fld"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>`;
+  const ownerEdit = isOwner ? `<div class="dsec"><div class="dl">编辑</div><div class="dcard">
+      <label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+      ${editExtra}
+      <button class="dbtn" id="gSaveBtn" style="margin-top:10px">保存修改</button>
+    </div></div>` : '';
+  // 成员列表: 最多显示 20 个, 超出折叠"还有 N 人"
+  const allM=(members||[]); const MAX_SHOW=20;
+  const showM=allM.slice(0, MAX_SHOW); const moreN=allM.length-showM.length;
+  const memberRows=showM.map(mm=>`
         <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;color:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
           <span class="mi-nm">${esc(mm.name)}</span>
           ${mm.role==='owner'?'<span class="mi-role">房主</span>':(isOwner && mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
-        </div>`).join('')}</div></div>
+        </div>`).join('') + (moreN>0?`<div class="mitem-more">…还有 ${moreN} 人</div>`:'');
+  body.innerHTML=`
+    ${overview}
+    ${ownerEdit}
+    <div class="dsec"><div class="dl">成员 (${allM.length})</div>
+      <div class="member-list">${memberRows}</div></div>
     ${isOwner?`<div class="dsec"><div class="dl">危险操作</div>
       <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`:''}`;
   applyTextConfig();  // 重新应用文案到引入的动态元素
