@@ -1021,7 +1021,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-1035flow';
+  var BUILD_VER='20260713-1030fix';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1310,8 +1310,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
   try{
     var id=JSON.parse(localStorage.getItem('eh_identity_v2')||'null');
     var r=JSON.parse(localStorage.getItem('eh_last_room')||'null');
-    var inRoom=localStorage.getItem('eh_in_room')==='1';   // 同步在场标记: 只有真在房间态刷新才恢复 hall(返回列表已即时清除),杜绝"退回列表→刷新又掉进房间"
-    if(!id||!id.id||!r||!r.id||!inRoom) return;
+    if(!id||!id.id||!r||!r.id) return;
     var enter=document.getElementById('enter'), hall=document.getElementById('hall');
     if(!enter||!hall) return;
     enter.classList.remove('on'); hall.classList.add('on'); document.body.classList.add('hall-on');
@@ -1984,8 +1983,6 @@ function initThemeUI(){
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
-  // ★ 在场标记收口: 切 hall=置位, 切 enter/lobby=同步清除。所有场景切换唯一入口,避免任何路径遗漏导致“列表页刷新又掉进房间”
-  try{ if(id==='hall') localStorage.setItem('eh_in_room','1'); else localStorage.removeItem('eh_in_room'); }catch(e){}
   // 切场景清掉可能残留的全屏遮挡(录音浮层/键盘态), 防其挡住点击
   document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on'); }
 
@@ -2243,8 +2240,7 @@ function lastRoom(){ try{ const s=localStorage.getItem('eh_last_room'); const r=
 // 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
 function resumeAfterAuth(){
   const r=lastRoom();
-  const inRoom=localStorage.getItem('eh_in_room')==='1';   // 与 preRestoreScene/首帧防闪同判据: 仅"确实在房间"才恢复进房
-  if(r && inRoom){ renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间
+  if(r){ renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间
   else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
 }
 function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
@@ -2254,7 +2250,6 @@ function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
 function preRestoreScene(){
   const r=lastRoom(); if(!r) return false;
   if(!me || !me.id) return false;
-  if(localStorage.getItem('eh_in_room')!=='1') return false;   // 只在"确实身处房间"时刷新恢复;已返回列表页则不拉回
   const hi=$('#hallIcon'); if(hi){ hi.textContent=safeEmoji(r.emoji)||'💬';
     const rc = roomAccentC(r);
     hi.style.setProperty('--room-c', rc); }
@@ -2271,7 +2266,7 @@ async function enterRoom(room){
   curRoom = room;
   stopVoice(); stopSong();
   // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
-  try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); localStorage.setItem('eh_in_room','1'); }catch(e){}
+  try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){}
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = !_cachePurged && roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
@@ -4422,7 +4417,7 @@ async function leaveRoom(){
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;
   if(curMode!=='none') setMode('none');   // 离开房间退出所有发言模式(虚空/语音/神曲)
-  try{ localStorage.removeItem('eh_last_room'); localStorage.removeItem('eh_in_room'); }catch(e){}  // 主动离开→刷新回大厅
+  try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
 }
 
 // ============ 房主设置抽屉 ============
@@ -4705,7 +4700,6 @@ async function logoutIdentity(bound){
   try{ navigator.credentials && navigator.credentials.preventSilentAccess && navigator.credentials.preventSilentAccess(); }catch(e){}
   // 重新生成一个身份并回到入场页
   loadOrRollIdentity(); paintIdentity();
-  try{ localStorage.removeItem('eh_last_room'); }catch(e){}   // 登出同步清除房间信息, 避免下一个用户看到前人残留数据
   goScene('enter');
   toast(bound?'已退出登录':'已换新身份');
 }
@@ -4713,7 +4707,6 @@ function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('b
 
 // ============ 返回大厅 ============
 function backToLobby(){ try{ EhSfx.play('back'); }catch(e){} AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
-  try{ localStorage.removeItem('eh_in_room'); }catch(e){}  // ★同步立即清在场标记: 返回后立即刷新也不会被拉回房间(不等异步 leaveRoom)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
@@ -5010,7 +5003,6 @@ on('sendVerifyBtn','click',()=>sendVerifyEmail());
 on('doProfBtn','click',()=>saveProfile());
 on('enterBtn','click',async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
-  try{ localStorage.removeItem('eh_in_room'); }catch(e){}  // 新登录/匿名进入→明确处于列表页,清除可能遗留的在场标记(避免下次刷新被拉回老房间)
   // 先切大厅并立即铺骨架占位(秒显), 认证在背后跑 → 不再干等网络往返后才切场景
   goScene('lobby');
   { const ch=$('#channels'); if(ch && !ch.children.length) ch.innerHTML=chSkel(4);
