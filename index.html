@@ -1083,7 +1083,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0730menuicon';
+  var BUILD_VER='20260714-0800stripdrag';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -4344,6 +4344,28 @@ function renderSongStrip(){
     strip.style.setProperty('--strip-c', safeColor(st.color));   // 切曲风: strip 标签+底色也跟随
     try{ if(curRoom) $('#cin').focus(); }catch(_){}   // 切完聚焦输入框(主人要:切曲风后自动就绪打字)
   });
+  bindStripDrag(strip);   // 每次重渲染确保拖动已绑(内部有幂等标记)
+}
+// 曲风条横向拖动: 不依赖 CSS touch-action(祖先 #app 是 pan-y, iOS 会吞子级 pan-x → 拖不动)。
+// 直接用 pointer 事件手动改 scrollLeft, 全平台可靠。拖动阈值区分"拖"vs"点"(点仍触发选曲风)。
+function bindStripDrag(strip){
+  if(!strip || strip._dragBound) return; strip._dragBound=true;
+  let down=false, moved=false, startX=0, startScroll=0, pid=null;
+  strip.addEventListener('pointerdown', e=>{
+    down=true; moved=false; startX=e.clientX; startScroll=strip.scrollLeft; pid=e.pointerId;
+    try{ strip.setPointerCapture(pid); }catch(_){}
+  });
+  strip.addEventListener('pointermove', e=>{
+    if(!down) return;
+    const dx=e.clientX-startX;
+    if(Math.abs(dx)>4) moved=true;          // 超阈值判定为拖动
+    if(moved){ strip.scrollLeft=startScroll-dx; e.preventDefault(); }
+  });
+  const end=()=>{ down=false; try{ strip.releasePointerCapture(pid); }catch(_){} };
+  strip.addEventListener('pointerup', end);
+  strip.addEventListener('pointercancel', end);
+  // 拖动结束的这一下 click 不该触发选曲风(拖完手指抬起会误触 chip click)→ 捕获阶段拦掉
+  strip.addEventListener('click', e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; } }, true);
 }
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
 
