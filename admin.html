@@ -223,6 +223,13 @@
   .sw-caps{display:flex;gap:8px;flex-wrap:wrap}
   .sw-cap{padding:7px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12.5px;transition:.15s;user-select:none}
   .sw-cap.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+  /* 风格标签选择器 */
+  .style-chips{display:flex;flex-direction:column;gap:7px}
+  .sc-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .sc-gl{font-size:11px;color:var(--dim);flex:0 0 56px}
+  .sc-tag{padding:4px 11px;border-radius:14px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12px;transition:.13s;user-select:none}
+  .sc-tag:hover{border-color:var(--violet);color:var(--ink)}
+  .sc-tag.on{border-color:var(--violet);color:#fff;background:color-mix(in srgb,var(--violet) 30%,transparent)}
   .sw-range{display:flex;align-items:center;gap:10px}
   .sw-range input[type=range]{flex:1;accent-color:var(--violet)}
   .sw-range .val{font-size:12px;color:var(--violet);font-weight:700;min-width:54px;text-align:right}
@@ -784,6 +791,29 @@ const TTS_VOICES=[
   { id:'Milo', label:'Milo · 英文男声' },
   { id:'Dean', label:'Dean · 英文男声' },
 ];
+// 风格标签库(点选拼成指令; 与 mimo-v2.5-tts 支持的风格控制对齐)
+const STYLE_TAGS={
+  speak:[
+    { g:'基调', tags:['温柔','低沉磁性','活泼元气','慵懒','俏皮','严肃','干练','冷淡','深情'] },
+    { g:'情感', tags:['开心','平静','兴奋','委屈','疲惫','害羞'] },
+    { g:'音色', tags:['清亮','空灵','甜美','沙哑','圆润','气声多'] },
+    { g:'语速', tags:['语速偏快','慢半拍','句尾上扬'] },
+    { g:'角色/方言', tags:['御姐音','夹子音','大叔音','台湾腔','东北话','四川话','粤语'] },
+  ],
+  sing:[
+    { g:'基调', tags:['深情吟唱','慵懒','甜美俏皮','空灵','高亢','轻快跳跃'] },
+    { g:'唱腔', tags:['气声很多','R&B黏腻','耳语哼唱','尾音悠长','尾音上扬撒娇'] },
+    { g:'方言/角色', tags:['台湾腔','粤语','东北话','四川话','御姐音'] },
+  ],
+};
+// 渲染某类(speak/sing)的标签组; 已在当前值里的标签高亮
+function styleChipGroups(kind, curVal){
+  const cur=String(curVal||'');
+  return `<div class="style-chips" data-kind="${kind}">`+STYLE_TAGS[kind].map(grp=>
+    `<div class="sc-grp"><span class="sc-gl">${grp.g}</span>`+grp.tags.map(t=>
+      `<span class="sc-tag${cur.includes(t)?' on':''}" data-tag="${t}">${t}</span>`).join('')+`</div>`
+  ).join('')+`</div>`;
+}
 // persona 定义(与前端 eh-souls.default.js 对齐; 工坊只需展示用字段)
 const SW_PERSONAS=[
   { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#8B5CFF', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
@@ -898,12 +928,12 @@ function renderSoulForm(){
 
       <div class="sw-fld"><label>🎙️ 语音音色(语音/清唱用，内置8种)</label>
         <select id="sf-voice">${TTS_VOICES.map(v=>`<option value="${v.id}"${(s.voice||'')===v.id?' selected':''}>${v.label}</option>`).join('')}</select></div>
-      <div class="sw-row">
-        <div class="sw-fld"><label>说话风格(语音消息的语气，留空用人设默认)</label>
-          <input type="text" id="sf-speak" value="${esc(s.speak_style||'')}" maxlength="200" placeholder="如：低沉磁性、慢半拍、温柔克制"></div>
-      </div>
-      <div class="sw-fld"><label>清唱唱腔(清唱神曲的味道，留空用人设默认)</label>
-        <input type="text" id="sf-sing" value="${esc(s.sing_style||'')}" maxlength="200" placeholder="如：台湾腔甜美俏皮 / 慵懒R&B黏腻 / 空灵气声耳语"></div>
+      <div class="sw-fld"><label>🗣️ 说话风格 <span style="color:var(--dim);font-weight:400">点标签组合，或右侧手写</span></label>
+        ${styleChipGroups('speak', s.speak_style||'')}
+        <input type="text" id="sf-speak" value="${esc(s.speak_style||'')}" maxlength="200" placeholder="点上面标签自动填，也可手写覆盖" style="margin-top:8px"></div>
+      <div class="sw-fld"><label>🎤 清唱唱腔 <span style="color:var(--dim);font-weight:400">点标签组合，或右侧手写</span></label>
+        ${styleChipGroups('sing', s.sing_style||'')}
+        <input type="text" id="sf-sing" value="${esc(s.sing_style||'')}" maxlength="200" placeholder="点上面标签自动填，也可手写覆盖" style="margin-top:8px"></div>
 
       <div class="sw-preview">
         <label style="font-size:12px;color:var(--sub);font-weight:600">🧪 试聊预览</label>
@@ -922,6 +952,17 @@ function renderSoulForm(){
   // 绑定交互
   $('#sf-intensity').oninput=e=>$('#sf-int-v').textContent=e.target.value;
   $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
+  // 风格标签点选 → 拼进对应输入框(顿号分隔, 去重), 再次点取消
+  $('#soulWorkshop').querySelectorAll('.style-chips').forEach(box=>{
+    const kind=box.dataset.kind; const inp=kind==='speak'?$('#sf-speak'):$('#sf-sing');
+    box.querySelectorAll('.sc-tag').forEach(chip=>chip.onclick=()=>{
+      chip.classList.toggle('on');
+      const on=[...box.querySelectorAll('.sc-tag.on')].map(c=>c.dataset.tag);
+      inp.value=on.join('、');
+    });
+    // 手写框改动 → 反向同步标签高亮(手写覆盖时标签跟着亮/灭)
+    inp.oninput=()=>{ const v=inp.value; box.querySelectorAll('.sc-tag').forEach(c=>c.classList.toggle('on', v.includes(c.dataset.tag))); };
+  });
   $('#sf-cancel').onclick=()=>{ swEditing=null; renderWorkshop(); };
   // 主题色: 取色器↔文本框双向联动
   const _cp=$('#sf-color-pick'), _ct=$('#sf-color');
