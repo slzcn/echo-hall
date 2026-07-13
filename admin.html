@@ -771,6 +771,19 @@ $('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
 // ============================================================
 //  🌟 灵魂工坊 —— 5 原型卡 + 微调 + 试聊
 // ============================================================
+// TTS 内置音色(与网关 mimo-v2.5-tts 内置音色列表一致; 唱歌只能用内置音色)
+const TTS_VOICES=[
+  { id:'', label:'（跟人设默认）' },
+  { id:'冰糖', label:'冰糖 · 中文女声' },
+  { id:'茉莉', label:'茉莉 · 中文女声' },
+  { id:'苏打', label:'苏打 · 中文男声' },
+  { id:'白桦', label:'白桦 · 中文男声' },
+  { id:'mimo_default', label:'MiMo 默认' },
+  { id:'Mia', label:'Mia · 英文女声' },
+  { id:'Chloe', label:'Chloe · 英文女声' },
+  { id:'Milo', label:'Milo · 英文男声' },
+  { id:'Dean', label:'Dean · 英文男声' },
+];
 // persona 定义(与前端 eh-souls.default.js 对齐; 工坊只需展示用字段)
 const SW_PERSONAS=[
   { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#8B5CFF', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
@@ -883,6 +896,15 @@ function renderSoulForm(){
       <div class="sw-fld"><label>自定义 system_prompt(高级，留空则用原型默认人设)</label>
         <textarea id="sf-sysprompt" rows="4" placeholder="留空即用「${PERSONA_LABEL[s.persona]}」的默认人设内核">${esc(s.system_prompt||'')}</textarea></div>
 
+      <div class="sw-fld"><label>🎙️ 语音音色(语音/清唱用，内置8种)</label>
+        <select id="sf-voice">${TTS_VOICES.map(v=>`<option value="${v.id}"${(s.voice||'')===v.id?' selected':''}>${v.label}</option>`).join('')}</select></div>
+      <div class="sw-row">
+        <div class="sw-fld"><label>说话风格(语音消息的语气，留空用人设默认)</label>
+          <input type="text" id="sf-speak" value="${esc(s.speak_style||'')}" maxlength="200" placeholder="如：低沉磁性、慢半拍、温柔克制"></div>
+      </div>
+      <div class="sw-fld"><label>清唱唱腔(清唱神曲的味道，留空用人设默认)</label>
+        <input type="text" id="sf-sing" value="${esc(s.sing_style||'')}" maxlength="200" placeholder="如：台湾腔甜美俏皮 / 慵懒R&B黏腻 / 空灵气声耳语"></div>
+
       <div class="sw-preview">
         <label style="font-size:12px;color:var(--sub);font-weight:600">🧪 试聊预览</label>
         <div class="sw-row" style="margin-top:8px">
@@ -928,6 +950,9 @@ function collectSoulForm(){
     icebreak_min: parseInt($('#sf-icebreak').value)||8,
     caps, welcomes,
     system_prompt: sp||null,
+    voice: ($('#sf-voice')?.value||'').trim()||null,
+    speak_style: ($('#sf-speak')?.value||'').trim()||null,
+    sing_style: ($('#sf-sing')?.value||'').trim()||null,
     enabled: swEditing.enabled!==false,
   };
 }
