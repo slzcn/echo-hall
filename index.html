@@ -1084,7 +1084,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1030touchdrag';
+  var BUILD_VER='20260714-1100snappersist';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1383,6 +1383,15 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       nt.innerHTML = (r.name||'').replace(/[<>&]/g,'')+' <span style="font-size:11px;color:var(--dim);font-weight:400">· '+kl+'</span>'; }
     var pr=document.getElementById('presence');
     if(pr){ var s=''; for(var i=0;i<3;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>'; pr.innerHTML=s; }
+    // ⚡ 消息快照静态回填: 上次在这房时存的消息 DOM(localStorage), 刷新首帧就铺出来 →
+    //   刷新后不再"骨架空窗等 240ms", 而是"先显旧消息, 真实数据到达后无缝替换"。
+    try{
+      var snap=JSON.parse(localStorage.getItem('eh_room_snap')||'null');
+      if(snap && snap.rid===r.id && snap.html && (Date.now()-snap.at < 600000)){  // 10 分钟内的快照才用
+        var st=document.getElementById('stream');
+        if(st){ st.innerHTML=snap.html; st.scrollTop=st.scrollHeight; window.__preSnap=true; }  // 铺上并贴底
+      }
+    }catch(e){}
     window.__preHall=true;   // 标记已预绘, 主脚本 preRestoreScene 不必重复
   }catch(e){}
 })();
@@ -2295,6 +2304,24 @@ const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
 const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
 let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
+// 把当前房消息 DOM 持久化到 localStorage → 下次【刷新】首帧静态回填(见页首防闪脚本读 eh_room_snap)。
+// 只留最近 ~30 条(localStorage 有 ~5MB 限, 且首帧只需铺满一屏), 太旧/太多截掉。节流调用。
+let _persistSnapT=0;
+function persistRoomSnap(){
+  if(!curRoom) return;
+  const now=Date.now();
+  if(now-_persistSnapT < 1500) return;   // 节流: 1.5s 内最多存一次(连发消息不狂写)
+  _persistSnapT=now;
+  try{
+    const st=$('#stream'); if(!st) return;
+    // 只取最近 30 条消息(尾部), 拼成片段 → 体积可控
+    const msgs=[...st.querySelectorAll('.msg')];
+    const tail=msgs.slice(-30);
+    const html=tail.map(m=>m.outerHTML).join('');
+    if(!html) return;
+    localStorage.setItem('eh_room_snap', JSON.stringify({ rid:curRoom.id, html, at:now }));
+  }catch(e){ /* localStorage 满/隐私模式 → 忽略, 不影响功能 */ }
+}
 // 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
 function prefetchSouls(rid){
   const hit=soulsCache[rid];
@@ -2422,6 +2449,7 @@ async function enterRoom(room){
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
   ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
+  setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
@@ -2671,6 +2699,7 @@ function subscribeMessages(rid){
       notifyIfMentioned(m, el);   // 被 @ → 强提醒
       try{ trackChatHeat(m); }catch(e){}   // 多人发言声波涟漪
       if(m.kind==='song') try{ updateSongQueueBar(); }catch(e){}   // 新 pending 神曲 → 刷队列条
+      try{ persistRoomSnap(); }catch(_){}   // 新消息落 → 更新刷新用快照(内部节流)
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
@@ -4713,6 +4742,7 @@ async function leaveRoom(){
         }catch(_){}
       });
       roomSnap={ rid:curRoom.id, html:_st.innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() };
+      persistRoomSnap();   // 同时持久化到 localStorage, 供下次刷新首帧静态回填
     }catch(e){ roomSnap=null; }
   }
   await leavePresence();
