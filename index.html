@@ -746,10 +746,11 @@
   .song-card.timeout .song-play::before{content:'↻';font-size:14px}
   .song-card.timeout .song-composing{color:var(--amber,#FFB84D)}
   .song-card.timeout .song-composing::after{content:'' !important;animation:none}
-  .song-card.loading .song-play{position:relative;cursor:wait}
   .song-pre{display:none!important;width:0;height:0}   /* 预加载用隐藏 audio, 不占布局 */
-  .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
-  @keyframes songSpin{to{transform:rotate(360deg)}}
+  /* loading: 不用 transparent-border 拼转圈环(某些安卓 webview 会渲成黑色扇形/圆盘)。
+     改成播放键整体呼吸 + 三角保持可见, 兼容所有内核。有预加载, 加载很快, 呼吸够表达"在加载"。 */
+  .song-card.loading .song-play{position:relative;cursor:wait;animation:songLoadPulse .8s ease-in-out infinite}
+  @keyframes songLoadPulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1.02)}}
   /* "归队"动效: 刚谱好的歌从"谱曲中"变可播放时, 卡片弹一下 + 主题色光环扩散 + 音符飞入 */
   .song-card.arrived{animation:songArrive 1.6s ease-out 2, songPop .5s cubic-bezier(.2,1.4,.4,1)}
   @keyframes songArrive{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--sc,var(--magenta)) 45%,transparent)}70%{box-shadow:0 0 0 8px color-mix(in srgb,var(--sc,var(--magenta)) 0%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
@@ -1083,7 +1084,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1000songfocus';
+  var BUILD_VER='20260714-1030touchdrag';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -4355,29 +4356,25 @@ function renderSongStrip(){
   });
   bindStripDrag(strip);   // 每次重渲染确保拖动已绑(内部有幂等标记)
 }
-// 曲风条横向拖动: 不依赖 CSS touch-action(祖先 #app 是 pan-y, iOS 会吞子级 pan-x → 拖不动)。
-// 直接用 pointer 事件手动改 scrollLeft。**关键**: 只在超阈值(真拖)后才 setPointerCapture,
-// 轻点选曲风完全不 capture → 避免 capture 未释放残留导致"点着点着不能滑"。每次进出都强制清状态。
+// 曲风条横向拖动: 用原生 touch 事件手动改 scrollLeft(不用 pointer capture——它在部分内核会
+// 残留卡死"点着点着不能滑")。touch 无 capture 状态, 天生不会泄漏。桌面走原生鼠标滚(overflow-x:auto)。
 function bindStripDrag(strip){
   if(!strip || strip._dragBound) return; strip._dragBound=true;
-  let down=false, dragging=false, startX=0, startScroll=0, pid=null;
-  const reset=()=>{ down=false; dragging=false; if(pid!=null){ try{ strip.releasePointerCapture(pid); }catch(_){} } pid=null; };
-  strip.addEventListener('pointerdown', e=>{
-    reset();                                  // 先清干净任何残留(防上次没释放的 capture 卡死)
-    down=true; startX=e.clientX; startScroll=strip.scrollLeft; pid=e.pointerId;
-  });
-  strip.addEventListener('pointermove', e=>{
-    if(!down) return;
-    const dx=e.clientX-startX;
-    if(!dragging && Math.abs(dx)>5){          // 超阈值才升级为拖动, 此刻才 capture
-      dragging=true; try{ strip.setPointerCapture(pid); }catch(_){}
-    }
-    if(dragging){ strip.scrollLeft=startScroll-dx; e.preventDefault(); }
-  });
-  strip.addEventListener('pointerup', ()=>{ const wasDrag=dragging; reset(); strip._lastWasDrag=wasDrag; });
-  strip.addEventListener('pointercancel', reset);
-  strip.addEventListener('lostpointercapture', ()=>{ down=false; dragging=false; pid=null; });
-  // 拖动结束那下 click 不该选曲风(触摸拖完抬手会误触 chip click)→ 捕获阶段拦掉一次
+  let startX=0, startScroll=0, dragging=false, tracking=false;
+  strip.addEventListener('touchstart', e=>{
+    if(e.touches.length!==1){ tracking=false; return; }
+    tracking=true; dragging=false;
+    startX=e.touches[0].clientX; startScroll=strip.scrollLeft;
+  }, {passive:true});
+  strip.addEventListener('touchmove', e=>{
+    if(!tracking) return;
+    const dx=e.touches[0].clientX-startX;
+    if(!dragging && Math.abs(dx)>5) dragging=true;   // 超阈值判定拖动
+    if(dragging){ strip.scrollLeft=startScroll-dx; if(e.cancelable) e.preventDefault(); }
+  }, {passive:false});
+  strip.addEventListener('touchend', ()=>{ strip._lastWasDrag=dragging; tracking=false; dragging=false; }, {passive:true});
+  strip.addEventListener('touchcancel', ()=>{ tracking=false; dragging=false; }, {passive:true});
+  // 拖动那下抬手的 click 不选曲风(误触)→ 捕获阶段拦一次
   strip.addEventListener('click', e=>{ if(strip._lastWasDrag){ e.stopPropagation(); e.preventDefault(); strip._lastWasDrag=false; } }, true);
 }
 if(!(window.AudioContext||window.webkitAudioContext)){ const p=$('#pmSong'); if(p) p.style.display='none'; }
