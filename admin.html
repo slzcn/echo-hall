@@ -9,7 +9,7 @@
    但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
    localStorage 存已到达版本防循环; 断网恢复复检。*/
 (function(){
-  var ADMIN_VER='20260714-0010recall';
+  var ADMIN_VER='20260714-0040recallA';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
