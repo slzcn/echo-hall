@@ -853,6 +853,22 @@
     100%{transform:translateY(-90vh) scale(.9) rotate(var(--spin));opacity:0}}
   #resonance{position:fixed;inset:0;z-index:39;pointer-events:none;opacity:0;transition:opacity .3s}
   #resonance.on{opacity:1}
+  /* ===== 互动特效引擎 ===== */
+  /* 全屏闪色层(打一拳红闪等) */
+  #ixFlash{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0}
+  #ixFlash.on{animation:ixFlash .42s ease-out}
+  @keyframes ixFlash{0%{opacity:0}18%{opacity:.6}100%{opacity:0}}
+  /* 全屏抖动(挨打时整个 app 震一下) */
+  .ix-shake{animation:ixShake .5s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes ixShake{10%,90%{transform:translate(-2px,1px)}20%,80%{transform:translate(4px,-2px)}30%,50%,70%{transform:translate(-7px,3px)}40%,60%{transform:translate(7px,-3px)}}
+  /* 飞行物(拳头/玫瑰 从下往目标飞, 砸中放大后消散) */
+  .ix-fly{position:fixed;z-index:61;pointer-events:none;font-size:44px;will-change:transform,opacity;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+  /* 命中光环(温情类头像发光扩散) */
+  .ix-glow{position:fixed;z-index:59;pointer-events:none;border-radius:50%;opacity:0}
+  .ix-glow.on{animation:ixGlow 1s ease-out}
+  @keyframes ixGlow{0%{opacity:.7;transform:scale(.4)}100%{opacity:0;transform:scale(2.4)}}
+  /* 纸屑雨(撒花庆祝, 从顶部落下) */
+  .ix-rain{position:fixed;top:-30px;z-index:60;pointer-events:none;font-size:22px;will-change:transform,opacity}
   .proj{position:fixed;left:100%;white-space:nowrap;z-index:41;font-size:clamp(20px,4vw,34px);font-weight:800;pointer-events:none;
     color:var(--cyan);text-shadow:0 0 20px var(--cyan);animation:fly 8s linear forwards}
   @keyframes fly{from{transform:translateX(0)}to{transform:translateX(calc(-100vw - 100%))}}
@@ -1077,7 +1093,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0335songs+roomadmin';
+  var BUILD_VER='20260714-1710ixengine';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1114,6 +1130,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="mood-aura" id="moodAura"></div>
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
 <div id="resonance"></div>
+<div id="ixFlash"></div>
 <div id="toast"></div>
 
 <div class="stage">
@@ -4743,6 +4760,41 @@ function burst(str,count=10){
     p.style.animationDelay=(secureRand()*0.3)+'s'; p.style.fontSize=(20+secureRand()*20)+'px';
     layer.appendChild(p); setTimeout(()=>p.remove(),3800);
   }
+}
+
+// ============ 互动特效引擎(数据驱动: 按 fx 参数组合原子能力) ============
+// fx: { vibrate:[..], flash:"#色", shake:true, fly:"👊", burst:"🌹", rain:true, glow:"#色", sfx:"名" }
+// targetEl: 命中目标的 DOM(对方头像), 用于飞行物落点/发光定位; 没有则用屏幕中心。
+function playInteractionFx(fx, targetEl){
+  if(!fx) return;
+  try{ if(fx.sfx) EhSfx.play(fx.sfx); }catch(_){}
+  try{ if(fx.vibrate && navigator.vibrate) navigator.vibrate(fx.vibrate); }catch(_){}
+  // 全屏闪色
+  if(fx.flash){ const f=$('#ixFlash'); if(f){ f.style.background=`radial-gradient(circle at 50% 45%, ${safeColor(fx.flash)}66, transparent 72%)`; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),450); } }
+  // 全屏抖动
+  if(fx.shake){ const app=document.querySelector('#app')||document.body; app.classList.remove('ix-shake'); void app.offsetWidth; app.classList.add('ix-shake'); setTimeout(()=>app.classList.remove('ix-shake'),520); }
+  // 目标落点(对方头像中心); 无目标→屏幕中上
+  let tx=window.innerWidth/2, ty=window.innerHeight*0.4;
+  if(targetEl){ try{ const r=targetEl.getBoundingClientRect(); tx=r.left+r.width/2; ty=r.top+r.height/2; }catch(_){} }
+  // 飞行物: 从底部中央飞向目标, 命中放大后消散
+  if(fx.fly){
+    const el=document.createElement('div'); el.className='ix-fly'; el.textContent=fx.fly;
+    el.style.left=(window.innerWidth/2-22)+'px'; el.style.top=(window.innerHeight-80)+'px';
+    document.body.appendChild(el);
+    const dx=tx-window.innerWidth/2, dy=ty-(window.innerHeight-58);
+    el.animate([
+      {transform:'translate(0,0) scale(.6) rotate(0deg)',opacity:1,offset:0},
+      {transform:`translate(${dx*0.7}px,${dy*0.7}px) scale(1) rotate(160deg)`,opacity:1,offset:.6},
+      {transform:`translate(${dx}px,${dy}px) scale(1.5) rotate(220deg)`,opacity:1,offset:.82},
+      {transform:`translate(${dx}px,${dy}px) scale(.3) rotate(240deg)`,opacity:0,offset:1}
+    ],{duration:620,easing:'cubic-bezier(.4,0,.5,1)'}).onfinish=()=>el.remove();
+  }
+  // 命中光环(温情类头像发光)
+  if(fx.glow){ const g=document.createElement('div'); g.className='ix-glow'; const sz=90; g.style.width=g.style.height=sz+'px'; g.style.left=(tx-sz/2)+'px'; g.style.top=(ty-sz/2)+'px'; g.style.background=`radial-gradient(circle, ${safeColor(fx.glow)}88, transparent 70%)`; document.body.appendChild(g); g.classList.add('on'); setTimeout(()=>g.remove(),1000); }
+  // 粒子撒射(命中点爆开)
+  if(fx.burst){ setTimeout(()=>{ try{ burst(fx.burst, 24); }catch(_){} }, fx.fly?520:0); }
+  // 纸屑雨(全屏从上落下)
+  if(fx.rain){ const chars=[...(fx.burst||'🎉🎊✨')]; for(let i=0;i<28;i++){ const r=document.createElement('div'); r.className='ix-rain'; r.textContent=chars[i%chars.length]; r.style.left=(secureRand()*100)+'vw'; document.body.appendChild(r); const dur=1600+secureRand()*1400; r.animate([{transform:'translateY(0) rotate(0)',opacity:1},{transform:`translateY(${window.innerHeight+60}px) rotate(${secureRand()*720-360}deg)`,opacity:.9}],{duration:dur,easing:'ease-in'}).onfinish=()=>r.remove(); } }
 }
 
 // ============ toast ============
