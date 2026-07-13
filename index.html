@@ -199,6 +199,24 @@
   .song-jump.multi .sj-dot{display:inline-flex}
   @keyframes sjPulse{0%,100%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--violet,#8B5CFF)}50%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 22px -2px var(--violet,#8B5CFF)}}
   html[data-mode="day"] .song-jump{background:#FFFFFF;color:#6b3fd4;border-color:rgba(107,63,212,.4)}
+  /* 神曲"生成中"态: 集成到"神"按钮(替代顶部浮条)。青色系区分于谱好态(紫), "神"字流光扫过+呼吸描边。 */
+  .song-jump.gen{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;
+    color:var(--cyan,#28E6D8);border-color:color-mix(in srgb,var(--cyan,#28E6D8) 50%,transparent);
+    animation:sjGenPulse 1.5s ease-in-out infinite}
+  /* 生成中 + 尚无谱好: 用青色描边呼吸(不带数字角标) */
+  @keyframes sjGenPulse{0%,100%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 12px -5px var(--cyan,#28E6D8)}50%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 20px -2px var(--cyan,#28E6D8)}}
+  /* "神"字流光: 一道高光从上到下扫过, 像笔墨在书写/晕染 */
+  .song-jump .sj-god{position:relative;display:inline-block}
+  .song-jump.gen .sj-god{background:linear-gradient(180deg,color-mix(in srgb,var(--cyan,#28E6D8) 30%,#fff) 0%,var(--cyan,#28E6D8) 45%,color-mix(in srgb,var(--cyan,#28E6D8) 40%,transparent) 100%);
+    background-size:100% 220%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    animation:sjInk 1.4s ease-in-out infinite}
+  @keyframes sjInk{0%{background-position:0 -110%}100%{background-position:0 110%}}
+  /* 生成中小圈(替代数字角标): 青色转圈, 表达"在生成" */
+  .song-jump.gen .sj-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid transparent;
+    border-top-color:var(--cyan,#28E6D8);animation:sjSpin .9s linear infinite;display:block;pointer-events:none}
+  .song-jump .sj-ring{display:none}
+  @keyframes sjSpin{to{transform:rotate(360deg)}}
+  html[data-mode="day"] .song-jump.gen{color:#0C8E82;border-color:rgba(12,142,130,.4)}
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
@@ -1040,7 +1058,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0400entertmout';
+  var BUILD_VER='20260714-0500godgen';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1155,13 +1173,12 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
-    <!-- 神曲谱曲队列条: 有歌在生成且滚出视野时浮现, 点击滚到最近一首(进度不被后续消息刷走) -->
-    <div class="song-queue-bar" id="songQueueBar"><span class="sqb-dots" id="sqbDots"></span><span class="sqb-txt" id="sqbTxt"></span></div>
+    <!-- (神曲"谱曲中"提示已集成到右下角"神"按钮的生成中态, 顶部浮条已移除) -->
     <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 5 12 10 18 5"></polyline><polyline points="6 15 12 20 18 15"></polyline></svg></div>
     <!-- @我提醒: 被@时常驻浮现, 点击定位到最近一条@我的消息(多条则轮流) -->
     <div class="mention-jump" id="mentionJump" title="有人@我 · 点击查看"><span class="mj-dot" id="mjDot"></span><span class="mj-at">@</span></div>
     <!-- 神曲谱好提醒: 你点的神曲生成完成时浮现(仿@提醒), 点击跳到那首歌并高亮 -->
-    <div class="song-jump" id="songJump" title="你的神曲谱好了 · 点击去听"><span class="sj-dot" id="sjDot"></span><span class="sj-god">神</span></div>
+    <div class="song-jump" id="songJump" title="你的神曲谱好了 · 点击去听"><span class="sj-dot" id="sjDot"></span><span class="sj-ring"></span><span class="sj-god">神</span></div>
     <div class="reply-preview" id="replyPreview">
       <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
     </div>
@@ -2777,8 +2794,7 @@ function renderTyping(users){
 // 顶部浮条显示"N首神曲谱曲中"(彩点=各自曲风色), 点它滚到最近一首 → 进度不被后续消息刷走。
 // 全房所有人正在谱的歌都算(你要"队列内容全显示")。生成完卡片就绪, pending消失, 条自动更新/隐藏。
 function updateSongQueueBar(){
-  const bar=$('#songQueueBar'); if(!bar) return;
-  const stream=$('#stream'); if(!stream){ bar.classList.remove('on'); return; }
+  const stream=$('#stream'); if(!stream){ _songGenCount=0; updateSongJump(); return; }
   const pend=[...stream.querySelectorAll('.song-card.pending')];
   // 超时判定: 神曲发出超 SONG_TIMEOUT_MS(120s)仍 pending → worker 兜底也没救回。
   // 分两级: ①自己发的歌 + 没自动重试过 → 静默自动重试一次(只发送者本人这端做, 避免多观看者重复烧额度)
@@ -2805,33 +2821,20 @@ function updateSongQueueBar(){
       }
     }
   });
-  if(!pend.length){ bar.classList.remove('on'); _sqbTarget=null; if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } return; }
-  // 是否有 pending 卡片在可视区外(上方或下方)→ 才需要浮条提示(在视野里就不用打扰)
-  // 用 offsetTop 相对 stream 滚动位置判定(比 getBoundingClientRect 在各种布局下更稳)
-  // 有 pending 就保活轮询(不管在不在视野): 让超时判定持续跑, 在视野内的卡片也能被标记超时
+  // pending 数驱动"神"按钮的生成中态(替代原顶部浮条)。点击=滚到最近的 pending 神曲。
+  _songGenCount = pend.length;
+  _sqbTarget = pend.length ? (pend[pend.length-1].closest('.msg')||pend[pend.length-1]) : null;
+  if(!pend.length){ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } updateSongJump(); return; }
+  // 有 pending 就保活轮询: 让超时判定持续跑
   if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 2500); }
-  const viewTop=stream.scrollTop, viewBot=viewTop+stream.clientHeight;
-  if(stream.clientHeight<=0){ bar.classList.remove('on'); return; }   // 容器不可见(未进房等)→ 不显示浮条(但轮询继续判超时)
-  let offscreen=null;
-  for(const c of pend){
-    const msg=c.closest('.msg')||c;
-    const cTop=msg.offsetTop, cBot=cTop+msg.offsetHeight;
-    if(cBot<viewTop+4 || cTop>viewBot-4){ offscreen=c; break; }
-  }
-  if(!offscreen){ bar.classList.remove('on'); _sqbTarget=null; return; }
-  _sqbTarget=(offscreen.closest('.msg')||offscreen);   // 点击滚到最近一个视野外的
-  // 彩点: 每首歌一个曲风色点(最多 5 个防超长)
-  const dots=pend.slice(0,5).map(c=>{ const col=(c.style.getPropertyValue('--sc')||'').trim()||'var(--accent)'; return `<i style="background:${col}"></i>`; }).join('');
-  $('#sqbDots').innerHTML=dots;
-  $('#sqbTxt').textContent = pend.length===1 ? '神曲谱曲中 · 点此查看' : `${pend.length} 首神曲谱曲中 · 点此查看`;
-  bar.classList.add('on');
+  updateSongJump();
 }
 let _sqbTimer=null;
+let _songGenCount=0;   // 当前 pending(生成中)神曲数, 驱动"神"按钮生成中态
 const SONG_TIMEOUT_MS=120000;   // 神曲 pending 超 2 分钟(worker 兜底也没救回)→ 标记超时, 可手动重试
 let _sqbTarget=null;
 (function bindSongQueueBar(){
-  const bar=document.getElementById('songQueueBar');
-  if(bar) bar.addEventListener('click',()=>{ if(_sqbTarget) _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'}); });
+  // 滚动时刷新(超时判定 + 生成中计数); 顶部浮条已移除, 展示走"神"按钮
   const stream=document.getElementById('stream');
   if(stream) stream.addEventListener('scroll',()=>{ requestAnimationFrame(updateSongQueueBar); }, {passive:true});
 })();
@@ -3317,15 +3320,30 @@ function pushSongReady(mid){
   if(_songReadyQueue.length>20) _songReadyQueue.length=20;
   updateSongJump();
 }
+// "神"按钮双态: 谱好(紫脉冲+数字, 优先) > 生成中(青流光+转圈)。都无则隐藏。
 function updateSongJump(){
   const b=$('#songJump'); if(!b) return;
-  const n=_songReadyQueue.length;
-  if(!n){ b.classList.remove('on','multi'); return; }
-  b.classList.add('on'); b.classList.toggle('multi', n>1);
-  const d=$('#sjDot'); if(d) d.textContent = n>9?'9+':String(n);
+  const ready=_songReadyQueue.length;
+  const gen=(typeof _songGenCount==='number')?_songGenCount:0;
+  if(ready){
+    // 谱好态优先(更值得提醒): 紫色脉冲 + 数字角标
+    b.classList.remove('gen'); b.classList.add('on'); b.classList.toggle('multi', ready>1);
+    b.title='你的神曲谱好了 · 点击去听';
+    const d=$('#sjDot'); if(d) d.textContent = ready>9?'9+':String(ready);
+  } else if(gen){
+    // 仅生成中: 青色流光 + 转圈, 无数字角标
+    b.classList.remove('on','multi'); b.classList.add('gen');
+    b.title = gen===1 ? '神曲生成中 · 点击查看' : `${gen} 首神曲生成中 · 点击查看`;
+  } else {
+    b.classList.remove('on','multi','gen');
+  }
 }
 function jumpToSongReady(){
-  if(!_songReadyQueue.length) return;
+  // 谱好队列非空 → 轮流跳谱好的歌; 否则(仅生成中)→ 滚到最近的 pending 神曲
+  if(!_songReadyQueue.length){
+    if(_sqbTarget){ try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){} }
+    return;
+  }
   const mid=_songReadyQueue[_songReadyIdx % _songReadyQueue.length]; _songReadyIdx++;
   const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
   if(msg){
