@@ -2206,6 +2206,8 @@ function fallbackCopy(text){
   }catch(e){ return false; }
 }
 const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
+let _snapTailBusy=false;   // refreshSnapshotTail 并发锁: 多个补拉触发点(缓存/订阅就绪/keep-alive)会并发,
+                           // 各自在对方 append 前查"消息在DOM吗"都判否→重复append(实测同条×3)。串行化根治。
 const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(后台可配)
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
 const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
@@ -2353,6 +2355,8 @@ function ensureBottom(){
 
 // 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
 async function refreshSnapshotTail(room){
+  if(_snapTailBusy) return;   // 并发锁: 多触发点同时补拉会各自漏判→重复append, 串行化
+  _snapTailBusy=true;
   try{
     const isPublic = room.kind==='official' || room.kind==='public';
     let rows;
@@ -2390,6 +2394,7 @@ async function refreshSnapshotTail(room){
     });
     if(near && appended) ensureBottom();   // 有补进新消息且原本贴底 → 精准落底
   }catch(e){ console.warn('refreshSnapshotTail', e); }
+  finally{ _snapTailBusy=false; }
 }
 
 async function joinAsMember(room){
