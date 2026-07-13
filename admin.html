@@ -102,6 +102,26 @@
   .kpi .ic{font-size:17px;opacity:.9}
   .kpi .n{font-size:27px;font-weight:800;color:var(--kc);line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums}
   .kpi .l{font-size:11.5px;color:var(--sub);margin-top:3px}
+  /* ★ 可点击的 KPI(看详情) */
+  .kpi.clickable{cursor:pointer}
+  .kpi.clickable::before{content:"→";position:absolute;right:14px;top:14px;font-size:13px;color:var(--kc);opacity:0;transition:.2s}
+  .kpi.clickable:hover::before{opacity:.7}
+  .kpi.clickable:active{transform:translateY(-1px) scale(.99)}
+
+  /* ===== ★ KPI 详情弹层 ===== */
+  .detail-modal{width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;padding:0;overflow:hidden;animation:pop .28s cubic-bezier(.2,.9,.3,1.3)}
+  .dm-head{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .dm-title{font-size:15px;font-weight:800;flex:1}
+  .dm-close{width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
+    cursor:pointer;font-size:15px;transition:.15s;flex-shrink:0;display:grid;place-items:center}
+  .dm-close:hover{border-color:var(--magenta);color:var(--magenta)}
+  .dm-body{padding:14px 20px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+  .dm-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;background:rgba(10,12,24,.4);margin-bottom:7px}
+  .dm-item .av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;flex-shrink:0;background:rgba(120,140,220,.1)}
+  .dm-item .main{flex:1;min-width:0}
+  .dm-item .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dm-item .sub{font-size:11px;color:var(--dim);margin-top:2px}
+  .dm-item .tail{font-size:11px;color:var(--sub);flex-shrink:0;text-align:right}
 
   /* ===== card / table ===== */
   .card{padding:18px;border-radius:14px;margin-bottom:16px}
@@ -234,6 +254,89 @@
   .txt-row-key{color:var(--dim);font-family:monospace;font-size:10px;margin-left:5px;opacity:.6}
   .txt-row-input{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;box-sizing:border-box}
   .txt-row-def{font-size:10.5px;color:var(--dim);margin-top:3px;padding-left:2px}
+
+  /* ===== ★ 兼容性兼底: 旧浏览器(Safari<16.2/Chrome<111/老安卓)不支持 color-mix 时的降级 ===== */
+  /* 不支持 color-mix 时, 上面那些 color-mix 值会整个失效(背景/阴影/边框变无)。
+     这里用 cyber 默认主题的预算 rgba 近似值兼底关键元素, 保障旧设备上仍可读可用。*/
+  @supports not (background: color-mix(in srgb, red, blue)){
+    .badge-super{background:rgba(255,60,172,.16)}
+    .badge-normal{background:rgba(152,163,199,.16)}
+    .tab.on{box-shadow:0 6px 18px rgba(139,92,255,.3)}
+    .roomrow:hover td{background:rgba(40,230,216,.07)}
+    .k-official{background:rgba(40,230,216,.15)}
+    .k-public{background:rgba(77,227,138,.15)}
+    .k-private{background:rgba(255,60,172,.15)}
+    .k-arch{background:rgba(152,163,199,.12)}
+    .sw-cap.on{background:rgba(40,230,216,.1)}
+    .persona-card .pc-traits span{background:rgba(139,92,255,.14)}
+    .sw-preview .pv-out{background:rgba(139,92,255,.08);border:1px solid rgba(139,92,255,.25)}
+    .btn{box-shadow:0 8px 30px rgba(40,230,216,.22)}
+    .fld input:focus,.inline-form input:focus{box-shadow:0 0 0 3px rgba(40,230,216,.12)}
+    .persona-card.sel{box-shadow:0 0 0 3px rgba(139,92,255,.18)}
+    body{background-image:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(139,92,255,.14),transparent 70%)}
+    .sk::after{background:linear-gradient(90deg,transparent,rgba(40,230,216,.1),transparent)}
+  }
+  /* ★ 不支持 mask-composite 时: 登录卡渐变边框降级为普通细边框(避免变实心色块) */
+  @supports not ((-webkit-mask-composite: xor) or (mask-composite: exclude)){
+    .auth-card::before{background:none;border:1px solid var(--line2);padding:0;-webkit-mask:none;mask:none;opacity:1}
+  }
+  /* ★ 不支持 backdrop-filter 时: .glass 降级为不透明实色面板(避免内容透出难读) */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+    .glass{background:var(--panel-solid)}
+    .mask{background:rgba(4,6,12,.9)}
+  }
+
+  /* ===== ★ 移动端适配强化 ===== */
+  @media(max-width:600px){
+    .top h1{font-size:18px}
+    .tabs{gap:6px;margin-bottom:14px}
+    .tab{padding:8px 12px;font-size:12px}
+    .card{padding:14px}
+    table{font-size:12px}
+    th,td{padding:8px 6px}
+    .sw-soul{flex-wrap:wrap}
+    .persona-grid{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:380px){
+    .kpis{grid-template-columns:1fr 1fr;gap:8px}
+    .kpi{padding:13px 14px}
+    .kpi .n{font-size:21px}
+    .persona-grid{grid-template-columns:1fr}
+  }
+
+  /* ===== ★ 通用响应式增强: 表格横向溢出保护 + 全局兜底 ===== */
+  /* 所有 table 默认横向可滚, 防主题变量表(800px)/管理员表撑破父容器 */
+  .card > table, .card > div > table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  /* 平板竖屏(768-900) tabs 更紧凑, 允许换行不挤 */
+  @media(max-width:900px){
+    .wrap{padding:20px 16px 56px}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  }
+  /* 手机窄屏(<=480px) tabs 改横向可滚 (换行两行占地方), 输入行不再最小 160 拆行 */
+  @media(max-width:480px){
+    .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:12px;padding-bottom:2px}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;white-space:nowrap;padding:8px 13px;font-size:12.5px}
+    .top{gap:8px}
+    .top h1{font-size:17px;flex-shrink:0}
+    .top .who{margin-left:auto;font-size:11.5px;gap:6px}
+    .inline-form input{min-width:0;flex:1 1 100%;font-size:16px}
+    .inline-form button{flex:1 1 100%}
+    .card h3{font-size:13px;flex-wrap:wrap;gap:6px}
+    .card h3 button, .card h3 .mini-btn{margin-top:2px}
+    /* KPI 一行两个改一行一个更好读 */
+    .kpis{grid-template-columns:1fr 1fr}
+    /* 详情弹层给足边距 */
+    .detail-modal{max-height:90vh}
+    .dm-head{padding:14px 16px}
+    .dm-body{padding:12px 16px 16px}
+  }
+  /* 超小屏 <=360 KPI 单列, 保证数字不换行 */
+  @media(max-width:360px){
+    .kpis{grid-template-columns:1fr}
+    .top h1{font-size:16px}
+    .top h1 .dot{width:7px;height:7px}
+  }
 </style>
 </head>
 <body>
@@ -361,7 +464,6 @@
       <div style="color:var(--dim);font-size:11.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匹名。每个词用逗号分隔,保存后立即生效。</div>
       <div id="poolPanel"></div>
     </div>
-    </div>
   </div>
 
   <div class="page" id="p-tuning">
@@ -394,6 +496,12 @@
 <div class="mask" id="cmask"><div class="glass confirm">
   <div class="ct" id="ctitle">确认操作</div><div class="cm" id="cmsg"></div>
   <div class="cbtns"><button class="cf-no" id="cno">取消</button><button class="cf-yes" id="cyes">确定</button></div>
+</div></div>
+
+<!-- ★ KPI 详情弹层 -->
+<div class="mask" id="dmask"><div class="glass detail-modal">
+  <div class="dm-head"><span class="dm-title" id="dmTitle">详情</span><button class="dm-close" id="dmClose">✕</button></div>
+  <div class="dm-body" id="dmBody"></div>
 </div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -478,18 +586,85 @@ async function loadMe(){
 }
 
 // ===== 概览(缓存 + 骨架屏) =====
-const KPI_META=[['users','用户','👥','var(--cyan)'],['rooms_official','官方频道','📡','var(--violet)'],
-  ['rooms_public','公开房','🌐','var(--green)'],['rooms_private','私密房','🔒','var(--magenta)'],
-  ['rooms_public_archived','已归档','🗄️','var(--sub)'],['messages','消息总数','💬','var(--amber)']];
+const KPI_META=[['users','用户','👥','var(--cyan)','users'],['rooms_official','官方频道','📡','var(--violet)','rooms:official'],
+  ['rooms_public','公开房','🌐','var(--green)','rooms:public'],['rooms_private','私密房','🔒','var(--magenta)','rooms:private'],
+  ['rooms_public_archived','已归档','🗄️','var(--sub)','rooms:archived'],['messages','消息总数','💬','var(--amber)','messages']];
 let statsCache=null;
 function paintKpis(s){
-  $('#kpis').innerHTML=KPI_META.map(([k,l,ic,c])=>`<div class="glass kpi" style="--kc:${c}"><div class="ic">${ic}</div><div class="n">${s[k]??'—'}</div><div class="l">${l}</div></div>`).join('');
+  $('#kpis').innerHTML=KPI_META.map(([k,l,ic,c,dt])=>`<div class="glass kpi clickable" data-dt="${dt}" data-l="${l}" style="--kc:${c}"><div class="ic">${ic}</div><div class="n">${s[k]??'—'}</div><div class="l">${l}</div></div>`).join('');
+  $('#kpis').querySelectorAll('.kpi.clickable').forEach(el=>el.onclick=()=>openKpiDetail(el.dataset.dt, el.dataset.l));
 }
 async function loadOverview(){
   if(statsCache) paintKpis(statsCache);                                  // 缓存秒显
   else $('#kpis').innerHTML=Array(6).fill('<div class="sk sk-kpi"></div>').join('');  // 骨架屏
   const res=await api('/stats'); if(!res.ok){ if(!statsCache) $('#kpis').innerHTML='<div class="empty">加载失败</div>'; return; }
   statsCache=res.body; paintKpis(statsCache);
+}
+
+// ===== ★ KPI 点击看详情 =====
+const KIND_LABEL={official:'官方',public:'公开',private:'私密'};
+function openDetailMask(){ $('#dmask').classList.add('on'); }
+function closeDetailMask(){ $('#dmask').classList.remove('on'); }
+$('#dmClose').onclick=closeDetailMask;
+$('#dmask').onclick=e=>{ if(e.target===$('#dmask')) closeDetailMask(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('#dmask').classList.contains('on')) closeDetailMask(); });
+
+async function openKpiDetail(dt, label){
+  $('#dmTitle').textContent=label||'详情';
+  $('#dmBody').innerHTML=Array(5).fill('<div class="sk sk-row" style="height:46px"></div>').join('');
+  openDetailMask();
+  try{
+    if(dt==='users'){ await renderUsersDetail(); }
+    else if(dt==='messages'){ await renderMessagesDetail(); }
+    else if(dt && dt.startsWith('rooms:')){ await renderRoomsDetail(dt.split(':')[1]); }
+    else $('#dmBody').innerHTML='<div class="empty">暂无详情</div>';
+  }catch(e){ $('#dmBody').innerHTML='<div class="empty">加载出错</div>'; }
+}
+
+// 房间类 KPI: 复用 roomsCache(没缓存就拉 /rooms), 按类型/归档状态过滤
+async function renderRoomsDetail(seg){
+  let rooms=roomsCache;
+  if(!rooms){ const res=await api('/rooms'); if(!res.ok){ $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`; return; } rooms=roomsCache=res.body.rooms||[]; }
+  let list;
+  if(seg==='archived') list=rooms.filter(r=>r.kind==='public'&&r.archived);
+  else if(seg==='public') list=rooms.filter(r=>r.kind==='public'&&!r.archived);
+  else list=rooms.filter(r=>r.kind===seg);
+  $('#dmBody').innerHTML=list.map(r=>`<div class="dm-item">
+    <div class="av">${safeEmoji(r.emoji)||'💬'}</div>
+    <div class="main"><div class="nm">${esc(r.name)}</div>
+      <div class="sub">${KIND_LABEL[r.kind]||r.kind}${r.archived?' · 已归档':''}${r.topic?' · '+esc(r.topic):''}</div></div>
+    <div class="tail">${(r.created_at||'').slice(0,10)}</div></div>`).join('')||'<div class="empty">暂无数据</div>';
+}
+
+// 消息 KPI: 拉全站最近消息(super 不带 room_id 返回最近 N 条)
+async function renderMessagesDetail(){
+  const res=await api('/messages?limit=200');
+  if(!res.ok){ $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
+  const msgs=(res.body.messages||[]);
+  $('#dmBody').innerHTML=(msgs.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">全站最近 ${msgs.length} 条消息</div>`:'')+
+    msgs.map(m=>`<div class="dm-item">
+    <div class="av">${safeEmoji(m.emoji)||'💬'}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(m.color,'#EAF0FF')}">${esc(m.name)}
+      ${m.kind==='song'?'<span style="color:var(--magenta);font-size:9px"> 🎵</span>':''}${m.kind==='voice'?'<span style="color:var(--cyan);font-size:9px"> 🎙️</span>':''}${m.kind==='whisper'?'<span style="color:var(--amber);font-size:9px"> 🔒</span>':''}</div>
+      <div class="sub" style="white-space:normal;line-height:1.4">${voiceOrText(m)}</div></div>
+    <div class="tail">${(m.created_at||'').replace('T',' ').slice(5,16)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
+}
+
+// 用户 KPI: 调 /users(后端新增 route); 若后端未部署则友好提示
+async function renderUsersDetail(){
+  const res=await api('/users?limit=500');
+  if(!res.ok){
+    if(res.status===404) $('#dmBody').innerHTML='<div class="empty">用户明细接口未部署<br><span style="font-size:11px">后端 eh-admin-api 需新增 /users route</span></div>';
+    else $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`;
+    return;
+  }
+  const us=(res.body.users||[]);
+  $('#dmBody').innerHTML=(us.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">共 ${us.length} 位用户</div>`:'')+
+    us.map(u=>`<div class="dm-item">
+    <div class="av">${safeEmoji(u.emoji)||'👤'}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${esc(u.name)}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
+      <div class="sub">注册 ${(u.created_at||'').slice(0,10)}</div></div>
+    <div class="tail">${u.last_seen?('活跃 '+(u.last_seen||'').slice(5,10)):''}</div></div>`).join('')||'<div class="empty">暂无用户</div>';
 }
 
 // ===== 房间列表(缓存 + 骨架屏) =====
