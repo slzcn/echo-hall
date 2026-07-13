@@ -1040,7 +1040,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0330strippan';
+  var BUILD_VER='20260714-0400entertmout';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1744,10 +1744,21 @@ function awaitSb(timeout=8000){
   });
 }
 
+// Promise 超时包装: 网络抖动时 supabase auth 请求会 hang 住(无内置超时), 套上超时兜底,
+// 超时 reject/resolve fallback → 进房流程不再卡死在 await ensureAuth()(偶发"连接中+空白"根因)。
+function withTimeout(promise, ms, fallback){
+  return Promise.race([
+    promise,
+    new Promise((res,rej)=>setTimeout(()=>{ if(fallback!==undefined) res(fallback); else rej(new Error('timeout')); }, ms))
+  ]);
+}
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
 async function ensureAuth(){
-  try{ await awaitSb(); }catch(e){ console.warn(e); toast(EH_CONFIG.text.err_initId); return null; }
-  const { data:{ session } } = await sb.auth.getSession();
+  try{ await withTimeout(awaitSb(), 8000); }catch(e){ console.warn(e); toast(EH_CONFIG.text.err_initId); return null; }
+  // getSession 偶发 hang → 8s 超时降级(拿不到 session 就当没登录, 走下面匿名/兜底)
+  let session=null;
+  try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 8000, { data:{ session:null } })); }
+  catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
   let uid = session?.user?.id;
   if(!uid){
     // ★状态分裂防护: 缓存 me 是正式账号但真实 session 丢了 → 别静默匿名登录冒充(会导致
@@ -1761,8 +1772,10 @@ async function ensureAuth(){
       try{ saveIdentity(); }catch(e){}
       try{ toast('登录已过期，已切临时身份，请重新登录'); }catch(e){}
     }
-    const { data, error } = await sb.auth.signInAnonymously();
-    if(error){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
+    let data=null, error=null;
+    try{ ({ data, error } = await withTimeout(sb.auth.signInAnonymously(), 10000)); }
+    catch(e){ console.warn('anon signin 超时', e); toast(EH_CONFIG.text.err_initId); return null; }
+    if(error || !data?.user){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
@@ -2464,8 +2477,16 @@ async function loadHistory(first){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
     const hit=prefetchCache[curRoom.id];
-    if(first && !_cachePurged && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){ data = await hit.p; delete prefetchCache[curRoom.id]; _usedCache=true; }
-    else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:TUNE('publicRecentLimit',500) })); }
+    // 关键: 预取 promise / RPC 都套 10s 超时。网络抖动时它们会 hang→await 永不返回→
+    // loadHistory 卡死→消息永久空白(偶发"进房卡住"根因)。超时则降级现拉一次。
+    if(first && !_cachePurged && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
+      try{ data = await withTimeout(hit.p, 10000); }catch(_){ data=null; }
+      delete prefetchCache[curRoom.id]; _usedCache=true;
+    }
+    if(data===undefined || data===null){   // 无缓存命中 或 缓存超时 → 现拉(也带超时)
+      try{ ({ data } = await withTimeout(sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:TUNE('publicRecentLimit',500) }), 12000, { data:[] })); }
+      catch(_){ data=[]; }
+    }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
   } else {
