@@ -1029,7 +1029,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-2130msgfix';
+  var BUILD_VER='20260713-2200mysideFix';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2472,6 +2472,10 @@ async function loadHistory(first){
     const frag=document.createDocumentFragment();
     head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag); scrollStream();
+    // 兜底回补左右归属: 正式账号 session 恢复慢, 历史可能在 myUid 就绪前渲染→自己的消息判成别人靠左。
+    // 无论时序如何, 首屏渲染完再回补一次(渲染时/回补时至少一次拿到真 myUid)。
+    try{ resyncMsgOwnership(); }catch(e){}
+    try{ setTimeout(()=>{ try{ resyncMsgOwnership(); }catch(e){} }, 800); }catch(e){}   // 再延迟兜底(等session彻底恢复)
     try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 400); }catch(e){}   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
     // 用了预取缓存 → 缓存可能已滞后(最长60s), 后台补拉一次最新, 覆盖"预取到进房"的空窗新消息(修"进房非最新, 要刷新")
     if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r).catch(()=>{}); }, 60); }
@@ -2494,6 +2498,7 @@ async function loadHistory(first){
         stream.insertBefore(bfrag, stream.firstChild);
         // 保持视觉滚动位置不跳(往顶插入内容会顶高)
         stream.scrollTop = prevTop + (stream.scrollHeight - prevH);
+        try{ resyncMsgOwnership(); }catch(e){}   // 这批较早消息里自己发的也归位到右侧
         fetchEchoes(batch.map(m=>m.id));
         if(rest.length) schedule(drainRest);
       };
