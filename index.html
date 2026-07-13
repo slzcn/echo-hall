@@ -554,6 +554,8 @@
   .plus-btn.mode-on{transform:none;font-size:22px;font-weight:400;border-color:var(--accent,var(--cyan));color:var(--ink);background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent);box-shadow:0 0 12px -3px var(--accent,var(--cyan))}
   .composer.void-mode .plus-btn.mode-on{border-color:var(--violet);background:color-mix(in srgb,var(--violet) 16%,transparent);box-shadow:0 0 12px -3px var(--violet)}
   .composer.song-mode .plus-btn.mode-on{border-color:var(--song-c,var(--magenta));background:color-mix(in srgb,var(--song-c,var(--magenta)) 16%,transparent);box-shadow:0 0 12px -3px var(--song-c,var(--magenta))}
+  /* 神曲模式按钮里的音符: 跟随当前曲风色(--song-c), 与神曲卡片的♪符号统一 */
+  .composer.song-mode .plus-btn.mode-on .pb-note{color:var(--song-c,var(--magenta));font-size:22px;line-height:1;display:inline-block}
   /* ＋ 花样菜单 */
   .plus-menu{position:absolute;bottom:calc(100% + 10px);left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
     padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);min-width:220px}
@@ -715,6 +717,7 @@
   .song-card.timeout .song-composing{color:var(--amber,#FFB84D)}
   .song-card.timeout .song-composing::after{content:'' !important;animation:none}
   .song-card.loading .song-play{position:relative;cursor:wait}
+  .song-pre{display:none!important;width:0;height:0}   /* 预加载用隐藏 audio, 不占布局 */
   .song-card.loading .song-play::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;border-top-color:var(--sc,var(--magenta));animation:songSpin .7s linear infinite}
   @keyframes songSpin{to{transform:rotate(360deg)}}
   /* "归队"动效: 刚谱好的歌从"谱曲中"变可播放时, 卡片弹一下 + 主题色光环扩散 + 音符飞入 */
@@ -1035,7 +1038,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0145recallA';
+  var BUILD_VER='20260714-0210songui';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3399,8 +3402,8 @@ function setMode(mode){
   composer.classList.toggle('song-mode', songMode);
   // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
   const pb=$('#plusBtn');
-  // 有模式时显模式图标: 走 avEmoji 校正(🕳️黑洞在按钮里也偏下, 否则不居中); 无模式显 ＋
-  pb.innerHTML = mode==='none' ? '＋' : avEmoji(MODE_ICON[mode]);
+  // 有模式时显模式图标: 神曲用可染色音符♪(跟随当前曲风色, 与神曲卡符号统一); 其余走 avEmoji 校正
+  pb.innerHTML = mode==='none' ? '＋' : (mode==='song' ? '<span class="pb-note">♪</span>' : avEmoji(MODE_ICON[mode]));
   pb.classList.toggle('mode-on', mode!=='none');
   pb.title = mode==='none' ? '更多花样' : '退出当前模式';
   // 菜单项高亮
@@ -3734,11 +3737,13 @@ function songHtml(text){
   const btnTip = pending ? 'AI 谱曲中 · 约 40 秒' : '播放';
   // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
   const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
+  // 就绪的歌: 挂一个隐藏 <audio preload=auto> 预热浏览器缓存, 点播放时音频已缓存→秒播(不再点后干等下载)
+  const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
     <button class="song-play" data-tip="${btnTip}">${btnInner}</button>
     <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
       ${metaExtra}</span>
-    <span class="song-lyric">${chs}</span></span></span>`;
+    <span class="song-lyric">${chs}</span></span>${preloadAudio}</span>`;
 }
 
 // Web Audio 基础
