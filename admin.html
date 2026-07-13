@@ -202,14 +202,24 @@
 
   #toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);z-index:90;
     background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;max-width:90vw;
-    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:normal;line-height:1.5;text-align:center}
   #toast.on{transform:translateX(-50%) translateY(0)}
 
   @media(max-width:600px){
     .wrap{padding:16px 12px 50px}
-    th:nth-child(4),td:nth-child(4){display:none}
+    /* 砍列只针对房间表(隐藏"创建时间"), 不再全局误伤管理员"操作"列/主题mono列/BGM wave列 */
+    .rooms-table th:nth-child(4),.rooms-table td:nth-child(4){display:none}
     .kpis{grid-template-columns:1fr 1fr;gap:10px}
     .kpi .n{font-size:23px}
+    /* 触摸目标提到 ≥40px */
+    .icon-btn{width:40px;height:40px}
+    .mini-btn{padding:9px 14px;min-height:40px}
+    .tab{padding:11px 16px;min-height:42px}
+    /* 极小字号在手机上提到可读(时间戳/tag/key 原 9-10px 几乎看不清) */
+    .k-tag,.mm-tm,.txt-row-key,.persona-card .pc-traits span{font-size:11px !important}
+    th{font-size:12px}
+    /* iOS 输入框聚焦不缩放: 可编辑 input 提到 16px */
+    .txt-row-input,table input[type=text],table input:not([type]){font-size:16px !important}
   }
   /* 分组折叠文案表 */
   .txt-group{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;overflow:hidden}
@@ -288,7 +298,7 @@
       </div>
     </div>
     <div class="glass card"><h3>房间列表 <span class="hint" id="roomsHint"></span></h3>
-      <table><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th><th>灵魂</th></tr></thead><tbody id="roomsTbody"></tbody></table>
+      <div style="overflow-x:auto"><table class="rooms-table"><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th><th>灵魂</th></tr></thead><tbody id="roomsTbody"></tbody></table></div>
     </div>
     <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
       <div id="msgList"></div>
@@ -375,7 +385,7 @@
       <div style="font-size:11.5px;color:var(--dim);margin-top:10px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
     </div>
     <div class="glass card"><h3>管理员列表</h3>
-      <table><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table>
+      <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
     </div>
   </div>
 </div></div>
@@ -522,6 +532,7 @@ function voiceOrText(m){
   return esc(m.text);
 }
 async function loadMessages(rid,name){
+  $('#soulCard').style.display='none';   // 收起工坊卡, 避免与聊天记录卡同时展开
   $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
   $('#msgList').innerHTML=Array(6).fill('<div class="sk sk-row" style="height:44px"></div>').join('');
   $('#msgCard').scrollIntoView({behavior:'smooth'});
@@ -825,7 +836,7 @@ async function loadConfig(){
 
 async function saveConfigKey(key,value){
   const r=await api('/config',{method:'POST',body:{key,value}});
-  if(r.ok){ toast('已保存: '+key); if(CFG_CACHE) CFG_CACHE[key]=value; }
+  if(r.ok){ toast('已保存: '+key); if(CFG_CACHE) CFG_CACHE[key]=value; try{ clearDirty(); }catch(_){} }
   else toast(r.body?.error||'保存失败');
   return r.ok;
 }
@@ -1006,7 +1017,7 @@ $('#textSaveBtn')?.addEventListener('click',async()=>{
 
 // ---- ↺ 恢复默认: 把 CFG_DEFAULT 对应 key 写回后台 + 重新渲染当前 tab ----
 async function resetConfigKeys(keys, reRender, label){
-  if(!confirm('确定把【'+label+'】恢复为系统默认值？\n当前修改将被覆盖。')) return;
+  if(!await confirmBox('确定把【'+label+'】恢复为系统默认值？当前修改将被覆盖。','恢复默认')) return;
   for(const k of keys){
     const def=JSON.parse(JSON.stringify(CFG_DEFAULT[k]));
     if(CFG_CACHE) CFG_CACHE[k]=def;
@@ -1130,7 +1141,23 @@ $('#poolResetBtn')?.addEventListener('click',()=>resetConfigKeys(['identityPool'
 $('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
 
 // tabs
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+// 未保存防护: 编辑页(主题/BGM/文案/参数/身份池)输入框被改→dirty; 切tab/关页前拦截提醒, 防静默丢改动。
+let _pageDirty=false;
+const EDIT_PAGES=['theme','bgm','text','tuning'];
+function markDirty(){ _pageDirty=true; }
+function clearDirty(){ _pageDirty=false; }
+// 事件委托: 这些页的输入框一改就置 dirty(保存/恢复默认后各处会重渲染, 用 clearDirty 复位)
+['p-theme','p-bgm','p-text','p-tuning'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
+// 保存后清 dirty: saveConfigKey 内部末尾已调 clearDirty(见其定义), 这里只挂关页拦截
+window.addEventListener('beforeunload',e=>{ if(_pageDirty){ e.preventDefault(); e.returnValue=''; } });
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
+  const cur=document.querySelector('.tab.on');
+  // 从编辑页切走且有未保存改动 → 二次确认
+  if(_pageDirty && cur && EDIT_PAGES.includes(cur.dataset.page) && cur!==t){
+    if(!await confirmBox('当前有未保存的修改, 切换页面将丢弃。确定离开?','未保存的修改')) return;
+    clearDirty();
+  }
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   $('#p-'+t.dataset.page).classList.add('on');
@@ -1140,6 +1167,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.page==='bgm') loadBgm();
   if(t.dataset.page==='text') loadTextBind();
   if(t.dataset.page==='tuning') loadTuning();
+  clearDirty();   // 进入新页(重渲染)后复位
 });
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
