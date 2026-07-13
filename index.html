@@ -1029,7 +1029,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-2300nickfix';
+  var BUILD_VER='20260713-2330crossroom';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2379,6 +2379,9 @@ async function refreshSnapshotTail(room){
     let rows;
     if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:TUNE('publicRecentLimit',500)}); rows=(data||[]).slice().reverse(); }
     else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE()); rows=(data||[]).slice().reverse(); }
+    // ★防串房: await RPC(几百ms)期间用户可能已切到别的房, stream 已是新房的 DOM。
+    //   若不校验就 append, 会把本房消息塞进当前(别的)房→串房。发现已离房则放弃。
+    if(!curRoom || curRoom.id!==room.id) return;
     dedupProjInHistory(rows);   // 与 loadHistory 同款去重: 灵魂投影的 proj 与 msg 重复时跳过 proj
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
@@ -2443,6 +2446,7 @@ function dedupProjInHistory(rows){
 }
 
 async function loadHistory(first){
+  const _enterRid = curRoom && curRoom.id;   // 进房时的房id: 拉取(await)期间可能切房, 渲染前校验防串房
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows; let _usedCache=false;   // 本次首屏是否用了预取缓存(用了→进房后补拉最新, 覆盖预取到进房的空窗新消息)
   if(isPublic){
@@ -2473,6 +2477,8 @@ async function loadHistory(first){
   // ★灵魂投影去重: 同一句灵魂投影会同时产生 msg 留底 + proj 飞幕两条,
   //   历史里两条都会变成气泡 → 重复。把"有同内容 msg"的 proj 标 _skipHist,
   //   buildMsgEl 历史分支遇 _skipHist 跳过。真人 broadcastProject 只发 proj 一条不受影响。
+  // ★防串房: 拉取期间已切到别的房 → 放弃渲染, 否则把本房历史塞进当前(别的)房
+  if(!curRoom || curRoom.id!==_enterRid) return;
   dedupProjInHistory(rows);
   const stream=$('#stream');
   let moreBtn=$('#loadMoreBtn');
