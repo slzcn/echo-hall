@@ -1021,7 +1021,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-0048';
+  var BUILD_VER='20260713-1055identity';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1698,8 +1698,14 @@ function paintIdentity(){
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
   const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
   // 正式账号 vs 临时身份: 更新标签 + 主按钮文案 + 换一个按钮(临时才可换)
+  // ★ 多重判据: registered 字段可能因旧版本或异常保存而缺失,
+  //   同时看 username/email(正式账号特有字段)作为兼容判据, 避免“已登录却显示临时身份”。
+  const isRegistered = !!(me && (me.registered || me.username || me.email));
   const tag=$('#idTag'), rr=$('#rerollBtn'), eb=$('#enterBtn');
-  if(me.registered){ if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入'; }
+  if(isRegistered){
+    if(!me.registered){ me.registered=true; try{saveIdentity();}catch(e){} }   // 兼容修复: 回写标志到 localStorage,避免下次再错
+    if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入';
+  }
   else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; if(eb) eb.textContent='匿 名 进 入'; }
 }
 
@@ -5231,6 +5237,9 @@ function bootSupabase(){
       const isReg = !!session.user.email;   // 有邮箱=正式账号; 匿名临时身份没有
       myUid=session.user.id; resyncMsgOwnership();
       if(me) { me.id=myUid; if(isReg) me.registered=true; }
+      // ★ 正式账号同步立即修正 UI: 不等异步 prof/acc 查询, 避免“已登录但显示临时身份”的中间态
+      // (旧版本 localStorage 里 me.registered 可能缺失/为 false, 后台拉 prof 卡住时 UI 会一直错乱)
+      if(isReg && me){ try{saveIdentity();}catch(e){} try{paintIdentity();}catch(e){} }
       setTimeout(async ()=>{
         // 先恢复现场(进房只需 myUid[已就绪] + 本地缓存 me), 不等 DB 查询, 避免 hall 骨架空等数秒
         if(location.hash) history.replaceState(null,'',location.pathname+location.search);
@@ -5259,6 +5268,8 @@ function bootSupabase(){
       if(session?.user && !myUid){
         const isReg = !!session.user.email;
         myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; if(isReg) me.registered=true; }
+        // ★ 同主路径: 同步立即修正 UI, 不等异步 prof/acc 查询
+        if(isReg && me){ try{saveIdentity();}catch(e){} try{paintIdentity();}catch(e){} }
         // 先恢复现场再补 DB 资料(同 onAuthStateChange 路径, 避免 hall 骨架空等)
         if(!authHandled && ($('#enter').classList.contains('on')||$('#hall').classList.contains('on'))){
           authHandled=true; resumeAfterAuth();
