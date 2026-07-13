@@ -190,14 +190,22 @@
     font-size:17px;font-weight:800;line-height:1;
     opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
     transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  .song-jump.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;animation:sjPulse 1.8s ease-in-out infinite}
+  .song-jump.on{opacity:1;pointer-events:auto;
+    background:color-mix(in srgb,var(--violet,#8B5CFF) 18%,var(--panel-solid,rgba(20,24,38,.9)));
+    border-color:var(--violet,#8B5CFF);color:#fff;
+    animation:sjReadyBounce 1.1s cubic-bezier(.3,1.3,.5,1) infinite}
+  .song-jump.on .sj-god{font-weight:900;text-shadow:0 0 10px var(--violet,#8B5CFF),0 0 18px color-mix(in srgb,var(--violet,#8B5CFF) 60%,transparent)}
   .song-jump:hover{transform:translateY(-2px) scale(1.06)}
   .song-jump:active{transform:translateY(0) scale(.94)}
   .song-jump .sj-dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
     background:var(--violet,#8B5CFF);color:#fff;font-size:10px;font-weight:800;display:none;
     align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,rgba(20,24,38,.94))}
   .song-jump.multi .sj-dot{display:inline-flex}
-  @keyframes sjPulse{0%,100%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--violet,#8B5CFF)}50%{box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 22px -2px var(--violet,#8B5CFF)}}
+  /* 谱好态: 弹跳 + 光环扩散, 冲击感明显强于生成中, 强烈暗示"快点我去听" */
+  @keyframes sjReadyBounce{
+    0%{transform:translateY(0) scale(1);box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 0 0 color-mix(in srgb,var(--violet,#8B5CFF) 55%,transparent)}
+    40%{transform:translateY(-4px) scale(1.1);box-shadow:0 10px 24px -6px rgba(0,0,0,.5),0 0 0 8px color-mix(in srgb,var(--violet,#8B5CFF) 0%,transparent)}
+    100%{transform:translateY(0) scale(1);box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 0 0 color-mix(in srgb,var(--violet,#8B5CFF) 0%,transparent)}}
   html[data-mode="day"] .song-jump{background:#FFFFFF;color:#6b3fd4;border-color:rgba(107,63,212,.4)}
   /* 神曲"生成中"态: 集成到"神"按钮(替代顶部浮条)。青色系区分于谱好态(紫), "神"字流光扫过+呼吸描边。 */
   .song-jump.gen{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;
@@ -807,6 +815,10 @@
   .msg.mentioned-flash{animation:mentionPulse 2s ease-out}
   @keyframes mentionPulse{0%{background:color-mix(in srgb,var(--amber) 32%,transparent);border-radius:12px}
     60%{background:color-mix(in srgb,var(--amber) 14%,transparent)}100%{background:transparent}}
+  /* 点"神"跳到那首歌: 消息整条选中高亮(仿@, 用神曲紫), 明确"就是这条" */
+  .msg.song-flash{animation:songFlash 2.2s ease-out}
+  @keyframes songFlash{0%{background:color-mix(in srgb,var(--violet,#8B5CFF) 30%,transparent);border-radius:12px}
+    60%{background:color-mix(in srgb,var(--violet,#8B5CFF) 13%,transparent)}100%{background:transparent}}
 
   /* 操作音效配套视觉反馈：轻涟漪 / 消息光效 / 回声弹跳 */
   .eh-ripple{position:absolute;border-radius:50%;pointer-events:none;z-index:3;background:radial-gradient(circle,color-mix(in srgb,var(--accent,var(--cyan)) 42%,transparent) 0%,transparent 68%);transform:translate(-50%,-50%) scale(.18);opacity:.75;animation:ehRipple .55s ease-out forwards;mix-blend-mode:screen}
@@ -1071,7 +1083,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0610recallHall';
+  var BUILD_VER='20260714-0710godready';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3371,18 +3383,22 @@ function updateSongJump(){
   }
 }
 function jumpToSongReady(){
-  // 谱好队列非空 → 轮流跳谱好的歌; 否则(仅生成中)→ 滚到最近的 pending 神曲
+  // 谱好队列非空 → 轮流跳谱好的歌; 否则(仅生成中)→ 滚到最近的 pending 神曲(同样高亮)
   if(!_songReadyQueue.length){
-    if(_sqbTarget){ try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){} }
+    if(_sqbTarget){ try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'});
+      _sqbTarget.classList.remove('song-flash'); void _sqbTarget.offsetWidth; _sqbTarget.classList.add('song-flash');
+      setTimeout(()=>_sqbTarget&&_sqbTarget.classList.remove('song-flash'),2200); }catch(_){} }
     return;
   }
   const mid=_songReadyQueue[_songReadyIdx % _songReadyQueue.length]; _songReadyIdx++;
   const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
   if(msg){
     msg.scrollIntoView({behavior:'smooth',block:'center'});
+    // 整条消息选中高亮(仿@, 神曲紫) → 明确"就是这条"; 卡片也弹一下强调
+    msg.classList.remove('song-flash'); void msg.offsetWidth; msg.classList.add('song-flash');
+    setTimeout(()=>msg.classList.remove('song-flash'),2200);
     const nc=msg.querySelector('.song-card');
     if(nc){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'),3000); }
-    else { msg.classList.add('mentioned-flash'); setTimeout(()=>msg.classList.remove('mentioned-flash'),2000); }
   } else { toast('那首歌不在当前列表里'); }
   if(_songReadyIdx % _songReadyQueue.length===0){ _songReadyQueue=[]; _songReadyIdx=0; updateSongJump(); }
 }
