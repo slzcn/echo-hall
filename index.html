@@ -2797,7 +2797,18 @@ function setConn(live,txt){ const el=$('#cntLed'); if(el){ el.classList.toggle('
 let EMOJI_ONLY_RE=null;
 try{ EMOJI_ONLY_RE=new RegExp('^(\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F|\\s)+$','u'); }catch(e){}
 const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'').length<=12;
-function fmtTime(ts){ const d=ts?new Date(ts):new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function fmtTime(ts){
+  const d=ts?new Date(ts):new Date();
+  const hm=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const now=new Date();
+  // 按"日历日"差判断今天/昨天(不能用毫秒差, 否则23:00vs01:00会误判)
+  const dayStart=t=>new Date(t.getFullYear(),t.getMonth(),t.getDate()).getTime();
+  const diffDays=Math.round((dayStart(now)-dayStart(d))/86400000);
+  if(diffDays<=0) return hm;                                   // 今天(或未来时钟偏差): 只显时分
+  if(diffDays===1) return `昨天 ${hm}`;                         // 昨天
+  if(d.getFullYear()===now.getFullYear()) return `${d.getMonth()+1}/${d.getDate()} ${hm}`;   // 今年内: 月/日 时分
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${hm}`;                          // 跨年: 年/月/日 时分
+}
 
 function buildMsgEl(m, isHistory){
   // 灵魂身份跟随最新: 消息存的是发送时的 name/emoji/color 快照, 但灵魂是固定住户,
