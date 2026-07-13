@@ -2378,7 +2378,7 @@ async function refreshSnapshotTail(room){
         }
       }catch(_){}
     });
-    if(near) scrollStream();   // 原本贴底才自动滚到底，避免打断用户回看
+    if(near) ensureBottom();   // 原本贴底才自动滚到底(补进的新消息也精准落底), 避免打断用户回看
   }catch(e){ console.warn('refreshSnapshotTail', e); }
 }
 
@@ -2412,12 +2412,12 @@ function dedupProjInHistory(rows){
 
 async function loadHistory(first){
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
-  let rows;
+  let rows; let _usedCache=false;   // 本次首屏是否用了预取缓存(用了→进房后补拉最新, 覆盖预取到进房的空窗新消息)
   if(isPublic){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
     const hit=prefetchCache[curRoom.id];
-    if(first && !_cachePurged && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){ data = await hit.p; delete prefetchCache[curRoom.id]; }
+    if(first && !_cachePurged && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){ data = await hit.p; delete prefetchCache[curRoom.id]; _usedCache=true; }
     else { ({ data } = await sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:TUNE('publicRecentLimit',500) })); }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
     if(rows.length){ oldestId = rows[0].id; }
@@ -2425,7 +2425,7 @@ async function loadHistory(first){
     // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
     const hit=prefetchCache[curRoom.id];
     if(first && !_cachePurged && !oldestId && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
-      const data = await hit.p; delete prefetchCache[curRoom.id];
+      const data = await hit.p; delete prefetchCache[curRoom.id]; _usedCache=true;
       rows = (data||[]).slice().reverse();
       if(rows.length){ oldestId = rows[0].id; }
     } else {
@@ -2458,6 +2458,8 @@ async function loadHistory(first){
     head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag); scrollStream();
     try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 400); }catch(e){}   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
+    // 用了预取缓存 → 缓存可能已滞后(最长60s), 后台补拉一次最新, 覆盖"预取到进房"的空窗新消息(修"进房非最新, 要刷新")
+    if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r).catch(()=>{}); }, 60); }
     fetchEchoes(head.map(m=>m.id));
     if(canLoadMore) addLoadMore();
     // 剩余较早消息分批 idle 渲染, 不阻塞首屏
