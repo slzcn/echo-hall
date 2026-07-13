@@ -1021,7 +1021,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-1030fix';
+  var BUILD_VER='20260713-0048';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1744,8 +1744,8 @@ function getSubtext(){ return EH_CONFIG.text.officialDesc; }
 let subI=0;
 function typeSub(){
   const el=$('#subLine'); if(!el) return;
-  if(subI<getSubtext().length){ el.innerHTML=esc(getSubtext().slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
-  else el.innerHTML=esc(getSubtext());
+  if(subI<=getSubtext().length){ el.innerHTML=esc(getSubtext().slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
+  else el.innerHTML=esc(getSubtext())+'<span class="cursor">&nbsp;</span>';
 }
 
 // ============ 场景切换 ============
