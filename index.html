@@ -1050,12 +1050,13 @@
     .cursor-trail,.type-spark,#warp,#soundwave,.mood-aura{display:none!important}
   }
   /* 房间设置里"叫狼姐陪聊"开关(仅私密房) */
-  .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:10px 12px;border-radius:10px;cursor:pointer;
-    background:color-mix(in srgb,var(--magenta,#FF3CAC) 8%,transparent);border:1px solid color-mix(in srgb,var(--magenta,#FF3CAC) 25%,transparent);
+  /* 叫狼姐开关: 用中性线框, 不再高亮红/品红, 与设置页其它 fld 一致 */
+  .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 0;padding:10px 12px;border-radius:10px;cursor:pointer;
+    background:var(--card-bg-soft,rgba(10,12,24,.4));border:1px solid var(--line2);
     font-size:13px;color:var(--ink);user-select:none;transition:.15s}
-  .wolf-toggle:hover{border-color:color-mix(in srgb,var(--magenta,#FF3CAC) 45%,transparent)}
+  .wolf-toggle:hover{border-color:var(--line2)}
   .wolf-toggle i{display:block;font-style:normal;font-size:11px;color:var(--sub);margin-top:2px}
-  .wolf-toggle input{width:18px;height:18px;accent-color:var(--magenta,#FF3CAC);flex-shrink:0;cursor:pointer}
+  .wolf-toggle input{width:18px;height:18px;accent-color:var(--accent,var(--cyan));flex-shrink:0;cursor:pointer}
   /* 名场面(回声墙) */
   .wall-modal{max-width:440px}
   /* 列表高度: 用 dvh(移动端地址栏收缩不跳变) + clamp 保底, 让它在超小屏/横屏都不溢出;
@@ -1076,7 +1077,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1500pressnap';
+  var BUILD_VER='20260714-1600roomadmin';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -4780,33 +4781,37 @@ async function leaveRoom(){
 async function openGear(){
   if(!curRoom) return;
   const isOwner = curRoom.role==='owner';
+  const isMgr = me && (me.role==='admin' || me.role==='super');   // 管理员/超管
+  const isOfficial = curRoom.kind==='official';
+  // 可编辑 = 房主, 或 (管理员/超管 且 非官方房)。官方房一律只读。
+  const canEdit = !isOfficial && (isOwner || isMgr);
   // 进房时 room 对象不带 topic，这里补拉一次，否则保存会把已有公告清空
   const [{ data:members },{ data:roomRow }] = await Promise.all([
     sb.from('eh_members').select('user_id,name,emoji,color,role').eq('room_id',curRoom.id),
-    sb.from('eh_rooms').select('name,topic').eq('id',curRoom.id).maybeSingle(),
+    sb.from('eh_rooms').select('name,topic,emoji').eq('id',curRoom.id).maybeSingle(),
   ]);
-  if(roomRow){ if(roomRow.name) curRoom.name=roomRow.name; curRoom.topic=roomRow.topic||''; }
+  if(roomRow){ if(roomRow.name) curRoom.name=roomRow.name; curRoom.topic=roomRow.topic||''; if(roomRow.emoji) curRoom.emoji=roomRow.emoji; }
   const body=$('#gearBody');
   const isPriv = curRoom.kind==='private';
   const wolfOn = isPriv && (curRoom.topic||'')==='@wolf';   // 私密房用 topic=@wolf 标记"已邀请狼姐"
   const kindLabel = curRoom.kind==='private'?'私密房':(curRoom.kind==='public'?'公开房':'官方房');
   const roomEmoji = safeEmoji(curRoom.emoji)||'💬';
-  // 标题(抽屉头)按权限切: 房主"房间设置", 普通用户"房间信息"
-  { const h=$('#gearDrawer .drawer-h h3'); if(h) h.textContent = isOwner ? '房间设置' : '房间信息'; }
+  // 标题(抽屉头)按权限切: 可编辑"房间设置", 否则"房间信息"
+  { const h=$('#gearDrawer .drawer-h h3'); if(h) h.textContent = canEdit ? '房间设置' : '房间信息'; }
   // 房间概览卡(所有人可见): 头像+名字+类型+公告
   const noticeText = (curRoom.topic && curRoom.topic!=='@wolf') ? esc(curRoom.topic) : '';
   const overview = `<div class="dsec"><div class="dcard room-overview">
       <div class="ro-hero"><div class="ro-ic" style="--room-c:${roomAccentC(curRoom)}">${roomEmoji}</div>
         <div class="ro-meta"><div class="ro-nm">${esc(curRoom.name)}</div><div class="ro-kind">${kindLabel} · ${(members||[]).length} 人</div></div></div>
-      ${noticeText?`<div class="ro-notice">📢 ${noticeText}</div>`:(isOwner?'':`<div class="ro-notice dim">房主还没设置公告</div>`)}
+      ${noticeText?`<div class="ro-notice">📢 ${noticeText}</div>`:(canEdit?'':`<div class="ro-notice dim">还没设置公告</div>`)}
     </div></div>`;
-  // 房主编辑区(仅房主): 统一结构 = 共性(房间名) + 按房型追加特殊项(公告/狼姐开关)。
-  //   公开/官方 → 公告; 私密 → 狼姐开关。特殊项单独一行, 结构一致不再各拼一套。
+  // 编辑区(房主/管理员, 非官方房): 房间名 + 图标 + 按房型追加特殊项(公告/狼姐开关)
   const editExtra = isPriv
     ? `<label class="wolf-toggle"><span>🐺 叫狼姐来陪你 <i>私密房里她会放开撩</i></span><input type="checkbox" id="gWolf" ${wolfOn?'checked':''}></label>`
     : `<label class="fld"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc(curRoom.topic||'')}" placeholder="给房间设个公告"></label>`;
-  const ownerEdit = isOwner ? `<div class="dsec"><div class="dl">编辑</div><div class="dcard">
+  const ownerEdit = canEdit ? `<div class="dsec"><div class="dl">编辑</div><div class="dcard">
       <label class="fld"><span data-txt="roomNameLabel">房间名</span><input id="gRoomName" maxlength="40" value="${esc(curRoom.name)}"></label>
+      <label class="fld"><span>房间图标</span><input id="gRoomEmoji" maxlength="8" value="${esc(curRoom.emoji||'')}" placeholder="一个 emoji, 如 🌙"></label>
       ${editExtra}
       <button class="dbtn" id="gSaveBtn" style="margin-top:10px">保存修改</button>
     </div></div>` : '';
@@ -4823,7 +4828,7 @@ async function openGear(){
     ${ownerEdit}
     <div class="dsec"><div class="dl">成员 (${allM.length})</div>
       <div class="member-list">${memberRows}</div></div>
-    ${isOwner?`<div class="dsec"><div class="dl">危险操作</div>
+    ${(isOwner && !isOfficial)?`<div class="dsec"><div class="dl">危险操作</div>
       <div class="dcard"><button class="dbtn danger" id="gDissolveBtn">解散房间</button></div></div>`:''}`;
   applyTextConfig();  // 重新应用文案到引入的动态元素
   // 以下管理操作仅房主有(普通用户无这些元素, 加空判防报错)
@@ -4834,9 +4839,10 @@ async function openGear(){
     let topic;
     if(isPriv){ topic = $('#gWolf') && $('#gWolf').checked ? '@wolf' : ''; }
     else { topic = ($('#gRoomTopic').value||'').trim(); }
-    const { error }=await sb.from('eh_rooms').update({name,topic}).eq('id',curRoom.id);
+    const emoji = (($('#gRoomEmoji')&&$('#gRoomEmoji').value)||'').trim().slice(0,8) || curRoom.emoji;
+    const { error }=await sb.from('eh_rooms').update({name,topic,emoji}).eq('id',curRoom.id);
     if(error){ toast(EH_CONFIG.text.err_saveFail); return; }
-    curRoom.name=name; curRoom.topic=topic;
+    curRoom.name=name; curRoom.topic=topic; curRoom.emoji=emoji;
     // 私密房关掉狼姐 → 立刻删她成员行(房主可删; worker 下轮不再驻守)。开启由 worker 扫 @wolf 加成员。
     if(isPriv && topic!=='@wolf'){ try{ await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id','ca72217f-7157-47f6-b540-049074bf06dd'); }catch(e){} }
     { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
