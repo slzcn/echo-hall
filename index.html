@@ -2474,9 +2474,14 @@ async function loadHistory(first){
     if(canLoadMore) addLoadMore();
     // 剩余较早消息分批 idle 渲染, 不阻塞首屏
     if(rest.length){
-      const schedule = window.requestIdleCallback || (cb=>setTimeout(cb,50));
+      const rid0 = curRoom && curRoom.id;   // 快照房id: 切房后停止本轮分批, 防往错房插消息
+      // requestIdleCallback 带 timeout(1s): 页面不在前台/CPU忙时 idle 回调会被无限推迟,
+      // 导致分批渲染中途"卡住"→较早消息(几百条)永远渲染不出、公开房又无"加载更早"→永久看不到。
+      // timeout 强制到点必跑; 无 rIC 的浏览器用 setTimeout 保底。
+      const schedule = window.requestIdleCallback ? (cb=>requestIdleCallback(cb,{timeout:250})) : (cb=>setTimeout(cb,16));
       const drainRest = ()=>{
         if(!rest.length) return;
+        if(curRoom && curRoom.id!==rid0) return;   // 已切到别的房, 停止
         const batch = rest.splice(-IDLE_BATCH);  // 从尾部取(时间上更靠近首屏, 用户往上翻先看到)
         const prevH = stream.scrollHeight, prevTop = stream.scrollTop;
         const bfrag = document.createDocumentFragment();
