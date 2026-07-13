@@ -4,6 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>回声厅 · 后台</title>
+<script>
+/* 版本自愈: 后台页也参与版本检测(与前台共用 ver.txt)。admin.html 不参与 BUILD_VER 主链,
+   但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
+   localStorage 存已到达版本防循环; 断网恢复复检。*/
+(function(){
+  var ADMIN_VER='20260713-2325adminselfheal';
+  window.__EH_ADMIN_VER=ADMIN_VER;
+  function check(reason){
+    fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
+      if(!r.ok){ console.warn('[EH后台自愈] ver.txt HTTP', r.status); return null; }
+      return r.text();
+    }).then(function(t){
+      if(t===null||t===undefined) return;
+      var latest=(t||'').trim();
+      console.info('[EH后台自愈]',reason,'内嵌='+ADMIN_VER,'线上='+latest);
+      if(!latest) return;
+      if(latest===ADMIN_VER) return;   // 已是最新
+      var last=null; try{ last=localStorage.getItem('eh_admin_ver_last'); }catch(e){}
+      if(last===latest){ console.warn('[EH后台自愈] 已重载过 '+latest+' 仍非最新, 疑CDN/缓存卡住; 请手动强刷'); return; }
+      try{ localStorage.setItem('eh_admin_ver_last',latest); }catch(e){}
+      var u=new URL(location.href); u.searchParams.set('v',latest); u.searchParams.set('_r',Date.now());
+      console.info('[EH后台自愈] 重载→', u.toString());
+      location.replace(u.toString());
+    }).catch(function(e){ console.warn('[EH后台自愈] fetch失败', e&&e.message); });
+  }
+  try{ check('init'); }catch(e){}
+  window.addEventListener('online', function(){ check('online'); });
+})();
+</script>
 <style>
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
