@@ -1029,7 +1029,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-2200mysideFix';
+  var BUILD_VER='20260713-2230authfix';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1739,11 +1739,22 @@ async function ensureAuth(){
   const { data:{ session } } = await sb.auth.getSession();
   let uid = session?.user?.id;
   if(!uid){
+    // ★状态分裂防护: 缓存 me 是正式账号但真实 session 丢了 → 别静默匿名登录冒充(会导致
+    //   "个人空间显示超管、发消息却是匿名uid"的分裂)。清掉假的注册态 + 提示重新登录。
+    if(me && me.registered){
+      console.warn('[auth] 正式账号 session 已失效, 清假身份并提示重登');
+      me.registered=false; me.role='user'; me.username=''; try{ saveIdentity(); }catch(e){}
+      try{ toast('登录已过期，请重新登录'); }catch(e){}
+    }
     const { data, error } = await sb.auth.signInAnonymously();
     if(error){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
+  // 真实 session 是匿名的, 但缓存 me 还标着正式账号 → 同样纠正(防旧缓存残留冒充超管)
+  if(session?.user && !session.user.email && me && me.registered){
+    me.registered=false; me.role='user'; me.username=''; try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){}
+  }
   // upsert 到 eh_users: 只是把身份档案落库, 后续进房/发言都不依赖它当场完成 →
   // fire-and-forget, 不阻塞"进入→大厅"导航(省一个网络往返的可感知等待)。
   const isAnon = !session?.user?.email;
