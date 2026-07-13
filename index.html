@@ -480,6 +480,12 @@
   .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
   @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
+  /* 消息撤回占位: 居中灰色细提示(微信式) */
+  .recalled-tip{text-align:center;font-size:12px;color:var(--dim);padding:7px 6px;animation:slidein .3s;opacity:.82;user-select:none}
+  .recalled-tip .rc-ic{display:inline-block;font-size:12px;opacity:.7;margin-right:2px;transform:translateY(.5px)}
+  /* 长按环里的撤回按钮: 用警示色区分于回复/投影 */
+  .ar-actions .ar-recall{color:var(--magenta)}
+  .ar-actions .ar-recall:hover{background:rgba(255,60,172,.12)}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
 
@@ -1029,7 +1035,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-2340adminsso';
+  var BUILD_VER='20260714-0010recall';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2582,6 +2588,13 @@ function subscribeMessages(rid){
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
       const m=p.new;
       if(!curRoom || curRoom.id!==rid || m.room_id!==rid) return;   // 防串房: 旧channel残留推送不处理
+      // ★撤回 UPDATE: 别人撤回了消息(kind=recalled) → 整条气泡换成占位. 放在"自己UPDATE跳过"之前,
+      //   因为撤回可能来自房主/管理员撤别人的(m.user_id 是原作者, 不一定是撤回者), 都要处理.
+      if(m.kind==='recalled'){
+        const old=document.querySelector(`.msg[data-mid="${m.id}"], .recalled-tip[data-mid="${m.id}"]`);
+        if(old){ const ph=buildMsgEl(m); if(ph) old.replaceWith(ph); }
+        return;
+      }
       // song UPDATE (神曲生成完回写) 不跺“自己发的不重放”——发送者自己也需要“归队”动效
       if(m.user_id===myUid && m.kind!=='song') return;
       const el=document.querySelector(`.msg[data-mid="${m.id}"] .txt`);
@@ -2848,6 +2861,15 @@ function fmtTime(ts){
 }
 
 function buildMsgEl(m, isHistory){
+  // ★撤回消息: 渲染成"XX 撤回了一条消息"占位气泡(灰、居中、无内容/头像/回声)
+  if(m.kind==='recalled'){
+    const rel=document.createElement('div');
+    rel.className='recalled-tip';
+    rel.dataset.mid=m.id;
+    const who = (m.user_id===myUid) ? '你' : (m.anon ? '有人' : esc(m.name||'某人'));
+    rel.innerHTML=`<span class="rc-ic">⊘</span> ${who} 撤回了一条消息`;
+    return rel;
+  }
   // 灵魂身份跟随最新: 消息存的是发送时的 name/emoji/color 快照, 但灵魂是固定住户,
   // 改了配置后历史消息也该用最新身份(名字/头像/色) → 用 roomSouls 覆盖旧快照。
   if(m.user_id && soulUidSet.has(m.user_id)){
@@ -4390,6 +4412,7 @@ function showActRing(x,y,m){
     <div class="ar-actions">
       <button data-a="reply"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 4 12l5 6"/><path d="M4 12h9a7 7 0 0 1 7 7v0"/></svg></span>回复</button>
       <button data-a="project"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M10 11l4 1-4 1z" fill="currentColor" stroke="none"/></svg></span>投影</button>
+      ${canRecall(m)?`<button data-a="recall" class="ar-recall"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg></span>撤回</button>`:''}
     </div>`;
   ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();   // 别冒泡到 document 的关闭监听(否则刚开的托盘立即被关)
@@ -4398,6 +4421,8 @@ function showActRing(x,y,m){
   });
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
   ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
+  const recallBtn=ring.querySelector('[data-a="recall"]');
+  if(recallBtn) recallBtn.onclick=()=>{ hideActRing(); recallMsg(mid, m); };
   ring.classList.add('on');
   const rw=ring.offsetWidth||240, rh=ring.offsetHeight||100;
   ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
@@ -4405,6 +4430,36 @@ function showActRing(x,y,m){
 }
 function hideActRing(){ $('#actRing').classList.remove('on'); }
 document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
+
+// ============ 消息撤回(软删除: UPDATE kind=recalled, 复用现有字段, 无需改 schema) ============
+// 权限: ①作者本人且 ≤120s  ②房主(curRoom.role==='owner')  ③管理员(me.role admin/super)
+const RECALL_WINDOW_MS = 120000;
+function canRecall(m){
+  if(!m || m.id==null) return false;
+  if(String(m.id).startsWith('local_')) return false;        // 还没落库的乐观消息不能撤
+  if(m.kind==='recalled') return false;                      // 已撤回的不再撤
+  if(m.kind==='proj' || m.kind==='act') return false;        // 投影/系统动作不撤(瞬时/系统)
+  const isAuthor = m.user_id===myUid;
+  const inWindow = m.created_at ? (Date.now()-Date.parse(m.created_at) <= RECALL_WINDOW_MS) : false;
+  if(isAuthor && inWindow) return true;
+  if(curRoom && curRoom.role==='owner') return true;
+  if(me && (me.role==='admin' || me.role==='super')) return true;
+  return false;
+}
+async function recallMsg(mid, m){
+  if(!canRecall(m)){ toast('无法撤回这条消息'); return; }
+  const idNum = isNaN(+mid)?mid:+mid;
+  // 乐观: 本地立即替换成占位(撤回者自己界面, 不等 realtime 回声——自己的 UPDATE 会被 realtime handler 跳过)
+  const domEl=document.querySelector(`.msg[data-mid="${idNum}"], .recalled-tip[data-mid="${idNum}"]`);
+  const placeholder=buildMsgEl({id:idNum, kind:'recalled', user_id:m.user_id, name:m.name, anon:m.anon});
+  try{
+    // UPDATE: kind→recalled, text 清空为占位标记(不泄露原文), 保留 user_id/name 用于占位显示归属
+    const { error } = await sb.from('eh_messages').update({ kind:'recalled', text:'[[已撤回]]' }).eq('id', idNum);
+    if(error){ console.warn('recall',error); toast('撤回失败，请重试'); return; }
+    if(domEl && placeholder){ domEl.replaceWith(placeholder); }
+    try{ EhSfx.playClick(); }catch(e){}
+  }catch(e){ console.warn('recall ex',e); toast('撤回失败，请重试'); }
+}
 
 // 引用回复
 function startReply(m){
