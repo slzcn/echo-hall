@@ -1025,7 +1025,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260713-1055identity';
+  var BUILD_VER='20260713-1500flow';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2247,6 +2247,9 @@ function bindRoomCards(box){
 const SNAP_TTL=30000;   // 快照有效期 30s
 // 刷新页面后恢复上次所在房间(进大厅后调, 仅当有记录)
 function lastRoom(){ try{ const s=localStorage.getItem('eh_last_room'); const r=s&&JSON.parse(s); return (r&&r.id)?r:null; }catch(e){ return null; } }
+// ★ 同步立即清除“上次所在房间”标记。用于所有“用户主动导航到非房间场景”的动作(返回大厅/登录/注册/匿名进入/登出)。
+// 必须同步、先于任何 await 执行: 防止“切场景后立即刷新”时 eh_last_room 未及时清除 → 首帧防闪又把用户拉回旧房间。
+function clearLastRoom(){ try{ localStorage.removeItem('eh_last_room'); }catch(e){} }
 // 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
 function resumeAfterAuth(){
   const r=lastRoom();
@@ -4711,6 +4714,7 @@ function rebindEmailSlot(){
 // 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
 async function logoutIdentity(bound){
   if(!await ehConfirm(bound?'确定退出登录？':'确定退出并换一个新身份？', bound?'退出登录':'切换身份')) return;
+  clearLastRoom();   // ★ 同步先清: 不在房间里登出(curRoom=null)时 leaveRoom 会被跳过, 避免 eh_last_room 残留 → 换账号后进错房
   try{ if(curRoom) await leaveRoom(); }catch(e){}
   try{ await sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem(LS_ID); }catch(e){}
@@ -4733,6 +4737,7 @@ function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('b
 
 // ============ 返回大厅 ============
 function backToLobby(){ try{ EhSfx.play('back'); }catch(e){} AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
+  clearLastRoom();   // ★ 同步立即清标记: 用户明确返回大厅 → 即使立即刷新也不再回旧房间(不等异步 leaveRoom)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
   // 房间清理(删presence/关订阅/归档)后台异步跑，不阻塞返回动作
@@ -4900,6 +4905,7 @@ async function doLogin(){
     : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
   saveIdentity(); paintIdentity();
   saveCredential(account, password);   // 显式交给浏览器密码管理器保存(SPA无页面跳转, 不能只靠自动气泡)
+  clearLastRoom();   // ★ 登录成功进大厅: 清掉前一账号可能残留的 eh_last_room, 防刷新进到别人/旧身份的房间
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
 }
 // SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
@@ -4932,6 +4938,7 @@ async function doRegister(){
   me.name=username; me.id=myUid; me.username=username; me.registered=true; me.email=me.email||''; saveIdentity(); paintIdentity();
   saveCredential(username, password);   // 注册即登录, 一并交浏览器保存
   await sb.from('eh_users').update({ name:username, is_anonymous:false }).eq('id',myUid);
+  clearLastRoom();   // ★ 新注册账号进大厅: 不应携带“历史房间”, 清掉残留防刷新进错房
   toast(EH_CONFIG.text.ok_regDone); closeModal(); goScene('lobby'); renderLobby();
 }
 // 找回密码：仅对注册时填了邮箱的账号
@@ -5029,6 +5036,7 @@ on('sendVerifyBtn','click',()=>sendVerifyEmail());
 on('doProfBtn','click',()=>saveProfile());
 on('enterBtn','click',async()=>{
   const btn=$('#enterBtn'); btn.disabled=true;
+  clearLastRoom();   // ★ 匿名进入大厅: 清掉可能残留的旧 eh_last_room(同浏览器前一用户留的), 防刷新进错房
   // 先切大厅并立即铺骨架占位(秒显), 认证在背后跑 → 不再干等网络往返后才切场景
   goScene('lobby');
   { const ch=$('#channels'); if(ch && !ch.children.length) ch.innerHTML=chSkel(4);
