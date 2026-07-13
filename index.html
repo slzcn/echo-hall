@@ -1038,7 +1038,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-0210songui';
+  var BUILD_VER='20260714-0230songtxt';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2771,14 +2771,16 @@ function updateSongQueueBar(){
       // 自己发的 + 还没自动重试 → 自动补一次(去重靠 _EH_SONG_GENERATING)
       if(mine && !msg.dataset.autoRetried && mid && !_EH_SONG_GENERATING.has(String(mid))){
         msg.dataset.autoRetried='1'; msg.dataset.songTs=String(nowMs);   // 重置计时, 给自动重试再 120s
-        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent='重新谱曲中';
+        const aca=c.dataset.sid==='acapella';
+        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent=aca?'生成中':'重新谱曲中';
         generateAndPersistSong(String(mid), c.dataset.lyric||'', c.dataset.sid||'', msg).catch(e=>console.warn('auto-retry song',e));
       }
       // 非自己发的, 或自动重试已过(autoRetried 且又超 120s=总 240s) → 转手动超时态
       else if(!mine || msg.dataset.autoRetried){
         c.classList.add('timeout');
-        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent='谱曲超时';
-        const btn=c.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','谱曲超时 · 点击重试');
+        const aca=c.dataset.sid==='acapella';
+        const cm=c.querySelector('.song-composing'); if(cm) cm.textContent=aca?'生成超时':'谱曲超时';
+        const btn=c.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip',(aca?'生成超时':'谱曲超时')+' · 点击重试');
       }
     }
   });
@@ -3734,9 +3736,11 @@ function songHtml(text){
   const pendCls = pending ? ' pending' : '';
   // 谱曲中: 跳动音符♪(音乐语义, 非"加载"转圈); 就绪: 播放三角
   const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
-  const btnTip = pending ? 'AI 谱曲中 · 约 40 秒' : '播放';
-  // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
-  const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
+  // 清唱(acapella)是 TTS 干唱不"谱曲", 用"生成中"; 其它曲风走 MiniMax 配乐, 用"谱曲中"
+  const genWord = sid==='acapella' ? '生成中' : '谱曲中';
+  const btnTip = pending ? `AI ${genWord} · 约 40 秒` : '播放';
+  // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示状态文字, 明确表达含义(不止一个转圈)
+  const metaExtra = pending ? `<span class="song-composing">${genWord}</span>` : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
   // 就绪的歌: 挂一个隐藏 <audio preload=auto> 预热浏览器缓存, 点播放时音频已缓存→秒播(不再点后干等下载)
   const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
@@ -4084,8 +4088,9 @@ document.addEventListener('click',e=>{
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
       card.classList.remove('failed','timeout');
-      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
-      const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中';
+      const aca=card.dataset.sid==='acapella';
+      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip',`AI ${aca?'生成中':'谱曲中'} · 约 40 秒`);
+      const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=aca?'生成中':'谱曲中';
       if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计 120s 超时
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
@@ -4177,7 +4182,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱生成中'; }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='生成中'; }catch(_){}
     return;
   }
   _EH_SONG_GENERATING.add(mid);
