@@ -500,6 +500,18 @@
   .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
   @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
+  /* 互动系统消息(居中系统行) */
+  .ixmsg{text-align:center;font-size:12.5px;color:var(--sub);padding:6px 10px;animation:slidein .3s}
+  .ixmsg .ix-em{font-size:16px;vertical-align:-2px}
+  /* 「对TA」头像菜单 */
+  .peer-menu{position:fixed;z-index:72;min-width:132px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;
+    box-shadow:0 10px 30px -8px rgba(0,0,0,.6);padding:5px;opacity:0;transform:translateY(-6px) scale(.96);
+    transition:opacity .14s,transform .14s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .peer-menu.on{opacity:1;transform:translateY(0) scale(1)}
+  .peer-menu .pm-hd{font-size:11px;color:var(--dim);padding:5px 10px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .peer-menu .pm-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--ink);transition:.1s;user-select:none}
+  .peer-menu .pm-row:hover{background:var(--hover)}
+  .peer-menu .pm-row span{flex:1;min-width:0}
   /* 消息撤回占位: 居中灰色细提示(微信式) */
   .recalled-tip{text-align:center;font-size:12px;color:var(--dim);padding:7px 6px;animation:slidein .3s;opacity:.82;user-select:none}
   .recalled-tip .rc-ic{display:inline-block;font-size:12px;opacity:.7;margin-right:2px;transform:translateY(.5px)}
@@ -1093,7 +1105,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1710ixengine';
+  var BUILD_VER='20260714-1800interact';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2457,7 +2469,7 @@ async function enterRoom(room){
       sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
       setupPresence(room),
       refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
-      loadRoomSouls(room.id)           // 拉本房灵魂居民(展示层)
+      loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions())           // 拉本房灵魂居民(展示层)
     ]);
     room.role = memRes?.value?.data?.role || 'member';
     { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
@@ -2480,7 +2492,7 @@ async function enterRoom(room){
   const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
     setupPresence(room),
-    loadRoomSouls(room.id) ];
+    loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions()) ];
   // allSettled: 单个失败不拖垮全流程,不再因一次抖动卡死在"连接中"
   const results = await Promise.allSettled(tasks);
   const memRes = results[1];
@@ -2732,6 +2744,20 @@ function subscribeMessages(rid){
       if(m.kind==='proj'){ projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
+      // 互动: 播特效。震动/闪屏/抖动只给目标本人(挨打的才震), 旁观者看飞行物/撒花但不震。
+      if(m.kind==='interact'){
+        const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]); const targetUid=parts[1];
+        if(ix){
+          const iAmTarget=(targetUid===myUid);
+          const iSent=(m.user_id===myUid);   // 自己发的已在 sendInteraction 本地演过, 不重复
+          if(!iSent){
+            const tEl=document.querySelector(`#presence .pav[data-uid="${targetUid}"]`)||null;
+            const fx=iAmTarget ? ix.fx : Object.assign({}, ix.fx, {vibrate:null, shake:false, flash:null});
+            try{ playInteractionFx(fx, tEl); }catch(_){}
+          }
+        }
+        // 继续往下走 buildMsgEl 渲染系统行(所有人都看到文案)
+      }
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
       if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
@@ -2883,7 +2909,7 @@ function renderPresenceAvatars(users){
     div.className='pav'+(isMe?' me':'')+(isSoul?' soul-av':'');   // soul-av: 灵魂头像带"呼吸=活跃度"动画
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
-    if(!isMe && p.name){ div.dataset.atname=p.name; }
+    if(!isMe && p.name){ div.dataset.atname=p.name; div.dataset.uid=p.user_id; }
     // 灵魂在光墙也带 AI 角标(与消息头像一致)
     if(isSoul) div.style.setProperty('--soul-c', c);
     const soulDot=isSoul?`<span class="soul-dot">AI</span>`:'';
@@ -3067,6 +3093,14 @@ function buildMsgEl(m, isHistory){
     const el=document.createElement('div'); el.className='actmsg';
     el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
+  if(m.kind==='interact'){
+    // text = ixId|targetUid|文案; 渲染成居中系统行(带互动emoji)。特效在 realtime INSERT 时演(见订阅)。
+    const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
+    const txt=parts.slice(2).join('|')||'';
+    const el=document.createElement('div'); el.className='ixmsg';
+    el.innerHTML=`<span class="ix-em">${safeEmoji(ix&&ix.emoji)||'✨'}</span> ${esc(txt)}`;
+    return el;
+  }
   const el=document.createElement('div');
   const isVoid = !!m.anon;
   const isBot = !!m.is_bot;   // 灵魂居民发的消息 → 带 AI 徽标 + 呼吸光环
@@ -3099,7 +3133,7 @@ function buildMsgEl(m, isHistory){
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
   const avBow = (m.user_id===WOLF_UID) ? `<span class="av-bow">🎀</span>` : '';   // 狼姐专属红蝴蝶结
   // 点消息头像 → @ 该发送者(与在线光墙头像一致)。排除: 自己、虚空匿名(@会泄露身份)
-  const avAt = (!isMe && !isVoid && m.name) ? ` data-atname="${esc(m.name)}" title="点击 @${esc(m.name)}"` : '';
+  const avAt = (!isMe && !isVoid && m.name) ? ` data-atname="${esc(m.name)}" data-uid="${esc(m.user_id||'')}" title="点击 · 对TA"` : '';
   el.innerHTML=`
     <div class="av"${avAt} style="background:${avColor}22;color:${avColor};box-shadow:inset 0 0 0 1.5px ${avColor}">${avEmoji(avIc)}${soulDot}${avBow}</div>
     <div class="body">
@@ -3365,13 +3399,67 @@ function insertAtName(name){
   syncSendBtn();
   try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
 }
-// 事件委托：点头像 → @ 那个人。两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
+// 事件委托：点头像 → 弹「对TA」菜单(@ + 互动)。双击头像=快速@(兼容老习惯)。
+//   两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
+let _headDblT=null;
 document.addEventListener('click',e=>{
-  const pav=e.target.closest('#presence .pav');
-  if(pav){ const nm=pav.dataset.atname; if(nm) insertAtName(nm); return; }
-  const av=e.target.closest('.msg .av[data-atname]');
-  if(av){ const nm=av.dataset.atname; if(nm) insertAtName(nm); }
+  const pav=e.target.closest('#presence .pav[data-atname]');
+  const av=pav?null:e.target.closest('.msg .av[data-atname]');
+  const el=pav||av; if(!el) return;
+  const nm=el.dataset.atname; const uid=el.dataset.uid||''; if(!nm) return;
+  // 双击=快速@(不弹菜单)。用延时区分单/双击。
+  if(_headDblT){ clearTimeout(_headDblT); _headDblT=null; insertAtName(nm); return; }
+  _headDblT=setTimeout(()=>{ _headDblT=null; openPeerMenu(el, nm, uid); }, 240);
 });
+// ===== 互动系统: 配置 + 「对TA」菜单 + 发送 + 特效 =====
+let _interactions=[];   // eh_interactions 缓存
+async function loadInteractions(){
+  try{ const { data }=await sb.from('eh_interactions').select('*').eq('enabled',true).order('sort'); if(Array.isArray(data)) _interactions=data; }catch(e){}
+}
+const _ixCooldown=new Map();   // interactionId → 上次发的时间戳(本地冷却)
+const isSoulUid=(uid)=>soulUidSet && soulUidSet.has(uid);
+// 点头像弹出「对TA」小菜单: @TA + 各互动
+function openPeerMenu(anchorEl, name, uid){
+  hidePeerMenu();
+  const isTargetSoul=isSoulUid(uid);
+  const items=[`<div class="pm-row" data-act="at">💬 <span>@ ${esc(name)}</span></div>`];
+  _interactions.forEach(ix=>{
+    if(isTargetSoul && ix.can_target_soul===false) return;
+    items.push(`<div class="pm-row" data-ix="${esc(ix.id)}">${safeEmoji(ix.emoji)||'✨'} <span>${esc(ix.name)}</span></div>`);
+  });
+  const menu=document.createElement('div'); menu.className='peer-menu'; menu.id='peerMenu';
+  menu.innerHTML=`<div class="pm-hd">对 ${esc(name)}</div>`+items.join('');
+  document.body.appendChild(menu);
+  // 定位到头像附近(视口内)
+  const r=anchorEl.getBoundingClientRect();
+  let x=r.left, y=r.bottom+6;
+  requestAnimationFrame(()=>{ const mw=menu.offsetWidth, mh=menu.offsetHeight;
+    if(x+mw>window.innerWidth-8) x=window.innerWidth-mw-8;
+    if(y+mh>window.innerHeight-8) y=r.top-mh-6;
+    menu.style.left=Math.max(8,x)+'px'; menu.style.top=Math.max(8,y)+'px'; menu.classList.add('on'); });
+  menu.querySelectorAll('.pm-row').forEach(row=>row.onclick=(e)=>{ e.stopPropagation();
+    if(row.dataset.act==='at'){ insertAtName(name); hidePeerMenu(); return; }
+    const ix=_interactions.find(i=>i.id===row.dataset.ix); if(ix) sendInteraction(ix, uid, name);
+    hidePeerMenu();
+  });
+}
+function hidePeerMenu(){ const m=$('#peerMenu'); if(m) m.remove(); }
+document.addEventListener('click',e=>{ if(!e.target.closest('#peerMenu') && !e.target.closest('.pav')&&!e.target.closest('.msg .av')) hidePeerMenu(); });
+// 发一个互动: 本地立即演特效 + 写 kind=interact 消息广播给房里所有人
+async function sendInteraction(ix, targetUid, targetName){
+  if(!curRoom||!myUid) return;
+  const now=Date.now(), cd=ix.cooldown_ms||4000;
+  if(now-(_ixCooldown.get(ix.id)||0) < cd){ toast('手速太快，歇会儿再来~'); return; }
+  _ixCooldown.set(ix.id, now);
+  // 发起者本地先演一遍(命中对方头像); 目标本人收到 realtime 再演(带震)
+  const tEl=document.querySelector(`#presence .pav[data-uid="${targetUid}"]`)||null;
+  try{ playInteractionFx(Object.assign({}, ix.fx, {vibrate:null, shake:false, flash:null}), tEl); }catch(_){}  // 自己发不震自己屏
+  const txt=(ix.text_tpl||'{from} 对 {to} 使用了 '+ix.name).replace('{from}',me.name).replace('{to}',targetName);
+  // text 编码: ixId|targetUid|文案 ; kind=interact
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
+    text:ix.id+'|'+targetUid+'|'+txt, kind:'interact' };
+  try{ await sb.from('eh_messages').insert(payload); }catch(e){ console.warn('sendInteraction',e); }
+}
 // 本地打字机：把灵魂消息逐字吐进 .txt(好看,零成本,不走网关流式)
 // 用字素簇切分(保 emoji 完整),每帧吐 1-2 字,@高亮在收尾时统一渲染
 function typewriterInto(el, fullText){
