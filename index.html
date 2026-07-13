@@ -1076,7 +1076,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1400roomcfg';
+  var BUILD_VER='20260714-1500pressnap';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2403,6 +2403,7 @@ async function enterRoom(room){
     // 秒还原已渲染消息 + 滚动位置状态
     $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
+    renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
@@ -2425,6 +2426,7 @@ async function enterRoom(room){
   _songReadyQueue=[]; _songReadyIdx=0; updateSongJump();   // 切房清空神曲谱好提醒
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
+  renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
 
   await ensureAuth();
@@ -2798,6 +2800,19 @@ function presenceSkeleton(n){
   for(let i=0;i<n;i++) s+='<div class="pav-skel"><div class="sk-ic"></div><div class="sk-nm"></div></div>';
   return s;
 }
+// ⚡ 进房时立即用上次快照乐观铺光墙(不等 ensureAuth/joinAsMember/setupPresence 那几个网络await)。
+// 命中返回 true(已铺旧头像), 否则 false(调用方保持骨架)。真实 refreshPresence 回来后 diff 无缝替换。
+function renderPresenceSnapshot(room){
+  try{
+    const snap=JSON.parse(localStorage.getItem('eh_pres_snap')||'null');
+    if(!(snap && snap.rid===room.id && Array.isArray(snap.users) && snap.users.length && (Date.now()-snap.at < 120000))) return false;
+    presenceMap.clear();   // 清旧房残留节点引用(骨架 innerHTML 已冲掉 DOM, Map 需同步清)
+    let us=snap.users.slice();
+    if(myUid && !us.some(u=>u.user_id===myUid)) us.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color});
+    renderPresenceAvatars(us);
+    return true;
+  }catch(e){ return false; }
+}
 function renderPresenceAvatars(users){
   const container=$('#presence');
   // 首次真实渲染前, 清掉进房时的骨架占位
@@ -2924,6 +2939,13 @@ async function refreshPresence(){
   lastUsersSnapshot=users;
   renderPresenceAvatars(users);
   renderTyping(users);
+  // 持久化光墙快照(最多30人)→ 下次进同房先乐观铺出来, 消除"现拉一个网络往返"的空窗
+  try{
+    if(data && curRoom){
+      const slim=users.slice(0,30).map(u=>({user_id:u.user_id,name:u.name,emoji:u.emoji,color:u.color}));
+      localStorage.setItem('eh_pres_snap', JSON.stringify({ rid:curRoom.id, users:slim, at:Date.now() }));
+    }
+  }catch(e){}
 }
 
 // presence realtime 事件的 debounce 触发器: 300ms 合并瞬时多次变化
