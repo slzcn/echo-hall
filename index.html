@@ -2567,7 +2567,13 @@ function subscribeMessages(rid){
     // 连接指示灯由 realtime 通道真实状态驱动(而非"一批一次性查询有没有 resolve")。
     // SUBSCRIBED=真的连上了; 掉线/出错/超时→回落"连接中",Supabase 会自动重连,重连成功再置亮。
     .subscribe((status)=>{
-      if(status==='SUBSCRIBED') setConn(true);
+      if(status==='SUBSCRIBED'){
+        setConn(true);
+        // ★关键: 订阅"真正就绪"后补拉一次最新, 兜住"loadHistory 拉完 → 订阅就绪"之间的空窗消息
+        // (realtime 异步建立需数百ms, 这段窗口内别人发的消息 loadHistory 没拉到、订阅也没收到 → 原来必须刷新)。
+        // 也覆盖掉线重连(SUBSCRIBED 再次触发)期间漏收的消息。用 curRoom 校验防串房。
+        try{ if(curRoom && curRoom.id===rid) refreshSnapshotTail(curRoom).catch(()=>{}); }catch(_){}
+      }
       else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED') setConn(false,'连接中');
     });
 }
