@@ -2325,6 +2325,19 @@ async function enterRoom(room){
   room.role = memRes?.value?.data?.role || 'member';
   $('#gearBtn').classList.toggle('show', room.role==='owner' && room.kind!=='official');
   sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+  ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
+}
+// 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
+// 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
+function ensureBottom(){
+  const s=$('#stream'); if(!s) return;
+  let lastH=-1, tries=0;
+  const kick=()=>{
+    s.scrollTop=s.scrollHeight; hideToLatest();
+    // 高度还在变(异步内容在长)→ 继续贴底, 最多 ~1.2s
+    if(s.scrollHeight!==lastH && tries<8){ lastH=s.scrollHeight; tries++; setTimeout(kick, 120); }
+  };
+  requestAnimationFrame(kick);
 }
 
 // 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
