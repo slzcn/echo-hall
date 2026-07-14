@@ -523,6 +523,13 @@
       <div id="ixList"></div>
       <div style="margin-top:10px"><button class="mini-btn" id="ixAddBtn" style="border-color:var(--cyan);color:var(--cyan)">+ 新增互动</button></div>
     </div>
+
+    <div class="glass card">
+      <h3>🎤 真人清唱风味池</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">真人发清唱时, worker 从这里随机挑一种唱腔(灵魂清唱用各自人设唱腔, 不受此影响)。每行一种, 用自然语言描述, 如"东北话腔调, 豪爽带点搞笑"。改后点保存, worker 30 秒内生效。留空则用代码默认池。</p>
+      <textarea id="humanSingTa" rows="7" style="width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:10px;color:var(--ink);padding:10px;font-size:13px;font-family:inherit;line-height:1.7" placeholder="每行一种唱腔…"></textarea>
+      <div style="margin-top:10px"><button class="btn" id="humanSingSave">保存风味池</button></div>
+    </div>
   </div>
 
   <!-- 📝 文案 & 绑定 -->
@@ -1661,6 +1668,21 @@ async function delIx(i){
 }
 $('#ixAddBtn')?.addEventListener('click',()=>{ _ixDraft.push({id:'',name:'新互动',emoji:'✨',category:'fun',fx:{},cooldown_ms:4000,can_target_soul:true,enabled:true,sort:(_ixDraft.length+1)*10}); renderIxList(); });
 
+// ---- 🎤 真人清唱风味池(eh_config.humanSingStyles, 走通用 /config) ----
+async function loadHumanSing(){
+  const ta=$('#humanSingTa'); if(!ta) return;
+  const r=await api('/config');
+  let arr=[];
+  if(r.ok && Array.isArray(r.body.config)){ const row=r.body.config.find(x=>x.key==='humanSingStyles'); if(row && Array.isArray(row.value)) arr=row.value; }
+  ta.value=arr.join('\n');
+}
+$('#humanSingSave')?.addEventListener('click',async()=>{
+  const ta=$('#humanSingTa'); if(!ta) return;
+  const arr=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!arr.length){ toast('至少留一种唱腔'); return; }
+  await saveConfigKey('humanSingStyles', arr);
+});
+
 // ---- 📋 全站日志 ----
 const AUDIT_KEY_LABEL = {
   themePalettes:'🎨 主题配色', themes:'🎨 主题元数据', roomTheme:'🏠 官方房主题绑定',
@@ -1907,7 +1929,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='bgm') loadBgm();
   if(t.dataset.page==='text') loadTextBind();
   if(t.dataset.page==='tuning') loadTuning();
-  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); }
+  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位
 });
