@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2305nokindlabel';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260714-2320presfix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3064,6 +3064,8 @@ function presenceSkeleton(n){
 // 命中返回 true(已铺旧头像), 否则 false(调用方保持骨架)。真实 refreshPresence 回来后 diff 无缝替换。
 function renderPresenceSnapshot(room){
   try{
+    // 私密房不用乐观快照: 成员固定且少, 直接等真实查询, 避免任何缓存串房把陈生人铺到私密房光墙(安全)
+    if(room && room.kind==='private') return false;
     const snap=JSON.parse(localStorage.getItem('eh_pres_snap')||'null');
     if(!(snap && snap.rid===room.id && Array.isArray(snap.users) && snap.users.length && (Date.now()-snap.at < 120000))) return false;
     presenceMap.clear();   // 清旧房残留节点引用(骨架 innerHTML 已冲掉 DOM, Map 需同步清)
@@ -3194,10 +3196,13 @@ let _sqbTarget=null;
 
 async function refreshPresence(){
   if(!curRoom) return;
+  const _rid = curRoom.id;   // 锁定本次刷新的目标房 id, 防 await 期间切房导致数据串房(公开房 presence 被打上私密房 rid)
   const since = new Date(Date.now()-ONLINE_WINDOW()).toISOString();
   let data=null;
-  try{ ({ data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',curRoom.id).gte('last_seen',since)); }
+  try{ ({ data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',_rid).gte('last_seen',since)); }
   catch(e){ console.warn('presence query', e); }   // 查询失败也别让文字卡"连接中",下面用本地兜底至少显示"我"
+  // await 期间已切房: 本次结果属于旧房, 丢弃不渲染不写快照(否则旧房头像串到新房光墙)
+  if(!curRoom || curRoom.id!==_rid) return;
   let users=(data||[]).slice();
   if(myUid && !users.some(u=>u.user_id===myUid)){ users.unshift({user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,typing_at:null}); }
   users=users.sort((a,b)=> a.user_id===myUid?-1:b.user_id===myUid?1:0);
@@ -3206,9 +3211,9 @@ async function refreshPresence(){
   renderTyping(users);
   // 持久化光墙快照(最多30人)→ 下次进同房先乐观铺出来, 消除"现拉一个网络往返"的空窗
   try{
-    if(data && curRoom){
+    if(data && curRoom && curRoom.id===_rid){
       const slim=users.slice(0,30).map(u=>({user_id:u.user_id,name:u.name,emoji:u.emoji,color:u.color}));
-      localStorage.setItem('eh_pres_snap', JSON.stringify({ rid:curRoom.id, users:slim, at:Date.now() }));
+      localStorage.setItem('eh_pres_snap', JSON.stringify({ rid:_rid, users:slim, at:Date.now() }));
     }
   }catch(e){}
 }
