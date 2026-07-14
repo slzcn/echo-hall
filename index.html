@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0030summontokenfix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0035authprofile';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1975,11 +1975,31 @@ async function ensureAuth(){
     try{ rollIdentity(); }catch(e){}
     try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){}
   }
-  // upsert 到 eh_users: 只是把身份档案落库, 后续进房/发言都不依赖它当场完成 →
-  // fire-and-forget, 不阻塞"进入→大厅"导航(省一个网络往返的可感知等待)。
-  const isAnon = !session?.user?.email;
-  sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:isAnon, last_seen:new Date().toISOString() })
-    .then(({error})=>{ if(error) console.warn('eh_users upsert', error.message); });
+  // ★正式账号(session 带 email)的档案以【库为准】: 弱网抖动曾把缓存 me 误降级成随机匿名名,
+  //   若此时照缓存 upsert 会把正式账号(如超管 yiran)的 name/emoji/color 冲成随机名(踩过)。
+  //   故: 正式 session → 先从 eh_users 读回权威档案回填 me(修正被污染的缓存), 且 upsert 只更 last_seen,
+  //   绝不用缓存覆盖正式账号的 name/emoji/color。只有匿名身份才整档 upsert。
+  const isRegSession = !!(session?.user && session.user.email);
+  if(isRegSession){
+    // 只更在线时间, 不碰身份字段(名字/头像/色由本人显式改名时才写)
+    sb.from('eh_users').update({ last_seen:new Date().toISOString() }).eq('id',uid)
+      .then(({error})=>{ if(error) console.warn('eh_users last_seen', error.message); });
+    // 读回权威档案, 修正可能被弱网降级污染的本地缓存
+    sb.from('eh_users').select('name,emoji,color').eq('id',uid).maybeSingle().then(({data:prof})=>{
+      if(prof && prof.name){
+        let changed=false;
+        if(me.name!==prof.name){ me.name=prof.name; changed=true; }
+        if(prof.emoji && me.emoji!==prof.emoji){ me.emoji=prof.emoji; changed=true; }
+        if(prof.color && me.color!==prof.color){ me.color=prof.color; changed=true; }
+        if(!me.registered){ me.registered=true; changed=true; }   // 正式 session 必是正式账号
+        if(changed){ try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){} }
+      }
+    });
+  }else{
+    // 匿名身份: 整档 upsert(名字随机、可随时重掷, 不怕覆盖)
+    sb.from('eh_users').upsert({ id:uid, name:me.name, emoji:me.emoji, color:me.color, is_anonymous:true, last_seen:new Date().toISOString() })
+      .then(({error})=>{ if(error) console.warn('eh_users upsert', error.message); });
+  }
   return uid;
 }
 
