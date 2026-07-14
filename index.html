@@ -226,7 +226,7 @@
   @keyframes sjSpin{to{transform:rotate(360deg)}}
   html[data-mode="day"] .song-jump.gen{color:#0C8E82;border-color:rgba(12,142,130,.4)}
   /* 日间模式: 神曲卡上依赖曲风色(--sc)的文字, 与深墨(--ink)混色以保证浅底可读性(WCAG≥5), 保留曲风识别 */
-  html[data-mode="day"] .song-card{ --sc-txt: color-mix(in srgb, var(--sc, var(--magenta)) 40%, var(--ink, #1A2036)); }
+  html[data-mode="day"] .song-card{ --sc-txt: color-mix(in srgb, var(--sc, var(--magenta)) 35%, var(--ink, #1A2036)); }
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
@@ -720,6 +720,13 @@
   .playing .pglyph::before{opacity:0}
   .playing .pglyph::after{opacity:1}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+  /* 实体色文字统一可读性: 夜间用原色, 日间混墨保对比度(--ec 由行内设) */
+  .ec-name,.ai-tag,.wi-nm,.ai-av,.mi-av{ color: var(--ec, inherit); }
+  html[data-mode="day"] .ec-name,
+  html[data-mode="day"] .ai-tag,
+  html[data-mode="day"] .wi-nm,
+  html[data-mode="day"] .ai-av,
+  html[data-mode="day"] .mi-av{ color: color-mix(in srgb, var(--ec, var(--ink)) 38%, var(--ink,#1A2036)); }
   .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px;color:var(--sc-txt,var(--sc,var(--magenta)))}
   .song-lyric{font-size:13.5px;color:var(--sub);max-width:min(240px,72vw);white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
   .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
@@ -1130,7 +1137,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1450atkbd';
+  var BUILD_VER='20260714-1315readable';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3238,7 +3245,7 @@ function buildMsgEl(m, isHistory){
   if(m.kind==='proj' && isHistory && m._skipHist) return null;   // 历史里与 msg 留底重复的灵魂投影, 去重跳过
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
-    el.innerHTML=`✦ <b style="color:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
+    el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   if(m.kind==='interact'){
     // text = ixId|targetUid|文案; 渲染成居中系统行(带互动emoji)。特效在 realtime INSERT 时演(见订阅)。
@@ -3517,9 +3524,9 @@ function checkAtTrigger(){
 function renderAtMenu(){
   const menu=$('#atMenu');
   menu.innerHTML=_atList.map((c,i)=>`<div class="at-item${i===_atSel?' sel':''}" data-i="${i}">
-    <div class="ai-av" style="background:${safeColor(c.color)}22;color:${safeColor(c.color)}">${safeEmoji(c.emoji)||(c.isSoul?'✦':'👤')}</div>
+    <div class="ai-av" style="background:${safeColor(c.color)}22;--ec:${safeColor(c.color)}">${safeEmoji(c.emoji)||(c.isSoul?'✦':'👤')}</div>
     <span class="ai-nm">${esc(c.name)}</span>
-    ${c.isSoul?`<span class="ai-tag" style="color:${safeColor(c.color)};background:color-mix(in srgb,${safeColor(c.color)} 16%,transparent)">✦AI</span>`:''}
+    ${c.isSoul?`<span class="ai-tag" style="--ec:${safeColor(c.color)};background:color-mix(in srgb,${safeColor(c.color)} 16%,transparent)">✦AI</span>`:''}
   </div>`).join('');
   menu.classList.add('on');
   menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
@@ -4162,7 +4169,7 @@ function songHtml(text){
   const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
     <button class="song-play" data-tip="${btnTip}">${btnInner}</button>
-    <span class="song-meta"><span class="song-style" style="color:${safeColor(st.color)}">${st.emoji} ${esc(st.name)}
+    <span class="song-meta"><span class="song-style">${st.emoji} ${esc(st.name)}
       ${metaExtra}</span>
     <span class="song-lyric">${chs}</span></span>${preloadAudio}</span>`;
 }
@@ -5151,7 +5158,7 @@ async function openGear(){
   const allM=(members||[]); const MAX_SHOW=20;
   const showM=allM.slice(0, MAX_SHOW); const moreN=allM.length-showM.length;
   const memberRows=showM.map(mm=>`
-        <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;color:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
+        <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;--ec:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
           <span class="mi-nm">${esc(mm.name)}</span>
           ${mm.role==='owner'?'<span class="mi-role">房主</span>':(isOwner && mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
         </div>`).join('') + (moreN>0?`<div class="mitem-more">…还有 ${moreN} 人</div>`:'');
@@ -5859,7 +5866,7 @@ function openWall(){
   const top=items.slice(0,8);
   box.innerHTML = top.length ? top.map((it,i)=>`
     <div class="wall-item">
-      <div class="wi-top"><span class="wi-nm" style="color:${esc(it.color||'var(--ink)')}">${esc(it.name)}</span>
+      <div class="wi-top"><span class="wi-nm" style="--ec:${esc(it.color||'var(--ink)')}">${esc(it.name)}</span>
         <span class="wi-rank">#${i+1} · ${it.total} 共鸣</span></div>
       <div class="wi-txt">${esc(it.text)}</div>
       <div class="wi-echoes">${it.pills.map(p=>`<span class="wi-pill">${esc(p)}</span>`).join('')}</div>
