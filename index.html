@@ -1111,9 +1111,8 @@
   .summon-item:hover .si-nm{color:var(--ink)}
   .summon-item.on .si-nm{color:var(--ink)}
   .summon-item .si-emoji{font-size:22px;line-height:1;flex:none}
-  .summon-item .si-body{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px}
-  .summon-item .si-nm{font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;flex:none}
-  .summon-item .si-blurb{font-size:12px;color:var(--sub);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .summon-item .si-body{flex:1;min-width:0;display:block}
+  .summon-item .si-nm{font-weight:500;font-size:13px;color:var(--ink);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .summon-item .si-check{flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.15s}
   .summon-item.on .si-check{background:var(--accent);border-color:var(--accent);color:#fff}
   .summon-item.busy{opacity:.5;pointer-events:none}
@@ -1147,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1940cardnmcolor';  window.__EH_BUILD_VER=BUILD_VER;  function check(reason){
+  var BUILD_VER='20260714-1955summononeline';  window.__EH_BUILD_VER=BUILD_VER;  function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
       return r.text();
@@ -5181,9 +5180,9 @@ async function openGear(){
       ? `<div class="summon-panel" id="gSummonPanel">
            <div class="sp-title">✨ 召唤陪聊灵魂</div>
            <div class="summon-grid" id="gSummonGrid">${EH_SUMMONABLES_FALLBACK.map(x=>`
-             <div class="summon-item" data-key="${x.key}" data-orig="0">
+             <div class="summon-item" data-key="${x.key}" data-name="${esc(x.name)}" data-orig="0">
                <span class="si-emoji">${x.emoji}</span>
-               <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你</div><div class="si-blurb">${esc(x.blurb)}</div></div>
+               <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb)}</div></div>
                <span class="si-check">✓</span>
              </div>`).join('')}</div>
          </div>`
@@ -5273,10 +5272,10 @@ async function openGear(){
       const inRoomByName=(nm)=> (typeof soulNameSet!=='undefined' && soulNameSet && soulNameSet.has(nm));
       // data-orig = 该灵魂进面板时是否已在房(1=已召唤)。保存时对比 on 与 orig 决定 召唤/请离开。
       grid.innerHTML=list.map(x=>{ const on = !!x.on || inRoomByName(x.name); return `
-        <div class="summon-item ${on?'on':''}" data-key="${x.key}" data-orig="${on?'1':'0'}">
+        <div class="summon-item ${on?'on':''}" data-key="${x.key}" data-name="${esc(x.name)}" data-orig="${on?'1':'0'}">
 
           <span class="si-emoji">${x.emoji}</span>
-          <div class="si-body"><div class="si-nm">${on?'':'叫'}${esc(x.name)}${on?'（在房·点取消请离开）':'来陪你'}</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
+          <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb||'')}</div></div>
           <span class="si-check">✓</span>
         </div>`; }).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
@@ -5298,7 +5297,7 @@ async function openGear(){
       // diff: 勾了但初始没召唤=要召唤(on:true); 取消了但初始已召唤=要撤销(on:false)
       const _items=[..._sg.querySelectorAll('.summon-item')];
       const _changes=_items.filter(it=>{ const on=it.classList.contains('on')?1:0; const orig=it.dataset.orig==='1'?1:0; return on!==orig; })
-                           .map(it=>({ it, key:it.dataset.key, on:it.classList.contains('on'), nm:it.querySelector('.si-nm').textContent.replace(/^叫|来陪你$/g,'') }));
+                           .map(it=>({ it, key:it.dataset.key, on:it.classList.contains('on'), nm:it.dataset.name||it.dataset.key }));
       if(_changes.length){
         _saveBtn.disabled=true; _saveBtn.textContent='处理中…';
         const _fails=[];   // 收集失败项, 最后统一一条友好提示(不再逐条弹原始错误码)
