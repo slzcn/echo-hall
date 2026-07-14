@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2340secfix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0010summonfix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5283,15 +5283,18 @@ async function openGear(){
         try{ await loadRoomSouls(curRoom.id); }catch(_){}
         const r=await fetch(API+'/soul-summonables?room_id='+encodeURIComponent(curRoom.id),{ headers:{ 'Authorization':'Bearer '+token } });
         const d=await r.json();
-        if(r.ok&&d.list){ renderList(d.list); }  // 拉回真实召唤态, 覆盖骨架(骨架失败也无妨, 保持可勾选)
+        if(r.ok&&d.list){ renderList(d.list); return; }  // 拉回真实召唤态, 覆盖骨架
       }catch(e){}
+      // 端点失败兜底: 用前端白名单 + members/soulNameSet 判定勾选, 不卡在骨架全空(根治"成员在房却不勾选")
+      try{ renderList(EH_SUMMONABLES_FALLBACK.map(x=>({key:x.key,name:x.name,emoji:x.emoji,blurb:x.blurb,on:false}))); }catch(_){}
     }
     // 所有灵魂都可勾选/取消: 勾上=要召唤, 取消已召唤的=要撤销; data-orig 记初始态, 保存时 diff
     function renderList(list){
       grid.style.display='flex';
-      // 勾选态记忆真相源: 优先信后端 x.on, 但后端可能因"狼姐在房用的是漫游uid、和召唤key对不上"
-      // 而返回 false → 用本房实际灵魂名(soulNameSet, 按名字兜底)再校正一次: 名字在房里就算已召唤。
-      const inRoomByName=(nm)=> (typeof soulNameSet!=='undefined' && soulNameSet && soulNameSet.has(nm));
+      // 勾选态真相源(三重兑底, 任一命中即勾): ①后端 x.on ②本房灵魂名 soulNameSet ③房间成员名(最硬, 就是擑起"N人"的那份 members)
+      // 前两重依赖 RPC/端点, 会因网络抖动/灵魂漫游uid与召唤key对不上 而 false; members 是 openGear 开头已拉的可靠数据, 灵魂在房就一定在里面 → 根治"成员在房却不勾选"
+      const _memNames = new Set((members||[]).map(m=>m && m.name).filter(Boolean));
+      const inRoomByName=(nm)=> (typeof soulNameSet!=='undefined' && soulNameSet && soulNameSet.has(nm)) || _memNames.has(nm);
       // data-orig = 该灵魂进面板时是否已在房(1=已召唤)。保存时对比 on 与 orig 决定 召唤/请离开。
       grid.innerHTML=list.map(x=>{ const on = !!x.on || inRoomByName(x.name); return `
         <div class="summon-item ${on?'on':''}" data-key="${x.key}" data-name="${esc(x.name)}" data-orig="${on?'1':'0'}">
