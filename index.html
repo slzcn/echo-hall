@@ -1113,7 +1113,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2340gearfix';
+  var BUILD_VER='20260714-1245bgmlobby';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2038,16 +2038,32 @@ function ehRipple(el, ev){
 }
 
 const AudioEngine=(function(){
-  // 用 HTMLAudioElement 循环播放 mp3 BGM (替代之前的 Web Audio 合成器)
-  // 接口保持不变: start(cfg)/stop()/resume()/playing()/curName()/duck(on)
-  let el=null, cur=null, fadeTimer=null;
+  // 用 HTMLAudioElement 播放 mp3 BGM。两种模式:
+  //  · loop 模式(在房间里): 单曲循环该房 BGM。
+  //  · chain 模式(大厅/离房续播): 当前曲放完后随机连播任意房间的 BGM(丝滑不断)。
+  // 接口: start(cfg)/stop()/resume()/playing()/curName()/duck(on)/chain(pool)/toChainAfter(pool)
+  let el=null, cur=null, fadeTimer=null, mode='loop', chainPool=null;
   const VOL_ON=0.55, VOL_DUCK=0.12, FADE_MS=1000;
+  function pickNext(pool){
+    const list=(pool||[]).filter(c=>c&&c.url);
+    if(!list.length) return null;
+    if(list.length===1) return list[0];
+    // 避免连续重复同一首
+    let n; do{ n=list[Math.floor(Math.random()*list.length)]; }while(cur&&n.url===cur.url&&list.length>1);
+    return n;
+  }
+  function onEnded(){
+    // chain 模式: 放完随机下一首; loop 模式此事件不触发(el.loop=true)
+    if(mode!=='chain'||!bgmOn()) return;
+    const nx=pickNext(chainPool); if(nx) playCfg(nx);
+  }
   function ensure(){
     if(!el){
       try{
-        el=new Audio(); el.loop=true; el.preload='auto'; el.crossOrigin='anonymous';
+        el=new Audio(); el.preload='auto'; el.crossOrigin='anonymous';
         el.volume=0;
-        el.addEventListener('error',()=>{ /* 静默, BGM 非必需, 不阻断房间体验 */ });
+        el.addEventListener('error',()=>{ /* 静默, BGM 非必需 */ if(mode==='chain'){ const nx=pickNext(chainPool); if(nx&&(!cur||nx.url!==cur.url)) setTimeout(()=>{ if(mode==='chain') playCfg(nx); },500); } });
+        el.addEventListener('ended',onEnded);
       }catch(e){ el=null; }
     }
     return el;
@@ -2065,6 +2081,7 @@ const AudioEngine=(function(){
   function playCfg(cfg){
     if(!cfg||!cfg.url) return;
     ensure(); if(!el) return;
+    el.loop=(mode==='loop');
     if(cur && cur.url===cfg.url && !el.paused){ /* 已在播同一首, 恢复音量即可 */ fadeTo(VOL_ON,FADE_MS); cur=cfg; return; }
     cur=cfg;
     try{ el.pause(); }catch(_){}
@@ -2075,8 +2092,16 @@ const AudioEngine=(function(){
     fadeTo(VOL_ON,FADE_MS);
   }
   return {
-    start(cfg){ if(!bgmOn()) return; playCfg(cfg); },
-    stop(){ if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
+    // 进房: 单曲循环该房 BGM(硬切)
+    start(cfg){ if(!bgmOn()) return; mode='loop'; chainPool=null; if(el) el.loop=true; playCfg(cfg); },
+    // 大厅/冷启动: 立即随机连播模式(从 pool 里随机起一首)
+    chain(pool){ if(!bgmOn()) return; mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
+      if(!(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } },
+    // 离房返回大厅: 不打断当前曲, 只切成 chain 模式——放完再随机连播(丝滑续播)
+    toChainAfter(pool){ mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
+      // 若当前没在播(比如已被静音/停了), 直接随机起一首
+      if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } },
+    stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
     resume(){ if(!el||!cur) return; if(el.paused){ try{el.play();}catch(_){} } },
     playing(){ return !!(el && cur && !el.paused); },
     curName(){ return cur?cur.name:null; },
@@ -2085,9 +2110,30 @@ const AudioEngine=(function(){
   };
 })();
 function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
+// 全部可用 BGM 曲目池(官方房各一首 + 公共/私密 fallback 各一首), 供大厅随机连播
+function bgmPool(){
+  try{
+    const out=[], seen=new Set();
+    const push=(c)=>{ if(c&&c.url&&!seen.has(c.url)){ seen.add(c.url); out.push(c); } };
+    Object.keys(ROOM_BGM).forEach(k=>{ if(k==='_fallback') return; push(ROOM_BGM[k]); });
+    if(ROOM_BGM._fallback){ push(ROOM_BGM._fallback.public); push(ROOM_BGM._fallback.private); }
+    return out;
+  }catch(e){ return []; }
+}
+// 大厅氛围: 随机连播任意房间 BGM(离房丝滑续播由 backToLobby 调 toChainAfter)
+function startLobbyBGM(){ try{ if(!bgmOn()) return; AudioEngine.chain(bgmPool()); }catch(e){ console.warn('startLobbyBGM',e); } }
+// 首次交互解锁: HTMLAudioElement 受 autoplay 策略限制, 手势后若在大厅且无房则起大厅 BGM。
+// (进房路径由 startRoomBGM 负责; 这里兜底"停在大厅还没响"的冷启动/自动恢复登录进大厅)
+function kickBgmOnGesture(){
+  try{
+    AudioEngine.resume();
+    if(bgmOn() && !AudioEngine.playing() && !curRoom && $('#lobby') && $('#lobby').classList.contains('on')) startLobbyBGM();
+  }catch(_){}
+}
+try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){}
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇
 function paintBgmBtn(on){ const b2=$('#bgmBtnHall'); if(b2){ b2.classList.toggle('muted',!on); b2.textContent=on?'🎵':'🔇'; } }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
     if(!bgmOn()) return;
@@ -2189,7 +2235,11 @@ function initThemeUI(){
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
   // 切场景清掉可能残留的全屏遮挡(录音浮层/键盘态), 防其挡住点击
-  document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on'); }
+  document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
+  // 落到大厅 → 大厅氛围随机连播(chain 会保留正在播的曲, 从房间返回时丝滑续播, 不打断)
+  if(id==='lobby'){ try{ startLobbyBGM(); }catch(_){} }
+  else if(id==='enter'){ try{ AudioEngine.stop(); }catch(_){} }   // 回到入场/登出页: 停 BGM
+}
 
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
@@ -3502,7 +3552,8 @@ const isSoulUid=(uid)=>soulUidSet && soulUidSet.has(uid);
 function openPeerMenu(anchorEl, name, uid){
   hidePeerMenu();
   const isTargetSoul=isSoulUid(uid);
-  const items=[`<div class="pm-row" data-act="at">💬 <span>@ ${esc(name)}</span></div>`];
+  // 长按菜单只保留互动(送花/抱一下/打一拳/扔炸弹); @TA 仍由"点头像"触发, 不在此菜单
+  const items=[];
   _interactions.forEach(ix=>{
     if(isTargetSoul && ix.can_target_soul===false) return;
     items.push(`<div class="pm-row" data-ix="${esc(ix.id)}">${safeEmoji(ix.emoji)||'✨'} <span>${esc(ix.name)}</span></div>`);
@@ -5362,7 +5413,10 @@ async function logoutIdentity(bound){
 function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ try{ EhSfx.play('back'); }catch(e){} AudioEngine.stop(); applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
+function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
+  // 丝滑续播: 不打断当前房 BGM, 只切成大厅随机连播模式——当前曲放完后随机连播任意房间 BGM
+  try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){}
+  applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
   clearLastRoom();   // ★ 同步立即清标记: 用户明确返回大厅 → 即使立即刷新也不再回旧房间(不等异步 leaveRoom)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
