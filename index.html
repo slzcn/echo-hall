@@ -1146,7 +1146,8 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2005wolfblurbfix';  window.__EH_BUILD_VER=BUILD_VER;  function check(reason){
+  var BUILD_VER='20260714-2010lobbyskel';  window.__EH_BUILD_VER=BUILD_VER;
+  function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
       return r.text();
@@ -2364,10 +2365,19 @@ function soulThemeColor(custom, fallback){
   return fallback || ROOM_KIND_C.official;
 }
 let _themeUIInit=false;
+// 大厅房间查询带超时: 慢网/弱网下 sb 查询可能永不返回 → 骨架卡死不消失(见 21:09 截图 6KB/s)。
+// 8s 超时后抛错, 由 renderLobby 的重试兜底; 不再无限挂骨架。
+function roomsQuery(q, ms=8000){ return withTimeout(q, ms).catch(()=>({data:null,__timeout:true})); }
+let _lobbyRetryTimer=null;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
   const _ln=$('#lobbyName'); if(_ln){ _ln.textContent=me.name; _ln.style.color=me.color; }
-  await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
+  const rs=await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
+  // 任一区块因超时/失败没拿到数据 → 稍后自动重试(最多几次), 避免骨架永久卡住
+  const anyFail=rs.some(x=>x&&x.failed);
+  if(anyFail && !_lobbyRetryTimer){
+    _lobbyRetryTimer=setTimeout(()=>{ _lobbyRetryTimer=null; if($('#lobby')&&$('#lobby').classList.contains('on')) renderLobby(false); }, 2500);
+  }
 }
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
 function chSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="ch-skel"><div class="sk-b sk-icon"></div><div class="sk-b sk-h"></div><div class="sk-b sk-d"></div><div class="sk-b sk-l"></div></div>'; return s; }
@@ -2381,7 +2391,9 @@ async function renderOfficial(soft){
     return;
   }
   if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at');
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at'));
+  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试, 不清空也不卡死
+  const { data } = _r;
   box.innerHTML=(data||[]).map(r=>{
     const c=roomAccentC({...r,kind:'official'});
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
@@ -2402,7 +2414,9 @@ async function renderPublic(soft){
     return;
   }
   if(!box.children.length) box.innerHTML=chSkel(2);   // 慢网先占位
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false});
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false}));
+  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
+  const { data } = _r;
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:${roomAccentC({...r,kind:'public'})}">
@@ -2471,7 +2485,9 @@ async function renderMyRooms(soft){
     return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
   }
   if(!boxE.children.length) boxE.innerHTML=rmSkel(2);   // 慢网先占位
-  const { data } = await sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false});
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false}));
+  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
+  const { data } = _r;
   const box=$('#myRooms'); const pe=$('#privEmpty');
   if(!data || !data.length){ box.innerHTML=''; if(pe) pe.style.display='block'; return; }
   if(pe) pe.style.display='none';
