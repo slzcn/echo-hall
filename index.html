@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0045disslistfix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0135authhard';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1951,16 +1951,25 @@ async function ensureAuth(){
   catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
   let uid = session?.user?.id;
   if(!uid){
-    // ★状态分裂防护: 缓存 me 是正式账号但真实 session 丢了 → 别静默匿名登录冒充(会导致
-    //   "个人空间显示超管、发消息却是匿名uid"的分裂)。清掉假的注册态 + 提示重新登录。
+    // ★关键防误判: getSession 上面套了 8s 超时(防 autoRefresh 网络 hang), 但 getSession 本是【本地读】,
+    //   超时返回 null 往往是"刷新 token 的网络卡了", session 其实还在。若此时就把正式账号降级+重掷随机名,
+    //   弱网抖一下就把 yiran 变成随机匿名(反复踩坑的根因)。故: 对正式账号先做一次【不带超时的】兜底重读,
+    //   拿到真 session 就继续用它, 不降级。
     if(me && me.registered){
-      console.warn('[auth] 正式账号 session 已失效, 清假身份+重掷匿名昵称并提示重登');
-      // ★根治"多个同名yiran不同uid": 降级为匿名时必须重掷随机昵称, 否则新匿名uid沿用
-      //   正式账号昵称(yiran)→ 每次掉线都产生一个"叫yiran的新匿名uid", 消息左右错乱。
+      try{ const rr=await sb.auth.getSession(); if(rr?.data?.session?.user){ session=rr.data.session; uid=session.user.id; } }catch(_){}
+    }
+  }
+  if(!uid){
+    // 二次确认后仍无 session:
+    //  · 正式账号 → 判定登录确已失效: 只清本地登录态(不重掷名字、不匿名冒充), 提示重登, 直接返回。
+    //    不再 signInAnonymously 顶替(那会造出随机匿名 uid + 冲掉身份, 且用户以为还是自己)。
+    //  · 匿名身份 → 正常匿名登录拿 uid。
+    if(me && me.registered){
+      console.warn('[auth] 正式账号 session 确已失效, 清本地登录态, 提示重登(不降级冒充)');
       me.registered=false; me.role='user'; me.username='';
-      try{ rollIdentity(); }catch(e){}   // 换成"折跃刺猬"这类随机匿名名
       try{ saveIdentity(); }catch(e){}
-      try{ toast('登录已过期，已切临时身份，请重新登录'); }catch(e){}
+      try{ toast('登录已过期，请重新登录'); }catch(e){}
+      return null;
     }
     let data=null, error=null;
     try{ ({ data, error } = await withTimeout(sb.auth.signInAnonymously(), 10000)); }
