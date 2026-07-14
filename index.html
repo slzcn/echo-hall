@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1615soulname';
+  var BUILD_VER='20260714-1640kicksummon';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -5279,6 +5279,11 @@ async function openGear(){
         }
         _saveBtn.disabled=false; _saveBtn.textContent='保存修改';
         toast('已召唤，稍等她/他进房~');
+        // 召唤后端已即时建好灵魂的成员+档案 → 前端立刻重拉本房灵魂名单 + 刷光墙,
+        // 让新灵魂的头像/@识别/在线态马上出现(它开口回应仍要等本机大脑下一轮拾取, ~15s)。
+        try{ soulsCache[curRoom.id]=null; }catch(_){}
+        loadRoomSouls(curRoom.id).catch(()=>{});
+        refreshPresence().catch(()=>{});
       }
     }
     // 公告: 仅公开房有; 私密房不写 topic(不显示公告, 也不覆盖 DB 原值)
@@ -5298,8 +5303,18 @@ async function openGear(){
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
     if(!await ehConfirm('确定踢出该成员？','踢出成员')) return;
     const _kickUid=el.dataset.uid;
-    await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',_kickUid);
+    // 乐观即时反馈: 先把该成员行从抽屉里抹掉, 别等网络往返
+    const _row=el.closest('.mitem'); if(_row) _row.style.opacity='0.4';
+    // ①删成员 ②删他的在线心跳(否则他还挂在光墙上直到窗口过期, 看着"踢了没用")
+    const [d1,d2]=await Promise.all([
+      sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',_kickUid),
+      sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',_kickUid),
+    ]);
+    if(d1&&d1.error){ if(_row) _row.style.opacity=''; toast('踢出失败'); return; }
     try{ window.ehLog && ehLog('member_kick',{room_id:curRoom.id,target_uid:_kickUid}); }catch(_){}
+    // 立即从本地光墙移除该头像 + 刷新在线(不靠对方心跳过期)
+    try{ const pel=presenceMap.get(_kickUid); if(pel){ pel.remove(); presenceMap.delete(_kickUid); } }catch(_){}
+    refreshPresence().catch(()=>{});
     toast(EH_CONFIG.text.ok_kicked); openGear();
   });
   const _disBtn=$('#gDissolveBtn'); if(_disBtn) _disBtn.onclick=async()=>{
