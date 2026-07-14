@@ -225,6 +225,8 @@
   .song-jump .sj-ring{display:none}
   @keyframes sjSpin{to{transform:rotate(360deg)}}
   html[data-mode="day"] .song-jump.gen{color:#0C8E82;border-color:rgba(12,142,130,.4)}
+  /* 日间模式: 神曲卡上依赖曲风色(--sc)的文字, 与深墨(--ink)混色以保证浅底可读性(WCAG≥5), 保留曲风识别 */
+  html[data-mode="day"] .song-card{ --sc-txt: color-mix(in srgb, var(--sc, var(--magenta)) 40%, var(--ink, #1A2036)); }
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
@@ -716,11 +718,11 @@
   .playing .pglyph::before{opacity:0}
   .playing .pglyph::after{opacity:1}
   .song-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
+  .song-style{font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:4px;color:var(--sc-txt,var(--sc,var(--magenta)))}
   .song-lyric{font-size:13.5px;color:var(--sub);max-width:min(240px,72vw);white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
   .song-lyric .sl-ch{transition:color .12s,text-shadow .12s}
   .song-lyric .sl-ch.sung{color:var(--ink)}
-  .song-lyric .sl-ch.on{color:var(--sc,var(--cyan));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
+  .song-lyric .sl-ch.on{color:var(--sc-txt,var(--sc,var(--cyan)));text-shadow:0 0 8px var(--sc,var(--cyan));font-weight:700}
   .song-eq{display:inline-flex;gap:2px;align-items:center;height:12px;margin-left:2px;transform:translateY(-1px)}
   .song-eq i{width:2.5px;height:8px;border-radius:1px;background:currentColor;opacity:.7;transform:scaleY(.5);transform-origin:center}
   .song-card.playing .song-eq i{animation:vbar .7s ease-in-out infinite}
@@ -732,10 +734,10 @@
   .song-card.pending .song-play{cursor:wait;border-color:var(--sc,var(--magenta));background:transparent}
   .song-card.pending .song-play:hover{background:transparent;box-shadow:none}
   /* 谱曲中: 跳动音符(上下浮动+微透明呼吸), 音乐语义, 替代"加载转圈" */
-  .song-note{display:inline-block;color:var(--sc,var(--magenta));font-size:14px;line-height:1;animation:noteBob 1s ease-in-out infinite}
+  .song-note{display:inline-block;color:var(--sc-txt,var(--sc,var(--magenta)));font-size:14px;line-height:1;animation:noteBob 1s ease-in-out infinite}
   @keyframes noteBob{0%,100%{transform:translateY(1px) rotate(-6deg);opacity:.75}50%{transform:translateY(-2px) rotate(6deg);opacity:1}}
   /* "谱曲中"文字: 曲风色, 三点省略号跟着流动 */
-  .song-composing{color:var(--sc,var(--magenta));font-size:11px;font-weight:600;letter-spacing:.3px;margin-left:2px;opacity:.9}
+  .song-composing{color:var(--sc-txt,var(--sc,var(--magenta)));font-size:11px;font-weight:600;letter-spacing:.3px;margin-left:2px;opacity:.9}
   .song-composing::after{content:'';animation:composeDots 1.4s steps(1,end) infinite}
   @keyframes composeDots{0%{content:''}25%{content:'·'}50%{content:'··'}75%{content:'···'}100%{content:''}}
   .song-card.failed{opacity:.85}
@@ -4614,13 +4616,13 @@ function bindStripDrag(strip){
   let startX=0, startScroll=0, dragging=false, tracking=false;
   strip.addEventListener('touchstart', e=>{
     if(e.touches.length!==1){ tracking=false; return; }
-    tracking=true; dragging=false;
+    tracking=true; dragging=false; strip._lastWasDrag=false;   // 新触摸周期开始即复位, 防上次残留的拖动标志误拦本次点击
     startX=e.touches[0].clientX; startScroll=strip.scrollLeft;
   }, {passive:true});
   strip.addEventListener('touchmove', e=>{
     if(!tracking) return;
     const dx=e.touches[0].clientX-startX;
-    if(!dragging && Math.abs(dx)>5) dragging=true;   // 超阈值判定拖动
+    if(!dragging && Math.abs(dx)>10) dragging=true;   // 超阈值判定拖动(10px: 点小胶囊时手指微抖不误判为拖, 避免 click 被误拦致'点了没反应')
     if(dragging){ strip.scrollLeft=startScroll-dx; if(e.cancelable) e.preventDefault(); }
   }, {passive:false});
   strip.addEventListener('touchend', ()=>{ strip._lastWasDrag=dragging; tracking=false; dragging=false; }, {passive:true});
