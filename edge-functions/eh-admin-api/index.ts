@@ -299,8 +299,8 @@ Deno.serve(async (req)=>{
       const memCur = Array.isArray(memExist) && memExist[0];
       if (on) {
         if (cur) return j({ ok: true, note: "已在房里" });
-        // 漫游灵魂正在场(在 members 但非驻守): 不重复创建第二个, 也不碰它的全局漫游身份
-        if (memCur) return j({ ok: true, note: "该灵魂正在房里活动，无需重复召唤" });
+        // 同名灵魂已在房(含官方漫游灵魂): 直接静默通过, 不写数据也不报错(主人要求)
+        if (memCur) return j({ ok: true });
         // 从模板行拷人设
         const tpl = await sbGet("eh_souls?select=*&auth_uid=eq." + encodeURIComponent(spec.tplUid) + "&limit=1");
         const t = (Array.isArray(tpl) && tpl[0]) || {};
