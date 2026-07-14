@@ -1130,7 +1130,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1410summon';
+  var BUILD_VER='20260714-1450atkbd';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3485,7 +3485,9 @@ function renderAtMentions(escHtml){
   // 名字可能含特殊字符,先 esc 再按长度降序(避免短名先吞掉长名的前缀)
   const names=[...cands.map(c=>c.name), myName].filter(Boolean).sort((a,b)=>b.length-a.length);
   const soulNames=new Set(cands.filter(c=>c.isSoul).map(c=>c.name));
-  const soulColorByName={}; cands.forEach(c=>{ if(c.isSoul) soulColorByName[c.name]=safeColor(c.color); });
+  // 存"原始"颜色(可能为空), 不要先 safeColor——safeColor 会把空色兜成 #8B5CFF 紫,
+  // 再喂给 soulThemeColor 会被当"合法自定义色"直接返回, 于是灵魂@永远紫、无视房间主题(与头像/名字色不一致)。
+  const soulColorByName={}; cands.forEach(c=>{ if(c.isSoul) soulColorByName[c.name]=(c.color||''); });
   let out=escHtml;
   for(const nm of names){
     const enm=esc(nm);
@@ -5823,7 +5825,19 @@ on('backBtn','click',()=>backToLobby());
 // 房间头像 = 房间信息/设置入口(所有人看信息, 房主/管理另有编辑区), 替代原顶部齿轮
 on('hallIcon','click',()=>openGear());
 // 双击房间名 = 软刷新聊天记录(只刷数据不刷页面)+ 回到最新
-(function(){ const nm=$('#hallName'); if(nm) nm.addEventListener('dblclick',softRefreshRoom); })();
+// iOS Safari 的原生 dblclick 在触屏上极不可靠(双击=缩放手势, 常被吞), 改用 pointerup 手动判定双击:
+// 两次抬手间隔 < 400ms 且位置相近 → 视为双击。同时保留桌面 dblclick 兜底。
+(function(){
+  const nm=$('#hallName'); if(!nm) return;
+  let lastT=0, lastX=0, lastY=0;
+  nm.addEventListener('pointerup', (e)=>{
+    const t=e.timeStamp||Date.now();
+    const dx=Math.abs((e.clientX||0)-lastX), dy=Math.abs((e.clientY||0)-lastY);
+    if(t-lastT < 400 && dx < 30 && dy < 30){ e.preventDefault(); lastT=0; softRefreshRoom(); }
+    else { lastT=t; lastX=e.clientX||0; lastY=e.clientY||0; }
+  });
+  nm.addEventListener('dblclick', softRefreshRoom);   // 桌面兜底
+})();
 on('wallBtn','click',()=>openWall());
 on('wallX','click',()=>$('#wallMask').classList.remove('on'));
 on('wallMask','click',e=>{ if(e.target===$('#wallMask')) $('#wallMask').classList.remove('on'); });
@@ -6005,6 +6019,26 @@ if(window.visualViewport){
 }
 window.addEventListener('resize', syncViewportH);
 syncViewportH();
+
+// iOS 补丁: 点输入框瞬间, Safari 会先把整个 document 上滚去露出输入框(此时 kb-open 还没挂,
+// #hall 未 fixed → 页面被顶飞留白, 见截图)。改为 focus 立刻钉 kb-open + 把 document 归零,
+// 抢在 iOS 自动滚动之前, 并在键盘开着时持续吸收残留的 body 滚动。
+(function(){
+  const cin=$('#cin'); if(!cin) return;
+  const pin=()=>{
+    if(!document.body.classList.contains('hall-on')) return;
+    document.body.classList.add('kb-open');
+    // document 归零(iOS 把 body 顶上去时 scrollY>0), 用 rAF 多次抢在其自动滚动之后
+    const zero=()=>{ if(window.scrollY||document.documentElement.scrollTop){ window.scrollTo(0,0); } };
+    zero(); requestAnimationFrame(zero); setTimeout(zero,60); setTimeout(zero,180);
+    try{ scrollStream(); }catch(_){}
+  };
+  cin.addEventListener('focus', pin);
+  // 失焦: 键盘收起, 复位(兜底: 某些情形 visualViewport.resize 不触发)
+  cin.addEventListener('blur', ()=>{ setTimeout(syncViewportH, 60); });
+  // 键盘开着时, 任何把 body 顶起来的滚动都拉回去(iOS 偶发)
+  window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
+})();
 
 // ============ 启动 ============
 loadOrRollIdentity();
