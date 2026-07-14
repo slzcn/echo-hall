@@ -1147,7 +1147,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1745soullabel';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260714-1800summonmem';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5251,6 +5251,8 @@ async function openGear(){
     const API=SB_URL+'/functions/v1/eh-admin-api';
     async function loadList(){
       try{
+        // 先确保本房灵魂名单是最新的(soulNameSet 用于按名字校正勾选态), 再拉召唤列表
+        try{ await loadRoomSouls(curRoom.id); }catch(_){}
         const r=await fetch(API+'/soul-summonables?room_id='+encodeURIComponent(curRoom.id),{ headers:{ 'Authorization':'Bearer '+token } });
         const d=await r.json();
         if(r.ok&&d.list){ renderList(d.list); }  // 拉回真实召唤态, 覆盖骨架(骨架失败也无妨, 保持可勾选)
@@ -5259,14 +5261,17 @@ async function openGear(){
     // 所有灵魂都可勾选/取消: 勾上=要召唤, 取消已召唤的=要撤销; data-orig 记初始态, 保存时 diff
     function renderList(list){
       grid.style.display='flex';
-      // data-was = 该灵魂进面板时是否已在房(1=已召唤)。保存时对比 on 与 was 决定 召唤/请离开。
-      grid.innerHTML=list.map(x=>`
-        <div class="summon-item ${x.on?'on':''}" data-key="${x.key}" data-orig="${x.on?'1':'0'}">
+      // 勾选态记忆真相源: 优先信后端 x.on, 但后端可能因"狼姐在房用的是漫游uid、和召唤key对不上"
+      // 而返回 false → 用本房实际灵魂名(soulNameSet, 按名字兜底)再校正一次: 名字在房里就算已召唤。
+      const inRoomByName=(nm)=> (typeof soulNameSet!=='undefined' && soulNameSet && soulNameSet.has(nm));
+      // data-orig = 该灵魂进面板时是否已在房(1=已召唤)。保存时对比 on 与 orig 决定 召唤/请离开。
+      grid.innerHTML=list.map(x=>{ const on = !!x.on || inRoomByName(x.name); return `
+        <div class="summon-item ${on?'on':''}" data-key="${x.key}" data-orig="${on?'1':'0'}">
 
           <span class="si-emoji">${x.emoji}</span>
-          <div class="si-body"><div class="si-nm">${x.on?'':'叫'}${esc(x.name)}${x.on?'（在房·点取消请离开）':'来陪你'}</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
+          <div class="si-body"><div class="si-nm">${on?'':'叫'}${esc(x.name)}${on?'（在房·点取消请离开）':'来陪你'}</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
           <span class="si-check">✓</span>
-        </div>`).join('');
+        </div>`; }).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
         it.onclick=()=>{ if(it.classList.contains('busy'))return; it.classList.toggle('on'); };
 
