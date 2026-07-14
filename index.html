@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1600summonv2';
+  var BUILD_VER='20260714-1615soulname';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2899,8 +2899,8 @@ function subscribeMessages(rid){
         }
         // 继续往下走 buildMsgEl 渲染系统行(所有人都看到文案)
       }
-      // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位
-      if(soulUidSet.has(m.user_id)){ m.is_bot=true; removeSoulThinking(m.user_id); }
+      // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位。按 uid 或名字兜底(同名多uid副本)
+      if(isSoulUser(m.user_id, m.name)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
@@ -2932,7 +2932,7 @@ function subscribeMessages(rid){
       // 定稿时 kind 从占位的 msg 变成了 song/act(神曲/动作) → 整条重建成对应样式
       const bubble=document.querySelector(`.msg[data-mid="${m.id}"]`);
       if(!m.streaming && (m.kind==='song'||m.kind==='act') && bubble){
-        if(soulUidSet.has(m.user_id)) m.is_bot=true;
+        if(isSoulUser(m.user_id, m.name)) m.is_bot=true;
         // song “归队”: 旧卡片 pending → 新卡片 ready 时加呢呼吸高亮
         let wasPending=false;
         if(m.kind==='song'){
@@ -3054,12 +3054,13 @@ function renderPresenceAvatars(users){
     seen.add(p.user_id);
     // 灵魂身份跟随最新(名字/头像/色),覆盖 presence 里的旧快照。必须在 sig 前做,
     // 否则灵魂改色而 presence 快照未变时 sig 不变 → 跳过重建 → 拿不到新色。
-    const soulLatest = soulUidSet.has(p.user_id) ? roomSouls.find(x=>x.auth_uid===p.user_id) : null;
+    // 按 uid 或名字兜底: 同名多uid的漫游/驻守副本都识别为灵魂(否则光墙头像色错、@变色不一致)。
+    const isSoul=isSoulUser(p.user_id, p.name);
+    const soulLatest = isSoul ? soulLatestBy(p.user_id, p.name) : null;
     if(soulLatest){ p={...p, name:soulLatest.name, emoji:soulLatest.emoji, color:soulLatest.color}; }
     let el=presenceMap.get(p.user_id);
     const isMe=p.user_id===myUid;
     // 灵魂头像色跟房间强调色(与消息头像/AI角标统一); 真人访客保持自己的个性色
-    const isSoul=soulUidSet.has(p.user_id);
     const c=isSoul ? soulThemeColor(p.color, safeColor(p.color)) : safeColor(p.color);
     // sig 纳入最终渲染色 c: 换房/换主题致灵魂色变时, sig 变→强制重建头像(否则旧sig命中→卡旧色)
     const sig=(p.name||'')+'|'+(p.emoji||'')+'|'+c+'|'+(isMe?'me':'')+'|'+(isSoul?'ai':'');
@@ -3236,9 +3237,11 @@ function buildMsgEl(m, isHistory){
   }
   // 灵魂身份跟随最新: 消息存的是发送时的 name/emoji/color 快照, 但灵魂是固定住户,
   // 改了配置后历史消息也该用最新身份(名字/头像/色) → 用 roomSouls 覆盖旧快照。
-  if(m.user_id && soulUidSet.has(m.user_id)){
-    const s=roomSouls.find(x=>x.auth_uid===m.user_id);
-    if(s){ m={...m, name:s.name, emoji:s.emoji, color:s.color}; }
+  // 按 uid 或名字兜底(同名多uid的漫游/驻守副本都算灵魂), 并把 is_bot 一并补上, 保证徽标/配色一致。
+  if(isSoulUser(m.user_id, m.name)){
+    m.is_bot=true;
+    const s=soulLatestBy(m.user_id, m.name);
+    if(s){ m={...m, is_bot:true, name:s.name, emoji:s.emoji, color:s.color}; }
   }
   // 前端纵深防御: 灵魂控制标记([REACT:x]/[SONG:x]/[EMOJI]/[ACT]/[PROJ])万一以文本外泄
   //(worker 已修但历史库里那条 "[REACT:😏]" 还在), 渲染前清掉, 不让标记字面显示给用户。
@@ -3435,9 +3438,15 @@ function bumpUnread(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()
 // 进房拉本房启用中的灵魂(仅展示字段)：驱动 is_bot 兜底识别 + 未来工坊入口。
 let roomSouls = [];              // [{auth_uid,name,emoji,color,persona,emotion}]
 let soulUidSet = new Set();      // 快速判断某 uid 是不是灵魂(历史旧消息 is_bot 缺失时兜底)
+let soulNameSet = new Set();     // 按名字兜底: 同一灵魂可能有多个 auth_uid(狼姐漫游uid + 私密房驻守uid),
+                                 // 只认 uid 会漏判成真人(@变色/头像色错乱)。灵魂名保留唯一, 按名兜底最稳。
+// 统一判定"是不是灵魂": uid 命中 或 名字命中(覆盖同名多uid的漫游/驻守副本)
+function isSoulUser(uid, name){ return (uid && soulUidSet.has(uid)) || (name && soulNameSet.has(name)); }
+// 取灵魂的最新展示身份(先按 uid, 再按名字兜底)
+function soulLatestBy(uid, name){ return (uid && roomSouls.find(x=>x.auth_uid===uid)) || (name && roomSouls.find(x=>x.name===name)) || null; }
 async function loadRoomSouls(rid){
-  roomSouls=[]; soulUidSet=new Set();
-  const applyData=(data)=>{ roomSouls=data||[]; soulUidSet=new Set(roomSouls.map(s=>s.auth_uid)); refreshRenderedSoulIdentity(); };
+  roomSouls=[]; soulUidSet=new Set(); soulNameSet=new Set();
+  const applyData=(data)=>{ roomSouls=data||[]; soulUidSet=new Set(roomSouls.map(s=>s.auth_uid)); soulNameSet=new Set(roomSouls.map(s=>s.name)); refreshRenderedSoulIdentity(); };
   const hit=soulsCache[rid];
   if(hit && Date.now()-hit.at < PREFETCH_TTL()){
     // 列表页已预取 → 秒用缓存(进房不再等 eh_room_souls RPC 往返)
@@ -3488,7 +3497,7 @@ function atCandidates(){
   const seen=new Set(); const list=[];
   (lastUsersSnapshot||[]).forEach(u=>{
     if(u.user_id===myUid || !u.name || seen.has(u.name)) return;
-    seen.add(u.name); list.push({name:u.name, emoji:u.emoji, color:u.color, isSoul:soulUidSet.has(u.user_id)});
+    seen.add(u.name); list.push({name:u.name, emoji:u.emoji, color:u.color, isSoul:isSoulUser(u.user_id, u.name)});
   });
   // 灵魂即使 presence 没抓到也补上(常驻在线)
   (roomSouls||[]).forEach(s=>{ if(!seen.has(s.name)){ seen.add(s.name); list.push({name:s.name, emoji:s.emoji, color:s.color, isSoul:true}); } });
