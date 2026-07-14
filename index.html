@@ -1105,13 +1105,14 @@
   .summon-panel .sp-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sub);margin-bottom:7px}
   .summon-panel .sp-hint{font-size:11px;color:var(--dim);font-weight:400}
   .summon-grid{display:flex;flex-direction:column;gap:8px}
-  .summon-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--card-bg-soft,rgba(255,255,255,.03));cursor:pointer;transition:.15s;user-select:none}
-  .summon-item:hover{border-color:var(--cyan)}
-  .summon-item.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,transparent)}
+  .summon-item{display:flex;align-items:center;gap:10px;padding:7px 2px;cursor:pointer;transition:.15s;user-select:none;border-bottom:1px solid var(--line2,rgba(255,255,255,.06))}
+  .summon-item:last-child{border-bottom:none}
+  .summon-item:hover .si-nm{color:var(--cyan)}
+  .summon-item.on .si-nm{color:var(--cyan)}
   .summon-item .si-emoji{font-size:22px;line-height:1;flex:none}
   .summon-item .si-body{flex:1;min-width:0}
   .summon-item .si-nm{font-weight:600;font-size:14px;color:var(--ink)}
-  .summon-item .si-blurb{font-size:12px;color:var(--sub);margin-top:2px;line-height:1.3}
+  .summon-item .si-blurb{font-size:12px;color:var(--sub);margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .summon-item .si-check{flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:.15s}
   .summon-item.on .si-check{background:var(--cyan);border-color:var(--cyan)}
   .summon-item.locked{cursor:default;opacity:.85}
@@ -1146,7 +1147,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1640kicksummon';
+  var BUILD_VER='20260714-1655summonv3';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -5167,7 +5168,7 @@ async function openGear(){
     const topicField = isPriv ? '' : `<label class="fld"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc((curRoom.topic&&curRoom.topic!=='@wolf')?curRoom.topic:'')}" placeholder="给房间设个公告"></label>`;
     const summonPanel = isPriv
       ? `<div class="summon-panel" id="gSummonPanel">
-           <div class="sp-title">✨ 召唤陪聊灵魂 <span class="sp-hint">勾选后点保存生效</span></div>
+           <div class="sp-title">✨ 召唤陪聊灵魂</div>
            <div class="sp-loading" id="gSummonLoading">加载中…</div>
            <div class="summon-grid" id="gSummonGrid" style="display:none"></div>
          </div>`
