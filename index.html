@@ -1147,8 +1147,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1820onetoast';  window.__EH_BUILD_VER=BUILD_VER;
-  function check(reason){
+  var BUILD_VER='20260714-1940cardnmcolor';  window.__EH_BUILD_VER=BUILD_VER;  function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
       return r.text();
@@ -2448,9 +2447,17 @@ async function fillRoomStats(box, rid){
     prev.classList.remove('empty');
     const txt = msgPreview(last);
     const nm = last.anon ? '🕳️ 某个回声' : esc(last.name)+':';
-    // 预览发送者名字色跟房间强调色(与卡片--ch-c统一); 匿名回声不着色
+    // 预览发送者名字色规范: 真人=自己个性色(与房间内消息、光墙统一); 灵魂/空色/匿名=回退房间强调色
     let nmC='';
-    try{ if(!last.anon){ const rc=roomAccentC({name:card.dataset.nm,kind:card.dataset.kind||'official'}); if(rc) nmC=` style="color:${rc}"`; } }catch(e){}
+    try{
+      if(!last.anon){
+        const roomC=roomAccentC({name:card.dataset.nm,kind:card.dataset.kind||'official'});
+        const userC=(typeof safeColor==='function' && last.color && /^#[0-9a-fA-F]{3,8}$/.test(last.color)) ? last.color : null;
+        // 灵魂(is_bot)跟房间色, 真人跟自己色, 兜底房间色
+        const c = (last.is_bot ? roomC : (userC || roomC));
+        if(c) nmC=` style="color:${c}"`;
+      }
+    }catch(e){}
     prev.innerHTML=`<b${nmC}>${nm}</b> ${esc(String(txt).slice(0,40))}`;
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
