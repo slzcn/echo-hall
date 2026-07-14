@@ -329,6 +329,8 @@ Deno.serve(async (req)=>{
           await sbWrite("eh_members?user_id=eq." + uid + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
           return j({ error: "写灵魂配置失败", detail: ins.body }, ins.status);
         }
+        // 召唤成功同时补写 presence(last_seen=now), 让灵魂立即出现在光墙(否则要等 worker 下一轮心跳才显示, 房主感知为“召唤了但人没进来”)
+        await sbWrite("eh_presence", "POST", { room_id: roomId, user_id: uid, name, emoji, color, last_seen: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
         return j({ ok: true });
       } else {
         // 撤销: 删 souls+members+presence + 删 auth 身份
