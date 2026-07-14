@@ -1111,7 +1111,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2000ixadmin';
+  var BUILD_VER='20260714-2100ixv2';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3405,18 +3405,24 @@ function insertAtName(name){
   syncSendBtn();
   try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
 }
-// 事件委托：点头像 → 弹「对TA」菜单(@ + 互动)。双击头像=快速@(兼容老习惯)。
+// 头像交互: 点=直接@ TA; 长按(500ms)=弹「对TA」互动菜单。
 //   两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
-let _headDblT=null;
-document.addEventListener('click',e=>{
-  const pav=e.target.closest('#presence .pav[data-atname]');
-  const av=pav?null:e.target.closest('.msg .av[data-atname]');
-  const el=pav||av; if(!el) return;
+let _hlTimer=null, _hlFired=false, _hlStart=null;
+function headEl(t){ const pav=t.closest('#presence .pav[data-atname]'); return pav||t.closest('.msg .av[data-atname]'); }
+document.addEventListener('pointerdown',e=>{
+  const el=headEl(e.target); if(!el) return;
   const nm=el.dataset.atname; const uid=el.dataset.uid||''; if(!nm) return;
-  // 双击=快速@(不弹菜单)。用延时区分单/双击。
-  if(_headDblT){ clearTimeout(_headDblT); _headDblT=null; insertAtName(nm); return; }
-  _headDblT=setTimeout(()=>{ _headDblT=null; openPeerMenu(el, nm, uid); }, 240);
+  _hlFired=false; _hlStart={x:e.clientX,y:e.clientY};
+  _hlTimer=setTimeout(()=>{ _hlFired=true; try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} openPeerMenu(el, nm, uid); }, 500);
+},{passive:true});
+document.addEventListener('pointermove',e=>{ if(_hlTimer && _hlStart && (Math.abs(e.clientX-_hlStart.x)>10||Math.abs(e.clientY-_hlStart.y)>10)){ clearTimeout(_hlTimer); _hlTimer=null; } },{passive:true});
+document.addEventListener('pointerup',e=>{
+  if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; }
+  const el=headEl(e.target);
+  if(el && !_hlFired){ const nm=el.dataset.atname; if(nm) insertAtName(nm); }   // 未触发长按 → 点=@
+  _hlStart=null;
 });
+document.addEventListener('pointercancel',()=>{ if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; } _hlStart=null; });
 // ===== 互动系统: 配置 + 「对TA」菜单 + 发送 + 特效 =====
 let _interactions=[];   // eh_interactions 缓存
 async function loadInteractions(){
