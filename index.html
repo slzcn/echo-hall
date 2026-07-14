@@ -1111,7 +1111,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2100ixv2';
+  var BUILD_VER='20260714-2200loginfill';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1172,8 +1172,8 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <div class="login-collapse" id="loginCollapse">
         <form class="login-form" id="loginForm" onsubmit="return false">
           <div class="login-row">
-            <input id="loginAccount" name="username" autocomplete="username" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
-            <input id="loginPassword" type="password" name="password" autocomplete="current-password" data-txt-ph="loginPwdPh" placeholder="密码">
+            <input id="loginAccount" name="username" autocomplete="off" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
+            <input id="loginPassword" type="password" name="password" autocomplete="off" data-txt-ph="loginPwdPh" placeholder="密码">
           </div>
           <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
           <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
@@ -5618,7 +5618,17 @@ on('loginToggle','click',()=>{
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
   // 密码框始终是真正的 type=password + 标准 autocomplete, 浏览器/密码管理器才会记住并自动填充。
   // (不再用 type=text 骗过 iOS 自填充条——那会连带砸掉记住密码; iOS 聊天输入框的误填充由其独立 form 隔离)
-  if(open){ setTimeout(()=>$('#loginAccount').focus(),200); triggerCredentialLogin(); }  // 点开=用户手势, 此时才弹系统凭据验证→拉取→自动登录
+  // 密码框默认 autocomplete=off(收着时浏览器不弹填充, 免打扰); 点开登录才恢复标准 autocomplete → 填充/记住正常
+  if(open){
+    const la=$('#loginAccount'), lp=$('#loginPassword');
+    if(la) la.setAttribute('autocomplete','username');
+    if(lp) lp.setAttribute('autocomplete','current-password');
+    setTimeout(()=>$('#loginAccount').focus(),200); triggerCredentialLogin();  // 点开=用户手势, 此时才弹系统凭据验证→拉取→自动登录
+  } else {
+    const la=$('#loginAccount'), lp=$('#loginPassword');
+    if(la) la.setAttribute('autocomplete','off');
+    if(lp) lp.setAttribute('autocomplete','off');
+  }
 });
 on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
 on('loginPassword','keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doLogin();} });
