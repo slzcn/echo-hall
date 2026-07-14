@@ -1107,16 +1107,15 @@
   .summon-grid{display:flex;flex-direction:column;gap:8px}
   .summon-item{display:flex;align-items:center;gap:10px;padding:7px 2px;cursor:pointer;transition:.15s;user-select:none;border-bottom:1px solid var(--line2,rgba(255,255,255,.06))}
   .summon-item:last-child{border-bottom:none}
-  .summon-item:hover .si-nm{color:var(--cyan)}
-  .summon-item.on .si-nm{color:var(--cyan)}
+  .summon-item:hover .si-nm{color:var(--accent)}
+  .summon-item.on .si-nm{color:var(--accent)}
   .summon-item .si-emoji{font-size:22px;line-height:1;flex:none}
   .summon-item .si-body{flex:1;min-width:0}
-  .summon-item .si-nm{font-weight:600;font-size:14px;color:var(--ink)}
+  .summon-item .si-nm{font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .summon-item .si-blurb{font-size:12px;color:var(--sub);margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .summon-item .si-check{flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:.15s}
-  .summon-item.on .si-check{background:var(--cyan);border-color:var(--cyan)}
-  .summon-item.locked{cursor:default;opacity:.85}
-  .summon-item.locked .si-check{background:var(--cyan);border-color:var(--cyan)}
+  .summon-item .si-check{flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.15s}
+  .summon-item.on .si-check{background:var(--accent);border-color:var(--accent);color:#fff}
+  .summon-item.busy{opacity:.5;pointer-events:none}
   .summon-item.busy{opacity:.5;pointer-events:none}
   .summon-panel .sp-loading{font-size:12px;color:var(--sub);padding:6px 2px}
   .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 0;padding:10px 12px;border-radius:10px;cursor:pointer;
@@ -1147,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1655summonv3';
+  var BUILD_VER='20260714-1600summonv4';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1804,6 +1803,11 @@ try{ injectThemeCSS(); applyTextConfig(); }catch(e){}
 //  回声厅 Echo Hall 2.0 — 全站 Supabase(匿名登录 + RLS + Realtime + Presence)
 // ============================================================
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
+// 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
+const EH_SUMMONABLES_FALLBACK = [
+  { key:'wolf', emoji:'🐺', name:'狼姐', blurb:'私密房里会放开撚' },
+  { key:'comedian', emoji:'🎭', name:'老K', blurb:'私密房的毒舌段子手' },
+];
 const WOLF_UID = 'ca72217f-7157-47f6-b540-049074bf06dd';   // 狼姐原始 uid(官方房)
 // 狼姐视觉特判: 原始 uid 或 名字为'狼姐'(私密房召唤来的是新独立 uid, 按名字认)
 function isWolfSoul(o){ return o && (o.user_id===WOLF_UID || o.name==='狼姐'); }
@@ -5169,8 +5173,12 @@ async function openGear(){
     const summonPanel = isPriv
       ? `<div class="summon-panel" id="gSummonPanel">
            <div class="sp-title">✨ 召唤陪聊灵魂</div>
-           <div class="sp-loading" id="gSummonLoading">加载中…</div>
-           <div class="summon-grid" id="gSummonGrid" style="display:none"></div>
+           <div class="summon-grid" id="gSummonGrid">${EH_SUMMONABLES_FALLBACK.map(x=>`
+             <div class="summon-item" data-key="${x.key}" data-orig="0">
+               <span class="si-emoji">${x.emoji}</span>
+               <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你</div><div class="si-blurb">${esc(x.blurb)}</div></div>
+               <span class="si-check">✓</span>
+             </div>`).join('')}</div>
          </div>`
       : '';
     const editExtra = topicField + summonPanel;
@@ -5226,8 +5234,10 @@ async function openGear(){
   }
   // 私密房: 异步加载"召唤陪聊灵魂"多选面板(调 eh-admin-api, 房主可召唤)
   if(isPriv && canEdit){ (async()=>{
-    const grid=$('#gSummonGrid'), loading=$('#gSummonLoading');
+    const grid=$('#gSummonGrid');
     if(!grid) return;
+    // 骨架已直接显示(EH_SUMMONABLES_FALLBACK), 先给骨架卡片绑点击, 拉回真实态后 renderList 覆盖
+    grid.querySelectorAll('.summon-item').forEach(it=>{ it.onclick=()=>{ if(it.classList.contains('busy'))return; it.classList.toggle('on'); }; });
     let token='';
     try{ const { data:{ session } }=await sb.auth.getSession(); token=session&&session.access_token||''; }catch(_){}
     const API=SB_URL+'/functions/v1/eh-admin-api';
@@ -5235,24 +5245,20 @@ async function openGear(){
       try{
         const r=await fetch(API+'/soul-summonables?room_id='+encodeURIComponent(curRoom.id),{ headers:{ 'Authorization':'Bearer '+token } });
         const d=await r.json();
-        if(!r.ok||!d.list){ if(loading){ loading.textContent='加载失败'+(d.error?('：'+d.error):''); } return; }
-        renderList(d.list);
-      }catch(e){ if(loading){ loading.textContent='加载失败'; } }
+        if(r.ok&&d.list){ renderList(d.list); }  // 拉回真实召唤态, 覆盖骨架(骨架失败也无妨, 保持可勾选)
+      }catch(e){}
     }
-    // 已在房里的(x.on)= 已召唤, 锁定不可取消(防重复召唤同一灵魂); 未召唤的可勾选, 点保存才触发
+    // 所有灵魂都可勾选/取消: 勾上=要召唤, 取消已召唤的=要撤销; data-orig 记初始态, 保存时 diff
     function renderList(list){
-      if(loading) loading.style.display='none';
       grid.style.display='flex';
       grid.innerHTML=list.map(x=>`
-        <div class="summon-item ${x.on?'on locked':''}" data-key="${x.key}" data-on="${x.on?'1':'0'}">
+        <div class="summon-item ${x.on?'on':''}" data-key="${x.key}" data-orig="${x.on?'1':'0'}">
           <span class="si-emoji">${x.emoji}</span>
           <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
           <span class="si-check">✓</span>
         </div>`).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
-        // 已召唤的锁定(不能取消/重复); 未召唤的点击切换勾选态(不立即调API)
-        if(it.classList.contains('locked')) return;
-        it.onclick=()=>{ it.classList.toggle('on'); };
+        it.onclick=()=>{ if(it.classList.contains('busy'))return; it.classList.toggle('on'); };
       });
     }
     // 暴露给保存按钮: 收集"新勾选(要召唤)"的 key + token/API
@@ -5266,22 +5272,26 @@ async function openGear(){
     // 私密房: 先提交召唤(勾选了但还没在房里的灵魂), 成功后再存房间信息
     if(isPriv && window._ehSummonCtx){
       const { grid:_sg, token:_stk, API:_sapi } = window._ehSummonCtx;
-      const _toSummon=[..._sg.querySelectorAll('.summon-item.on:not(.locked)')];
-      if(_toSummon.length){
-        _saveBtn.disabled=true; _saveBtn.textContent='召唤中…';
-        for(const it of _toSummon){
-          const key=it.dataset.key; const nm=it.querySelector('.si-nm').textContent.replace(/^叫|来陪你$/g,'');
+      // diff: 勾了但初始没召唤=要召唤(on:true); 取消了但初始已召唤=要撤销(on:false)
+      const _items=[..._sg.querySelectorAll('.summon-item')];
+      const _changes=_items.filter(it=>{ const on=it.classList.contains('on')?1:0; const orig=it.dataset.orig==='1'?1:0; return on!==orig; })
+                           .map(it=>({ it, key:it.dataset.key, on:it.classList.contains('on'), nm:it.querySelector('.si-nm').textContent.replace(/^叫|来陪你$/g,'') }));
+      if(_changes.length){
+        _saveBtn.disabled=true; _saveBtn.textContent='处理中…';
+        for(const ch of _changes){
+          ch.it.classList.add('busy');
           try{
-            const r=await fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+_stk, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key, on:true }) });
+            const r=await fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+_stk, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
             const d=await r.json();
-            if(r.ok&&d.ok){ it.classList.add('locked'); try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key,on:true}); }catch(_){} }
-            else{ toast((d&&d.error)||('召唤 '+nm+' 失败')); }
-          }catch(e){ toast('召唤 '+nm+' 网络异常'); }
+            if(r.ok&&(d.ok||d.note)){ ch.it.dataset.orig=ch.on?'1':'0'; try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key:ch.key,on:ch.on}); }catch(_){} }
+            else{ toast((d&&d.error)||((ch.on?'召唤 ':'请走 ')+ch.nm+' 失败')); ch.it.classList.toggle('on'); }
+          }catch(e){ toast((ch.on?'召唤 ':'请走 ')+ch.nm+' 网络异常'); ch.it.classList.toggle('on'); }
+          ch.it.classList.remove('busy');
         }
         _saveBtn.disabled=false; _saveBtn.textContent='保存修改';
-        toast('已召唤，稍等她/他进房~');
-        // 召唤后端已即时建好灵魂的成员+档案 → 前端立刻重拉本房灵魂名单 + 刷光墙,
-        // 让新灵魂的头像/@识别/在线态马上出现(它开口回应仍要等本机大脑下一轮拾取, ~15s)。
+        const _sum=_changes.filter(c=>c.on).length, _rem=_changes.filter(c=>!c.on).length;
+        toast(_sum&&_rem?'已更新陪聊灵魂~':_sum?'已召唤，稍等她/他进房~':'已请走~');
+        // 前端立刻重拉本房灵魂名单 + 刷光墙(召唤即时显现; 撤销即时消失)
         try{ soulsCache[curRoom.id]=null; }catch(_){}
         loadRoomSouls(curRoom.id).catch(()=>{});
         refreshPresence().catch(()=>{});
