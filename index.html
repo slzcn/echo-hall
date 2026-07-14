@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2320presfix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260714-2340secfix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5766,8 +5766,9 @@ async function joinByCode(){
   const room=Array.isArray(rooms)?rooms[0]:rooms;
   btn.disabled=false; btn.textContent='进 入 房 间';
   if(error || !room){ $('#joinErr').textContent='邀请码无效或房间不存在'; return; }
-  const { error:mErr }=await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'member',name:me.name,emoji:me.emoji,color:me.color});
-  if(mErr && !/duplicate|unique/i.test(mErr.message||'')){ $('#joinErr').textContent='加入失败'; return; }
+  // 走带码校验的 SECURITY DEFINER RPC 代插成员(收紧后的 RLS 不允许私密房裸 insert, 必须经此函数验证邀请码)
+  const { error:mErr }=await sb.rpc('eh_join_by_code',{p_code:code,p_name:me.name,p_emoji:me.emoji,p_color:me.color});
+  if(mErr){ $('#joinErr').textContent='加入失败'; return; }
   closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
 }
 // ============ 正式账号：注册 / 登录 / 找回 ============
