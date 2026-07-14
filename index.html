@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1600summonv4';
+  var BUILD_VER='20260714-1715summon-kick';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -5203,11 +5203,19 @@ async function openGear(){
   // 成员列表: 最多显示 20 个, 超出折叠"还有 N 人"
   const allM=(members||[]); const MAX_SHOW=20;
   const showM=allM.slice(0, MAX_SHOW); const moreN=allM.length-showM.length;
-  const memberRows=showM.map(mm=>`
+  const memberRows=showM.map(mm=>{
+    const isSoulMem = isSoulUser(mm.user_id, mm.name);   // 灵魂: 踢成员没用(worker会按召唤/@wolf重加), 改走召唤面板"请离开"
+    let tail;
+    if(mm.role==='owner') tail='<span class="mi-role">房主</span>';
+    else if(isSoulMem) tail='<span class="mi-role" style="opacity:.7">灵魂 · 见下方召唤面板</span>';
+    else if(isOwner && mm.user_id!==myUid) tail=`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`;
+    else tail='';
+    return `
         <div class="mitem"><div class="mi-av" style="background:${safeColor(mm.color)}22;--ec:${safeColor(mm.color)}">${safeEmoji(mm.emoji) || '👤'}</div>
           <span class="mi-nm">${esc(mm.name)}</span>
-          ${mm.role==='owner'?'<span class="mi-role">房主</span>':(isOwner && mm.user_id!==myUid?`<span class="mi-kick" data-uid="${mm.user_id}">踢出</span>`:'')}
-        </div>`).join('') + (moreN>0?`<div class="mitem-more">…还有 ${moreN} 人</div>`:'');
+          ${tail}
+        </div>`;
+  }).join('') + (moreN>0?`<div class="mitem-more">…还有 ${moreN} 人</div>`:'');
   body.innerHTML=`
     ${overview}
     ${ownerEdit}
@@ -5251,14 +5259,17 @@ async function openGear(){
     // 所有灵魂都可勾选/取消: 勾上=要召唤, 取消已召唤的=要撤销; data-orig 记初始态, 保存时 diff
     function renderList(list){
       grid.style.display='flex';
+      // data-was = 该灵魂进面板时是否已在房(1=已召唤)。保存时对比 on 与 was 决定 召唤/请离开。
       grid.innerHTML=list.map(x=>`
         <div class="summon-item ${x.on?'on':''}" data-key="${x.key}" data-orig="${x.on?'1':'0'}">
+
           <span class="si-emoji">${x.emoji}</span>
-          <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
+          <div class="si-body"><div class="si-nm">${x.on?'':'叫'}${esc(x.name)}${x.on?'（在房·点取消请离开）':'来陪你'}</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
           <span class="si-check">✓</span>
         </div>`).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
         it.onclick=()=>{ if(it.classList.contains('busy'))return; it.classList.toggle('on'); };
+
       });
     }
     // 暴露给保存按钮: 收集"新勾选(要召唤)"的 key + token/API
@@ -5269,7 +5280,7 @@ async function openGear(){
   const _saveBtn=$('#gSaveBtn'); if(_saveBtn) _saveBtn.onclick=async()=>{
     const name=$('#gRoomName').value.trim();
     if(!name){ toast(EH_CONFIG.text.err_roomNameEmpty); return; }
-    // 私密房: 先提交召唤(勾选了但还没在房里的灵魂), 成功后再存房间信息
+    // 私密房: 提交召唤(勾选且原本不在)/请离开(取消勾选且原本在), 成功后再存房间信息
     if(isPriv && window._ehSummonCtx){
       const { grid:_sg, token:_stk, API:_sapi } = window._ehSummonCtx;
       // diff: 勾了但初始没召唤=要召唤(on:true); 取消了但初始已召唤=要撤销(on:false)
@@ -5284,7 +5295,7 @@ async function openGear(){
             const r=await fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+_stk, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
             const d=await r.json();
             if(r.ok&&(d.ok||d.note)){ ch.it.dataset.orig=ch.on?'1':'0'; try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key:ch.key,on:ch.on}); }catch(_){} }
-            else{ toast((d&&d.error)||((ch.on?'召唤 ':'请走 ')+ch.nm+' 失败')); ch.it.classList.toggle('on'); }
+            else{ toast((d&&d.error)||((ch.on?'召唤 ':'请走 ')+ch.nm+' 失败'+(r.status===404?'(后端暂不支持请离开)':''))); ch.it.classList.toggle('on'); }
           }catch(e){ toast((ch.on?'召唤 ':'请走 ')+ch.nm+' 网络异常'); ch.it.classList.toggle('on'); }
           ch.it.classList.remove('busy');
         }
