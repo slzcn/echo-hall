@@ -201,6 +201,9 @@
     background:var(--violet,#8B5CFF);color:#fff;font-size:10px;font-weight:800;display:none;
     align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,rgba(20,24,38,.94))}
   .song-jump.multi .sj-dot{display:inline-flex}
+  /* 生成中(gen)态也显示数字角标: 有几首在谱曲一目了然, 点击依次定位。青色区分于谱好态(紫) */
+  .song-jump.gen .sj-dot{display:inline-flex;background:var(--cyan,#28E6D8);color:#04201d;box-shadow:0 0 0 2px var(--panel-solid,rgba(20,24,38,.94))}
+  html[data-mode="day"] .song-jump.gen .sj-dot{background:#0C8E82;color:#fff}
   /* 谱好态: 弹跳 + 光环扩散, 冲击感明显强于生成中, 强烈暗示"快点我去听" */
   @keyframes sjReadyBounce{
     0%{transform:translateY(0) scale(1);box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 0 0 color-mix(in srgb,var(--violet,#8B5CFF) 55%,transparent)}
@@ -219,9 +222,10 @@
     background-size:100% 220%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
     animation:sjInk 1.4s ease-in-out infinite}
   @keyframes sjInk{0%{background-position:0 -110%}100%{background-position:0 110%}}
-  /* 生成中小圈(替代数字角标): 青色转圈, 表达"在生成" */
+  /* 生成中小圈: 单首谱曲时用青色转圈表达"在生成"; 多首时改用数字角标(见 .gen .sj-dot), 转圈由 JS 关掉 */
   .song-jump.gen .sj-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid transparent;
     border-top-color:var(--cyan,#28E6D8);animation:sjSpin .9s linear infinite;display:block;pointer-events:none}
+  .song-jump.gen.multi .sj-ring{display:none}
   .song-jump .sj-ring{display:none}
   @keyframes sjSpin{to{transform:rotate(360deg)}}
   html[data-mode="day"] .song-jump.gen{color:#0C8E82;border-color:rgba(12,142,130,.4)}
@@ -1138,7 +1142,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1335noxscroll';
+  var BUILD_VER='20260714-1345gennum';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -2611,7 +2615,7 @@ async function enterRoom(room){
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
   _mentionQueue=[]; _mentionIdx=0; updateMentionJump();   // 切房清空@我提醒
-  _songReadyQueue=[]; _songReadyIdx=0; updateSongJump();   // 切房清空神曲谱好提醒
+  _songReadyQueue=[]; _songReadyIdx=0; _songGenQueue=[]; _songGenIdx=0; updateSongJump();   // 切房清空神曲谱好+谱曲中提醒
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
@@ -3135,6 +3139,9 @@ function updateSongQueueBar(){
   });
   // pending 数驱动"神"按钮的生成中态(替代原顶部浮条)。点击=滚到最近的 pending 神曲。
   _songGenCount = pend.length;
+  // 收集每首谱曲中神曲的 mid(按 DOM 顺序), 供"神"按钮显数字 + 点击依次定位
+  _songGenQueue = pend.map(c=>{ const m=c.closest('.msg'); return m&&m.dataset.mid?String(m.dataset.mid):null; }).filter(Boolean);
+  if(_songGenIdx >= _songGenQueue.length) _songGenIdx=0;
   _sqbTarget = pend.length ? (pend[pend.length-1].closest('.msg')||pend[pend.length-1]) : null;
   if(!pend.length){ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } updateSongJump(); return; }
   // 有 pending 就保活轮询: 让超时判定持续跑
@@ -3143,6 +3150,7 @@ function updateSongQueueBar(){
 }
 let _sqbTimer=null;
 let _songGenCount=0;   // 当前 pending(生成中)神曲数, 驱动"神"按钮生成中态
+let _songGenQueue=[], _songGenIdx=0;   // 谱曲中神曲 mid 队列 + 轮转索引(点"神"依次定位)
 const SONG_TIMEOUT_MS=120000;   // 神曲 pending 超 2 分钟(worker 兜底也没救回)→ 标记超时, 可手动重试
 let _sqbTarget=null;
 (function bindSongQueueBar(){
@@ -3718,9 +3726,10 @@ function updateSongJump(){
     b.title='你的神曲谱好了 · 点击去听';
     const d=$('#sjDot'); if(d) d.textContent = ready>9?'9+':String(ready);
   } else if(gen){
-    // 仅生成中: 青色流光 + 转圈, 无数字角标
-    b.classList.remove('on','multi'); b.classList.add('gen');
-    b.title = gen===1 ? '神曲生成中 · 点击查看' : `${gen} 首神曲生成中 · 点击查看`;
+    // 仅生成中: 青色流光。单首=转圈; 多首=青色数字角标(点击依次定位每一首)
+    b.classList.remove('on'); b.classList.add('gen'); b.classList.toggle('multi', gen>1);
+    if(gen>1){ const d=$('#sjDot'); if(d) d.textContent = gen>9?'9+':String(gen); }
+    b.title = gen===1 ? '神曲谱曲中 · 点击查看' : `${gen} 首神曲谱曲中 · 点击依次查看`;
   } else {
     b.classList.remove('on','multi','gen');
   }
@@ -3728,9 +3737,25 @@ function updateSongJump(){
 function jumpToSongReady(){
   // 谱好队列非空 → 轮流跳谱好的歌; 否则(仅生成中)→ 滚到最近的 pending 神曲(同样高亮)
   if(!_songReadyQueue.length){
-    if(_sqbTarget){ try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'});
-      _sqbTarget.classList.remove('song-flash'); void _sqbTarget.offsetWidth; _sqbTarget.classList.add('song-flash');
-      setTimeout(()=>_sqbTarget&&_sqbTarget.classList.remove('song-flash'),2200); }catch(_){} }
+    // 仅谱曲中: 轮流定位 _songGenQueue 里的每一首(依次), 每点一次跳下一首
+    if(_songGenQueue.length){
+      const gid=_songGenQueue[_songGenIdx % _songGenQueue.length]; _songGenIdx++;
+      const gm=document.querySelector(`.msg[data-mid="${gid}"]`);
+      if(gm){
+        gm.scrollIntoView({behavior:'smooth',block:'center'});
+        gm.classList.remove('song-flash'); void gm.offsetWidth; gm.classList.add('song-flash');
+        setTimeout(()=>gm.classList.remove('song-flash'),2200);
+        const gc=gm.querySelector('.song-card'); if(gc){ gc.classList.add('arrived'); setTimeout(()=>gc.classList.remove('arrived'),3000); }
+      } else if(_sqbTarget){
+        try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'});
+          _sqbTarget.classList.remove('song-flash'); void _sqbTarget.offsetWidth; _sqbTarget.classList.add('song-flash');
+          setTimeout(()=>_sqbTarget&&_sqbTarget.classList.remove('song-flash'),2200); }catch(_){}
+      }
+    } else if(_sqbTarget){
+      try{ _sqbTarget.scrollIntoView({behavior:'smooth',block:'center'});
+        _sqbTarget.classList.remove('song-flash'); void _sqbTarget.offsetWidth; _sqbTarget.classList.add('song-flash');
+        setTimeout(()=>_sqbTarget&&_sqbTarget.classList.remove('song-flash'),2200); }catch(_){}
+    }
     return;
   }
   const mid=_songReadyQueue[_songReadyIdx % _songReadyQueue.length]; _songReadyIdx++;
