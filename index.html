@@ -1113,7 +1113,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2300chipfix';
+  var BUILD_VER='20260714-2330nickdup';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -5599,11 +5599,24 @@ async function saveProfile(){
   if(name.length>24){ $('#profErr').textContent='昵称最多 24 字'; return; }
   const btn=$('#doProfBtn'); btn.disabled=true; btn.textContent='保存中…';
   // 关键: 只更新昵称/头像/颜色, 保留 id 和 registered 标记(不动用户名/登录)
+  // 先存旧值, DB 写失败(如昵称撞名)时回滚这次乐观更新, 免得本地显示了但库里没改
+  const prev={ name:me.name, emoji:me.emoji, color:me.color };
   me.name=name; me.emoji=_profEmoji; me.color=_profColor;
   saveIdentity(); paintIdentity();
   const { error }=await sb.from('eh_users').update({ name, emoji:_profEmoji, color:_profColor }).eq('id',myUid);
   btn.disabled=false; btn.textContent='保 存';
-  if(error){ $('#profErr').textContent='保存失败'; return; }
+  if(error){
+    // 回滚乐观更新
+    me.name=prev.name; me.emoji=prev.emoji; me.color=prev.color;
+    saveIdentity(); paintIdentity();
+    // 23505 = Postgres 唯一约束冲突; saveProfile 只改 name/emoji/color, 唯一能撞的就是昵称唯一索引
+    if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
+      $('#profErr').textContent='这个昵称被用了，换一个吧';
+    } else {
+      $('#profErr').textContent='保存失败';
+    }
+    return;
+  }
   // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
