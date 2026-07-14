@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-2010lobbyskel';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260714-2040projone';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2908,8 +2908,9 @@ function subscribeMessages(rid){
       // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
       // 这样同 id 多端发言能互相同步, 且 buildMsgEl 里 isMe=user_id===myUid 让它仍显示在"我的"位置(右侧)。
       if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id)，防重复
-      // 投影：触发全屏飞幕，不进消息流
-      if(m.kind==='proj'){ projectText(m.text, m.color); return; }
+      // 投影：触发全屏飞幕，不进消息流。★自己发的投影已在 broadcastProject 里本地飞过一次,
+      //   realtime 又把自己的 insert 推回来 → 会飞第二次(重复)。故自己的 proj 回声直接跳过。
+      if(m.kind==='proj'){ if(m.user_id!==myUid) projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
       // 互动: 播特效。震动/闪屏/抖动只给目标本人(挨打的才震), 旁观者看飞行物/撒花但不震。
