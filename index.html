@@ -1715,32 +1715,48 @@ function applyTextConfig(){
 // ---- 从 Supabase eh_config 表拉取覆盖配置(存在则 merge) ----
 async function loadRemoteConfig(){
   try{
+    // TOP10 #8: 客户端缓存 5 分钟，减少启动请求
+    const CACHE_KEY='eh_cfg_cache'; const CACHE_TTL=300000;
+    try{
+      const raw=localStorage.getItem(CACHE_KEY);
+      if(raw){
+        const {ts,map}=JSON.parse(raw);
+        if(Date.now()-ts<CACHE_TTL && map && typeof map==='object'){
+          applyConfigMap(map);
+          // 后台异步刷新一次（不阻塞）
+          sb.from('eh_config').select('key,value').then(({data})=>{ if(data&&data.length){ const m={}; data.forEach(r=>{m[r.key]=r.value;}); applyConfigMap(m); try{localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),map:m}));}catch(_){} } });
+          return;
+        }
+      }
+    }catch(_){}
     const { data } = await sb.from('eh_config').select('key,value');
     if(data && data.length){
       const map={}; data.forEach(r=>{ map[r.key]=r.value; });
-      // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
-      // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-      ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
-        if(!map[k]) return;
-        const dst=EH_CONFIG[k];
-        if(Array.isArray(dst)){
-          dst.length=0;
-          if(Array.isArray(map[k])) map[k].forEach(v=>dst.push(v));
-        } else if(dst && typeof dst==='object'){
-          Object.keys(dst).forEach(ok=>delete dst[ok]);
-          Object.assign(dst, map[k]);
-        } else {
-          EH_CONFIG[k]=map[k];
-        }
-      });
-      injectThemeCSS();
-      applyTextConfig();
-      // 已进房时后台改主题需重新 apply(applyTheme 会读当前 docEl data-theme)
-      try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
-      // ★后台删过 DB 数据(违禁清理等) → 按 cachePurgeAt 戳丢弃本地/内存缓存重建
-      try{ checkCachePurge(); }catch(_){}
+      applyConfigMap(map);
+      try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), map})); }catch(_){}
     }
   }catch(e){ /* 表不存在或读取失败 → 用默认配置,不影响运行 */ }
+}
+function applyConfigMap(map){
+  // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
+  // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
+  ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
+    if(!map[k]) return;
+    const dst=EH_CONFIG[k];
+    if(Array.isArray(dst)){
+      dst.length=0;
+      if(Array.isArray(map[k])) map[k].forEach(v=>dst.push(v));
+    } else if(dst && typeof dst==='object'){
+      Object.keys(dst).forEach(ok=>delete dst[ok]);
+      Object.assign(dst, map[k]);
+    } else {
+      EH_CONFIG[k]=map[k];
+    }
+  });
+  injectThemeCSS();
+  applyTextConfig();
+  try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
+  try{ checkCachePurge(); }catch(_){}
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
 try{ injectThemeCSS(); applyTextConfig(); }catch(e){}
@@ -1763,6 +1779,32 @@ async function authApi(path, body){
 }
 
 const $ = s => document.querySelector(s);
+
+  // TOP10 #3: 生产日志静默,仅 ?debug=1 时输出
+  const _EH_DBG = /[?&]debug=1(&|$)/.test(location.search);
+  function _ehDbg(){ if(_EH_DBG){ try{ console.log.apply(console, arguments); }catch(_){} } }
+  window._ehDbg = _ehDbg;
+  // TOP10 日志合表: 前端 5 类行为埋点（scope=user）
+  // 后端 admin 侧的 scope=admin 由 Edge Function 用 service_role 写入
+  window.ehLog = function(tag, payload){
+    try{
+      if(!sb) return; // 未 boot 前静默
+      const body = {
+        scope: 'user',
+        tag: tag,
+        actor_id: (typeof myUid!=='undefined' && myUid) ? myUid : null,
+        actor_name: (typeof me!=='undefined' && me && me.name) ? me.name : null,
+        room_id: (payload && payload.room_id) ? payload.room_id : ((typeof curRoom!=='undefined' && curRoom) ? curRoom.id : null),
+        room_name: (payload && (payload.room_name || payload.name)) ? (payload.room_name || payload.name) : ((typeof curRoom!=='undefined' && curRoom) ? curRoom.name : null),
+        payload: payload || {},
+        ua: navigator.userAgent.slice(0,200)
+      };
+      // fire-and-forget, RLS 拒绝也不阻塞主流程
+      sb.from('eh_logs').insert(body).then(({error})=>{
+        if(error) _ehDbg('[ehLog fail]', tag, error.message);
+      });
+    }catch(e){ _ehDbg('[ehLog error]', tag, e); }
+  };
 const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     // 安全过滤：颜色只允许 #hex，非法则回退默认色；emoji 截断+转义防注入
     const safeColor = (c,def='#8B5CFF') => (typeof c==='string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : def;
@@ -2444,6 +2486,8 @@ function preRestoreScene(){
   return true;
 }
 async function enterRoom(room){
+  try{ window.startMoodWeather && window.startMoodWeather(); }catch(_){}
+  try{ window.ehLog && ehLog('room_enter',{room_id:room&&room.id,name:room&&room.name,kind:room&&room.kind}); }catch(_){}
   try{ EhSfx.play('enter'); }catch(e){}
   try{ window.EhFx&&EhFx.warp(); }catch(e){}   // 空间穿越转场
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
@@ -2800,8 +2844,30 @@ function subscribeMessages(rid){
         if(soulUidSet.has(m.user_id)) m.is_bot=true;
         // song “归队”: 旧卡片 pending → 新卡片 ready 时加呢呼吸高亮
         let wasPending=false;
-        if(m.kind==='song'){ const oldCard=bubble.querySelector('.song-card'); wasPending=oldCard && oldCard.classList.contains('pending'); }
-        const fresh=buildMsgEl(m); if(fresh){ bubble.replaceWith(fresh); if(wasPending){ const nc=fresh.querySelector('.song-card'); if(nc && !nc.classList.contains('pending')){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'), 3400); try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){} try{ if(m.user_id===myUid){ const st=$('#stream'); const r=fresh.getBoundingClientRect(); const vis=st?(r.top>=0 && r.bottom<=st.getBoundingClientRect().bottom+40):false; if(!vis) pushSongReady(m.id); } }catch(_){} } } }
+        if(m.kind==='song'){
+          const oldCard=bubble.querySelector('.song-card');
+          wasPending = oldCard && oldCard.classList.contains('pending');
+        }
+        const fresh=buildMsgEl(m);
+        if(fresh){
+          bubble.replaceWith(fresh);
+          if(wasPending){
+            const nc=fresh.querySelector('.song-card');
+            if(nc && !nc.classList.contains('pending')){
+              nc.classList.add('arrived');
+              setTimeout(()=>nc.classList.remove('arrived'), 3400);
+              try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
+              try{
+                if(m.user_id===myUid){
+                  const st=$('#stream');
+                  const r=fresh.getBoundingClientRect();
+                  const vis = st ? (r.top>=0 && r.bottom<=st.getBoundingClientRect().bottom+40) : false;
+                  if(!vis) pushSongReady(m.id);
+                }
+              }catch(_){}
+            }
+          }
+        }
         try{ updateSongQueueBar(); }catch(e){}   // 一首谱好归位 → 刷队列条(可能减一首或隐藏)
       } else if(m.kind==='song'){
         // 少见分支：bubble 不存在 才走这里
@@ -4439,7 +4505,7 @@ async function resumeStuckPendingSongs(){
       const upd=await sb.from('eh_messages').update({text:newText}).eq('id', m.id).select();
       if(upd.error){ console.warn('[resume song patch]', m.id, upd.error.message); continue; }
       if(!upd.data || upd.data.length===0){ console.warn('[resume song 0-rows]', m.id); continue; }
-      console.log('[song resumed]', m.id, '(bucket had mp3, patched)');
+      _ehDbg('[song resumed]', m.id, '(bucket had mp3, patched)');
     }
   }catch(e){ console.warn('resumeStuckPendingSongs',e); }
 }
@@ -4500,7 +4566,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       // 埞尚很容易遇: RLS 静默拒/mid 不匹配/session 失效 → 0 行无错
       throw new Error('song patch: 0 rows updated (RLS/session or mid mismatch)');
     }
-    console.log('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
+    _ehDbg('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
   }catch(e){
     console.warn('generateSong fail',e);
     toast(EH_CONFIG.text.err_singSend||'神曲生成失败');
@@ -4916,6 +4982,8 @@ function ehConfirm(msg, title){
 
 // ============ 离开房间 ============
 async function leaveRoom(){
+  try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
+  try{ if(typeof curRoom!=='undefined' && curRoom) window.ehLog && ehLog('room_leave',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
   stopVoice(); stopSong();
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
   // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
@@ -5020,7 +5088,9 @@ async function openGear(){
     if(isPriv){ topic = $('#gWolf') && $('#gWolf').checked ? '@wolf' : ''; }
     else { topic = ($('#gRoomTopic').value||'').trim(); }
     const emoji = (($('#gRoomEmoji')&&$('#gRoomEmoji').value)||'').trim().slice(0,8) || curRoom.emoji;
+    const _preName=curRoom.name, _preTopic=curRoom.topic, _preEmoji=curRoom.emoji;
     const { error }=await sb.from('eh_rooms').update({name,topic,emoji}).eq('id',curRoom.id);
+    if(!error){ try{ window.ehLog && ehLog('room_update',{room_id:curRoom.id,before:{name:_preName,topic:_preTopic,emoji:_preEmoji},after:{name,topic,emoji}}); }catch(_){} }
     if(error){ toast(EH_CONFIG.text.err_saveFail); return; }
     curRoom.name=name; curRoom.topic=topic; curRoom.emoji=emoji;
     // 私密房关掉狼姐 → 立刻删她成员行(房主可删; worker 下轮不再驻守)。开启由 worker 扫 @wolf 加成员。
@@ -5031,11 +5101,14 @@ async function openGear(){
   };
   body.querySelectorAll('.mi-kick').forEach(el=>el.onclick=async()=>{
     if(!await ehConfirm('确定踢出该成员？','踢出成员')) return;
-    await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',el.dataset.uid);
+    const _kickUid=el.dataset.uid;
+    await sb.from('eh_members').delete().eq('room_id',curRoom.id).eq('user_id',_kickUid);
+    try{ window.ehLog && ehLog('member_kick',{room_id:curRoom.id,target_uid:_kickUid}); }catch(_){}
     toast(EH_CONFIG.text.ok_kicked); openGear();
   });
   const _disBtn=$('#gDissolveBtn'); if(_disBtn) _disBtn.onclick=async()=>{
     if(!await ehConfirm('解散后房间和消息将从前台消失，确定？','解散房间')) return;
+    try{ window.ehLog && ehLog('room_dissolve',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
     await sb.from('eh_rooms').delete().eq('id',curRoom.id);
     toast(EH_CONFIG.text.ok_roomDissolved); closeGear(); backToLobby();
   };
@@ -5068,7 +5141,7 @@ function purgeClientCaches(reason){
   try{ roomSnap=null; }catch(_){}
   try{ Object.keys(prefetchCache).forEach(k=>delete prefetchCache[k]); }catch(_){}
   _cachePurged=true;
-  console.log('[EH] client caches purged:', reason||'');
+  _ehDbg('[EH] client caches purged:', reason||'');
 }
 function checkCachePurge(){
   try{
@@ -5389,6 +5462,7 @@ async function createRoom(){
   if(!room){ toast(EH_CONFIG.text.err_createRoom); return; }
   // 房主入成员表
   await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
+  try{ window.ehLog && ehLog('room_create',{room_id:room.id,name:room.name,kind:room.kind,emoji:room.emoji}); }catch(_){}
   createdRoom=room;
   const wolfHint=$('#wolfHintCreated');
   if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfHint) wolfHint.style.display='block'; }
@@ -5916,21 +5990,24 @@ function fillAndLogin(id, pwv){
   })();
 
   // ---- 3. 灵魂心情天气: 轮询 roomSouls 主导情绪, 染 mood-aura ----
-  (function moodWeather(){
+  // TOP10 #4: moodWeather 轮询按进/离房启停,离房后不再吃CPU
+  (function(){
     const aura=document.getElementById('moodAura');
     const MOOD={ excited:{c:'#FF6B35',cls:'mood-excited'}, happy:{c:'#FFD24D',cls:''},
       caring:{c:'#8B5CFF',cls:'mood-caring'}, calm:{c:'#28E6D8',cls:''} };
-    setInterval(()=>{
+    let _moodT=null;
+    function tick(){
       try{
         if(!document.body.classList.contains('hall-on') || typeof roomSouls==='undefined' || !roomSouls.length){ aura.classList.remove('on'); return; }
-        // 统计主导情绪
         const cnt={}; roomSouls.forEach(s=>{ const e=s.emotion||'calm'; cnt[e]=(cnt[e]||0)+1; });
         let dom='calm',mx=0; Object.keys(cnt).forEach(e=>{ if(cnt[e]>mx){mx=cnt[e];dom=e;} });
         const m=MOOD[dom]||MOOD.calm;
         aura.style.setProperty('--mood-c', m.c);
         aura.className='mood-aura on '+(m.cls||'');
       }catch(_){}
-    }, 3000);
+    }
+    window.startMoodWeather = function(){ if(_moodT) return; _moodT=setInterval(tick, 3000); tick(); };
+    window.stopMoodWeather  = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; if(aura) aura.classList.remove('on'); } };
   })();
 
   // ---- 供主脚本调用的钩子 ----
