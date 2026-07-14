@@ -1147,7 +1147,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1800summonmem';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260714-1820onetoast';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5294,23 +5294,42 @@ async function openGear(){
                            .map(it=>({ it, key:it.dataset.key, on:it.classList.contains('on'), nm:it.querySelector('.si-nm').textContent.replace(/^叫|来陪你$/g,'') }));
       if(_changes.length){
         _saveBtn.disabled=true; _saveBtn.textContent='处理中…';
+        const _fails=[];   // 收集失败项, 最后统一一条友好提示(不再逐条弹原始错误码)
         for(const ch of _changes){
           ch.it.classList.add('busy');
           try{
             const r=await fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+_stk, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
-            const d=await r.json();
+            const d=await r.json().catch(()=>({}));
             if(r.ok&&(d.ok||d.note)){ ch.it.dataset.orig=ch.on?'1':'0'; try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key:ch.key,on:ch.on}); }catch(_){} }
-            else{ toast((d&&d.error)||((ch.on?'召唤 ':'请走 ')+ch.nm+' 失败'+(r.status===404?'(后端暂不支持请离开)':''))); ch.it.classList.toggle('on'); }
-          }catch(e){ toast((ch.on?'召唤 ':'请走 ')+ch.nm+' 网络异常'); ch.it.classList.toggle('on'); }
+            else{ _fails.push({nm:ch.nm, on:ch.on, code:r.status}); ch.it.classList.toggle('on'); }
+          }catch(e){ _fails.push({nm:ch.nm, on:ch.on, code:'net'}); ch.it.classList.toggle('on'); }
           ch.it.classList.remove('busy');
         }
         _saveBtn.disabled=false; _saveBtn.textContent='保存修改';
-        const _sum=_changes.filter(c=>c.on).length, _rem=_changes.filter(c=>!c.on).length;
-        toast(_sum&&_rem?'已更新陪聊灵魂~':_sum?'已召唤，稍等她/他进房~':'已请走~');
         // 前端立刻重拉本房灵魂名单 + 刷光墙(召唤即时显现; 撤销即时消失)
         try{ soulsCache[curRoom.id]=null; }catch(_){}
         loadRoomSouls(curRoom.id).catch(()=>{});
         refreshPresence().catch(()=>{});
+        // 统一一条提示: 有失败只报失败(友好话, 不显原始错误码); 全成功报成功。提示后 return, 不再走后面的通用"已保存"(避免两条提示)
+        if(_fails.length){
+          const f=_fails[0];
+          toast(_fails.length>1 ? '部分灵魂操作失败，请重试' : ((f.on?'召唤 ':'请走 ')+f.nm+(f.code===404?' 失败：后端暂不支持':'失败，请重试')));
+        }else{
+          const _sum=_changes.filter(c=>c.on).length, _rem=_changes.filter(c=>!c.on).length;
+          toast(_sum&&_rem?'已更新陪聊灵魂~':_sum?'已召唤，稍等她/他进房~':'已请走~');
+        }
+        // 召唤/请离开已单独给出结果提示 → 收起抽屉, 不再落到下面的房间信息保存(那会再弹一条"已保存")
+        // 但房名/图标可能也改了, 仍需存: 静默存(不再 toast), 存完关抽屉。
+        const _nm2=$('#gRoomName').value.trim()||curRoom.name;
+        const _eb2=$('#gRoomEmojiBtn'); const _emoji2=((_eb2&&_eb2.dataset.emoji)||'').trim().slice(0,8)||curRoom.emoji;
+        if(_nm2!==curRoom.name || _emoji2!==curRoom.emoji){
+          await sb.from('eh_rooms').update({name:_nm2,emoji:_emoji2}).eq('id',curRoom.id).then(()=>{
+            curRoom.name=_nm2; curRoom.emoji=_emoji2;
+            { const _hi=$('#hallIcon'); if(_hi) _hi.textContent=safeEmoji(curRoom.emoji)||'💬'; }
+            $('#hallNameTxt').innerHTML=`${esc(_nm2)} <span style="font-size:11px;color:var(--dim);font-weight:400">· ${curRoom.kind==='private'?'私密':'公开'}</span>`;
+          }).catch(()=>{});
+        }
+        closeGear(); return;
       }
     }
     // 公告: 仅公开房有; 私密房不写 topic(不显示公告, 也不覆盖 DB 原值)
