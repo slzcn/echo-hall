@@ -311,6 +311,8 @@
   .me-btn.ic svg{width:18px;height:18px}
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
   .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--accent,var(--cyan));box-shadow:0 0 12px -3px var(--accent,var(--cyan));transform:translateY(-1px)}
+  /* 大厅头部工具栏: 与聊天页 .hall-tools 完全同款(🎵/🎨/🦊 三个 .tool-btn), 绝对定位到标题右侧 */
+  .lobby-tools{position:absolute;top:0;right:0}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px var(--shadow-lg);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -410,8 +412,8 @@
   .tool-btn.active,.me-btn.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
 
   /* BGM 按钮: emoji 图标(🎵/🔇), 与工具栏其它 emoji 统一。开=轻微呼吸, 静音=灰淡 */
-  #bgmBtnHall:not(.muted){animation:bgmBreath 2.4s ease-in-out infinite}
-  #bgmBtnHall.muted{opacity:.55;filter:grayscale(.4)}
+  .bgm-btn:not(.muted){animation:bgmBreath 2.4s ease-in-out infinite}
+  .bgm-btn.muted{opacity:.55;filter:grayscale(.4)}
   @keyframes bgmBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
   .gear.active{color:var(--amber);border-color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent)}  /* 齿轮用琥珀主色, 与其 hover 一致 */
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
@@ -1113,7 +1115,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1245bgmlobby';
+  var BUILD_VER='20260714-1310lobbytools';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -1189,8 +1191,11 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
   <div class="scene" id="lobby">
     <div class="lobby-head">
       <h2>回声厅</h2>
-      <div class="me-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin" style="right:48px">🎨</div>
-      <div class="me-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
+      <div class="hall-tools lobby-tools">
+        <div class="tool-btn bgm-btn" id="bgmBtnLobby" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
+        <div class="tool-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin">🎨</div>
+        <div class="tool-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
+      </div>
       <div class="skin-menu" id="skinMenu"></div>
     </div>
     <div class="sec-label"><span class="sl-t" data-txt="hallOfficial">📡 官方频道</span></div>
@@ -1220,7 +1225,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       </div>
       <div class="hall-tools">
         <div class="tool-btn" id="wallBtn" title="名场面 · 本房高共鸣消息">✨</div>
-        <div class="tool-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
+        <div class="tool-btn bgm-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
         <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
       </div>
@@ -2131,8 +2136,8 @@ function kickBgmOnGesture(){
   }catch(_){}
 }
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){}
-// BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇
-function paintBgmBtn(on){ const b2=$('#bgmBtnHall'); if(b2){ b2.classList.toggle('muted',!on); b2.textContent=on?'🎵':'🔇'; } }
+// BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
+function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
@@ -2147,9 +2152,10 @@ function startRoomBGM(room){
   }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
 function initBgmUI(){
-  const b2=$('#bgmBtnHall'); if(!b2) return;
   paintBgmBtn(bgmOn());
-  b2.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+  const toggle=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
+  const bh=$('#bgmBtnHall'); if(bh) bh.onclick=toggle;
+  const bl=$('#bgmBtnLobby'); if(bl) bl.onclick=toggle;
 }
 
 
