@@ -1123,7 +1123,9 @@
      父 modal 已 max-height:90dvh, 这里减去标题+padding 的余量, 避免双层滚动打架 */
   .wall-list{max-height:min(56dvh,440px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     display:flex;flex-direction:column;gap:10px;margin-top:8px}
-  .wall-item{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card-bg-soft);position:relative}
+  .wall-item{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card-bg-soft);position:relative;cursor:pointer;transition:border-color .15s,transform .1s}
+  .wall-item:hover{border-color:color-mix(in srgb,var(--accent,var(--cyan)) 45%,var(--line))}
+  .wall-item:active{transform:scale(.99)}
   .wall-item .wi-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
   .wall-item .wi-nm{font-size:12.5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
   .wall-item .wi-rank{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap;flex-shrink:0}
@@ -1137,7 +1139,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1315readable';
+  var BUILD_VER='20260714-1520projwall';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -3236,13 +3238,10 @@ function buildMsgEl(m, isHistory){
     m={...m, text:cleaned};
   }
   const isMe = m.user_id===myUid;
-  // 投影: 实时收到时走飞幕特效(不进流), 但加载历史时当普通气泡渲染
-  // (真人把投影当聊天用, 历史不显示=丢消息), 带个投影小标记区分
-  // ★灵魂投影会同时留底一条 msg + 一条 proj(worker 解析 [PROJ] 后另发), 历史里会重复显示两次
-  //   → loadHistory 里 dedupProjInHistory 已给"有同内容 msg 留底"的 proj 打 _skipHist, 这里跳过它;
-  //   真人投影(broadcastProject 只发 proj 一条, 无 msg 留底)不会被打标, 仍渲染成气泡。
-  if(m.kind==='proj' && !isHistory) return null;   // 实时投影是瞬时飞幕，不进消息流
-  if(m.kind==='proj' && isHistory && m._skipHist) return null;   // 历史里与 msg 留底重复的灵魂投影, 去重跳过
+  // 投影 = 针对某条已存在消息的"瞬时飞幕"效果(类似点赞是对消息的动作, 不产生新消息内容)。
+  // 原消息本身就是永久记录 → proj 永远不渲染成气泡: 实时收到走飞幕(见订阅处), 历史一律跳过。
+  // (旧设计: 灵魂 msg留底+proj两条 / 真人 proj 当气泡显历史 → 都会出现"两条"或重复, 现统一去掉。)
+  if(m.kind==='proj') return null;
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
     el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
@@ -5860,18 +5859,26 @@ function openWall(){
     Object.keys(map).forEach(e=>{ const c=map[e]&&map[e].count||0; if(c>0){ total+=c; pills.push(e+' '+c); } });
     if(total<=0) return;
     const nm=el.querySelector('.meta .nm'), txt=el.querySelector('.txt');
-    items.push({ total, pills, name:nm?nm.textContent:'', color:nm?nm.style.color:'', text:txt?txt.textContent.trim().slice(0,120):'' });
+    items.push({ mid, total, pills, name:nm?nm.textContent:'', color:nm?nm.style.color:'', text:txt?txt.textContent.trim().slice(0,120):'' });
   });
   items.sort((a,b)=>b.total-a.total);
   const top=items.slice(0,8);
   box.innerHTML = top.length ? top.map((it,i)=>`
-    <div class="wall-item">
+    <div class="wall-item" data-mid="${esc(String(it.mid))}" title="点击定位到这条消息">
       <div class="wi-top"><span class="wi-nm" style="--ec:${esc(it.color||'var(--ink)')}">${esc(it.name)}</span>
         <span class="wi-rank">#${i+1} · ${it.total} 共鸣</span></div>
       <div class="wi-txt">${esc(it.text)}</div>
       <div class="wi-echoes">${it.pills.map(p=>`<span class="wi-pill">${esc(p)}</span>`).join('')}</div>
     </div>`).join('')
     : '<div class="wall-empty">还没有高共鸣的消息～<br>长按消息贴表情，热门的会留在这里</div>';
+  // 点名场面卡 → 关弹窗 + 定位到那条消息并高亮(复用 @提醒的定位方式)
+  box.querySelectorAll('.wall-item[data-mid]').forEach(it=>it.onclick=()=>{
+    const mid=it.dataset.mid;
+    mask.classList.remove('on');
+    const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
+    if(msg){ msg.scrollIntoView({behavior:'smooth',block:'center'}); msg.classList.add('mentioned-flash'); setTimeout(()=>msg.classList.remove('mentioned-flash'),2000); }
+    else toast('那条消息不在当前列表里');
+  });
   mask.classList.add('on');
 }
 on('meBtn','click',()=>openMe());
