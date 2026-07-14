@@ -1097,20 +1097,18 @@
   /* 房间设置里"叫狼姐陪聊"开关(仅私密房) */
   /* 叫狼姐开关: 用中性线框, 不再高亮红/品红, 与设置页其它 fld 一致 */
   .summon-panel{margin:10px 0 0}
-  .summon-panel .sp-title{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--txt);margin-bottom:8px}
-  .summon-panel .sp-hint{font-size:11px;color:var(--sub);font-weight:400;margin-left:2px}
-  .summon-grid{display:flex;flex-direction:column;gap:8px}
-  .summon-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;border:1.5px solid var(--line2);background:rgba(255,255,255,.02);cursor:pointer;transition:.16s}
+  .summon-panel .sp-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sub);margin-bottom:7px}
+  .summon-panel .sp-hint{font-size:11px;color:var(--dim);font-weight:400}
+  .summon-grid{display:flex;flex-wrap:wrap;gap:7px}
+  .summon-item{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:16px;border:1px solid var(--line2);background:var(--card-bg-soft,rgba(255,255,255,.03));cursor:pointer;transition:.15s;font-size:13px;color:var(--sub);user-select:none}
   .summon-item:hover{border-color:var(--cyan)}
-  .summon-item.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-  .summon-item .si-emoji{font-size:24px;line-height:1;flex:0 0 auto}
-  .summon-item .si-meta{flex:1;min-width:0}
-  .summon-item .si-nm{font-size:14px;font-weight:600;color:var(--txt)}
-  .summon-item .si-blurb{font-size:11px;color:var(--sub);margin-top:1px;line-height:1.35}
-  .summon-item .si-check{flex:0 0 auto;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;transition:.16s}
-  .summon-item.on .si-check{background:var(--cyan);border-color:var(--cyan)}
-  .summon-item.busy{opacity:.55;pointer-events:none}
-  .summon-panel .sp-loading{font-size:12px;color:var(--sub);padding:8px 2px}
+  .summon-item.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,transparent);color:var(--ink)}
+  .summon-item .si-emoji{font-size:15px;line-height:1}
+  .summon-item .si-nm{font-weight:600}
+  .summon-item .si-dot{font-size:11px;opacity:0;transition:.15s;margin-left:1px}
+  .summon-item.on .si-dot{opacity:1;color:var(--cyan)}
+  .summon-item.busy{opacity:.5;pointer-events:none}
+  .summon-panel .sp-loading{font-size:12px;color:var(--sub);padding:6px 2px}
   .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 0;padding:10px 12px;border-radius:10px;cursor:pointer;
     background:var(--card-bg-soft,rgba(10,12,24,.4));border:1px solid var(--line2);
     font-size:13px;color:var(--ink);user-select:none;transition:.15s}
@@ -1139,7 +1137,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260714-1520projwall';
+  var BUILD_VER='20260714-1325slim';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -5129,7 +5127,7 @@ async function openGear(){
     const topicField = `<label class="fld"><span>公告 / 主题</span><input id="gRoomTopic" maxlength="200" value="${esc((curRoom.topic&&curRoom.topic!=='@wolf')?curRoom.topic:'')}" placeholder="给房间设个公告"></label>`;
     const summonPanel = isPriv
       ? `<div class="summon-panel" id="gSummonPanel">
-           <div class="sp-title">✨ 召唤陪聊灵魂 <span class="sp-hint">私密房专属·可多选</span></div>
+           <div class="sp-title">✨ 召唤陪聊灵魂 <span class="sp-hint">点选即召唤</span></div>
            <div class="sp-loading" id="gSummonLoading">加载中…</div>
            <div class="summon-grid" id="gSummonGrid" style="display:none"></div>
          </div>`
@@ -5204,10 +5202,8 @@ async function openGear(){
       if(loading) loading.style.display='none';
       grid.style.display='flex';
       grid.innerHTML=list.map(x=>`
-        <div class="summon-item ${x.on?'on':''}" data-key="${x.key}">
-          <span class="si-emoji">${x.emoji}</span>
-          <div class="si-meta"><div class="si-nm">${esc(x.name)}</div><div class="si-blurb">${esc(x.blurb||'')}</div></div>
-          <div class="si-check">${x.on?'✓':''}</div>
+        <div class="summon-item ${x.on?'on':''}" data-key="${x.key}" title="${esc(x.blurb||'')}">
+          <span class="si-emoji">${x.emoji}</span><span class="si-nm">${esc(x.name)}</span><span class="si-dot">✓</span>
         </div>`).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
         it.onclick=async()=>{
@@ -5219,7 +5215,7 @@ async function openGear(){
             const d=await r.json();
             if(!r.ok||!d.ok){ toast((d&&d.error)||'操作失败'); it.classList.remove('busy'); return; }
             it.classList.toggle('on',turnOn);
-            it.querySelector('.si-check').textContent=turnOn?'✓':'';
+            
             const nm=it.querySelector('.si-nm').textContent;
             toast(turnOn?('已召唤 '+nm+'，稍等她/他进房~'):('已请 '+nm+' 离开'));
             try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key,on:turnOn}); }catch(_){}
