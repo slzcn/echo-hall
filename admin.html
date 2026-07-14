@@ -189,6 +189,17 @@
     color:var(--ink);font-family:inherit;font-size:14px;outline:none;transition:.15s}
   .inline-form input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .empty{color:var(--dim);font-size:12.5px;padding:26px;text-align:center}
+  /* 互动管理卡 */
+  .ix-card{border:1px solid var(--line2);border-radius:12px;padding:12px;margin-bottom:12px;background:rgba(10,12,24,.4)}
+  .ix-row,.ix-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ix-row2{margin-top:8px}
+  .ix-fxrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .ix-in{background:var(--panel);border:1px solid var(--line2);border-radius:8px;color:var(--ink);padding:7px 10px;font-size:13px;font-family:inherit}
+  .ix-in:focus{outline:none;border-color:var(--cyan)}
+  .ix-emoji{width:52px;text-align:center;font-size:16px}
+  .ix-fxin{background:var(--panel);border:1px solid var(--line2);border-radius:7px;color:var(--ink);padding:5px 8px;font-size:12px;width:120px;font-family:inherit}
+  .ix-chk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);cursor:pointer;user-select:none}
+  .ix-chk input{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer}
   .note-box{font-size:12.5px;color:var(--sub);line-height:1.9}
   .note-box b{color:var(--ink)}
 
@@ -504,6 +515,13 @@
         <button class="btn" id="ssSaveBtn">保存曲风池</button>
         <button class="mini-btn" id="ssResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 全部恢复默认</button>
       </div>
+    </div>
+
+    <div class="glass card">
+      <h3>👊 互动管理</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">点头像「对TA」菜单里的互动(打一拳/送花/撒花等)。特效由 fx 参数组合: 勾选震动/闪屏/抖动/飞行物/撒射/纸屑雨/光环 + 音效。改后点「保存」。</p>
+      <div id="ixList"></div>
+      <div style="margin-top:10px"><button class="mini-btn" id="ixAddBtn" style="border-color:var(--cyan);color:var(--cyan)">+ 新增互动</button></div>
     </div>
   </div>
 
@@ -1571,6 +1589,66 @@ $('#ssResetBtn')?.addEventListener('click', ()=>{
   resetConfigKeys(['songStyles'], loadSongStyles, '曲风池');
 });
 
+// ---- 👊 互动管理 ----
+let _ixDraft=[];
+const IX_CATS=[['hit','打击/整蛊'],['warm','温情'],['vibe','氛围'],['fun','其它']];
+async function loadInteractionsAdmin(){
+  const res=await api('/interactions'); if(!res.ok){ $('#ixList').innerHTML='<div class="empty">加载失败</div>'; return; }
+  _ixDraft=(res.body.items||[]).map(x=>({...x, fx:x.fx||{}}));
+  renderIxList();
+}
+function renderIxList(){
+  const box=$('#ixList'); if(!box) return;
+  box.innerHTML=_ixDraft.map((ix,i)=>{
+    const fx=ix.fx||{};
+    const chk=(k,label)=>`<label class="ix-chk"><input type="checkbox" data-i="${i}" data-fx="${k}" ${fx[k]?'checked':''}>${label}</label>`;
+    const txt=(k,ph)=>`<input class="ix-fxin" data-i="${i}" data-fxs="${k}" value="${esc(fx[k]||'')}" placeholder="${ph}">`;
+    return `<div class="ix-card">
+      <div class="ix-row">
+        <input class="ix-in ix-emoji" data-i="${i}" data-k="emoji" value="${esc(ix.emoji||'')}" placeholder="👊" maxlength="8">
+        <input class="ix-in" data-i="${i}" data-k="name" value="${esc(ix.name||'')}" placeholder="名称" style="flex:1">
+        <input class="ix-in ix-id" data-i="${i}" data-k="id" value="${esc(ix.id||'')}" placeholder="id(英文)" maxlength="24" style="width:90px">
+        <select class="ix-in" data-i="${i}" data-k="category" style="width:100px">${IX_CATS.map(c=>`<option value="${c[0]}"${ix.category===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
+      </div>
+      <input class="ix-in" data-i="${i}" data-k="text_tpl" value="${esc(ix.text_tpl||'')}" placeholder="文案模板, 用 {from} {to}, 如: {from} 打了 {to} 一拳" style="width:100%;margin-top:6px">
+      <div class="ix-fxrow">
+        ${chk('shake','抖动')}${chk('rain','纸屑雨')}
+        ${txt('flash','闪屏色#')} ${txt('fly','飞行物emoji')} ${txt('burst','撒射emoji')} ${txt('glow','光环色#')}
+        <input class="ix-fxin" data-i="${i}" data-fxv="1" value="${(fx.vibrate||[]).join(',')}" placeholder="震动 如40,30,60" style="width:110px">
+        <input class="ix-fxin" data-i="${i}" data-fxs="sfx" value="${esc(fx.sfx||'')}" placeholder="音效 punch/echo/receive" style="width:150px">
+      </div>
+      <div class="ix-row2">
+        <label class="ix-chk"><input type="checkbox" data-i="${i}" data-k2="can_target_soul" ${ix.can_target_soul!==false?'checked':''}>可对灵魂</label>
+        <label class="ix-chk"><input type="checkbox" data-i="${i}" data-k2="enabled" ${ix.enabled!==false?'checked':''}>启用</label>
+        <input class="ix-in" data-i="${i}" data-k="cooldown_ms" value="${ix.cooldown_ms||4000}" placeholder="冷却ms" style="width:80px" type="number">
+        <input class="ix-in" data-i="${i}" data-k="sort" value="${ix.sort||0}" placeholder="排序" style="width:60px" type="number">
+        <button class="mini-btn ix-save" data-i="${i}" style="border-color:var(--cyan);color:var(--cyan)">💾 保存</button>
+        <button class="mini-btn ix-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta)">删除</button>
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty">暂无互动</div>';
+  // 绑定输入 → 回写 _ixDraft
+  box.querySelectorAll('.ix-in[data-k]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix) ix[el.dataset.k]=el.value; });
+  box.querySelectorAll('input[data-k2]').forEach(el=>el.onchange=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix) ix[el.dataset.k2]=el.checked; });
+  box.querySelectorAll('input[data-fx]').forEach(el=>el.onchange=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; if(el.checked) ix.fx[el.dataset.fx]=true; else delete ix.fx[el.dataset.fx]; } });
+  box.querySelectorAll('.ix-fxin[data-fxs]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; if(el.value.trim()) ix.fx[el.dataset.fxs]=el.value.trim(); else delete ix.fx[el.dataset.fxs]; } });
+  box.querySelectorAll('.ix-fxin[data-fxv]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; const arr=el.value.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)); if(arr.length) ix.fx.vibrate=arr; else delete ix.fx.vibrate; } });
+  box.querySelectorAll('.ix-save').forEach(b=>b.onclick=()=>saveIx(_ixDraft[+b.dataset.i]));
+  box.querySelectorAll('.ix-del').forEach(b=>b.onclick=()=>delIx(+b.dataset.i));
+}
+async function saveIx(ix){
+  if(!ix) return;
+  if(!String(ix.id||'').trim()){ toast('id 不能为空(英文)'); return; }
+  const res=await api('/interaction-save',{method:'POST',body:ix});
+  if(res.ok){ toast('已保存 '+(ix.name||ix.id)); loadInteractionsAdmin(); } else toast(res.body?.error||'保存失败');
+}
+async function delIx(i){
+  const ix=_ixDraft[i]; if(!ix) return;
+  if(!await (typeof confirmBox==='function'?confirmBox('删除互动「'+(ix.name||ix.id)+'」?'):Promise.resolve(confirm('删除?')))) return;
+  if(ix.id){ const res=await api('/interaction-delete',{method:'POST',body:{id:ix.id}}); if(!res.ok){ toast('删除失败'); return; } }
+  toast('已删除'); loadInteractionsAdmin();
+}
+$('#ixAddBtn')?.addEventListener('click',()=>{ _ixDraft.push({id:'',name:'新互动',emoji:'✨',category:'fun',fx:{},cooldown_ms:4000,can_target_soul:true,enabled:true,sort:(_ixDraft.length+1)*10}); renderIxList(); });
 
 // ---- 📋 操作日志 ----
 const AUDIT_KEY_LABEL = {
@@ -1806,7 +1884,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='bgm') loadBgm();
   if(t.dataset.page==='text') loadTextBind();
   if(t.dataset.page==='tuning') loadTuning();
-  if(t.dataset.page==='songstyles') loadSongStyles();
+  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); }
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位
 });
