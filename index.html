@@ -1146,11 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-<<<<<<< HEAD
-  var BUILD_VER='20260714-1545acafirst';
-=======
-  var BUILD_VER='20260714-1450summonv2';
->>>>>>> fa2d9a4 (召唤面板 v2: 上下结构+描述+勾选保存+防重复; 私密房去公告; Edge Function 匿名房主鉴权)
+  var BUILD_VER='20260714-1600summonv2';
   window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
