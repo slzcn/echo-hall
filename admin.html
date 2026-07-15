@@ -2041,7 +2041,17 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
 $('#username').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#password').focus(); });
-$('#logoutBtn').onclick=async()=>{ if(!await confirmBox('确定退出登录？','退出')) return; await sb.auth.signOut(); location.reload(); };
+$('#logoutBtn').onclick=async()=>{
+  if(!await confirmBox('确定退出登录？','退出')) return;
+  await sb.auth.signOut();
+  // ★ admin 退出必须同时清前台本地身份缓存，否则退出后前台从 localStorage 读到旧名字/头像但 auth 已登出
+  // → 显示“yiran · 临时身份”的错位 bug，点进入会新建临时用户。
+  try{ localStorage.removeItem('eh_identity_v2'); }catch(e){}
+  try{ localStorage.removeItem('eh_me_cache_v2'); }catch(e){}
+  try{ localStorage.removeItem('eh_me_cache_v1'); }catch(e){}
+  try{ localStorage.removeItem('eh_last_room'); }catch(e){}
+  location.reload();
+};
 
 // 启动: 先显示验证遮罩, 检查同源已有登录态(与前台共享 session)→
 // 有效直接进面板(无感,不重登); 无效/无权限才显示登录框。

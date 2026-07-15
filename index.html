@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0700fixes4';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0157optd-adminbug';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2208,6 +2208,9 @@ async function ensureAuth(){
     catch(e){ console.warn('anon signin 超时', e); toast(EH_CONFIG.text.err_initId); return null; }
     if(error || !data?.user){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
+    // ★ 防冒充: 匿名登录后强制重掋随机名字, 避免旧缓存的正式账号名字(如 yiran)被新匿名 uid 带入 DB 产生“匿名 yiran”重复临时身份
+    // 触发场景: admin 退出时未清 localStorage → me.name/emoji 残留 → 匿名登录后 → upsert 写入一条“临时 yiran”。
+    try{ if(me){ me.registered=false; me.role='user'; me.username=''; } rollIdentity(); }catch(e){}
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
   // 真实 session 是匿名的, 但缓存 me 还标着正式账号 → 同样纠正+重掷昵称(防旧缓存残留冒充+同名)
