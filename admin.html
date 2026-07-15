@@ -138,13 +138,25 @@
   .skin-opt .ck{margin-left:auto;opacity:0;color:var(--cyan)}
   .skin-opt.active .ck{opacity:1}
 
-  /* ===== tabs ===== */
-  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  /* ===== tabs (多端自适应: 桌面自动换行, 手机横向滑动不挤成一坨) ===== */
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;position:sticky;top:0;z-index:20;
+    background:var(--bg);padding:8px 0;-webkit-overflow-scrolling:touch}
   .tab{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--sub);
-    cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+    cursor:pointer;font-size:13px;font-weight:600;transition:.15s;white-space:nowrap;flex:0 0 auto}
   .tab.on{background:var(--violet);color:#fff;border-color:var(--violet);box-shadow:0 6px 18px color-mix(in srgb,var(--violet) 30%,transparent)}
   .tab:not(.on):hover{border-color:var(--cyan);color:var(--cyan)}
+  @media (max-width:640px){
+    .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;margin:0 -14px 14px;padding:8px 14px}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{padding:8px 13px;font-size:12.5px}
+  }
   .page{display:none;animation:fade .25s ease} .page.on{display:block}
+  /* 分段选择器(贵客待遇档等) */
+  .seg{display:inline-flex;gap:0;border:1px solid var(--line2);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+  .seg-btn{padding:8px 16px;background:var(--panel);color:var(--sub);border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:.15s}
+  .seg-btn+.seg-btn{border-left:1px solid var(--line2)}
+  .seg-btn.on{background:var(--violet);color:#fff}
+  .seg-btn:not(.on):hover{color:var(--cyan)}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 
@@ -445,14 +457,12 @@
   </div>
   <div class="tabs">
     <div class="tab on" data-page="overview">概览</div>
-    <div class="tab" data-page="rooms">房间 & 聊天记录</div>
-    <div class="tab" data-page="theme">🎨 主题配色</div>
-    <div class="tab" data-page="bgm">🎵 BGM</div>
-    <div class="tab" data-page="songstyles">🎼 曲风</div>
-    <div class="tab" data-page="text">📝 文案 & 绑定</div>
-    <div class="tab" data-page="tuning">⚙️ 运行参数</div>
-    <div class="tab" data-page="vip">💎 贵客名单</div>
-    <div class="tab" data-page="audit">📋 操作日志</div>
+    <div class="tab" data-page="rooms">房间</div>
+    <div class="tab" data-page="theme">外观</div>
+    <div class="tab" data-page="songstyles">玩法</div>
+    <div class="tab" data-page="text">文案参数</div>
+    <div class="tab" data-page="vip">贵客</div>
+    <div class="tab" data-page="audit">日志</div>
     <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
   </div>
 
@@ -508,19 +518,14 @@
         选主题看当前 --cyan 效果
       </div>
     </div>
-  </div>
-
-  <!-- 🎵 BGM -->
-  <div class="page" id="p-bgm">
-    <div class="glass card"><h3>官方房 BGM 氛围参数
-      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存 BGM</button> <button class="mini-btn" id="bgmResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+    <div class="glass card"><h3>官方房 BGM
+      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存</button> <button class="mini-btn" id="bgmResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button></h3>
       <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
-        · root:根音Hz(20-2000) · chord:和弦半音程(逗号分隔如 0,4,7,11) · wave:波形 · pulse:律动ms(0=纯pad) · cut:低通截止Hz
+        root 根音Hz · chord 和弦半音程(如 0,4,7,11) · wave 波形 · pulse 律动ms(0=纯pad) · cut 低通Hz
       </div>
       <div id="bgmTable"></div>
     </div>
   </div>
-
 
   <div class="page" id="p-songstyles">
     <div class="glass card">
@@ -570,20 +575,16 @@
 
     <div class="glass card"><h3>🎭 身份随机池(匿名昵称生成)
       <button class="mini-btn" id="poolSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存身份池</button> <button class="mini-btn" id="poolResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
-      <div style="color:var(--dim);font-size:11.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匹名。每个词用逗号分隔,保存后立即生效。</div>
+      <div style="color:var(--dim);font-size:11.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匿名。每个词逗号分隔,保存后立即生效。</div>
       <div id="poolPanel"></div>
     </div>
-  </div>
 
-  <div class="page" id="p-tuning">
     <div class="glass card">
-      <h3>⚙️ 运行参数</h3>
-      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">改后点「保存」写入 eh_config，前端启动 loadRemoteConfig 拉取覆盖默认值（无需改代码）。留空/非法则用默认。</p>
+      <h3>⚙️ 运行参数
+        <button class="btn" id="tuningSaveBtn" style="font-size:12px;padding:6px 14px">💾 保存</button>
+        <button class="mini-btn" id="tuningResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button></h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">改后保存写入 eh_config,前端启动拉取覆盖默认。留空/非法用默认。</p>
       <div id="tuningTable"></div>
-      <div style="margin-top:14px;display:flex;gap:8px">
-        <button class="btn" id="tuningSaveBtn">保存运行参数</button>
-        <button class="mini-btn" id="tuningResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 全部恢复默认</button>
-      </div>
     </div>
   </div>
 
@@ -591,17 +592,23 @@
     <div class="glass card">
       <h3>💎 贵客名单</h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
-        把用户的 <b>user_id</b> 加进来, 即使是普通/临时账号, 进房也享受<b>管理员级进场待遇</b>:
-        全屏紫金光幕 + 广播全房 + 灵魂有概率起身相迎。填 user_id(uuid), 一行一个或用下方输入框逐个加。
-        不知道 id? 去「房间 & 聊天记录」翻到该用户的消息, 或让 TA 发一条, 从记录里复制 user_id。
+        填用户 <b>user_id</b>(uuid),即使普通/临时账号进房也享贵客进场:全屏紫钻光幕 + 广播全房 + 灵魂相迎。
+        不知道 id?去「房间」翻该用户消息复制。
       </p>
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">进场待遇档</label>
+        <div class="seg" id="vipTreatSeg">
+          <button class="seg-btn on" data-v="admin">管理员级</button>
+          <button class="seg-btn" data-v="super">超管级(加震屏更炸)</button>
+        </div>
+      </div>
       <div id="vipList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
       <div class="inline-form" style="display:flex;gap:8px;margin-bottom:14px">
-        <input type="text" id="vipInput" placeholder="粘贴 user_id (uuid), 回车或点添加" style="flex:1;min-width:0">
+        <input type="text" id="vipInput" placeholder="粘贴 user_id,回车或点添加" style="flex:1;min-width:0">
         <button class="mini-btn" id="vipAddBtn" style="border-color:var(--cyan);color:var(--cyan)">＋ 添加</button>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn" id="vipSaveBtn">保存贵客名单</button>
+        <button class="btn" id="vipSaveBtn">保存</button>
         <button class="mini-btn" id="vipResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 清空</button>
       </div>
     </div>
@@ -1902,12 +1909,19 @@ function collectTuning(){
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
 
 // ---- 💎 贵客名单 ----
-let _vipDraft=[];
+let _vipDraft=[], _vipTreat='admin';
 async function loadVip(){
   const cfg=await loadConfig();
   _vipDraft = Array.isArray(cfg.vipUids) ? cfg.vipUids.slice() : [];
+  _vipTreat = (cfg.vipTreatment==='super') ? 'super' : 'admin';
+  document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.v===_vipTreat));
   renderVip();
 }
+document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>{
+  _vipTreat=b.dataset.v;
+  document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(x=>x.classList.toggle('on',x===b));
+  markDirty();
+}));
 function renderVip(){
   const box=$('#vipList'); if(!box) return;
   if(!_vipDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:8px 0">还没有贵客。粘贴 user_id 添加。</div>'; return; }
@@ -1931,7 +1945,13 @@ function addVip(){
 }
 $('#vipAddBtn')?.addEventListener('click',addVip);
 $('#vipInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addVip(); } });
-$('#vipSaveBtn')?.addEventListener('click',async()=>{ if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); try{clearDirty();}catch(_){} } });
+$('#vipSaveBtn')?.addEventListener('click',async()=>{
+  const okList=await saveConfigKey('vipUids',_vipDraft);
+  const okTreat=await saveConfigKey('vipTreatment',_vipTreat);
+  if(okList && CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice();
+  if(okTreat && CFG_CACHE) CFG_CACHE.vipTreatment=_vipTreat;
+  if(okList&&okTreat){ try{clearDirty();}catch(_){} }
+});
 $('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵客名单吗?','清空贵客名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
 
 // ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
@@ -1995,7 +2015,7 @@ const EDIT_PAGES=['theme','bgm','text','tuning','songstyles','vip'];
 function markDirty(){ _pageDirty=true; }
 function clearDirty(){ _pageDirty=false; }
 // 事件委托: 这些页的输入框一改就置 dirty(保存/恢复默认后各处会重渲染, 用 clearDirty 复位)
-['p-theme','p-bgm','p-text','p-tuning'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
+['p-theme','p-text','p-vip'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
 // 保存后清 dirty: saveConfigKey 内部末尾已调 clearDirty(见其定义), 这里只挂关页拦截
 window.addEventListener('beforeunload',e=>{ if(_pageDirty){ e.preventDefault(); e.returnValue=''; } });
 
@@ -2011,12 +2031,10 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   $('#p-'+t.dataset.page).classList.add('on');
   if(t.dataset.page==='admins') loadAdmins();
   if(t.dataset.page==='rooms') loadRooms();
-  if(t.dataset.page==='theme') loadTheme();
-  if(t.dataset.page==='bgm') loadBgm();
-  if(t.dataset.page==='text') loadTextBind();
-  if(t.dataset.page==='tuning') loadTuning();
+  if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
+  if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
   if(t.dataset.page==='vip') loadVip();
-  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }
+  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }  // 玩法 = 曲风+互动+清唱
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位
 });

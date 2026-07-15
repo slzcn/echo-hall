@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0540enter-ephemeral';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0620admin-refactor';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1608,18 +1608,20 @@ const EH_CONFIG_DEFAULT = {
     othersStageMinTier: 'admin', // 别人看到"全屏光幕"的最低档(admin/vip=只有管理员级进场才惊动全场; 设 'reg' 则正式也全屏)
     // ★贵客名单: 见顶层 EH_CONFIG.vipUids(后台"💎贵客名单"tab 存的独立 key)。此处留空占位, 判定优先读顶层。
     vipUids: [],
+    vipTreatment: 'admin',  // 贵客享受的待遇档: 'admin'(管理员级) 或 'super'(超管级=进场加震屏+更炸)。保留💎紫身份, 只调隆重程度。
     tiers: {
       // label 入场词; icon 图标; cls CSS皮肤; sfx 音效名(空=不放);
       // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
       super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  },  // 超管: 全屏金光幕+皇冠雨+闪+震(最炸)
-      vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵客: 全屏紫光幕+钻石雨(管理员级排面, 紫金皮肤区分)
+      vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵客: 全屏紫光幕+钻石雨(默认管理员级; vipTreatment='super' 时自动加震屏升到超管级排面)
       admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'receive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
       reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'receive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
       anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:'',        stage:false, burst:'',       flash:'',        shake:false },  // 临时: 低调淡入
     },
   },
-  // 贵客名单(独立 key, 后台"💎贵客名单"tab 增删): user_id 数组, 命中者进场享 vip 待遇(管理员级)。
+  // 贵客名单(独立 key, 后台"贵客"tab 增删): user_id 数组, 命中者进场享 vip 待遇。
   vipUids: [],
+  vipTreatment: 'admin',   // 贵客待遇档(独立key, 后台可改): 'admin'管理员级 / 'super'超管级(加震屏更炸)
   themePalettes: {
     cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#9C85FF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
     vapor: {"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,44,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#cb86bc","--dim":"#8d497e","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
@@ -1934,7 +1936,7 @@ function _validateConfigMap(map){
     resonanceDefaultC:'string', roomBgm:'object', text:'object',
     identityPool:'object', tuning:'object', songStyles:'object',
     fx:'object', entranceFx:'object',
-    publicThemePool:'array', privateThemePool:'array', vipUids:'array'
+    publicThemePool:'array', privateThemePool:'array', vipUids:'array', vipTreatment:'string'
   };
   var out = {};
   for(var k in map){
@@ -1968,7 +1970,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','vipTreatment','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -3884,7 +3886,14 @@ function entranceBanner(room){
 function renderEntrance(info, isSelf){
   const cfg=(EH_CONFIG.entranceFx)||{};
   const tier=info.tier||'reg';
-  const t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
+  let t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
+  // 贵客待遇档: vipTreatment='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留💎紫身份皮肤与入场词。
+  //   来源: 顶层 EH_CONFIG.vipTreatment(后台"贵客"tab 存的独立key) 优先; 兼容 entranceFx.vipTreatment。
+  const _vipTreat = EH_CONFIG.vipTreatment || cfg.vipTreatment;
+  if(tier==='vip' && (_vipTreat==='super')){
+    const s=(cfg.tiers && cfg.tiers.super)||{};
+    t={...t, shake:true, flash:t.flash||s.flash, stage:true};
+  }
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可
     if(!isSelf){ sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`); }
