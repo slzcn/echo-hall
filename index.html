@@ -560,6 +560,46 @@
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
 
+  /* ===== 进场动效系统: 自己进房的类型化"入场横幅"(替代朴素 sysmsg) ===== */
+  .entry-banner{position:relative;overflow:hidden;margin:10px auto;max-width:340px;border-radius:14px;padding:12px 18px;
+    display:flex;align-items:center;gap:11px;justify-content:center;text-align:center;
+    animation:entBannerIn .5s cubic-bezier(.2,.9,.3,1.25) both;
+    background:linear-gradient(120deg,color-mix(in srgb,var(--ent-c,var(--cyan)) 16%,transparent),color-mix(in srgb,var(--ent-c,var(--cyan)) 4%,transparent));
+    border:1px solid color-mix(in srgb,var(--ent-c,var(--cyan)) 40%,transparent);
+    box-shadow:0 0 22px -6px color-mix(in srgb,var(--ent-c,var(--cyan)) 55%,transparent)}
+  .entry-banner .eb-ic{font-size:22px;line-height:1;flex-shrink:0;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--ent-c,var(--cyan)) 60%,transparent));animation:entIcPop .6s cubic-bezier(.2,1.4,.4,1) both}
+  .entry-banner .eb-txt{font-size:13px;color:var(--ink);line-height:1.45}
+  .entry-banner .eb-nm{font-weight:800;color:var(--ent-c,var(--cyan));text-shadow:0 0 10px color-mix(in srgb,var(--ent-c,var(--cyan)) 45%,transparent)}
+  .entry-banner .eb-act{font-weight:700;letter-spacing:2px;color:var(--ent-c,var(--cyan))}
+  .entry-banner .eb-tag{font-size:10px;padding:1px 7px;border-radius:6px;font-weight:600;flex-shrink:0;
+    background:color-mix(in srgb,var(--ent-c,var(--cyan)) 20%,transparent);color:var(--ent-c,var(--cyan))}
+  /* 扫光: 一道高光斜掠过横幅 */
+  .entry-banner::after{content:"";position:absolute;top:0;left:-60%;width:45%;height:100%;pointer-events:none;
+    background:linear-gradient(115deg,transparent,color-mix(in srgb,var(--ent-c,var(--cyan)) 40%,transparent),transparent);
+    transform:skewX(-18deg);animation:entSweep 1.1s ease-out .18s both}
+  @keyframes entBannerIn{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes entIcPop{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.25) rotate(8deg)}100%{transform:scale(1) rotate(0)}}
+  @keyframes entSweep{from{left:-60%}to{left:130%}}
+  /* 4 档类型皮肤: 只调 --ent-c 主色 + 高阶档加光爆环 */
+  .entry-banner.ent-super{--ent-c:var(--amber)}
+  .entry-banner.ent-admin{--ent-c:var(--amber)}
+  .entry-banner.ent-reg{--ent-c:var(--cyan)}
+  .entry-banner.ent-anon{--ent-c:var(--sub);box-shadow:none;animation-timing-function:ease}
+  .entry-banner.ent-anon::after{display:none}   /* 临时身份: 低调, 无扫光 */
+  /* 超管专属: 一圈金色光爆脉冲(比其它档更隆重) */
+  .entry-banner.ent-super::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;
+    box-shadow:0 0 0 0 color-mix(in srgb,var(--amber) 60%,transparent);animation:entBurst 1s ease-out both}
+  @keyframes entBurst{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--amber) 55%,transparent);opacity:.9}
+    100%{box-shadow:0 0 0 16px transparent;opacity:0}}
+  /* 光墙他人头像按类型弹入 */
+  .pav.ent-pop .av-ic{animation:pavEntPop .55s cubic-bezier(.2,1.3,.4,1) both}
+  .pav.ent-pop.ent-vip .av-ic{box-shadow:inset 0 0 0 1.5px var(--pav-c,var(--cyan)),0 0 14px -2px color-mix(in srgb,var(--pav-c,var(--cyan)) 70%,transparent)}
+  @keyframes pavEntPop{0%{transform:scale(0) translateY(6px);opacity:0}60%{transform:scale(1.18) translateY(0);opacity:1}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion:reduce){
+    .entry-banner,.entry-banner .eb-ic,.entry-banner::after,.entry-banner.ent-super::before,.pav.ent-pop .av-ic{animation:none!important}
+    .entry-banner{box-shadow:none}
+  }
+
   /* "正在输入"改浮层: absolute 悬浮在输入框上方, 不占据布局(不挤压/遮挡消息流),
      宽度自适应内容(不铺满整行), 小圆角半透明胶囊, 贴左显示 */
   /* 简洁: 无边框/背景/阴影, 只留文字+动画点浮在输入框上方 */
@@ -1188,7 +1228,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0010dedup';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0040entrance';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1524,6 +1564,20 @@ const EH_CONFIG_DEFAULT = {
     "--fx-title-glow": "1",       // 大标题辉光强度倍率
     "--fx-private-heat": ".5",    // 私密房"暧昧红"氛围强度(0=关)
   },
+  // ★进场动效系统: 按用户类型(超管/管理员/正式/临时)给不同的"进房横幅"。
+  //   自己进房时替换朴素文字为一张类型化入场卡(粒子/扫光/光爆), 且光墙他人头像按类型弹入。
+  //   尊重系统"减少动态效果"设置(prefers-reduced-motion → 降级为纯文字)。后台 eh_config.entranceFx 可改。
+  entranceFx: {
+    enabled: true,          // 总开关
+    othersAvatar: true,     // 他人上光墙时按类型弹入动画
+    tiers: {
+      // label 入场词; icon 图标; cls 对应 CSS 皮肤; sfx 音效名(EhSfx, 空=不放)
+      super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul'    },  // 超级管理员: 金色皇冠光爆
+      admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'receive' },  // 管理员: 琥珀光环
+      reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'receive' },  // 正式账号: 青色光波
+      anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:''        },  // 临时身份: 柔和淡入
+    },
+  },
   themePalettes: {
     cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#7B5CFF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
     vapor: {"--bg":"#160a1e","--bg2":"#28123a","--panel":"rgba(38,21,50,0.8)","--panel-solid":"#20132a","--line":"rgba(199,125,255,0.24)","--line2":"rgba(199,125,255,0.38)","--ink":"#FFEAF5","--sub":"#ad86cb","--dim":"#70498d","--cyan":"#C77DFF","--magenta":"#FF4D9E","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#C77DFF","--grid":"rgba(199,125,255,0.05)","--glow-cyan":"0 0 22px rgba(199,125,255,0.6)","--glow-mag":"0 0 20px rgba(255,77,158,0.55)"},
@@ -1836,6 +1890,7 @@ function _validateConfigMap(map){
     roomKindC:'object', identityDefaultC:'string', voidC:'string',
     resonanceDefaultC:'string', roomBgm:'object', text:'object',
     identityPool:'object', tuning:'object', songStyles:'object',
+    fx:'object', entranceFx:'object',
     publicThemePool:'array', privateThemePool:'array'
   };
   var out = {};
@@ -1870,7 +1925,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -2830,6 +2885,7 @@ async function enterRoom(room){
   try{ EhSfx.play('enter'); }catch(e){}
   try{ window.EhFx&&EhFx.warp(); }catch(e){}   // 空间穿越转场
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
+  _presenceSettled = false;   // 进场动效: 新房光墙重新计"首批", 首批渲染不弹入
   curRoom = room;
   // 💋 私密房(尤其邀了狼姐 @wolf)→ 挂"暧昧红"氛围类; 其余房去掉
   try{ document.body.classList.toggle('priv-heat', room && room.kind==='private'); }catch(_){}
@@ -2889,7 +2945,7 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+  try{ entranceBanner(room); }catch(_){ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }
   ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
@@ -3312,6 +3368,7 @@ async function beat(extra){
 }
 // —— 性能优化: diff 渲染头像 + 拆分 typing 更新, 避免每次心跳/输入全量重建 DOM ——
 const presenceMap = new Map();   // user_id → DOM 节点
+let _presenceSettled = false;    // 进场动效: 光墙首批渲染完成后置真; 之后新增的真人头像才弹入(避免进房齐弹)
 let lastUsersSnapshot = [];       // 供 renderTyping 复用
 
 // 在线列表骨架占位: 进房到 presence 数据回来期间撑住高度, 消除闪烁
@@ -3362,6 +3419,14 @@ function renderPresenceAvatars(users){
     }
     const div=document.createElement('div');
     div.className='pav'+(isMe?' me':'')+(isSoul?' soul-av':'');   // soul-av: 灵魂头像带"呼吸=活跃度"动画
+    // ★进场动效: 光墙"稳定"后新出现的真人头像(非我/非灵魂/非换色重建)→ 按类型弹入。
+    //   _presenceSettled 在进房首批渲染后置真, 避免进房时全体头像齐弹(那是加载, 不是"进场")。
+    const isNewJoin = _presenceSettled && !el && !isMe && !isSoul;
+    if(isNewJoin && EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.enabled && EH_CONFIG.entranceFx.othersAvatar!==false){
+      div.classList.add('ent-pop');
+      const jt=userTier(p);   // 他人 presence 行一般无 role, 多为 reg/anon; 有 role 字段则识别 vip
+      if(jt==='super'||jt==='admin') div.classList.add('ent-vip');
+    }
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
     if(!isMe && p.name){ div.dataset.atname=p.name; div.dataset.uid=p.user_id; }
@@ -3374,6 +3439,7 @@ function renderPresenceAvatars(users){
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
     presenceMap.set(p.user_id,div);
   });
+  _presenceSettled=true;   // 首批渲染完成 → 之后新增头像才算"进场"
   // 清理离开的人
   presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
   const kindLabel = '人在线';   // 统一: 私密房也用"人在线"(原来私密房特写"名成员在线"和其它房不一致)
@@ -3706,6 +3772,36 @@ async function fillReplyRef(el, mid){
   if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+replyPreviewText(data.text, data.kind); } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
+
+// ---- 进场动效系统 ----
+// 判定当前用户类型档位: super > admin > reg(正式) > anon(临时)。灵魂无浏览器会话, 不走此路径。
+function userTier(u){
+  u = u || me || {};
+  if(u.role==='super') return 'super';
+  if(u.role==='admin') return 'admin';
+  if(u.registered || u.username || u.email) return 'reg';
+  return 'anon';
+}
+// 自己进房 → 按类型渲染一张入场横幅(替代朴素"你以…进入"文字)。降级: 关了/减动效 → 回退纯文字 sysMsg。
+function entranceBanner(room){
+  const cfg = (EH_CONFIG.entranceFx)||{};
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const tier = userTier();
+  const t = (cfg.tiers && cfg.tiers[tier]) || null;
+  // 关闭/减动效/配置缺失 → 老行为(纯文字), 保证永不空场
+  if(!cfg.enabled || reduce || !t){
+    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
+    return;
+  }
+  const tagTxt = tier==='super'?'超管':(tier==='admin'?'管理员':(tier==='reg'?'正式':'临时'));
+  const el=document.createElement('div');
+  el.className='entry-banner '+(t.cls||'ent-reg');
+  el.innerHTML=`<span class="eb-ic">${safeEmoji(t.icon)||'✦'}</span>`+
+    `<span class="eb-txt"><span class="eb-nm">${esc(me.name)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(room.name)}」</span>`+
+    `<span class="eb-tag">${tagTxt}</span>`;
+  $('#stream').appendChild(el); scrollStream();
+  if(t.sfx){ try{ EhSfx.play(t.sfx); }catch(_){} }
+}
 // 优化批A#1: 消息流条数上限,长时间挂机时防 DOM 无限累积卡顿。
 // 只在贴底状态下(新消息追加)触发修剪,避免用户往上翻看历史时误删刚加载的旧消息。
 const MAX_STREAM = 800, TRIM_TO = 600;
