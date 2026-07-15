@@ -1153,7 +1153,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1915badgemix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1923optc';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2722,7 +2722,7 @@ async function enterRoom(room){
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
-    await joinAsMember(room);
+    if(await joinAsMember(room)===false) return;
     // allSettled: 任一查询失败也不拖垮其余(避免一次网络抖动 → Promise.all reject → 卡"连接中")
     const [memRes] = await Promise.allSettled([
       sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
@@ -2747,7 +2747,7 @@ async function enterRoom(room){
   subscribeMessages(room.id);   // 连接灯由其 subscribe 状态驱动
   const isPublic = room.kind==='official' || room.kind==='public';
   const histP = isPublic ? loadHistory(true) : null;
-  await joinAsMember(room);
+  if(await joinAsMember(room)===false) return;
   const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
     setupPresence(room),
@@ -2847,11 +2847,35 @@ async function refreshSnapshotTail(room){
 }
 
 async function joinAsMember(room){
-  // upsert 成员(重复靠主键忽略)
-  const { error } = await sb.from('eh_members').insert({
+  if(!room) return false;
+  // 私密房准入只做成员资格校验: 邀请码加入已由 eh_join_by_code RPC 代插成员。
+  // 这里禁止再裸 insert，避免绕过邀请码/权限模型；校验套超时，后端慢时安全失败而不是卡住。
+  if(room.kind==='private'){
+    let data=null, error=null;
+    try{ ({ data, error } = await withTimeout(
+      sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
+      8000, { data:null, error:new Error('timeout') }
+    )); }catch(e){ error=e; }
+    if(error || !data){
+      console.warn('private room membership check', error||'not member');
+      try{ clearLastRoom(); }catch(_){ }
+      try{ if(msgChan){ await sb.removeChannel(msgChan); msgChan=null; } }catch(_){ }
+      try{ if(presChan){ await sb.removeChannel(presChan); presChan=null; } }catch(_){ }
+      curRoom=null;
+      try{ setConn(false,'需要邀请码'); }catch(_){ }
+      try{ toast(error&&error.message==='timeout'?'私密房权限确认超时，请稍后重试':'需要邀请码才能进入私密房'); }catch(_){ }
+      try{ goScene('lobby'); renderLobby(); }catch(_){ }
+      return false;
+    }
+    return true;
+  }
+  // 公开/官方房自动 upsert 成员(重复靠主键忽略)，套超时防止进房流程卡住。
+  let error=null;
+  try{ ({ error } = await withTimeout(sb.from('eh_members').insert({
     room_id:room.id, user_id:myUid, role:'member', name:me.name, emoji:me.emoji, color:me.color
-  });
+  }), 8000, { error:new Error('timeout') })); }catch(e){ error=e; }
   if(error && !/duplicate|unique/i.test(error.message||'')) console.warn('join', error);
+  return true;
 }
 
 // ---- 历史消息 ----
@@ -2897,17 +2921,27 @@ async function loadHistory(first){
   } else {
     // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
     const hit=prefetchCache[curRoom.id];
+    let histTimedOut=false, usedCacheRows=false;
     if(first && !_cachePurged && !oldestId && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
-      const data = await hit.p; delete prefetchCache[curRoom.id]; _usedCache=true;
-      rows = (data||[]).slice().reverse();
-      if(rows.length){ oldestId = rows[0].id; }
-    } else {
+      try{
+        const data = await withTimeout(hit.p, 15000);
+        rows = (data||[]).slice().reverse();
+        if(rows.length){ oldestId = rows[0].id; }
+        _usedCache=true; usedCacheRows=true;
+      }catch(e){ console.warn('private history cache timeout', e); histTimedOut=true; rows=[]; }
+      delete prefetchCache[curRoom.id];
+    }
+    if(!usedCacheRows){
       let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE());
       if(oldestId) q = q.lt('id', oldestId);
-      const { data } = await q;
+      let data=[], error=null;
+      try{ ({ data, error } = await withTimeout(q, 15000)); }
+      catch(e){ console.warn('private history query timeout', e); histTimedOut=true; data=[]; }
+      if(error){ console.warn('private history query', error); }
       rows = (data||[]).slice().reverse();
       if(rows.length){ oldestId = rows[0].id; }
     }
+    if(histTimedOut && curRoom && curRoom.id===_enterRid){ try{ toast('历史加载超时，下拉重试'); }catch(_){ } }
   }
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶, 无更多)
   const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
@@ -3292,8 +3326,11 @@ async function refreshPresence(){
   const _rid = curRoom.id;   // 锁定本次刷新的目标房 id, 防 await 期间切房导致数据串房(公开房 presence 被打上私密房 rid)
   const since = new Date(Date.now()-ONLINE_WINDOW()).toISOString();
   let data=null;
-  try{ ({ data } = await sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',_rid).gte('last_seen',since)); }
-  catch(e){ console.warn('presence query', e); }   // 查询失败也别让文字卡"连接中",下面用本地兜底至少显示"我"
+  try{ ({ data } = await withTimeout(
+    sb.from('eh_presence').select('user_id,name,emoji,color,typing_at').eq('room_id',_rid).gte('last_seen',since),
+    8000, { data:null, error:new Error('timeout') }
+  )); }
+  catch(e){ console.warn('presence query', e); }   // 查询失败/超时也别让文字卡"连接中",下面用本地兜底至少显示"我"
   // await 期间已切房: 本次结果属于旧房, 丢弃不渲染不写快照(否则旧房头像串到新房光墙)
   if(!curRoom || curRoom.id!==_rid) return;
   let users=(data||[]).slice();
@@ -5311,6 +5348,10 @@ async function leaveRoom(){
     }catch(e){ roomSnap=null; }
   }
   await leavePresence();
+  // 离房清理 presence 相关本地状态，避免旧房头像/typing 快照残留到下一房或长期占内存。
+  try{ if(_presDebounce){ clearTimeout(_presDebounce); _presDebounce=null; } }catch(_){ }
+  try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
+  try{ presenceMap.clear(); lastUsersSnapshot=[]; }catch(_){ }
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
