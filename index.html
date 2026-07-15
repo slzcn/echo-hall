@@ -127,7 +127,8 @@
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000 55%,transparent 100%)}
-  .bg-orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.4;z-index:0;pointer-events:none;animation:float 14s ease-in-out infinite}
+  .bg-orb{position:fixed;border-radius:50%;filter:blur(48px);opacity:.4;z-index:0;pointer-events:none;will-change:transform;animation:float 14s ease-in-out infinite}
+  body.hall-on .bg-orb{display:none}
   .orb1{width:420px;height:420px;background:radial-gradient(circle,var(--violet),transparent 70%);top:-120px;left:-80px}
   .orb2{width:380px;height:380px;background:radial-gradient(circle,var(--cyan),transparent 70%);bottom:-120px;right:-60px;animation-delay:-5s}
   .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
@@ -620,19 +621,19 @@
   .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
-  .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
+  .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
     border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
     animation:soulHalo 3.2s ease-in-out infinite}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.3;inset:-2px;box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
-    50%{opacity:.85;inset:-4px;box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
+  @keyframes soulHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
+    50%{opacity:.85;transform:scale(1.08);box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
   /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
   .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{animation:pavHalo 3.6s ease-in-out infinite}
+  .pav.soul-av .av-ic::after{transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
   .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
   .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.3;box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent)}
-    50%{opacity:.8;box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}}
+  @keyframes pavHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent)}
+    50%{opacity:.8;transform:scale(1.08);box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}}
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -1093,6 +1094,10 @@
     background:var(--accent,var(--cyan));box-shadow:0 0 6px var(--accent,var(--cyan));will-change:transform,opacity}
   @media(prefers-reduced-motion:reduce){
     .cursor-trail,.type-spark,#warp,#soundwave,.mood-aura{display:none!important}
+    /* 优化批A: 常驻装饰动画全部关掉,一次性功能动画(slidein/popin/msgSendPop)保留 */
+    .bg-orb,.msg.soul .av,.msg.soul .av::after,.pav.soul-av .av-ic,.pav.soul-av .av-ic::after,
+    .mention-jump.on,.bgm-btn:not(.muted),.song-jump.on,.song-jump.gen .sj-god,.song-jump.gen .sj-ring,
+    .song-jump .sj-god,.mood-aura.on,.soul-thinking .av{animation:none!important}
   }
   /* 房间设置里"叫狼姐陪聊"开关(仅私密房) */
   /* 叫狼姐开关: 用中性线框, 不再高亮红/品红, 与设置页其它 fld 一致 */
@@ -1141,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1354palette2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1442optA';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3481,8 +3486,28 @@ async function fillReplyRef(el, mid){
   if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+replyPreviewText(data.text, data.kind); } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
+// 优化批A#1: 消息流条数上限,长时间挂机时防 DOM 无限累积卡顿。
+// 只在贴底状态下(新消息追加)触发修剪,避免用户往上翻看历史时误删刚加载的旧消息。
+const MAX_STREAM = 800, TRIM_TO = 600;
+function trimStreamHead(){
+  try{
+    const s=$('#stream'); if(!s) return;
+    if(s.children.length <= MAX_STREAM) return;
+    // 仅在贴底附近才修剪(用户可能正在往上翻查历史,别打扰)
+    const nearBot = (s.scrollHeight - s.scrollTop - s.clientHeight) < 200;
+    if(!nearBot) return;
+    while(s.children.length > TRIM_TO){
+      const first = s.firstElementChild;
+      if(!first) break;
+      // 保护 soul-thinking 占位(灵魂思考中,不能删,否则移除逻辑找不到)
+      if(first.classList && first.classList.contains('soul-thinking')) break;
+      s.removeChild(first);
+    }
+  }catch(_){}
+}
 function scrollStream(smooth){
   const s=$('#stream'); if(!s) return;
+  trimStreamHead();  // 优化批A#1: 每次滚动前顺手修剪超限消息
   // 平滑模式(新消息贴底时): 用 rAF 等 DOM 布局完成再滚, 避免"半截跳动"; 硬跳模式(进房/回底)直接到位
   if(smooth){
     requestAnimationFrame(()=>{ try{ s.scrollTo({top:s.scrollHeight,behavior:'smooth'}); }catch(_){ s.scrollTop=s.scrollHeight; } });
@@ -5189,6 +5214,8 @@ function ehConfirm(msg, title){
 // ============ 离开房间 ============
 async function leaveRoom(){
   try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
+  // 优化批A#6: 房外不空跑房间态 timer(_sqbTimer 歌曲队列条 2.5s 轮询)
+  try{ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } }catch(_){}
   try{ if(typeof curRoom!=='undefined' && curRoom) window.ehLog && ehLog('room_leave',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
   stopVoice(); stopSong();
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
@@ -6472,6 +6499,7 @@ function fillAndLogin(id, pwv){
 
   // ---- 1. 光标/触摸赛博拖尾 ----
   (function cursorTrail(){
+    if(coarse) return;  // 优化批A#3: 触屏无 hover,跳过整套 rAF 死循环
     const N=6, dots=[]; let x=innerWidth/2,y=innerHeight/2, tx=x,ty=y, active=false, hideT=null;
     for(let i=0;i<N;i++){ const d=document.createElement('div'); d.className='cursor-trail'; d.style.opacity='0'; document.body.appendChild(d); dots.push({el:d,x,y}); }
     const move=(px,py)=>{ tx=px; ty=py; active=true; clearTimeout(hideT); hideT=setTimeout(()=>active=false,600); };
