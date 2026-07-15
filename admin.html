@@ -622,6 +622,17 @@
       </div>
     </div>
 
+    <!-- 角色显示名称(五档可改) -->
+    <div class="glass card">
+      <h3>角色显示名称</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">五档身份在进场横幅角标/个人空间徽章上显示的名称。改后保存即全站生效(权限逻辑不受影响)。</p>
+      <div id="tierNamesTable" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn" id="tierNamesSave">保存名称</button>
+        <button class="mini-btn" id="tierNamesReset" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button>
+      </div>
+    </div>
+
     <!-- 管理员/超管 列表 -->
     <div class="glass card">
       <h3>🛡️ 管理员 & 超级管理员</h3>
@@ -1333,6 +1344,9 @@ const CFG_DEFAULT = {
   roomThemeOverride:{},
   soulColors:{"狼姐":"#FF3D92","老K":"#8FA6E8","阿夜":"#C77DFF","回音":"#6486FF","图灵":"#00E5D4","小暖":"#FF6F52"},
   roomKindC:{"public":"#1DE9B6","private":"#B57EDC","official":"#0ABAB5"},
+  // 人员相关(需在 CFG_DEFAULT 里占位, loadConfig 才会 merge 远程值)
+  vipUids:[], vipTreatment:"admin",
+  tierNames:{ super:"超级管理员", vip:"贵宾", admin:"管理员", reg:"正式用户", anon:"临时用户" },
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色(可写)
   identityDefaultC:"#0ABAB5",
   voidC:"#4A5D7E",
@@ -2073,6 +2087,26 @@ function collectTuning(){
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
 
+// ---- 角色显示名称 ----
+const TIER_DEF={ super:'超级管理员', vip:'贵宾', admin:'管理员', reg:'正式用户', anon:'临时用户' };
+const TIER_ROWS=[['super','超级管理员'],['vip','贵宾'],['admin','管理员'],['reg','正式用户'],['anon','临时用户']];
+let _tierDraft={};
+async function loadTierNames(){
+  const cfg=await loadConfig();
+  _tierDraft=Object.assign({}, TIER_DEF, (cfg&&cfg.tierNames)||{});
+  const box=$('#tierNamesTable'); if(!box) return;
+  box.innerHTML=TIER_ROWS.map(([k,def])=>`<div style="display:flex;align-items:center;gap:10px">
+    <span style="flex:0 0 92px;font-size:12px;color:var(--dim);font-family:monospace">${k}</span>
+    <input data-tier="${k}" value="${esc(_tierDraft[k]||def)}" maxlength="12" style="flex:1;min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
+  </div>`).join('');
+  box.querySelectorAll('[data-tier]').forEach(el=>el.oninput=()=>{ _tierDraft[el.dataset.tier]=el.value; markDirty(); });
+}
+$('#tierNamesSave')?.addEventListener('click',async()=>{
+  const out={}; $('#tierNamesTable').querySelectorAll('[data-tier]').forEach(el=>{ out[el.dataset.tier]=(el.value||'').trim()||TIER_DEF[el.dataset.tier]; });
+  if(await saveConfigKey('tierNames',out)){ if(CFG_CACHE) CFG_CACHE.tierNames=out; try{clearDirty();}catch(_){} }
+});
+$('#tierNamesReset')?.addEventListener('click',async()=>{ if(!await confirmBox('恢复五档默认名称?','恢复默认')) return; _tierDraft=Object.assign({},TIER_DEF); loadTierNames(); markDirty(); });
+
 // ---- 💎 贵宾名单 ----
 let _vipDraft=[], _vipTreat='admin';
 async function loadVip(){
@@ -2080,6 +2114,7 @@ async function loadVip(){
   _vipDraft = Array.isArray(cfg.vipUids) ? cfg.vipUids.slice() : [];
   _vipTreat = (cfg.vipTreatment==='super') ? 'super' : 'admin';
   document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.v===_vipTreat));
+  loadTierNames();
   renderVip();
 }
 document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>{
