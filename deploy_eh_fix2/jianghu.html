@@ -1,0 +1,814 @@
+<title>江湖 · 夜行长卷</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{
+  --ink:#0b0c0e; --ink2:#14161a; --ink3:#1c1f26;
+  --xuan:#e8e2d2; --mist:#8b8778; --dim:#5c5a50;
+  --zhu:#c8442e; --zhu-soft:rgba(200,68,46,.16);
+  --jade:#5a9e8f; --gold:#b89753; --blood:#a33;
+  --line:rgba(232,226,210,.14); --line2:rgba(232,226,210,.28);
+  --disp:"Kaiti SC","STKaiti",KaiTi,"楷体",'Noto Serif CJK SC',serif;
+  --body:"Songti SC",STSong,"宋体",SimSun,'Noto Serif CJK SC',serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--ink);color:var(--xuan);font-family:var(--body);font-size:16px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% -10%,rgba(184,151,83,.06),transparent 60%),
+    radial-gradient(140% 120% at 50% 120%,rgba(0,0,0,.6),transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E")}
+#ink{position:fixed;inset:0;z-index:1;pointer-events:none}
+.wrap{position:relative;z-index:2;max-width:680px;margin:0 auto;min-height:100dvh;
+  padding:max(18px,env(safe-area-inset-top)) 18px max(26px,env(safe-area-inset-bottom));display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:13px;padding:4px 0 12px}
+.seal{width:48px;height:48px;flex:0 0 auto;border-radius:9px;position:relative;
+  background:linear-gradient(150deg,#d24a30,#a2331f);box-shadow:0 6px 20px rgba(200,68,46,.35),inset 0 0 0 1px rgba(255,255,255,.12);
+  display:grid;place-items:center;transform:rotate(-4deg)}
+.seal b{font-family:var(--disp);font-weight:700;font-size:27px;color:#fbe9dd;line-height:1}
+.seal::after{content:"";position:absolute;inset:5px;border:1px solid rgba(255,255,255,.28);border-radius:5px}
+.brand .t h1{font-family:var(--disp);font-size:27px;font-weight:700;letter-spacing:6px;line-height:1}
+.brand .t p{font-size:11px;color:var(--mist);letter-spacing:2.5px;margin-top:5px}
+.stage{flex:1;position:relative}
+.card{background:linear-gradient(180deg,rgba(28,31,38,.72),rgba(16,18,22,.72));border:1px solid var(--line);
+  border-radius:14px;padding:20px 20px 22px;position:relative;overflow:hidden;backdrop-filter:blur(3px)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--zhu),transparent)}
+.eyebrow{font-family:var(--disp);font-size:12px;letter-spacing:4px;color:var(--zhu);display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+.scene{font-size:16px;line-height:1.9;min-height:24px;letter-spacing:.3px}
+.scene p{margin:0 0 11px}
+.em{color:var(--zhu)} .qi{color:var(--jade)} .gd{color:var(--gold)} .mut{color:var(--mist)}
+.cursor{display:inline-block;width:8px;height:1em;vertical-align:-1px;background:var(--zhu);margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.choices{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+.choice{position:relative;text-align:left;font-family:var(--body);font-size:15px;color:var(--xuan);
+  background:linear-gradient(90deg,rgba(232,226,210,.05),rgba(232,226,210,.02));border:1px solid var(--line2);
+  border-left:3px solid var(--dim);border-radius:9px;padding:12px 14px;cursor:pointer;transition:.15s;line-height:1.55}
+.choice:hover,.choice:focus-visible{border-left-color:var(--zhu);background:rgba(200,68,46,.08);transform:translateX(3px);outline:none}
+.choice:focus-visible{box-shadow:0 0 0 2px var(--zhu-soft)}
+.choice .num{font-family:var(--disp);color:var(--zhu);margin-right:8px;font-size:15px}
+.choice .hint{display:block;font-size:11.5px;color:var(--mist);margin-top:4px}
+.choice[disabled]{opacity:.4;cursor:not-allowed;transform:none}
+.choice .rt{float:right;font-family:var(--mono);font-size:12px;color:var(--gold)}
+.btn{font-family:var(--disp);letter-spacing:3px;font-size:15px;color:var(--ink);cursor:pointer;
+  background:linear-gradient(150deg,#d24a30,#a2331f);border:none;border-radius:10px;padding:12px 18px;
+  box-shadow:0 8px 24px rgba(200,68,46,.3);transition:.16s;font-weight:700}
+.btn:hover{transform:translateY(-2px)} .btn:focus-visible{outline:2px solid var(--xuan);outline-offset:2px}
+.btn.ghost{background:none;color:var(--xuan);border:1px solid var(--line2);box-shadow:none}
+.btn.ghost:hover{border-color:var(--zhu);color:var(--zhu);transform:none}
+.row{display:flex;gap:9px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+/* HUD */
+.hud{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:12px;background:rgba(16,18,22,.6);
+  border:1px solid var(--line);border-radius:12px;padding:12px 15px}
+.stat{display:flex;flex-direction:column;gap:4px}
+.stat .lab{display:flex;justify-content:space-between;font-size:11px}
+.stat .lab .nm{color:var(--mist);font-family:var(--disp);letter-spacing:2px;font-size:12.5px}
+.stat .lab .vl{font-family:var(--mono);color:var(--xuan);font-variant-numeric:tabular-nums}
+.bar{height:5px;border-radius:3px;background:rgba(232,226,210,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;transition:width .4s cubic-bezier(.2,.8,.2,1)}
+.bar.hp i{background:linear-gradient(90deg,#7a2418,var(--zhu))}
+.bar.qi i{background:linear-gradient(90deg,#2f5c52,var(--jade))}
+.align-row{grid-column:1/-1;display:flex;align-items:center;gap:9px}
+.align-row .nm{font-family:var(--disp);color:var(--mist);font-size:12.5px;letter-spacing:2px}
+.align-bar{flex:1;height:6px;border-radius:3px;position:relative;background:linear-gradient(90deg,#8a2b1e,#3a3d34 48% 52%,#3a6f8a)}
+.align-bar .pin{position:absolute;top:50%;width:3px;height:13px;border-radius:2px;background:var(--xuan);transform:translate(-50%,-50%);transition:left .4s}
+.align-row .tag{font-family:var(--disp);font-size:12px;min-width:2.4em;text-align:right}
+.meta-line{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:7px 13px;font-size:12px;color:var(--mist);margin-top:9px;padding-top:10px;border-top:1px dashed var(--line)}
+.meta-line b{color:var(--gold);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.chip{font-family:var(--disp);font-size:12px;letter-spacing:1px;color:var(--jade);border:1px solid rgba(90,158,143,.4);border-radius:20px;padding:1px 10px}
+.chip.evil{color:var(--zhu);border-color:rgba(200,68,46,.4)}
+.chip.tier{color:var(--gold);border-color:rgba(184,151,83,.4)}
+/* 枢纽菜单 */
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.act{text-align:left;background:linear-gradient(140deg,rgba(232,226,210,.05),rgba(232,226,210,.02));border:1px solid var(--line2);
+  border-radius:12px;padding:14px 15px;cursor:pointer;transition:.15s;display:flex;gap:12px;align-items:flex-start}
+.act:hover,.act:focus-visible{border-color:var(--zhu);background:rgba(200,68,46,.07);transform:translateY(-2px);outline:none}
+.act .ic{font-size:24px;line-height:1;flex:0 0 auto;margin-top:2px}
+.act .tx b{font-family:var(--disp);font-size:16px;letter-spacing:2px;color:var(--xuan)}
+.act .tx span{display:block;font-size:11.5px;color:var(--mist);margin-top:3px;line-height:1.5}
+.act.wide{grid-column:1/-1}
+.act.hot{border-color:rgba(184,151,83,.5);background:rgba(184,151,83,.08)}
+.act.hot .tx b{color:var(--gold)}
+/* 战斗 */
+.foe{display:flex;align-items:center;gap:13px;margin-bottom:6px}
+.foe .face{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;font-size:29px;flex:0 0 auto;
+  background:radial-gradient(circle at 40% 30%,rgba(200,68,46,.25),rgba(20,22,26,.9));border:1px solid var(--line2)}
+.foe .info{flex:1;min-width:0}.foe .info h3{font-family:var(--disp);font-size:19px;letter-spacing:2px}
+.foe .info .d{font-size:12px;color:var(--mist);margin-top:1px}
+.foe .st{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;min-height:16px}
+.stg{font-size:10.5px;font-family:var(--disp);letter-spacing:1px;padding:1px 7px;border-radius:10px;border:1px solid var(--line2)}
+.stg.bleed{color:#e06a5a;border-color:rgba(200,68,46,.5)} .stg.stun{color:#d9c45a;border-color:rgba(184,151,83,.5)}
+.stg.pierce{color:#c88;border-color:rgba(200,120,120,.5)} .stg.poison{color:#8bc48b;border-color:rgba(120,200,120,.4)}
+.stg.dodge{color:var(--jade);border-color:rgba(90,158,143,.5)}
+.foe .hpwrap{margin-top:6px}
+.clash{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin:12px 0;font-family:var(--disp);text-align:center}
+.clash .duo{display:flex;align-items:center;gap:18px}
+.clash .mv{font-size:30px} .clash .vs{color:var(--zhu);font-size:15px}
+.clash .res{font-size:14px;color:var(--mist);letter-spacing:.5px;line-height:1.6}
+.moves{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.move{font-family:var(--body);cursor:pointer;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;text-align:left;
+  background:rgba(232,226,210,.03);transition:.14s;position:relative}
+.move:hover,.move:focus-visible{border-color:var(--zhu);background:rgba(200,68,46,.1);transform:translateY(-1px);outline:none}
+.move[disabled]{opacity:.35;cursor:not-allowed;transform:none}
+.move .mn{font-family:var(--disp);font-size:15px;letter-spacing:1px;color:var(--xuan)}
+.move .tri{font-size:11px;margin-left:5px}.tri.fast{color:#7fb0c8}.tri.clever{color:var(--jade)}.tri.fierce{color:var(--zhu)}
+.move .md{display:block;font-size:11px;color:var(--mist);margin-top:3px;line-height:1.45}
+.move .cost{position:absolute;top:9px;right:11px;font-family:var(--mono);font-size:11.5px;color:var(--jade)}
+.move.ult{border-color:rgba(184,151,83,.5)}.move.ult .mn{color:var(--gold)}
+.foe-tell{text-align:center;font-family:var(--disp);color:var(--zhu);font-size:12.5px;letter-spacing:1px;height:17px;margin-top:2px}
+/* 结局 */
+.epitaph{text-align:center;padding:6px 0 4px}
+.epitaph .seal-big{width:80px;height:80px;margin:0 auto 14px;border-radius:14px;transform:rotate(-5deg);display:grid;place-items:center;position:relative;box-shadow:0 10px 34px rgba(200,68,46,.4)}
+.epitaph .seal-big b{font-family:var(--disp);font-size:42px;color:#fbe9dd}
+.epitaph .seal-big::after{content:"";position:absolute;inset:8px;border:1.5px solid rgba(255,255,255,.3);border-radius:8px}
+.epitaph .fate{font-family:var(--disp);font-size:28px;letter-spacing:3px}
+.epitaph .fate small{display:block;font-size:12.5px;color:var(--zhu);letter-spacing:5px;margin-top:5px}
+.epitaph .verse{font-family:var(--disp);font-size:16px;line-height:2;margin:15px 0;letter-spacing:.5px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}
+.stat-grid .b{background:rgba(232,226,210,.04);border:1px solid var(--line);border-radius:10px;padding:10px 6px;text-align:center}
+.stat-grid .b .v{font-family:var(--mono);font-size:19px;color:var(--gold);font-variant-numeric:tabular-nums}
+.stat-grid .b .l{font-family:var(--disp);font-size:11.5px;color:var(--mist);letter-spacing:2px;margin-top:2px}
+.codebox{display:flex;gap:9px;align-items:center;margin:12px 0 4px;background:rgba(200,68,46,.08);border:1px dashed rgba(200,68,46,.4);border-radius:10px;padding:10px 13px}
+.codebox .lb{font-family:var(--disp);color:var(--zhu);font-size:12.5px;flex:0 0 auto}
+.codebox code{flex:1;font-family:var(--mono);font-size:14px;letter-spacing:2px;overflow:hidden;text-overflow:ellipsis}
+.codebox button{font-family:var(--body);font-size:11.5px;color:var(--mist);background:none;border:1px solid var(--line2);border-radius:7px;padding:5px 9px;cursor:pointer}
+.codebox button:hover{color:var(--zhu);border-color:var(--zhu)}
+.field{margin:12px 0}.field .fl{font-family:var(--disp);font-size:12.5px;color:var(--mist);letter-spacing:2px;margin-bottom:7px;display:block}
+.field input{width:100%;font-family:var(--body);font-size:16px;color:var(--xuan);background:rgba(10,12,14,.6);border:1px solid var(--line2);border-radius:9px;padding:11px 13px;letter-spacing:1px}
+.field input:focus{outline:none;border-color:var(--zhu);box-shadow:0 0 0 3px var(--zhu-soft)}
+.foot{text-align:center;color:var(--dim);font-size:11px;letter-spacing:.5px;padding-top:16px;margin-top:auto}
+.foot span{color:var(--mist)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);z-index:40;opacity:0;pointer-events:none;
+  background:var(--ink3);border:1px solid var(--line2);border-radius:10px;padding:9px 17px;font-size:13px;transition:.3s;box-shadow:0 12px 40px rgba(0,0,0,.5);max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+#danmu{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.dm{position:absolute;right:-40%;white-space:nowrap;font-size:13px;color:rgba(232,226,210,.5);text-shadow:0 1px 3px rgba(0,0,0,.6);will-change:transform}
+.dm .who{color:var(--zhu);opacity:.8}
+.flash{position:fixed;inset:0;z-index:5;pointer-events:none;background:var(--zhu);opacity:0}
+@keyframes flashfx{0%{opacity:.4}100%{opacity:0}}
+.shake{animation:shake .3s}@keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-5px,2px)}50%{transform:translate(4px,-3px)}75%{transform:translate(-3px,3px)}}
+.fadein{animation:fadein .45s ease both}@keyframes fadein{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+.divider{font-family:var(--disp);text-align:center;color:var(--dim);font-size:12px;letter-spacing:3px;margin:14px 0 8px}
+.list{display:flex;flex-direction:column;gap:8px}
+.li{display:flex;gap:11px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:rgba(232,226,210,.02)}
+.li .ic{font-size:20px;flex:0 0 auto}
+.li .tx{flex:1;min-width:0}.li .tx b{font-family:var(--disp);font-size:15px;letter-spacing:1px}
+.li .tx span{display:block;font-size:11.5px;color:var(--mist);margin-top:2px;line-height:1.4}
+.li .buy{font-family:var(--disp);font-size:13px;color:var(--gold);border:1px solid rgba(184,151,83,.4);border-radius:8px;padding:7px 12px;cursor:pointer;background:none;white-space:nowrap;transition:.15s}
+.li .buy:hover:not([disabled]){background:rgba(184,151,83,.12)} .li .buy[disabled]{opacity:.4;cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.05ms!important}.cursor{animation:none}}
+@media(max-width:520px){.brand .t h1{font-size:24px}.hud{grid-template-columns:1fr}.acts{grid-template-columns:1fr}.moves{grid-template-columns:1fr}}
+</style>
+<canvas id="ink"></canvas>
+<div id="danmu"></div>
+<div class="flash" id="flash"></div>
+<div class="wrap">
+  <div class="brand"><div class="seal"><b>俠</b></div>
+    <div class="t"><h1>江&nbsp;湖</h1><p>夜 行 长 卷 · 门 派 · 武 功 · 副 本 · 营 生</p></div></div>
+  <div class="stage" id="stage"></div>
+  <div class="foot">水墨武侠 RPG · 三才过招 · 正邪双修 · <span>说书人为你写传 · 传承码可复现命格</span></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s), stage=$("#stage");
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let rng=Math.random;
+const ri=(a,b)=>a+Math.floor(rng()*(b-a+1)), pick=a=>a[Math.floor(rng()*a.length)], chance=p=>rng()<p, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function seedFromCode(c){let h=2166136261;const s=(c||"").toUpperCase();for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function codeFromSeed(seed){const A="甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥金木水火土风雷山川刀剑气霜";let n=seed>>>0,o="";for(let i=0;i<6;i++){o+=A[n%A.length];n=Math.floor(n/A.length)^(n<<3);n>>>=0;if(n===0)n=(seed+i*2654435761)>>>0;}return o;}
+
+/* ============ 数据 ============ */
+const XING=["独孤","慕容","上官","欧阳","东方","令狐","司马","诸葛","赵","钱","孙","李","周","吴","郑","王","楚","秦","叶","萧"];
+const MING=["无咎","惊鸿","问秋","听雪","子夜","孤鸿","知微","北陌","忘机","踏歌","青崖","归尘","一苇","随风","不器","半山","照野","孤舟","观澜","止水"];
+// 招式: tri=快fast/巧clever/猛fierce; cost内力; pow基础威力; eff效果; ult无视相克
+const MOVES={
+  fast:{n:"快招",tri:"fast",cost:0,pow:5,d:"抢攻，破巧招"},
+  clever:{n:"巧招",tri:"clever",cost:0,pow:7,d:"借力，破猛招"},
+  fierce:{n:"猛招",tri:"fierce",cost:0,pow:9,d:"力劈，破快招"},
+  yun:{n:"运功调息",tri:null,cost:0,pow:0,eff:{yun:1},d:"回内力+3，气血+4，本回合不攻"},
+  lingbo:{n:"凌波微步",tri:"fast",cost:1,pow:7,eff:{dodge:1},d:"身法飘忽，下次受击减半"},
+  taiji:{n:"太极劲",tri:"clever",cost:2,pow:8,eff:{pierce:2},d:"化力破防，敌防降2回合"},
+  yiyang:{n:"一阳指",tri:"clever",cost:2,pow:9,eff:{stun:1},d:"点穴，敌眩晕1回合"},
+  tangmen:{n:"满天花雨",tri:"fast",cost:2,pow:7,eff:{bleed:3},d:"暗器攒射，流血3回合"},
+  huoyan:{n:"火焰刀",tri:"fierce",cost:3,pow:12,eff:{bleed:4},d:"刀气灼身，重伤+流血"},
+  qishang:{n:"七伤拳",tri:"fierce",cost:2,pow:14,eff:{recoil:5},d:"伤敌先伤己，反噬5"},
+  dugu:{n:"独孤九剑",tri:"fast",cost:2,pow:12,eff:{pierce:1},d:"料敌机先，几乎必中"},
+  xixing:{n:"吸星大法",tri:"clever",cost:2,pow:7,eff:{drain:3},d:"汲敌内力为己用",align:-1},
+  xianglong:{n:"降龙十八掌",tri:"fierce",cost:4,pow:20,ult:true,d:"刚猛无俦，无视相克重击"},
+  dutou:{n:"化功大法",tri:"clever",cost:3,pow:6,eff:{poison:5,drain:2},d:"阴毒内力，中毒+吸功",align:-2},
+  tanzhi:{n:"弹指神通",tri:"fast",cost:2,pow:9,eff:{stun:1},d:"指力如箭，封穴眩晕"},
+  wudang:{n:"梯云纵",tri:"fast",cost:1,pow:6,eff:{dodge:1,heal:5},d:"轻功卸力兼疗伤"},
+};
+// 门派: 属性偏向 + 初始已学武功 + 签名绝学
+const SECTS=[
+  {n:"少林",tag:"外家硬功·佛门正宗",atk:2,def:4,qi:1,spd:0,align:6,arts:["fierce","yun"],sig:"qishang"},
+  {n:"武当",tag:"以柔克刚·道法自然",atk:2,def:2,qi:4,spd:1,align:6,arts:["taiji","wudang"],sig:"taiji"},
+  {n:"峨眉",tag:"身法灵巧·刚柔并济",atk:2,def:2,qi:3,spd:2,align:4,arts:["clever","wudang"],sig:"yiyang"},
+  {n:"丐帮",tag:"草莽豪杰·降龙护体",atk:3,def:3,qi:2,spd:0,align:4,arts:["fierce"],sig:"xianglong"},
+  {n:"唐门",tag:"暗器机关·防不胜防",atk:4,def:1,qi:2,spd:2,align:-2,arts:["tangmen"],sig:"tangmen"},
+  {n:"华山",tag:"剑气两宗·独孤遗风",atk:3,def:2,qi:2,spd:2,align:2,arts:["fast","dugu"],sig:"dugu"},
+  {n:"逍遥",tag:"无迹可寻·北冥神功",atk:2,def:2,qi:5,spd:2,align:0,arts:["lingbo","xixing"],sig:"lingbo"},
+  {n:"日月神教",tag:"离经叛道·吸星化功",atk:4,def:2,qi:3,spd:1,align:-16,arts:["xixing"],sig:"dutou"},
+];
+const TALENT=[
+  {n:"天生神力",d:"猛招伤害更高",k:"fierce"},
+  {n:"眼疾手快",d:"快招几乎不吃亏",k:"fast"},
+  {n:"七窍玲珑",d:"巧招常拆敌招",k:"clever"},
+  {n:"气海宽广",d:"内力上限+3",k:"qi"},
+  {n:"福缘深厚",d:"命格骰逢凶化吉",k:"luck"},
+  {n:"铁骨铜皮",d:"气血上限+12",k:"hp"},
+  {n:"过目不忘",d:"习武更易(阅历+快)",k:"exp"},
+];
+const TIERS=["三流","二流","一流","绝顶","宗师"];
+const TIER_EXP=[0,60,150,300,520];
+// 兵器/护甲(市集)
+const GEAR=[
+  {t:"weapon",n:"精钢长剑",atk:3,cost:40,d:"攻+3"},
+  {t:"weapon",n:"玄铁重剑",atk:6,cost:120,d:"攻+6，重剑无锋"},
+  {t:"weapon",n:"鱼肠软剑",atk:4,spd:2,cost:90,d:"攻+4 身法+2"},
+  {t:"armor",n:"软猬甲",def:3,cost:50,d:"防+3"},
+  {t:"armor",n:"金丝宝甲",def:6,cost:140,d:"防+6，刀枪不入"},
+  {t:"pill",n:"金创药",heal:26,cost:24,d:"即回气血26"},
+  {t:"pill",n:"大还丹",heal:50,qi:6,cost:70,d:"回气血50 内力6"},
+];
+const DANMU=[["路人甲","这剑法…有点东西"],["看客","666 江湖气拉满"],["隔壁老王","就这？我上我也行"],["说书先生","且听下回分解"],["江湖骗子","祖传秘籍走过路过"],["小二","客官里边请~"],["扫地僧","戾气太重，慎之"],["吃瓜群众","我嗑到了 我嗑到了"],["课代表","快破巧·巧破猛·猛破快"],["锦衣卫","此地不宜久留"],["镖师","这趟镖不好走啊"],["赌坊老板","愿赌服输"]];
+
+/* ============ 状态 ============ */
+let g=null;
+function newGame(seed){
+  rng=mulberry32(seed>>>0);
+  const sect=pick(SECTS), tal=pick(TALENT), name=pick(XING)+pick(MING);
+  const arts=[...new Set([...sect.arts,"fast","clever","fierce","yun",sect.sig])];
+  g={seed,code:codeFromSeed(seed),name,sect:sect.n,sectData:sect,talent:tal,
+    hpMax:44+(tal.k==="hp"?12:0),hp:44+(tal.k==="hp"?12:0),
+    qiMax:8+sect.qi+(tal.k==="qi"?3:0),qi:8+sect.qi+(tal.k==="qi"?3:0),
+    atk:6+sect.atk,def:2+sect.def,spd:5+sect.spd,
+    money:30,fame:0,align:clamp(sect.align,-100,100),luck:0,exp:0,tier:0,day:1,maxDay:30,
+    arts,weapon:null,armor:null,pills:{},deeds:[],won:0,dungeonDone:0};
+  return g;
+}
+const alignTag=a=>a<=-45?{t:"魔",e:1}:a<=-15?{t:"邪",e:1}:a>=45?{t:"侠",e:0}:a>=15?{t:"正",e:0}:{t:"中",e:0};
+function eatk(){return g.atk+(g.weapon?g.weapon.atk:0);}
+function edef(){return g.def+(g.armor?g.armor.def:0);}
+function espd(){return g.spd+(g.weapon&&g.weapon.spd?g.weapon.spd:0);}
+function has(id){return g.arts.includes(id);}
+function gainExp(n){ g.exp+=n; while(g.tier<4 && g.exp>=TIER_EXP[g.tier+1]){ g.tier++; g.hpMax+=14;g.qiMax+=3;g.atk+=2;g.def+=1;g.hp=g.hpMax;g.qi=g.qiMax; toast("境界突破 → "+TIERS[g.tier]+"！气血内力大涨"); } }
+function money(n){g.money=Math.max(0,g.money+n);}
+function heal(n){g.hp=clamp(g.hp+n,0,g.hpMax);}
+function qiGain(n){g.qi=clamp(g.qi+n,0,g.qiMax);}
+function fameGain(n){g.fame=Math.max(0,g.fame+n);}
+function alignShift(n){g.align=clamp(g.align+n,-100,100);}
+function learn(id){ if(!has(id)){g.arts.push(id);return true;} return false; }
+function fateRoll(bonus,dc){let d=ri(1,6);if(g.talent.k==="luck"&&d<=2&&chance(.6))d=ri(3,6);const total=d+bonus+Math.floor(g.luck/2);return{d,total,ok:total>=dc};}
+
+/* ============ UI 通用 ============ */
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2100);}
+function flash(){if(reduce)return;const f=$("#flash");f.style.animation="none";void f.offsetWidth;f.style.animation="flashfx .3s ease-out";}
+function shake(){if(reduce)return;const w=$(".wrap");w.classList.remove("shake");void w.offsetWidth;w.classList.add("shake");}
+function toTop(){try{window.scrollTo({top:0,behavior:reduce?"auto":"smooth"});}catch(e){window.scrollTo(0,0);}}
+function hudHTML(){
+  const at=alignTag(g.align),pin=clamp((g.align+100)/2,2,98);
+  const nextExp=g.tier<4?TIER_EXP[g.tier+1]:g.exp;
+  return `<div class="hud">
+    <div class="stat"><div class="lab"><span class="nm">气血</span><span class="vl">${g.hp}/${g.hpMax}</span></div><div class="bar hp"><i style="width:${clamp(g.hp/g.hpMax*100,0,100)}%"></i></div></div>
+    <div class="stat"><div class="lab"><span class="nm">内力</span><span class="vl">${g.qi}/${g.qiMax}</span></div><div class="bar qi"><i style="width:${clamp(g.qi/g.qiMax*100,0,100)}%"></i></div></div>
+    <div class="align-row"><span class="nm">正邪</span><div class="align-bar"><span class="pin" style="left:${pin}%"></span></div><span class="tag" style="color:${at.e?'var(--zhu)':'var(--jade)'}">${at.t}道</span></div>
+    <div class="meta-line">
+      <span>${g.name}</span><span class="chip ${g.sectData.align<0?'evil':''}">${g.sect}</span>
+      <span class="chip tier">${TIERS[g.tier]}</span>
+      <span>银两 <b>${g.money}</b></span><span>名声 <b>${g.fame}</b></span>
+      <span>攻<b>${eatk()}</b>防<b>${edef()}</b>身<b>${espd()}</b></span>
+      <span class="mut">第${g.day}/${g.maxDay}日 · 阅历${g.exp}${g.tier<4?"/"+nextExp:""}</span>
+    </div></div>`;
+}
+let typing=null;
+function typeScene(el,html,done){
+  if(typing)clearInterval(typing);el.innerHTML="";
+  const tmp=document.createElement("div");tmp.innerHTML=html;const nodes=[...tmp.childNodes];let ni=0;
+  (function nextNode(){
+    if(ni>=nodes.length){done&&done();return;}
+    const src=nodes[ni++];
+    if(src.nodeName!=="P"){el.appendChild(src.cloneNode(true));return nextNode();}
+    const p=document.createElement("p");el.appendChild(p);const inner=src.innerHTML;let i=0;
+    const cur=document.createElement("span");cur.className="cursor";p.appendChild(cur);
+    typing=setInterval(()=>{
+      i+=reduce?inner.length:1;let seg=inner.slice(0,i);
+      if(((seg.match(/</g)||[]).length)>((seg.match(/>/g)||[]).length))return;
+      p.innerHTML=seg;p.appendChild(cur);
+      if(i>=inner.length){clearInterval(typing);typing=null;cur.remove();nextNode();}
+    },reduce?1:15);
+  })();
+}
+let dmT=null;
+function danmuTick(){if(!chance(.5))return;const d=pick(DANMU),el=document.createElement("div");el.className="dm";el.innerHTML=`<span class="who">「${d[0]}」</span> ${d[1]}`;el.style.top=(8+rng()*70)+"vh";$("#danmu").appendChild(el);const dur=reduce?.1:9+rng()*5,w=Math.min(innerWidth+400,innerWidth*1.5);el.animate([{transform:"translateX(0)"},{transform:`translateX(-${w+el.offsetWidth+80}px)`}],{duration:dur*1000,easing:"linear"}).onfinish=()=>el.remove();}
+function startDanmu(){stopDanmu();dmT=setInterval(danmuTick,2800);}
+function stopDanmu(){if(dmT)clearInterval(dmT);dmT=null;$("#danmu").innerHTML="";}
+
+/* ============ 起 / 命格 ============ */
+function screenIntro(){
+  stopDanmu();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">入 江 湖</div>
+    <div class="scene" id="sc"></div>
+    <div class="field"><label class="fl">报上名号（可留空，江湖自会赐名）</label><input id="pname" maxlength="8" placeholder="例：独孤惊鸿" autocomplete="off"></div>
+    <div class="field"><label class="fl">传承码（输入他人之码，复现同一命格）</label><input id="pcode" maxlength="12" placeholder="留空则天命随机" autocomplete="off"></div>
+    <div class="row"><button class="btn" id="go">领 命 入 世</button><button class="btn ghost" id="rs">✧ 换个天命</button></div></div>`;
+  typeScene($("#sc"),`<p>夜雨初歇，你立于<span class="em">十里坡</span>断碑之前。碑文风蚀，只余八字——<span class="em">"江湖路远，各自珍重"</span>。</p><p class="mut">怀中一柄旧剑、袖里三十文钱。前路有门派、有武学、有副本恶斗、有一段等你去挣的<span class="gd">传</span>。</p>`);
+  let seed=(Math.random()*4294967296)>>>0;
+  $("#rs").onclick=()=>{seed=(Math.random()*4294967296)>>>0;toast("天命已换："+codeFromSeed(seed));};
+  $("#go").onclick=()=>{const code=$("#pcode").value.trim();newGame(code?seedFromCode(code):seed);const nm=$("#pname").value.trim();if(nm)g.name=nm.slice(0,8);screenBirth();};
+}
+function screenBirth(){
+  const t=g.talent,sig=MOVES[g.sectData.sig];
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">命 格 既 定</div>
+    <div class="scene">
+      <p>你是 <span class="em">${g.name}</span>，出身 <span class="gd">${g.sect}</span>（${g.sectData.tag}）。</p>
+      <p>天赋<span class="qi">「${t.n}」</span>——<span class="mut">${t.d}。</span></p>
+      <p>本门绝学：<span class="gd">「${sig.n}」</span> <span class="mut">${sig.d}。</span></p>
+      <p class="mut">三才之道：<span class="em">快</span>破<span class="em">巧</span>，<span class="em">巧</span>破<span class="em">猛</span>，<span class="em">猛</span>破<span class="em">快</span>。攒内力施<span class="gd">绝招</span>破万法。</p>
+    </div>${hudHTML()}
+    <div class="choices"><button class="choice" id="start"><span class="num">壹</span>提剑入世，闯荡江湖　<span class="hint">传承码 ${g.code}</span></button></div></div>`;
+  $("#start").onclick=()=>{startDanmu();g.deeds.push(`以${g.sect}弟子之身踏入江湖`);hub();};
+}
+
+/* ============ 枢纽 ============ */
+function passDay(n){ g.day+=(n||1); if(g.day>g.maxDay){ return true; } return false; }
+function hub(msg){
+  toTop();
+  const canDao=g.fame>=80||g.tier>=4;
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">江 湖 · 第 ${g.day} 日</div>
+    ${msg?`<div class="scene" id="sc" style="margin-bottom:6px"></div>`:""}
+    ${hudHTML()}
+    <div class="acts">
+      <button class="act" data-a="roam"><span class="ic">🌄</span><div class="tx"><b>闯荡江湖</b><span>随缘奇遇或遭遇战，最见世面</span></div></button>
+      <button class="act" data-a="arena"><span class="ic">🥋</span><div class="tx"><b>比武擂台</b><span>挑战名家，赢取名声银两</span></div></button>
+      <button class="act" data-a="dungeon"><span class="ic">🏯</span><div class="tx"><b>闯 副 本</b><span>秘境群敌，重宝厚利，九死一生</span></div></button>
+      <button class="act" data-a="work"><span class="ic">🪙</span><div class="tx"><b>营生糊口</b><span>采药·打铁·卖艺·赌坊·接镖</span></div></button>
+      <button class="act" data-a="market"><span class="ic">🏪</span><div class="tx"><b>客栈市集</b><span>购武功装备丹药，疗伤打尖</span></div></button>
+      <button class="act" data-a="sect"><span class="ic">⛩️</span><div class="tx"><b>本门修行</b><span>参研武学·打坐冲境</span></div></button>
+      <button class="act wide" data-a="tale"><span class="ic">📜</span><div class="tx"><b>说书人 · 我的江湖传</b><span>由说书人依你的事迹，现场说一段书</span></div></button>
+      ${canDao?`<button class="act wide hot" data-a="dao"><span class="ic">⚔️</span><div class="tx"><b>证 道 之 战</b><span>名动江湖，宿敌已至——了结这段传</span></div></button>`:""}
+      <button class="act" data-a="rest"><span class="ic">🛌</span><div class="tx"><b>歇息一晚</b><span>回复气血内力，消磨一日</span></div></button>
+      <button class="act" data-a="retire"><span class="ic">🍃</span><div class="tx"><b>就此退隐</b><span>急流勇退，落幕收场</span></div></button>
+    </div></div>`;
+  if(msg)typeScene($("#sc"),`<p>${msg}</p>`);
+  stage.querySelectorAll(".act").forEach(b=>b.onclick=()=>route(b.dataset.a));
+  if(g.day>g.maxDay) return screenEnding(false);
+}
+function route(a){
+  if(a==="roam")return roam();
+  if(a==="arena")return arena();
+  if(a==="dungeon")return dungeonPick();
+  if(a==="work")return workMenu();
+  if(a==="market")return market();
+  if(a==="sect")return sectTrain();
+  if(a==="tale")return teller();
+  if(a==="dao")return combat(finalFoe(),{dao:true});
+  if(a==="rest"){heal(20);qiGain(g.qiMax);if(passDay())return screenEnding(false);return hub("你寻一处客栈住下，一夜好眠，气力回复。");}
+  if(a==="retire")return screenEnding(false,"retire");
+}
+
+/* ============ 闯荡 · 奇遇 ============ */
+const EVENTS=[
+ {t:()=>`<p>山道拐角，一名<span class="em">蒙面客</span>横刀立马，身后瘫着受惊的镖师。</p><p class="mut">"留下买路财，或留下命。"</p>`,
+  c:()=>[
+   {l:"拔剑相助，护住镖队",h:"过招·得名声",run:()=>combat({name:"独行大盗",face:"🗡️",hp:30,atk:7,def:2,spd:5,moves:["fierce","fast"],reward:{fame:12,money:20,exp:14,align:8}})},
+   {l:"抱拳周旋，晓以厉害",h:"命格骰·口才",run:()=>{const r=fateRoll(Math.floor(g.fame/12)+2,7);if(r.ok){fameGain(6);done(`三言两语点破他底细，大盗悻悻收刀。<span class="mut">(骰${r.d}) 名声+6</span>`);}else{g.hp=clamp(g.hp-8,0,g.hpMax);done(`话不投机，冷不防吃了一刀。<span class="em">(骰${r.d}) 气血-8</span>`);}}},
+   {l:"分他碎银，各走各路",h:"破财免灾",run:()=>{money(-12);done(`你抛出碎银，大盗大笑让路。<span class="mut">银两-12</span>`);}},
+  ]},
+ {t:()=>`<p>断崖之下，一具枯骨怀抱铁匣，匣中残卷散发霉味，似是一门<span class="gd">失传武学</span>。崖壁血书："<span class="em">练此功者，十有九疯</span>"。</p>`,
+  c:()=>[
+   {l:"我命由我，强练此功",h:"命格骰·根骨",run:()=>{const r=fateRoll(Math.floor(g.qiMax/4),8);if(r.ok){const id=teachRandom();g.atk+=2;done(id?`经脉如遭雷击，再睁眼已脱胎换骨：<span class="gd">习得「${MOVES[id].n}」</span>，攻+2！`:`你强行运功，武艺大进。<span class="gd">攻+2</span>`);}else{g.hp=clamp(g.hp-16,0,g.hpMax);alignShift(-6);done(`真气逆冲，你口吐鲜血几近走火入魔。<span class="em">气血-16 正邪-6</span>`);}}},
+   {l:"厚葬枯骨，只取玉佩",h:"积德·得机缘",run:()=>{alignShift(10);g.luck+=2;money(30);done(`你掩埋前人尸骨，玉佩温润入怀。<span class="jade">正邪+10 机缘+2</span> 银两+30`);}},
+   {l:"不碰凶物，转身离去",h:"",run:()=>{done(`你摇头离去。能全身而退，亦是智慧。`);}},
+  ]},
+ {t:()=>`<p>溪畔，一位<span class="jade">白衣少女</span>正为落水孩童施针。她抬眼："这位侠士，可愿助我一臂之力？"</p>`,
+  c:()=>[
+   {l:"当仁不让，替她挡住追兵",h:"侠义·或恶斗",run:()=>{if(chance(.5))return combat({name:"追命刀客",face:"🔪",hp:26,atk:8,def:2,spd:7,moves:["fast","fierce"],reward:{fame:14,align:12,exp:16,money:15}});alignShift(12);fameGain(10);heal(8);done(`追兵望风而逃，少女感激赠药。<span class="jade">正邪+12 名声+10 气血+8</span>`);}},
+   {l:"授她防身之法",h:"命格骰·传艺",run:()=>{const r=fateRoll(Math.floor(g.fame/10)+1,7);if(r.ok){g.luck+=2;alignShift(6);money(20);done(`少女心领神会，赠你一枚护身符。<span class="jade">机缘+2 正邪+6</span> 银两+20`);}else done(`你比划半天，少女似懂非懂道了谢。<span class="mut">(骰${r.d})</span>`);}},
+   {l:"事不关己，掉头就走",h:"损正邪",run:()=>{alignShift(-8);done(`你充耳不闻。身后传来一声轻叹。<span class="em">正邪-8</span>`);}},
+  ]},
+ {t:()=>`<p>一座荒庙，火堆旁坐着个<span class="gd">邋遢老者</span>，正就着月光饮酒。见你来，咧嘴一笑："小娃娃，陪老夫喝两盅，指点你几招如何？"</p>`,
+  c:()=>[
+   {l:"恭敬奉茶，请前辈指点",h:"命格骰·机缘",run:()=>{const r=fateRoll(2+Math.floor(g.luck/2),6);if(r.ok){const id=teachRandom();g.luck++;done(id?`老者竟是隐世高人，倾囊相授：<span class="gd">习得「${MOVES[id].n}」！</span>`:`老者点你一句心法，内力精进。`+(qiGain(4),`<span class="qi">内力+4</span>`));}else done(`老者喝得酩酊，倒头就睡。<span class="mut">(骰${r.d})</span>`);}},
+   {l:"陪他豪饮，称兄道弟",h:"回气血内力",run:()=>{heal(14);qiGain(4);fameGain(3);done(`一夜畅饮，筋骨舒泰。<span class="qi">气血+14 内力+4</span> 名声+3`);}},
+   {l:"这等醉汉，不理也罢",h:"",run:()=>{done(`你拂袖离去。老者望着你背影，摇头轻叹。`);}},
+  ]},
+ {t:()=>`<p>茶棚里两拨人正剑拔弩张——一边是<span class="jade">名门弟子</span>，一边是<span class="em">魔教中人</span>，都想拉你入伙。</p>`,
+  c:()=>[
+   {l:"站名门这边",h:"偏正道",run:()=>{alignShift(10);fameGain(8);done(`你亮明立场，名门弟子引为知己。<span class="jade">正邪+10 名声+8</span>`);}},
+   {l:"站魔教这边",h:"偏邪道·得利",run:()=>{alignShift(-12);money(40);const id=chance(.5)?teachEvil():null;done(`魔教中人大喜，塞给你一袋银子${id?`并传你<span class="gd">「${MOVES[id].n}」</span>`:""}。<span class="em">正邪-12</span> 银两+40`);}},
+   {l:"两边不帮，抽身走人",h:"命格骰·脱身",run:()=>{const r=fateRoll(espd()>7?2:0,6);if(r.ok)done(`你悄然退去，两不相帮。<span class="mut">(骰${r.d})</span>`);else{g.hp=clamp(g.hp-6,0,g.hpMax);done(`双方都当你软弱，各给了你一记。<span class="em">气血-6</span>`);}}},
+  ]},
+];
+let _cont=null;
+function done(html){_cont(html);}
+function roam(){
+  toTop();
+  if(g.day>1 && chance(.42)) return combat(randomFoe());
+  const ev=pick(EVENTS),choices=ev.c();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">奇 遇 · 第 ${g.day} 日</div>
+    <div class="scene" id="sc"></div><div class="choices" id="ch" style="opacity:0"></div>${hudHTML()}</div>`;
+  typeScene($("#sc"),ev.t(),()=>{
+    const ch=$("#ch");ch.style.opacity="1";ch.classList.add("fadein");
+    ch.innerHTML=choices.map((c,i)=>`<button class="choice" data-i="${i}"><span class="num">${"壹贰叁"[i]}</span>${c.l}${c.h?`<span class="hint">${c.h}</span>`:""}</button>`).join("");
+    ch.querySelectorAll(".choice").forEach(b=>b.onclick=()=>{
+      _cont=(html)=>afterEvent(html);
+      const out=choices[+b.dataset.i].run();
+    });
+  });
+}
+function afterEvent(html){
+  if(passDay())return screenEnding(false);
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">此 一 程</div>
+    <div class="scene" id="sc"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="on"><span class="num">続</span>回到江湖 →</button></div></div>`;
+  typeScene($("#sc"),`<p>${html}</p>`);
+  $("#on").onclick=()=>{ if(g.hp<=0)return screenEnding(true); hub(); };
+  if(g.hp<=0)setTimeout(()=>screenEnding(true),500);
+}
+function teachRandom(){const pool=Object.keys(MOVES).filter(id=>!has(id)&&!MOVES[id].ult&&(!MOVES[id].align||g.align<=0||chance(.4)));if(!pool.length)return null;const id=pick(pool);learn(id);return id;}
+function teachEvil(){const pool=["xixing","dutou"].filter(id=>!has(id));if(!pool.length)return null;const id=pick(pool);learn(id);return id;}
+
+/* ============ 敌人 ============ */
+function scaleFoe(f){const s=1+g.tier*0.18+g.day*0.03;f.hp=Math.round(f.hp*s);f.atk=Math.round(f.atk*s);f.hpMax=f.hp;return f;}
+function randomFoe(){
+  const pool=[
+   {name:"山贼头目",face:"🪓",hp:30,atk:7,def:2,spd:4,moves:["fierce","fast"]},
+   {name:"黑衣杀手",face:"🥷",hp:26,atk:8,def:2,spd:8,moves:["fast","clever"]},
+   {name:"醉拳武者",face:"🍶",hp:34,atk:6,def:3,spd:5,moves:["clever","fierce"]},
+   {name:"毒蛛门徒",face:"🕷️",hp:24,atk:9,def:1,spd:7,moves:["fast","tangmen"]},
+   {name:"铁塔武僧",face:"🧱",hp:42,atk:6,def:5,spd:3,moves:["fierce"]},
+   {name:"点穴高手",face:"👆",hp:28,atk:7,def:3,spd:7,moves:["clever","yiyang"]},
+  ];
+  const f={...pick(pool)};f.hpMax=f.hp;scaleFoe(f);f.reward={fame:6+g.day,money:8+ri(0,12),exp:10+g.day};return f;
+}
+const ARENA=[
+ {name:"擂台好手·铁臂王",face:"💪",hp:38,atk:8,def:4,spd:4,moves:["fierce","fast"],reward:{fame:14,money:30,exp:16}},
+ {name:"江南剑客·顾惜朝",face:"⚔️",hp:44,atk:10,def:3,spd:8,moves:["fast","dugu","clever"],reward:{fame:22,money:55,exp:24}},
+ {name:"独臂神尼",face:"🙏",hp:52,atk:11,def:5,spd:6,moves:["clever","yiyang","fierce"],reward:{fame:34,money:90,exp:34}},
+];
+function finalFoe(){
+  const evil=g.align<=-20;
+  const f=evil
+   ?{name:"名门盟主·正道领袖",face:"⚔️",hp:120,atk:15,def:6,spd:8,moves:["clever","yiyang","dugu","xianglong"],d:"率正道群雄前来讨伐"}
+   :{name:"血手魔头·宗师",face:"😈",hp:126,atk:17,def:5,spd:8,moves:["fierce","huoyan","dutou","xianglong"],d:"屠戮半城的绝世凶徒"};
+  f.hpMax=f.hp;f.qi=12;f.boss=true;f.reward={fame:60,exp:60,money:200};return f;
+}
+
+/* ============ 战斗系统 ============ */
+const CYC={fast:"clever",clever:"fierce",fierce:"fast"}; // key 克 value
+const TRIN={fast:"快",clever:"巧",fierce:"猛"};
+let C=null; // 战斗上下文
+function combat(foe,opt){
+  toTop();opt=opt||{};
+  C={foe:{...foe,qi:foe.qi||6,st:{}},you:{st:{}},opt,turn:1,busy:false,log:opt.dao?"宿敌当前——生死一战！":`狭路相逢——<span class="em">${foe.name}</span>拦住去路！`};
+  renderCombat();
+}
+function stTags(st){
+  const m=[];if(st.bleed>0)m.push(`<span class="stg bleed">流血${st.bleed}</span>`);if(st.poison>0)m.push(`<span class="stg poison">中毒${st.poison}</span>`);
+  if(st.stun>0)m.push(`<span class="stg stun">眩晕${st.stun}</span>`);if(st.pierce>0)m.push(`<span class="stg pierce">破防${st.pierce}</span>`);if(st.dodge>0)m.push(`<span class="stg dodge">身法${st.dodge}</span>`);return m.join("");
+}
+function myMoves(){return g.arts.filter(id=>MOVES[id]).map(id=>({id,...MOVES[id]}));}
+function renderCombat(){
+  const f=C.foe;
+  const mv=myMoves().map(m=>{
+    const dis=(m.cost>g.qi)?"disabled":"";
+    const tri=m.tri?`<span class="tri ${m.tri}">${TRIN[m.tri]}</span>`:"";
+    return `<button class="move ${m.ult?'ult':''}" data-id="${m.id}" ${dis}><span class="mn">${m.n}${tri}</span>${m.cost?`<span class="cost">耗${m.cost}</span>`:""}<span class="md">${m.d}</span></button>`;
+  }).join("");
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">过 招 · ${f.boss?"生死一战":"第 "+g.day+" 日"}</div>
+    <div class="foe"><div class="face">${f.face}</div><div class="info"><h3>${f.name}</h3>
+      <div class="d">气血 ${Math.max(0,f.hp)}/${f.hpMax} · 内力 ${f.qi}</div>
+      <div class="hpwrap bar hp"><i style="width:${clamp(f.hp/f.hpMax*100,0,100)}%"></i></div>
+      <div class="st">${stTags(f.st)}</div></div></div>
+    <div class="foe-tell" id="tell">${f.qi>=4?"⚠ 对手内力充盈，似要施展绝招":(stTags(C.you.st)?"你身上："+stTags(C.you.st):"")}</div>
+    <div class="clash" id="clash"><span class="res">${C.log}</span></div>
+    <div class="moves" id="mv">${mv}</div>${hudHTML()}</div>`;
+  $("#mv").querySelectorAll(".move").forEach(b=>{ if(!b.disabled)b.onclick=()=>playerTurn(b.dataset.id); });
+}
+function foeChoose(f){
+  if(f.st.stun>0)return null;
+  const cands=(f.moves||["fast","clever","fierce"]).filter(id=>MOVES[id]&&(MOVES[id].cost||0)<=f.qi);
+  let id=pick(cands.length?cands:["fast"]);
+  // 内力够偏向绝招/强招
+  if(f.qi>=4){const strong=cands.filter(x=>MOVES[x].ult||MOVES[x].cost>=2);if(strong.length&&chance(.5))id=pick(strong);}
+  return id;
+}
+function dealDmg(base,atk,def,mult,pierceOn){const d=pierceOn?Math.round(def*0.4):def;return Math.max(1,Math.round((base+atk-d)*(mult||1)));}
+function applyEff(eff,src,tgt,who){ // who='you'|'foe' 施法者
+  if(!eff)return "";let s="";
+  if(eff.bleed){tgt.st.bleed=(tgt.st.bleed||0)+eff.bleed;s+=" 流血";}
+  if(eff.poison){tgt.st.poison=(tgt.st.poison||0)+eff.poison;s+=" 中毒";}
+  if(eff.stun){tgt.st.stun=(tgt.st.stun||0)+eff.stun;s+=" 眩晕";}
+  if(eff.pierce){tgt.st.pierce=(tgt.st.pierce||0)+eff.pierce;s+=" 破防";}
+  if(eff.dodge){src.st.dodge=(src.st.dodge||0)+eff.dodge;s+=" 身法";}
+  if(eff.drain){if(who==="you"){qiGain(eff.drain);}else{g.qi=clamp(g.qi,0,g.qiMax);}s+=" 吸内力";}
+  return s;
+}
+function playerTurn(id){
+  if(C.busy)return;C.busy=true;
+  const f=C.foe,m=MOVES[id];
+  if(m.cost>g.qi){C.busy=false;return;}
+  g.qi-=m.cost;
+  // 玩家中毒/流血在回合末结算；先出招
+  const fid=foeChoose(f), fm=fid?MOVES[fid]:null;
+  if(fid)f.qi-=(fm.cost||0);
+  let res="",pHit=0,fHit=0,pIcon=m.tri?TRIN[m.tri]:"运",fIcon=fm?(fm.tri?TRIN[fm.tri]:"运"):"—";
+
+  // 运功
+  if(m.eff&&m.eff.yun){ qiGain(3);heal(4);res=`你凝神<span class="qi">运功调息</span>，内力气血回复。`; }
+  else {
+    const pUlt=m.ult, fUlt=fm&&fm.ult;
+    let pLands=false,fLands=false;
+    if(pUlt&&!fUlt){pLands=true;flash();shake();}
+    else if(fUlt&&!pUlt){fLands=true;shake();}
+    else if(pUlt&&fUlt){pLands=fLands=true;flash();shake();}
+    else if(!fm){pLands=true;} // 敌被眩晕
+    else if(m.tri&&fm.tri){
+      if(CYC[m.tri]===fm.tri)pLands=true;
+      else if(CYC[fm.tri]===m.tri)fLands=true;
+      else {pLands=fLands=true;} // 同系硬拼
+    } else {pLands=true;if(fm.tri)fLands=true;}
+    // 玩家命中
+    if(pLands){
+      let mult=1;if(g.talent.k===m.tri)mult+=0.25;if(m.ult)mult+=0;
+      if(pUlt&&fUlt)mult*=0.7; if(m.tri&&fm&&CYC[m.tri]===fm.tri)mult+=0.2;
+      pHit=dealDmg(m.pow,eatk(),edef2(f),mult,f.st.pierce>0);
+      f.hp-=pHit;const es=applyEff(m.eff,C.you,f,"you");
+      res=`你使<span class="gd">${m.n}</span>${m.tri&&fm&&CYC[m.tri]===fm.tri?`，<span class="qi">${TRIN[m.tri]}破${TRIN[fm.tri]}</span>`:""}命中！${es?`<span class="em">${es}</span>`:""}`;
+      if(m.eff&&m.eff.recoil){g.hp=clamp(g.hp-m.eff.recoil,0,g.hpMax);res+=` <span class="em">(反噬-${m.eff.recoil})</span>`;}
+    }
+    if(fLands&&f.hp>0){
+      let mult=1;
+      if(C.you.st.dodge>0){mult*=0.5;C.you.st.dodge--;}
+      fHit=dealDmg(fm.pow,f.atk,edef(),mult,C.you.st.pierce>0);
+      g.hp=clamp(g.hp-fHit,0,g.hpMax);applyEff(fm.eff,f,C.you,"foe");
+      if(!pLands)res=`<span class="em">${f.name}使${fm.n}</span>，你未能拆招，吃了一记！`;
+      else res+=` 但<span class="em">${f.name}</span>也还了一手。`;
+    }
+    if(!pLands&&!fLands)res=`双方僵持，各自变招。`;
+    qiGain(1);f.qi=Math.min(14,f.qi+1);
+  }
+  C.log=`${res}${pHit?` <span class="qi">敌-${pHit}</span>`:""}${fHit?` <span class="em">己-${fHit}</span>`:""}`;
+  // 回合末: 流血/中毒结算
+  let dot="";
+  if(f.hp>0){ if(f.st.bleed>0){f.hp-=f.st.bleed;dot+=`敌流血-${f.st.bleed} `;f.st.bleed--;} if(f.st.poison>0){f.hp-=f.st.poison;dot+=`敌中毒-${f.st.poison} `;} }
+  if(g.hp>0){ if(C.you.st.bleed>0){g.hp=clamp(g.hp-C.you.st.bleed,0,g.hpMax);dot+=`己流血-${C.you.st.bleed} `;C.you.st.bleed--;} if(C.you.st.poison>0){g.hp=clamp(g.hp-C.you.st.poison,0,g.hpMax);C.you.st.poison--;} }
+  // 状态递减
+  if(f.st.stun>0)f.st.stun--; if(f.st.pierce>0)f.st.pierce--; if(C.you.st.stun>0)C.you.st.stun--; if(C.you.st.pierce>0)C.you.st.pierce--; if(f.st.poison>0)f.st.poison--;
+  if(dot)C.log+=` <span class="mut">${dot}</span>`;
+
+  renderCombat();
+  const c=$("#clash");if(c)c.innerHTML=`<div class="duo"><span class="mv" style="color:var(--jade)">${pIcon}</span><span class="vs">×</span><span class="mv" style="color:var(--zhu)">${fIcon}</span></div><div class="res">${C.log}</div>`;
+  $("#mv").querySelectorAll(".move").forEach(b=>b.disabled=true);
+  setTimeout(()=>{
+    if(f.hp<=0)return winCombat();
+    if(g.hp<=0)return loseCombat();
+    C.turn++;C.busy=false;renderCombat();
+    const c2=$("#clash");if(c2)c2.innerHTML=`<div class="duo"><span class="mv" style="color:var(--jade)">${pIcon}</span><span class="vs">×</span><span class="mv" style="color:var(--zhu)">${fIcon}</span></div><div class="res">${C.log}</div>`;
+  },reduce?100:780);
+}
+function edef2(f){return f.def;}
+function loseCombat(){ screenEnding(true); }
+function winCombat(){
+  const f=C.foe,rw=f.reward||{};
+  if(C.opt.dao)return screenEnding(false,"dao");
+  if(rw.fame)fameGain(rw.fame);if(rw.money)money(rw.money);if(rw.exp)gainExp(rw.exp);if(rw.align)alignShift(rw.align);
+  g.won++;g.deeds.push(`力克${f.name}`);
+  let extra="";
+  if(chance(.28)){const id=teachRandom();if(id)extra=` 你自其遗招中悟得<span class="gd">「${MOVES[id].n}」</span>！`;}
+  heal(6);
+  const afterFn=C.opt.after;
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">胜</div>
+    <div class="scene" id="sc"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="on"><span class="num">続</span>${afterFn?"继续 →":"回到江湖 →"}</button></div></div>`;
+  typeScene($("#sc"),`<p>${f.name}败退。<span class="gd">名声+${rw.fame||0} 银两+${rw.money||0} 阅历+${rw.exp||0}</span>${rw.align?` <span class="jade">正邪+${rw.align}</span>`:""}${extra}</p>`);
+  $("#on").onclick=()=>{ if(afterFn)return afterFn(); if(passDay())return screenEnding(false); hub(); };
+}
+
+/* ============ 比武擂台 ============ */
+function arena(){
+  toTop();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">比 武 擂 台</div>
+    <div class="scene"><p class="mut">擂台之上，各路高手轮番坐镇。胜者名动一方，败者……但求全身而退。</p></div>
+    <div class="list" id="ls"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="back"><span class="num">返</span>离开擂台</button></div></div>`;
+  $("#ls").innerHTML=ARENA.map((a,i)=>`<div class="li"><span class="ic">${a.face}</span><div class="tx"><b>${a.name}</b><span>气血${a.hp} 攻${a.atk} · 胜得 名声+${a.reward.fame} 银两+${a.reward.money}</span></div><button class="buy" data-i="${i}">挑战</button></div>`).join("");
+  stage.querySelectorAll(".buy").forEach(b=>b.onclick=()=>{const a=ARENA[+b.dataset.i];const foe={...a,st:{}};foe.hpMax=foe.hp;scaleFoe(foe);foe.reward={...a.reward};combat(foe,{after:()=>{if(passDay())return screenEnding(false);hub("你走下擂台，四座喝彩。");}});});
+  $("#back").onclick=()=>hub();
+}
+
+/* ============ 副本 ============ */
+const DUNGEONS=[
+ {n:"乱葬岗",face:"🪦",fee:0,rooms:3,foes:[["野狗群","🐺",26,6,1,6],["盗墓贼","⛏️",30,7,2,5],["百年僵尸","🧟",46,9,4,3]],boss:["尸王","👹",64,12,5,4,["fierce","huoyan"]],loot:{money:80,exp:40,fame:16}},
+ {n:"藏剑山庄",face:"🏯",fee:20,rooms:3,foes:[["庄丁","🧑",30,7,3,5],["剑奴","🗡️",38,9,3,7],["首席剑客","⚔️",50,11,4,8]],boss:["庄主·剑痴","🀄",78,13,5,7,["dugu","clever","fast"]],loot:{money:150,exp:60,fame:26,art:"dugu"}},
+ {n:"魔教总坛",face:"🔥",fee:40,rooms:4,foes:[["护法弟子","🥷",34,8,2,7],["长老","🧙",48,11,4,6],["血卫","🩸",56,12,5,5],["左右使","😈",66,13,4,8]],boss:["教主·东方无涯","🐍",100,16,6,9,["dutou","huoyan","xixing","xianglong"]],loot:{money:280,exp:100,fame:44,art:"xianglong"}},
+];
+function dungeonPick(){
+  toTop();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">闯 副 本</div>
+    <div class="scene"><p class="mut">秘境深处群敌环伺，一层层闯下去，尽头有重宝，也有葬身之地。中途不可退，唯有杀出或倒下。</p></div>
+    <div class="list" id="ls"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="back"><span class="num">返</span>再想想</button></div></div>`;
+  $("#ls").innerHTML=DUNGEONS.map((d,i)=>{const can=g.money>=d.fee;return `<div class="li"><span class="ic">${d.face}</span><div class="tx"><b>${d.n}</b><span>${d.rooms}层 + 首领 · 门票${d.fee}两 · 通关 银两+${d.loot.money} 阅历+${d.loot.exp}${d.loot.art?` 得「${MOVES[d.loot.art].n}」`:""}</span></div><button class="buy" data-i="${i}" ${can?"":"disabled"}>${can?"闯":"银两不足"}</button></div>`;}).join("");
+  stage.querySelectorAll(".buy").forEach(b=>{if(!b.disabled)b.onclick=()=>startDungeon(+b.dataset.i);});
+  $("#back").onclick=()=>hub();
+}
+function startDungeon(i){
+  const d=DUNGEONS[i];money(-d.fee);
+  const D={d,i,room:0,total:d.rooms};
+  dungeonRoom(D);
+}
+function dungeonRoom(D){
+  const d=D.d;
+  if(D.room<d.rooms){
+    const fa=d.foes[Math.min(D.room,d.foes.length-1)];
+    const foe={name:fa[0],face:fa[1],hp:fa[2],atk:fa[3],def:fa[4],spd:fa[5],moves:["fierce","fast","clever"],st:{}};
+    foe.hpMax=foe.hp;scaleFoe(foe);foe.reward={money:ri(6,16),exp:8+D.room*4};
+    D.room++;
+    combat(foe,{after:()=>{ if(g.hp<=0)return screenEnding(true); dungeonInterlude(D); }});
+  } else {
+    const b=d.boss;
+    const foe={name:b[0],face:b[1],hp:b[2],atk:b[3],def:b[4],spd:b[5],moves:b[6],qi:12,boss:true,st:{}};
+    foe.hpMax=foe.hp;scaleFoe(foe);foe.reward={};
+    combat(foe,{after:()=>dungeonClear(D)});
+  }
+}
+function dungeonInterlude(D){
+  const heallable=chance(.5);
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">${D.d.n} · 第 ${D.room}/${D.total} 层已破</div>
+    <div class="scene" id="sc"></div>${hudHTML()}
+    <div class="choices" id="ch"></div></div>`;
+  const opts=[];
+  if(heallable){opts.push({l:"搜刮尸身，寻些疗伤之物",h:"回气血",fn:()=>{heal(14);qiGain(3);toast("气血+14 内力+3");dungeonRoom(D);}});}
+  opts.push({l:"稳住心神，继续深入 →",h:"",fn:()=>dungeonRoom(D)});
+  typeScene($("#sc"),`<p>血战之后，前方石门缓缓开启，阴风阵阵。<span class="mut">深处杀气更盛。</span></p>`);
+  $("#ch").innerHTML=opts.map((o,i)=>`<button class="choice" data-i="${i}"><span class="num">${"壹贰"[i]}</span>${o.l}${o.h?`<span class="hint">${o.h}</span>`:""}</button>`).join("");
+  $("#ch").querySelectorAll(".choice").forEach(b=>b.onclick=()=>opts[+b.dataset.i].fn());
+}
+function dungeonClear(D){
+  const l=D.d.loot;money(l.money);gainExp(l.exp);fameGain(l.fame);
+  let got="";if(l.art&&learn(l.art))got=`，更得镇本之学<span class="gd">「${MOVES[l.art].n}」</span>`;
+  g.dungeonDone++;g.deeds.push(`独闯${D.d.n}，力斩${D.d.boss[0]}`);
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">通 关</div>
+    <div class="scene" id="sc"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="on"><span class="num">続</span>满载而归 →</button></div></div>`;
+  typeScene($("#sc"),`<p>你杀穿<span class="gd">${D.d.n}</span>，斩首领<span class="em">${D.d.boss[0]}</span>于剑下${got}。</p><p class="gd">银两+${l.money} 阅历+${l.exp} 名声+${l.fame}</p>`);
+  $("#on").onclick=()=>{if(passDay())return screenEnding(false);hub();};
+}
+
+/* ============ 营生 ============ */
+function workMenu(){
+  toTop();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">营 生 糊 口</div>
+    <div class="scene"><p class="mut">江湖不只有刀光。攒些盘缠，方能买药购功。（各耗一日）</p></div>
+    <div class="acts" id="ac">
+      <button class="act" data-w="herb"><span class="ic">🌿</span><div class="tx"><b>上山采药</b><span>命格骰·眼力 · 采得草药换银</span></div></button>
+      <button class="act" data-w="forge"><span class="ic">🔨</span><div class="tx"><b>铁铺帮工</b><span>稳赚辛苦钱，偶得好料</span></div></button>
+      <button class="act" data-w="busk"><span class="ic">🎭</span><div class="tx"><b>市集卖艺</b><span>名声越高，打赏越丰</span></div></button>
+      <button class="act" data-w="gamble"><span class="ic">🎲</span><div class="tx"><b>赌坊搏一把</b><span>压上10两，愿赌服输</span></div></button>
+      <button class="act" data-w="escort"><span class="ic">🐎</span><div class="tx"><b>接一趟镖</b><span>酬金丰厚，多半有恶斗</span></div></button>
+    </div>${hudHTML()}
+    <div class="choices"><button class="choice" id="back"><span class="num">返</span>回江湖</button></div></div>`;
+  const acts={
+    herb:()=>{const r=fateRoll(2+Math.floor(g.luck/2),6);const s=r.ok?ri(18,34):ri(4,12);money(s);endWork(`你翻山越岭，${r.ok?"采得几味珍稀药材":"只寻到些寻常草药"}，卖得 <span class="gd">${s}</span> 两。<span class="mut">(骰${r.d})</span>`);},
+    forge:()=>{const s=ri(12,20);money(s);if(chance(.25)){heal(-0);g.atk+=1;endWork(`你抡了一天大锤，工钱<span class="gd">${s}</span>两，还从老铁匠处学得发力窍门。<span class="jade">攻+1</span>`);}else endWork(`挥汗如雨，得工钱<span class="gd">${s}</span>两。`);},
+    busk:()=>{const s=Math.round(10+g.fame*0.5+ri(0,8));money(s);fameGain(2);endWork(`你使一套拳脚博得满堂彩，打赏<span class="gd">${s}</span>两，名声+2。`);},
+    gamble:()=>{if(g.money<10){toast("囊中羞涩，凑不齐赌本");return;}money(-10);const r=fateRoll(Math.floor(g.luck/2),7);if(r.ok){const win=chance(.3)?40:22;money(win);endWork(`骰子一掷，<span class="gd">你赢了 ${win} 两</span>！赌坊老板脸都绿了。<span class="mut">(骰${r.d})</span>`);}else endWork(`十两打了水漂，你摸摸空瘪的钱袋。<span class="em">(骰${r.d})</span>`);},
+    escort:()=>{if(chance(.7)){const f=randomFoe();f.name="劫镖·"+f.name;f.reward={fame:8,money:45+ri(0,20),exp:14};combat(f,{after:()=>{if(passDay())return screenEnding(false);hub("镖货安然送达，镖局重谢。");}});}else{const s=40+ri(0,30);money(s);endWork(`一路太平，顺顺当当交了镖，酬金<span class="gd">${s}</span>两。`);}},
+  };
+  function endWork(html){ if(passDay())return screenEnding(false);
+    stage.innerHTML=`<div class="card fadein"><div class="eyebrow">这一日</div><div class="scene" id="sc"></div>${hudHTML()}
+      <div class="choices"><button class="choice" id="on"><span class="num">続</span>回到江湖 →</button></div></div>`;
+    typeScene($("#sc"),`<p>${html}</p>`);$("#on").onclick=()=>hub();
+  }
+  $("#ac").querySelectorAll(".act").forEach(b=>b.onclick=()=>acts[b.dataset.w]());
+  $("#back").onclick=()=>hub();
+}
+
+/* ============ 市集 ============ */
+function market(){
+  toTop();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">客 栈 市 集</div>
+    <div class="scene"><p class="mut">兵器铺、药堂、书肆一字排开。银两傍身，方能行走江湖。</p></div>
+    <div class="divider">— 兵 器 与 丹 药 —</div><div class="list" id="gear"></div>
+    <div class="divider">— 武 功 秘 籍 —</div><div class="list" id="arts"></div>
+    ${hudHTML()}
+    <div class="choices"><button class="choice" id="heal"><span class="num">医</span>请郎中疗伤　<span class="hint">30两 回满气血内力</span></button>
+    <button class="choice" id="back"><span class="num">返</span>回江湖</button></div></div>`;
+  renderShop();
+  $("#heal").onclick=()=>{if(g.money<30){toast("银两不足");return;}money(-30);g.hp=g.hpMax;g.qi=g.qiMax;toast("郎中妙手，气血内力尽复");market();};
+  $("#back").onclick=()=>hub();
+  function renderShop(){
+    $("#gear").innerHTML=GEAR.map((it,i)=>{const owned=(it.t==="weapon"&&g.weapon&&g.weapon.n===it.n)||(it.t==="armor"&&g.armor&&g.armor.n===it.n);const can=g.money>=it.cost&&!owned;return `<div class="li"><span class="ic">${it.t==="weapon"?"⚔️":it.t==="armor"?"🛡️":"💊"}</span><div class="tx"><b>${it.n}</b><span>${it.d} · ${it.cost}两</span></div><button class="buy" data-g="${i}" ${can?"":"disabled"}>${owned?"已备":"购"}</button></div>`;}).join("");
+    // 可学武功(未学的，按品阶给价)
+    const learnable=Object.keys(MOVES).filter(id=>!has(id)&&!["fast","clever","fierce","yun"].includes(id));
+    const priced=learnable.map(id=>({id,cost:MOVES[id].ult?160:MOVES[id].cost>=3?110:70}));
+    $("#arts").innerHTML=priced.length?priced.map(p=>{const m=MOVES[p.id];const can=g.money>=p.cost;return `<div class="li"><span class="ic">📖</span><div class="tx"><b>${m.n}${m.align?' <span class="mut">(邪功)</span>':''}</b><span>${m.d} · ${p.cost}两</span></div><button class="buy" data-a="${p.id}" data-c="${p.cost}" ${can?"":"disabled"}>习</button></div>`;}).join(""):`<div class="mut" style="text-align:center;padding:10px">天下武学，已尽入你手。</div>`;
+    $("#gear").querySelectorAll(".buy").forEach(b=>{if(b.disabled)return;b.onclick=()=>{const it=GEAR[+b.dataset.g];if(g.money<it.cost)return;money(-it.cost);if(it.t==="weapon")g.weapon=it;else if(it.t==="armor")g.armor=it;else{heal(it.heal||0);qiGain(it.qi||0);}toast("购得 "+it.n);market();};});
+    $("#arts").querySelectorAll(".buy").forEach(b=>{if(b.disabled)return;b.onclick=()=>{const id=b.dataset.a,c=+b.dataset.c;if(g.money<c)return;money(-c);learn(id);if(MOVES[id].align)alignShift(MOVES[id].align*3);toast("习得 "+MOVES[id].n);market();};});
+  }
+}
+
+/* ============ 本门修行 ============ */
+function sectTrain(){
+  toTop();
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">本 门 修 行</div>
+    <div class="scene"><p class="mut">回本门清修一日。打坐冲境，或参研武学。</p></div>
+    <div class="acts" id="ac">
+      <button class="act" data-s="med"><span class="ic">🧘</span><div class="tx"><b>打坐修炼</b><span>阅历+，或有顿悟突破境界</span></div></button>
+      <button class="act" data-s="spar"><span class="ic">🤺</span><div class="tx"><b>与同门拆招</b><span>稳涨阅历，磨练武艺</span></div></button>
+    </div>${hudHTML()}
+    <div class="choices"><button class="choice" id="back"><span class="num">返</span>回江湖</button></div></div>`;
+  $("#ac").querySelectorAll(".act").forEach(b=>b.onclick=()=>{
+    let html;
+    if(b.dataset.s==="med"){const e=ri(16,28)+(g.talent.k==="exp"?10:0);gainExp(e);qiGain(g.qiMax);html=`你入定良久，气行周天，<span class="gd">阅历+${e}</span>，内力充盈。`;}
+    else{const e=ri(12,20)+(g.talent.k==="exp"?8:0);gainExp(e);g.atk+=chance(.3)?1:0;html=`你与同门你来我往拆解百招，<span class="gd">阅历+${e}</span>。`;}
+    if(passDay())return screenEnding(false);
+    stage.innerHTML=`<div class="card fadein"><div class="eyebrow">修 行</div><div class="scene" id="sc"></div>${hudHTML()}<div class="choices"><button class="choice" id="on"><span class="num">続</span>回到江湖 →</button></div></div>`;
+    typeScene($("#sc"),`<p>${html}</p>`);$("#on").onclick=()=>hub();
+  });
+  $("#back").onclick=()=>hub();
+}
+
+/* ============ 说书人 AI(程序化叙事) ============ */
+function pickN(arr,seed){return arr[Math.abs(seed)%arr.length];}
+function teller(){
+  toTop();
+  const at=alignTag(g.align), fameW= g.fame>=60?"名震一方":g.fame>=25?"渐有薄名":"寂寂无名";
+  const open=pickN([`茶馆里惊堂木一拍，说书人清了清嗓：`,`且说这江湖之中，近来出了个人物——`,`列位看官，今日说的这段书，主角姓${g.name[0]}。`,`酒过三巡，那说书先生压低声音道：`],g.day+g.fame);
+  const style=at.e?pickN([`此人行事狠辣，正道之士谈之色变。`,`有人说他是煞星转世，也有人暗暗佩服他的手段。`,`黑道尊他，白道恨他，偏偏拿他没辙。`],g.align):pickN([`此人一副侠义心肠，路见不平便要拔刀。`,`市井小民提起他，无不竖起大拇指。`,`他不慕名利，却偏偏名声越来越响。`],g.align);
+  const deed=g.deeds.length?`——听说他${pickN(g.deeds,g.won+g.day)}，${pick(["一时传为美谈","惊动了半个江湖","让不少人记住了他的名号","连老夫都听了三遍"])}。`:`——只是初出茅庐，故事才刚刚起头。`;
+  const arts=g.arts.filter(id=>!["fast","clever","fierce","yun"].includes(id));
+  const artLine=arts.length?`他一身${pickN(["精妙","诡奇","刚猛","飘逸"],arts.length)}武学，尤以<span class="gd">「${MOVES[pick(arts)].n}」</span>最为人称道；`:`他武艺尚浅，`;
+  const tierLine=`如今已是<span class="gd">${TIERS[g.tier]}</span>身手，${fameW}。`;
+  const fut=pickN(g.fame>=80?[`照这势头，用不了多久，怕要有一场惊天动地的了结。`]:g.align<=-40?[`只怕这条路走到黑，终有正道群雄围而诛之的一日。`]:g.align>=40?[`假以时日，"侠之大者"四字，未必落不到他头上。`]:[`至于他将来是龙是虫，是名垂青史还是横死荒野，且看下回分解。`],g.fame+g.tier);
+  stage.innerHTML=`<div class="card fadein"><div class="eyebrow">说 书 人 · 我 的 江 湖 传</div>
+    <div class="scene" id="sc"></div>${hudHTML()}
+    <div class="choices"><button class="choice" id="again"><span class="num">再</span>让他再说一段</button><button class="choice" id="back"><span class="num">返</span>回江湖</button></div></div>`;
+  typeScene($("#sc"),`<p>${open}</p><p>${style}${deed}</p><p>${artLine}${tierLine}</p><p class="mut">${fut}</p>`);
+  $("#again").onclick=()=>{g.day+=0;teller();};
+  $("#back").onclick=()=>hub();
+}
+
+/* ============ 结局 ============ */
+function endingKind(dead,how){
+  if(dead)return{seal:"殁",fate:"马革裹尸",py:"横死江湖",c:"#a2331f",v:[`剑折沙场，血染征衣。`,`<span class="mut">江湖不记来路，只记你曾来过。</span>`]};
+  const a=g.align,f=g.fame;
+  if(how==="dao"&&a<=-20)return{seal:"霸",fate:"独霸武林",py:"顺我者昌",c:"#a2331f",v:[`你踏着正道群雄的尸骨登临绝巅，`,`从此江湖，只余你一个名字。`]};
+  if(how==="dao")return{seal:"聖",fate:"武林盟主",py:"众望所归",c:"#b89753",v:[`你力挫魔头，还江湖一个太平，`,`群雄推你为尊，一言可安天下。`]};
+  if(how==="retire"&&f>=50)return{seal:"隱",fate:"功成身退",py:"事了拂衣",c:"#5a9e8f",v:[`你在最盛时转身离去，`,`<span class="mut">深藏功与名，只余传说在江湖流传。</span>`]};
+  if(a>=45&&f>=60)return{seal:"俠",fate:"侠之大者",py:"名动天下",c:"#b89753",v:[`为国为民，侠之大者。`,`你的名字，成了孩童口中的传说。`]};
+  if(a<=-45)return{seal:"魔",fate:"一代魔头",py:"人人得而诛之",c:"#a2331f",v:[`血雨腥风，尽在掌中。`,`<span class="mut">你笑看正道群雄，无人能挡。</span>`]};
+  if(g.tier>=4)return{seal:"宗",fate:"一代宗师",py:"自成一派",c:"#5a9e8f",v:[`武学通神，登峰造极。`,`你开宗立派，桃李满天下。`]};
+  if(f>=55)return{seal:"名",fate:"成名立万",py:"江湖有名",c:"#b89753",v:[`一战功成，声名鹊起。`,`酒楼茶肆，皆传你之名。`]};
+  if(a>=15)return{seal:"隱",fate:"归隐山林",py:"淡泊明志",c:"#5a9e8f",v:[`事了拂衣去，深藏功与名。`,`<span class="mut">江湖再无你的传说，只余一段留白。</span>`]};
+  return{seal:"客",fate:"江湖过客",py:"来去无痕",c:"#8b8778",v:[`一剑一马一壶酒，走过山高与水长。`,`<span class="mut">你只是江湖里，寻常的一个过客。</span>`]};
+}
+function screenEnding(dead,how){
+  toTop();stopDanmu();
+  const e=endingKind(dead,how);
+  const arts=g.arts.filter(id=>!["fast","clever","fierce","yun"].includes(id));
+  stage.innerHTML=`<div class="card fadein"><div class="epitaph">
+    <div class="seal-big" style="background:linear-gradient(150deg,${e.c},#241b12)"><b>${e.seal}</b></div>
+    <div class="fate" style="color:${e.c}">${e.fate}<small>${e.py}</small></div>
+    <div class="verse">${e.v.map(v=>`<div>${v}</div>`).join("")}</div>
+    <div class="stat-grid">
+      <div class="b"><div class="v">${g.fame}</div><div class="l">名声</div></div>
+      <div class="b"><div class="v">${alignTag(g.align).t}</div><div class="l">正邪</div></div>
+      <div class="b"><div class="v">${TIERS[g.tier]}</div><div class="l">境界</div></div>
+      <div class="b"><div class="v">${g.won}</div><div class="l">胜战</div></div>
+      <div class="b"><div class="v">${g.dungeonDone}</div><div class="l">通副本</div></div>
+      <div class="b"><div class="v">${arts.length}</div><div class="l">武学</div></div>
+    </div>
+    <div class="scene" style="text-align:left"><p class="mut">《江湖列传》载：${g.name}，${g.sect}出身，天赋「${g.talent.n}」，历江湖 ${Math.min(g.day,g.maxDay)} 日。${g.deeds.length?"生平"+g.deeds.slice(-3).join("、")+"，":""}${arts.length?"习得"+arts.map(id=>MOVES[id].n).slice(0,4).join("、")+"，":""}终成<span class="gd">${e.fate}</span>。</p></div>
+    <div class="codebox"><span class="lb">传承码</span><code>${g.code}</code><button id="copy">复制</button></div>
+    <p class="mut" style="font-size:12px;text-align:left">传承码发给友人，输入即可复现你这一命的开局命格，走出属于他自己的一段传。</p>
+    <div class="row" style="margin-top:14px"><button class="btn" id="again">再 走 一 回</button><button class="btn ghost" id="same">同 命 重 演</button></div>
+  </div></div>`;
+  $("#copy").onclick=()=>{navigator.clipboard?.writeText(g.code).then(()=>toast("传承码已复制"),()=>toast("复制失败"));};
+  $("#again").onclick=screenIntro;
+  $("#same").onclick=()=>{const s=g.seed;newGame(s);startDanmu();screenBirth();};
+  shake();
+}
+
+/* ============ 背景水墨 ============ */
+(function(){
+  const cv=$("#ink"),ctx=cv.getContext("2d");let W,H,dpr;const dots=[],leaves=[];
+  function resize(){dpr=Math.min(2,devicePixelRatio||1);W=cv.width=innerWidth*dpr;H=cv.height=innerHeight*dpr;cv.style.width=innerWidth+"px";cv.style.height=innerHeight+"px";}
+  resize();addEventListener("resize",resize);
+  for(let i=0;i<30;i++)dots.push({x:Math.random(),y:Math.random(),r:6+Math.random()*38,a:.015+Math.random()*.03,vx:(Math.random()-.5)*6e-5,vy:(Math.random()-.5)*4e-5});
+  function nl(){return{x:Math.random(),y:-.1-Math.random()*.3,vx:2e-4+Math.random()*4e-4,vy:6e-4+Math.random()*1e-3,rot:Math.random()*6,vr:(Math.random()-.5)*.03,s:5+Math.random()*7,a:.1+Math.random()*.16};}
+  for(let i=0;i<12;i++)leaves.push(nl());
+  function frame(){ctx.clearRect(0,0,W,H);
+    for(const d of dots){d.x+=d.vx;d.y+=d.vy;if(d.x<-.1)d.x=1.1;if(d.x>1.1)d.x=-.1;if(d.y<-.1)d.y=1.1;if(d.y>1.1)d.y=-.1;
+      const gr=ctx.createRadialGradient(d.x*W,d.y*H,0,d.x*W,d.y*H,d.r*dpr*3);gr.addColorStop(0,`rgba(120,120,110,${d.a})`);gr.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=gr;ctx.beginPath();ctx.arc(d.x*W,d.y*H,d.r*dpr*3,0,7);ctx.fill();}
+    for(const l of leaves){l.x+=l.vx;l.y+=l.vy;l.rot+=l.vr;if(l.y>1.2)Object.assign(l,nl());ctx.save();ctx.translate(l.x*W,l.y*H);ctx.rotate(l.rot);ctx.fillStyle=`rgba(120,150,110,${l.a})`;ctx.beginPath();ctx.ellipse(0,0,l.s*dpr,l.s*dpr*.32,0,0,7);ctx.fill();ctx.restore();}
+    requestAnimationFrame(frame);}
+  if(!reduce)frame();
+})();
+screenIntro();
+</script>

@@ -963,13 +963,10 @@
   .me-hero .mh-name{font-size:20px;font-weight:800;letter-spacing:.5px}
   .me-hero .mh-sub{font-size:11.5px;color:var(--dim);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
   .me-hero .mh-badge{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
-  /* 超级管理员: 实心金 + 发光, 最尊贵 (金色系跟随主题 --amber) */
-  .me-hero .mh-badge.super{background:color-mix(in srgb,var(--amber) 26%,transparent);color:var(--amber);box-shadow:0 0 10px -2px color-mix(in srgb,var(--amber) 60%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--amber) 45%,transparent);text-shadow:0 0 6px color-mix(in srgb,var(--amber) 55%,transparent)}
-  /* 管理员: 同金色系但描边款, 更含蓄, 低超管一级 */
-  .me-hero .mh-badge.admin{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 40%,transparent)}
-  /* 管理员/超管徽章做成后台入口链接: 去下划线 + 悬停微亮提示可点 */
+  .me-hero .mh-badge.super{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
+  /* 管理员徽章做成后台入口链接: 外观与原徽章一致, 仅去下划线 + 悬停微亮提示可点 */
   a.mh-admin-link{text-decoration:none;cursor:pointer;transition:.15s}
-  a.mh-admin-link:hover{background:color-mix(in srgb,var(--amber) 34%,transparent);box-shadow:0 0 14px -2px var(--amber)}
+  a.mh-admin-link:hover{background:color-mix(in srgb,var(--magenta) 26%,transparent);box-shadow:0 0 12px -3px var(--magenta)}
   a.mh-admin-link::after{content:'↗';font-size:8px;margin-left:3px;opacity:.7}
   .me-hero .mh-badge.reg{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
   .me-hero .mh-badge.anon{background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub)}
@@ -1152,7 +1149,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1735badge';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1717fix2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5605,7 +5602,7 @@ async function openMe(){
   // 顶部个人卡: 大头像 + 昵称 + (@用户名 · 状态徽章)
   // 管理员/超级管理员的徽章包成链接, 新窗口打开管理后台(不改徽章样式, a 继承外观)
   const roleLabel = isSuper ? '超级管理员' : (me && me.role==='admin' ? '管理员' : '');
-  const badge = isAdmin ? `<a class="mh-badge ${isSuper?'super':'admin'} mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${roleLabel}</a>`
+  const badge = isAdmin ? `<a class="mh-badge super mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${roleLabel}</a>`
     : isBound ? '<span class="mh-badge reg">正式账号</span>'
     : '<span class="mh-badge anon">临时身份</span>';
   const subLine = isBound
@@ -5678,7 +5675,7 @@ async function refreshMeData(scope, isBound, acctKnown){
   }
   // 账号信息首次读到后缓存
   if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
-    const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : (me.role==='admin' ? '<span class="mh-badge admin">管理员</span>' : '<span class="mh-badge reg">正式账号</span>');
+    const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : '<span class="mh-badge reg">正式账号</span>';
     if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
   }
   // 停止转圈, 至少显示 300ms 让用户看到反馈

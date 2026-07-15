@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>回声厅 · 后台</title>
+<script>
+/* 版本自愈: 后台页也参与版本检测(与前台共用 ver.txt)。admin.html 不参与 BUILD_VER 主链,
+   但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
+   localStorage 存已到达版本防循环; 断网恢复复检。*/
+(function(){
+  var ADMIN_VER='20260714-0610recallHall';
+  window.__EH_ADMIN_VER=ADMIN_VER;
+  function check(reason){
+    fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
+      if(!r.ok){ console.warn('[EH后台自愈] ver.txt HTTP', r.status); return null; }
+      return r.text();
+    }).then(function(t){
+      if(t===null||t===undefined) return;
+      var latest=(t||'').trim();
+      console.info('[EH后台自愈]',reason,'内嵌='+ADMIN_VER,'线上='+latest);
+      if(!latest) return;
+      if(latest===ADMIN_VER) return;   // 已是最新
+      var last=null; try{ last=localStorage.getItem('eh_admin_ver_last'); }catch(e){}
+      if(last===latest){ console.warn('[EH后台自愈] 已重载过 '+latest+' 仍非最新, 疑CDN/缓存卡住; 请手动强刷'); return; }
+      try{ localStorage.setItem('eh_admin_ver_last',latest); }catch(e){}
+      var u=new URL(location.href); u.searchParams.set('v',latest); u.searchParams.set('_r',Date.now());
+      console.info('[EH后台自愈] 重载→', u.toString());
+      location.replace(u.toString());
+    }).catch(function(e){ console.warn('[EH后台自愈] fetch失败', e&&e.message); });
+  }
+  try{ check('init'); }catch(e){}
+  window.addEventListener('online', function(){ check('online'); });
+})();
+</script>
+<style>
+  :root{
+    --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
+    --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
+    --ink:#EAF0FF; --sub:#98A3C7; --dim:#717EA9;
+    --cyan:#0ABAB5; --magenta:#FF6F61; --violet:#B57EDC; --amber:#F7C873; --green:#1DE9B6;
+    --grid:rgba(80,120,255,.05);
+    --glow-cyan:0 0 24px rgba(40,230,216,.5);
+  }
+  /* 皮肤(与前台共用 localStorage eh_theme) */
+  html[data-theme="vapor"]{ --bg:#160a1e; --bg2:#28123a; --panel:rgba(48,20,60,.78); --panel-solid:#301440;
+    --line:rgba(199,125,255,.24); --line2:rgba(199,125,255,.38); --ink:#FFEAF5; --sub:#D69AC0; --dim:#925A80;
+    --cyan:#C77DFF; --magenta:#FF4D9E; --violet:#4DE0D0; --amber:#FFB84D; --green:#7FE0C0; --grid:rgba(199,125,255,.05); }
+  html[data-theme="mono"]{ --bg:#0a0708; --bg2:#151011; --panel:rgba(28,20,22,.82); --panel-solid:#1c1416;
+    --line:rgba(245,208,106,.20); --line2:rgba(245,208,106,.34); --ink:#FBEEE4; --sub:#B89A94; --dim:#7C625A;
+    --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --grid:rgba(245,208,106,.04); }
+  html[data-theme="aurora"]{ --bg:#050f12; --bg2:#0a2029; --panel:rgba(12,38,44,.76); --panel-solid:#0c2630;
+    --line:rgba(0,240,181,.22); --line2:rgba(0,240,181,.36); --ink:#EAFFFA; --sub:#7FC9BC; --dim:#4A8578;
+    --cyan:#00F0B5; --magenta:#B24DFF; --violet:#2ED9FF; --amber:#F7E7CE; --green:#00F0B5; --grid:rgba(0,240,181,.05); }
+  html[data-theme="klein"]{ --bg:#050818; --bg2:#0a1030; --panel:rgba(14,24,64,.80); --panel-solid:#0e1840;
+    --line:rgba(58,90,255,.24); --line2:rgba(58,90,255,.38); --ink:#E8ECFF; --sub:#8B9AD6; --dim:#5560A0;
+    --cyan:#3A5AFF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --grid:rgba(58,90,255,.05); }
+  html[data-theme="coral"]{ --bg:#1a0a0e; --bg2:#2e1218; --panel:rgba(54,22,28,.80); --panel-solid:#361620;
+    --line:rgba(255,111,97,.24); --line2:rgba(255,111,97,.38); --ink:#FFEDE8; --sub:#D6A19A; --dim:#92615A;
+    --cyan:#FF6F61; --magenta:#FF4D8D; --violet:#00D4C0; --amber:#FFB84D; --green:#5FE0B0; --grid:rgba(255,111,97,.05); }
+  html[data-theme="lagoon"]{ --bg:#061412; --bg2:#0c2622; --panel:rgba(14,44,40,.78); --panel-solid:#0e2c28;
+    --line:rgba(136,216,192,.26); --line2:rgba(136,216,192,.4); --ink:#EAFBF6; --sub:#8FC9BC; --dim:#5A8578;
+    --cyan:#4DD4B8; --magenta:#FD6E53; --violet:#FF6FA5; --amber:#FFC97A; --green:#4DD4B8; --grid:rgba(136,216,192,.05); }
+  html[data-theme="dusk"]{ --bg:#0a0e16; --bg2:#141c2a; --panel:rgba(26,36,54,.80); --panel-solid:#1a2436;
+    --line:rgba(122,146,190,.24); --line2:rgba(122,146,190,.38); --ink:#EAF0FB; --sub:#9AAAC9; --dim:#647085;
+    --cyan:#7A92BE; --magenta:#FF8A6E; --violet:#A9BEE8; --amber:#F7E7CE; --green:#6ED0B0; --grid:rgba(122,146,190,.05); }
+  html[data-theme="rose"]{ --bg:#14100f; --bg2:#241c1a; --panel:rgba(44,34,32,.80); --panel-solid:#2c2220;
+    --line:rgba(201,173,161,.24); --line2:rgba(201,173,161,.4); --ink:#F7EEEA; --sub:#C2A79E; --dim:#8A7168;
+    --cyan:#C9ADA1; --magenta:#C25B72; --violet:#6E7FA0; --amber:#E0B87A; --green:#8FB0A0; --grid:rgba(201,173,161,.05); }
+  html[data-theme="sunset"]{ --bg:#180a12; --bg2:#2c1020; --panel:rgba(52,18,36,.80); --panel-solid:#341024;
+    --line:rgba(253,94,83,.24); --line2:rgba(253,94,83,.38); --ink:#FFEBED; --sub:#D6A0A8; --dim:#925A66;
+    --cyan:#FD5E53; --magenta:#FF3C8E; --violet:#B24DFF; --amber:#FFB04D; --green:#5FE0B0; --grid:rgba(253,94,83,.05); }
+
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{overscroll-behavior:none}
+  body{font-family:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
+    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:100dvh;
+    background-image:radial-gradient(ellipse 60% 50% at 50% 0%,color-mix(in srgb,var(--violet) 14%,transparent),transparent 70%);transition:background .3s}
+  /* 背景细网格(与前台一致的赛博感) */
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 55%,transparent 100%)}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 18px 60px;position:relative;z-index:1}
+  .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);
+    border:1px solid var(--line);border-radius:16px}
+  a{color:var(--cyan)}
+
+  /* ===== 登录 ===== */
+  #auth{min-height:100vh;min-height:100dvh;display:none;align-items:center;justify-content:center;padding:20px;position:relative;z-index:1}
+  #auth.show{display:flex}
+  /* 首屏验证登录态遮罩: 避免已登录用户看到登录框闪现 */
+  #authBoot{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;position:relative;z-index:2}
+  #authBoot.hide{display:none}
+  #authBoot .ab-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--cyan);animation:abspin .8s linear infinite}
+  #authBoot .ab-txt{font-size:13px;color:var(--sub);letter-spacing:.5px}
+  @keyframes abspin{to{transform:rotate(360deg)}}
+  .auth-card{width:min(420px,92vw);padding:36px 30px;position:relative;overflow:hidden;animation:pop .4s cubic-bezier(.2,.9,.3,1.3)}
+  .auth-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1px;
+    background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
+  .auth-logo{text-align:center;font-size:11px;letter-spacing:6px;color:var(--cyan);font-weight:600;margin-bottom:4px}
+  .auth-card h1{font-size:25px;font-weight:800;letter-spacing:1px;text-align:center;
+    background:linear-gradient(120deg,var(--ink),var(--cyan) 45%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .auth-card .sub{text-align:center;color:var(--sub);font-size:12.5px;margin:8px 0 24px}
+  .fld{display:block;margin-bottom:15px}
+  .fld span{display:block;font-size:12px;color:var(--dim);margin-bottom:7px;letter-spacing:.5px}
+  .fld input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(10,12,24,.55);
+    color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
+  .fld input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 12%,transparent)}
+  .btn{width:100%;padding:13px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:2px;
+    cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--violet));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 22%,transparent)}
+  .btn:hover{transform:translateY(-2px)} .btn:active{transform:translateY(0) scale(.99)} .btn:disabled{opacity:.55;cursor:wait;transform:none}
+  .err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:8px;text-align:center}
+  .auth-note{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6;text-align:center}
+
+  /* ===== 顶栏 ===== */
+  #panel{display:none}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .top h1{font-size:21px;font-weight:800;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+  .top h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  .top .who{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sub)}
+  .icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel);color:var(--sub);transition:.15s;user-select:none;position:relative}
+  .icon-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .logout{cursor:pointer;color:var(--dim);border:1px solid var(--line);padding:7px 13px;border-radius:9px;transition:.15s;font-size:12.5px}
+  .logout:hover{color:var(--magenta);border-color:var(--magenta)}
+  .badge-super,.badge-normal{font-size:10px;padding:2px 9px;border-radius:6px;font-weight:600}
+  .badge-super{background:color-mix(in srgb,var(--magenta) 16%,transparent);color:var(--magenta)}
+  .badge-normal{background:color-mix(in srgb,var(--sub) 16%,transparent);color:var(--sub)}
+  /* 皮肤菜单 */
+  .skin-menu{position:absolute;top:44px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:13px;
+    padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 16px 44px rgba(0,0,0,.55);min-width:150px}
+  .skin-menu.on{display:flex}
+  .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.12s}
+  .skin-opt:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+  .skin-opt.active{color:var(--ink)}
+  .skin-opt .sw{width:13px;height:13px;border-radius:50%;flex:0 0 auto}
+  .skin-opt .ck{margin-left:auto;opacity:0;color:var(--cyan)}
+  .skin-opt.active .ck{opacity:1}
+
+  /* ===== tabs ===== */
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--sub);
+    cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  .tab.on{background:var(--violet);color:#fff;border-color:var(--violet);box-shadow:0 6px 18px color-mix(in srgb,var(--violet) 30%,transparent)}
+  .tab:not(.on):hover{border-color:var(--cyan);color:var(--cyan)}
+  .page{display:none;animation:fade .25s ease} .page.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+
+  /* ===== KPI ===== */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{padding:16px 18px;border-radius:14px;position:relative;overflow:hidden;transition:.2s;--kc:var(--cyan)}
+  .kpi:hover{transform:translateY(-3px);border-color:var(--kc)}
+  .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc);opacity:.85}
+  .kpi .ic{font-size:17px;opacity:.9}
+  .kpi .n{font-size:27px;font-weight:800;color:var(--kc);line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:11.5px;color:var(--sub);margin-top:3px}
+  /* ★ 可点击的 KPI(看详情) */
+  .kpi.clickable{cursor:pointer}
+  .kpi.clickable::before{content:"→";position:absolute;right:14px;top:14px;font-size:13px;color:var(--kc);opacity:0;transition:.2s}
+  .kpi.clickable:hover::before{opacity:.7}
+  .kpi.clickable:active{transform:translateY(-1px) scale(.99)}
+
+  /* ===== ★ KPI 详情弹层 ===== */
+  .detail-modal{width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;padding:0;overflow:hidden;animation:pop .28s cubic-bezier(.2,.9,.3,1.3)}
+  .dm-head{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .dm-title{font-size:15px;font-weight:800;flex:1}
+  .dm-close{width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
+    cursor:pointer;font-size:15px;transition:.15s;flex-shrink:0;display:grid;place-items:center}
+  .dm-close:hover{border-color:var(--magenta);color:var(--magenta)}
+  .dm-body{padding:14px 20px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+  .dm-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;background:rgba(10,12,24,.4);margin-bottom:7px}
+  .dm-item .av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;flex-shrink:0;background:rgba(120,140,220,.1)}
+  .dm-item .main{flex:1;min-width:0}
+  .dm-item .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dm-item .sub{font-size:11px;color:var(--dim);margin-top:2px}
+  .dm-item .tail{font-size:11px;color:var(--sub);flex-shrink:0;text-align:right}
+
+  /* ===== card / table ===== */
+  .card{padding:18px;border-radius:14px;margin-bottom:16px}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .card h3 .hint{font-size:11px;color:var(--dim);font-weight:400}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:11px;letter-spacing:.3px}
+  td{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+  .roomrow{cursor:pointer;transition:.12s}
+  .roomrow:hover td{background:color-mix(in srgb,var(--cyan) 7%,transparent)}
+  .roomrow td:first-child{border-radius:8px 0 0 8px}.roomrow td:last-child{border-radius:0 8px 8px 0}
+  .k-tag{font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600}
+  .k-official{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
+  .k-public{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}
+  .k-private{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
+  .k-arch{background:color-mix(in srgb,var(--sub) 12%,transparent);color:var(--dim)}
+  .msgline{padding:9px 11px;border-radius:9px;background:rgba(10,12,24,.4);margin-bottom:6px;font-size:12.5px}
+  .msgline .mm-nm{font-weight:700}
+  .msgline .mm-tm{font-size:10px;color:var(--dim);margin-left:8px}
+  .mini-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
+    font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
+  .mini-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .mini-btn.danger:hover{border-color:var(--magenta);color:var(--magenta)}
+  .inline-form{display:flex;gap:8px;flex-wrap:wrap}
+  .inline-form input{flex:1;min-width:160px;padding:10px 13px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.55);
+    color:var(--ink);font-family:inherit;font-size:14px;outline:none;transition:.15s}
+  .inline-form input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
+  .empty{color:var(--dim);font-size:12.5px;padding:26px;text-align:center}
+  /* 互动管理卡 */
+  .ix-card{border:1px solid var(--line2);border-radius:12px;padding:12px;margin-bottom:12px;background:rgba(10,12,24,.4)}
+  .ix-row,.ix-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ix-row2{margin-top:8px}
+  .ix-fxrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .ix-in{background:var(--panel);border:1px solid var(--line2);border-radius:8px;color:var(--ink);padding:7px 10px;font-size:13px;font-family:inherit}
+  .ix-in:focus{outline:none;border-color:var(--cyan)}
+  .ix-emoji{width:52px;text-align:center;font-size:16px}
+  .ix-fxin{background:var(--panel);border:1px solid var(--line2);border-radius:7px;color:var(--ink);padding:5px 8px;font-size:12px;width:120px;font-family:inherit}
+  .ix-chk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);cursor:pointer;user-select:none}
+  .ix-chk input{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer}
+  .note-box{font-size:12.5px;color:var(--sub);line-height:1.9}
+  .note-box b{color:var(--ink)}
+
+  /* ===== 灵魂工坊 ===== */
+  .sw-souls{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+  .sw-soul{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,12,24,.4)}
+  .sw-soul .av{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;flex-shrink:0}
+  .sw-soul .info{flex:1;min-width:0}
+  .sw-soul .nm{font-weight:700;font-size:14px}
+  .sw-soul .meta{font-size:11px;color:var(--dim);margin-top:2px}
+  .sw-soul .ops{display:flex;gap:6px;flex-wrap:wrap}
+  .sw-switch{position:relative;width:42px;height:23px;border-radius:12px;background:var(--line2);cursor:pointer;transition:.2s;flex-shrink:0}
+  .sw-switch.on{background:var(--green)}
+  .sw-switch::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s}
+  .sw-switch.on::after{left:21px}
+  .persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+  .persona-card{padding:14px;border-radius:13px;border:1.5px solid var(--line2);background:rgba(10,12,24,.4);cursor:pointer;transition:.18s}
+  .persona-card:hover{border-color:var(--cyan);transform:translateY(-2px)}
+  .persona-card.sel{border-color:var(--pc);box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 18%,transparent)}
+  .persona-card .pc-ic{font-size:28px;margin-bottom:6px}
+  .persona-card .pc-nm{font-weight:700;font-size:14px;color:var(--pc)}
+  .persona-card .pc-tag{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4}
+  .persona-card .pc-traits{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .persona-card .pc-traits span{font-size:9px;padding:2px 7px;border-radius:5px;background:color-mix(in srgb,var(--pc) 14%,transparent);color:var(--pc)}
+  .sw-form{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+  .sw-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .sw-fld{flex:1;min-width:120px}
+  .sw-fld label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:5px;font-weight:600}
+  .sw-fld input[type=text],.sw-fld input[type=number],.sw-fld textarea{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.55);color:var(--ink);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box}
+  .sw-fld input:focus,.sw-fld textarea:focus{border-color:var(--cyan)}
+  .sw-fld textarea{resize:vertical;line-height:1.6}
+  .sw-caps{display:flex;gap:8px;flex-wrap:wrap}
+  .sw-cap{padding:7px 14px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12.5px;transition:.15s;user-select:none}
+  .sw-cap.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+  /* 风格标签选择器 */
+  .style-chips{display:flex;flex-direction:column;gap:7px}
+  .sc-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .sc-gl{font-size:11px;color:var(--dim);flex:0 0 56px}
+  .sc-tag{padding:4px 11px;border-radius:14px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12px;transition:.13s;user-select:none}
+  .sc-tag:hover{border-color:var(--violet);color:var(--ink)}
+  .sc-tag.on{border-color:var(--violet);color:#fff;background:color-mix(in srgb,var(--violet) 30%,transparent)}
+  .sw-range{display:flex;align-items:center;gap:10px}
+  .sw-range input[type=range]{flex:1;accent-color:var(--violet)}
+  .sw-range .val{font-size:12px;color:var(--violet);font-weight:700;min-width:54px;text-align:right}
+  .sw-preview{margin-top:16px;padding:14px;border-radius:12px;background:rgba(10,12,24,.5);border:1px solid var(--line)}
+  .sw-preview .pv-out{margin-top:10px;padding:11px 13px;border-radius:10px;background:color-mix(in srgb,var(--violet) 8%,transparent);border:1px solid color-mix(in srgb,var(--violet) 25%,transparent);font-size:13px;line-height:1.6;color:var(--ink);min-height:20px;white-space:pre-wrap}
+  .sw-preview .pv-out.dim{color:var(--dim)}
+  .sw-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .sw-btn{padding:11px 22px;border-radius:11px;border:none;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:.18s}
+  .sw-btn.primary{background:linear-gradient(120deg,var(--violet),var(--magenta));color:#fff}
+  .sw-btn.ghost{background:none;border:1px solid var(--line2);color:var(--sub)}
+  .sw-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ===== 骨架屏 ===== */
+  .sk{position:relative;overflow:hidden;background:rgba(120,140,220,.08);border-radius:8px}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cyan) 10%,transparent),transparent);animation:shim 1.3s infinite}
+  @keyframes shim{100%{transform:translateX(100%)}}
+  .sk-kpi{height:88px;border-radius:14px}
+  .sk-row{height:38px;margin-bottom:6px}
+
+  /* ===== 确认弹层 ===== */
+  .mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+  .mask.on{display:flex}
+  .confirm{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;animation:pop .28s cubic-bezier(.2,.9,.3,1.3)}
+  .confirm .ct{font-size:17px;font-weight:800;margin-bottom:10px}
+  .confirm .cm{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .confirm .cbtns{display:flex;gap:10px}
+  .confirm button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
+  .cf-no{background:rgba(10,12,24,.5);color:var(--sub)}
+  .cf-no:hover{color:var(--ink)}
+  .cf-yes{background:linear-gradient(120deg,var(--magenta),var(--violet));color:#fff;border:none}
+  .cf-yes:hover{transform:translateY(-1px)}
+
+  #toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);z-index:90;
+    background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;padding:11px 20px;font-size:13px;max-width:90vw;
+    transition:.4s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;white-space:normal;line-height:1.5;text-align:center}
+  #toast.on{transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:600px){
+    .wrap{padding:16px 12px 50px}
+    /* 砍列只针对房间表(隐藏"创建时间"), 不再全局误伤管理员"操作"列/主题mono列/BGM wave列 */
+    .rooms-table th:nth-child(4),.rooms-table td:nth-child(4){display:none}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px}
+    .kpi .n{font-size:23px}
+    /* 触摸目标提到 ≥40px */
+    .icon-btn{width:40px;height:40px}
+    .mini-btn{padding:9px 14px;min-height:40px}
+    .tab{padding:11px 16px;min-height:42px}
+    /* 极小字号在手机上提到可读(时间戳/tag/key 原 9-10px 几乎看不清) */
+    .k-tag,.mm-tm,.txt-row-key,.persona-card .pc-traits span{font-size:11px !important}
+    th{font-size:12px}
+    /* iOS 输入框聚焦不缩放: 可编辑 input 提到 16px */
+    .txt-row-input,table input[type=text],table input:not([type]){font-size:16px !important}
+  }
+  /* 分组折叠文案表 */
+  .txt-group{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;overflow:hidden}
+  .txt-grp-head{padding:10px 12px;cursor:pointer;user-select:none;background:rgba(255,255,255,.02);font-size:13px;display:flex;align-items:center;gap:6px}
+  .txt-grp-head:hover{background:rgba(255,255,255,.05)}
+  .txt-grp-caret{color:var(--cyan);font-size:11px;width:12px;display:inline-block}
+  .txt-grp-cnt{color:var(--dim);font-size:11px;margin-left:2px}
+  .txt-grp-reset{margin-left:auto}
+  .txt-grp-body{padding:8px 12px 12px}
+  .txt-row{margin-bottom:11px}
+  .txt-row-label{font-size:12px;color:var(--sub);margin-bottom:3px}
+  .txt-row-key{color:var(--dim);font-family:monospace;font-size:10px;margin-left:5px;opacity:.6}
+  .txt-row-input{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;box-sizing:border-box}
+  .txt-row-def{font-size:10.5px;color:var(--dim);margin-top:3px;padding-left:2px}
+
+  /* ===== ★ 兼容性兼底: 旧浏览器(Safari<16.2/Chrome<111/老安卓)不支持 color-mix 时的降级 ===== */
+  /* 不支持 color-mix 时, 上面那些 color-mix 值会整个失效(背景/阴影/边框变无)。
+     这里用 cyber 默认主题的预算 rgba 近似值兼底关键元素, 保障旧设备上仍可读可用。*/
+  @supports not (background: color-mix(in srgb, red, blue)){
+    .badge-super{background:rgba(255,60,172,.16)}
+    .badge-normal{background:rgba(152,163,199,.16)}
+    .tab.on{box-shadow:0 6px 18px rgba(139,92,255,.3)}
+    .roomrow:hover td{background:rgba(40,230,216,.07)}
+    .k-official{background:rgba(40,230,216,.15)}
+    .k-public{background:rgba(77,227,138,.15)}
+    .k-private{background:rgba(255,60,172,.15)}
+    .k-arch{background:rgba(152,163,199,.12)}
+    .sw-cap.on{background:rgba(40,230,216,.1)}
+    .persona-card .pc-traits span{background:rgba(139,92,255,.14)}
+    .sw-preview .pv-out{background:rgba(139,92,255,.08);border:1px solid rgba(139,92,255,.25)}
+    .btn{box-shadow:0 8px 30px rgba(40,230,216,.22)}
+    .fld input:focus,.inline-form input:focus{box-shadow:0 0 0 3px rgba(40,230,216,.12)}
+    .persona-card.sel{box-shadow:0 0 0 3px rgba(139,92,255,.18)}
+    body{background-image:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(139,92,255,.14),transparent 70%)}
+    .sk::after{background:linear-gradient(90deg,transparent,rgba(40,230,216,.1),transparent)}
+  }
+  /* ★ 不支持 mask-composite 时: 登录卡渐变边框降级为普通细边框(避免变实心色块) */
+  @supports not ((-webkit-mask-composite: xor) or (mask-composite: exclude)){
+    .auth-card::before{background:none;border:1px solid var(--line2);padding:0;-webkit-mask:none;mask:none;opacity:1}
+  }
+  /* ★ 不支持 backdrop-filter 时: .glass 降级为不透明实色面板(避免内容透出难读) */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+    .glass{background:var(--panel-solid)}
+    .mask{background:rgba(4,6,12,.9)}
+  }
+
+  /* ===== ★ 移动端适配强化 ===== */
+  @media(max-width:600px){
+    .top h1{font-size:18px}
+    .tabs{gap:6px;margin-bottom:14px}
+    .tab{padding:8px 12px;font-size:12px}
+    .card{padding:14px}
+    table{font-size:12px}
+    th,td{padding:8px 6px}
+    .sw-soul{flex-wrap:wrap}
+    .persona-grid{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:380px){
+    .kpis{grid-template-columns:1fr 1fr;gap:8px}
+    .kpi{padding:13px 14px}
+    .kpi .n{font-size:21px}
+    .persona-grid{grid-template-columns:1fr}
+  }
+
+  /* ===== ★ 通用响应式增强: 表格横向溢出保护 + 全局兜底 ===== */
+  /* 所有 table 默认横向可滚, 防主题变量表(800px)/管理员表撑破父容器 */
+  .card > table, .card > div > table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  /* 平板竖屏(768-900) tabs 更紧凑, 允许换行不挤 */
+  @media(max-width:900px){
+    .wrap{padding:20px 16px 56px}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  }
+  /* 手机窄屏(<=480px) tabs 改横向可滚 (换行两行占地方), 输入行不再最小 160 拆行 */
+  @media(max-width:480px){
+    .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:12px;padding-bottom:2px}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;white-space:nowrap;padding:8px 13px;font-size:12.5px}
+    .top{gap:8px}
+    .top h1{font-size:17px;flex-shrink:0}
+    .top .who{margin-left:auto;font-size:11.5px;gap:6px}
+    .inline-form input{min-width:0;flex:1 1 100%;font-size:16px}
+    .inline-form button{flex:1 1 100%}
+    .card h3{font-size:13px;flex-wrap:wrap;gap:6px}
+    .card h3 button, .card h3 .mini-btn{margin-top:2px}
+    /* KPI 一行两个改一行一个更好读 */
+    .kpis{grid-template-columns:1fr 1fr}
+    /* 详情弹层给足边距 */
+    .detail-modal{max-height:90vh}
+    .dm-head{padding:14px 16px}
+    .dm-body{padding:12px 16px 16px}
+  }
+  /* 超小屏 <=360 KPI 单列, 保证数字不换行 */
+  @media(max-width:360px){
+    .kpis{grid-template-columns:1fr}
+    .top h1{font-size:16px}
+    .top h1 .dot{width:7px;height:7px}
+  }
+</style>
+</head>
+<body>
+<script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+<div id="toast"></div>
+
+<!-- 登录 -->
+<div id="authBoot">
+  <div class="ab-spin"></div>
+  <div class="ab-txt">正在验证登录态…</div>
+</div>
+<div id="auth">
+  <div class="glass auth-card">
+    <div class="auth-logo">◢◤ CONSOLE ◢◤</div>
+    <h1>回声厅 · 后台</h1>
+    <div class="sub">管理员登录 · 与前台同一账号</div>
+    <div class="err" id="authErr"></div>
+    <label class="fld"><span>账号</span><input id="username" autocomplete="username" placeholder="用户名 或 邮箱"></label>
+    <label class="fld"><span>密码</span><input id="password" type="password" autocomplete="current-password" placeholder="密码"></label>
+    <button class="btn" id="authBtn">登 录</button>
+    <div class="auth-note">只有被设为管理员的账号能进入后台。<br>没有账号请先到前台注册。</div>
+  </div>
+</div>
+
+<!-- 面板 -->
+<div id="panel"><div class="wrap">
+  <div class="top">
+    <h1><span class="dot"></span>回声厅控制台</h1>
+    <div class="who">
+      <span id="whoName">—</span><span id="whoRole"></span>
+      <div class="icon-btn" id="skinBtn" title="皮肤">🎨<div class="skin-menu" id="skinMenu"></div></div>
+      <span class="logout" id="logoutBtn">退出</span>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab on" data-page="overview">概览</div>
+    <div class="tab" data-page="rooms">房间 & 聊天记录</div>
+    <div class="tab" data-page="theme">🎨 主题配色</div>
+    <div class="tab" data-page="bgm">🎵 BGM</div>
+    <div class="tab" data-page="songstyles">🎼 曲风</div>
+    <div class="tab" data-page="text">📝 文案 & 绑定</div>
+    <div class="tab" data-page="tuning">⚙️ 运行参数</div>
+    <div class="tab" data-page="audit">📋 操作日志</div>
+    <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
+  </div>
+
+  <div class="page on" id="p-overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="glass card"><h3>说明</h3>
+      <div class="note-box">
+        · 公开消息（官方 + 公开房）默认保留 <b>3 个月</b>，每天自动清理超期。<br>
+        · <b>普通管理员</b>只能查看公开房间记录；<b>超级管理员</b>可查看全站（含私密房）。<br>
+        · 私密房消息永久保留，不自动清理。
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="p-rooms">
+    <div class="glass card">
+      <h3>🔄 重建客户端缓存
+        <button class="mini-btn" id="purgeCacheBtn" style="border-color:var(--magenta);color:var(--magenta)">立即重建全端缓存</button>
+      </h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7">
+        · 在后台<b>删减/修改了聊天记录</b>（如清除违禁信息）后，点这里让所有客户端丢弃本地缓存、重新拉取最新数据。<br>
+        · 客户端有本地缓存（回房秒显快照 + localStorage 消息列表），不重建的话用户可能仍看到<b>已删的旧内容</b>。<br>
+        · 点击后所有在线/后续打开的客户端会在下次进入时<b>自动重建</b>，无需用户手动清缓存。
+        <span id="purgeCacheHint" style="color:var(--cyan)"></span>
+      </div>
+    </div>
+    <div class="glass card"><h3>房间列表 <span class="hint" id="roomsHint"></span></h3>
+      <div style="overflow-x:auto"><table class="rooms-table"><thead><tr><th>房间</th><th>类型</th><th>状态</th><th>创建时间</th><th>灵魂</th></tr></thead><tbody id="roomsTbody"></tbody></table></div>
+    </div>
+    <div class="glass card" id="msgCard" style="display:none"><h3><span id="msgTitle">聊天记录</span><button class="mini-btn" id="msgBack">← 返回列表</button></h3>
+      <div id="msgList"></div>
+    </div>
+    <div class="glass card" id="soulCard" style="display:none"><h3><span id="soulTitle">灵魂工坊</span><button class="mini-btn" id="soulBack">← 返回列表</button></h3>
+      <div id="soulWorkshop"></div>
+    </div>
+  </div>
+
+  <!-- 🎨 主题配色 -->
+  <div class="page" id="p-theme">
+    <div class="glass card"><h3>十套主题配色 · 每套 17 个 CSS 变量
+      <button class="mini-btn" id="themeSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存所有主题</button> <button class="mini-btn" id="themeResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
+        · 修改后先点「保存」写入 Supabase eh_config → 前端启动时拉取覆盖默认值<br>
+        · 主题ID 固定(cyber/vapor/aurora/mono/klein/coral/lagoon/dusk/rose/sunset) · 键名不可改 · 值支持 #hex / rgba(...) / 阴影表达式
+      </div>
+      <div id="themeTable"></div>
+      <div style="margin-top:16px;padding:14px;border-radius:12px;background:rgba(10,12,24,.4);font-size:12px;color:var(--sub)">
+        💡 预览:<span id="themePreviewBox" style="display:inline-block;width:80px;height:24px;border-radius:6px;margin-left:8px;vertical-align:middle;background:var(--cyan)"></span>
+        <select id="themePreviewSel" style="margin-left:12px;padding:5px 10px;border-radius:8px;background:rgba(10,12,24,.6);color:var(--ink);border:1px solid var(--line2);font-family:inherit;font-size:12px">
+          <option value="cyber">cyber 赛博霓虹</option><option value="vapor">vapor 蒸汽波</option>
+          <option value="mono">mono 暗夜极简</option><option value="aurora">aurora 极光渐变</option>
+        </select>
+        选主题看当前 --cyan 效果
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎵 BGM -->
+  <div class="page" id="p-bgm">
+    <div class="glass card"><h3>官方房 BGM 氛围参数
+      <button class="mini-btn" id="bgmSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存 BGM</button> <button class="mini-btn" id="bgmResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px">
+        · root:根音Hz(20-2000) · chord:和弦半音程(逗号分隔如 0,4,7,11) · wave:波形 · pulse:律动ms(0=纯pad) · cut:低通截止Hz
+      </div>
+      <div id="bgmTable"></div>
+    </div>
+  </div>
+
+
+  <div class="page" id="p-songstyles">
+    <div class="glass card">
+      <h3>🎼 曲风池管理</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">编辑曲风名字、副标题、颜色、emoji、音乐参数, 拖 ≡ 手柄可调整顺序。前端神曲面板会按此顺序展示。改后点「保存」。</p>
+      <div id="songStylesList"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="mini-btn" id="ssAddBtn" style="border-color:var(--cyan);color:var(--cyan)">+ 新增曲风</button>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" id="ssSaveBtn">保存曲风池</button>
+        <button class="mini-btn" id="ssResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 全部恢复默认</button>
+      </div>
+    </div>
+
+    <div class="glass card">
+      <h3>👊 互动管理</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">点头像「对TA」菜单里的互动(打一拳/送花/撒花等)。特效由 fx 参数组合: 勾选震动/闪屏/抖动/飞行物/撒射/纸屑雨/光环 + 音效。改后点「保存」。</p>
+      <div id="ixList"></div>
+      <div style="margin-top:10px"><button class="mini-btn" id="ixAddBtn" style="border-color:var(--cyan);color:var(--cyan)">+ 新增互动</button></div>
+    </div>
+
+    <div class="glass card">
+      <h3>🎤 真人清唱风味池</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">真人发清唱时, worker 从这里随机挑一种唱腔(灵魂清唱用各自人设唱腔, 不受此影响)。每行一种, 用自然语言描述, 如"东北话腔调, 豪爽带点搞笑"。改后点保存, worker 30 秒内生效。留空则用代码默认池。</p>
+      <textarea id="humanSingTa" rows="7" style="width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:10px;color:var(--ink);padding:10px;font-size:13px;font-family:inherit;line-height:1.7" placeholder="每行一种唱腔…"></textarea>
+      <div style="margin-top:10px"><button class="btn" id="humanSingSave">保存风味池</button></div>
+    </div>
+  </div>
+
+  <!-- 📝 文案 & 绑定 -->
+  <div class="page" id="p-text">
+    <div class="glass card"><h3>官方房主题绑定
+      <button class="mini-btn" id="bindSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存绑定</button> <button class="mini-btn" id="bindResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">房间进入时自动应用该主题(用户未手动锁定时)</div>
+      <div id="roomThemeTable"></div>
+    </div>
+    <div class="glass card"><h3>官方房兜底强调色</h3>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">卡片左边框强调色(DB 未存则用此兜底)</div>
+      <div id="fallbackCTable"></div>
+    </div>
+    <div class="glass card"><h3>界面文案
+      <button class="mini-btn" id="textSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存文案</button> <button class="mini-btn" id="textResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div id="textSearch" style="margin-bottom:10px"><input id="textSearchInput" placeholder="🔍 搜索文案(中文标签/key/内容)" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none"></div>
+      <div id="textTable"></div>
+    </div>
+
+    <div class="glass card"><h3>🎭 身份随机池(匿名昵称生成)
+      <button class="mini-btn" id="poolSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存身份池</button> <button class="mini-btn" id="poolResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <div style="color:var(--dim);font-size:11.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匹名。每个词用逗号分隔,保存后立即生效。</div>
+      <div id="poolPanel"></div>
+    </div>
+  </div>
+
+  <div class="page" id="p-tuning">
+    <div class="glass card">
+      <h3>⚙️ 运行参数</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">改后点「保存」写入 eh_config，前端启动 loadRemoteConfig 拉取覆盖默认值（无需改代码）。留空/非法则用默认。</p>
+      <div id="tuningTable"></div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" id="tuningSaveBtn">保存运行参数</button>
+        <button class="mini-btn" id="tuningResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 全部恢复默认</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="p-audit">
+    <div class="glass card">
+      <h3>📋 全站日志
+        <button class="mini-btn" id="auditRefreshBtn" style="border-color:var(--cyan);color:var(--cyan);font-size:11px;padding:3px 10px">↻ 刷新</button>
+      </h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
+        合并展示后台配置日志与前台用户行为日志。后台日志 scope=admin, 前台行为 scope=user；发言内容不重复记录, 直接看聊天记录表。
+        配置保存/回滚类日志可点「↩ 恢复到变更前」。
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px">
+        <select id="auditScope" style="padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.85);color:var(--ink)">
+          <option value="">全部 scope</option><option value="admin">admin 后台</option><option value="user">user 前台</option>
+        </select>
+        <select id="auditTag" style="padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.85);color:var(--ink)">
+          <option value="">全部 tag</option>
+          <option value="config_update">config_update 配置保存</option><option value="config_rollback">config_rollback 配置回滚</option>
+          <option value="room_create">room_create 建房</option><option value="room_dissolve">room_dissolve 解散房间</option>
+          <option value="member_kick">member_kick 踢人</option><option value="room_update">room_update 改房间设置</option>
+          <option value="room_enter">room_enter 进房</option><option value="room_leave">room_leave 离房</option>
+        </select>
+      </div>
+      <div id="auditList" style="max-height:70vh;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <div class="page" id="p-admins">
+    <div class="glass card"><h3>任命管理员</h3>
+      <div class="inline-form">
+        <input id="newAdminUser" placeholder="对方的前台用户名" autocomplete="off">
+        <button class="mini-btn" id="addAdminBtn">设为管理员</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:10px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
+    </div>
+    <div class="glass card"><h3>管理员列表</h3>
+      <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 确认弹层 -->
+<div class="mask" id="cmask"><div class="glass confirm">
+  <div class="ct" id="ctitle">确认操作</div><div class="cm" id="cmsg"></div>
+  <div class="cbtns"><button class="cf-no" id="cno">取消</button><button class="cf-yes" id="cyes">确定</button></div>
+</div></div>
+
+<!-- ★ KPI 详情弹层 -->
+<div class="mask" id="dmask"><div class="glass detail-modal">
+  <div class="dm-head"><span class="dm-title" id="dmTitle">详情</span><button class="dm-close" id="dmClose">✕</button></div>
+  <div class="dm-body" id="dmBody"></div>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SB_URL='https://cddkniwbhvcbfgkgomtl.supabase.co';
+const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY';
+const FN=SB_URL+'/functions/v1/eh-admin-api';
+const AUTH_FN=SB_URL+'/functions/v1/eh-auth';
+const sb=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true}});
+const $=s=>document.querySelector(s);
+const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeColor=(c,def='#98A3C7')=>(typeof c==='string'&&/^#[0-9a-fA-F]{3,8}$/.test(c))?c:def;
+const safeEmoji=e=>esc((e||'').slice(0,8));
+let meAdmin=null;
+
+let toastT;
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+// 赛博确认弹层(替代原生 confirm)
+function confirmBox(msg,title){
+  return new Promise(res=>{
+    $('#ctitle').textContent=title||'确认操作'; $('#cmsg').textContent=msg; $('#cmask').classList.add('on');
+    const done=v=>{ $('#cmask').classList.remove('on'); $('#cyes').onclick=$('#cno').onclick=null; res(v); };
+    $('#cyes').onclick=()=>done(true); $('#cno').onclick=()=>done(false);
+    $('#cmask').onclick=e=>{ if(e.target===$('#cmask')) done(false); };
+  });
+}
+
+// ===== 皮肤(与前台共用 localStorage eh_theme) =====
+const SKINS=[['cyber','赛博夜城','#00E5D4'],['vapor','迈阿密日落','#C77DFF'],['aurora','极光迷幻','#00F0B5'],['mono','暗夜奢华','#F5D06A'],['klein','克莱因之夜','#3A5AFF'],['coral','珊瑚热恋','#FF6F61'],['lagoon','湖水迷情','#4DD4B8'],['dusk','远山暮色','#7A92BE'],['rose','莫兰迪玫瑰','#C9ADA1'],['sunset','日暮狂欢','#FD5E53']];
+function curTheme(){ try{ return localStorage.getItem('eh_theme')||'cyber'; }catch(e){ return 'cyber'; } }
+function applyTheme(id){ if(id==='cyber') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',id);
+  try{ localStorage.setItem('eh_theme',id); }catch(e){} renderSkinMenu(); }
+function renderSkinMenu(){ const cur=curTheme();
+  $('#skinMenu').innerHTML=SKINS.map(([id,nm,c])=>`<div class="skin-opt${id===cur?' active':''}" data-skin="${id}"><span class="sw" style="background:${c}"></span>${nm}<span class="ck" style="color:${c}">✓</span></div>`).join('');
+  $('#skinMenu').querySelectorAll('.skin-opt').forEach(el=>el.onclick=e=>{ e.stopPropagation(); applyTheme(el.dataset.skin); }); }
+$('#skinBtn').onclick=e=>{ e.stopPropagation(); $('#skinMenu').classList.toggle('on'); };
+document.addEventListener('click',()=>$('#skinMenu').classList.remove('on'));
+
+// 调 eh-admin-api，带当前 Supabase 登录 token
+async function api(path,{method='GET',body}={}){
+  const { data:{ session } } = await sb.auth.getSession();
+  const headers={'Content-Type':'application/json'};
+  if(session?.access_token) headers['Authorization']='Bearer '+session.access_token;
+  const r=await fetch(FN+path,{method,headers,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  return {ok:r.ok,status:r.status,body:j};
+}
+
+// 登录
+async function doAuth(){
+  const account=$('#username').value.trim(), password=$('#password').value;
+  $('#authErr').textContent='';
+  if(!account||!password){ $('#authErr').textContent='请填写账号和密码'; return; }
+  const btn=$('#authBtn'); btn.disabled=true; const oldTxt=btn.textContent; btn.textContent='登 录 中…';
+  try{
+    const rz=await (await fetch(AUTH_FN+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account})})).json();
+    if(!rz.loginEmail){ $('#authErr').textContent='账号不存在'; return; }
+    const { error }=await sb.auth.signInWithPassword({ email:rz.loginEmail, password });
+    if(error){ $('#authErr').textContent='账号或密码错误'; return; }
+    const ok=await loadMe();
+    if(!ok){ $('#authErr').textContent='该账号没有后台权限'; await sb.auth.signOut(); return; }
+    enterPanel();
+  } catch(e){ $('#authErr').textContent='网络异常，请重试'; }
+  finally { btn.disabled=false; btn.textContent=oldTxt; }
+}
+
+function enterPanel(){
+  $('#authBoot').classList.add('hide'); $('#auth').classList.remove('show'); $('#auth').style.display='none';
+  $('#panel').style.display='block';
+  $('#whoName').textContent=meAdmin.username;
+  $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
+  $('#adminsTab').style.display=meAdmin.role==='super'?'block':'none';
+  renderSkinMenu();
+  loadOverview(); loadRooms();
+}
+
+async function loadMe(){
+  const res=await api('/me');
+  if(!res.ok) return false;
+  if(res.body.role!=='admin' && res.body.role!=='super') return false;
+  meAdmin={ uid:res.body.uid, username:res.body.username, role:res.body.role };
+  return true;
+}
+
+// ===== 概览(缓存 + 骨架屏) =====
+const KPI_META=[['users','用户','👥','var(--cyan)','users'],['rooms_official','官方频道','📡','var(--violet)','rooms:official'],
+  ['rooms_public','公开房','🌐','var(--green)','rooms:public'],['rooms_private','私密房','🔒','var(--magenta)','rooms:private'],
+  ['rooms_public_archived','已归档','🗄️','var(--sub)','rooms:archived'],['messages','消息总数','💬','var(--amber)','messages']];
+let statsCache=null;
+function paintKpis(s){
+  $('#kpis').innerHTML=KPI_META.map(([k,l,ic,c,dt])=>`<div class="glass kpi clickable" data-dt="${dt}" data-l="${l}" style="--kc:${c}"><div class="ic">${ic}</div><div class="n">${s[k]??'—'}</div><div class="l">${l}</div></div>`).join('');
+  $('#kpis').querySelectorAll('.kpi.clickable').forEach(el=>el.onclick=()=>openKpiDetail(el.dataset.dt, el.dataset.l));
+}
+async function loadOverview(){
+  if(statsCache) paintKpis(statsCache);                                  // 缓存秒显
+  else $('#kpis').innerHTML=Array(6).fill('<div class="sk sk-kpi"></div>').join('');  // 骨架屏
+  const res=await api('/stats'); if(!res.ok){ if(!statsCache) $('#kpis').innerHTML='<div class="empty">加载失败</div>'; return; }
+  statsCache=res.body; paintKpis(statsCache);
+}
+
+// ===== ★ KPI 点击看详情 =====
+const KIND_LABEL={official:'官方',public:'公开',private:'私密'};
+function openDetailMask(){ $('#dmask').classList.add('on'); }
+function closeDetailMask(){ $('#dmask').classList.remove('on'); }
+$('#dmClose').onclick=closeDetailMask;
+$('#dmask').onclick=e=>{ if(e.target===$('#dmask')) closeDetailMask(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('#dmask').classList.contains('on')) closeDetailMask(); });
+
+async function openKpiDetail(dt, label){
+  $('#dmTitle').textContent=label||'详情';
+  $('#dmBody').innerHTML=Array(5).fill('<div class="sk sk-row" style="height:46px"></div>').join('');
+  openDetailMask();
+  try{
+    if(dt==='users'){ await renderUsersDetail(); }
+    else if(dt==='messages'){ await renderMessagesDetail(); }
+    else if(dt && dt.startsWith('rooms:')){ await renderRoomsDetail(dt.split(':')[1]); }
+    else $('#dmBody').innerHTML='<div class="empty">暂无详情</div>';
+  }catch(e){ $('#dmBody').innerHTML='<div class="empty">加载出错</div>'; }
+}
+
+// 房间类 KPI: 复用 roomsCache(没缓存就拉 /rooms), 按类型/归档状态过滤
+async function renderRoomsDetail(seg){
+  let rooms=roomsCache;
+  if(!rooms){ const res=await api('/rooms'); if(!res.ok){ $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`; return; } rooms=roomsCache=res.body.rooms||[]; }
+  let list;
+  if(seg==='archived') list=rooms.filter(r=>r.kind==='public'&&r.archived);
+  else if(seg==='public') list=rooms.filter(r=>r.kind==='public'&&!r.archived);
+  else list=rooms.filter(r=>r.kind===seg);
+  $('#dmBody').innerHTML=list.map(r=>`<div class="dm-item">
+    <div class="av">${safeEmoji(r.emoji)||'💬'}</div>
+    <div class="main"><div class="nm">${esc(r.name)}</div>
+      <div class="sub">${KIND_LABEL[r.kind]||r.kind}${r.archived?' · 已归档':''}${r.topic?' · '+esc(r.topic):''}</div></div>
+    <div class="tail">${(r.created_at||'').slice(0,10)}</div></div>`).join('')||'<div class="empty">暂无数据</div>';
+}
+
+// 消息 KPI: 拉全站最近消息(super 不带 room_id 返回最近 N 条)
+async function renderMessagesDetail(){
+  const res=await api('/messages?limit=200');
+  if(!res.ok){ $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
+  const msgs=(res.body.messages||[]);
+  $('#dmBody').innerHTML=(msgs.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">全站最近 ${msgs.length} 条消息</div>`:'')+
+    msgs.map(m=>`<div class="dm-item">
+    <div class="av">${safeEmoji(m.emoji)||'💬'}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(m.color,'#EAF0FF')}">${esc(m.name)}
+      ${m.kind==='song'?'<span style="color:var(--magenta);font-size:9px"> 🎵</span>':''}${m.kind==='voice'?'<span style="color:var(--cyan);font-size:9px"> 🎙️</span>':''}${m.kind==='whisper'?'<span style="color:var(--amber);font-size:9px"> 🔒</span>':''}</div>
+      <div class="sub" style="white-space:normal;line-height:1.4">${voiceOrText(m)}</div></div>
+    <div class="tail">${(m.created_at||'').replace('T',' ').slice(5,16)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
+}
+
+// 用户 KPI: 调 /users(后端新增 route); 若后端未部署则友好提示
+async function renderUsersDetail(){
+  const res=await api('/users?limit=500');
+  if(!res.ok){
+    if(res.status===404) $('#dmBody').innerHTML='<div class="empty">用户明细接口未部署<br><span style="font-size:11px">后端 eh-admin-api 需新增 /users route</span></div>';
+    else $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`;
+    return;
+  }
+  const us=(res.body.users||[]);
+  $('#dmBody').innerHTML=(us.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">共 ${us.length} 位用户</div>`:'')+
+    us.map(u=>`<div class="dm-item">
+    <div class="av">${safeEmoji(u.emoji)||'👤'}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${esc(u.name)}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
+      <div class="sub">注册 ${(u.created_at||'').slice(0,10)}</div></div>
+    <div class="tail">${u.last_seen?('活跃 '+(u.last_seen||'').slice(5,10)):''}</div></div>`).join('')||'<div class="empty">暂无用户</div>';
+}
+
+// ===== 房间列表(缓存 + 骨架屏) =====
+let roomsCache=null;
+function paintRooms(rooms){
+  $('#roomsHint').textContent=meAdmin.role==='super'?'（超管：全站含私密）':'（仅公开房）';
+  $('#roomsTbody').innerHTML=rooms.map(r=>{
+    const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
+    const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
+    return `<tr class="roomrow" data-rid="${r.id}" data-nm="${esc(r.name)}">
+      <td>${safeEmoji(r.emoji)||''} ${esc(r.name)}</td>
+      <td><span class="k-tag k-${r.kind}">${kt}</span></td>
+      <td>${arch||'—'}</td>
+      <td>${(r.created_at||'').slice(0,10)}</td>
+      <td><button class="mini-btn soul-open" data-rid="${r.id}" data-nm="${esc(r.name)}" style="border-color:var(--violet);color:var(--violet)">🌟 工坊</button></td></tr>`;
+  }).join('')||'<tr><td colspan="5" class="empty">没有房间</td></tr>';
+  $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=(e)=>{ if(e.target.closest('.soul-open')) return; loadMessages(el.dataset.rid,el.dataset.nm); });
+  $('#roomsTbody').querySelectorAll('.soul-open').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openWorkshop(b.dataset.rid, b.dataset.nm); });
+}
+async function loadRooms(){
+  if(roomsCache) paintRooms(roomsCache);
+  else $('#roomsTbody').innerHTML='<tr><td colspan="5" style="padding:0;border:none">'+Array(4).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
+  const res=await api('/rooms'); if(!res.ok){ if(!roomsCache) $('#roomsTbody').innerHTML='<tr><td colspan="5" class="empty">加载失败</td></tr>'; return; }
+  roomsCache=res.body.rooms||[]; paintRooms(roomsCache);
+}
+
+// 语音/神曲消息渲染
+const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/eh-voice/';
+const SONG_STYLE_NAMES={dj:'DJ·烈焰红唇',jazz:'爵士·威士忌之吻',funk:'Funk·荧光心跳',gufeng:'古风·午夜绸缎',kid:'卡通·暧昧微醺',rnb:'R&B·冰霞柔情',shen:'神曲喊麦',disco:'迪斯科','8bit':'电玩',lofi:'慵懒Lo-Fi'};
+function voiceOrText(m){
+  const src=String(m.text||'');
+  if(m.kind==='voice' && src.startsWith(VOICE_URL_PREFIX))
+    return `<audio controls preload="none" style="height:30px;max-width:100%" src="${esc(src.split('#')[0])}"></audio>`;
+  if(m.kind==='song'){
+    const i=src.indexOf('|'), sid=i>0?src.slice(0,i):'';
+    const lyric=i>0 && SONG_STYLE_NAMES[sid]?src.slice(i+1):src;
+    const style=SONG_STYLE_NAMES[sid]?`<span style="color:var(--magenta)">[🎵${SONG_STYLE_NAMES[sid]}] </span>`:'';
+    return style+esc(lyric);
+  }
+  return esc(m.text);
+}
+async function loadMessages(rid,name){
+  $('#soulCard').style.display='none';   // 收起工坊卡, 避免与聊天记录卡同时展开
+  $('#msgCard').style.display='block'; $('#msgTitle').textContent='聊天记录 · '+name;
+  $('#msgList').innerHTML=Array(6).fill('<div class="sk sk-row" style="height:44px"></div>').join('');
+  $('#msgCard').scrollIntoView({behavior:'smooth'});
+  const res=await api('/messages?room_id='+encodeURIComponent(rid)+'&limit=500');
+  if(!res.ok){ $('#msgList').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
+  const msgs=(res.body.messages||[]).slice().reverse();
+  // 大列表用 fragment 一次性插入, 避免多次 reflow
+  const html=msgs.map(m=>`<div class="msgline">
+    <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji)||''} ${esc(m.name)}</span>
+    <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
+    ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
+    ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
+    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎙️语音</span>':''}
+    ${m.kind==='song'?'<span style="color:var(--magenta);font-size:10px"> 🎵神曲</span>':''}
+    <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('');
+  $('#msgList').innerHTML=html||'<div class="empty">这个房间还没有消息</div>';
+}
+$('#msgBack').onclick=()=>{ $('#msgCard').style.display='none'; };
+
+// ============================================================
+//  🌟 灵魂工坊 —— 5 原型卡 + 微调 + 试聊
+// ============================================================
+// TTS 内置音色(与网关 mimo-v2.5-tts 内置音色列表一致; 唱歌只能用内置音色)
+const TTS_VOICES=[
+  { id:'', label:'（跟人设默认）' },
+  { id:'冰糖', label:'冰糖 · 中文女声' },
+  { id:'茉莉', label:'茉莉 · 中文女声' },
+  { id:'苏打', label:'苏打 · 中文男声' },
+  { id:'白桦', label:'白桦 · 中文男声' },
+  { id:'mimo_default', label:'MiMo 默认' },
+  { id:'Mia', label:'Mia · 英文女声' },
+  { id:'Chloe', label:'Chloe · 英文女声' },
+  { id:'Milo', label:'Milo · 英文男声' },
+  { id:'Dean', label:'Dean · 英文男声' },
+];
+// 风格标签库(点选拼成指令; 与 mimo-v2.5-tts 支持的风格控制对齐)
+const STYLE_TAGS={
+  speak:[
+    { g:'基调', tags:['温柔','低沉磁性','活泼元气','慵懒','俏皮','严肃','干练','冷淡','深情'] },
+    { g:'情感', tags:['开心','平静','兴奋','委屈','疲惫','害羞'] },
+    { g:'音色', tags:['清亮','空灵','甜美','沙哑','圆润','气声多'] },
+    { g:'语速', tags:['语速偏快','慢半拍','句尾上扬'] },
+    { g:'角色/方言', tags:['御姐音','夹子音','大叔音','台湾腔','东北话','四川话','粤语'] },
+  ],
+  sing:[
+    { g:'基调', tags:['深情吟唱','慵懒','甜美俏皮','空灵','高亢','轻快跳跃'] },
+    { g:'唱腔', tags:['气声很多','R&B黏腻','耳语哼唱','尾音悠长','尾音上扬撒娇'] },
+    { g:'方言/角色', tags:['台湾腔','粤语','东北话','四川话','御姐音'] },
+  ],
+};
+// 渲染某类(speak/sing)的标签组; 已在当前值里的标签高亮
+function styleChipGroups(kind, curVal){
+  const cur=String(curVal||'');
+  return `<div class="style-chips" data-kind="${kind}">`+STYLE_TAGS[kind].map(grp=>
+    `<div class="sc-grp"><span class="sc-gl">${grp.g}</span>`+grp.tags.map(t=>
+      `<span class="sc-tag${cur.includes(t)?' on':''}" data-tag="${t}">${t}</span>`).join('')+`</div>`
+  ).join('')+`</div>`;
+}
+// persona 定义(与前端 eh-souls.default.js 对齐; 工坊只需展示用字段)
+const SW_PERSONAS=[
+  { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#B57EDC', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
+    caps:{voice:true,song:true,emoji:false}, welcomes:['来了啊，坐，这个点还醒着的都是自己人。','欢迎回到深夜频率，要不要我给你放一首？'] },
+  { id:'sunny', name:'小暖', emoji:'☀️', color:'#F7C873', tag:'元气妹 · 活泼秒回，爱发表情', traits:['元气','秒回','玩梗'],
+    caps:{voice:true,song:true,emoji:true}, welcomes:['哇你来啦！！等你好久了(才没有~) 😆','欢迎欢迎～快说说今天有什么好玩的！'] },
+  { id:'comedian', name:'老K', emoji:'🎭', color:'#FF6F61', tag:'段子手 · 毒舌但暖，反差萌', traits:['毒舌','整活','反差萌'],
+    caps:{voice:false,song:true,emoji:true}, welcomes:['哟，稀客。就差你没来了，现在齐活。','欢迎欢迎，本房笑点承包商已就位。'] },
+  { id:'listener', name:'回音', emoji:'🕳️', color:'#0ABAB5', tag:'树洞灵 · 极致共情，少评判', traits:['共情','倾听','不说教'],
+    caps:{voice:true,song:false,emoji:false}, welcomes:['你来了。这里很安全，想说什么都可以，不想说也没关系。','我在。你不用急着开口，我会一直在这儿。'] },
+  { id:'nerd', name:'图灵', emoji:'⚡', color:'#1DE9B6', tag:'知识控 · 理性爱科普，讲冷知识', traits:['理性','科普','冷知识'],
+    caps:{voice:false,song:false,emoji:false}, welcomes:['欢迎。今天想聊点什么——技术、脑洞，还是纯粹的冷知识？','新成员接入。有任何好奇的问题，随时问。'] },
+];
+const PERSONA_LABEL={night_dj:'深夜DJ',sunny:'元气妹',comedian:'段子手',listener:'树洞灵',nerd:'知识控',custom:'自定义'};
+const EMOTION_LABEL={calm:'平静',happy:'开心',caring:'关切',excited:'兴奋'};
+
+let swRoom=null;          // {id,name}
+let swEditing=null;       // 正在编辑的灵魂对象(新建时为草稿)
+let swSouls=[];           // 该房现有灵魂
+
+async function openWorkshop(rid,name){
+  swRoom={id:rid,name};
+  $('#msgCard').style.display='none';
+  $('#soulCard').style.display='block';
+  $('#soulTitle').textContent='🌟 灵魂工坊 · '+name;
+  $('#soulCard').scrollIntoView({behavior:'smooth'});
+  swEditing=null;
+  $('#soulWorkshop').innerHTML='<div class="sk sk-row" style="height:60px"></div>';
+  const res=await api('/souls?room_id='+encodeURIComponent(rid));
+  if(!res.ok){ $('#soulWorkshop').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`; return; }
+  swSouls=res.body.souls||[];
+  renderWorkshop();
+}
+$('#soulBack').onclick=()=>{ $('#soulCard').style.display='none'; swEditing=null; };
+
+function renderWorkshop(){
+  if(swEditing){ renderSoulForm(); return; }
+  // 列表视图: 现有灵魂 + 新建入口
+  let html='<div class="sw-souls">';
+  if(swSouls.length){
+    html+=swSouls.map(s=>{
+      const persona=PERSONA_LABEL[s.persona]||s.persona;
+      const emo=EMOTION_LABEL[s.emotion]||s.emotion;
+      return `<div class="sw-soul">
+        <div class="av" style="background:${s.color}22;color:${s.color};box-shadow:inset 0 0 0 1.5px ${s.color}">${safeEmoji(s.emoji)}</div>
+        <div class="info"><div class="nm" style="color:${s.color}">${esc(s.name)}</div>
+          <div class="meta">${persona} · 情绪:${emo} · 发言${s.msgs_sent||0}条 · 触发${s.triggers||0}次</div></div>
+        <div class="ops">
+          <button class="mini-btn" data-edit="${s.id}">编辑</button>
+          <button class="mini-btn danger" data-del="${s.id}">删除</button>
+        </div>
+        <div class="sw-switch ${s.enabled?'on':''}" data-toggle="${s.id}" title="${s.enabled?'已启用':'已停用'}"></div>
+      </div>`;
+    }).join('');
+  } else {
+    html+='<div class="empty">这个房间还没有灵魂居民。选一个原型，让它住进来 👇</div>';
+  }
+  html+='</div>';
+  html+='<h3 style="font-size:13px;color:var(--sub);margin:8px 0 4px">＋ 添加灵魂 · 选一个人格原型</h3>';
+  html+='<div class="persona-grid">'+SW_PERSONAS.map(p=>`
+    <div class="persona-card" data-persona="${p.id}" style="--pc:${p.color}">
+      <div class="pc-ic">${p.emoji}</div>
+      <div class="pc-nm">${p.name}</div>
+      <div class="pc-tag">${esc(p.tag)}</div>
+      <div class="pc-traits">${p.traits.map(t=>`<span>${esc(t)}</span>`).join('')}</div>
+    </div>`).join('')+'</div>';
+  $('#soulWorkshop').innerHTML=html;
+  // 绑定
+  $('#soulWorkshop').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ swEditing=swSouls.find(s=>String(s.id)===b.dataset.edit); renderSoulForm(); });
+  $('#soulWorkshop').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delSoul(b.dataset.del));
+  $('#soulWorkshop').querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggleSoul(b.dataset.toggle));
+  $('#soulWorkshop').querySelectorAll('.persona-card').forEach(c=>c.onclick=()=>{
+    const p=SW_PERSONAS.find(x=>x.id===c.dataset.persona);
+    swEditing={ id:null, persona:p.id, name:p.name, emoji:p.emoji, color:p.color, system_prompt:null,
+      intensity:55, icebreak_min:8, caps:{...p.caps}, welcomes:[...p.welcomes], enabled:true, _defaults:p };
+    renderSoulForm();
+  });
+}
+
+function renderSoulForm(){
+  const s=swEditing; const isNew=!s.id;
+  const caps=s.caps||{voice:true,song:true,emoji:true};
+  $('#soulWorkshop').innerHTML=`
+    <div class="sw-form">
+      <div style="font-size:12.5px;color:var(--dim)">${isNew?'新建灵魂':'编辑灵魂'} · 原型 <b style="color:${s.color}">${PERSONA_LABEL[s.persona]||s.persona}</b></div>
+      <div class="sw-row">
+        <div class="sw-fld" style="flex:2"><label>名字</label><input type="text" id="sf-name" value="${esc(s.name)}" maxlength="40"></div>
+        <div class="sw-fld" style="flex:0 0 80px"><label>头像</label><input type="text" id="sf-emoji" value="${esc(s.emoji)}" maxlength="8"></div>
+        <div class="sw-fld" style="flex:0 0 150px"><label>主题色</label><div style="display:flex;align-items:center;gap:7px"><input type="color" id="sf-color-pick" value="${/^#[0-9a-fA-F]{6}$/.test(s.color)?s.color:'#B57EDC'}" style="width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;flex:0 0 auto"><input type="text" id="sf-color" value="${esc(s.color)}" placeholder="#B57EDC" style="flex:1;min-width:0"></div></div>
+      </div>
+      <div class="sw-fld"><label>性格强度(含蓄 ← → 话痨)：<span id="sf-int-v" style="color:var(--violet)">${s.intensity}</span></label>
+        <div class="sw-range"><span style="font-size:11px;color:var(--dim)">含蓄</span>
+          <input type="range" id="sf-intensity" min="0" max="100" value="${s.intensity}">
+          <span style="font-size:11px;color:var(--dim)">话痨</span></div>
+      </div>
+      <div class="sw-row">
+        <div class="sw-fld"><label>破冰间隔(冷场多少分钟后主动抛话题)</label>
+          <input type="number" id="sf-icebreak" value="${s.icebreak_min}" min="1" max="120"></div>
+      </div>
+      <div class="sw-fld"><label>开放能力(文字恒开)</label>
+        <div class="sw-caps">
+          <div class="sw-cap on" style="opacity:.6;cursor:default">💬 文字</div>
+          <div class="sw-cap ${caps.voice?'on':''}" data-cap="voice">🎙️ 语音</div>
+          <div class="sw-cap ${caps.song?'on':''}" data-cap="song">🎵 神曲</div>
+          <div class="sw-cap ${caps.emoji?'on':''}" data-cap="emoji">✨ 表情刷屏</div>
+        </div>
+      </div>
+      <div class="sw-fld"><label>欢迎语(每行一条，迎宾时随机挑)</label>
+        <textarea id="sf-welcomes" rows="3">${esc((s.welcomes||[]).join('\n'))}</textarea></div>
+      <div class="sw-fld"><label>自定义 system_prompt(高级，留空则用原型默认人设)</label>
+        <textarea id="sf-sysprompt" rows="4" placeholder="留空即用「${PERSONA_LABEL[s.persona]}」的默认人设内核">${esc(s.system_prompt||'')}</textarea></div>
+
+      <div class="sw-fld"><label>🎙️ 语音音色(语音/清唱用，内置8种)</label>
+        <select id="sf-voice">${TTS_VOICES.map(v=>`<option value="${v.id}"${(s.voice||'')===v.id?' selected':''}>${v.label}</option>`).join('')}</select></div>
+      <div class="sw-fld"><label>🗣️ 说话风格 <span style="color:var(--dim);font-weight:400">点标签组合，或右侧手写</span></label>
+        ${styleChipGroups('speak', s.speak_style||'')}
+        <input type="text" id="sf-speak" value="${esc(s.speak_style||'')}" maxlength="200" placeholder="点上面标签自动填，也可手写覆盖" style="margin-top:8px"></div>
+      <div class="sw-fld"><label>🎤 清唱唱腔 <span style="color:var(--dim);font-weight:400">点标签组合，或右侧手写</span></label>
+        ${styleChipGroups('sing', s.sing_style||'')}
+        <input type="text" id="sf-sing" value="${esc(s.sing_style||'')}" maxlength="200" placeholder="点上面标签自动填，也可手写覆盖" style="margin-top:8px"></div>
+
+      <div class="sw-preview">
+        <label style="font-size:12px;color:var(--sub);font-weight:600">🧪 试聊预览</label>
+        <div class="sw-row" style="margin-top:8px">
+          <div class="sw-fld"><input type="text" id="sf-try" placeholder="发一句话，看它怎么回…"></div>
+          <button class="sw-btn ghost" id="sf-try-btn" style="padding:9px 18px">试聊</button>
+        </div>
+        <div class="pv-out dim" id="sf-pv">回应会显示在这里（需核心大脑 eh-soul 已部署）</div>
+      </div>
+
+      <div class="sw-actions">
+        <button class="sw-btn primary" id="sf-save">${isNew?'🌟 让它住进来':'💾 保存修改'}</button>
+        <button class="sw-btn ghost" id="sf-cancel">取消</button>
+      </div>
+    </div>`;
+  // 绑定交互
+  $('#sf-intensity').oninput=e=>$('#sf-int-v').textContent=e.target.value;
+  $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
+  // 风格标签点选 → 拼进对应输入框(顿号分隔, 去重), 再次点取消
+  $('#soulWorkshop').querySelectorAll('.style-chips').forEach(box=>{
+    const kind=box.dataset.kind; const inp=kind==='speak'?$('#sf-speak'):$('#sf-sing');
+    box.querySelectorAll('.sc-tag').forEach(chip=>chip.onclick=()=>{
+      chip.classList.toggle('on');
+      const on=[...box.querySelectorAll('.sc-tag.on')].map(c=>c.dataset.tag);
+      inp.value=on.join('、');
+    });
+    // 手写框改动 → 反向同步标签高亮(手写覆盖时标签跟着亮/灭)
+    inp.oninput=()=>{ const v=inp.value; box.querySelectorAll('.sc-tag').forEach(c=>c.classList.toggle('on', v.includes(c.dataset.tag))); };
+  });
+  $('#sf-cancel').onclick=()=>{ swEditing=null; renderWorkshop(); };
+  // 主题色: 取色器↔文本框双向联动
+  const _cp=$('#sf-color-pick'), _ct=$('#sf-color');
+  if(_cp&&_ct){
+    _cp.oninput=()=>{ _ct.value=_cp.value; };
+    _ct.oninput=()=>{ if(/^#[0-9a-fA-F]{6}$/.test(_ct.value.trim())) _cp.value=_ct.value.trim(); };
+  }
+  $('#sf-save').onclick=saveSoul;
+  $('#sf-try-btn').onclick=trySoul;
+  $('#sf-try').addEventListener('keydown',e=>{ if(e.key==='Enter') trySoul(); });
+}
+
+function collectSoulForm(){
+  const caps={voice:false,song:false,emoji:false};
+  $('#soulWorkshop').querySelectorAll('[data-cap]').forEach(c=>{ if(c.classList.contains('on')) caps[c.dataset.cap]=true; });
+  const welcomes=$('#sf-welcomes').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const sp=$('#sf-sysprompt').value.trim();
+  return {
+    id: swEditing.id||undefined,
+    room_id: swRoom.id,
+    persona: swEditing.persona,
+    name: $('#sf-name').value.trim(),
+    emoji: $('#sf-emoji').value.trim(),
+    color: $('#sf-color').value.trim(),
+    intensity: parseInt($('#sf-intensity').value)||55,
+    icebreak_min: parseInt($('#sf-icebreak').value)||8,
+    caps, welcomes,
+    system_prompt: sp||null,
+    voice: ($('#sf-voice')?.value||'').trim()||null,
+    speak_style: ($('#sf-speak')?.value||'').trim()||null,
+    sing_style: ($('#sf-sing')?.value||'').trim()||null,
+    enabled: swEditing.enabled!==false,
+  };
+}
+
+async function saveSoul(){
+  const body=collectSoulForm();
+  if(!body.name){ toast('给灵魂起个名字'); return; }
+  const btn=$('#sf-save'); btn.disabled=true; const t=btn.textContent; btn.textContent='保存中…';
+  const res=await api('/soul-save',{method:'POST',body});
+  btn.disabled=false; btn.textContent=t;
+  if(!res.ok){ toast(res.body?.error||'保存失败'); return; }
+  toast(body.id?'已保存':'灵魂已住进房间 🌟');
+  swEditing=null;
+  await openWorkshop(swRoom.id, swRoom.name);
+}
+
+async function toggleSoul(id){
+  const s=swSouls.find(x=>String(x.id)===String(id)); if(!s) return;
+  const res=await api('/soul-toggle',{method:'POST',body:{id,enabled:!s.enabled}});
+  if(!res.ok){ toast(res.body?.error||'操作失败'); return; }
+  s.enabled=!s.enabled; renderWorkshop();
+}
+
+async function delSoul(id){
+  const s=swSouls.find(x=>String(x.id)===String(id));
+  if(!await confirmBox(`确定让「${s?.name||'这个灵魂'}」离开房间？它发过的消息会保留。`,'删除灵魂')) return;
+  const res=await api('/soul-delete',{method:'POST',body:{id}});
+  if(!res.ok){ toast(res.body?.error||'删除失败'); return; }
+  toast('灵魂已离开');
+  await openWorkshop(swRoom.id, swRoom.name);
+}
+
+async function trySoul(){
+  const text=$('#sf-try').value.trim(); if(!text) return;
+  const pv=$('#sf-pv'); pv.className='pv-out dim'; pv.textContent='灵魂正在思考…';
+  const soul=collectSoulForm();
+  const res=await api('/soul-preview',{method:'POST',body:{soul,text}});
+  if(!res.ok){ pv.className='pv-out dim'; pv.textContent='⚠️ '+(res.body?.error||'试聊暂不可用'); return; }
+  pv.className='pv-out'; pv.textContent=res.body?.reply||res.body?.text||'(无回应)';
+}
+
+
+// ===== 管理员(缓存 + 骨架屏) =====
+let adminsCache=null;
+function paintAdmins(admins){
+  $('#adminsTbody').innerHTML=admins.map(a=>{
+    const isMe=a.auth_uid===meAdmin.uid;
+    let ops='';
+    if(a.role!=='super') ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
+    else if(isMe) ops='<span style="color:var(--dim)">（你）</span>';
+    return `<tr><td>${esc(a.username)}</td>
+      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'管理员'}</span></td>
+      <td>${(a.created_at||'').replace('T',' ').slice(0,16)}</td>
+      <td>${ops}</td></tr>`;
+  }).join('')||'<tr><td colspan="4" class="empty">暂无管理员</td></tr>';
+  $('#adminsTbody').querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{
+    if(!await confirmBox('撤销该管理员的后台权限？其前台账号保留。','撤销管理员')) return;
+    const r=await api('/revoke',{method:'POST',body:{auth_uid:b.dataset.revoke}});
+    toast(r.ok?'已撤销':(r.body?.error||'失败')); adminsCache=null; loadAdmins();
+  });
+  $('#adminsTbody').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=async()=>{
+    if(!await confirmBox('转让超管身份给该管理员？你将降为普通管理员。','转让超管')) return;
+    const r=await api('/transfer',{method:'POST',body:{id:b.dataset.transfer}});
+    if(r.ok){ toast('已转让，你已降为普管'); adminsCache=null; await loadMe(); enterPanel(); }
+    else toast(r.body?.error||'失败');
+  });
+}
+async function loadAdmins(){
+  if(adminsCache) paintAdmins(adminsCache);
+  else $('#adminsTbody').innerHTML='<tr><td colspan="4" style="padding:0;border:none">'+Array(3).fill('<div class="sk sk-row"></div>').join('')+'</td></tr>';
+  const res=await api('/admins'); if(!res.ok){ if(!adminsCache) $('#adminsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
+  adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
+}
+$('#addAdminBtn').onclick=async()=>{
+  const username=$('#newAdminUser').value.trim();
+  if(!username){ toast('请输入用户名'); return; }
+  const btn=$('#addAdminBtn'); btn.disabled=true;
+  const r=await api('/appoint',{method:'POST',body:{username}});
+  btn.disabled=false;
+  if(r.ok){ toast('已设为管理员'); $('#newAdminUser').value=''; adminsCache=null; loadAdmins(); }
+  else toast(r.body?.error||'失败');
+};
+$('#newAdminUser').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#addAdminBtn').click(); });
+
+// ============ 集中配置管理(config) ============
+let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTheme, officialFallbackC, roomBgm, text }
+// 默认值(前台 index.html EH_CONFIG_DEFAULT 副本;后台无数据时用)
+const CFG_DEFAULT = {
+  themePalettes:{
+    cyber:{"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(18,30,52,.78)","--panel-solid":"#101c2e","--line":"rgba(0,229,212,.22)","--line2":"rgba(0,229,212,.36)","--ink":"#EAF6FF","--sub":"#7FA8C9","--dim":"#4A6B85","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#7B5CFF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,.05)","--glow-cyan":"0 0 20px rgba(0,229,212,.55)","--glow-mag":"0 0 20px rgba(255,45,142,.55)"},
+    vapor:{"--bg":"#160a1e","--bg2":"#28123a","--panel":"rgba(48,20,60,.78)","--panel-solid":"#301440","--line":"rgba(255,77,158,.24)","--line2":"rgba(255,77,158,.38)","--ink":"#FFEAF5","--sub":"#D69AC0","--dim":"#925A80","--cyan":"#FF4D9E","--magenta":"#FF7A45","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#7FE0C0","--accent":"#FF4D9E","--grid":"rgba(255,77,158,.05)","--glow-cyan":"0 0 22px rgba(255,77,158,.6)","--glow-mag":"0 0 20px rgba(255,122,69,.55)"},
+    aurora:{"--bg":"#050f12","--bg2":"#0a2029","--panel":"rgba(12,38,44,.76)","--panel-solid":"#0c2630","--line":"rgba(0,240,181,.22)","--line2":"rgba(0,240,181,.36)","--ink":"#EAFFFA","--sub":"#7FC9BC","--dim":"#4A8578","--cyan":"#00F0B5","--magenta":"#B24DFF","--violet":"#2ED9FF","--amber":"#F7E7CE","--green":"#00F0B5","--accent":"#00F0B5","--grid":"rgba(0,240,181,.05)","--glow-cyan":"0 0 22px rgba(0,240,181,.6)","--glow-mag":"0 0 20px rgba(178,77,255,.55)"},
+    mono:{"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(28,20,22,.82)","--panel-solid":"#1c1416","--line":"rgba(245,208,106,.20)","--line2":"rgba(245,208,106,.34)","--ink":"#FBEEE4","--sub":"#B89A94","--dim":"#7C625A","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,.04)","--glow-cyan":"0 0 20px rgba(245,208,106,.5)","--glow-mag":"0 0 20px rgba(224,80,122,.5)"},
+    klein:{"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(14,24,64,.80)","--panel-solid":"#0e1840","--line":"rgba(58,90,255,.24)","--line2":"rgba(58,90,255,.38)","--ink":"#E8ECFF","--sub":"#8B9AD6","--dim":"#5560A0","--cyan":"#3A5AFF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#3A5AFF","--grid":"rgba(58,90,255,.05)","--glow-cyan":"0 0 22px rgba(58,90,255,.6)","--glow-mag":"0 0 20px rgba(255,138,61,.55)"},
+    coral:{"--bg":"#1a0a0e","--bg2":"#2e1218","--panel":"rgba(54,22,28,.80)","--panel-solid":"#361620","--line":"rgba(255,111,97,.24)","--line2":"rgba(255,111,97,.38)","--ink":"#FFEDE8","--sub":"#D6A19A","--dim":"#92615A","--cyan":"#FF6F61","--magenta":"#FF4D8D","--violet":"#00D4C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF6F61","--grid":"rgba(255,111,97,.05)","--glow-cyan":"0 0 22px rgba(255,111,97,.6)","--glow-mag":"0 0 20px rgba(255,77,141,.55)"},
+    lagoon:{"--bg":"#061412","--bg2":"#0c2622","--panel":"rgba(14,44,40,.78)","--panel-solid":"#0e2c28","--line":"rgba(136,216,192,.26)","--line2":"rgba(136,216,192,.4)","--ink":"#EAFBF6","--sub":"#8FC9BC","--dim":"#5A8578","--cyan":"#4DD4B8","--magenta":"#FD6E53","--violet":"#FF6FA5","--amber":"#FFC97A","--green":"#4DD4B8","--accent":"#4DD4B8","--grid":"rgba(136,216,192,.05)","--glow-cyan":"0 0 22px rgba(77,212,184,.55)","--glow-mag":"0 0 20px rgba(253,110,83,.5)"},
+    dusk:{"--bg":"#0a0e16","--bg2":"#141c2a","--panel":"rgba(26,36,54,.80)","--panel-solid":"#1a2436","--line":"rgba(122,146,190,.24)","--line2":"rgba(122,146,190,.38)","--ink":"#EAF0FB","--sub":"#9AAAC9","--dim":"#647085","--cyan":"#7A92BE","--magenta":"#FF8A6E","--violet":"#F5D06A","--amber":"#F7E7CE","--green":"#6ED0B0","--accent":"#F5D06A","--grid":"rgba(122,146,190,.05)","--glow-cyan":"0 0 20px rgba(122,146,190,.45)","--glow-mag":"0 0 20px rgba(255,138,110,.5)"},
+    rose:{"--bg":"#14100f","--bg2":"#241c1a","--panel":"rgba(44,34,32,.80)","--panel-solid":"#2c2220","--line":"rgba(201,173,161,.24)","--line2":"rgba(201,173,161,.4)","--ink":"#F7EEEA","--sub":"#C2A79E","--dim":"#8A7168","--cyan":"#C9ADA1","--magenta":"#C25B72","--violet":"#6E7FA0","--amber":"#E0B87A","--green":"#8FB0A0","--accent":"#C9ADA1","--grid":"rgba(201,173,161,.05)","--glow-cyan":"0 0 20px rgba(201,173,161,.45)","--glow-mag":"0 0 20px rgba(194,91,114,.5)"},
+    sunset:{"--bg":"#180a12","--bg2":"#2c1020","--panel":"rgba(52,18,36,.80)","--panel-solid":"#341024","--line":"rgba(253,94,83,.24)","--line2":"rgba(253,94,83,.38)","--ink":"#FFEBED","--sub":"#D6A0A8","--dim":"#925A66","--cyan":"#FD5E53","--magenta":"#FF3C8E","--violet":"#B24DFF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FD5E53","--grid":"rgba(253,94,83,.05)","--glow-cyan":"0 0 22px rgba(253,94,83,.6)","--glow-mag":"0 0 20px rgba(255,60,142,.55)"},
+  },
+  themes:[{id:"cyber",name:"赛博夜城",dot:"#00E5D4"},{id:"vapor",name:"迈阿密日落",dot:"#C77DFF"},{id:"aurora",name:"极光迷幻",dot:"#00F0B5"},{id:"mono",name:"暗夜奢华",dot:"#F5D06A"},{id:"klein",name:"克莱因之夜",dot:"#3A5AFF"},{id:"coral",name:"珊瑚热恋",dot:"#FF6F61"},{id:"lagoon",name:"湖水迷情",dot:"#4DD4B8"},{id:"dusk",name:"远山暮色",dot:"#7A92BE"},{id:"rose",name:"莫兰迪玫瑰",dot:"#C9ADA1"},{id:"sunset",name:"日暮狂欢",dot:"#FD5E53"}],
+  roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"klein","虚空回音":"aurora"},
+  officialFallbackC:{"闲聊广场":"#00E5D4","深夜电台":"#FF4D9E","技术黑话":"#3A5AFF","虚空回音":"#00F0B5"},
+  publicThemePool:["coral","lagoon","sunset","cyber","klein"],
+  privateThemePool:["dusk","rose","mono","vapor","aurora"],
+  roomThemeOverride:{},
+  soulColors:{"狼姐":"#FF6F61","老K":"#F7E7CE","阿夜":"#B57EDC","回音":"#002FA7","图灵":"#1DE9B6","小暖":"#FD5E53"},
+  roomKindC:{"public":"#1DE9B6","private":"#B57EDC","official":"#0ABAB5"},
+  // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色(可写)
+  identityDefaultC:"#0ABAB5",
+  voidC:"#4A5D7E",
+  resonanceDefaultC:"#FF6F61",
+  roomBgm:{
+    "闲聊广场":{root:220,chord:[0,4,7,11],wave:"triangle",pulse:2400,cut:1400,name:"明亮合成 pad"},
+    "深夜电台":{root:146.83,chord:[0,3,7,10],wave:"sine",pulse:0,cut:900,name:"蒸汽波暖垫"},
+    "技术黑话":{root:98,chord:[0,7,12],wave:"sawtooth",pulse:3200,cut:560,name:"极简低频 drone"},
+    "虚空回音":{root:329.63,chord:[0,5,7,12],wave:"sine",pulse:1600,cut:2600,name:"空灵铃音"},
+  },
+  identityPool:{adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'],voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员']},
+  tuning:{publicRecentLimit:500,historyPage:60,prefetchN:48,prefetchTtlMs:60000,voidTtlMs:300000,onlineWindowMs:35000,resonanceThreshold:5,voiceMaxSec:30,singMode:'ai'},
+    text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时身份 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"📡 官方频道",hallPublic:"🌐 公开房间",hallPrivate:"🔒 私密房",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存",loginSwitchId:"↻ 换一个",loginToggleShow:"已有账号？点此登录 ▾",loginUserPh:"用户名 或 邮箱",loginPwdPh:"密码",loginNoAccount:"没有账号？",loginGoReg:"注册一个 →",loginForgot:"忘记密码",lobbyPrivateHint:"凭邀请码加入，或创建一个只有你和朋友的房间",lobbyCreateBtn:"＋ 创建",lobbyJoinBtn:"🔑 加入",titleBgm:"氛围音乐",titleRoomSet:"房间设置",titleProfile:"个人空间",titleSkin:"皮肤",titleMore:"更多花样",titleEmoji:"表情",holdToTalk:"按住 说话",recordingHint:"松开发送 · 上滑取消",createRoomTitle:"创建房间",createRoomSub:"选择房间类型，起个名字。",roomNameLabel:"房间名",roomNamePh:"比如：午夜同好会",roomIconLabel:"图标",inviteShareHint:"把邀请码发给朋友，他们就能进来：",copyBtn:"复制",joinRoomTitle:"用邀请码加入",joinRoomSub:"输入朋友给你的邀请码：",inviteCodeLabel:"邀请码",inviteCodePh:"例如 A3F9K2M7QX",regTitle:"注册账号",regSub:"注册后可跨设备用账号密码登录，保留身份与聊天记录。",regUserLabel:"用户名",regUserPh:"3-20 位，支持中英文",regPwdPh:"至少 6 位",regEmailLabel:"邮箱（选填）",regEmailPh:"用于找回密码，建议填写",forgotTitle:"找回密码",forgotSub:"输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）",forgotEmailPh:"注册时填的邮箱",emailSetTitle:"邮箱设置",emailSetSub:"用于找回密码。绑定用户名/密码登录不受影响。",emailCurLabel:"当前邮箱",emailNewLabel:"新邮箱",editProfileTitle:"编辑形象",editProfileSub:"自定义你的昵称和头像（用户名登录不受影响）。",nickLabel:"昵称",nickPh:"显示给别人看的名字",avatarLabel:"头像",themeColorLabel:"主题色",confirmTitle:"确认操作",cancelBtn:"取消",okBtn:"确定",ok_emailVerified:"✓ 邮箱验证成功",ok_saved:"已保存",ok_kicked:"已踢出",ok_profileUpdated:"形象已更新",ok_roomDissolved:"房间已解散",ok_welcomeBack:"欢迎回来",ok_regDone:"注册成功，已登录",ok_codeCopied:"邀请码已复制",ok_emailUpdated:"邮箱已更新，请验证",ok_resetSent:"若该邮箱已注册，重置链接已发送",err_saveFail:"保存失败",err_sendFail:"发送失败",err_copyFail:"复制失败",err_createRoom:"建房失败",err_recInit:"录音初始化失败",err_recTooLong:"录音太长，发送失败",err_recTooShort:"说话时间太短",err_roomNameEmpty:"房间名不能为空",err_noRecSupport:"此浏览器不支持录音",err_noAudioSupport:"此浏览器不支持音频合成",err_userNotFound:"没找到这个人（需在本房在线）",err_regFail:"注册失败",err_noAccount:"账号不存在",err_wrongPwd:"账号或密码错误",err_initId:"身份初始化失败，刷新重试",err_badCode:"邀请码无效或房间不存在",err_emailFmt:"邮箱格式不对",err_needMic:"需要麦克风权限才能发语音",err_voiceUpload:"语音上传失败",err_voiceSend:"语音发送失败",err_voiceLoad:"语音加载失败，可能已过期",err_voiceUrl:"语音地址缺失",err_voiceBucket:"语音存储未配置(缺 eh-voice 桶)",err_verifyFail:"验证失败",ok_emailAlready:"邮箱已验证",err_singSend:"神曲发送失败",warn_regNeedLogin:"注册成功但登录失败，请回登录页手动登录",warn_needLogin:"请先登录",warn_needCredentials:"请填写账号和密码",warn_needCode:"请输入邀请码",warn_needRoomName:"给房间起个名",warn_browserBlock:"被浏览器拦截，请再点一次",warn_pwdShort:"密码至少 6 位",warn_userShort:"用户名至少 3 位",help_sing:"用法：/sing 要唱的文字",help_whisper:"用法：/whisper @昵称 内容",sing_needText:"先打点字，让它唱出来",sing_noContent:"没有可唱的内容"},
+  songStyles:[
+    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#E63946', bpm:124, bpc:0.5, base:3,  scale:'minP',
+      motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square',   groove:'four', tts:{rate:1.3, pitch:1.0},  ttsStyle:'high',  playRate:1.12,
+      coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
+    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:'major',
+      motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3],  wave:'sine',     bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy',  playRate:0.95,
+      coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
+    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:'major',
+      motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2, pitch:1.1},  ttsStyle:'sweet', playRate:1.1,
+      coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
+    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#B57EDC', bpm:78,  bpc:0.5, base:0,  scale:'majP',
+      motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3],wave:'sine',    bass:'sine',     groove:'boom', tts:{rate:0.95,pitch:1.1},  ttsStyle:'gu',    playRate:0.96,
+      coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
+    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#0ABAB5', bpm:76,  bpc:0.5, base:-2, scale:'major',
+      motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine',    bass:'sine',     groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy',  playRate:0.92,
+      coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
+    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:'major',
+      motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5],  wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5},  ttsStyle:'meng',  playRate:1.18,
+      coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
+    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#F5F0E1', bpm:80,  bpc:0.5, base:0,  scale:'major',
+      motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],  wave:'sine',     bass:'sine',     groove:'lofi', tts:{rate:1.0, pitch:1.0},  ttsStyle:'lazy',  playRate:1.0,
+      coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
+  ]
+};
+
+// ---- 文案分组元数据: 组名 → [ [key,中文标签], ... ] ; 决定折叠面板结构+友好标签 ----
+const TEXT_GROUPS = [["入场页", [["entrySlogan", "副标语"], ["entryBtn", "匿名进入按钮"]]], ["登录页", [["loginSwitchId", "↻ 换一个"], ["loginToggleShow", "已有账号？点此登录 ▾"], ["loginUserPh", "用户名 或 邮箱"], ["loginPwdPh", "密码"], ["loginNoAccount", "没有账号？"], ["loginGoReg", "注册一个 →"], ["loginForgot", "忘记密码"]]], ["大厅", [["hallOfficial", "官方频道标题"], ["hallPublic", "公开房间标题"], ["hallPrivate", "私密房标题"], ["publicEmpty", "公开房空状态"], ["officialDesc", "闲聊广场描述语"], ["lobbyPrivateHint", "凭邀请码加入，或创建一个只有你和朋友的房间"], ["lobbyCreateBtn", "＋ 创建"], ["lobbyJoinBtn", "🔑 加入"]]], ["聊天室·顶栏", [["titleBgm", "氛围音乐"], ["titleRoomSet", "房间设置"], ["titleProfile", "个人空间"], ["titleSkin", "皮肤"], ["titleMore", "更多花样"], ["titleEmoji", "表情"]]], ["聊天室·模式", [["modeVoiceTitle", "语音留声标题"], ["modeVoiceSub", "语音留声副标"], ["modeVoidTitle", "说给虚空标题"], ["modeVoidSub", "说给虚空副标"], ["modeSingTitle", "文字神曲标题"], ["modeSingSub", "文字神曲副标"]]], ["聊天室·输入", [["composerPlaceholder", "输入框提示"], ["voidPlaceholder", "虚空模式提示"], ["roomFirstMsg", "房间空状态"], ["cmdSing", "/sing 命令说明"], ["cmdWhisper", "/whisper 命令说明"], ["holdToTalk", "按住 说话"], ["recordingHint", "松开发送 · 上滑取消"]]], ["按钮", [["btnCreateRoom", "生成房间"], ["btnEnterRoom", "进入房间"], ["btnLogin", "登录"], ["btnRegister", "注册并进入"]]], ["房间创建", [["roomTypePublicDesc", "公开房说明"], ["roomTypePrivateDesc", "私密房说明"], ["roomCreatedTitle", "创建成功标题"], ["createRoomTitle", "创建房间"], ["createRoomSub", "选择房间类型，起个名字。"], ["roomNameLabel", "房间名"], ["roomNamePh", "比如：午夜同好会"], ["roomIconLabel", "图标"], ["inviteShareHint", "把邀请码发给朋友，他们就能进来："], ["copyBtn", "复制"]]], ["加入房间", [["joinRoomTitle", "用邀请码加入"], ["joinRoomSub", "输入朋友给你的邀请码："], ["inviteCodeLabel", "邀请码"], ["inviteCodePh", "例如 A3F9K2M7QX"]]], ["注册", [["regTitle", "注册账号"], ["regSub", "注册后可跨设备用账号密码登录，保留身份与聊天记录。"], ["regUserLabel", "用户名"], ["regUserPh", "3-20 位，支持中英文"], ["regPwdPh", "至少 6 位"], ["regEmailLabel", "邮箱（选填）"], ["regEmailPh", "用于找回密码，建议填写"]]], ["找回密码", [["forgotTitle", "找回密码"], ["forgotSub", "输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）"], ["forgotEmailPh", "注册时填的邮箱"]]], ["邮箱设置", [["emailSetTitle", "邮箱设置"], ["emailSetSub", "用于找回密码。绑定用户名/密码登录不受影响。"], ["emailCurLabel", "当前邮箱"], ["emailNewLabel", "新邮箱"]]], ["编辑形象", [["editProfileTitle", "编辑形象"], ["editProfileSub", "自定义你的昵称和头像（用户名登录不受影响）。"], ["nickLabel", "昵称"], ["nickPh", "显示给别人看的名字"], ["avatarLabel", "头像"], ["themeColorLabel", "主题色"]]], ["确认弹窗", [["confirmTitle", "确认操作"], ["cancelBtn", "取消"], ["okBtn", "确定"]]], ["Toast·成功", [["ok_saved", "已保存"], ["ok_kicked", "已踢出"], ["ok_profileUpdated", "形象已更新"], ["ok_roomDissolved", "房间已解散"], ["ok_welcomeBack", "欢迎回来"], ["ok_regDone", "注册成功"], ["ok_codeCopied", "邀请码已复制"], ["ok_emailUpdated", "邮箱已更新"], ["ok_resetSent", "重置链接已发送"], ["ok_emailVerified", "邮箱验证成功"], ["ok_emailAlready", "邮箱已验证"]]], ["Toast·错误", [["err_saveFail", "保存失败"], ["err_sendFail", "发送失败"], ["err_copyFail", "复制失败"], ["err_createRoom", "建房失败"], ["err_recInit", "录音初始化失败"], ["err_recTooLong", "录音太长"], ["err_recTooShort", "说话太短"], ["err_roomNameEmpty", "房间名不能为空"], ["err_noRecSupport", "浏览器不支持录音"], ["err_noAudioSupport", "浏览器不支持音频合成"], ["err_userNotFound", "找不到该用户"], ["err_regFail", "注册失败"], ["err_noAccount", "账号不存在"], ["err_wrongPwd", "账号或密码错误"], ["err_initId", "身份初始化失败"], ["err_badCode", "邀请码无效"], ["err_emailFmt", "邮箱格式不对"], ["err_needMic", "需要麦克风权限"], ["err_voiceUpload", "语音上传失败"], ["err_voiceSend", "语音发送失败"], ["err_voiceLoad", "语音加载失败"], ["err_voiceUrl", "语音地址缺失"], ["err_voiceBucket", "语音存储未配置"], ["err_singSend", "神曲发送失败"], ["err_verifyFail", "验证失败"]]], ["Toast·警告", [["warn_regNeedLogin", "注册成功但登录失败"], ["warn_needLogin", "请先登录"], ["warn_needCredentials", "需要账号密码"], ["warn_needCode", "需要邀请码"], ["warn_needRoomName", "需要房间名"], ["warn_browserBlock", "浏览器拦截"], ["warn_pwdShort", "密码太短"], ["warn_userShort", "用户名太短"]]], ["命令帮助", [["help_sing", "/sing 用法"], ["help_whisper", "/whisper 用法"], ["sing_needText", "神曲需文字"], ["sing_noContent", "神曲无内容"]]], ["系统", [["connecting", "连接中"], ["loading", "加载中"]]]];
+
+async function loadConfig(){
+  if(CFG_CACHE) return CFG_CACHE;
+  const r=await api('/config');
+  const remote={}; if(r.ok && Array.isArray(r.body.config)){ r.body.config.forEach(row=>{ remote[row.key]=row.value; }); }
+  // merge: 远程覆盖默认
+  CFG_CACHE = JSON.parse(JSON.stringify(CFG_DEFAULT));
+  Object.keys(remote).forEach(k=>{ if(k in CFG_CACHE) CFG_CACHE[k]=remote[k]; });
+  return CFG_CACHE;
+}
+
+async function saveConfigKey(key,value){
+  const r=await api('/config',{method:'POST',body:{key,value}});
+  if(r.ok){ toast('已保存: '+key); if(CFG_CACHE) CFG_CACHE[key]=value; try{ clearDirty(); }catch(_){} }
+  else toast(r.body?.error||'保存失败');
+  return r.ok;
+}
+
+// ---- 🎨 主题配色 ----
+async function loadTheme(){
+  const cfg=await loadConfig();
+  const themes=['cyber','vapor','mono','aurora'];
+  const keys=Object.keys(cfg.themePalettes.cyber);
+  let html='<div style="overflow-x:auto"><table style="min-width:800px"><thead><tr><th style="min-width:150px">CSS 变量</th>';
+  themes.forEach(t=>{ html+=`<th style="min-width:150px">${t}</th>`; });
+  html+='</tr></thead><tbody>';
+  keys.forEach(k=>{
+    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px">${k}</td>`;
+    themes.forEach(t=>{
+      const v=cfg.themePalettes[t][k]||'';
+      const isHex=/^#[0-9a-fA-F]{3,8}$/.test(v);
+      const picker=isHex?`<input type="color" data-cpk="${t}|${k}" value="${v.length===4?'#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]:v.slice(0,7)}" style="width:28px;height:28px;padding:0;border:1px solid var(--line2);border-radius:5px;background:none;vertical-align:middle;cursor:pointer">`:'<span style="font-size:10px;color:var(--dim);vertical-align:middle;margin-right:4px">rgba/其他</span>';
+      html+=`<td>${picker}<input data-cv="${t}|${k}" value="${esc(v)}" style="width:calc(100% - 40px);padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;outline:none;margin-left:4px" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  $('#themeTable').innerHTML=html;
+  // 联动 color picker → 文本
+  $('#themeTable').querySelectorAll('[data-cpk]').forEach(cpk=>{
+    cpk.oninput=()=>{ const t=$('#themeTable').querySelector(`[data-cv="${cpk.dataset.cpk}"]`); if(t) t.value=cpk.value; refreshThemePreview(); };
+  });
+  $('#themeTable').querySelectorAll('[data-cv]').forEach(el=>el.oninput=refreshThemePreview);
+  refreshThemePreview();
+}
+function collectThemePalettes(){
+  const out=JSON.parse(JSON.stringify(CFG_CACHE.themePalettes));
+  $('#themeTable').querySelectorAll('[data-cv]').forEach(el=>{
+    const [t,k]=el.dataset.cv.split('|'); out[t][k]=el.value;
+  });
+  return out;
+}
+function refreshThemePreview(){
+  const t=$('#themePreviewSel').value;
+  const p=collectThemePalettes();
+  $('#themePreviewBox').style.background=p[t]['--cyan']||'#0ABAB5';
+}
+
+// ---- 🎵 BGM ----
+async function loadBgm(){
+  const cfg=await loadConfig();
+  const rooms=Object.keys(cfg.roomBgm);
+  let html='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>root(Hz)</th><th>chord</th><th>wave</th><th>pulse(ms)</th><th>cut(Hz)</th><th>说明</th></tr></thead><tbody>';
+  const waveOpts=['sine','triangle','sawtooth','square'];
+  rooms.forEach(r=>{
+    const b=cfg.roomBgm[r];
+    html+=`<tr><td>${esc(r)}</td>
+      <td><input data-bgm="${r}|root"   value="${b.root}"  type="number" step="0.01" min="20" max="2000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|chord"  value="${(b.chord||[]).join(',')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><select data-bgm="${r}|wave" style="padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px">${waveOpts.map(w=>`<option ${w===b.wave?'selected':''}>${w}</option>`).join('')}</select></td>
+      <td><input data-bgm="${r}|pulse"  value="${b.pulse}" type="number" min="0" max="10000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|cut"    value="${b.cut}"   type="number" min="50" max="20000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
+      <td><input data-bgm="${r}|name"   value="${esc(b.name||'')}" style="width:130px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px"></td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  $('#bgmTable').innerHTML=html;
+}
+function collectBgm(){
+  const out=JSON.parse(JSON.stringify(CFG_CACHE.roomBgm));
+  $('#bgmTable').querySelectorAll('[data-bgm]').forEach(el=>{
+    const [r,f]=el.dataset.bgm.split('|');
+    if(f==='root'||f==='pulse'||f==='cut') out[r][f]=parseFloat(el.value)||0;
+    else if(f==='chord') out[r][f]=el.value.split(',').map(s=>parseInt(s.trim(),10)).filter(x=>!isNaN(x));
+    else out[r][f]=el.value;
+  });
+  return out;
+}
+
+// ---- 📝 文案 & 绑定 ----
+async function loadTextBind(){
+  const cfg=await loadConfig();
+  // roomTheme
+  const themeIds=cfg.themes.map(t=>t.id);
+  let rt='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>默认主题</th></tr></thead><tbody>';
+  Object.keys(cfg.roomTheme).forEach(r=>{
+    rt+=`<tr><td>${esc(r)}</td><td><select data-rt="${r}" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12px">${themeIds.map(t=>`<option ${t===cfg.roomTheme[r]?'selected':''}>${t}</option>`).join('')}</select></td></tr>`;
+  });
+  rt+='</tbody></table></div>'; $('#roomThemeTable').innerHTML=rt;
+  // officialFallbackC
+  let fc='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>兜底色</th></tr></thead><tbody>';
+  Object.keys(cfg.officialFallbackC).forEach(r=>{
+    const v=cfg.officialFallbackC[r];
+    fc+=`<tr><td>${esc(r)}</td><td><input type="color" data-fc-picker="${r}" value="${v}" style="width:32px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;vertical-align:middle;cursor:pointer"> <input data-fc="${r}" value="${esc(v)}" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;margin-left:6px"></td></tr>`;
+  });
+  fc+='</tbody></table></div>'; $('#fallbackCTable').innerHTML=fc;
+  $('#fallbackCTable').querySelectorAll('[data-fc-picker]').forEach(p=>p.oninput=()=>{ const t=$('#fallbackCTable').querySelector(`[data-fc="${p.dataset.fcPicker}"]`); if(t) t.value=p.value; });
+  // text —— 分组折叠 + 搜索 + 默认值对比
+  renderTextGroups(cfg);
+  renderIdentityPool();
+}
+
+// 渲染分组折叠文案表
+function renderTextGroups(cfg){
+  const def=CFG_DEFAULT.text;
+  let html='';
+  TEXT_GROUPS.forEach((grp,gi)=>{
+    const [gname, items]=grp;
+    // 统计本组改过几条
+    let changed=0; items.forEach(([k])=>{ if(cfg.text[k]!==def[k]) changed++; });
+    html+=`<div class="txt-group" data-group="${gi}">`;
+    html+=`<div class="txt-grp-head" onclick="toggleTxtGroup(${gi})">`;
+    html+=`<span class="txt-grp-caret">▸</span> <b>${esc(gname)}</b> <span class="txt-grp-cnt">${items.length}条${changed?` · <span style="color:var(--amber)">${changed}改</span>`:''}</span>`;
+    html+=`<button class="mini-btn txt-grp-reset" onclick="event.stopPropagation();resetTextGroup(${gi})" style="border-color:var(--dim);color:var(--sub);float:right;font-size:10.5px;padding:2px 8px">↺ 本组</button>`;
+    html+=`</div>`;
+    html+=`<div class="txt-grp-body" style="display:none">`;
+    items.forEach(([k,label])=>{
+      const cur=cfg.text[k]!=null?cfg.text[k]:'', dv=def[k]!=null?def[k]:'';
+      const isChanged=cur!==dv;
+      html+=`<div class="txt-row" data-k="${k}" data-label="${esc(label)}">`;
+      html+=`<div class="txt-row-label">${esc(label)} <span class="txt-row-key">${k}</span></div>`;
+      html+=`<input data-tx="${k}" value="${esc(cur)}" class="txt-row-input" oninput="onTxtInput(this)" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor=(this.value!==this.dataset.def)?'var(--amber)':'var(--line)'" data-def="${esc(dv)}">`;
+      html+=`<div class="txt-row-def" style="${isChanged?'':'display:none'}">默认: ${esc(dv)} <a onclick="revertTxt('${k}')" style="color:var(--cyan);cursor:pointer;margin-left:4px">↺还原这条</a></div>`;
+      html+=`</div>`;
+    });
+    html+=`</div></div>`;
+  });
+  $('#textTable').innerHTML=html;
+}
+// 折叠展开
+function toggleTxtGroup(gi){
+  const g=document.querySelector(`.txt-group[data-group="${gi}"]`); if(!g) return;
+  const body=g.querySelector('.txt-grp-body'), caret=g.querySelector('.txt-grp-caret');
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none'; caret.textContent=open?'▾':'▸';
+}
+// 输入时实时显示/隐藏默认值对比
+function onTxtInput(el){
+  const row=el.closest('.txt-row'), defEl=row.querySelector('.txt-row-def');
+  if(el.value!==el.dataset.def){ defEl.style.display='block'; el.style.borderColor='var(--amber)'; }
+  else { defEl.style.display='none'; el.style.borderColor='var(--line)'; }
+}
+// 单条还原默认
+function revertTxt(k){
+  const el=$('#textTable').querySelector(`[data-tx="${k}"]`); if(!el) return;
+  el.value=el.dataset.def; onTxtInput(el);
+}
+// 本组恢复默认(仅重置输入框,不自动保存,需点保存文案)
+function resetTextGroup(gi){
+  const items=TEXT_GROUPS[gi][1];
+  items.forEach(([k])=>{ const el=$('#textTable').querySelector(`[data-tx="${k}"]`); if(el){ el.value=el.dataset.def; onTxtInput(el); } });
+  toast('已重置本组输入框,点【💾 保存文案】生效');
+}
+// 搜索过滤
+function filterText(q){
+  q=(q||'').trim().toLowerCase();
+  document.querySelectorAll('.txt-group').forEach(g=>{
+    let anyVisible=false;
+    g.querySelectorAll('.txt-row').forEach(row=>{
+      const k=row.dataset.k.toLowerCase(), label=row.dataset.label.toLowerCase();
+      const val=(row.querySelector('.txt-row-input').value||'').toLowerCase();
+      const hit=!q||k.includes(q)||label.includes(q)||val.includes(q);
+      row.style.display=hit?'block':'none'; if(hit) anyVisible=true;
+    });
+    // 搜索时自动展开有命中的组,无命中隐藏整组
+    g.style.display=anyVisible?'block':'none';
+    if(q&&anyVisible){ g.querySelector('.txt-grp-body').style.display='block'; g.querySelector('.txt-grp-caret').textContent='▾'; }
+  });
+}
+
+$('#themeSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('themePalettes',collectThemePalettes()); });
+$('#bgmSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('roomBgm',collectBgm()); });
+$('#bindSaveBtn')?.addEventListener('click',async()=>{
+  const rt={}; $('#roomThemeTable').querySelectorAll('[data-rt]').forEach(el=>rt[el.dataset.rt]=el.value);
+  const fc={}; $('#fallbackCTable').querySelectorAll('[data-fc]').forEach(el=>fc[el.dataset.fc]=el.value);
+  await saveConfigKey('roomTheme',rt); await saveConfigKey('officialFallbackC',fc);
+});
+$('#textSaveBtn')?.addEventListener('click',async()=>{
+  const tx={}; $('#textTable').querySelectorAll('[data-tx]').forEach(el=>tx[el.dataset.tx]=el.value);
+  await saveConfigKey('text',tx);
+});
+
+
+// ---- 🎼 曲风池 ----
+let _ssDraft = null;   // 前端编辑中的曲风数组 (保存或切换 tab 才写回)
+const WAVE_OPTS = ['sine','triangle','sawtooth','square'];
+const GROOVE_OPTS = ['four','lofi','boom'];
+const SCALE_OPTS = ['minP','majP','major','minor'];
+const TTS_STYLE_OPTS = ['high','lazy','sweet','gu','meng','normal'];
+
+async function loadSongStyles(){
+  const cfg = await loadConfig();
+  _ssDraft = JSON.parse(JSON.stringify( (cfg&&cfg.songStyles) || CFG_DEFAULT.songStyles ));
+  renderSongStyles();
+}
+
+function renderSongStyles(){
+  const box = $('#songStylesList'); if(!box) return;
+  if(!_ssDraft || !_ssDraft.length){
+    box.innerHTML = '<p style="color:var(--sub);font-size:12px;padding:16px;text-align:center">还没有曲风, 点下方「+ 新增曲风」添加</p>';
+    return;
+  }
+  box.innerHTML = _ssDraft.map((s,i)=>ssItemHtml(s,i)).join('');
+  // 绑定各种字段联动
+  box.querySelectorAll('[data-ssidx]').forEach(el=>{
+    const i = +el.dataset.ssidx, k = el.dataset.sskey;
+    if(el.type==='number' || el.dataset.ssnum==='1'){
+      el.oninput = ()=>{ _ssDraft[i][k] = parseFloat(el.value)||0; markDirty(); if(k==='color') syncColor(i); };
+    } else if(el.dataset.ssjson==='1'){
+      el.oninput = ()=>{ try{ _ssDraft[i][k] = JSON.parse(el.value); el.style.borderColor='var(--line)'; markDirty(); }catch(e){ el.style.borderColor='#E63946'; } };
+    } else if(el.dataset.ssnested==='1'){
+      // tts.rate / tts.pitch 这类嵌套
+      const [par,child] = k.split('.');
+      el.oninput = ()=>{ if(!_ssDraft[i][par]) _ssDraft[i][par]={}; _ssDraft[i][par][child] = parseFloat(el.value)||0; markDirty(); };
+    } else {
+      el.oninput = ()=>{ _ssDraft[i][k] = el.value; markDirty(); if(k==='color') syncColor(i); if(k==='name'||k==='sub'||k==='emoji') refreshItemHeader(i); };
+      el.onchange = el.oninput;
+    }
+  });
+  // 拖排序 - 手柄 mousedown 启动
+  box.querySelectorAll('.ss-drag').forEach(h=>{
+    h.addEventListener('mousedown', e=>ssDragStart(e, +h.dataset.dragidx));
+    h.addEventListener('touchstart', e=>ssDragStart(e, +h.dataset.dragidx), {passive:false});
+  });
+  // 删除 / 展开
+  box.querySelectorAll('.ss-del').forEach(b=>b.onclick=()=>{
+    const i = +b.dataset.delidx;
+    confirmBox(`删除曲风「${_ssDraft[i].name}」? 无法撤销。`, '确认删除').then(ok=>{
+      if(ok){ _ssDraft.splice(i,1); renderSongStyles(); markDirty(); }
+    });
+  });
+  box.querySelectorAll('.ss-toggle').forEach(b=>b.onclick=()=>{
+    const i = +b.dataset.togidx;
+    const adv = box.querySelector(`[data-adv="${i}"]`);
+    if(adv){ const on = adv.style.display==='none'; adv.style.display = on?'block':'none'; b.textContent = on?'⌃ 收起':'⌄ 高级'; }
+  });
+}
+
+function ssItemHtml(s,i){
+  const color = s.color || '#0ABAB5';
+  return `<div class="ss-item" data-ssrow="${i}" style="border:1px solid var(--line);border-left:3px solid ${color};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(10,12,24,.3)">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="ss-drag" data-dragidx="${i}" style="cursor:grab;color:var(--dim);font-size:16px;user-select:none;padding:0 4px" title="拖动排序">≡</span>
+      <span class="ss-heademoji" style="font-size:20px">${s.emoji||'🎵'}</span>
+      <div style="flex:1;min-width:200px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:11px;color:var(--dim)">ID</label>
+        <input data-ssidx="${i}" data-sskey="id" value="${esc(s.id||'')}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
+        <label style="font-size:11px;color:var(--dim)">名字</label>
+        <input data-ssidx="${i}" data-sskey="name" value="${esc(s.name||'')}" style="width:90px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
+        <label style="font-size:11px;color:var(--dim)">副标</label>
+        <input data-ssidx="${i}" data-sskey="sub" value="${esc(s.sub||'')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
+        <label style="font-size:11px;color:var(--dim)">emoji</label>
+        <input data-ssidx="${i}" data-sskey="emoji" value="${esc(s.emoji||'')}" style="width:50px;text-align:center;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:14px">
+        <label style="font-size:11px;color:var(--dim)">色</label>
+        <input type="color" data-ssidx="${i}" data-sskey="color" value="${/^#[0-9a-fA-F]{6}$/.test(color)?color:'#0ABAB5'}" style="width:28px;height:24px;padding:0;border:1px solid var(--line2);border-radius:4px;background:none;cursor:pointer">
+        <input data-ssidx="${i}" data-sskey="color" value="${esc(color)}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:11px">
+      </div>
+      <button class="mini-btn ss-toggle" data-togidx="${i}" style="font-size:11px;padding:3px 8px">⌄ 高级</button>
+      <button class="mini-btn ss-del" data-delidx="${i}" style="font-size:11px;padding:3px 8px;border-color:#E63946;color:#E63946">删</button>
+    </div>
+    <div data-adv="${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:12px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+        ${advField(i,'subEn','副标英文',s.subEn||'','text')}
+        ${advField(i,'bpm','BPM',s.bpm||0,'num')}
+        ${advField(i,'bpc','每拍(小节)',s.bpc||0.5,'num')}
+        ${advField(i,'base','根音偏移',s.base||0,'num')}
+        ${advSelect(i,'scale','音阶',s.scale||'major',SCALE_OPTS)}
+        ${advSelect(i,'wave','主波形',s.wave||'sine',WAVE_OPTS)}
+        ${advSelect(i,'bass','贝斯波形',s.bass||'sine',WAVE_OPTS)}
+        ${advSelect(i,'groove','鼓型',s.groove||'four',GROOVE_OPTS)}
+        ${advSelect(i,'ttsStyle','TTS 风格',s.ttsStyle||'normal',TTS_STYLE_OPTS)}
+        ${advField(i,'playRate','AI 播放速率',s.playRate||1.0,'num')}
+        ${advField(i,'tts.rate','TTS 语速',(s.tts&&s.tts.rate)||1.0,'nested')}
+        ${advField(i,'tts.pitch','TTS 音高',(s.tts&&s.tts.pitch)||1.0,'nested')}
+      </div>
+      <div style="margin-top:8px">
+        ${advField(i,'motif','旋律 motif (JSON 数组 8 个)',JSON.stringify(s.motif||[]),'json')}
+      </div>
+      <div style="margin-top:8px">
+        ${advField(i,'chords','和弦 chords (JSON 数组 4 个)',JSON.stringify(s.chords||[]),'json')}
+      </div>
+      <div style="margin-top:8px">
+        ${advField(i,'coverPrompt','AI 生成 prompt',s.coverPrompt||'','textarea')}
+      </div>
+    </div>
+  </div>`;
+}
+function advField(i,key,label,val,type){
+  const common = `data-ssidx="${i}" data-sskey="${key}"`;
+  const nested = type==='nested' ? ` data-ssnested="1"` : '';
+  const num = type==='num' ? ` data-ssnum="1"` : '';
+  const jsn = type==='json' ? ` data-ssjson="1"` : '';
+  if(type==='textarea'){
+    return `<div style="grid-column:1 / -1"><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+      <textarea ${common} style="width:100%;min-height:44px;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:11.5px;font-family:monospace">${esc(val)}</textarea></div>`;
+  }
+  if(type==='json'){
+    return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+      <input ${common}${jsn} value="${esc(val)}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-family:monospace;font-size:11px"></div>`;
+  }
+  const kind = type==='num'||type==='nested' ? 'number step=0.01' : 'text';
+  return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+    <input type="${kind}" ${common}${nested}${num} value="${esc(val)}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px"></div>`;
+}
+function advSelect(i,key,label,val,opts){
+  return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+    <select data-ssidx="${i}" data-sskey="${key}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
+      ${opts.map(o=>`<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('')}
+    </select></div>`;
+}
+function syncColor(i){
+  const row = document.querySelector(`[data-ssrow="${i}"]`); if(!row) return;
+  row.style.borderLeftColor = _ssDraft[i].color || '#0ABAB5';
+  // color picker 和文本框互相同步
+  const inputs = row.querySelectorAll('[data-sskey="color"]');
+  inputs.forEach(el=>{ if(el.value!==_ssDraft[i].color) el.value = _ssDraft[i].color; });
+}
+function refreshItemHeader(i){
+  const row = document.querySelector(`[data-ssrow="${i}"]`); if(!row) return;
+  const emo = row.querySelector('.ss-heademoji'); if(emo) emo.textContent = _ssDraft[i].emoji||'🎵';
+}
+
+// ---- 拖排序 ----
+let _ssDragging = null, _ssDragPreview = null;
+function ssDragStart(ev, idx){
+  ev.preventDefault();
+  _ssDragging = idx;
+  const row = document.querySelector(`[data-ssrow="${idx}"]`);
+  if(row){ row.style.opacity='0.5'; row.style.transform='scale(0.98)'; }
+  document.body.style.cursor = 'grabbing';
+  const move = e=>{
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const rows = [...document.querySelectorAll('[data-ssrow]')];
+    for(const r of rows){
+      const rc = r.getBoundingClientRect();
+      if(y >= rc.top && y <= rc.bottom){
+        const target = +r.dataset.ssrow;
+        if(target !== _ssDragging){
+          // 数组交换到 target 位置
+          const it = _ssDraft.splice(_ssDragging, 1)[0];
+          _ssDraft.splice(target, 0, it);
+          _ssDragging = target;
+          renderSongStyles();
+          markDirty();
+          // 重新拾起
+          const nr = document.querySelector(`[data-ssrow="${target}"]`);
+          if(nr){ nr.style.opacity='0.5'; nr.style.transform='scale(0.98)'; }
+        }
+        break;
+      }
+    }
+  };
+  const up = ()=>{
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('touchmove', move);
+    document.removeEventListener('mouseup', up);
+    document.removeEventListener('touchend', up);
+    document.body.style.cursor = '';
+    if(_ssDragging !== null){
+      const row = document.querySelector(`[data-ssrow="${_ssDragging}"]`);
+      if(row){ row.style.opacity=''; row.style.transform=''; }
+    }
+    _ssDragging = null;
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', up);
+  document.addEventListener('touchend', up);
+}
+
+// ---- 新增/保存/重置 按钮 ----
+$('#ssAddBtn')?.addEventListener('click', ()=>{
+  if(!_ssDraft) _ssDraft = [];
+  const newId = 'style'+Date.now().toString(36).slice(-4);
+  _ssDraft.push({
+    id: newId, name:'新曲风', sub:'新副标题', subEn:'New Style', emoji:'🎵', color:'#0ABAB5',
+    bpm:100, bpc:0.5, base:0, scale:'major',
+    motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],
+    wave:'sine', bass:'sine', groove:'four',
+    tts:{rate:1.0, pitch:1.0}, ttsStyle:'normal', playRate:1.0,
+    coverPrompt:'New music style'
+  });
+  renderSongStyles();
+  markDirty();
+});
+$('#ssSaveBtn')?.addEventListener('click', async()=>{
+  if(!_ssDraft || !_ssDraft.length){ toast('至少保留一个曲风'); return; }
+  // 校验 id 唯一 + 非空
+  const ids = _ssDraft.map(s=>String(s.id||'').trim());
+  if(ids.some(id=>!id)){ toast('id 不能为空'); return; }
+  if(new Set(ids).size !== ids.length){ toast('id 有重复, 请修正'); return; }
+  if(await saveConfigKey('songStyles', _ssDraft)){
+    if(CFG_CACHE) CFG_CACHE.songStyles = _ssDraft;
+    try{ clearDirty(); }catch(_){}
+    loadSongStyles();
+  }
+});
+$('#ssResetBtn')?.addEventListener('click', ()=>{
+  resetConfigKeys(['songStyles'], loadSongStyles, '曲风池');
+});
+
+// ---- 👊 互动管理 ----
+let _ixDraft=[];
+const IX_CATS=[['hit','打击/整蛊'],['warm','温情'],['vibe','氛围'],['fun','其它']];
+async function loadInteractionsAdmin(){
+  const res=await api('/interactions'); if(!res.ok){ $('#ixList').innerHTML='<div class="empty">加载失败</div>'; return; }
+  _ixDraft=(res.body.items||[]).map(x=>({...x, fx:x.fx||{}}));
+  renderIxList();
+}
+function renderIxList(){
+  const box=$('#ixList'); if(!box) return;
+  box.innerHTML=_ixDraft.map((ix,i)=>{
+    const fx=ix.fx||{};
+    const chk=(k,label)=>`<label class="ix-chk"><input type="checkbox" data-i="${i}" data-fx="${k}" ${fx[k]?'checked':''}>${label}</label>`;
+    const txt=(k,ph)=>`<input class="ix-fxin" data-i="${i}" data-fxs="${k}" value="${esc(fx[k]||'')}" placeholder="${ph}">`;
+    return `<div class="ix-card">
+      <div class="ix-row">
+        <input class="ix-in ix-emoji" data-i="${i}" data-k="emoji" value="${esc(ix.emoji||'')}" placeholder="👊" maxlength="8">
+        <input class="ix-in" data-i="${i}" data-k="name" value="${esc(ix.name||'')}" placeholder="名称" style="flex:1">
+        <input class="ix-in ix-id" data-i="${i}" data-k="id" value="${esc(ix.id||'')}" placeholder="id(英文)" maxlength="24" style="width:90px">
+        <select class="ix-in" data-i="${i}" data-k="category" style="width:100px">${IX_CATS.map(c=>`<option value="${c[0]}"${ix.category===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
+      </div>
+      <input class="ix-in" data-i="${i}" data-k="text_tpl" value="${esc(ix.text_tpl||'')}" placeholder="文案模板, 用 {from} {to}, 如: {from} 打了 {to} 一拳" style="width:100%;margin-top:6px">
+      <div class="ix-fxrow">
+        ${chk('shake','抖动')}${chk('rain','纸屑雨')}
+        ${txt('flash','闪屏色#')} ${txt('fly','飞行物emoji')} ${txt('burst','撒射emoji')} ${txt('glow','光环色#')}
+        <input class="ix-fxin" data-i="${i}" data-fxv="1" value="${(fx.vibrate||[]).join(',')}" placeholder="震动 如40,30,60" style="width:110px">
+        <input class="ix-fxin" data-i="${i}" data-fxs="sfx" value="${esc(fx.sfx||'')}" placeholder="音效 punch/echo/receive" style="width:150px">
+      </div>
+      <div class="ix-row2">
+        <label class="ix-chk"><input type="checkbox" data-i="${i}" data-k2="can_target_soul" ${ix.can_target_soul!==false?'checked':''}>可对灵魂</label>
+        <label class="ix-chk"><input type="checkbox" data-i="${i}" data-k2="enabled" ${ix.enabled!==false?'checked':''}>启用</label>
+        <input class="ix-in" data-i="${i}" data-k="cooldown_ms" value="${ix.cooldown_ms||4000}" placeholder="冷却ms" style="width:80px" type="number">
+        <input class="ix-in" data-i="${i}" data-k="sort" value="${ix.sort||0}" placeholder="排序" style="width:60px" type="number">
+        <button class="mini-btn ix-save" data-i="${i}" style="border-color:var(--cyan);color:var(--cyan)">💾 保存</button>
+        <button class="mini-btn ix-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta)">删除</button>
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty">暂无互动</div>';
+  // 绑定输入 → 回写 _ixDraft
+  box.querySelectorAll('.ix-in[data-k]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix) ix[el.dataset.k]=el.value; });
+  box.querySelectorAll('input[data-k2]').forEach(el=>el.onchange=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix) ix[el.dataset.k2]=el.checked; });
+  box.querySelectorAll('input[data-fx]').forEach(el=>el.onchange=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; if(el.checked) ix.fx[el.dataset.fx]=true; else delete ix.fx[el.dataset.fx]; } });
+  box.querySelectorAll('.ix-fxin[data-fxs]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; if(el.value.trim()) ix.fx[el.dataset.fxs]=el.value.trim(); else delete ix.fx[el.dataset.fxs]; } });
+  box.querySelectorAll('.ix-fxin[data-fxv]').forEach(el=>el.oninput=()=>{ const ix=_ixDraft[+el.dataset.i]; if(ix){ ix.fx=ix.fx||{}; const arr=el.value.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)); if(arr.length) ix.fx.vibrate=arr; else delete ix.fx.vibrate; } });
+  box.querySelectorAll('.ix-save').forEach(b=>b.onclick=()=>saveIx(_ixDraft[+b.dataset.i]));
+  box.querySelectorAll('.ix-del').forEach(b=>b.onclick=()=>delIx(+b.dataset.i));
+}
+async function saveIx(ix){
+  if(!ix) return;
+  if(!String(ix.id||'').trim()){ toast('id 不能为空(英文)'); return; }
+  const res=await api('/interaction-save',{method:'POST',body:ix});
+  if(res.ok){ toast('已保存 '+(ix.name||ix.id)); loadInteractionsAdmin(); } else toast(res.body?.error||'保存失败');
+}
+async function delIx(i){
+  const ix=_ixDraft[i]; if(!ix) return;
+  if(!await (typeof confirmBox==='function'?confirmBox('删除互动「'+(ix.name||ix.id)+'」?'):Promise.resolve(confirm('删除?')))) return;
+  if(ix.id){ const res=await api('/interaction-delete',{method:'POST',body:{id:ix.id}}); if(!res.ok){ toast('删除失败'); return; } }
+  toast('已删除'); loadInteractionsAdmin();
+}
+$('#ixAddBtn')?.addEventListener('click',()=>{ _ixDraft.push({id:'',name:'新互动',emoji:'✨',category:'fun',fx:{},cooldown_ms:4000,can_target_soul:true,enabled:true,sort:(_ixDraft.length+1)*10}); renderIxList(); });
+
+// ---- 🎤 真人清唱风味池(eh_config.humanSingStyles, 走通用 /config) ----
+async function loadHumanSing(){
+  const ta=$('#humanSingTa'); if(!ta) return;
+  const r=await api('/config');
+  let arr=[];
+  if(r.ok && Array.isArray(r.body.config)){ const row=r.body.config.find(x=>x.key==='humanSingStyles'); if(row && Array.isArray(row.value)) arr=row.value; }
+  ta.value=arr.join('\n');
+}
+$('#humanSingSave')?.addEventListener('click',async()=>{
+  const ta=$('#humanSingTa'); if(!ta) return;
+  const arr=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!arr.length){ toast('至少留一种唱腔'); return; }
+  await saveConfigKey('humanSingStyles', arr);
+});
+
+// ---- 📋 全站日志 ----
+const AUDIT_KEY_LABEL = {
+  themePalettes:'🎨 主题配色', themes:'🎨 主题元数据', roomTheme:'🏠 官方房主题绑定',
+  officialFallbackC:'🏠 官方房兜底色', publicThemePool:'🏠 公开房主题池', privateThemePool:'🏠 私密房主题池', roomThemeOverride:'🏠 房间主题手动覆盖', roomKindC:'🏠 房间类型强调色', roomBgm:'🎵 BGM',
+  text:'📝 文案', identityPool:'🎭 身份池', tuning:'⚙️ 运行参数', songStyles:'🎼 曲风池'
+};
+const LOG_TAG_LABEL={
+  config_update:'💾 配置保存', config_rollback:'↩ 配置回滚',
+  room_create:'🏠 建房', room_dissolve:'🧨 解散房间', member_kick:'🥾 踢人', room_update:'⚙️ 改房间设置',
+  room_enter:'🚪 进房', room_leave:'👋 离房'
+};
+function normalizeLogRow(row){
+  const p=row.payload||{};
+  const key=p.key || row.target_name || '';
+  const tag=row.tag || p.action || 'unknown';
+  return {
+    id: row.id,
+    scope: row.scope || 'admin', tag,
+    key, label: AUDIT_KEY_LABEL[key] || LOG_TAG_LABEL[tag] || tag,
+    actor: row.actor_name || p.admin || '?',
+    room: row.room_name || p.name || p.room_name || '',
+    ts: row.created_at || p.ts || row.ts,
+    prevValue: p.prevValue, newValue: p.newValue,
+    hadPrev: Object.prototype.hasOwnProperty.call(p,'prevValue') && p.prevValue !== null,
+    raw: row
+  };
+}
+async function loadAuditLog(){
+  const box = $('#auditList'); if(!box) return;
+  box.innerHTML = '<p style="color:var(--dim);text-align:center;padding:20px">读取中…</p>';
+  const qs=[]; const sc=$('#auditScope')?.value||''; const tag=$('#auditTag')?.value||'';
+  if(sc) qs.push('scope='+encodeURIComponent(sc));
+  if(tag) qs.push('tag='+encodeURIComponent(tag));
+  qs.push('limit=200');
+  const r = await api('/logs?'+qs.join('&'));
+  if(!r.ok){ box.innerHTML = '<p style="color:#E63946;text-align:center;padding:20px">读取失败: '+esc(r.body?.error||'unknown')+'</p>'; return; }
+  const log = (r.body?.logs || []).map(normalizeLogRow);
+  if(!log.length){ box.innerHTML = '<p style="color:var(--dim);text-align:center;padding:20px">还没有日志。配置保存或前台用户行为发生后会记录在这里。</p>'; return; }
+  box.innerHTML = log.map((e,i)=>auditItemHtml(e,i)).join('');
+  box.querySelectorAll('[data-rbidx]').forEach(b=>b.onclick=async()=>{
+    const i = +b.dataset.rbidx;
+    const e = log[i];
+    if(e.scope!=='admin' || !e.hadPrev || !e.key){ toast('这条日志不可回滚'); return; }
+    const label = AUDIT_KEY_LABEL[e.key] || e.key;
+    const ok = await confirmBox(`确认把「${label}」恢复到变更前的值吗?\n\n当前值将被覆盖, 但会保留在日志中(可再次回滚)。`, '确认回滚');
+    if(!ok) return;
+    const res = await api('/rollback', { method:'POST', body:{ key:e.key, value:e.prevValue } });
+    if(res.ok){ toast('已回滚: '+label); CFG_CACHE = null; loadAuditLog(); }
+    else toast(res.body?.error || '回滚失败');
+  });
+  box.querySelectorAll('[data-vwidx]').forEach(b=>b.onclick=()=>{
+    const i = +b.dataset.vwidx;
+    const e = log[i];
+    const old = document.getElementById('auditDetail'); if(old && old.dataset.open===String(i)){ old.remove(); return; }
+    const detail = document.createElement('div');
+    detail.id = 'auditDetail'; detail.dataset.open = i;
+    detail.style.cssText = 'margin-top:8px;padding:10px 12px;border:1px dashed var(--line2);border-radius:6px;background:rgba(0,0,0,.3);font-size:11px;font-family:monospace;max-height:300px;overflow:auto';
+    detail.innerHTML = `<div style="color:var(--dim);margin-bottom:6px">◆ 原始日志 raw:</div>
+      <pre style="margin:0;white-space:pre-wrap;word-break:break-all;color:var(--sub)">${esc(JSON.stringify(e.raw,null,2))}</pre>`;
+    const row = document.querySelector(`[data-auditrow="${i}"]`);
+    if(row){ const old2 = document.getElementById('auditDetail'); if(old2) old2.remove(); row.appendChild(detail); }
+  });
+}
+function auditItemHtml(e,i){
+  const ts = e.ts ? new Date(e.ts).toLocaleString('zh-CN',{hour12:false}) : '?';
+  const isAdmin=e.scope==='admin';
+  const scopeTag = isAdmin
+    ? '<span style="background:var(--cyan);color:#000;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">admin</span>'
+    : '<span style="background:#B57EDC;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">user</span>';
+  const tagLabel = LOG_TAG_LABEL[e.tag] || e.tag;
+  const rbBtn = (isAdmin && e.hadPrev && e.key)
+    ? `<button class="mini-btn" data-rbidx="${i}" style="border-color:#F7C873;color:#F7C873;font-size:11px;padding:3px 10px">↩ 恢复到变更前</button>`
+    : `<span style="color:var(--dim);font-size:11px">${isAdmin?'无可回滚历史':'前台行为日志'}</span>`;
+  const room = e.room ? `<span style="color:var(--sub);font-size:11.5px">🏠 ${esc(e.room)}</span>` : '';
+  return `<div data-auditrow="${i}" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(10,12,24,.3)">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      ${scopeTag}
+      <span style="font-weight:600;color:var(--ink);font-size:13px">${esc(tagLabel)}</span>
+      <span style="color:var(--sub);font-size:11.5px;font-family:monospace">${esc(e.key||e.tag)}</span>
+      ${room}
+      <span style="flex:1"></span>
+      <span style="color:var(--dim);font-size:11.5px">🕒 ${esc(ts)}</span>
+      <span style="color:var(--sub);font-size:11.5px">👤 ${esc(e.actor||'?')}</span>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="mini-btn" data-vwidx="${i}" style="border-color:var(--line2);color:var(--sub);font-size:11px;padding:3px 10px">⌄ 查看详情</button>
+      ${rbBtn}
+    </div>
+  </div>`;
+}
+$('#auditRefreshBtn')?.addEventListener('click', loadAuditLog);
+$('#auditScope')?.addEventListener('change', loadAuditLog);
+$('#auditTag')?.addEventListener('change', loadAuditLog);
+
+// ---- ↺ 恢复默认: 把 CFG_DEFAULT 对应 key 写回后台 + 重新渲染当前 tab ----
+async function resetConfigKeys(keys, reRender, label){
+  if(!await confirmBox('确定把【'+label+'】恢复为系统默认值？当前修改将被覆盖。','恢复默认')) return;
+  for(const k of keys){
+    const def=JSON.parse(JSON.stringify(CFG_DEFAULT[k]));
+    if(CFG_CACHE) CFG_CACHE[k]=def;
+    await saveConfigKey(k, def);
+  }
+  if(reRender) reRender();
+  toast('已恢复默认: '+label);
+}
+$('#themeResetBtn')?.addEventListener('click',()=>resetConfigKeys(['themePalettes'], loadTheme, '主题配色'));
+$('#bgmResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomBgm'], loadBgm, 'BGM'));
+$('#bindResetBtn')?.addEventListener('click',()=>resetConfigKeys(['roomTheme','officialFallbackC'], loadTextBind, '房间绑定'));
+$('#textResetBtn')?.addEventListener('click',()=>resetConfigKeys(['text'], loadTextBind, '界面文案'));
+$('#textSearchInput')?.addEventListener('input',e=>filterText(e.target.value));
+
+// ---- ⚙️ 运行参数 UI ----
+// [key, 中文名, 单位/说明, options?] options 非空=下拉选择(枚举); 空=数字输入
+const TUNING_FIELDS=[
+  ['publicRecentLimit','公开房进房显示条数','公开/官方房一次拉最近多少条(上限500)'],
+  ['historyPage','私密房每页条数','私密房「加载更早」翻页步长'],
+  ['prefetchN','预取条数','列表页悬停/进房预取的消息数'],
+  ['prefetchTtlMs','预取缓存有效期','毫秒, 超时重拉'],
+  ['voidTtlMs','虚空消息存活','毫秒, 默认300000=5分钟'],
+  ['onlineWindowMs','在线判定窗口','毫秒, 多久内有心跳算在线'],
+  ['resonanceThreshold','共鸣触发阈值','单条消息某表情达到此数触发全房共鸣'],
+  ['voiceMaxSec','语音最大时长','秒'],
+  ['singMode','神曲实现方式','ai=大模型真歌合成(发送后后台生成完未可播); legacy=本地合成哼唱+系统念字(零延迟, 不依赖后端)', [['ai','ai —— 大模型真歌'],['legacy','legacy —— 本地合成']]],
+];
+async function loadTuning(){
+  const cfg=await loadConfig();
+  const t=(cfg&&cfg.tuning)||CFG_DEFAULT.tuning;
+  const def=CFG_DEFAULT.tuning;
+  let html='<div style="overflow-x:auto"><table><thead><tr><th>参数</th><th>值</th><th>说明</th></tr></thead><tbody>';
+  TUNING_FIELDS.forEach(([k,label,hint,options])=>{
+    const cur=(t[k]!=null)?t[k]:def[k];
+    const changed=cur!==def[k];
+    html+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:10px">改</span>':''}<div style="font-family:monospace;font-size:10px;color:var(--dim)">${k}</div></td>`;
+    if(options && options.length){
+      // 枚举下拉
+      const opts=options.map(([v,label])=>`<option value="${esc(v)}"${String(v)===String(cur)?' selected':''}>${esc(label)}</option>`).join('');
+      html+=`<td><select data-tune="${k}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none">${opts}</select></td>`;
+    } else {
+      html+=`<td><input type="number" data-tune="${k}" value="${cur}" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+    }
+    html+=`<td style="color:var(--dim);font-size:11.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${def[k]}</span></td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  $('#tuningTable').innerHTML=html;
+}
+function collectTuning(){
+  const def=CFG_DEFAULT.tuning; const out={};
+  TUNING_FIELDS.forEach(([k,label,hint,options])=>{
+    const el=$(`#tuningTable [data-tune="${k}"]`);
+    if(!el){ out[k]=def[k]; return; }
+    if(options && options.length){
+      // 枚举字符串
+      const v=el.value; const valid=options.some(o=>o[0]===v);
+      out[k]=valid?v:def[k];
+    } else {
+      let v=parseInt(el.value,10);
+      if(isNaN(v)||v<0) v=def[k];
+      if(k==='publicRecentLimit') v=Math.min(v,500);
+      out[k]=v;
+    }
+  });
+  return out;
+}
+$('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
+
+// ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
+$('#purgeCacheBtn')?.addEventListener('click',async()=>{
+  if(!await confirmBox('确定重建全端客户端缓存吗？\n所有客户端将在下次进入时丢弃本地缓存、重新拉取最新聊天记录。','重建客户端缓存')) return;
+  const btn=$('#purgeCacheBtn'), hint=$('#purgeCacheHint');
+  btn.disabled=true; const old=btn.textContent; btn.textContent='重建中…';
+  try{
+    // 基于后端真实 tuning 值 spread, 只改 cachePurgeAt, 绝不覆盖其他运行参数
+    let cur;
+    try{ const cfg=await loadConfig(); cur=(cfg&&cfg.tuning)?cfg.tuning:null; }catch(_){ cur=null; }
+    if(!cur){ cur=(CFG_CACHE&&CFG_CACHE.tuning)||JSON.parse(JSON.stringify(CFG_DEFAULT.tuning)); }
+    const now=Date.now();
+    const v=Object.assign({}, cur, { cachePurgeAt: now });
+    if(await saveConfigKey('tuning', v)){
+      if(CFG_CACHE) CFG_CACHE.tuning=v;
+      const t=new Date(now); const hh=String(t.getHours()).padStart(2,'0'), mm=String(t.getMinutes()).padStart(2,'0');
+      if(hint) hint.textContent = ' ✓ 已触发重建（'+hh+':'+mm+'），客户端下次进入自动生效';
+      toast('已触发全端缓存重建');
+    }else{
+      toast('重建失败，请重试');
+    }
+  }catch(e){ toast('重建失败: '+(e&&e.message||e)); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+});
+$('#tuningResetBtn')?.addEventListener('click',()=>resetConfigKeys(['tuning'], loadTuning, '运行参数'));
+
+// ---- 🎭 身份随机池 UI ----
+async function renderIdentityPool(){
+  let cfg;
+  try{ cfg=await loadConfig(); }catch(_){ cfg={identityPool:JSON.parse(JSON.stringify(CFG_DEFAULT.identityPool))}; }
+  const p=(cfg&&cfg.identityPool)||CFG_DEFAULT.identityPool;
+  const rows=[['adjectives','形容词(前缀)','如量子/霓虹/赛博'],['animals','动物(后缀)','如水獭/狐狸/渡鸦'],['voidNames','虚空名','完整名,不拼接']];
+  let html='';
+  rows.forEach(([k,label,hint])=>{
+    const arr=p[k]||[];
+    html+=`<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">${label} <span style="color:var(--dim);font-size:10.5px">${hint} · ${arr.length}个</span></div>`;
+    html+=`<textarea data-pool="${k}" rows="3" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;resize:vertical;box-sizing:border-box" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'">${esc(arr.join(', '))}</textarea></div>`;
+  });
+  $('#poolPanel').innerHTML=html;
+}
+function collectPool(){
+  const p={};
+  $('#poolPanel').querySelectorAll('[data-pool]').forEach(t=>{
+    p[t.dataset.pool]=t.value.split(',').map(s=>s.trim()).filter(Boolean);
+  });
+  return p;
+}
+$('#poolSaveBtn')?.addEventListener('click',async()=>{
+  const p=collectPool();
+  if(!p.adjectives.length||!p.animals.length){ toast('形容词/动物不能为空'); return; }
+  await saveConfigKey('identityPool', p);
+});
+$('#poolResetBtn')?.addEventListener('click',()=>resetConfigKeys(['identityPool'], renderIdentityPool, '身份池'));
+$('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
+
+// tabs
+// 未保存防护: 编辑页(主题/BGM/文案/参数/身份池)输入框被改→dirty; 切tab/关页前拦截提醒, 防静默丢改动。
+let _pageDirty=false;
+const EDIT_PAGES=['theme','bgm','text','tuning','songstyles'];
+function markDirty(){ _pageDirty=true; }
+function clearDirty(){ _pageDirty=false; }
+// 事件委托: 这些页的输入框一改就置 dirty(保存/恢复默认后各处会重渲染, 用 clearDirty 复位)
+['p-theme','p-bgm','p-text','p-tuning'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
+// 保存后清 dirty: saveConfigKey 内部末尾已调 clearDirty(见其定义), 这里只挂关页拦截
+window.addEventListener('beforeunload',e=>{ if(_pageDirty){ e.preventDefault(); e.returnValue=''; } });
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
+  const cur=document.querySelector('.tab.on');
+  // 从编辑页切走且有未保存改动 → 二次确认
+  if(_pageDirty && cur && EDIT_PAGES.includes(cur.dataset.page) && cur!==t){
+    if(!await confirmBox('当前有未保存的修改, 切换页面将丢弃。确定离开?','未保存的修改')) return;
+    clearDirty();
+  }
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  $('#p-'+t.dataset.page).classList.add('on');
+  if(t.dataset.page==='admins') loadAdmins();
+  if(t.dataset.page==='rooms') loadRooms();
+  if(t.dataset.page==='theme') loadTheme();
+  if(t.dataset.page==='bgm') loadBgm();
+  if(t.dataset.page==='text') loadTextBind();
+  if(t.dataset.page==='tuning') loadTuning();
+  if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }
+  if(t.dataset.page==='audit') loadAuditLog();
+  clearDirty();   // 进入新页(重渲染)后复位
+});
+$('#authBtn').onclick=doAuth;
+$('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
+$('#username').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#password').focus(); });
+$('#logoutBtn').onclick=async()=>{ if(!await confirmBox('确定退出登录？','退出')) return; await sb.auth.signOut(); location.reload(); };
+
+// 启动: 先显示验证遮罩, 检查同源已有登录态(与前台共享 session)→
+// 有效直接进面板(无感,不重登); 无效/无权限才显示登录框。
+(async()=>{
+  function showLogin(){ $('#authBoot').classList.add('hide'); $('#auth').classList.add('show'); }
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session && await loadMe()){ enterPanel(); return; }
+  }catch(e){ console.warn('[EH后台] 登录态检查异常', e&&e.message); }
+  showLogin();
+})();
+</script>
+</body>
+</html>
