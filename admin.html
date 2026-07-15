@@ -38,7 +38,7 @@
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
     --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#717EA9;
-    --cyan:#28E6D8; --magenta:#FF3CAC; --violet:#8B5CFF; --amber:#FFB84D; --green:#4DE38A;
+    --cyan:#0ABAB5; --magenta:#FF6F61; --violet:#B57EDC; --amber:#F7C873; --green:#1DE9B6;
     --grid:rgba(80,120,255,.05);
     --glow-cyan:0 0 24px rgba(40,230,216,.5);
   }
@@ -48,7 +48,7 @@
     --cyan:#38E1D0; --magenta:#FF3D9A; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --grid:rgba(255,120,220,.06); }
   html[data-theme="mono"]{ --bg:#000; --bg2:#0a0a0c; --panel:rgba(16,16,20,.82); --panel-solid:#0e0e12;
     --line:rgba(210,180,120,.16); --line2:rgba(210,180,120,.3); --ink:#F4F1E9; --sub:#B8B0A0; --dim:#827B6D;
-    --cyan:#E9C877; --magenta:#E9C877; --violet:#D8B85C; --amber:#E9C877; --green:#C9BE96; --grid:rgba(210,180,120,.035); }
+    --cyan:#F7E7CE; --magenta:#F7E7CE; --violet:#D8B85C; --amber:#F7E7CE; --green:#C9BE96; --grid:rgba(210,180,120,.035); }
   html[data-theme="aurora"]{ --bg:#0d0620; --bg2:#160a30; --panel:rgba(30,16,56,.72); --panel-solid:#1a0e34;
     --line:rgba(165,92,255,.18); --line2:rgba(165,92,255,.32); --ink:#F2EAFF; --sub:#C4A8E8; --dim:#8A72B0;
     --cyan:#A55CFF; --magenta:#C77DFF; --violet:#7B4DFF; --amber:#FFCE6B; --green:#9B7BFF; --grid:rgba(140,90,255,.05); }
@@ -645,7 +645,7 @@ function confirmBox(msg,title){
 }
 
 // ===== 皮肤(与前台共用 localStorage eh_theme) =====
-const SKINS=[['cyber','赛博青','#28E6D8'],['vapor','蒸汽波','#FF5FA2'],['mono','暗夜金','#E9C877'],['aurora','极光','#A98BFF']];
+const SKINS=[['cyber','赛博青','#0ABAB5'],['vapor','蒸汽波','#FF5FA2'],['mono','暗夜金','#F7E7CE'],['aurora','极光','#A98BFF']];
 function curTheme(){ try{ return localStorage.getItem('eh_theme')||'cyber'; }catch(e){ return 'cyber'; } }
 function applyTheme(id){ if(id==='cyber') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',id);
   try{ localStorage.setItem('eh_theme',id); }catch(e){} renderSkinMenu(); }
@@ -884,15 +884,15 @@ function styleChipGroups(kind, curVal){
 }
 // persona 定义(与前端 eh-souls.default.js 对齐; 工坊只需展示用字段)
 const SW_PERSONAS=[
-  { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#8B5CFF', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
+  { id:'night_dj', name:'阿夜', emoji:'🌙', color:'#B57EDC', tag:'深夜DJ · 低沉治愈，慢半拍', traits:['治愈','慢半拍','神曲'],
     caps:{voice:true,song:true,emoji:false}, welcomes:['来了啊，坐，这个点还醒着的都是自己人。','欢迎回到深夜频率，要不要我给你放一首？'] },
-  { id:'sunny', name:'小暖', emoji:'☀️', color:'#FFB84D', tag:'元气妹 · 活泼秒回，爱发表情', traits:['元气','秒回','玩梗'],
+  { id:'sunny', name:'小暖', emoji:'☀️', color:'#F7C873', tag:'元气妹 · 活泼秒回，爱发表情', traits:['元气','秒回','玩梗'],
     caps:{voice:true,song:true,emoji:true}, welcomes:['哇你来啦！！等你好久了(才没有~) 😆','欢迎欢迎～快说说今天有什么好玩的！'] },
-  { id:'comedian', name:'老K', emoji:'🎭', color:'#FF3CAC', tag:'段子手 · 毒舌但暖，反差萌', traits:['毒舌','整活','反差萌'],
+  { id:'comedian', name:'老K', emoji:'🎭', color:'#FF6F61', tag:'段子手 · 毒舌但暖，反差萌', traits:['毒舌','整活','反差萌'],
     caps:{voice:false,song:true,emoji:true}, welcomes:['哟，稀客。就差你没来了，现在齐活。','欢迎欢迎，本房笑点承包商已就位。'] },
-  { id:'listener', name:'回音', emoji:'🕳️', color:'#28E6D8', tag:'树洞灵 · 极致共情，少评判', traits:['共情','倾听','不说教'],
+  { id:'listener', name:'回音', emoji:'🕳️', color:'#0ABAB5', tag:'树洞灵 · 极致共情，少评判', traits:['共情','倾听','不说教'],
     caps:{voice:true,song:false,emoji:false}, welcomes:['你来了。这里很安全，想说什么都可以，不想说也没关系。','我在。你不用急着开口，我会一直在这儿。'] },
-  { id:'nerd', name:'图灵', emoji:'⚡', color:'#4DE38A', tag:'知识控 · 理性爱科普，讲冷知识', traits:['理性','科普','冷知识'],
+  { id:'nerd', name:'图灵', emoji:'⚡', color:'#1DE9B6', tag:'知识控 · 理性爱科普，讲冷知识', traits:['理性','科普','冷知识'],
     caps:{voice:false,song:false,emoji:false}, welcomes:['欢迎。今天想聊点什么——技术、脑洞，还是纯粹的冷知识？','新成员接入。有任何好奇的问题，随时问。'] },
 ];
 const PERSONA_LABEL={night_dj:'深夜DJ',sunny:'元气妹',comedian:'段子手',listener:'树洞灵',nerd:'知识控',custom:'自定义'};
@@ -970,7 +970,7 @@ function renderSoulForm(){
       <div class="sw-row">
         <div class="sw-fld" style="flex:2"><label>名字</label><input type="text" id="sf-name" value="${esc(s.name)}" maxlength="40"></div>
         <div class="sw-fld" style="flex:0 0 80px"><label>头像</label><input type="text" id="sf-emoji" value="${esc(s.emoji)}" maxlength="8"></div>
-        <div class="sw-fld" style="flex:0 0 150px"><label>主题色</label><div style="display:flex;align-items:center;gap:7px"><input type="color" id="sf-color-pick" value="${/^#[0-9a-fA-F]{6}$/.test(s.color)?s.color:'#8B5CFF'}" style="width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;flex:0 0 auto"><input type="text" id="sf-color" value="${esc(s.color)}" placeholder="#8B5CFF" style="flex:1;min-width:0"></div></div>
+        <div class="sw-fld" style="flex:0 0 150px"><label>主题色</label><div style="display:flex;align-items:center;gap:7px"><input type="color" id="sf-color-pick" value="${/^#[0-9a-fA-F]{6}$/.test(s.color)?s.color:'#B57EDC'}" style="width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;flex:0 0 auto"><input type="text" id="sf-color" value="${esc(s.color)}" placeholder="#B57EDC" style="flex:1;min-width:0"></div></div>
       </div>
       <div class="sw-fld"><label>性格强度(含蓄 ← → 话痨)：<span id="sf-int-v" style="color:var(--violet)">${s.intensity}</span></label>
         <div class="sw-range"><span style="font-size:11px;color:var(--dim)">含蓄</span>
@@ -1151,19 +1151,20 @@ let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTh
 // 默认值(前台 index.html EH_CONFIG_DEFAULT 副本;后台无数据时用)
 const CFG_DEFAULT = {
   themePalettes:{
-    cyber:{"--bg":"#07080d","--bg2":"#0d0f1a","--panel":"rgba(18,21,36,.72)","--panel-solid":"#121524","--line":"rgba(120,140,220,.16)","--line2":"rgba(120,140,220,.28)","--ink":"#EAF0FF","--sub":"#98A3C7","--dim":"#717EA9","--cyan":"#28E6D8","--magenta":"#FF3CAC","--violet":"#8B5CFF","--amber":"#FFB84D","--green":"#4DE38A","--grid":"rgba(80,120,255,.05)","--glow-cyan":"0 0 24px rgba(40,230,216,.5)","--glow-mag":"0 0 24px rgba(255,60,172,.5)"},
-    vapor:{"--bg":"#160a1f","--bg2":"#22103a","--panel":"rgba(40,18,60,.72)","--panel-solid":"#241035","--line":"rgba(255,140,180,.18)","--line2":"rgba(255,140,180,.32)","--ink":"#FFE8F6","--sub":"#D9A8D0","--dim":"#9B77A8","--cyan":"#5FE6D0","--magenta":"#FF6E9C","--violet":"#B36BFF","--amber":"#FD8A5E","--green":"#66E6B0","--grid":"rgba(255,140,180,.06)","--glow-cyan":"0 0 24px rgba(95,230,208,.5)","--glow-mag":"0 0 26px rgba(255,110,156,.55)"},
-    mono:{"--bg":"#000000","--bg2":"#0a0a0c","--panel":"rgba(16,16,20,.82)","--panel-solid":"#0e0e12","--line":"rgba(210,180,120,.16)","--line2":"rgba(210,180,120,.3)","--ink":"#F4F1E9","--sub":"#B8B0A0","--dim":"#827B6D","--cyan":"#E9C877","--magenta":"#E9C877","--violet":"#D8B85C","--amber":"#E9C877","--green":"#C9BE96","--grid":"rgba(210,180,120,.035)","--glow-cyan":"0 0 20px rgba(233,200,119,.4)","--glow-mag":"0 0 20px rgba(233,200,119,.4)"},
-    aurora:{"--bg":"#0d0620","--bg2":"#160a30","--panel":"rgba(30,16,56,.72)","--panel-solid":"#1a0e34","--line":"rgba(120,180,220,.18)","--line2":"rgba(120,180,220,.32)","--ink":"#F2EAFF","--sub":"#C4A8E8","--dim":"#8A72B0","--cyan":"#2FE0C0","--magenta":"#B57BFF","--violet":"#8B6BFF","--amber":"#FFCE6B","--green":"#34E89E","--grid":"rgba(90,170,220,.05)","--glow-cyan":"0 0 28px rgba(47,224,192,.6)","--glow-mag":"0 0 24px rgba(139,107,255,.5)"},
+    cyber:{"--bg":"#06090c","--bg2":"#0b1016","--panel":"rgba(14,26,30,.72)","--panel-solid":"#0e1a1e","--line":"rgba(10,186,181,.16)","--line2":"rgba(10,186,181,.30)","--ink":"#E6F7F5","--sub":"#8FB4B0","--dim":"#5E807C","--cyan":"#0ABAB5","--magenta":"#FF6F61","--violet":"#B57EDC","--amber":"#F7C873","--green":"#34E0B0","--accent":"#0ABAB5","--grid":"rgba(10,186,181,.05)","--glow-cyan":"0 0 24px rgba(10,186,181,.5)","--glow-mag":"0 0 24px rgba(255,111,97,.5)"},
+    vapor:{"--bg":"#140a1c","--bg2":"#1f1030","--panel":"rgba(38,20,54,.72)","--panel-solid":"#221033","--line":"rgba(181,126,220,.18)","--line2":"rgba(181,126,220,.32)","--ink":"#F5EAFB","--sub":"#C9A8D6","--dim":"#907AA0","--cyan":"#88D8C0","--magenta":"#B57EDC","--violet":"#9B6BD8","--amber":"#FD8A5E","--green":"#7FCDBD","--accent":"#B57EDC","--grid":"rgba(181,126,220,.06)","--glow-cyan":"0 0 22px rgba(136,216,192,.45)","--glow-mag":"0 0 26px rgba(181,126,220,.55)"},
+    mono:{"--bg":"#000000","--bg2":"#09090a","--panel":"rgba(15,15,16,.82)","--panel-solid":"#0d0d0e","--line":"rgba(247,231,206,.14)","--line2":"rgba(247,231,206,.26)","--ink":"#F7F3EA","--sub":"#B8B0A0","--dim":"#7C756A","--cyan":"#F7E7CE","--magenta":"#F7E7CE","--violet":"#E8D2A8","--amber":"#F7E7CE","--green":"#D8C9A0","--accent":"#F7E7CE","--grid":"rgba(247,231,206,.03)","--glow-cyan":"0 0 20px rgba(247,231,206,.38)","--glow-mag":"0 0 20px rgba(247,231,206,.38)"},
+    aurora:{"--bg":"#07120f","--bg2":"#0c1d1a","--panel":"rgba(16,40,36,.70)","--panel-solid":"#0e2420","--line":"rgba(29,233,182,.16)","--line2":"rgba(29,233,182,.30)","--ink":"#E8FBF4","--sub":"#9AC9BC","--dim":"#6A9488","--cyan":"#88D8C0","--magenta":"#B57EDC","--violet":"#8B6BFF","--amber":"#F7E7CE","--green":"#1DE9B6","--accent":"#1DE9B6","--grid":"rgba(29,233,182,.05)","--glow-cyan":"0 0 26px rgba(29,233,182,.55)","--glow-mag":"0 0 24px rgba(181,126,220,.5)"},
   },
-  themes:[{id:"cyber",name:"赛博霓虹",dot:"#28E6D8"},{id:"vapor",name:"蒸汽波",dot:"#FF6E9C"},{id:"mono",name:"暗夜极简",dot:"#E9C877"},{id:"aurora",name:"极光渐变",dot:"#2FE0C0"}],
+  themes:[{id:"cyber",name:"赛博霓虹",dot:"#0ABAB5"},{id:"vapor",name:"蒸汽波",dot:"#B57EDC"},{id:"mono",name:"暗夜极简",dot:"#F7E7CE"},{id:"aurora",name:"极光渐变",dot:"#1DE9B6"}],
   roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"mono","虚空回音":"aurora"},
-  officialFallbackC:{"闲聊广场":"#28E6D8","深夜电台":"#FF6E9C","技术黑话":"#E9C877","虚空回音":"#2FE0C0"},
-  roomKindC:{"public":"#4DE38A","private":"#8B5CFF","official":"#28E6D8"},
+  officialFallbackC:{"闲聊广场":"#0ABAB5","深夜电台":"#B57EDC","技术黑话":"#F7E7CE","虚空回音":"#1DE9B6"},
+  soulColors:{"狼姐":"#FF6F61","老K":"#F7E7CE","阿夜":"#B57EDC","回音":"#4A5D7E","图灵":"#0ABAB5","小暖":"#1DE9B6"},
+  roomKindC:{"public":"#1DE9B6","private":"#B57EDC","official":"#0ABAB5"},
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色(可写)
-  identityDefaultC:"#28E6D8",
-  voidC:"#8B5CFF",
-  resonanceDefaultC:"#FF3CAC",
+  identityDefaultC:"#0ABAB5",
+  voidC:"#4A5D7E",
+  resonanceDefaultC:"#FF6F61",
   roomBgm:{
     "闲聊广场":{root:220,chord:[0,4,7,11],wave:"triangle",pulse:2400,cut:1400,name:"明亮合成 pad"},
     "深夜电台":{root:146.83,chord:[0,3,7,10],wave:"sine",pulse:0,cut:900,name:"蒸汽波暖垫"},
@@ -1183,10 +1184,10 @@ const CFG_DEFAULT = {
     { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:'major',
       motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2, pitch:1.1},  ttsStyle:'sweet', playRate:1.1,
       coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
-    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#8B5CFF', bpm:78,  bpc:0.5, base:0,  scale:'majP',
+    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#B57EDC', bpm:78,  bpc:0.5, base:0,  scale:'majP',
       motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3],wave:'sine',    bass:'sine',     groove:'boom', tts:{rate:0.95,pitch:1.1},  ttsStyle:'gu',    playRate:0.96,
       coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
-    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#28E6D8', bpm:76,  bpc:0.5, base:-2, scale:'major',
+    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#0ABAB5', bpm:76,  bpc:0.5, base:-2, scale:'major',
       motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine',    bass:'sine',     groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy',  playRate:0.92,
       coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
     { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:'major',
@@ -1255,7 +1256,7 @@ function collectThemePalettes(){
 function refreshThemePreview(){
   const t=$('#themePreviewSel').value;
   const p=collectThemePalettes();
-  $('#themePreviewBox').style.background=p[t]['--cyan']||'#28E6D8';
+  $('#themePreviewBox').style.background=p[t]['--cyan']||'#0ABAB5';
 }
 
 // ---- 🎵 BGM ----
@@ -1449,7 +1450,7 @@ function renderSongStyles(){
 }
 
 function ssItemHtml(s,i){
-  const color = s.color || '#28E6D8';
+  const color = s.color || '#0ABAB5';
   return `<div class="ss-item" data-ssrow="${i}" style="border:1px solid var(--line);border-left:3px solid ${color};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(10,12,24,.3)">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="ss-drag" data-dragidx="${i}" style="cursor:grab;color:var(--dim);font-size:16px;user-select:none;padding:0 4px" title="拖动排序">≡</span>
@@ -1464,7 +1465,7 @@ function ssItemHtml(s,i){
         <label style="font-size:11px;color:var(--dim)">emoji</label>
         <input data-ssidx="${i}" data-sskey="emoji" value="${esc(s.emoji||'')}" style="width:50px;text-align:center;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:14px">
         <label style="font-size:11px;color:var(--dim)">色</label>
-        <input type="color" data-ssidx="${i}" data-sskey="color" value="${/^#[0-9a-fA-F]{6}$/.test(color)?color:'#28E6D8'}" style="width:28px;height:24px;padding:0;border:1px solid var(--line2);border-radius:4px;background:none;cursor:pointer">
+        <input type="color" data-ssidx="${i}" data-sskey="color" value="${/^#[0-9a-fA-F]{6}$/.test(color)?color:'#0ABAB5'}" style="width:28px;height:24px;padding:0;border:1px solid var(--line2);border-radius:4px;background:none;cursor:pointer">
         <input data-ssidx="${i}" data-sskey="color" value="${esc(color)}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:11px">
       </div>
       <button class="mini-btn ss-toggle" data-togidx="${i}" style="font-size:11px;padding:3px 8px">⌄ 高级</button>
@@ -1522,7 +1523,7 @@ function advSelect(i,key,label,val,opts){
 }
 function syncColor(i){
   const row = document.querySelector(`[data-ssrow="${i}"]`); if(!row) return;
-  row.style.borderLeftColor = _ssDraft[i].color || '#28E6D8';
+  row.style.borderLeftColor = _ssDraft[i].color || '#0ABAB5';
   // color picker 和文本框互相同步
   const inputs = row.querySelectorAll('[data-sskey="color"]');
   inputs.forEach(el=>{ if(el.value!==_ssDraft[i].color) el.value = _ssDraft[i].color; });
@@ -1585,7 +1586,7 @@ $('#ssAddBtn')?.addEventListener('click', ()=>{
   if(!_ssDraft) _ssDraft = [];
   const newId = 'style'+Date.now().toString(36).slice(-4);
   _ssDraft.push({
-    id: newId, name:'新曲风', sub:'新副标题', subEn:'New Style', emoji:'🎵', color:'#28E6D8',
+    id: newId, name:'新曲风', sub:'新副标题', subEn:'New Style', emoji:'🎵', color:'#0ABAB5',
     bpm:100, bpc:0.5, base:0, scale:'major',
     motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],
     wave:'sine', bass:'sine', groove:'four',
@@ -1755,10 +1756,10 @@ function auditItemHtml(e,i){
   const isAdmin=e.scope==='admin';
   const scopeTag = isAdmin
     ? '<span style="background:var(--cyan);color:#000;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">admin</span>'
-    : '<span style="background:#8B5CFF;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">user</span>';
+    : '<span style="background:#B57EDC;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">user</span>';
   const tagLabel = LOG_TAG_LABEL[e.tag] || e.tag;
   const rbBtn = (isAdmin && e.hadPrev && e.key)
-    ? `<button class="mini-btn" data-rbidx="${i}" style="border-color:#FFB84D;color:#FFB84D;font-size:11px;padding:3px 10px">↩ 恢复到变更前</button>`
+    ? `<button class="mini-btn" data-rbidx="${i}" style="border-color:#F7C873;color:#F7C873;font-size:11px;padding:3px 10px">↩ 恢复到变更前</button>`
     : `<span style="color:var(--dim);font-size:11px">${isAdmin?'无可回滚历史':'前台行为日志'}</span>`;
   const room = e.room ? `<span style="color:var(--sub);font-size:11.5px">🏠 ${esc(e.room)}</span>` : '';
   return `<div data-auditrow="${i}" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(10,12,24,.3)">
