@@ -964,12 +964,13 @@
   .me-hero .mh-sub{font-size:11.5px;color:var(--dim);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
   .me-hero .mh-badge{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
   /* 超级管理员: 实心金 + 发光, 最尊贵 (金色系跟随主题 --amber) */
-  .me-hero .mh-badge.super{background:color-mix(in srgb,var(--amber) 26%,transparent);color:var(--amber);box-shadow:0 0 10px -2px color-mix(in srgb,var(--amber) 60%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--amber) 45%,transparent);text-shadow:0 0 6px color-mix(in srgb,var(--amber) 55%,transparent)}
+  /* 超级管理员: 金色为主 + 混主题accent沉气质, 不同主题下都协调(实心金+发光最尊贵) */
+  .me-hero .mh-badge.super{background:color-mix(in srgb,var(--amber) 22%,color-mix(in srgb,var(--accent) 30%,transparent));color:color-mix(in srgb,var(--amber) 88%,var(--accent));box-shadow:0 0 12px -2px color-mix(in srgb,var(--amber) 55%,var(--accent)),inset 0 0 0 1px color-mix(in srgb,var(--amber) 50%,transparent);text-shadow:0 0 6px color-mix(in srgb,var(--amber) 50%,transparent)}
   /* 管理员: 同金色系但描边款, 更含蓄, 低超管一级 */
-  .me-hero .mh-badge.admin{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 40%,transparent)}
+  .me-hero .mh-badge.admin{background:color-mix(in srgb,var(--amber) 10%,color-mix(in srgb,var(--accent) 14%,transparent));color:color-mix(in srgb,var(--amber) 82%,var(--accent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 42%,transparent)}
   /* 管理员/超管徽章做成后台入口链接: 去下划线 + 悬停微亮提示可点 */
   a.mh-admin-link{text-decoration:none;cursor:pointer;transition:.15s}
-  a.mh-admin-link:hover{background:color-mix(in srgb,var(--amber) 34%,transparent);box-shadow:0 0 14px -2px var(--amber)}
+  a.mh-admin-link:hover{background:color-mix(in srgb,var(--amber) 30%,color-mix(in srgb,var(--accent) 22%,transparent));box-shadow:0 0 14px -2px color-mix(in srgb,var(--amber) 60%,var(--accent))}
   a.mh-admin-link::after{content:'↗';font-size:8px;margin-left:3px;opacity:.7}
   .me-hero .mh-badge.reg{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
   .me-hero .mh-badge.anon{background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub)}
@@ -1152,7 +1153,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1744audio';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1915badgemix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
