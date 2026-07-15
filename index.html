@@ -1152,7 +1152,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1735badge';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1744audio';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3064,6 +3064,8 @@ function subscribeMessages(rid){
             const nc=fresh.querySelector('.song-card');
             if(nc && !nc.classList.contains('pending')){
               nc.classList.add('arrived');
+              // 音频域加固批B: acapella ready 回写 → 清 120s 降级定时器, 避免误报
+              try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){}
               setTimeout(()=>nc.classList.remove('arrived'), 3400);
               try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
               try{
@@ -4370,7 +4372,7 @@ function ac(){
 let noiseBuf=null;
 function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
-const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=20260711b';
+const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=' + (window.__EH_BUILD_VER||'unknown');
 let EH_MASTER_MANIFEST=null;
 async function loadMasterManifest(){
   if(EH_MASTER_MANIFEST) return EH_MASTER_MANIFEST;
@@ -4787,23 +4789,48 @@ document.addEventListener('visibilitychange', ()=>{
   try{ refreshSnapshotTail(curRoom); }catch(_){}
   resumeStuckPendingSongs().catch(()=>{});
 });
+// 音频域加固批B: 清唱兜底(worker 未回写时 120s 明确降级)
+const _EH_ACAPELLA_TIMERS = new Map();   // mid → timeoutId, 供 worker 回写时清理
+function _ehAcapellaTimeoutMark(mid){
+  try{
+    const stream=document.getElementById('stream'); if(!stream) return;
+    const msg=stream.querySelector('.msg[data-mid="'+mid+'"]'); if(!msg) return;
+    const card=msg.querySelector('.song-card'); if(!card) return;
+    if(!card.classList.contains('pending')) return;   // 已 ready 或 failed → 不改
+    card.classList.add('timeout');
+    const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱服务暂不可用';
+    const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','清唱服务暂不可用 · 点击重试');
+  }catch(_){}
+  finally{ _EH_ACAPELLA_TIMERS.delete(String(mid)); }
+}
 async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='生成中'; }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱排队中'; }catch(_){}
+    try{ toast('清唱排队中,由后台生成…'); }catch(_){}
+    // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
+    try{
+      const key=String(mid);
+      if(_EH_ACAPELLA_TIMERS.has(key)) clearTimeout(_EH_ACAPELLA_TIMERS.get(key));
+      const tid=setTimeout(()=>_ehAcapellaTimeoutMark(key), 120000);
+      _EH_ACAPELLA_TIMERS.set(key, tid);
+    }catch(_){}
     return;
   }
   _EH_SONG_GENERATING.add(mid);
   const startRoomId = curRoom && curRoom.id;   // 快照房间id, 防生成中途换房污染 path
+  // 音频域加固批B: fetch 加 AbortController 超时(80s), 防 Edge Function 卡住时 _EH_SONG_GENERATING 一直持有 mid, 挡住重试
+  const _ac = new AbortController();
+  const _to = setTimeout(()=>{ try{ _ac.abort('timeout'); }catch(_){} }, 80000);
   try{
     const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
     // 挑一首同曲风母版当参考
     let masterUrl='';
     try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) masterUrl=new URL(pool[Math.floor(Math.random()*pool.length)].url, location.href).href; }catch(_){}
     if(!masterUrl){ throw new Error('no master for sid '+sid); }
-    // 调 Edge Function 生成(37s 左右)
-    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterUrl,lyric,prompt:st.coverPrompt||''})});
+    // 调 Edge Function 生成(37s 左右, 前端 80s 硬超时)
+    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterUrl,lyric,prompt:st.coverPrompt||''}),signal:_ac.signal});
     if(!resp.ok) throw new Error('cover HTTP '+resp.status);
     const res=await resp.json();
     if(!res.ok || !res.coverMp3_b64) throw new Error('cover no audio');
@@ -4839,11 +4866,13 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     }
     _ehDbg('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
   }catch(e){
-    console.warn('generateSong fail',e);
-    toast(EH_CONFIG.text.err_singSend||'神曲生成失败');
+    const isTimeout = e && (e.name==='AbortError' || _ac.signal.aborted);
+    console.warn('[song] generate failed/timeout', isTimeout, e);
+    toast(isTimeout ? '神曲生成超时,可重试' : (EH_CONFIG.text.err_singSend||'神曲生成失败'));
     // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
-    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='生成失败'; } }catch(_){}
+    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip', isTimeout?'生成超时 · 点击重试':'谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时':'生成失败'; } }catch(_){}
   }finally{
+    clearTimeout(_to);
     _EH_SONG_GENERATING.delete(mid);
   }
 }
