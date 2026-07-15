@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0600ixfriendly';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0630errfriendly';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3459,6 +3459,7 @@ function replyPreviewText(text, kind){
   if(kind==='song'){ try{ const s=parseSong(text); return '🎵 '+(s.lyric||'神曲'); }catch(_){ return '🎵 神曲'; } }
   if(kind==='voice') return '🎙️ 语音消息';
   if(kind==='proj') return '📽️ 投影';
+  if(kind==='interact'){ const parts=String(text||'').split('|'); const txt=parts.slice(2).join('|').trim(); if(txt) return txt; const ix=_interactions.find(i=>i.id===parts[0]); return (safeEmoji(ix&&ix.emoji)||'✨')+' 互动'; }
   return text||'';
 }
 function refFromDom(mid){
@@ -5161,6 +5162,9 @@ function playInteractionFx(fx, targetEl){
 // ============ toast ============
 let toastT=null;
 function toast(msg){ const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(String(msg||''))){ try{ EhSfx.play('error'); }catch(e){} } t.innerHTML=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+// 后端错误 → 友好中文: 只在后端返回的是中文说明时采用它, 否则用 fallback。防原始英文码
+// (unauthorized/forbidden/not_found 等)直接弹给用户(见截图)。
+function friendlyErr(raw, fallback){ return (raw && /[一-龥]/.test(String(raw))) ? String(raw) : (fallback||'操作失败，请重试'); }
 // 赛博风确认弹层，返回 Promise<boolean>，替代原生 confirm()
 function ehConfirm(msg, title){
   return new Promise(res=>{
@@ -5398,10 +5402,12 @@ async function openGear(){
         try{ soulsCache[curRoom.id]=null; }catch(_){}
         loadRoomSouls(curRoom.id).catch(()=>{});
         refreshPresence().catch(()=>{});
-        // 统一一条提示: 后端有明确原因就直接显后端的(如"仅房主可召唤"), 否则按状态码给友好话。
+        // 统一一条提示: 只显示"中文友好话"。后端原始英文码(unauthorized/forbidden等)一律翻译,
+        // 绝不把原始码弹给用户(见截图 "unauthorized")。仅当后端返回的是中文说明才直接采用。
         if(_fails.length){
           const f=_fails[0];
-          if(f.msg){ toast(f.msg); }                                  // 后端原因优先(最准)
+          const zhMsg = (f.msg && /[一-龥]/.test(f.msg)) ? f.msg : '';   // 后端返回含中文才信
+          if(zhMsg){ toast(zhMsg); }
           else if(f.code===401){ toast('登录状态失效, 请下拉刷新页面后重试'); }
           else if(f.code===403){ toast('没有权限召唤(需房主/超管)'); }
           else if(_fails.length>1){ toast('部分灵魂操作失败，请重试'); }
@@ -5657,7 +5663,7 @@ async function sendVerifyEmail(){
   if(!session){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; toast(EH_CONFIG.text.warn_needLogin); return; }
   const r=await fetch(EH_AUTH_FN+'/send-verify',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({origin:location.origin+location.pathname.replace(/\/[^/]*$/,'')}) });
   const j=await r.json().catch(()=>({}));
-  if(!r.ok || !j.ok){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; $('#verifyHint').textContent=j.error||'发送失败'; return; }
+  if(!r.ok || !j.ok){ btn.disabled=false; btn.textContent='✉️ 发送验证邮件'; $('#verifyHint').textContent=friendlyErr(j.error,'发送失败'); return; }
   if(j.already){ me.emailVerified=true; saveIdentity(); renderEmailVerifyUI(); toast(EH_CONFIG.text.ok_emailAlready); return; }
   // SMTP 未配: sent=false, 后端返回验证链接。给本人一个可点的链接(过渡方案)。
   if(j.sent===false && j.link){
@@ -5899,7 +5905,7 @@ async function doRegister(){
   // 确保有匿名 uid 可继承(把当前匿名身份+历史转正)
   await ensureAuth();
   const res=await authApi('/register',{ username, password, email, anonUid:myUid });
-  if(!res.ok || !res.body.ok){ btn.disabled=false; btn.textContent='注 册 并 进 入'; $('#regErr').textContent=res.body.error||'注册失败'; return; }
+  if(!res.ok || !res.body.ok){ btn.disabled=false; btn.textContent='注 册 并 进 入'; $('#regErr').textContent=friendlyErr(res.body.error,'注册失败'); return; }
   // 转正后用新账号密码登录(刷新 session 为已确认的邮箱账号)
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
   btn.disabled=false; btn.textContent='注 册 并 进 入';
@@ -5970,7 +5976,7 @@ async function handleResetLink(){
       // ★闭环: 直接把登录框展开、填好用户名、聚焦密码框, 用户输新密码即可登录, 不再"改完没下文"。
       try{ openLoginWith(r.body.username||''); }catch(_){}
     }
-    else{ mask.querySelector('#rsErr').textContent=(r&&r.body&&r.body.error)||'重置失败，链接可能已过期'; }
+    else{ mask.querySelector('#rsErr').textContent=friendlyErr(r&&r.body&&r.body.error,'重置失败，链接可能已过期'); }
   };
 }
 // 展开登录框 + 预填用户名 + 聚焦密码(找回密码/主动登录复用)。确保在入场页且登录区可见。
@@ -5997,7 +6003,7 @@ async function changeEmail(){
   const r=await fetch(EH_AUTH_FN+'/update-email',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({email}) });
   const j=await r.json().catch(()=>({}));
   btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
-  if(!r.ok || !j.ok){ $('#emailErr').textContent=j.error||'保存失败'; return; }
+  if(!r.ok || !j.ok){ $('#emailErr').textContent=friendlyErr(j.error,'保存失败'); return; }
   me.email=email; me.emailVerified=false; saveIdentity();  // 换邮箱→需重新验证
   toast(EH_CONFIG.text.ok_emailUpdated); closeModal();
 }
@@ -6348,7 +6354,7 @@ typeSub();
   fetch(EH_AUTH_FN+'/verify-email',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token}) })
     .then(r=>r.json()).then(j=>{
       if(j&&j.ok){ if(me){ me.emailVerified=true; saveIdentity(); } toast(EH_CONFIG.text.ok_emailVerified); }
-      else toast(j&&j.error||'验证失败');
+      else toast(friendlyErr(j&&j.error,'验证失败'));
     }).catch(()=>toast(EH_CONFIG.text.err_verifyFail));
 })();
 // 找回密码回跳: URL 带 ?ehreset=<token> → 弹"设新密码"框(见 handleResetLink)
