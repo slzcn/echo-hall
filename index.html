@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0450vip';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0510vip-optd';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1985,6 +1985,9 @@ function applyConfigMap(rawMap){
   applyTextConfig();
   try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
   try{ checkCachePurge(); }catch(_){}
+  // OPTD 修偶发: 远程配置(含 songStyles 曲风池)到达后, 若正在神曲模式, 补一次曲风条重渲染+重绑拖动。
+  // 根治「首次进神曲模式时曲风池尚未从后台加载完 → 曲风条内容/拖动绑定时机错位 → 偶发拖不动」。
+  try{ if(typeof songMode!=='undefined' && songMode && typeof renderSongStrip==='function'){ renderSongStrip(); } }catch(_){}
   }catch(e){ try{ console.warn('[EH cfg] applyConfigMap threw, some fields kept default', e&&e.message); }catch(_){} try{ _ehDbg('[cfg] applyConfigMap throw', e&&e.message||String(e)); }catch(_){} }
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
@@ -5275,6 +5278,15 @@ function setSongMode(on){ setMode(on?'song':'none'); }
 let _cinWasFocused=false;   // 切曲风前输入框是否聚焦(用于切完不改变输入法开/收状态)
 function renderSongStrip(){
   const strip=$('#songStrip'); if(!strip) return;
+  // OPTD 修偶发: 首次进神曲模式时若曲风池还未从后台加载完(SONG_STYLES长度=0),
+  // 会渲染出空条 → 拖动没内容滑 → 偶发拖不动。空池时 300ms 后重试一次(applyConfigMap 配置到达也会另触发一次, 两道保障)。
+  if(!SONG_STYLES || SONG_STYLES.length===0){
+    if(!strip._retryPending){
+      strip._retryPending=true;
+      setTimeout(()=>{ strip._retryPending=false; if(typeof songMode!=='undefined' && songMode) renderSongStrip(); }, 300);
+    }
+    return;
+  }
   const cur=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
   strip.style.setProperty('--strip-c', safeColor(cur.color));   // 整条 strip 跟随当前曲风色(标签+底色)
   strip.innerHTML=`<span class="ss-lb">曲风</span>`+SONG_STYLES.map(s=>
