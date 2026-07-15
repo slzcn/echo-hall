@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0124optd-badge';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0540enter-ephemeral';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1651,7 +1651,7 @@ const EH_CONFIG_DEFAULT = {
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
-  roomNameC: { '午夜聊天':'#C08497', '技术黑话':'#4A5D7E' },   // 午夜聊天=莫兰迪玫瑰; 技术黑话=远山暮色(青灰蓝, 冷峻科技感)
+  roomNameC: { '午夜聊天':'#FF3D92', '技术黑话':'#4A5D7E' },   // 午夜聊天=日暮品红(午夜暧昧荷尔蒙); 技术黑话=远山暮色(青灰蓝, 冷峻科技感)
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
   identityDefaultC: '#0ABAB5',   // 匿名/未设色时的默认身份色(全站 fallback)
   voidC: '#4A5D7E',              // 虚空模式代表色
@@ -3866,12 +3866,17 @@ function entranceBanner(room){
   }
   // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
   renderEntrance({ name:me.name, tier, roomName:room.name }, true);
-  // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。enter 消息不进历史。
+  // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。
+  // ★enter 是"当场特效", 只需存活到 realtime 把它推给在场的人(几秒)。插入后 8s 自删——
+  //   根治它污染历史/大厅预览/灵魂上下文/回声统计(治本, 前端过滤只是治标, 且已删存量24条)。
   try{
     const minBc = TIER_RANK[cfg.broadcastMinTier||'reg'] ?? 1;
     if(cfg.broadcast!==false && curRoom && myUid && (TIER_RANK[tier]||0) >= minBc){
       sb.from('eh_messages').insert({ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
-        text:tier, kind:'enter' }).then(({error})=>{ if(error) console.warn('enter broadcast', error.message); });
+        text:tier, kind:'enter' }).select('id').single().then(({data,error})=>{
+          if(error){ console.warn('enter broadcast', error.message); return; }
+          if(data && data.id){ setTimeout(()=>{ try{ sb.from('eh_messages').delete().eq('id', data.id); }catch(_){} }, 8000); }
+        });
     }
   }catch(e){ console.warn('enter broadcast', e); }
 }
