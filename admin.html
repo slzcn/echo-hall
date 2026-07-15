@@ -127,17 +127,6 @@
   .badge-super,.badge-normal{font-size:10px;padding:2px 9px;border-radius:6px;font-weight:600}
   .badge-super{background:color-mix(in srgb,var(--magenta) 16%,transparent);color:var(--magenta)}
   .badge-normal{background:color-mix(in srgb,var(--sub) 16%,transparent);color:var(--sub)}
-  /* 皮肤菜单 */
-  .skin-menu{position:absolute;top:44px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:13px;
-    padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 16px 44px rgba(0,0,0,.55);min-width:150px}
-  .skin-menu.on{display:flex}
-  .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.12s}
-  .skin-opt:hover{background:rgba(255,255,255,.05);color:var(--ink)}
-  .skin-opt.active{color:var(--ink)}
-  .skin-opt .sw{width:13px;height:13px;border-radius:50%;flex:0 0 auto}
-  .skin-opt .ck{margin-left:auto;opacity:0;color:var(--cyan)}
-  .skin-opt.active .ck{opacity:1}
-
   /* ===== tabs (多端自适应: 桌面自动换行, 手机横向滑动不挤成一坨) ===== */
   .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;position:sticky;top:0;z-index:20;
     background:var(--bg);padding:8px 0;-webkit-overflow-scrolling:touch}
@@ -458,7 +447,6 @@
     <h1><span class="dot"></span>回声厅控制台</h1>
     <div class="who">
       <span id="whoName">—</span><span id="whoRole"></span>
-      <div class="icon-btn" id="skinBtn" title="皮肤">🎨<div class="skin-menu" id="skinMenu"></div></div>
       <span class="logout" id="logoutBtn">← 返回首页</span>
     </div>
   </div>
@@ -718,17 +706,6 @@ function confirmBox(msg,title){
   });
 }
 
-// ===== 皮肤(与前台共用 localStorage eh_theme) =====
-const SKINS=[['cyber','赛博夜城','#00E5D4'],['vapor','迈阿密日落','#C77DFF'],['aurora','极光迷幻','#22FF95'],['mono','暗夜奢华','#F5D06A'],['klein','克莱因之夜','#6486FF'],['coral','珊瑚热恋','#FF6F52'],['lagoon','湖水迷情','#12B0E0'],['dusk','远山暮色','#8FA6E8'],['rose','莫兰迪玫瑰','#E29AAE'],['sunset','日暮狂欢','#FF3D92']];
-function curTheme(){ try{ return localStorage.getItem('eh_theme')||'cyber'; }catch(e){ return 'cyber'; } }
-function applyTheme(id){ if(id==='cyber') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',id);
-  try{ localStorage.setItem('eh_theme',id); }catch(e){} renderSkinMenu(); }
-function renderSkinMenu(){ const cur=curTheme();
-  $('#skinMenu').innerHTML=SKINS.map(([id,nm,c])=>`<div class="skin-opt${id===cur?' active':''}" data-skin="${id}"><span class="sw" style="background:${c}"></span>${nm}<span class="ck" style="color:${c}">✓</span></div>`).join('');
-  $('#skinMenu').querySelectorAll('.skin-opt').forEach(el=>el.onclick=e=>{ e.stopPropagation(); applyTheme(el.dataset.skin); }); }
-$('#skinBtn').onclick=e=>{ e.stopPropagation(); $('#skinMenu').classList.toggle('on'); };
-document.addEventListener('click',()=>$('#skinMenu').classList.remove('on'));
-
 // 调 eh-admin-api，带当前 Supabase 登录 token
 async function api(path,{method='GET',body}={}){
   const { data:{ session } } = await sb.auth.getSession();
@@ -763,7 +740,6 @@ function enterPanel(){
   $('#whoName').textContent=meAdmin.username;
   $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
   $('#peopleTab').style.display=meAdmin.role==='super'?'block':'none';   // 人员(任命超管/管理员/贵宾)仅超管可见
-  renderSkinMenu();
   loadOverview(); loadRooms();
 }
 
