@@ -1146,11 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-<<<<<<< HEAD
-  var BUILD_VER='20260715-1310themetune';  window.__EH_BUILD_VER=BUILD_VER;
-=======
-  var BUILD_VER='20260715-0700laok-color';  window.__EH_BUILD_VER=BUILD_VER;
->>>>>>> 68c6b06 (老K配色: 洋红粉 #FF3CAC → 远山黛 #4A5D7E(男·痞帅段子手, 粉色违和))
+  var BUILD_VER='20260715-1320laok-color';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
