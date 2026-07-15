@@ -1270,7 +1270,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0255optd-adminSkinDrop';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0307fix-emptyprev-enterflood';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2788,7 +2788,7 @@ async function fillRoomStats(box, rid){
   const since=new Date(Date.now()-35000).toISOString();
   const [{ count }, { data:recent }] = await Promise.all([
     sb.from('eh_presence').select('*',{count:'exact',head:true}).eq('room_id',rid).gte('last_seen',since),
-    sb.rpc('eh_public_recent',{ rid, lim:5, hide_recalled:true }),   // 拉多几条: 跳过 enter(进场广播)这类非聊天内容, 取真正"最后一句"
+    sb.rpc('eh_public_recent',{ rid, lim:20, hide_recalled:true }),   // 拉 20 条: 跳过 enter(进场广播)等非聊天内容取真正"最后一句"; lim:5 开不够——短时间同一用户连续进出 5+ 次会将窗口挡满后误报“还没有人说话”。
   ]);
   const online=count||0;
   const cnt=card.querySelector('.cnt'); if(cnt) cnt.textContent = online>0? online+' 人在线' : '暂无人在线';
