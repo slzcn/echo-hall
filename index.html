@@ -18,7 +18,7 @@
    两处必须一致, 否则首屏会闪旧色。后台「🎨主题配色」tab 也有一份 CFG_DEFAULT 副本需同步。
    v3扩展到10套(2026-07-15): cyber走:root默认, 其余9套走html[data-theme=x], 日间10套显式覆盖(防夜间注入盖静态day base) */
   :root{
-    --bg:#070a12; --bg2:#0d1524; --panel:rgba(18,30,52,.78); --panel-solid:#101c2e; --line:rgba(0,229,212,.22); --line2:rgba(0,229,212,.36); --ink:#EAF6FF; --sub:#7FA8C9; --dim:#4A6B85; --cyan:#00E5D4; --magenta:#FF2D8E; --violet:#7B5CFF; --amber:#FFC24D; --green:#34E0B0; --accent:#00E5D4; --grid:rgba(0,229,212,.05); --glow-cyan:0 0 20px rgba(0,229,212,.55); --glow-mag:0 0 20px rgba(255,45,142,.55);
+    --bg:#070a12; --bg2:#0d1524; --panel:rgba(21,50,48,0.8); --panel-solid:#132a29; --line:rgba(0,229,212,0.24); --line2:rgba(0,229,212,0.38); --ink:#EAF6FF; --sub:#86cbc6; --dim:#498d88; --cyan:#00E5D4; --magenta:#FF2D8E; --violet:#7B5CFF; --amber:#FFC24D; --green:#34E0B0; --accent:#00E5D4; --grid:rgba(0,229,212,0.05); --glow-cyan:0 0 22px rgba(0,229,212,0.6); --glow-mag:0 0 20px rgba(255,45,142,0.55);
     --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
     /* 语义化组件变量(夜间基线) —— 日间模式在 html[data-mode="day"] 统一覆盖 */
     --input-bg:rgba(10,12,24,.6); --input-shadow:none;
@@ -31,39 +31,39 @@
   }
   /* ===== 皮肤: 迈阿密日落 (vapor) ===== */
   html[data-theme="vapor"]{
-    --bg:#160a1e; --bg2:#28123a; --panel:rgba(48,20,60,.78); --panel-solid:#301440; --line:rgba(199,125,255,.24); --line2:rgba(199,125,255,.38); --ink:#FFEAF5; --sub:#D69AC0; --dim:#925A80; --cyan:#C77DFF; --magenta:#FF4D9E; --violet:#4DE0D0; --amber:#FFB84D; --green:#7FE0C0; --accent:#C77DFF; --grid:rgba(199,125,255,.05); --glow-cyan:0 0 22px rgba(199,125,255,.6); --glow-mag:0 0 20px rgba(255,77,158,.55);
+    --bg:#160a1e; --bg2:#28123a; --panel:rgba(38,21,50,0.8); --panel-solid:#20132a; --line:rgba(199,125,255,0.24); --line2:rgba(199,125,255,0.38); --ink:#FFEAF5; --sub:#ad86cb; --dim:#70498d; --cyan:#C77DFF; --magenta:#FF4D9E; --violet:#4DE0D0; --amber:#FFB84D; --green:#7FE0C0; --accent:#C77DFF; --grid:rgba(199,125,255,0.05); --glow-cyan:0 0 22px rgba(199,125,255,0.6); --glow-mag:0 0 20px rgba(255,77,158,0.55);
   }
   /* ===== 皮肤: 极光迷幻 (aurora) ===== */
   html[data-theme="aurora"]{
-    --bg:#050f12; --bg2:#0a2029; --panel:rgba(12,38,44,.76); --panel-solid:#0c2630; --line:rgba(0,240,181,.22); --line2:rgba(0,240,181,.36); --ink:#EAFFFA; --sub:#7FC9BC; --dim:#4A8578; --cyan:#00F0B5; --magenta:#B24DFF; --violet:#2ED9FF; --amber:#F7E7CE; --green:#00F0B5; --accent:#00F0B5; --grid:rgba(0,240,181,.05); --glow-cyan:0 0 22px rgba(0,240,181,.6); --glow-mag:0 0 20px rgba(178,77,255,.55);
+    --bg:#03130d; --bg2:#08261a; --panel:rgba(21,50,36,0.8); --panel-solid:#132a1f; --line:rgba(34,255,149,0.24); --line2:rgba(34,255,149,0.38); --ink:#EAFFF3; --sub:#86cbaa; --dim:#498d6c; --cyan:#22FF95; --magenta:#C74DFF; --violet:#39D9FF; --amber:#F2E4A8; --green:#22FF95; --accent:#22FF95; --grid:rgba(34,255,149,0.05); --glow-cyan:0 0 22px rgba(34,255,149,0.6); --glow-mag:0 0 20px rgba(199,77,255,0.55);
   }
   /* ===== 皮肤: 暗夜奢华 (mono) ===== */
   html[data-theme="mono"]{
-    --bg:#0a0708; --bg2:#151011; --panel:rgba(28,20,22,.82); --panel-solid:#1c1416; --line:rgba(245,208,106,.20); --line2:rgba(245,208,106,.34); --ink:#FBEEE4; --sub:#B89A94; --dim:#7C625A; --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --accent:#F5D06A; --grid:rgba(245,208,106,.04); --glow-cyan:0 0 20px rgba(245,208,106,.5); --glow-mag:0 0 20px rgba(224,80,122,.5);
+    --bg:#0a0708; --bg2:#151011; --panel:rgba(50,42,21,0.8); --panel-solid:#2a2413; --line:rgba(245,208,106,0.24); --line2:rgba(245,208,106,0.38); --ink:#FBEEE4; --sub:#c7b68a; --dim:#89794d; --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --accent:#F5D06A; --grid:rgba(245,208,106,0.05); --glow-cyan:0 0 22px rgba(245,208,106,0.6); --glow-mag:0 0 20px rgba(224,80,122,0.55);
   }
   /* ===== 皮肤: 克莱因之夜 (klein) ===== */
   html[data-theme="klein"]{
-    --bg:#050818; --bg2:#0a1030; --panel:rgba(14,24,64,.80); --panel-solid:#0e1840; --line:rgba(58,90,255,.24); --line2:rgba(58,90,255,.38); --ink:#E8ECFF; --sub:#8B9AD6; --dim:#5560A0; --cyan:#3A5AFF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --accent:#3A5AFF; --grid:rgba(58,90,255,.05); --glow-cyan:0 0 22px rgba(58,90,255,.6); --glow-mag:0 0 20px rgba(255,138,61,.55);
+    --bg:#050818; --bg2:#0a1030; --panel:rgba(21,26,50,0.8); --panel-solid:#13172a; --line:rgba(58,90,255,0.24); --line2:rgba(58,90,255,0.38); --ink:#E8ECFF; --sub:#8691cb; --dim:#49548d; --cyan:#3A5AFF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --accent:#3A5AFF; --grid:rgba(58,90,255,0.05); --glow-cyan:0 0 22px rgba(58,90,255,0.6); --glow-mag:0 0 20px rgba(255,138,61,0.55);
   }
   /* ===== 皮肤: 珊瑚热恋 (coral) ===== */
   html[data-theme="coral"]{
-    --bg:#1a0a0e; --bg2:#2e1218; --panel:rgba(54,22,28,.80); --panel-solid:#361620; --line:rgba(255,111,97,.24); --line2:rgba(255,111,97,.38); --ink:#FFEDE8; --sub:#D6A19A; --dim:#92615A; --cyan:#FF6F61; --magenta:#FF4D8D; --violet:#00D4C0; --amber:#FFB84D; --green:#5FE0B0; --accent:#FF6F61; --grid:rgba(255,111,97,.05); --glow-cyan:0 0 22px rgba(255,111,97,.6); --glow-mag:0 0 20px rgba(255,77,141,.55);
+    --bg:#1a0a0c; --bg2:#2e1216; --panel:rgba(50,26,21,0.8); --panel-solid:#2a1713; --line:rgba(255,111,82,0.24); --line2:rgba(255,111,82,0.38); --ink:#FFEDE6; --sub:#cb9186; --dim:#8d5449; --cyan:#FF6F52; --magenta:#FF5C93; --violet:#2DD4C4; --amber:#FFB84D; --green:#5FE0B0; --accent:#FF6F52; --grid:rgba(255,111,82,0.05); --glow-cyan:0 0 22px rgba(255,111,82,0.6); --glow-mag:0 0 20px rgba(255,92,147,0.55);
   }
   /* ===== 皮肤: 湖水迷情 (lagoon) ===== */
   html[data-theme="lagoon"]{
-    --bg:#061412; --bg2:#0c2622; --panel:rgba(14,44,40,.78); --panel-solid:#0e2c28; --line:rgba(136,216,192,.26); --line2:rgba(136,216,192,.4); --ink:#EAFBF6; --sub:#8FC9BC; --dim:#5A8578; --cyan:#4DD4B8; --magenta:#FD6E53; --violet:#FF6FA5; --amber:#FFC97A; --green:#4DD4B8; --accent:#4DD4B8; --grid:rgba(136,216,192,.05); --glow-cyan:0 0 22px rgba(77,212,184,.55); --glow-mag:0 0 20px rgba(253,110,83,.5);
+    --bg:#04141c; --bg2:#082832; --panel:rgba(21,43,50,0.8); --panel-solid:#13252a; --line:rgba(18,176,224,0.24); --line2:rgba(18,176,224,0.38); --ink:#E6FBFF; --sub:#8bb8c6; --dim:#4e7b88; --cyan:#12B0E0; --magenta:#FF8A5E; --violet:#4DE0C0; --amber:#FFC97A; --green:#25D6C0; --accent:#12B0E0; --grid:rgba(18,176,224,0.05); --glow-cyan:0 0 22px rgba(18,176,224,0.6); --glow-mag:0 0 20px rgba(255,138,94,0.55);
   }
   /* ===== 皮肤: 远山暮色 (dusk) ===== */
   html[data-theme="dusk"]{
-    --bg:#0a0e16; --bg2:#141c2a; --panel:rgba(26,36,54,.80); --panel-solid:#1a2436; --line:rgba(122,146,190,.24); --line2:rgba(122,146,190,.38); --ink:#EAF0FB; --sub:#9AAAC9; --dim:#647085; --cyan:#7A92BE; --magenta:#FF8A6E; --violet:#A9BEE8; --amber:#F7E7CE; --green:#6ED0B0; --accent:#7A92BE; --grid:rgba(122,146,190,.05); --glow-cyan:0 0 20px rgba(122,146,190,.45); --glow-mag:0 0 20px rgba(255,138,110,.5);
+    --bg:#0a0e18; --bg2:#151b2c; --panel:rgba(24,30,47,0.8); --panel-solid:#161a28; --line:rgba(143,166,232,0.24); --line2:rgba(143,166,232,0.38); --ink:#EEF2FC; --sub:#919dbf; --dim:#556082; --cyan:#8FA6E8; --magenta:#FFA07A; --violet:#C0CAF5; --amber:#F7E7CE; --green:#7ED8B4; --accent:#8FA6E8; --grid:rgba(143,166,232,0.05); --glow-cyan:0 0 22px rgba(143,166,232,0.6); --glow-mag:0 0 20px rgba(255,160,122,0.55);
   }
   /* ===== 皮肤: 莫兰迪玫瑰 (rose) ===== */
   html[data-theme="rose"]{
-    --bg:#14100f; --bg2:#241c1a; --panel:rgba(44,34,32,.80); --panel-solid:#2c2220; --line:rgba(201,173,161,.24); --line2:rgba(201,173,161,.4); --ink:#F7EEEA; --sub:#C2A79E; --dim:#8A7168; --cyan:#C9ADA1; --magenta:#C25B72; --violet:#6E7FA0; --amber:#E0B87A; --green:#8FB0A0; --accent:#C9ADA1; --grid:rgba(201,173,161,.05); --glow-cyan:0 0 20px rgba(201,173,161,.45); --glow-mag:0 0 20px rgba(194,91,114,.5);
+    --bg:#15100f; --bg2:#261b1a; --panel:rgba(46,26,31,0.8); --panel-solid:#26171b; --line:rgba(226,154,174,0.24); --line2:rgba(226,154,174,0.38); --ink:#F9EFEC; --sub:#bc95a0; --dim:#7e5863; --cyan:#E29AAE; --magenta:#D06A8E; --violet:#9AA0D0; --amber:#E6BE86; --green:#95BAA6; --accent:#E29AAE; --grid:rgba(226,154,174,0.05); --glow-cyan:0 0 22px rgba(226,154,174,0.6); --glow-mag:0 0 20px rgba(208,106,142,0.55);
   }
   /* ===== 皮肤: 日暮狂欢 (sunset) ===== */
   html[data-theme="sunset"]{
-    --bg:#180a12; --bg2:#2c1020; --panel:rgba(52,18,36,.80); --panel-solid:#341024; --line:rgba(253,94,83,.24); --line2:rgba(253,94,83,.38); --ink:#FFEBED; --sub:#D6A0A8; --dim:#925A66; --cyan:#FD5E53; --magenta:#FF3C8E; --violet:#B24DFF; --amber:#FFB04D; --green:#5FE0B0; --accent:#FD5E53; --grid:rgba(253,94,83,.05); --glow-cyan:0 0 22px rgba(253,94,83,.6); --glow-mag:0 0 20px rgba(255,60,142,.55);
+    --bg:#180818; --bg2:#2c0e26; --panel:rgba(50,21,34,0.8); --panel-solid:#2a131d; --line:rgba(255,61,146,0.24); --line2:rgba(255,61,146,0.38); --ink:#FFEAF2; --sub:#cb86a4; --dim:#8d4967; --cyan:#FF3D92; --magenta:#FF7A3D; --violet:#B24DFF; --amber:#FFB04D; --green:#5FE0B0; --accent:#FF3D92; --grid:rgba(255,61,146,0.05); --glow-cyan:0 0 22px rgba(255,61,146,0.6); --glow-mag:0 0 20px rgba(255,122,61,0.55);
   }
   /* ===== 日间模式(亮底): 每套主题都必须显式覆盖夜间注入的强调色(v2踩过坑) ===== */
   html[data-mode="day"]{
@@ -78,38 +78,38 @@
     --name-halo:rgba(255,255,255,.9); --text-halo:rgba(255,255,255,.7);
   }
   html[data-mode="day"][data-theme="cyber"]{
-    --bg:#eef4f5; --bg2:#dcebec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,158,146,.28); --line2:rgba(0,158,146,.42); --ink:#0d2a2e; --sub:#4a7b80; --dim:#7BA0A4; --cyan:#009E92; --magenta:#D81B6F; --violet:#5A3DE0; --amber:#C8892E; --green:#12A87C; --accent:#009E92; --grid:rgba(0,158,146,.06); --glow-cyan:0 2px 10px rgba(0,158,146,.18); --glow-mag:0 2px 10px rgba(216,27,111,.16);
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
   html[data-mode="day"][data-theme="vapor"]{
-    --bg:#faeef4; --bg2:#f3dced; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(155,95,214,.26); --line2:rgba(155,95,214,.4); --ink:#3a1028; --sub:#a04f7c; --dim:#C285A8; --cyan:#9B5FD6; --magenta:#E01A75; --violet:#189E8E; --amber:#D6892E; --green:#1FA88A; --accent:#9B5FD6; --grid:rgba(155,95,214,.06); --glow-cyan:0 2px 10px rgba(155,95,214,.18); --glow-mag:0 2px 10px rgba(224,26,117,.16);
+    --bg:#f4eff8; --bg2:#e7daf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(168,54,255,0.28); --line2:rgba(168,54,255,0.42); --ink:#210c31; --sub:#6c3d8f; --dim:#a281bb; --cyan:#a836ff; --magenta:#f0006d; --violet:#17877b; --amber:#C8892E; --green:#218765; --accent:#a836ff; --grid:rgba(168,54,255,0.06); --glow-cyan:0 2px 10px rgba(168,54,255,0.18); --glow-mag:0 2px 10px rgba(240,0,109,0.16);
   }
   html[data-mode="day"][data-theme="aurora"]{
-    --bg:#e9f6f2; --bg2:#d5ede6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,168,120,.26); --line2:rgba(0,168,120,.4); --ink:#052a22; --sub:#3f8c78; --dim:#6FA898; --cyan:#00A878; --magenta:#8A2FD8; --violet:#0E9ECC; --amber:#C8892E; --green:#00A878; --accent:#00A878; --grid:rgba(0,168,120,.06); --glow-cyan:0 2px 10px rgba(0,168,120,.18); --glow-mag:0 2px 10px rgba(138,47,216,.15);
+    --bg:#eff8f4; --bg2:#daf1e6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,136,71,0.28); --line2:rgba(0,136,71,0.42); --ink:#0c311f; --sub:#3d8f68; --dim:#81bb9f; --cyan:#008847; --magenta:#bd2eff; --violet:#00809f; --amber:#C8892E; --green:#008847; --accent:#008847; --grid:rgba(0,136,71,0.06); --glow-cyan:0 2px 10px rgba(0,136,71,0.18); --glow-mag:0 2px 10px rgba(189,46,255,0.16);
   }
   html[data-mode="day"][data-theme="mono"]{
-    --bg:#f5f0ea; --bg2:#eae1d5; --panel:rgba(255,255,255,.92); --panel-solid:#ffffff; --line:rgba(176,134,44,.26); --line2:rgba(176,134,44,.4); --ink:#2a1c10; --sub:#8a6f54; --dim:#A88F70; --cyan:#B0862C; --magenta:#C23A62; --violet:#A06A2D; --amber:#B0862C; --green:#9A8040; --accent:#B0862C; --grid:rgba(176,134,44,.06); --glow-cyan:0 2px 10px rgba(176,134,44,.16); --glow-mag:0 2px 10px rgba(194,58,98,.14);
+    --bg:#f8f6ef; --bg2:#f1ebda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(147,111,10,0.28); --line2:rgba(147,111,10,0.42); --ink:#31270c; --sub:#8a7742; --dim:#b8aa85; --cyan:#936f0a; --magenta:#db3666; --violet:#9f7130; --amber:#C8892E; --green:#97732c; --accent:#936f0a; --grid:rgba(147,111,10,0.06); --glow-cyan:0 2px 10px rgba(147,111,10,0.18); --glow-mag:0 2px 10px rgba(219,54,102,0.16);
   }
   html[data-mode="day"][data-theme="klein"]{
-    --bg:#eef0fb; --bg2:#dde1f5; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(42,64,200,.26); --line2:rgba(42,64,200,.4); --ink:#0a1240; --sub:#5560A0; --dim:#838CC0; --cyan:#2A40C8; --magenta:#E0662A; --violet:#128A90; --amber:#C8892E; --green:#1FA88A; --accent:#2A40C8; --grid:rgba(42,64,200,.06); --glow-cyan:0 2px 10px rgba(42,64,200,.18); --glow-mag:0 2px 10px rgba(224,102,42,.16);
+    --bg:#eff0f8; --bg2:#dadef1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(58,90,255,0.28); --line2:rgba(58,90,255,0.42); --ink:#0c1231; --sub:#3d4a8f; --dim:#818abb; --cyan:#3a5aff; --magenta:#cc5100; --violet:#108185; --amber:#C8892E; --green:#178762; --accent:#3a5aff; --grid:rgba(58,90,255,0.06); --glow-cyan:0 2px 10px rgba(58,90,255,0.18); --glow-mag:0 2px 10px rgba(204,81,0,0.16);
   }
   html[data-mode="day"][data-theme="coral"]{
-    --bg:#fceeeb; --bg2:#f7ddd7; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,80,60,.26); --line2:rgba(224,80,60,.4); --ink:#3a1210; --sub:#a06158; --dim:#C28B82; --cyan:#E0503C; --magenta:#E01A6E; --violet:#009E8E; --amber:#C8892E; --green:#1FA88A; --accent:#E0503C; --grid:rgba(224,80,60,.06); --glow-cyan:0 2px 10px rgba(224,80,60,.18); --glow-mag:0 2px 10px rgba(224,26,110,.15);
+    --bg:#f8f0ef; --bg2:#f1deda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(225,38,0,0.28); --line2:rgba(225,38,0,0.42); --ink:#31120c; --sub:#8f4b3d; --dim:#bb8b81; --cyan:#e12600; --magenta:#eb004f; --violet:#1c897f; --amber:#C8892E; --green:#1b8b61; --accent:#e12600; --grid:rgba(225,38,0,0.06); --glow-cyan:0 2px 10px rgba(225,38,0,0.18); --glow-mag:0 2px 10px rgba(235,0,79,0.16);
   }
   html[data-mode="day"][data-theme="lagoon"]{
-    --bg:#e9f7f3; --bg2:#d5ede7; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(20,150,128,.26); --line2:rgba(20,150,128,.4); --ink:#05271f; --sub:#3f8c78; --dim:#6FA898; --cyan:#149680; --magenta:#E0562A; --violet:#E0568A; --amber:#C8892E; --green:#149680; --accent:#149680; --grid:rgba(20,150,128,.06); --glow-cyan:0 2px 10px rgba(20,150,128,.18); --glow-mag:0 2px 10px rgba(224,86,42,.15);
+    --bg:#eff6f8; --bg2:#daecf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(13,124,158,0.28); --line2:rgba(13,124,158,0.42); --ink:#0c2831; --sub:#437989; --dim:#85abb7; --cyan:#0d7c9e; --magenta:#e33e00; --violet:#17876f; --amber:#C8892E; --green:#17887a; --accent:#0d7c9e; --grid:rgba(13,124,158,0.06); --glow-cyan:0 2px 10px rgba(13,124,158,0.18); --glow-mag:0 2px 10px rgba(227,62,0,0.16);
   }
   html[data-mode="day"][data-theme="dusk"]{
-    --bg:#eef1f8; --bg2:#dee3f0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(74,93,126,.26); --line2:rgba(74,93,126,.4); --ink:#16223a; --sub:#566482; --dim:#838EA8; --cyan:#4A5D7E; --magenta:#E0662A; --violet:#6E7FA0; --amber:#C8892E; --green:#2E9E7A; --accent:#4A5D7E; --grid:rgba(74,93,126,.06); --glow-cyan:0 2px 10px rgba(74,93,126,.16); --glow-mag:0 2px 10px rgba(224,102,42,.15);
+    --bg:#eff1f8; --bg2:#dae0f1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(75,112,218,0.28); --line2:rgba(75,112,218,0.42); --ink:#0c1631; --sub:#4b5981; --dim:#8b95b1; --cyan:#4b70da; --magenta:#e04000; --violet:#5671e4; --amber:#C8892E; --green:#2a8963; --accent:#4b70da; --grid:rgba(75,112,218,0.06); --glow-cyan:0 2px 10px rgba(75,112,218,0.18); --glow-mag:0 2px 10px rgba(224,64,0,0.16);
   }
   html[data-mode="day"][data-theme="rose"]{
-    --bg:#f7f0ee; --bg2:#ede1dd; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(150,120,110,.26); --line2:rgba(150,120,110,.4); --ink:#2a1c18; --sub:#8a7168; --dim:#A8918A; --cyan:#96786E; --magenta:#B03A56; --violet:#4E5F80; --amber:#C8892E; --green:#5F8070; --accent:#B03A56; --grid:rgba(150,120,110,.06); --glow-cyan:0 2px 10px rgba(150,120,110,.16); --glow-mag:0 2px 10px rgba(176,58,86,.15);
+    --bg:#f8eff1; --bg2:#f1dae0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(201,67,104,0.28); --line2:rgba(201,67,104,0.42); --ink:#310d17; --sub:#7d4f5c; --dim:#ae8e97; --cyan:#c94368; --magenta:#cc4f7b; --violet:#6772c5; --amber:#C8892E; --green:#2d8857; --accent:#c94368; --grid:rgba(201,67,104,0.06); --glow-cyan:0 2px 10px rgba(201,67,104,0.18); --glow-mag:0 2px 10px rgba(204,79,123,0.16);
   }
   html[data-mode="day"][data-theme="sunset"]{
-    --bg:#fceeec; --bg2:#f7dcd8; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,74,60,.26); --line2:rgba(224,74,60,.4); --ink:#3a1018; --sub:#a05a62; --dim:#C28590; --cyan:#E04A3C; --magenta:#E01A75; --violet:#8A2FD8; --amber:#C8892E; --green:#1FA88A; --accent:#E04A3C; --grid:rgba(224,74,60,.06); --glow-cyan:0 2px 10px rgba(224,74,60,.18); --glow-mag:0 2px 10px rgba(224,26,117,.15);
+    --bg:#f8eff3; --bg2:#f1dae4; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,0,98,0.28); --line2:rgba(224,0,98,0.42); --ink:#310c1c; --sub:#8f3d61; --dim:#bb819b; --cyan:#e00062; --magenta:#d64300; --violet:#a939ff; --amber:#C8892E; --green:#1b8b61; --accent:#e00062; --grid:rgba(224,0,98,0.06); --glow-cyan:0 2px 10px rgba(224,0,98,0.18); --glow-mag:0 2px 10px rgba(214,67,0,0.16);
   }
   /* cyber 默认走 :root(无 data-theme),所以日间也要单独给 html[data-mode="day"]:not([data-theme]) 覆盖 */
   html[data-mode="day"]:not([data-theme]){
-    --bg:#eef4f5; --bg2:#dcebec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,158,146,.28); --line2:rgba(0,158,146,.42); --ink:#0d2a2e; --sub:#4a7b80; --dim:#7BA0A4; --cyan:#009E92; --magenta:#D81B6F; --violet:#5A3DE0; --amber:#C8892E; --green:#12A87C; --accent:#009E92; --grid:rgba(0,158,146,.06); --glow-cyan:0 2px 10px rgba(0,158,146,.18); --glow-mag:0 2px 10px rgba(216,27,111,.16);
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* ★ 禁掉按钮/可交互元素点击后的浏览器默认黑色 focus outline(手机上一点就出一圈黑边),
@@ -1185,7 +1185,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-2100hormone';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-2330themes';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1522,25 +1522,25 @@ const EH_CONFIG_DEFAULT = {
     "--fx-private-heat": ".5",    // 私密房"暧昧红"氛围强度(0=关)
   },
   themePalettes: {
-    cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(18,30,52,.78)","--panel-solid":"#101c2e","--line":"rgba(0,229,212,.22)","--line2":"rgba(0,229,212,.36)","--ink":"#EAF6FF","--sub":"#7FA8C9","--dim":"#4A6B85","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#7B5CFF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,.05)","--glow-cyan":"0 0 20px rgba(0,229,212,.55)","--glow-mag":"0 0 20px rgba(255,45,142,.55)"},
-    vapor: {"--bg":"#160a1e","--bg2":"#28123a","--panel":"rgba(48,20,60,.78)","--panel-solid":"#301440","--line":"rgba(199,125,255,.24)","--line2":"rgba(199,125,255,.38)","--ink":"#FFEAF5","--sub":"#D69AC0","--dim":"#925A80","--cyan":"#C77DFF","--magenta":"#FF4D9E","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#7FE0C0","--accent":"#C77DFF","--grid":"rgba(199,125,255,.05)","--glow-cyan":"0 0 22px rgba(199,125,255,.6)","--glow-mag":"0 0 20px rgba(255,77,158,.55)"},
-    aurora: {"--bg":"#050f12","--bg2":"#0a2029","--panel":"rgba(12,38,44,.76)","--panel-solid":"#0c2630","--line":"rgba(0,240,181,.22)","--line2":"rgba(0,240,181,.36)","--ink":"#EAFFFA","--sub":"#7FC9BC","--dim":"#4A8578","--cyan":"#00F0B5","--magenta":"#B24DFF","--violet":"#2ED9FF","--amber":"#F7E7CE","--green":"#00F0B5","--accent":"#00F0B5","--grid":"rgba(0,240,181,.05)","--glow-cyan":"0 0 22px rgba(0,240,181,.6)","--glow-mag":"0 0 20px rgba(178,77,255,.55)"},
-    mono: {"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(28,20,22,.82)","--panel-solid":"#1c1416","--line":"rgba(245,208,106,.20)","--line2":"rgba(245,208,106,.34)","--ink":"#FBEEE4","--sub":"#B89A94","--dim":"#7C625A","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,.04)","--glow-cyan":"0 0 20px rgba(245,208,106,.5)","--glow-mag":"0 0 20px rgba(224,80,122,.5)"},
-    klein: {"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(14,24,64,.80)","--panel-solid":"#0e1840","--line":"rgba(58,90,255,.24)","--line2":"rgba(58,90,255,.38)","--ink":"#E8ECFF","--sub":"#8B9AD6","--dim":"#5560A0","--cyan":"#3A5AFF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#3A5AFF","--grid":"rgba(58,90,255,.05)","--glow-cyan":"0 0 22px rgba(58,90,255,.6)","--glow-mag":"0 0 20px rgba(255,138,61,.55)"},
-    coral: {"--bg":"#1a0a0e","--bg2":"#2e1218","--panel":"rgba(54,22,28,.80)","--panel-solid":"#361620","--line":"rgba(255,111,97,.24)","--line2":"rgba(255,111,97,.38)","--ink":"#FFEDE8","--sub":"#D6A19A","--dim":"#92615A","--cyan":"#FF6F61","--magenta":"#FF4D8D","--violet":"#00D4C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF6F61","--grid":"rgba(255,111,97,.05)","--glow-cyan":"0 0 22px rgba(255,111,97,.6)","--glow-mag":"0 0 20px rgba(255,77,141,.55)"},
-    lagoon: {"--bg":"#061412","--bg2":"#0c2622","--panel":"rgba(14,44,40,.78)","--panel-solid":"#0e2c28","--line":"rgba(136,216,192,.26)","--line2":"rgba(136,216,192,.4)","--ink":"#EAFBF6","--sub":"#8FC9BC","--dim":"#5A8578","--cyan":"#4DD4B8","--magenta":"#FD6E53","--violet":"#FF6FA5","--amber":"#FFC97A","--green":"#4DD4B8","--accent":"#4DD4B8","--grid":"rgba(136,216,192,.05)","--glow-cyan":"0 0 22px rgba(77,212,184,.55)","--glow-mag":"0 0 20px rgba(253,110,83,.5)"},
-    dusk: {"--bg":"#0a0e16","--bg2":"#141c2a","--panel":"rgba(26,36,54,.80)","--panel-solid":"#1a2436","--line":"rgba(122,146,190,.24)","--line2":"rgba(122,146,190,.38)","--ink":"#EAF0FB","--sub":"#9AAAC9","--dim":"#647085","--cyan":"#7A92BE","--magenta":"#FF8A6E","--violet":"#A9BEE8","--amber":"#F7E7CE","--green":"#6ED0B0","--accent":"#7A92BE","--grid":"rgba(122,146,190,.05)","--glow-cyan":"0 0 20px rgba(122,146,190,.45)","--glow-mag":"0 0 20px rgba(255,138,110,.5)"},
-    rose: {"--bg":"#14100f","--bg2":"#241c1a","--panel":"rgba(44,34,32,.80)","--panel-solid":"#2c2220","--line":"rgba(201,173,161,.24)","--line2":"rgba(201,173,161,.4)","--ink":"#F7EEEA","--sub":"#C2A79E","--dim":"#8A7168","--cyan":"#C9ADA1","--magenta":"#C25B72","--violet":"#6E7FA0","--amber":"#E0B87A","--green":"#8FB0A0","--accent":"#C9ADA1","--grid":"rgba(201,173,161,.05)","--glow-cyan":"0 0 20px rgba(201,173,161,.45)","--glow-mag":"0 0 20px rgba(194,91,114,.5)"},
-    sunset: {"--bg":"#180a12","--bg2":"#2c1020","--panel":"rgba(52,18,36,.80)","--panel-solid":"#341024","--line":"rgba(253,94,83,.24)","--line2":"rgba(253,94,83,.38)","--ink":"#FFEBED","--sub":"#D6A0A8","--dim":"#925A66","--cyan":"#FD5E53","--magenta":"#FF3C8E","--violet":"#B24DFF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FD5E53","--grid":"rgba(253,94,83,.05)","--glow-cyan":"0 0 22px rgba(253,94,83,.6)","--glow-mag":"0 0 20px rgba(255,60,142,.55)"},
+    cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#7B5CFF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
+    vapor: {"--bg":"#160a1e","--bg2":"#28123a","--panel":"rgba(38,21,50,0.8)","--panel-solid":"#20132a","--line":"rgba(199,125,255,0.24)","--line2":"rgba(199,125,255,0.38)","--ink":"#FFEAF5","--sub":"#ad86cb","--dim":"#70498d","--cyan":"#C77DFF","--magenta":"#FF4D9E","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#7FE0C0","--accent":"#C77DFF","--grid":"rgba(199,125,255,0.05)","--glow-cyan":"0 0 22px rgba(199,125,255,0.6)","--glow-mag":"0 0 20px rgba(255,77,158,0.55)"},
+    aurora: {"--bg":"#03130d","--bg2":"#08261a","--panel":"rgba(21,50,36,0.8)","--panel-solid":"#132a1f","--line":"rgba(34,255,149,0.24)","--line2":"rgba(34,255,149,0.38)","--ink":"#EAFFF3","--sub":"#86cbaa","--dim":"#498d6c","--cyan":"#22FF95","--magenta":"#C74DFF","--violet":"#39D9FF","--amber":"#F2E4A8","--green":"#22FF95","--accent":"#22FF95","--grid":"rgba(34,255,149,0.05)","--glow-cyan":"0 0 22px rgba(34,255,149,0.6)","--glow-mag":"0 0 20px rgba(199,77,255,0.55)"},
+    mono: {"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(50,42,21,0.8)","--panel-solid":"#2a2413","--line":"rgba(245,208,106,0.24)","--line2":"rgba(245,208,106,0.38)","--ink":"#FBEEE4","--sub":"#c7b68a","--dim":"#89794d","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,0.05)","--glow-cyan":"0 0 22px rgba(245,208,106,0.6)","--glow-mag":"0 0 20px rgba(224,80,122,0.55)"},
+    klein: {"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(21,26,50,0.8)","--panel-solid":"#13172a","--line":"rgba(58,90,255,0.24)","--line2":"rgba(58,90,255,0.38)","--ink":"#E8ECFF","--sub":"#8691cb","--dim":"#49548d","--cyan":"#3A5AFF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#3A5AFF","--grid":"rgba(58,90,255,0.05)","--glow-cyan":"0 0 22px rgba(58,90,255,0.6)","--glow-mag":"0 0 20px rgba(255,138,61,0.55)"},
+    coral: {"--bg":"#1a0a0c","--bg2":"#2e1216","--panel":"rgba(50,26,21,0.8)","--panel-solid":"#2a1713","--line":"rgba(255,111,82,0.24)","--line2":"rgba(255,111,82,0.38)","--ink":"#FFEDE6","--sub":"#cb9186","--dim":"#8d5449","--cyan":"#FF6F52","--magenta":"#FF5C93","--violet":"#2DD4C4","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF6F52","--grid":"rgba(255,111,82,0.05)","--glow-cyan":"0 0 22px rgba(255,111,82,0.6)","--glow-mag":"0 0 20px rgba(255,92,147,0.55)"},
+    lagoon: {"--bg":"#04141c","--bg2":"#082832","--panel":"rgba(21,43,50,0.8)","--panel-solid":"#13252a","--line":"rgba(18,176,224,0.24)","--line2":"rgba(18,176,224,0.38)","--ink":"#E6FBFF","--sub":"#8bb8c6","--dim":"#4e7b88","--cyan":"#12B0E0","--magenta":"#FF8A5E","--violet":"#4DE0C0","--amber":"#FFC97A","--green":"#25D6C0","--accent":"#12B0E0","--grid":"rgba(18,176,224,0.05)","--glow-cyan":"0 0 22px rgba(18,176,224,0.6)","--glow-mag":"0 0 20px rgba(255,138,94,0.55)"},
+    dusk: {"--bg":"#0a0e18","--bg2":"#151b2c","--panel":"rgba(24,30,47,0.8)","--panel-solid":"#161a28","--line":"rgba(143,166,232,0.24)","--line2":"rgba(143,166,232,0.38)","--ink":"#EEF2FC","--sub":"#919dbf","--dim":"#556082","--cyan":"#8FA6E8","--magenta":"#FFA07A","--violet":"#C0CAF5","--amber":"#F7E7CE","--green":"#7ED8B4","--accent":"#8FA6E8","--grid":"rgba(143,166,232,0.05)","--glow-cyan":"0 0 22px rgba(143,166,232,0.6)","--glow-mag":"0 0 20px rgba(255,160,122,0.55)"},
+    rose: {"--bg":"#15100f","--bg2":"#261b1a","--panel":"rgba(46,26,31,0.8)","--panel-solid":"#26171b","--line":"rgba(226,154,174,0.24)","--line2":"rgba(226,154,174,0.38)","--ink":"#F9EFEC","--sub":"#bc95a0","--dim":"#7e5863","--cyan":"#E29AAE","--magenta":"#D06A8E","--violet":"#9AA0D0","--amber":"#E6BE86","--green":"#95BAA6","--accent":"#E29AAE","--grid":"rgba(226,154,174,0.05)","--glow-cyan":"0 0 22px rgba(226,154,174,0.6)","--glow-mag":"0 0 20px rgba(208,106,142,0.55)"},
+    sunset: {"--bg":"#180818","--bg2":"#2c0e26","--panel":"rgba(50,21,34,0.8)","--panel-solid":"#2a131d","--line":"rgba(255,61,146,0.24)","--line2":"rgba(255,61,146,0.38)","--ink":"#FFEAF2","--sub":"#cb86a4","--dim":"#8d4967","--cyan":"#FF3D92","--magenta":"#FF7A3D","--violet":"#B24DFF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FF3D92","--grid":"rgba(255,61,146,0.05)","--glow-cyan":"0 0 22px rgba(255,61,146,0.6)","--glow-mag":"0 0 20px rgba(255,122,61,0.55)"},
   },
   // 主题元数据(下拉菜单:id/名称/圆点色)
   themes: [
-    { id:"cyber", name:"赛博夜城", dot:"#00E5D4" }, { id:"vapor", name:"迈阿密日落", dot:"#C77DFF" }, { id:"aurora", name:"极光迷幻", dot:"#00F0B5" }, { id:"mono", name:"暗夜奢华", dot:"#F5D06A" }, { id:"klein", name:"克莱因之夜", dot:"#3A5AFF" }, { id:"coral", name:"珊瑚热恋", dot:"#FF6F61" }, { id:"lagoon", name:"湖水迷情", dot:"#4DD4B8" }, { id:"dusk", name:"远山暮色", dot:"#7A92BE" }, { id:"rose", name:"莫兰迪玫瑰", dot:"#C9ADA1" }, { id:"sunset", name:"日暮狂欢", dot:"#FD5E53" }
+    { id:"cyber", name:"赛博夜城", dot:"#00E5D4" }, { id:"vapor", name:"迈阿密日落", dot:"#C77DFF" }, { id:"aurora", name:"极光迷幻", dot:"#22FF95" }, { id:"mono", name:"暗夜奢华", dot:"#F5D06A" }, { id:"klein", name:"克莱因之夜", dot:"#3A5AFF" }, { id:"coral", name:"珊瑚热恋", dot:"#FF6F52" }, { id:"lagoon", name:"湖水迷情", dot:"#12B0E0" }, { id:"dusk", name:"远山暮色", dot:"#8FA6E8" }, { id:"rose", name:"莫兰迪玫瑰", dot:"#E29AAE" }, { id:"sunset", name:"日暮狂欢", dot:"#FF3D92" }
   ],
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'klein','虚空回音':'aurora' },
   // 官方房卡片兜底强调色(对应主题夜间 accent)
-  officialFallbackC: { '闲聊广场':'#00E5D4','深夜电台':'#FF4D9E','技术黑话':'#3A5AFF','虚空回音':'#00F0B5' },
+  officialFallbackC: { '闲聊广场':'#00E5D4','深夜电台':'#FF4D9E','技术黑话':'#3A5AFF','虚空回音':'#22FF95' },
   // 公开/私密房按名字哈希稳定分配的主题池(后台可改)
   publicThemePool: ['coral','lagoon','sunset','cyber','klein'],   // 热烈开放系
   privateThemePool: ['dusk','rose','mono','vapor','aurora'],       // 私密沉静系
