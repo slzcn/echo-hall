@@ -1163,8 +1163,11 @@ const CFG_DEFAULT = {
     sunset:{"--bg":"#180a12","--bg2":"#2c1020","--panel":"rgba(52,18,36,.80)","--panel-solid":"#341024","--line":"rgba(253,94,83,.24)","--line2":"rgba(253,94,83,.38)","--ink":"#FFEBED","--sub":"#D6A0A8","--dim":"#925A66","--cyan":"#FD5E53","--magenta":"#FF3C8E","--violet":"#B24DFF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FD5E53","--grid":"rgba(253,94,83,.05)","--glow-cyan":"0 0 22px rgba(253,94,83,.6)","--glow-mag":"0 0 20px rgba(255,60,142,.55)"},
   },
   themes:[{id:"cyber",name:"赛博夜城",dot:"#00E5D4"},{id:"vapor",name:"迈阿密日落",dot:"#FF4D9E"},{id:"aurora",name:"极光迷幻",dot:"#00F0B5"},{id:"mono",name:"暗夜奢华",dot:"#F5D06A"},{id:"klein",name:"克莱因之夜",dot:"#3A5AFF"},{id:"coral",name:"珊瑚热恋",dot:"#FF6F61"},{id:"lagoon",name:"湖水迷情",dot:"#4DD4B8"},{id:"dusk",name:"远山暮色",dot:"#F5D06A"},{id:"rose",name:"莫兰迪玫瑰",dot:"#C9ADA1"},{id:"sunset",name:"日暮狂欢",dot:"#FD5E53"}],
-  roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"mono","虚空回音":"aurora"},
-  officialFallbackC:{"闲聊广场":"#0ABAB5","深夜电台":"#B57EDC","技术黑话":"#F7E7CE","虚空回音":"#1DE9B6"},
+  roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"klein","虚空回音":"aurora"},
+  officialFallbackC:{"闲聊广场":"#00E5D4","深夜电台":"#FF4D9E","技术黑话":"#3A5AFF","虚空回音":"#00F0B5"},
+  publicThemePool:["coral","lagoon","sunset","cyber","klein"],
+  privateThemePool:["dusk","rose","mono","vapor","aurora"],
+  roomThemeOverride:{},
   soulColors:{"狼姐":"#FF6F61","老K":"#F7E7CE","阿夜":"#B57EDC","回音":"#4A5D7E","图灵":"#0ABAB5","小暖":"#1DE9B6"},
   roomKindC:{"public":"#1DE9B6","private":"#B57EDC","official":"#0ABAB5"},
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色(可写)
@@ -1697,7 +1700,7 @@ $('#humanSingSave')?.addEventListener('click',async()=>{
 // ---- 📋 全站日志 ----
 const AUDIT_KEY_LABEL = {
   themePalettes:'🎨 主题配色', themes:'🎨 主题元数据', roomTheme:'🏠 官方房主题绑定',
-  officialFallbackC:'🏠 官方房兜底色', roomKindC:'🏠 房间类型强调色', roomBgm:'🎵 BGM',
+  officialFallbackC:'🏠 官方房兜底色', publicThemePool:'🏠 公开房主题池', privateThemePool:'🏠 私密房主题池', roomThemeOverride:'🏠 房间主题手动覆盖', roomKindC:'🏠 房间类型强调色', roomBgm:'🎵 BGM',
   text:'📝 文案', identityPool:'🎭 身份池', tuning:'⚙️ 运行参数', songStyles:'🎼 曲风池'
 };
 const LOG_TAG_LABEL={
