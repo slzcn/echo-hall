@@ -18,7 +18,7 @@
    两处必须一致, 否则首屏会闪旧色。后台「🎨主题配色」tab 也有一份 CFG_DEFAULT 副本需同步。
    v3扩展到10套(2026-07-15): cyber走:root默认, 其余9套走html[data-theme=x], 日间10套显式覆盖(防夜间注入盖静态day base) */
   :root{
-    --bg:#070a12; --bg2:#0d1524; --panel:rgba(21,50,48,0.8); --panel-solid:#132a29; --line:rgba(0,229,212,0.24); --line2:rgba(0,229,212,0.38); --ink:#EAF6FF; --sub:#86cbc6; --dim:#498d88; --cyan:#00E5D4; --magenta:#FF2D8E; --violet:#9C85FF; --amber:#FFC24D; --green:#34E0B0; --accent:#00E5D4; --grid:rgba(0,229,212,0.05); --glow-cyan:0 0 22px rgba(0,229,212,0.6); --glow-mag:0 0 20px rgba(255,45,142,0.55);
+    --bg:#070a12; --bg2:#0d1524; --panel:rgba(18,30,52,.78); --panel-solid:#101c2e; --line:rgba(0,229,212,.22); --line2:rgba(0,229,212,.36); --ink:#EAF6FF; --sub:#7FA8C9; --dim:#4A6B85; --cyan:#00E5D4; --magenta:#FF2D8E; --violet:#7B5CFF; --amber:#FFC24D; --green:#34E0B0; --accent:#00E5D4; --grid:rgba(0,229,212,.05); --glow-cyan:0 0 20px rgba(0,229,212,.55); --glow-mag:0 0 20px rgba(255,45,142,.55);
     --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
     /* 语义化组件变量(夜间基线) —— 日间模式在 html[data-mode="day"] 统一覆盖 */
     --input-bg:rgba(10,12,24,.6); --input-shadow:none;
@@ -31,39 +31,39 @@
   }
   /* ===== 皮肤: 迈阿密日落 (vapor) ===== */
   html[data-theme="vapor"]{
-    --bg:#1c081f; --bg2:#320f38; --panel:rgba(50,21,44,0.8); --panel-solid:#2a1325; --line:rgba(255,77,216,0.24); --line2:rgba(255,77,216,0.38); --ink:#FFEAF7; --sub:#cb86bc; --dim:#8d497e; --cyan:#FF4DD8; --magenta:#FF66B0; --violet:#4DE0D0; --amber:#FFB84D; --green:#8CE8A0; --accent:#FF4DD8; --grid:rgba(255,77,216,0.05); --glow-cyan:0 0 22px rgba(255,77,216,0.6); --glow-mag:0 0 20px rgba(255,102,176,0.55);
+    --bg:#160a1e; --bg2:#28123a; --panel:rgba(48,20,60,.78); --panel-solid:#301440; --line:rgba(199,125,255,.24); --line2:rgba(199,125,255,.38); --ink:#FFEAF5; --sub:#D69AC0; --dim:#925A80; --cyan:#C77DFF; --magenta:#FF4D9E; --violet:#4DE0D0; --amber:#FFB84D; --green:#7FE0C0; --accent:#C77DFF; --grid:rgba(199,125,255,.05); --glow-cyan:0 0 22px rgba(199,125,255,.6); --glow-mag:0 0 20px rgba(255,77,158,.55);
   }
   /* ===== 皮肤: 极光迷幻 (aurora) ===== */
   html[data-theme="aurora"]{
-    --bg:#03130d; --bg2:#08261a; --panel:rgba(21,50,36,0.8); --panel-solid:#132a1f; --line:rgba(34,255,149,0.24); --line2:rgba(34,255,149,0.38); --ink:#EAFFF3; --sub:#86cbaa; --dim:#498d6c; --cyan:#22FF95; --magenta:#C74DFF; --violet:#39D9FF; --amber:#EBC85A; --green:#22FF95; --accent:#22FF95; --grid:rgba(34,255,149,0.05); --glow-cyan:0 0 22px rgba(34,255,149,0.6); --glow-mag:0 0 20px rgba(199,77,255,0.55);
+    --bg:#050f12; --bg2:#0a2029; --panel:rgba(12,38,44,.76); --panel-solid:#0c2630; --line:rgba(0,240,181,.22); --line2:rgba(0,240,181,.36); --ink:#EAFFFA; --sub:#7FC9BC; --dim:#4A8578; --cyan:#00F0B5; --magenta:#B24DFF; --violet:#2ED9FF; --amber:#F7E7CE; --green:#00F0B5; --accent:#00F0B5; --grid:rgba(0,240,181,.05); --glow-cyan:0 0 22px rgba(0,240,181,.6); --glow-mag:0 0 20px rgba(178,77,255,.55);
   }
   /* ===== 皮肤: 暗夜奢华 (mono) ===== */
   html[data-theme="mono"]{
-    --bg:#0a0708; --bg2:#151011; --panel:rgba(50,42,21,0.8); --panel-solid:#2a2413; --line:rgba(245,208,106,0.24); --line2:rgba(245,208,106,0.38); --ink:#FBEEE4; --sub:#c7b68a; --dim:#89794d; --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --accent:#F5D06A; --grid:rgba(245,208,106,0.05); --glow-cyan:0 0 22px rgba(245,208,106,0.6); --glow-mag:0 0 20px rgba(224,80,122,0.55);
+    --bg:#0a0708; --bg2:#151011; --panel:rgba(28,20,22,.82); --panel-solid:#1c1416; --line:rgba(245,208,106,.20); --line2:rgba(245,208,106,.34); --ink:#FBEEE4; --sub:#B89A94; --dim:#7C625A; --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --accent:#F5D06A; --grid:rgba(245,208,106,.04); --glow-cyan:0 0 20px rgba(245,208,106,.5); --glow-mag:0 0 20px rgba(224,80,122,.5);
   }
   /* ===== 皮肤: 克莱因之夜 (klein) ===== */
   html[data-theme="klein"]{
-    --bg:#050818; --bg2:#0a1030; --panel:rgba(21,28,50,0.8); --panel-solid:#13182a; --line:rgba(100,134,255,0.24); --line2:rgba(100,134,255,0.38); --ink:#E8ECFF; --sub:#8695cb; --dim:#49588d; --cyan:#6486FF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --accent:#6486FF; --grid:rgba(100,134,255,0.05); --glow-cyan:0 0 22px rgba(100,134,255,0.6); --glow-mag:0 0 20px rgba(255,138,61,0.55);
+    --bg:#050818; --bg2:#0a1030; --panel:rgba(14,24,64,.80); --panel-solid:#0e1840; --line:rgba(58,90,255,.24); --line2:rgba(58,90,255,.38); --ink:#E8ECFF; --sub:#8B9AD6; --dim:#5560A0; --cyan:#3A5AFF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --accent:#3A5AFF; --grid:rgba(58,90,255,.05); --glow-cyan:0 0 22px rgba(58,90,255,.6); --glow-mag:0 0 20px rgba(255,138,61,.55);
   }
   /* ===== 皮肤: 珊瑚热恋 (coral) ===== */
   html[data-theme="coral"]{
-    --bg:#20100c; --bg2:#3a1c14; --panel:rgba(50,28,21,0.8); --panel-solid:#2a1913; --line:rgba(255,129,89,0.24); --line2:rgba(255,129,89,0.38); --ink:#FFEFE8; --sub:#cb9686; --dim:#8d5949; --cyan:#FF8159; --magenta:#FF6098; --violet:#2ED9C0; --amber:#FFB84D; --green:#5FE0B0; --accent:#FF8159; --grid:rgba(255,129,89,0.05); --glow-cyan:0 0 22px rgba(255,129,89,0.6); --glow-mag:0 0 20px rgba(255,96,152,0.55);
+    --bg:#1a0a0e; --bg2:#2e1218; --panel:rgba(54,22,28,.80); --panel-solid:#361620; --line:rgba(255,111,97,.24); --line2:rgba(255,111,97,.38); --ink:#FFEDE8; --sub:#D6A19A; --dim:#92615A; --cyan:#FF6F61; --magenta:#FF4D8D; --violet:#00D4C0; --amber:#FFB84D; --green:#5FE0B0; --accent:#FF6F61; --grid:rgba(255,111,97,.05); --glow-cyan:0 0 22px rgba(255,111,97,.6); --glow-mag:0 0 20px rgba(255,77,141,.55);
   }
   /* ===== 皮肤: 湖水迷情 (lagoon) ===== */
   html[data-theme="lagoon"]{
-    --bg:#04141c; --bg2:#082832; --panel:rgba(21,43,50,0.8); --panel-solid:#13252a; --line:rgba(18,176,224,0.24); --line2:rgba(18,176,224,0.38); --ink:#E6FBFF; --sub:#8bb8c6; --dim:#4e7b88; --cyan:#12B0E0; --magenta:#FF8A5E; --violet:#4DE0C0; --amber:#FFC97A; --green:#3FE0A0; --accent:#12B0E0; --grid:rgba(18,176,224,0.05); --glow-cyan:0 0 22px rgba(18,176,224,0.6); --glow-mag:0 0 20px rgba(255,138,94,0.55);
+    --bg:#061412; --bg2:#0c2622; --panel:rgba(14,44,40,.78); --panel-solid:#0e2c28; --line:rgba(136,216,192,.26); --line2:rgba(136,216,192,.4); --ink:#EAFBF6; --sub:#8FC9BC; --dim:#5A8578; --cyan:#4DD4B8; --magenta:#FD6E53; --violet:#FF6FA5; --amber:#FFC97A; --green:#4DD4B8; --accent:#4DD4B8; --grid:rgba(136,216,192,.05); --glow-cyan:0 0 22px rgba(77,212,184,.55); --glow-mag:0 0 20px rgba(253,110,83,.5);
   }
   /* ===== 皮肤: 远山暮色 (dusk) ===== */
   html[data-theme="dusk"]{
-    --bg:#0a0e18; --bg2:#151b2c; --panel:rgba(24,30,47,0.8); --panel-solid:#161a28; --line:rgba(143,166,232,0.24); --line2:rgba(143,166,232,0.38); --ink:#EEF2FC; --sub:#919dbf; --dim:#556082; --cyan:#8FA6E8; --magenta:#FFA07A; --violet:#C0CAF5; --amber:#F0C878; --green:#7ED8B4; --accent:#8FA6E8; --grid:rgba(143,166,232,0.05); --glow-cyan:0 0 22px rgba(143,166,232,0.6); --glow-mag:0 0 20px rgba(255,160,122,0.55);
+    --bg:#0a0e16; --bg2:#141c2a; --panel:rgba(26,36,54,.80); --panel-solid:#1a2436; --line:rgba(122,146,190,.24); --line2:rgba(122,146,190,.38); --ink:#EAF0FB; --sub:#9AAAC9; --dim:#647085; --cyan:#7A92BE; --magenta:#FF8A6E; --violet:#A9BEE8; --amber:#F7E7CE; --green:#6ED0B0; --accent:#7A92BE; --grid:rgba(122,146,190,.05); --glow-cyan:0 0 20px rgba(122,146,190,.45); --glow-mag:0 0 20px rgba(255,138,110,.5);
   }
   /* ===== 皮肤: 莫兰迪玫瑰 (rose) ===== */
   html[data-theme="rose"]{
-    --bg:#15100f; --bg2:#261b1a; --panel:rgba(46,26,31,0.8); --panel-solid:#26171b; --line:rgba(226,154,174,0.24); --line2:rgba(226,154,174,0.38); --ink:#F9EFEC; --sub:#bc95a0; --dim:#7e5863; --cyan:#E29AAE; --magenta:#D06A8E; --violet:#9AA0D0; --amber:#E6BE86; --green:#95BAA6; --accent:#E29AAE; --grid:rgba(226,154,174,0.05); --glow-cyan:0 0 22px rgba(226,154,174,0.6); --glow-mag:0 0 20px rgba(208,106,142,0.55);
+    --bg:#14100f; --bg2:#241c1a; --panel:rgba(44,34,32,.80); --panel-solid:#2c2220; --line:rgba(201,173,161,.24); --line2:rgba(201,173,161,.4); --ink:#F7EEEA; --sub:#C2A79E; --dim:#8A7168; --cyan:#C9ADA1; --magenta:#C25B72; --violet:#6E7FA0; --amber:#E0B87A; --green:#8FB0A0; --accent:#C9ADA1; --grid:rgba(201,173,161,.05); --glow-cyan:0 0 20px rgba(201,173,161,.45); --glow-mag:0 0 20px rgba(194,91,114,.5);
   }
   /* ===== 皮肤: 日暮狂欢 (sunset) ===== */
   html[data-theme="sunset"]{
-    --bg:#180818; --bg2:#2c0e26; --panel:rgba(50,21,34,0.8); --panel-solid:#2a131d; --line:rgba(255,61,146,0.24); --line2:rgba(255,61,146,0.38); --ink:#FFEAF2; --sub:#cb86a4; --dim:#8d4967; --cyan:#FF3D92; --magenta:#FF7A3D; --violet:#C476FF; --amber:#FFB04D; --green:#5FE0B0; --accent:#FF3D92; --grid:rgba(255,61,146,0.05); --glow-cyan:0 0 22px rgba(255,61,146,0.6); --glow-mag:0 0 20px rgba(255,122,61,0.55);
+    --bg:#180a12; --bg2:#2c1020; --panel:rgba(52,18,36,.80); --panel-solid:#341024; --line:rgba(253,94,83,.24); --line2:rgba(253,94,83,.38); --ink:#FFEBED; --sub:#D6A0A8; --dim:#925A66; --cyan:#FD5E53; --magenta:#FF3C8E; --violet:#B24DFF; --amber:#FFB04D; --green:#5FE0B0; --accent:#FD5E53; --grid:rgba(253,94,83,.05); --glow-cyan:0 0 22px rgba(253,94,83,.6); --glow-mag:0 0 20px rgba(255,60,142,.55);
   }
   /* ===== 日间模式(亮底): 每套主题都必须显式覆盖夜间注入的强调色(v2踩过坑) ===== */
   html[data-mode="day"]{
@@ -78,38 +78,38 @@
     --name-halo:rgba(255,255,255,.9); --text-halo:rgba(255,255,255,.7);
   }
   html[data-mode="day"][data-theme="cyber"]{
-    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+    --bg:#eef4f5; --bg2:#dcebec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,158,146,.28); --line2:rgba(0,158,146,.42); --ink:#0d2a2e; --sub:#4a7b80; --dim:#7BA0A4; --cyan:#009E92; --magenta:#D81B6F; --violet:#5A3DE0; --amber:#C8892E; --green:#12A87C; --accent:#009E92; --grid:rgba(0,158,146,.06); --glow-cyan:0 2px 10px rgba(0,158,146,.18); --glow-mag:0 2px 10px rgba(216,27,111,.16);
   }
   html[data-mode="day"][data-theme="vapor"]{
-    --bg:#f8eff6; --bg2:#f1daec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(220,0,172,0.28); --line2:rgba(220,0,172,0.42); --ink:#310c29; --sub:#8f3d7d; --dim:#bb81ae; --cyan:#dc00ac; --magenta:#eb0071; --violet:#17877b; --amber:#C8892E; --green:#1c8c34; --accent:#dc00ac; --grid:rgba(220,0,172,0.06); --glow-cyan:0 2px 10px rgba(220,0,172,0.18); --glow-mag:0 2px 10px rgba(235,0,113,0.16);
+    --bg:#faeef4; --bg2:#f3dced; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(155,95,214,.26); --line2:rgba(155,95,214,.4); --ink:#3a1028; --sub:#a04f7c; --dim:#C285A8; --cyan:#9B5FD6; --magenta:#E01A75; --violet:#189E8E; --amber:#D6892E; --green:#1FA88A; --accent:#9B5FD6; --grid:rgba(155,95,214,.06); --glow-cyan:0 2px 10px rgba(155,95,214,.18); --glow-mag:0 2px 10px rgba(224,26,117,.16);
   }
   html[data-mode="day"][data-theme="aurora"]{
-    --bg:#eff8f4; --bg2:#daf1e6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,136,71,0.28); --line2:rgba(0,136,71,0.42); --ink:#0c311f; --sub:#3d8f68; --dim:#81bb9f; --cyan:#008847; --magenta:#bd2eff; --violet:#00809f; --amber:#C8892E; --green:#008847; --accent:#008847; --grid:rgba(0,136,71,0.06); --glow-cyan:0 2px 10px rgba(0,136,71,0.18); --glow-mag:0 2px 10px rgba(189,46,255,0.16);
+    --bg:#e9f6f2; --bg2:#d5ede6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,168,120,.26); --line2:rgba(0,168,120,.4); --ink:#052a22; --sub:#3f8c78; --dim:#6FA898; --cyan:#00A878; --magenta:#8A2FD8; --violet:#0E9ECC; --amber:#C8892E; --green:#00A878; --accent:#00A878; --grid:rgba(0,168,120,.06); --glow-cyan:0 2px 10px rgba(0,168,120,.18); --glow-mag:0 2px 10px rgba(138,47,216,.15);
   }
   html[data-mode="day"][data-theme="mono"]{
-    --bg:#f8f6ef; --bg2:#f1ebda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(147,111,10,0.28); --line2:rgba(147,111,10,0.42); --ink:#31270c; --sub:#8a7742; --dim:#b8aa85; --cyan:#936f0a; --magenta:#db3666; --violet:#9f7130; --amber:#C8892E; --green:#97732c; --accent:#936f0a; --grid:rgba(147,111,10,0.06); --glow-cyan:0 2px 10px rgba(147,111,10,0.18); --glow-mag:0 2px 10px rgba(219,54,102,0.16);
+    --bg:#f5f0ea; --bg2:#eae1d5; --panel:rgba(255,255,255,.92); --panel-solid:#ffffff; --line:rgba(176,134,44,.26); --line2:rgba(176,134,44,.4); --ink:#2a1c10; --sub:#8a6f54; --dim:#A88F70; --cyan:#B0862C; --magenta:#C23A62; --violet:#A06A2D; --amber:#B0862C; --green:#9A8040; --accent:#B0862C; --grid:rgba(176,134,44,.06); --glow-cyan:0 2px 10px rgba(176,134,44,.16); --glow-mag:0 2px 10px rgba(194,58,98,.14);
   }
   html[data-mode="day"][data-theme="klein"]{
-    --bg:#eff1f8; --bg2:#dadff1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(59,102,255,0.28); --line2:rgba(59,102,255,0.42); --ink:#0c1431; --sub:#3d4f8f; --dim:#818ebb; --cyan:#3b66ff; --magenta:#cc5100; --violet:#108185; --amber:#C8892E; --green:#178762; --accent:#3b66ff; --grid:rgba(59,102,255,0.06); --glow-cyan:0 2px 10px rgba(59,102,255,0.18); --glow-mag:0 2px 10px rgba(204,81,0,0.16);
+    --bg:#eef0fb; --bg2:#dde1f5; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(42,64,200,.26); --line2:rgba(42,64,200,.4); --ink:#0a1240; --sub:#5560A0; --dim:#838CC0; --cyan:#2A40C8; --magenta:#E0662A; --violet:#128A90; --amber:#C8892E; --green:#1FA88A; --accent:#2A40C8; --grid:rgba(42,64,200,.06); --glow-cyan:0 2px 10px rgba(42,64,200,.18); --glow-mag:0 2px 10px rgba(224,102,42,.16);
   }
   html[data-mode="day"][data-theme="coral"]{
-    --bg:#f8f1ef; --bg2:#f1dfda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(222,53,0,0.28); --line2:rgba(222,53,0,0.42); --ink:#31150c; --sub:#8f513d; --dim:#bb8f81; --cyan:#de3500; --magenta:#ef0054; --violet:#198878; --amber:#C8892E; --green:#1b8b61; --accent:#de3500; --grid:rgba(222,53,0,0.06); --glow-cyan:0 2px 10px rgba(222,53,0,0.18); --glow-mag:0 2px 10px rgba(239,0,84,0.16);
+    --bg:#fceeeb; --bg2:#f7ddd7; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,80,60,.26); --line2:rgba(224,80,60,.4); --ink:#3a1210; --sub:#a06158; --dim:#C28B82; --cyan:#E0503C; --magenta:#E01A6E; --violet:#009E8E; --amber:#C8892E; --green:#1FA88A; --accent:#E0503C; --grid:rgba(224,80,60,.06); --glow-cyan:0 2px 10px rgba(224,80,60,.18); --glow-mag:0 2px 10px rgba(224,26,110,.15);
   }
   html[data-mode="day"][data-theme="lagoon"]{
-    --bg:#eff6f8; --bg2:#daecf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(13,124,158,0.28); --line2:rgba(13,124,158,0.42); --ink:#0c2831; --sub:#437989; --dim:#85abb7; --cyan:#0d7c9e; --magenta:#e33e00; --violet:#17876f; --amber:#C8892E; --green:#158559; --accent:#0d7c9e; --grid:rgba(13,124,158,0.06); --glow-cyan:0 2px 10px rgba(13,124,158,0.18); --glow-mag:0 2px 10px rgba(227,62,0,0.16);
+    --bg:#e9f7f3; --bg2:#d5ede7; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(20,150,128,.26); --line2:rgba(20,150,128,.4); --ink:#05271f; --sub:#3f8c78; --dim:#6FA898; --cyan:#149680; --magenta:#E0562A; --violet:#E0568A; --amber:#C8892E; --green:#149680; --accent:#149680; --grid:rgba(20,150,128,.06); --glow-cyan:0 2px 10px rgba(20,150,128,.18); --glow-mag:0 2px 10px rgba(224,86,42,.15);
   }
   html[data-mode="day"][data-theme="dusk"]{
-    --bg:#eff1f8; --bg2:#dae0f1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(75,112,218,0.28); --line2:rgba(75,112,218,0.42); --ink:#0c1631; --sub:#4b5981; --dim:#8b95b1; --cyan:#4b70da; --magenta:#e04000; --violet:#5671e4; --amber:#C8892E; --green:#2a8963; --accent:#4b70da; --grid:rgba(75,112,218,0.06); --glow-cyan:0 2px 10px rgba(75,112,218,0.18); --glow-mag:0 2px 10px rgba(224,64,0,0.16);
+    --bg:#eef1f8; --bg2:#dee3f0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(74,93,126,.26); --line2:rgba(74,93,126,.4); --ink:#16223a; --sub:#566482; --dim:#838EA8; --cyan:#4A5D7E; --magenta:#E0662A; --violet:#6E7FA0; --amber:#C8892E; --green:#2E9E7A; --accent:#4A5D7E; --grid:rgba(74,93,126,.06); --glow-cyan:0 2px 10px rgba(74,93,126,.16); --glow-mag:0 2px 10px rgba(224,102,42,.15);
   }
   html[data-mode="day"][data-theme="rose"]{
-    --bg:#f8eff1; --bg2:#f1dae0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(201,67,104,0.28); --line2:rgba(201,67,104,0.42); --ink:#310d17; --sub:#7d4f5c; --dim:#ae8e97; --cyan:#c94368; --magenta:#cc4f7b; --violet:#6772c5; --amber:#C8892E; --green:#2d8857; --accent:#c94368; --grid:rgba(201,67,104,0.06); --glow-cyan:0 2px 10px rgba(201,67,104,0.18); --glow-mag:0 2px 10px rgba(204,79,123,0.16);
+    --bg:#f7f0ee; --bg2:#ede1dd; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(150,120,110,.26); --line2:rgba(150,120,110,.4); --ink:#2a1c18; --sub:#8a7168; --dim:#A8918A; --cyan:#96786E; --magenta:#B03A56; --violet:#4E5F80; --amber:#C8892E; --green:#5F8070; --accent:#B03A56; --grid:rgba(150,120,110,.06); --glow-cyan:0 2px 10px rgba(150,120,110,.16); --glow-mag:0 2px 10px rgba(176,58,86,.15);
   }
   html[data-mode="day"][data-theme="sunset"]{
-    --bg:#f8eff3; --bg2:#f1dae4; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,0,98,0.28); --line2:rgba(224,0,98,0.42); --ink:#310c1c; --sub:#8f3d61; --dim:#bb819b; --cyan:#e00062; --magenta:#d64300; --violet:#a939ff; --amber:#C8892E; --green:#1b8b61; --accent:#e00062; --grid:rgba(224,0,98,0.06); --glow-cyan:0 2px 10px rgba(224,0,98,0.18); --glow-mag:0 2px 10px rgba(214,67,0,0.16);
+    --bg:#fceeec; --bg2:#f7dcd8; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,74,60,.26); --line2:rgba(224,74,60,.4); --ink:#3a1018; --sub:#a05a62; --dim:#C28590; --cyan:#E04A3C; --magenta:#E01A75; --violet:#8A2FD8; --amber:#C8892E; --green:#1FA88A; --accent:#E04A3C; --grid:rgba(224,74,60,.06); --glow-cyan:0 2px 10px rgba(224,74,60,.18); --glow-mag:0 2px 10px rgba(224,26,117,.15);
   }
   /* cyber 默认走 :root(无 data-theme),所以日间也要单独给 html[data-mode="day"]:not([data-theme]) 覆盖 */
   html[data-mode="day"]:not([data-theme]){
-    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+    --bg:#eef4f5; --bg2:#dcebec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,158,146,.28); --line2:rgba(0,158,146,.42); --ink:#0d2a2e; --sub:#4a7b80; --dim:#7BA0A4; --cyan:#009E92; --magenta:#D81B6F; --violet:#5A3DE0; --amber:#C8892E; --green:#12A87C; --accent:#009E92; --grid:rgba(0,158,146,.06); --glow-cyan:0 2px 10px rgba(0,158,146,.18); --glow-mag:0 2px 10px rgba(216,27,111,.16);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* ★ 禁掉按钮/可交互元素点击后的浏览器默认黑色 focus outline(手机上一点就出一圈黑边),
@@ -136,30 +136,6 @@
   .orb2{width:380px;height:380px;background:radial-gradient(circle,var(--cyan),transparent 70%);bottom:-120px;right:-60px;animation-delay:-5s}
   .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
   @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,20px) scale(.95)}}
-
-  /* ===== 荷尔蒙特效 P0/P1(值由 EH_CONFIG.fx 变量控, 后台可调) ===== */
-  /* ② 聊天页活背景: 不再进房关灯。底层两团极缓漂移的青/品红光晕 + 网格轻呼吸, 死场变活场。 */
-  body.hall-on .bg-orb{ display:block; opacity:calc(.32 * var(--fx-livebg,.55)*1.8); filter:blur(70px); animation-duration:var(--fx-livebg-speed,26s); }
-  body.hall-on .bg-grid{ animation:gridBreath 9s ease-in-out infinite; }
-  @keyframes gridBreath{0%,100%{opacity:.7}50%{opacity:1}}
-
-  /* ① 辉光打满: 卡片/气泡/头像的外发光强度统一由 --fx-bloom 放大(基于主题的 --glow-* 色) */
-  .enter-card,.identity{ box-shadow:0 8px 40px var(--shadow-lg), 0 0 calc(30px*var(--fx-bloom,1)) -6px color-mix(in srgb,var(--accent) calc(40%*var(--fx-bloom,1)),transparent); }
-
-  /* ⑤ 主按钮 hover 扫光: 一道高光从左扫到右(fx-sweep=0 关) */
-  .btn-primary{ position:relative; overflow:hidden; }
-  .btn-primary::after{ content:""; position:absolute; top:0; left:-60%; width:45%; height:100%;
-    background:linear-gradient(100deg,transparent,rgba(255,255,255,calc(.35*var(--fx-sweep,1))),transparent);
-    transform:skewX(-18deg); opacity:0; pointer-events:none; }
-  .btn-primary:hover::after{ animation:btnSweep .7s ease; }
-  @keyframes btnSweep{0%{left:-60%;opacity:1}100%{left:120%;opacity:1}}
-
-  /* 💋 私密房暧昧红氛围: 进狼姐私密房时底层叠一层极缓品红/深红径向光晕 + 暗角(fx-private-heat 控强度) */
-  body.priv-heat::before{ content:""; position:fixed; inset:0; z-index:1; pointer-events:none;
-    background:radial-gradient(ellipse 70% 55% at 50% 78%, color-mix(in srgb,var(--magenta) calc(22%*var(--fx-private-heat,.5)),transparent), transparent 70%),
-              radial-gradient(circle at 50% 120%, rgba(0,0,0,.5), transparent 60%);
-    animation:heatPulse calc(var(--fx-livebg-speed,26s) * .7) ease-in-out infinite; }
-  @keyframes heatPulse{0%,100%{opacity:.75}50%{opacity:1}}
 
   .stage{position:relative;z-index:2;height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;
     padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
@@ -265,11 +241,9 @@
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
   .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
-  /* ③ 大标题: 字重拉满+字距加大更"硬", 双层辉光(青底品红晕)强度由 --fx-title-glow 控 */
-  .title{font-size:40px;font-weight:900;letter-spacing:4px;margin:8px 0 4px;
-    background:linear-gradient(120deg,var(--ink),var(--cyan) 42%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
-    text-shadow:0 0 calc(28px*var(--fx-title-glow,1)) color-mix(in srgb,var(--cyan) calc(30%*var(--fx-title-glow,1)),transparent),
-                0 0 calc(52px*var(--fx-title-glow,1)) color-mix(in srgb,var(--magenta) calc(20%*var(--fx-title-glow,1)),transparent)}
+  .title{font-size:38px;font-weight:800;letter-spacing:2px;margin:8px 0 4px;
+    background:linear-gradient(120deg,var(--ink),var(--cyan) 45%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 40px color-mix(in srgb,var(--cyan) 20%,transparent)}
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
@@ -515,13 +489,7 @@
   .msg.me{flex-direction:row-reverse}
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
-  /* ④ "我"的气泡加强: 青→品红斜向渐变(饱和度由 --fx-me-bubble 控) + 内发光 + 顶部一道亮边, 让自己说的话有存在感 */
-  .msg.me .txt{border-radius:12px 4px 12px 12px;
-    background:var(--bubble-me-bg, linear-gradient(125deg,
-      color-mix(in srgb,var(--cyan) calc(var(--fx-me-bubble,.30)*100%),transparent),
-      color-mix(in srgb,var(--magenta) calc(var(--fx-me-bubble,.30)*100%),transparent)));
-    border-color:var(--bubble-border, color-mix(in srgb,var(--magenta) 45%,var(--line2)));
-    box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent), 0 0 calc(16px*var(--fx-bloom,1)) -4px color-mix(in srgb,var(--magenta) 50%,transparent)}
+  .msg.me .txt{border-radius:12px 4px 12px 12px;background:var(--bubble-me-bg, linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent)));border-color:var(--bubble-border, var(--line2))}
   .msg.whisper .txt{background:color-mix(in srgb,var(--amber) 10%,transparent);border-color:color-mix(in srgb,var(--amber) 30%,transparent);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
   .msg.projmsg .txt{background:color-mix(in srgb,var(--violet) 8%,var(--card-bg));border-color:color-mix(in srgb,var(--violet) 26%,transparent)}
@@ -559,75 +527,6 @@
   .ar-actions .ar-recall:hover{background:color-mix(in srgb,var(--magenta) 12%,transparent)}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
-
-  /* ===== 进场动效系统: 自己进房的类型化"入场横幅"(替代朴素 sysmsg) ===== */
-  /* 更炸版: 横幅弹性砸入 + 旋转流光边框 + 呼吸辉光; 高阶档另配全屏光幕(见 .ent-stage) */
-  .entry-banner{position:relative;overflow:hidden;margin:12px auto;max-width:360px;border-radius:15px;padding:13px 20px;
-    display:flex;align-items:center;gap:12px;justify-content:center;text-align:center;
-    animation:entBannerIn .62s cubic-bezier(.16,1.3,.3,1) both;
-    background:linear-gradient(120deg,color-mix(in srgb,var(--ent-c,var(--cyan)) 20%,transparent),color-mix(in srgb,var(--ent-c,var(--cyan)) 5%,transparent));
-    border:1px solid color-mix(in srgb,var(--ent-c,var(--cyan)) 45%,transparent);
-    box-shadow:0 0 26px -6px color-mix(in srgb,var(--ent-c,var(--cyan)) 60%,transparent)}
-  /* 旋转流光边框(conic 渐变从边缘扫一圈) */
-  .entry-banner::before{content:"";position:absolute;inset:-1px;border-radius:15px;padding:1px;pointer-events:none;z-index:0;
-    background:conic-gradient(from 0deg,transparent 0deg,color-mix(in srgb,var(--ent-c,var(--cyan)) 90%,transparent) 60deg,transparent 140deg,transparent 360deg);
-    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
-    animation:entBorderSpin 1.5s linear 1 both;opacity:.9}
-  .entry-banner>*{position:relative;z-index:1}
-  .entry-banner .eb-ic{font-size:24px;line-height:1;flex-shrink:0;filter:drop-shadow(0 0 8px color-mix(in srgb,var(--ent-c,var(--cyan)) 70%,transparent));animation:entIcPop .7s cubic-bezier(.2,1.6,.4,1) both}
-  .entry-banner .eb-txt{font-size:13.5px;color:var(--ink);line-height:1.45}
-  .entry-banner .eb-nm{font-weight:800;color:var(--ent-c,var(--cyan));text-shadow:0 0 12px color-mix(in srgb,var(--ent-c,var(--cyan)) 55%,transparent)}
-  .entry-banner .eb-act{font-weight:800;letter-spacing:2px;color:var(--ent-c,var(--cyan))}
-  .entry-banner .eb-tag{font-size:10px;padding:1px 7px;border-radius:6px;font-weight:700;flex-shrink:0;
-    background:color-mix(in srgb,var(--ent-c,var(--cyan)) 24%,transparent);color:var(--ent-c,var(--cyan))}
-  /* 扫光: 一道高光斜掠过横幅 */
-  .entry-banner::after{content:"";position:absolute;top:0;left:-60%;width:50%;height:100%;pointer-events:none;z-index:1;
-    background:linear-gradient(115deg,transparent,color-mix(in srgb,var(--ent-c,var(--cyan)) 55%,transparent),transparent);
-    transform:skewX(-18deg);animation:entSweep 1s ease-out .2s both}
-  @keyframes entBannerIn{0%{opacity:0;transform:translateY(16px) scale(.7)}55%{opacity:1;transform:translateY(0) scale(1.06)}75%{transform:scale(.98)}100%{transform:scale(1)}}
-  @keyframes entIcPop{0%{transform:scale(0) rotate(-40deg)}65%{transform:scale(1.4) rotate(12deg)}100%{transform:scale(1) rotate(0)}}
-  @keyframes entSweep{from{left:-60%}to{left:140%}}
-  @keyframes entBorderSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  /* 4 档类型皮肤 */
-  .entry-banner.ent-super{--ent-c:var(--amber)}
-  .entry-banner.ent-admin{--ent-c:var(--amber)}
-  .entry-banner.ent-reg{--ent-c:var(--cyan)}
-  .entry-banner.ent-anon{--ent-c:var(--sub);box-shadow:none;animation:entBannerInSoft .5s ease both}
-  .entry-banner.ent-anon::before,.entry-banner.ent-anon::after{display:none}   /* 临时身份: 低调, 无流光边/扫光 */
-  @keyframes entBannerInSoft{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  /* 超管/管理员: 横幅持续呼吸辉光(比普通档更"活") */
-  .entry-banner.ent-super,.entry-banner.ent-admin{animation:entBannerIn .62s cubic-bezier(.16,1.3,.3,1) both,entBannerGlow 1.6s ease-in-out .62s 2}
-  @keyframes entBannerGlow{0%,100%{box-shadow:0 0 26px -6px color-mix(in srgb,var(--ent-c,var(--amber)) 60%,transparent)}50%{box-shadow:0 0 40px -2px color-mix(in srgb,var(--ent-c,var(--amber)) 85%,transparent)}}
-
-  /* ===== 全屏入场光幕(高阶档: 一道巨大斜向光带横扫整屏 + 顶部大字砸下) ===== */
-  #entStage{position:fixed;inset:0;z-index:95;pointer-events:none;display:none;overflow:hidden}
-  #entStage.on{display:block}
-  #entStage .ent-sweep{position:absolute;top:-20%;left:-40%;width:45%;height:140%;transform:skewX(-16deg);
-    background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--ent-c,var(--amber)) 42%,transparent) 45%,color-mix(in srgb,var(--ent-c,var(--amber)) 60%,transparent) 55%,transparent);
-    filter:blur(6px);animation:entStageSweep 1s cubic-bezier(.4,0,.5,1) both}
-  #entStage .ent-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--ent-c,var(--amber)) 30%,transparent),transparent 60%);animation:entStageFlash .9s ease-out both}
-  #entStage .ent-big{position:absolute;top:34%;left:0;right:0;text-align:center;font-weight:900;letter-spacing:6px;
-    font-size:clamp(34px,11vw,84px);color:var(--ent-c,var(--amber));
-    text-shadow:0 0 24px color-mix(in srgb,var(--ent-c,var(--amber)) 70%,transparent),0 0 48px color-mix(in srgb,var(--ent-c,var(--amber)) 40%,transparent);
-    animation:entBigIn 1.3s cubic-bezier(.16,1.2,.3,1) both}
-  #entStage .ent-big small{display:block;font-size:.32em;letter-spacing:3px;opacity:.85;margin-top:6px;font-weight:700}
-  @keyframes entStageSweep{0%{left:-45%;opacity:0}20%{opacity:1}100%{left:130%;opacity:0}}
-  @keyframes entStageFlash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
-  @keyframes entBigIn{0%{opacity:0;transform:scale(.4) translateY(-30px);filter:blur(8px)}
-    40%{opacity:1;transform:scale(1.08) translateY(0);filter:blur(0)}60%{transform:scale(.97)}80%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.02)}}
-
-  /* 光墙他人头像按类型弹入 */
-  .pav.ent-pop .av-ic{animation:pavEntPop .6s cubic-bezier(.2,1.5,.4,1) both}
-  .pav.ent-pop.ent-vip .av-ic{box-shadow:inset 0 0 0 1.5px var(--pav-c,var(--cyan)),0 0 16px -1px color-mix(in srgb,var(--pav-c,var(--cyan)) 80%,transparent)}
-  .pav.ent-pop.ent-vip::after{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none;
-    box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 60%,transparent);animation:pavEntRing .8s ease-out both}
-  @keyframes pavEntPop{0%{transform:scale(0) translateY(8px) rotate(-12deg);opacity:0}55%{transform:scale(1.28) translateY(0) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
-  @keyframes pavEntRing{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent);opacity:.9}100%{box-shadow:0 0 0 14px transparent;opacity:0}}
-  @media (prefers-reduced-motion:reduce){
-    .entry-banner,.entry-banner *,.entry-banner::after,.entry-banner::before,.pav.ent-pop .av-ic,.pav.ent-pop.ent-vip::after,
-    #entStage .ent-sweep,#entStage .ent-flash,#entStage .ent-big{animation:none!important}
-    .entry-banner{box-shadow:none}#entStage{display:none!important}
-  }
 
   /* "正在输入"改浮层: absolute 悬浮在输入框上方, 不占据布局(不挤压/遮挡消息流),
      宽度自适应内容(不铺满整行), 小圆角半透明胶囊, 贴左显示 */
@@ -725,22 +624,19 @@
   .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
-  /* 呼吸光环 = 单圈头像描边 + 一层柔和外发光(不再画第二道硬边框, 避免与头像自身 inset 描边形成"双重边框") */
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
-    border:1px solid transparent;
+    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
     animation:soulHalo 3.2s ease-in-out infinite}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 26%,transparent)}
-    50%{opacity:1;transform:scale(1.06);box-shadow:0 0 20px 3px color-mix(in srgb,var(--soul-c,var(--violet)) 52%,transparent)}}
+  @keyframes soulHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
+    50%{opacity:.85;transform:scale(1.08);box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
   /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
-  /* 关键: 灵魂光墙头像的 ::after 改成"无边框·纯柔光", 覆盖基础 .pav .av-ic::after 的 1.5px 硬描边,
-     否则 头像 inset 环 + ::after 硬环 两道紧挨 = 视觉双重边框(主人反馈). 只留一道 inset 环 + 呼吸柔光. */
   .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
+  .pav.soul-av .av-ic::after{transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
   .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
   .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 26%,transparent)}
-    50%{opacity:1;transform:scale(1.08);box-shadow:0 0 18px 3px color-mix(in srgb,var(--pav-c,var(--cyan)) 52%,transparent)}}
+  @keyframes pavHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent)}
+    50%{opacity:.8;transform:scale(1.08);box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}}
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -1176,15 +1072,13 @@
     will-change:transform,opacity;transition:opacity .4s}
   /* 深夜氛围: body.deep-night 时整体压暗 + 顶部"夜航中"微光 */
   body.deep-night::after{content:"";position:fixed;inset:0;z-index:39;pointer-events:none;
-    background:radial-gradient(ellipse 120% 60% at 50% 100%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 70%);
+    background:radial-gradient(ellipse 120% 60% at 50% 100%,color-mix(in srgb,var(--violet) 10%,transparent),transparent 70%);
     opacity:.6;transition:opacity 1s}
   body.deep-night .stage{filter:brightness(.9) saturate(.92);transition:filter 1.2s}
-  /* "夜航中"徽章: 原来用 --violet(cyber/sunset 的紫在深底上对比不足4.5, 加 opacity .5 后几乎看不清),
-     改用 --accent(各主题的亮强调色, 对比都够) + 提高不透明度到 .82, 深夜也读得清。 */
   .night-badge{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:41;
-    font-size:10.5px;letter-spacing:2px;color:var(--accent);opacity:0;pointer-events:none;
-    text-shadow:0 0 8px color-mix(in srgb,var(--accent) 45%,transparent),0 1px 3px rgba(0,0,0,.6);transition:opacity 1.2s}
-  body.deep-night .night-badge{opacity:.82}
+    font-size:10.5px;letter-spacing:2px;color:var(--violet);opacity:0;pointer-events:none;
+    text-shadow:0 0 8px color-mix(in srgb,var(--violet) 50%,transparent);transition:opacity 1.2s}
+  body.deep-night .night-badge{opacity:.5}
   /* 灵魂心情天气: 房间顶部氛围光, 随主导情绪变色/节奏 */
   .mood-aura{position:fixed;top:0;left:0;right:0;height:120px;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.4s;
     background:radial-gradient(ellipse 80% 100% at 50% 0%,var(--mood-c,transparent),transparent 72%)}
@@ -1259,7 +1153,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0410theme-review';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0106optd-strip';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1290,7 +1184,6 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
 <div id="particles"></div>
-<div id="entStage"></div><!-- 进场全屏光幕(高阶档) -->
 <div id="warp"></div>
 <div id="soundwave"></div>
 <div class="mood-aura" id="moodAura"></div>
@@ -1585,67 +1478,35 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 const EH_CONFIG_DEFAULT = {
   version: 1,
   // 四套主题调色板(每套 17 变量,键必须一致)
-  // ★荷尔蒙/酷炫特效的【可调值】(结构与keyframes在CSS里, 这里只放能后台改的量: 强度/透明度/开关/色)。
-  //   注入全局 :root(见 injectFxCSS), 后台 eh_config.fx 可覆盖单个键。颜色多用 var(--magenta/--cyan) 跟主题走。
-  fx: {
-    "--fx-bloom": "1",            // 辉光总强度倍率(0=全关, 1=标准, 1.6=更炸)
-    "--fx-livebg": ".55",         // 聊天页活背景光晕不透明度(0=关, 死场)
-    "--fx-livebg-speed": "26s",   // 活背景光晕漂移周期(越大越缓)
-    "--fx-me-bubble": ".30",      // 自己气泡渐变饱和度(青→品红斜向)
-    "--fx-sweep": "1",            // 主按钮 hover 扫光(0=关)
-    "--fx-title-glow": "1",       // 大标题辉光强度倍率
-    "--fx-private-heat": ".5",    // 私密房"暧昧红"氛围强度(0=关)
-  },
-  // ★进场动效系统: 按用户类型(超管/管理员/正式/临时)给不同的"进房横幅"。
-  //   自己进房时替换朴素文字为一张类型化入场卡(粒子/扫光/光爆), 且光墙他人头像按类型弹入。
-  //   尊重系统"减少动态效果"设置(prefers-reduced-motion → 降级为纯文字)。后台 eh_config.entranceFx 可改。
-  entranceFx: {
-    enabled: true,          // 总开关
-    othersAvatar: true,     // 他人上光墙时按类型弹入动画
-    broadcast: true,        // 把进场事件广播给房里所有人(别人也能看到横幅/高阶档光幕)
-    broadcastMinTier: 'reg',// 最低广播档: reg=正式及以上广播(匿名进出不广播防刷屏); 设 'anon' 则全员广播
-    othersStageMinTier: 'admin', // 别人看到"全屏光幕"的最低档(admin=只有管理员/超管进场才惊动全场; 设 'reg' 则正式也全屏)
-    tiers: {
-      // label 入场词; icon 图标; cls CSS皮肤; sfx 音效名(空=不放);
-      // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
-      super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  },  // 超管: 全屏金光幕+皇冠雨+闪+震(最炸)
-      admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'receive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
-      reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'receive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
-      anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:'',        stage:false, burst:'',       flash:'',        shake:false },  // 临时: 低调淡入
-    },
-  },
   themePalettes: {
-    cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#9C85FF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
-    vapor: {"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,44,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#cb86bc","--dim":"#8d497e","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
-    aurora: {"--bg":"#03130d","--bg2":"#08261a","--panel":"rgba(21,50,36,0.8)","--panel-solid":"#132a1f","--line":"rgba(34,255,149,0.24)","--line2":"rgba(34,255,149,0.38)","--ink":"#EAFFF3","--sub":"#86cbaa","--dim":"#498d6c","--cyan":"#22FF95","--magenta":"#C74DFF","--violet":"#39D9FF","--amber":"#EBC85A","--green":"#22FF95","--accent":"#22FF95","--grid":"rgba(34,255,149,0.05)","--glow-cyan":"0 0 22px rgba(34,255,149,0.6)","--glow-mag":"0 0 20px rgba(199,77,255,0.55)"},
-    mono: {"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(50,42,21,0.8)","--panel-solid":"#2a2413","--line":"rgba(245,208,106,0.24)","--line2":"rgba(245,208,106,0.38)","--ink":"#FBEEE4","--sub":"#c7b68a","--dim":"#89794d","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,0.05)","--glow-cyan":"0 0 22px rgba(245,208,106,0.6)","--glow-mag":"0 0 20px rgba(224,80,122,0.55)"},
-    klein: {"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(21,28,50,0.8)","--panel-solid":"#13182a","--line":"rgba(100,134,255,0.24)","--line2":"rgba(100,134,255,0.38)","--ink":"#E8ECFF","--sub":"#8695cb","--dim":"#49588d","--cyan":"#6486FF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#6486FF","--grid":"rgba(100,134,255,0.05)","--glow-cyan":"0 0 22px rgba(100,134,255,0.6)","--glow-mag":"0 0 20px rgba(255,138,61,0.55)"},
-    coral: {"--bg":"#20100c","--bg2":"#3a1c14","--panel":"rgba(50,28,21,0.8)","--panel-solid":"#2a1913","--line":"rgba(255,129,89,0.24)","--line2":"rgba(255,129,89,0.38)","--ink":"#FFEFE8","--sub":"#cb9686","--dim":"#8d5949","--cyan":"#FF8159","--magenta":"#FF6098","--violet":"#2ED9C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF8159","--grid":"rgba(255,129,89,0.05)","--glow-cyan":"0 0 22px rgba(255,129,89,0.6)","--glow-mag":"0 0 20px rgba(255,96,152,0.55)"},
-    lagoon: {"--bg":"#04141c","--bg2":"#082832","--panel":"rgba(21,43,50,0.8)","--panel-solid":"#13252a","--line":"rgba(18,176,224,0.24)","--line2":"rgba(18,176,224,0.38)","--ink":"#E6FBFF","--sub":"#8bb8c6","--dim":"#4e7b88","--cyan":"#12B0E0","--magenta":"#FF8A5E","--violet":"#4DE0C0","--amber":"#FFC97A","--green":"#3FE0A0","--accent":"#12B0E0","--grid":"rgba(18,176,224,0.05)","--glow-cyan":"0 0 22px rgba(18,176,224,0.6)","--glow-mag":"0 0 20px rgba(255,138,94,0.55)"},
-    dusk: {"--bg":"#0a0e18","--bg2":"#151b2c","--panel":"rgba(24,30,47,0.8)","--panel-solid":"#161a28","--line":"rgba(143,166,232,0.24)","--line2":"rgba(143,166,232,0.38)","--ink":"#EEF2FC","--sub":"#919dbf","--dim":"#556082","--cyan":"#8FA6E8","--magenta":"#FFA07A","--violet":"#C0CAF5","--amber":"#F0C878","--green":"#7ED8B4","--accent":"#8FA6E8","--grid":"rgba(143,166,232,0.05)","--glow-cyan":"0 0 22px rgba(143,166,232,0.6)","--glow-mag":"0 0 20px rgba(255,160,122,0.55)"},
-    rose: {"--bg":"#15100f","--bg2":"#261b1a","--panel":"rgba(46,26,31,0.8)","--panel-solid":"#26171b","--line":"rgba(226,154,174,0.24)","--line2":"rgba(226,154,174,0.38)","--ink":"#F9EFEC","--sub":"#bc95a0","--dim":"#7e5863","--cyan":"#E29AAE","--magenta":"#D06A8E","--violet":"#9AA0D0","--amber":"#E6BE86","--green":"#95BAA6","--accent":"#E29AAE","--grid":"rgba(226,154,174,0.05)","--glow-cyan":"0 0 22px rgba(226,154,174,0.6)","--glow-mag":"0 0 20px rgba(208,106,142,0.55)"},
-    sunset: {"--bg":"#180818","--bg2":"#2c0e26","--panel":"rgba(50,21,34,0.8)","--panel-solid":"#2a131d","--line":"rgba(255,61,146,0.24)","--line2":"rgba(255,61,146,0.38)","--ink":"#FFEAF2","--sub":"#cb86a4","--dim":"#8d4967","--cyan":"#FF3D92","--magenta":"#FF7A3D","--violet":"#C476FF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FF3D92","--grid":"rgba(255,61,146,0.05)","--glow-cyan":"0 0 22px rgba(255,61,146,0.6)","--glow-mag":"0 0 20px rgba(255,122,61,0.55)"},
+    cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(18,30,52,.78)","--panel-solid":"#101c2e","--line":"rgba(0,229,212,.22)","--line2":"rgba(0,229,212,.36)","--ink":"#EAF6FF","--sub":"#7FA8C9","--dim":"#4A6B85","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#7B5CFF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,.05)","--glow-cyan":"0 0 20px rgba(0,229,212,.55)","--glow-mag":"0 0 20px rgba(255,45,142,.55)"},
+    vapor: {"--bg":"#160a1e","--bg2":"#28123a","--panel":"rgba(48,20,60,.78)","--panel-solid":"#301440","--line":"rgba(199,125,255,.24)","--line2":"rgba(199,125,255,.38)","--ink":"#FFEAF5","--sub":"#D69AC0","--dim":"#925A80","--cyan":"#C77DFF","--magenta":"#FF4D9E","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#7FE0C0","--accent":"#C77DFF","--grid":"rgba(199,125,255,.05)","--glow-cyan":"0 0 22px rgba(199,125,255,.6)","--glow-mag":"0 0 20px rgba(255,77,158,.55)"},
+    aurora: {"--bg":"#050f12","--bg2":"#0a2029","--panel":"rgba(12,38,44,.76)","--panel-solid":"#0c2630","--line":"rgba(0,240,181,.22)","--line2":"rgba(0,240,181,.36)","--ink":"#EAFFFA","--sub":"#7FC9BC","--dim":"#4A8578","--cyan":"#00F0B5","--magenta":"#B24DFF","--violet":"#2ED9FF","--amber":"#F7E7CE","--green":"#00F0B5","--accent":"#00F0B5","--grid":"rgba(0,240,181,.05)","--glow-cyan":"0 0 22px rgba(0,240,181,.6)","--glow-mag":"0 0 20px rgba(178,77,255,.55)"},
+    mono: {"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(28,20,22,.82)","--panel-solid":"#1c1416","--line":"rgba(245,208,106,.20)","--line2":"rgba(245,208,106,.34)","--ink":"#FBEEE4","--sub":"#B89A94","--dim":"#7C625A","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,.04)","--glow-cyan":"0 0 20px rgba(245,208,106,.5)","--glow-mag":"0 0 20px rgba(224,80,122,.5)"},
+    klein: {"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(14,24,64,.80)","--panel-solid":"#0e1840","--line":"rgba(58,90,255,.24)","--line2":"rgba(58,90,255,.38)","--ink":"#E8ECFF","--sub":"#8B9AD6","--dim":"#5560A0","--cyan":"#3A5AFF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#3A5AFF","--grid":"rgba(58,90,255,.05)","--glow-cyan":"0 0 22px rgba(58,90,255,.6)","--glow-mag":"0 0 20px rgba(255,138,61,.55)"},
+    coral: {"--bg":"#1a0a0e","--bg2":"#2e1218","--panel":"rgba(54,22,28,.80)","--panel-solid":"#361620","--line":"rgba(255,111,97,.24)","--line2":"rgba(255,111,97,.38)","--ink":"#FFEDE8","--sub":"#D6A19A","--dim":"#92615A","--cyan":"#FF6F61","--magenta":"#FF4D8D","--violet":"#00D4C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF6F61","--grid":"rgba(255,111,97,.05)","--glow-cyan":"0 0 22px rgba(255,111,97,.6)","--glow-mag":"0 0 20px rgba(255,77,141,.55)"},
+    lagoon: {"--bg":"#061412","--bg2":"#0c2622","--panel":"rgba(14,44,40,.78)","--panel-solid":"#0e2c28","--line":"rgba(136,216,192,.26)","--line2":"rgba(136,216,192,.4)","--ink":"#EAFBF6","--sub":"#8FC9BC","--dim":"#5A8578","--cyan":"#4DD4B8","--magenta":"#FD6E53","--violet":"#FF6FA5","--amber":"#FFC97A","--green":"#4DD4B8","--accent":"#4DD4B8","--grid":"rgba(136,216,192,.05)","--glow-cyan":"0 0 22px rgba(77,212,184,.55)","--glow-mag":"0 0 20px rgba(253,110,83,.5)"},
+    dusk: {"--bg":"#0a0e16","--bg2":"#141c2a","--panel":"rgba(26,36,54,.80)","--panel-solid":"#1a2436","--line":"rgba(122,146,190,.24)","--line2":"rgba(122,146,190,.38)","--ink":"#EAF0FB","--sub":"#9AAAC9","--dim":"#647085","--cyan":"#7A92BE","--magenta":"#FF8A6E","--violet":"#A9BEE8","--amber":"#F7E7CE","--green":"#6ED0B0","--accent":"#7A92BE","--grid":"rgba(122,146,190,.05)","--glow-cyan":"0 0 20px rgba(122,146,190,.45)","--glow-mag":"0 0 20px rgba(255,138,110,.5)"},
+    rose: {"--bg":"#14100f","--bg2":"#241c1a","--panel":"rgba(44,34,32,.80)","--panel-solid":"#2c2220","--line":"rgba(201,173,161,.24)","--line2":"rgba(201,173,161,.4)","--ink":"#F7EEEA","--sub":"#C2A79E","--dim":"#8A7168","--cyan":"#C9ADA1","--magenta":"#C25B72","--violet":"#6E7FA0","--amber":"#E0B87A","--green":"#8FB0A0","--accent":"#C9ADA1","--grid":"rgba(201,173,161,.05)","--glow-cyan":"0 0 20px rgba(201,173,161,.45)","--glow-mag":"0 0 20px rgba(194,91,114,.5)"},
+    sunset: {"--bg":"#180a12","--bg2":"#2c1020","--panel":"rgba(52,18,36,.80)","--panel-solid":"#341024","--line":"rgba(253,94,83,.24)","--line2":"rgba(253,94,83,.38)","--ink":"#FFEBED","--sub":"#D6A0A8","--dim":"#925A66","--cyan":"#FD5E53","--magenta":"#FF3C8E","--violet":"#B24DFF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FD5E53","--grid":"rgba(253,94,83,.05)","--glow-cyan":"0 0 22px rgba(253,94,83,.6)","--glow-mag":"0 0 20px rgba(255,60,142,.55)"},
   },
   // 主题元数据(下拉菜单:id/名称/圆点色)
   themes: [
-    { id:"cyber", name:"赛博夜城", dot:"#00E5D4" }, { id:"vapor", name:"迈阿密日落", dot:"#FF4DD8" }, { id:"aurora", name:"极光迷幻", dot:"#22FF95" }, { id:"mono", name:"暗夜奢华", dot:"#F5D06A" }, { id:"klein", name:"克莱因之夜", dot:"#6486FF" }, { id:"coral", name:"珊瑚热恋", dot:"#FF8159" }, { id:"lagoon", name:"湖水迷情", dot:"#12B0E0" }, { id:"dusk", name:"远山暮色", dot:"#8FA6E8" }, { id:"rose", name:"莫兰迪玫瑰", dot:"#E29AAE" }, { id:"sunset", name:"日暮狂欢", dot:"#FF3D92" }
+    { id:"cyber", name:"赛博夜城", dot:"#00E5D4" }, { id:"vapor", name:"迈阿密日落", dot:"#C77DFF" }, { id:"aurora", name:"极光迷幻", dot:"#00F0B5" }, { id:"mono", name:"暗夜奢华", dot:"#F5D06A" }, { id:"klein", name:"克莱因之夜", dot:"#3A5AFF" }, { id:"coral", name:"珊瑚热恋", dot:"#FF6F61" }, { id:"lagoon", name:"湖水迷情", dot:"#4DD4B8" }, { id:"dusk", name:"远山暮色", dot:"#7A92BE" }, { id:"rose", name:"莫兰迪玫瑰", dot:"#C9ADA1" }, { id:"sunset", name:"日暮狂欢", dot:"#FD5E53" }
   ],
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'klein','虚空回音':'aurora' },
   // 官方房卡片兜底强调色(对应主题夜间 accent)
-  officialFallbackC: { '闲聊广场':'#00E5D4','深夜电台':'#FF66B0','技术黑话':'#6486FF','虚空回音':'#22FF95' },
+  officialFallbackC: { '闲聊广场':'#00E5D4','深夜电台':'#FF4D9E','技术黑话':'#3A5AFF','虚空回音':'#00F0B5' },
   // 公开/私密房按名字哈希稳定分配的主题池(后台可改)
   publicThemePool: ['coral','lagoon','sunset','cyber','klein'],   // 热烈开放系
   privateThemePool: ['dusk','rose','mono','vapor','aurora'],       // 私密沉静系
   // 对任意房手动钉主题(覆盖哈希结果): { '房间名':'主题id' }
   roomThemeOverride: {},
   // 灵魂专属色(按灵魂名匹配, 私密房召唤的副本同名共享)
-  // 灵魂专属色: 从新十主题 accent 里选(按性格), 与主题体系统一。空则跟房间主题色走。
-  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#6486FF','图灵':'#00E5D4','小暖':'#FF6F52'},
+  soulColors: {'狼姐':'#FF6F61','老K':'#F7E7CE','阿夜':'#B57EDC','回音':'#002FA7','图灵':'#1DE9B6','小暖':'#FD5E53'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
-  // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
-  roomNameC: { '午夜聊天':'#C08497', '技术黑话':'#4A5D7E' },   // 午夜聊天=莫兰迪玫瑰; 技术黑话=远山暮色(青灰蓝, 冷峻科技感)
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
   identityDefaultC: '#0ABAB5',   // 匿名/未设色时的默认身份色(全站 fallback)
   voidC: '#4A5D7E',              // 虚空模式代表色
@@ -1830,25 +1691,25 @@ const EH_CONFIG_DEFAULT = {
   // 神曲曲风池: id/展示/音乐参数完整定义(可后台增删改+拖排序)
   // scale 存字符串 key(minP/majP/major/minor), 运行时映射到 SCALE 对象
   songStyles:[
-    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#8FA6E8', bpm:80,  bpc:0.5, base:0,  scale:'major',
+    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#F5F0E1', bpm:80,  bpc:0.5, base:0,  scale:'major',
       motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],  wave:'sine',     bass:'sine',     groove:'lofi', tts:{rate:1.0, pitch:1.0},  ttsStyle:'lazy',  playRate:1.0,
       coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
-    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#FF3D92', bpm:124, bpc:0.5, base:3,  scale:'minP',
+    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#E63946', bpm:124, bpc:0.5, base:3,  scale:'minP',
       motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square',   groove:'four', tts:{rate:1.3, pitch:1.0},  ttsStyle:'high',  playRate:1.12,
       coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
-    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#F5D06A', bpm:92,  bpc:0.5, base:-2, scale:'major',
+    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:'major',
       motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3],  wave:'sine',     bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy',  playRate:0.95,
       coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
-    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#22FF95', bpm:114, bpc:0.5, base:3,  scale:'major',
+    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:'major',
       motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2, pitch:1.1},  ttsStyle:'sweet', playRate:1.1,
       coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
-    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#C77DFF', bpm:78,  bpc:0.5, base:0,  scale:'majP',
+    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#B57EDC', bpm:78,  bpc:0.5, base:0,  scale:'majP',
       motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3],wave:'sine',    bass:'sine',     groove:'boom', tts:{rate:0.95,pitch:1.1},  ttsStyle:'gu',    playRate:0.96,
       coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
-    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#12B0E0', bpm:76,  bpc:0.5, base:-2, scale:'major',
+    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#0ABAB5', bpm:76,  bpc:0.5, base:-2, scale:'major',
       motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine',    bass:'sine',     groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy',  playRate:0.92,
       coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
-    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#E29AAE', bpm:108, bpc:0.5, base:5,  scale:'major',
+    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:'major',
       motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5],  wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5},  ttsStyle:'meng',  playRate:1.18,
       coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
   ],
@@ -1868,9 +1729,7 @@ function buildThemeCSS(palettes){
 function injectThemeCSS(){
   let el = document.getElementById('eh-theme-vars');
   if(!el){ el=document.createElement('style'); el.id='eh-theme-vars'; document.head.appendChild(el); }
-  // 主题变量 + 荷尔蒙特效可调值(fx→注入 :root, 供 CSS 结构/keyframes 引用; 后台可覆盖)
-  const fxCss = EH_CONFIG.fx ? (':root{'+Object.entries(EH_CONFIG.fx).map(([k,v])=>k+':'+v+';').join('')+'}\n') : '';
-  el.textContent = fxCss + buildThemeCSS(EH_CONFIG.themePalettes);
+  el.textContent = buildThemeCSS(EH_CONFIG.themePalettes);
 }
 // ---- 把 EH_CONFIG.text 应用到所有 data-txt / data-txt-ph 标记的元素 ----
 function applyTextConfig(){
@@ -1927,7 +1786,6 @@ function _validateConfigMap(map){
     roomKindC:'object', identityDefaultC:'string', voidC:'string',
     resonanceDefaultC:'string', roomBgm:'object', text:'object',
     identityPool:'object', tuning:'object', songStyles:'object',
-    fx:'object', entranceFx:'object',
     publicThemePool:'array', privateThemePool:'array'
   };
   var out = {};
@@ -1962,7 +1820,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -1979,6 +1837,9 @@ function applyConfigMap(rawMap){
   applyTextConfig();
   try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
   try{ checkCachePurge(); }catch(_){}
+  // OPTD 修偶发: 远程配置(含 songStyles 曲风池)到达后, 若正在神曲模式, 补一次曲风条重渲染+重绑拖动。
+  // 根治「首次进神曲模式时曲风池尚未从后台加载完 → 曲风条内容/拖动绑定时机错位 → 偶发拖不动」。
+  try{ if(typeof songMode!=='undefined' && songMode && typeof renderSongStrip==='function'){ renderSongStrip(); } }catch(_){}
   }catch(e){ try{ console.warn('[EH cfg] applyConfigMap threw, some fields kept default', e&&e.message); }catch(_){} try{ _ehDbg('[cfg] applyConfigMap throw', e&&e.message||String(e)); }catch(_){} }
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
@@ -2086,8 +1947,7 @@ const ANI = EH_CONFIG.identityPool.animals;
 const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🦉','🦇','🐙','🦌','🐧','🐈‍⬛','🐬','🐯','🦔','🦋'];
 // 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
 const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
-// 真人随机身份色: 与新十主题 accent 对齐(cyber/vapor/aurora/mono/klein/coral/lagoon/dusk/rose/sunset)
-const COLORS = ["#00E5D4","#C77DFF","#22FF95","#F5D06A","#6486FF","#FF6F52","#12B0E0","#8FA6E8","#E29AAE","#FF3D92"]; // 十主题色
+const COLORS = ["#0ABAB5","#FF6F61","#B57EDC","#F7E7CE","#1DE9B6","#4A5D7E","#88D8C0","#FD5E53","#C9ADA1","#002FA7"]; // 十大色调色板
 const LS_ID = 'eh_identity_v2';
 
 let me = null;      // {id(uid), name, emoji, color}
@@ -2639,10 +2499,8 @@ function themeAccentOf(roomName){
   const themeId = (EH_CONFIG.roomTheme||{})[roomName];
   return themeAccentById(themeId);
 }
-const ROOM_NAME_C = EH_CONFIG.roomNameC || {};   // 按房名定制主色(任意房型), 优先于 kind/主题色
 function roomAccentC(r){
   if(!r) return ROOM_KIND_C.official;
-  if(r.name && ROOM_NAME_C[r.name]) return ROOM_NAME_C[r.name];   // 房名定制色最高优先(如午夜聊天=莫兰迪玫瑰)
   if(r.kind==='official'){
     return themeAccentOf(r.name) || OFFICIAL_FALLBACK_C[r.name] || ROOM_KIND_C.official;
   }
@@ -2654,18 +2512,17 @@ function roomAccentC(r){
   }catch(_){}
   return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
 }
-// 灵魂取色优先级: custom(灵魂 DB 色, 即 admin 灵魂工坊调色板设的, 合法非空 hex) > soulColors[name](JS专属色兜底) > 所在房间强调色 > fallback
-// ★2026-07: custom 提到最高优先——原来 soulColors 硬编码盖过 DB, 导致 admin 里改灵魂色不生效(如老K DB设了#4A5D7E却显硬编码色)。
+// 灵魂取色优先级: soulColors[name](后台专属色) > custom(灵魂原始色, 合法非空 hex) > 所在房间强调色 > fallback
 // name 参数按灵魂名匹配(私密房召唤副本 uid 变但名字不变), 支持字符串或含 .name 的对象
 function soulThemeColor(custom, fallback, name){
-  // 0. 灵魂自身 custom 色(DB eh_souls.color, admin 可视化调色板直接编辑, 用户显式设置优先级最高)
-  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
-  // 1. JS soulColors[name] 兜底专属色(DB 未设色的灵魂走这里, 从新十主题选)
+  // 0. 后台配的灵魂专属色(按名字匹配, 最高优先)
   try{
     const nm = (typeof name==='string') ? name : (name && name.name) || '';
     const sc = (EH_CONFIG && EH_CONFIG.soulColors) || {};
     if(nm && sc[nm] && /^#[0-9a-fA-F]{3,8}$/.test(sc[nm])) return sc[nm];
   }catch(e){}
+  // 1. 灵魂自身 custom 色(合法 hex)
+  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
   // 2. 房间强调色
   try{
     if(curRoom && curRoom.kind){
@@ -2762,12 +2619,11 @@ async function fillRoomStats(box, rid){
   const since=new Date(Date.now()-35000).toISOString();
   const [{ count }, { data:recent }] = await Promise.all([
     sb.from('eh_presence').select('*',{count:'exact',head:true}).eq('room_id',rid).gte('last_seen',since),
-    sb.rpc('eh_public_recent',{ rid, lim:5, hide_recalled:true }),   // 拉多几条: 跳过 enter(进场广播)这类非聊天内容, 取真正"最后一句"
+    sb.rpc('eh_public_recent',{ rid, lim:1, hide_recalled:true }),
   ]);
   const online=count||0;
   const cnt=card.querySelector('.cnt'); if(cnt) cnt.textContent = online>0? online+' 人在线' : '暂无人在线';
-  // 进场广播 enter 不是聊天内容, 不能当大厅"最后一条"预览(否则一进房主页就变"✦ 有人进入了房间")
-  const last=(Array.isArray(recent)? recent.find(m=>m && m.kind!=='enter') : null)||null;
+  const last=(recent&&recent[0])||null;
   const prev=card.querySelector('[data-prev]'), tm=card.querySelector('.tm');
   if(last){
     prev.classList.remove('empty');
@@ -2925,10 +2781,7 @@ async function enterRoom(room){
   try{ EhSfx.play('enter'); }catch(e){}
   try{ window.EhFx&&EhFx.warp(); }catch(e){}   // 空间穿越转场
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
-  _presenceSettled = false;   // 进场动效: 新房光墙重新计"首批", 首批渲染不弹入
   curRoom = room;
-  // 💋 私密房(尤其邀了狼姐 @wolf)→ 挂"暧昧红"氛围类; 其余房去掉
-  try{ document.body.classList.toggle('priv-heat', room && room.kind==='private'); }catch(_){}
   stopVoice(); stopSong();
   // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
   try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){}
@@ -2942,17 +2795,14 @@ async function enterRoom(room){
   $('#hallNameTxt').innerHTML=esc(room.name);
   clearReply();
   if(snapHit){
-    // 秒还原已渲染消息 + 滚动位置状态。★先剔除快照里烘焙进去的旧进场横幅(否则回房会看到上次的横幅残留)
-    let _snapHtml = roomSnap.html;
-    try{ const _d=document.createElement('div'); _d.innerHTML=_snapHtml; _d.querySelectorAll('.entry-banner,.sysmsg').forEach(e=>e.remove()); _snapHtml=_d.innerHTML; }catch(_){}
-    $('#stream').innerHTML=_snapHtml; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
+    // 秒还原已渲染消息 + 滚动位置状态
+    $('#stream').innerHTML=roomSnap.html; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
-    try{ entranceBanner(room); }catch(_){}   // 进场动效: keep-alive 回房也要演(否则快速回房看不到进场特效)
     if(await joinAsMember(room)===false) return;
     // allSettled: 任一查询失败也不拖垮其余(避免一次网络抖动 → Promise.all reject → 卡"连接中")
     const [memRes] = await Promise.allSettled([
@@ -2988,7 +2838,7 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  try{ entranceBanner(room); }catch(_){ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }
+  sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
   ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
@@ -3049,13 +2899,11 @@ async function refreshSnapshotTail(room){
     // 不去碰更早的历史消息——那些由 loadHistory 的 idle 分批渲染负责; 若补拉也去补,
     // 会和"还在队列里没进DOM"的分批消息撞车→重复渲染(实测见过一条消息×2)。
     let domMaxMid=0;
-    // 扫所有带 mid 的行(含 .msg / .ixmsg 互动 / .actmsg / .recalled-tip), 别只扫 .msg——
-    // 否则互动/act 行不计入 domMaxMid, 且下面判重也漏, 刷新补拉会把它们反复 append(重复bug真因)。
-    stream.querySelectorAll('[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
+    stream.querySelectorAll('.msg[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
-      const exist=stream.querySelector(`[data-mid="${m.id}"]`);
+      const exist=stream.querySelector(`.msg[data-mid="${m.id}"]`);
       if(!exist){
         // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
         if(m.id>domMaxMid){ const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; } }
@@ -3065,7 +2913,7 @@ async function refreshSnapshotTail(room){
       //   DOM 里 data-mid 存在但 .txt 是空框。这类不能跳过, 要用真实 data 原地重建修复空框。
       try{
         const kind=exist.dataset.kind||'msg';
-        if(kind==='voice'||kind==='song'||kind==='proj'||kind==='interact'||kind==='act') return;   // 特效/互动/act消息不判空(无.txt, 内容非纯文本)
+        if(kind==='voice'||kind==='song'||kind==='proj') return;   // 特效消息不判空(内容非纯文本)
         const t=exist.querySelector('.txt');
         const hasTxt = t && t.textContent.trim();
         if(!hasTxt && (m.text||'').trim()){
@@ -3265,18 +3113,12 @@ function subscribeMessages(rid){
       // 去重靠"真实 id 是否已在 DOM"(本浏览器发的消息 insert 后回填了真实 id, 故被挡)。
       // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
       // 这样同 id 多端发言能互相同步, 且 buildMsgEl 里 isMe=user_id===myUid 让它仍显示在"我的"位置(右侧)。
-      if(document.querySelector(`[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id + 互动/act行)，防重复
+      if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id)，防重复
       // 投影：触发全屏飞幕，不进消息流。★自己发的投影已在 broadcastProject 里本地飞过一次,
       //   realtime 又把自己的 insert 推回来 → 会飞第二次(重复)。故自己的 proj 回声直接跳过。
       if(m.kind==='proj'){ if(m.user_id!==myUid) projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
-      // 进场广播: 别人看到进场横幅(高阶档还全屏光幕)。自己的已在 entranceBanner 本地演过, 跳过。
-      //   enter 不进历史/不留气泡(text 存的是档位字符串, 非聊天内容)。
-      if(m.kind==='enter'){
-        if(m.user_id!==myUid){ try{ renderEntrance({ name:m.name, tier:String(m.text||'reg'), roomName:curRoom&&curRoom.name }, false); }catch(_){} }
-        return;
-      }
       // 互动: 播特效。震动/闪屏/抖动只给目标本人(挨打的才震), 旁观者看飞行物/撒花但不震。
       if(m.kind==='interact'){
         const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]); const targetUid=parts[1];
@@ -3417,7 +3259,6 @@ async function beat(extra){
 }
 // —— 性能优化: diff 渲染头像 + 拆分 typing 更新, 避免每次心跳/输入全量重建 DOM ——
 const presenceMap = new Map();   // user_id → DOM 节点
-let _presenceSettled = false;    // 进场动效: 光墙首批渲染完成后置真; 之后新增的真人头像才弹入(避免进房齐弹)
 let lastUsersSnapshot = [];       // 供 renderTyping 复用
 
 // 在线列表骨架占位: 进房到 presence 数据回来期间撑住高度, 消除闪烁
@@ -3468,14 +3309,6 @@ function renderPresenceAvatars(users){
     }
     const div=document.createElement('div');
     div.className='pav'+(isMe?' me':'')+(isSoul?' soul-av':'');   // soul-av: 灵魂头像带"呼吸=活跃度"动画
-    // ★进场动效: 光墙"稳定"后新出现的真人头像(非我/非灵魂/非换色重建)→ 按类型弹入。
-    //   _presenceSettled 在进房首批渲染后置真, 避免进房时全体头像齐弹(那是加载, 不是"进场")。
-    const isNewJoin = _presenceSettled && !el && !isMe && !isSoul;
-    if(isNewJoin && EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.enabled && EH_CONFIG.entranceFx.othersAvatar!==false){
-      div.classList.add('ent-pop');
-      const jt=userTier(p);   // 他人 presence 行一般无 role, 多为 reg/anon; 有 role 字段则识别 vip
-      if(jt==='super'||jt==='admin') div.classList.add('ent-vip');
-    }
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
     if(!isMe && p.name){ div.dataset.atname=p.name; div.dataset.uid=p.user_id; }
@@ -3488,7 +3321,6 @@ function renderPresenceAvatars(users){
     if(el) container.replaceChild(div,el); else container.insertBefore(div, container.children[idx]||null);
     presenceMap.set(p.user_id,div);
   });
-  _presenceSettled=true;   // 首批渲染完成 → 之后新增头像才算"进场"
   // 清理离开的人
   presenceMap.forEach((el,uid)=>{ if(!seen.has(uid)){ el.remove(); presenceMap.delete(uid); } });
   const kindLabel = '人在线';   // 统一: 私密房也用"人在线"(原来私密房特写"名成员在线"和其它房不一致)
@@ -3636,8 +3468,6 @@ function fmtTime(ts){
 }
 
 function buildMsgEl(m, isHistory){
-  // 进场广播 enter: 只是"当场"特效, 不留气泡/不进历史(text 存的是档位, 非聊天内容)。历史里遇到直接跳过。
-  if(m.kind==='enter') return null;
   // ★撤回消息(A方案: 用 deleted_at 时间戳判定, 服务端 RPC 严格权限): 渲染占位气泡
   //   注: 保留 kind==='recalled' 作为向后兼容(万一 B 方案期间已有撤回过的消息)
   if(m.deleted_at || m.kind==='recalled'){
@@ -3673,7 +3503,6 @@ function buildMsgEl(m, isHistory){
   if(m.kind==='proj') return null;
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
-    if(m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='act'; }   // ★去重键: 无 mid 会在刷新/补拉时被反复 append
     el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,EH_CONFIG.voidC)}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   if(m.kind==='interact'){
@@ -3681,7 +3510,6 @@ function buildMsgEl(m, isHistory){
     const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
     const txt=parts.slice(2).join('|')||'';
     const el=document.createElement('div'); el.className='ixmsg';
-    if(m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='interact'; }   // ★去重键: 无 mid 会在刷新/补拉时被反复 append(实测互动消息刷新后重复多条)
     el.innerHTML=`<span class="ix-em">${safeEmoji(ix&&ix.emoji)||'✨'}</span> ${esc(txt)}`;
     return el;
   }
@@ -3808,7 +3636,6 @@ function replyPreviewText(text, kind){
   if(kind==='song'){ try{ const s=parseSong(text); return '🎵 '+(s.lyric||'神曲'); }catch(_){ return '🎵 神曲'; } }
   if(kind==='voice') return '🎙️ 语音消息';
   if(kind==='proj') return '📽️ 投影';
-  if(kind==='enter') return '✦ 进入了房间';
   if(kind==='interact'){ const parts=String(text||'').split('|'); const txt=parts.slice(2).join('|').trim(); if(txt) return txt; const ix=_interactions.find(i=>i.id===parts[0]); return (safeEmoji(ix&&ix.emoji)||'✨')+' 互动'; }
   return text||'';
 }
@@ -3824,83 +3651,6 @@ async function fillReplyRef(el, mid){
   if(data){ const r=el.querySelector('.reply-ref'); if(r){ const nm=data.anon?(data.user_id===myUid?data.name+'（虚空）':voidNameFor(data)):data.name; r.textContent='↳ '+(nm?nm+'：':'')+replyPreviewText(data.text, data.kind); } }
 }
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); }
-
-// ---- 进场动效系统 ----
-// 判定当前用户类型档位: super > admin > reg(正式) > anon(临时)。灵魂无浏览器会话, 不走此路径。
-function userTier(u){
-  u = u || me || {};
-  if(u.role==='super') return 'super';
-  if(u.role==='admin') return 'admin';
-  if(u.registered || u.username || u.email) return 'reg';
-  return 'anon';
-}
-const TIER_RANK = { anon:0, reg:1, admin:2, super:3 };   // 档位高低比较用
-// 自己进房 → 按类型渲染入场特效(横幅+全屏光幕+闪/震/粒子) + 按配置广播给房里其他人。
-function entranceBanner(room){
-  const cfg = (EH_CONFIG.entranceFx)||{};
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  const tier = userTier();
-  const t = (cfg.tiers && cfg.tiers[tier]) || null;
-  // 关闭/减动效/配置缺失 → 老行为(纯文字), 保证永不空场
-  if(!cfg.enabled || reduce || !t){
-    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
-    return;
-  }
-  // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
-  renderEntrance({ name:me.name, tier, roomName:room.name }, true);
-  // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。enter 消息不进历史。
-  try{
-    const minBc = TIER_RANK[cfg.broadcastMinTier||'reg'] ?? 1;
-    if(cfg.broadcast!==false && curRoom && myUid && (TIER_RANK[tier]||0) >= minBc){
-      sb.from('eh_messages').insert({ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
-        text:tier, kind:'enter' }).then(({error})=>{ if(error) console.warn('enter broadcast', error.message); });
-    }
-  }catch(e){ console.warn('enter broadcast', e); }
-}
-// 统一入场渲染器(自己 isSelf=true 走全套; 别人 isSelf=false 只横幅+高阶档光幕, 不闪不震不打扰)
-function renderEntrance(info, isSelf){
-  const cfg=(EH_CONFIG.entranceFx)||{};
-  const tier=info.tier||'reg';
-  const t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可
-    if(!isSelf){ sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`); }
-    else sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
-    return;
-  }
-  const tagTxt = tier==='super'?'超管':(tier==='admin'?'管理员':(tier==='reg'?'正式':'临时'));
-  const roomName = info.roomName || (curRoom&&curRoom.name) || '';
-  // 全屏光幕: 自己按 t.stage; 别人按 othersStageMinTier(默认只有 admin+ 才惊动全场)
-  const othersStageMin = TIER_RANK[cfg.othersStageMinTier||'admin'] ?? 2;
-  const wantStage = isSelf ? !!t.stage : ((TIER_RANK[tier]||0) >= othersStageMin);
-  if(wantStage){ try{ playEntranceStage(t, {name:info.name, roomName}); }catch(_){} }
-  // 闪屏/震屏: 只给本人(别人没进场却被闪/震很烦)
-  if(isSelf && (t.flash || t.shake)){ try{ playInteractionFx({flash:t.flash||'', shake:!!t.shake}, null); }catch(_){} }
-  // 横幅(自己/别人都显)
-  const el=document.createElement('div');
-  el.className='entry-banner '+(t.cls||'ent-reg');
-  const nm = isSelf ? info.name : info.name;
-  el.innerHTML=`<span class="eb-ic">${safeEmoji(t.icon)||'✦'}</span>`+
-    `<span class="eb-txt"><span class="eb-nm">${esc(nm)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(roomName)}」</span>`+
-    `<span class="eb-tag">${tagTxt}</span>`;
-  $('#stream').appendChild(el); scrollStream();
-  // 音效: 自己必放; 别人只有高阶档(会全屏光幕的)才放, 避免频繁进场吵
-  if(t.sfx && (isSelf || wantStage)){ try{ EhSfx.play(t.sfx); }catch(_){} }
-  // 粒子迸发
-  if(t.burst && (isSelf || wantStage)){ try{ burst(t.burst, tier==='super'?20:10); }catch(_){} }
-}
-// 全屏入场光幕: 注入 sweep 光带 + flash 辐射 + 大字, 播完自动清。色由 tier 皮肤的 --ent-c 决定。
-function playEntranceStage(t, room){
-  const stage=$('#entStage'); if(!stage) return;
-  const cVar = (t.cls==='ent-reg') ? 'var(--cyan)' : 'var(--amber)';   // reg 用青, super/admin 用金
-  stage.style.setProperty('--ent-c', cVar);
-  const bigWord = (t.label||'进入').replace(/\s/g,'');
-  stage.innerHTML=`<div class="ent-sweep"></div><div class="ent-flash"></div>`+
-    `<div class="ent-big">${bigWord}<small>${esc(me.name)} · ${esc(room.name)}</small></div>`;
-  stage.classList.add('on');
-  clearTimeout(playEntranceStage._t);
-  playEntranceStage._t=setTimeout(()=>{ stage.classList.remove('on'); stage.innerHTML=''; }, 1500);
-}
 // 优化批A#1: 消息流条数上限,长时间挂机时防 DOM 无限累积卡顿。
 // 只在贴底状态下(新消息追加)触发修剪,避免用户往上翻看历史时误删刚加载的旧消息。
 const MAX_STREAM = 800, TRIM_TO = 600;
@@ -4699,7 +4449,6 @@ function msgPreview(m){
     case 'act':   return '✦ '+m.text;
     case 'proj':  return '📽️ 投影';
     case 'voice': return '🎤 语音消息';
-    case 'enter': return '✦ 有人进入了房间';   // enter 广播: 预览别露原始档位字符串(reg/super)
     case 'song':  return '🎵 '+parseSong(m.text).lyric;
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
       const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
@@ -5257,6 +5006,16 @@ function setSongMode(on){ setMode(on?'song':'none'); }
 let _cinWasFocused=false;   // 切曲风前输入框是否聚焦(用于切完不改变输入法开/收状态)
 function renderSongStrip(){
   const strip=$('#songStrip'); if(!strip) return;
+  // OPTD 修偶发: 首次进神曲模式时若曲风池还未从后台加载完(SONG_STYLES长度=0),
+  // 这里会渲染出空条 → 拖动没内容滑 → 偶发拖不动。
+  // 兵户对策: 空池时 300ms 后重试一次(applyConfigMap 也会在配置到达后另外触发一次重渲染,两道保障)
+  if(!SONG_STYLES || SONG_STYLES.length===0){
+    if(!strip._retryPending){
+      strip._retryPending=true;
+      setTimeout(()=>{ strip._retryPending=false; if(typeof songMode!=='undefined' && songMode) renderSongStrip(); }, 300);
+    }
+    return;
+  }
   const cur=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0];
   strip.style.setProperty('--strip-c', safeColor(cur.color));   // 整条 strip 跟随当前曲风色(标签+底色)
   strip.innerHTML=`<span class="ss-lb">曲风</span>`+SONG_STYLES.map(s=>
@@ -6192,7 +5951,6 @@ function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('b
 
 // ============ 返回大厅 ============
 function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
-  try{ document.body.classList.remove('priv-heat'); }catch(_){}   // 离房去掉暧昧红氛围
   // 丝滑续播: 不打断当前房 BGM, 只切成大厅随机连播模式——当前曲放完后随机连播任意房间 BGM
   try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){}
   applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
