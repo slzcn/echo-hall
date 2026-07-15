@@ -1153,7 +1153,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1932optd';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1940roomrose';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1507,6 +1507,8 @@ const EH_CONFIG_DEFAULT = {
   soulColors: {'狼姐':'#FF6F61','老K':'#F7E7CE','阿夜':'#B57EDC','回音':'#002FA7','图灵':'#1DE9B6','小暖':'#FD5E53'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
+  // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
+  roomNameC: { '午夜聊天':'#C08497' },   // 莫兰迪玫瑰(低饱和裸玫瑰, 高级温柔)
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
   identityDefaultC: '#0ABAB5',   // 匿名/未设色时的默认身份色(全站 fallback)
   voidC: '#4A5D7E',              // 虚空模式代表色
@@ -1820,7 +1822,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -2496,8 +2498,10 @@ function themeAccentOf(roomName){
   const themeId = (EH_CONFIG.roomTheme||{})[roomName];
   return themeAccentById(themeId);
 }
+const ROOM_NAME_C = EH_CONFIG.roomNameC || {};   // 按房名定制主色(任意房型), 优先于 kind/主题色
 function roomAccentC(r){
   if(!r) return ROOM_KIND_C.official;
+  if(r.name && ROOM_NAME_C[r.name]) return ROOM_NAME_C[r.name];   // 房名定制色最高优先(如午夜聊天=莫兰迪玫瑰)
   if(r.kind==='official'){
     return themeAccentOf(r.name) || OFFICIAL_FALLBACK_C[r.name] || ROOM_KIND_C.official;
   }
