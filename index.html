@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0135authhard';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0230acctp1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1943,22 +1943,26 @@ function withTimeout(promise, ms, fallback){
   ]);
 }
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
+// ★统一的 session 解析(ensureAuth / bootSupabase 共用, 避免两套恢复逻辑各修各的漂移)。
+// getSession 本质是【本地读】(读 localStorage 里的 token), 正常几毫秒返回; 它偶发 hang 是内部
+// 顺带 autoRefresh 的网络卡了。故: 给一个较宽的超时(12s)只做安全网; 超时/拿到 null 时对"曾登录过"
+// 的情形再做一次不带超时的兜底重读——真 session 往往就在, 别因网络抖动误判成"没登录"。
+async function resolveSession(){
+  if(!sb) return null;
+  let session=null;
+  try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 12000, { data:{ session:null } })); }
+  catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
+  // 曾登录过(本地 me.registered 或有 username/email) 但这次没读到 → 不带超时再读一次兜底
+  const everReg = !!(me && (me.registered || me.username || me.email));
+  if(!session?.user && everReg){
+    try{ const rr=await sb.auth.getSession(); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){}
+  }
+  return session;
+}
 async function ensureAuth(){
   try{ await withTimeout(awaitSb(), 8000); }catch(e){ console.warn(e); toast(EH_CONFIG.text.err_initId); return null; }
-  // getSession 偶发 hang → 8s 超时降级(拿不到 session 就当没登录, 走下面匿名/兜底)
-  let session=null;
-  try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 8000, { data:{ session:null } })); }
-  catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
+  let session = await resolveSession();
   let uid = session?.user?.id;
-  if(!uid){
-    // ★关键防误判: getSession 上面套了 8s 超时(防 autoRefresh 网络 hang), 但 getSession 本是【本地读】,
-    //   超时返回 null 往往是"刷新 token 的网络卡了", session 其实还在。若此时就把正式账号降级+重掷随机名,
-    //   弱网抖一下就把 yiran 变成随机匿名(反复踩坑的根因)。故: 对正式账号先做一次【不带超时的】兜底重读,
-    //   拿到真 session 就继续用它, 不降级。
-    if(me && me.registered){
-      try{ const rr=await sb.auth.getSession(); if(rr?.data?.session?.user){ session=rr.data.session; uid=session.user.id; } }catch(_){}
-    }
-  }
   if(!uid){
     // 二次确认后仍无 session:
     //  · 正式账号 → 判定登录确已失效: 只清本地登录态(不重掷名字、不匿名冒充), 提示重登, 直接返回。
@@ -5888,15 +5892,61 @@ async function doRegister(){
   clearLastRoom();   // ★ 新注册账号进大厅: 不应携带“历史房间”, 清掉残留防刷新进错房
   toast(EH_CONFIG.text.ok_regDone); closeModal(); goScene('lobby'); renderLobby();
 }
-// 找回密码：仅对注册时填了邮箱的账号
+// 找回密码：走后端 /reset-request(按真邮箱找账号→发/给重置链接)。
+// 旧实现用 sb.auth.resetPasswordForEmail(真邮箱) 是错的——登录邮箱是 u_hex@eh.local, Supabase 找不到→链接无效。
 async function doReset(){
   const email=$('#resetEmail').value.trim();
   if(!/^\S+@\S+\.\S+$/.test(email)){ $('#resetErr').textContent='邮箱格式不对'; return; }
   const btn=$('#doResetBtn'); btn.disabled=true; btn.textContent='发送中…'; $('#resetErr').textContent='';
-  const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
+  let res=null; try{ res=await authApi('/reset-request',{ email, origin:location.origin+location.pathname.replace(/\/[^/]*$/,'/') }); }catch(_){}
   btn.disabled=false; btn.textContent='发 送 重 置 链 接';
-  // 出于安全，无论邮箱是否存在都提示已发送
-  toast(EH_CONFIG.text.ok_resetSent); closeModal();
+  // 无 SMTP: 后端命中账号会直接回 link(降级)。为不泄露邮箱是否注册, 未命中也照常提示。
+  if(res && res.body && res.body.link){
+    // 直接把重置链接给到本人(当前无邮件通道), 点击即进入"设新密码"页
+    closeModal();
+    ehResetLinkPrompt(res.body.link);
+  }else{
+    toast(EH_CONFIG.text.ok_resetSent); closeModal();
+  }
+}
+// 无邮件通道下的降级: 弹出可点的重置链接(仅本人在本设备看得到)
+function ehResetLinkPrompt(link){
+  try{
+    const mask=document.createElement('div'); mask.className='modal-mask on'; mask.style.zIndex='120';
+    mask.innerHTML=`<div class="modal" style="max-width:340px">
+      <h2 class="modal-title">重置密码</h2>
+      <p class="modal-sub" style="line-height:1.6">当前未开通邮件发送，点下面的按钮直接去设新密码（链接 30 分钟内有效）。</p>
+      <a class="btn-primary" style="display:block;text-align:center;text-decoration:none;margin-top:8px" href="${esc(link)}">去设置新密码</a>
+      <button class="btn-line" style="margin-top:8px;width:100%">关闭</button>
+    </div>`;
+    mask.querySelector('.btn-line').onclick=()=>mask.remove();
+    mask.onclick=e=>{ if(e.target===mask) mask.remove(); };
+    document.body.appendChild(mask);
+  }catch(_){ toast('重置链接已生成，请在浏览器地址栏打开'); }
+}
+// URL 带 ?ehreset=<token> → 弹"设新密码"框, 提交走 /reset-confirm
+async function handleResetLink(){
+  const m=/[?&]ehreset=([a-f0-9]+)/i.exec(location.search||''); if(!m) return;
+  const token=m[1];
+  // 清掉 URL 上的 token(防泄露/重复)
+  try{ const clean=location.pathname+location.search.replace(/([?&])ehreset=[a-f0-9]+/i,'$1').replace(/[?&]$/,'').replace(/\?&/,'?'); history.replaceState(null,'',clean); }catch(_){}
+  const mask=document.createElement('div'); mask.className='modal-mask on'; mask.style.zIndex='120';
+  mask.innerHTML=`<div class="modal" style="max-width:340px">
+    <h2 class="modal-title">设置新密码</h2>
+    <label class="fld"><span>新密码（至少 6 位）</span><input id="rsPw" type="password" autocomplete="new-password" placeholder="新密码"></label>
+    <div class="err-line" id="rsErr" style="color:var(--magenta);font-size:12px;min-height:16px"></div>
+    <button class="btn-primary" id="rsGo" style="width:100%">确认修改</button>
+  </div>`;
+  document.body.appendChild(mask);
+  mask.querySelector('#rsGo').onclick=async()=>{
+    const pw=mask.querySelector('#rsPw').value;
+    if(pw.length<6){ mask.querySelector('#rsErr').textContent='密码至少 6 位'; return; }
+    const gg=mask.querySelector('#rsGo'); gg.disabled=true; gg.textContent='提交中…';
+    let r=null; try{ r=await authApi('/reset-confirm',{ token, password:pw }); }catch(_){}
+    gg.disabled=false; gg.textContent='确认修改';
+    if(r && r.body && r.body.ok){ mask.remove(); toast('密码已重置，请用新密码登录'); }
+    else{ mask.querySelector('#rsErr').textContent=(r&&r.body&&r.body.error)||'重置失败，链接可能已过期'; }
+  };
 }
 // 修改邮箱: 更新 eh_accounts.email(真邮箱, 找回密码用)。不动 auth 登录邮箱(u_hex@eh.local)。
 async function changeEmail(){
@@ -6262,6 +6312,8 @@ typeSub();
       else toast(j&&j.error||'验证失败');
     }).catch(()=>toast(EH_CONFIG.text.err_verifyFail));
 })();
+// 找回密码回跳: URL 带 ?ehreset=<token> → 弹"设新密码"框(见 handleResetLink)
+try{ handleResetLink(); }catch(e){}
 // 检测 magic link 回跳：邮箱登录/绑定成功后 URL 带 token，SIGNED_IN 事件触发
 let authHandled=false;
 const cameFromLink = /access_token|type=magiclink|type=recovery/.test(location.hash||'');
@@ -6305,7 +6357,7 @@ function bootSupabase(){
   // 启动时主动查一次 session, 有则手动触发恢复(与上面同逻辑), 防刷新后登录态"丢失"。
   (async()=>{
     try{
-      const { data:{ session } } = await sb.auth.getSession();
+      const session = await resolveSession();   // 统一解析(带兜底重读), 与 ensureAuth 同源, 防刷新后误判"没登录"
       if(session?.user && !myUid){
         const isReg = !!session.user.email;
         myUid=session.user.id; resyncMsgOwnership(); if(me){ me.id=myUid; if(isReg) me.registered=true; }
