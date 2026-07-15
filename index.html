@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0530ixpreview';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0600ixfriendly';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2492,7 +2492,9 @@ async function fillRoomStats(box, rid){
   if(last){
     prev.classList.remove('empty');
     const txt = msgPreview(last);
-    const nm = last.anon ? '🕳️ 某个回声' : esc(last.name)+':';
+    // 互动消息的文案本身就是完整句(已含发起人名, 如"狼姐 朝 yiran 扔了颗炸弹"), 不再加"名字："前缀防重复
+    const _isIx = last.kind==='interact';
+    const nm = _isIx ? '' : (last.anon ? '🕳️ 某个回声' : esc(last.name)+':');
     // 预览发送者名字色规范: 真人=自己个性色(与房间内消息、光墙统一); 灵魂/空色/匿名=回退房间强调色
     let nmC='';
     try{
@@ -2504,7 +2506,7 @@ async function fillRoomStats(box, rid){
         if(c) nmC=` style="color:${c}"`;
       }
     }catch(e){}
-    prev.innerHTML=`<b${nmC}>${nm}</b> ${esc(String(txt).slice(0,40))}`;
+    prev.innerHTML=(nm?`<b${nmC}>${nm}</b> `:'')+esc(String(txt).slice(0,40));
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
     prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
@@ -4249,10 +4251,11 @@ function msgPreview(m){
     case 'proj':  return '📽️ 投影';
     case 'voice': return '🎤 语音消息';
     case 'song':  return '🎵 '+parseSong(m.text).lyric;
-    case 'interact': {   // text = ixId|targetUid|文案 → 显 emoji+文案, 别露原始编码(见截图 "bomb|uuid...")
+    case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
       const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
-      const txt=parts.slice(2).join('|')||'';
-      return (safeEmoji(ix&&ix.emoji)||'✨')+' '+(txt||(ix&&ix.name)||'互动');
+      const txt=parts.slice(2).join('|').trim();
+      if(txt) return txt;                                    // 如"狼姐 朝 yiran 扔了颗炸弹 💣"
+      return (safeEmoji(ix&&ix.emoji)||'✨')+' '+((ix&&ix.name)||'互动');   // 无文案兜底
     }
     default:      return m.text||'';
   }
