@@ -151,7 +151,7 @@
     .tab{padding:8px 13px;font-size:12.5px}
   }
   .page{display:none;animation:fade .25s ease} .page.on{display:block}
-  /* 分段选择器(贵客待遇档等) */
+  /* 分段选择器(贵宾待遇档等) */
   .seg{display:inline-flex;gap:0;border:1px solid var(--line2);border-radius:10px;overflow:hidden;flex-wrap:wrap}
   .seg-btn{padding:8px 16px;background:var(--panel);color:var(--sub);border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:.15s}
   .seg-btn+.seg-btn{border-left:1px solid var(--line2)}
@@ -592,24 +592,24 @@
     <div class="glass card">
       <h3>任命身份</h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
-        选身份 → 填对象 → 任命。<b>超管/管理员</b>是后台权限(需对方已注册, 填用户名);<b>贵客</b>是进场待遇(任意账号可, 填 user_id)。
+        选身份 → 填对象 → 任命。<b>超级管理员/管理员</b>是后台权限(需对方已注册, 填用户名);<b>贵宾</b>是进场待遇(任意账号可, 填 user_id)。
       </p>
       <div class="seg" id="roleSeg" style="margin-bottom:12px">
         <button class="seg-btn on" data-role="admin">管理员</button>
         <button class="seg-btn" data-role="super">超级管理员</button>
-        <button class="seg-btn" data-role="vip">贵客 💎</button>
+        <button class="seg-btn" data-role="vip">贵宾 💎</button>
       </div>
       <div class="inline-form" style="display:flex;gap:8px">
         <input type="text" id="apInput" placeholder="对方的前台用户名" autocomplete="off" style="flex:1;min-width:0">
         <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan)">任命</button>
       </div>
       <div id="apHint" style="font-size:11.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
-      <!-- 贵客待遇档(仅选贵客时显示) -->
+      <!-- 贵宾待遇档(仅选贵宾时显示) -->
       <div id="vipTreatWrap" style="margin-top:12px;display:none">
-        <label style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">贵客进场待遇档</label>
+        <label style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">贵宾进场待遇档</label>
         <div class="seg" id="vipTreatSeg">
           <button class="seg-btn on" data-v="admin">管理员级</button>
-          <button class="seg-btn" data-v="super">超管级(加震屏更炸)</button>
+          <button class="seg-btn" data-v="super">超级管理员级(加震屏更炸)</button>
         </div>
         <div style="margin-top:10px"><button class="mini-btn" id="vipTreatSave" style="border-color:var(--cyan);color:var(--cyan)">保存待遇档</button></div>
       </div>
@@ -617,15 +617,15 @@
 
     <!-- 管理员/超管 列表 -->
     <div class="glass card">
-      <h3>🛡️ 管理员 & 超管</h3>
+      <h3>🛡️ 管理员 & 超级管理员</h3>
       <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>任命时间</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
     </div>
 
-    <!-- 贵客名单 -->
+    <!-- 贵宾名单 -->
     <div class="glass card">
-      <h3>💎 贵客名单</h3>
+      <h3>💎 贵宾名单</h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
-        贵客进场享全屏紫钻光幕 + 广播全房 + 灵魂相迎。任意账号可(上方选「贵客」填 user_id 任命)。不知道 id?去「房间」翻该用户消息复制。
+        贵宾进场享全屏紫钻光幕 + 广播全房 + 灵魂相迎。任意账号可(上方选「贵宾」填 user_id 任命)。不知道 id?去「房间」翻该用户消息复制。
       </p>
       <div id="vipList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
       <div style="display:flex;gap:8px">
@@ -744,7 +744,7 @@ function enterPanel(){
   $('#panel').style.display='block';
   $('#whoName').textContent=meAdmin.username;
   $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
-  $('#peopleTab').style.display=meAdmin.role==='super'?'block':'none';   // 人员(任命超管/管理员/贵客)仅超管可见
+  $('#peopleTab').style.display=meAdmin.role==='super'?'block':'none';   // 人员(任命超管/管理员/贵宾)仅超管可见
   renderSkinMenu();
   loadOverview(); loadRooms();
 }
@@ -842,7 +842,7 @@ async function renderUsersDetail(){
 // ===== 房间列表(缓存 + 骨架屏) =====
 let roomsCache=null;
 function paintRooms(rooms){
-  $('#roomsHint').textContent=meAdmin.role==='super'?'（超管：全站含私密）':'（仅公开房）';
+  $('#roomsHint').textContent=meAdmin.role==='super'?'（超级管理员：全站含私密）':'（仅公开房）';
   $('#roomsTbody').innerHTML=rooms.map(r=>{
     const arch=r.archived?'<span class="k-tag k-arch">已归档</span>':'';
     const kt={official:'官方',public:'公开',private:'私密'}[r.kind]||r.kind;
@@ -1166,10 +1166,10 @@ function paintAdmins(admins){
   $('#adminsTbody').innerHTML=admins.map(a=>{
     const isMe=a.auth_uid===meAdmin.uid;
     let ops='';
-    if(a.role!=='super') ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超管</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
+    if(a.role!=='super') ops=`<button class="mini-btn" data-transfer="${a.auth_uid}">转让超级管理员</button> <button class="mini-btn danger" data-revoke="${a.auth_uid}">撤销</button>`;
     else if(isMe) ops='<span style="color:var(--dim)">（你）</span>';
     return `<tr><td>${esc(a.username)}</td>
-      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超管':'管理员'}</span></td>
+      <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超级管理员':'管理员'}</span></td>
       <td>${(a.created_at||'').replace('T',' ').slice(0,16)}</td>
       <td>${ops}</td></tr>`;
   }).join('')||'<tr><td colspan="4" class="empty">暂无管理员</td></tr>';
@@ -1179,7 +1179,7 @@ function paintAdmins(admins){
     toast(r.ok?'已撤销':(r.body?.error||'失败')); adminsCache=null; loadAdmins();
   });
   $('#adminsTbody').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=async()=>{
-    if(!await confirmBox('转让超管身份给该管理员？你将降为普通管理员。','转让超管')) return;
+    if(!await confirmBox('转让超级管理员身份给该管理员？你将降为普通管理员。',"转让超级管理员")) return;
     const r=await api('/transfer',{method:'POST',body:{id:b.dataset.transfer}});
     if(r.ok){ toast('已转让，你已降为普管'); adminsCache=null; await loadMe(); enterPanel(); }
     else toast(r.body?.error||'失败');
@@ -1191,12 +1191,12 @@ async function loadAdmins(){
   const res=await api('/admins'); if(!res.ok){ if(!adminsCache) $('#adminsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
   adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
 }
-// ===== 统一任命: 一套 UI 给三种身份(超管/管理员=后台角色; 贵客=进场待遇) =====
+// ===== 统一任命: 一套 UI 给三种身份(超管/管理员=后台角色; 贵宾=进场待遇) =====
 let _apRole='admin';
 const AP_META={
   admin:{ ph:'对方的前台用户名', hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员' },
-  super:{ ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超管' },
-  vip:{   ph:'对方的 user_id (uuid)', hint:'贵客只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。', btn:'加为贵客' },
+  super:{ ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超级管理员' },
+  vip:{   ph:'对方的 user_id (uuid)', hint:'贵宾只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。', btn:'加为贵宾' },
 };
 function setApRole(role){
   _apRole=role;
@@ -1212,13 +1212,13 @@ $('#apBtn').onclick=async()=>{
   const btn=$('#apBtn'); btn.disabled=true;
   try{
     if(_apRole==='vip'){
-      // 贵客: 加进 vipUids 配置(去重), 立即保存
+      // 贵宾: 加进 vipUids 配置(去重), 立即保存
       if(!_vipDraft.includes(val)){ _vipDraft.push(val); }
-      if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); toast('已加为贵客 💎'); $('#apInput').value=''; renderVip(); }
+      if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); toast('已加为贵宾 💎'); $('#apInput').value=''; renderVip(); }
     } else {
       // 超管/管理员: 走后端 /appoint(带 role)
       const r=await api('/appoint',{method:'POST',body:{username:val, role:_apRole}});
-      if(r.ok){ toast(_apRole==='super'?'已设为超管':'已设为管理员'); $('#apInput').value=''; adminsCache=null; loadAdmins(); }
+      if(r.ok){ toast(_apRole==='super'?'已设为超级管理员':'已设为管理员'); $('#apInput').value=''; adminsCache=null; loadAdmins(); }
       else toast(r.body?.error||'失败(超管任命可能需后端支持 role 参数)');
     }
   } finally { btn.disabled=false; }
@@ -1262,7 +1262,7 @@ const CFG_DEFAULT = {
   },
   identityPool:{adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],animals:['水獭','狐狸','渡鸦','水母','狼','鲸','猞猁','萤火虫','章鱼','麋鹿','蜂鸟','山猫','海豚','雪豹','刺猬','飞蛾'],voidNames:['某个回声','虚空来客','匿名信号','无名者','一缕微光','夜航员']},
   tuning:{publicRecentLimit:500,historyPage:60,prefetchN:48,prefetchTtlMs:60000,voidTtlMs:300000,onlineWindowMs:35000,resonanceThreshold:5,voiceMaxSec:30,singMode:'ai'},
-    text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时身份 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"📡 官方频道",hallPublic:"🌐 公开房间",hallPrivate:"🔒 私密房",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存",loginSwitchId:"↻ 换一个",loginToggleShow:"已有账号？点此登录 ▾",loginUserPh:"用户名 或 邮箱",loginPwdPh:"密码",loginNoAccount:"没有账号？",loginGoReg:"注册一个 →",loginForgot:"忘记密码",lobbyPrivateHint:"凭邀请码加入，或创建一个只有你和朋友的房间",lobbyCreateBtn:"＋ 创建",lobbyJoinBtn:"🔑 加入",titleBgm:"氛围音乐",titleRoomSet:"房间设置",titleProfile:"个人空间",titleSkin:"皮肤",titleMore:"更多花样",titleEmoji:"表情",holdToTalk:"按住 说话",recordingHint:"松开发送 · 上滑取消",createRoomTitle:"创建房间",createRoomSub:"选择房间类型，起个名字。",roomNameLabel:"房间名",roomNamePh:"比如：午夜同好会",roomIconLabel:"图标",inviteShareHint:"把邀请码发给朋友，他们就能进来：",copyBtn:"复制",joinRoomTitle:"用邀请码加入",joinRoomSub:"输入朋友给你的邀请码：",inviteCodeLabel:"邀请码",inviteCodePh:"例如 A3F9K2M7QX",regTitle:"注册账号",regSub:"注册后可跨设备用账号密码登录，保留身份与聊天记录。",regUserLabel:"用户名",regUserPh:"3-20 位，支持中英文",regPwdPh:"至少 6 位",regEmailLabel:"邮箱（选填）",regEmailPh:"用于找回密码，建议填写",forgotTitle:"找回密码",forgotSub:"输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）",forgotEmailPh:"注册时填的邮箱",emailSetTitle:"邮箱设置",emailSetSub:"用于找回密码。绑定用户名/密码登录不受影响。",emailCurLabel:"当前邮箱",emailNewLabel:"新邮箱",editProfileTitle:"编辑形象",editProfileSub:"自定义你的昵称和头像（用户名登录不受影响）。",nickLabel:"昵称",nickPh:"显示给别人看的名字",avatarLabel:"头像",themeColorLabel:"主题色",confirmTitle:"确认操作",cancelBtn:"取消",okBtn:"确定",ok_emailVerified:"✓ 邮箱验证成功",ok_saved:"已保存",ok_kicked:"已踢出",ok_profileUpdated:"形象已更新",ok_roomDissolved:"房间已解散",ok_welcomeBack:"欢迎回来",ok_regDone:"注册成功，已登录",ok_codeCopied:"邀请码已复制",ok_emailUpdated:"邮箱已更新，请验证",ok_resetSent:"若该邮箱已注册，重置链接已发送",err_saveFail:"保存失败",err_sendFail:"发送失败",err_copyFail:"复制失败",err_createRoom:"建房失败",err_recInit:"录音初始化失败",err_recTooLong:"录音太长，发送失败",err_recTooShort:"说话时间太短",err_roomNameEmpty:"房间名不能为空",err_noRecSupport:"此浏览器不支持录音",err_noAudioSupport:"此浏览器不支持音频合成",err_userNotFound:"没找到这个人（需在本房在线）",err_regFail:"注册失败",err_noAccount:"账号不存在",err_wrongPwd:"账号或密码错误",err_initId:"身份初始化失败，刷新重试",err_badCode:"邀请码无效或房间不存在",err_emailFmt:"邮箱格式不对",err_needMic:"需要麦克风权限才能发语音",err_voiceUpload:"语音上传失败",err_voiceSend:"语音发送失败",err_voiceLoad:"语音加载失败，可能已过期",err_voiceUrl:"语音地址缺失",err_voiceBucket:"语音存储未配置(缺 eh-voice 桶)",err_verifyFail:"验证失败",ok_emailAlready:"邮箱已验证",err_singSend:"神曲发送失败",warn_regNeedLogin:"注册成功但登录失败，请回登录页手动登录",warn_needLogin:"请先登录",warn_needCredentials:"请填写账号和密码",warn_needCode:"请输入邀请码",warn_needRoomName:"给房间起个名",warn_browserBlock:"被浏览器拦截，请再点一次",warn_pwdShort:"密码至少 6 位",warn_userShort:"用户名至少 3 位",help_sing:"用法：/sing 要唱的文字",help_whisper:"用法：/whisper @昵称 内容",sing_needText:"先打点字，让它唱出来",sing_noContent:"没有可唱的内容"},
+    text:{publicEmpty:"还没有公开房，建一个吧",roomFirstMsg:"还没有人说话，来当第一个",connecting:"连接中…",loading:"加载中…",entrySlogan:"临时用户 · 无需注册",entryBtn:"匿 名 进 入",hallOfficial:"📡 官方频道",hallPublic:"🌐 公开房间",hallPrivate:"🔒 私密房",modeVoiceTitle:"语音留声",modeVoiceSub:"按住录音，松手发送",modeVoidTitle:"说给虚空",modeVoidSub:"匿名 · 5分钟后消散",modeSingTitle:"文字神曲",modeSingSub:"把输入的话，唱出来",composerPlaceholder:"说点什么… 打个 / 看命令",voidPlaceholder:"说给虚空… 匿名，5分钟后消散 🕳️",cmdSing:"/sing 文字 → 变一首洗脑神曲（随机曲风）🎵",cmdWhisper:"/whisper @昵称 悄悄话（仅对方可见）",btnCreateRoom:"生 成 房 间",btnEnterRoom:"进 入 房 间",btnLogin:"登 录",btnRegister:"注 册 并 进 入",roomTypePublicDesc:"大厅可见",roomTypePrivateDesc:"邀请码进",roomCreatedTitle:"房间已创建 🎉",officialDesc:"陌生人的实时聊天空间 · 进来 · 说话 · 留存",loginSwitchId:"↻ 换一个",loginToggleShow:"已有账号？点此登录 ▾",loginUserPh:"用户名 或 邮箱",loginPwdPh:"密码",loginNoAccount:"没有账号？",loginGoReg:"注册一个 →",loginForgot:"忘记密码",lobbyPrivateHint:"凭邀请码加入，或创建一个只有你和朋友的房间",lobbyCreateBtn:"＋ 创建",lobbyJoinBtn:"🔑 加入",titleBgm:"氛围音乐",titleRoomSet:"房间设置",titleProfile:"个人空间",titleSkin:"皮肤",titleMore:"更多花样",titleEmoji:"表情",holdToTalk:"按住 说话",recordingHint:"松开发送 · 上滑取消",createRoomTitle:"创建房间",createRoomSub:"选择房间类型，起个名字。",roomNameLabel:"房间名",roomNamePh:"比如：午夜同好会",roomIconLabel:"图标",inviteShareHint:"把邀请码发给朋友，他们就能进来：",copyBtn:"复制",joinRoomTitle:"用邀请码加入",joinRoomSub:"输入朋友给你的邀请码：",inviteCodeLabel:"邀请码",inviteCodePh:"例如 A3F9K2M7QX",regTitle:"注册账号",regSub:"注册后可跨设备用账号密码登录，保留身份与聊天记录。",regUserLabel:"用户名",regUserPh:"3-20 位，支持中英文",regPwdPh:"至少 6 位",regEmailLabel:"邮箱（选填）",regEmailPh:"用于找回密码，建议填写",forgotTitle:"找回密码",forgotSub:"输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）",forgotEmailPh:"注册时填的邮箱",emailSetTitle:"邮箱设置",emailSetSub:"用于找回密码。绑定用户名/密码登录不受影响。",emailCurLabel:"当前邮箱",emailNewLabel:"新邮箱",editProfileTitle:"编辑形象",editProfileSub:"自定义你的昵称和头像（用户名登录不受影响）。",nickLabel:"昵称",nickPh:"显示给别人看的名字",avatarLabel:"头像",themeColorLabel:"主题色",confirmTitle:"确认操作",cancelBtn:"取消",okBtn:"确定",ok_emailVerified:"✓ 邮箱验证成功",ok_saved:"已保存",ok_kicked:"已踢出",ok_profileUpdated:"形象已更新",ok_roomDissolved:"房间已解散",ok_welcomeBack:"欢迎回来",ok_regDone:"注册成功，已登录",ok_codeCopied:"邀请码已复制",ok_emailUpdated:"邮箱已更新，请验证",ok_resetSent:"若该邮箱已注册，重置链接已发送",err_saveFail:"保存失败",err_sendFail:"发送失败",err_copyFail:"复制失败",err_createRoom:"建房失败",err_recInit:"录音初始化失败",err_recTooLong:"录音太长，发送失败",err_recTooShort:"说话时间太短",err_roomNameEmpty:"房间名不能为空",err_noRecSupport:"此浏览器不支持录音",err_noAudioSupport:"此浏览器不支持音频合成",err_userNotFound:"没找到这个人（需在本房在线）",err_regFail:"注册失败",err_noAccount:"账号不存在",err_wrongPwd:"账号或密码错误",err_initId:"身份初始化失败，刷新重试",err_badCode:"邀请码无效或房间不存在",err_emailFmt:"邮箱格式不对",err_needMic:"需要麦克风权限才能发语音",err_voiceUpload:"语音上传失败",err_voiceSend:"语音发送失败",err_voiceLoad:"语音加载失败，可能已过期",err_voiceUrl:"语音地址缺失",err_voiceBucket:"语音存储未配置(缺 eh-voice 桶)",err_verifyFail:"验证失败",ok_emailAlready:"邮箱已验证",err_singSend:"神曲发送失败",warn_regNeedLogin:"注册成功但登录失败，请回登录页手动登录",warn_needLogin:"请先登录",warn_needCredentials:"请填写账号和密码",warn_needCode:"请输入邀请码",warn_needRoomName:"给房间起个名",warn_browserBlock:"被浏览器拦截，请再点一次",warn_pwdShort:"密码至少 6 位",warn_userShort:"用户名至少 3 位",help_sing:"用法：/sing 要唱的文字",help_whisper:"用法：/whisper @昵称 内容",sing_needText:"先打点字，让它唱出来",sing_noContent:"没有可唱的内容"},
   songStyles:[
     { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#FF3D92', bpm:124, bpc:0.5, base:3,  scale:'minP',
       motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square',   groove:'four', tts:{rate:1.3, pitch:1.0},  ttsStyle:'high',  playRate:1.12,
@@ -1942,7 +1942,7 @@ function collectTuning(){
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
 
-// ---- 💎 贵客名单 ----
+// ---- 💎 贵宾名单 ----
 let _vipDraft=[], _vipTreat='admin';
 async function loadVip(){
   const cfg=await loadConfig();
@@ -1958,7 +1958,7 @@ document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.addEventListener
 }));
 function renderVip(){
   const box=$('#vipList'); if(!box) return;
-  if(!_vipDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:8px 0">还没有贵客。粘贴 user_id 添加。</div>'; return; }
+  if(!_vipDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:8px 0">还没有贵宾。粘贴 user_id 添加。</div>'; return; }
   box.innerHTML=_vipDraft.map((uid,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--violet) 6%,transparent)">
     <span style="font-size:16px">💎</span>
     <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--ink)">${esc(uid)}</code>
@@ -1982,7 +1982,7 @@ $('#vipInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDe
 $('#vipSaveBtn')?.addEventListener('click',async()=>{
   if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); try{clearDirty();}catch(_){} }
 });
-$('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵客名单吗?','清空贵客名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
+$('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵宾名单吗?','清空贵宾名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
 
 // ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
 $('#purgeCacheBtn')?.addEventListener('click',async()=>{
@@ -2062,7 +2062,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='rooms') loadRooms();
   if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
   if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
-  if(t.dataset.page==='people'){ loadAdmins(); loadVip(); }      // 人员 = 管理员/超管 + 贵客 合并
+  if(t.dataset.page==='people'){ loadAdmins(); loadVip(); }      // 人员 = 管理员/超管 + 贵宾 合并
   if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }  // 玩法 = 曲风+互动+清唱
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位

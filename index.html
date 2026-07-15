@@ -590,7 +590,7 @@
   @keyframes entBorderSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   /* 4 档类型皮肤 */
   .entry-banner.ent-super{--ent-c:var(--amber)}
-  .entry-banner.ent-vip-tier{--ent-c:#C77DFF}   /* 贵客: 尊贵紫金(用固定紫, 不跟主题, 让"贵客"身份在任何皮肤下都一致辨识) */
+  .entry-banner.ent-vip-tier{--ent-c:#C77DFF}   /* 贵宾: 尊贵紫金(用固定紫, 不跟主题, 让"贵宾"身份在任何皮肤下都一致辨识) */
   .entry-banner.ent-admin{--ent-c:var(--amber)}
   .entry-banner.ent-reg{--ent-c:var(--cyan)}
   .entry-banner.ent-anon{--ent-c:var(--sub);box-shadow:none;animation:entBannerInSoft .5s ease both}
@@ -606,7 +606,7 @@
     100%{opacity:0;transform:translate(90px,-26px) skewX(-22deg) scaleX(.7);filter:blur(4px);
       height:0!important;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0}}
   @media (prefers-reduced-motion:reduce){ .entry-banner.entry-blowaway,.sysmsg.entry-blowaway{animation:none;opacity:0} }
-  /* 超管/贵客/管理员: 横幅持续呼吸辉光(比普通档更"活") */
+  /* 超管/贵宾/管理员: 横幅持续呼吸辉光(比普通档更"活") */
   .entry-banner.ent-super,.entry-banner.ent-vip-tier,.entry-banner.ent-admin{animation:entBannerIn .62s cubic-bezier(.16,1.3,.3,1) both,entBannerGlow 1.6s ease-in-out .62s 2}
   @keyframes entBannerGlow{0%,100%{box-shadow:0 0 26px -6px color-mix(in srgb,var(--ent-c,var(--amber)) 60%,transparent)}50%{box-shadow:0 0 40px -2px color-mix(in srgb,var(--ent-c,var(--amber)) 85%,transparent)}}
 
@@ -1270,7 +1270,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0910entry-fade';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0930role-names';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1322,7 +1322,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
         <div class="id-av" id="idAv">🦊</div>
         <div class="id-info">
           <div class="id-name" id="idName">量子水獭</div>
-          <div class="id-tag" id="idTag" data-txt="entrySlogan">临时身份 · 无需注册</div>
+          <div class="id-tag" id="idTag" data-txt="entrySlogan">临时用户 · 无需注册</div>
         </div>
         <button class="reroll" id="rerollBtn" data-txt="loginSwitchId">↻ 换一个</button>
       </div>
@@ -1616,22 +1616,22 @@ const EH_CONFIG_DEFAULT = {
     broadcast: true,        // 把进场事件广播给房里所有人(别人也能看到横幅/高阶档光幕)
     broadcastMinTier: 'reg',// 最低广播档: reg=正式及以上广播(匿名进出不广播防刷屏); 设 'anon' 则全员广播
     othersStageMinTier: 'admin', // 别人看到"全屏光幕"的最低档(admin/vip=只有管理员级进场才惊动全场; 设 'reg' 则正式也全屏)
-    // ★贵客名单: 见顶层 EH_CONFIG.vipUids(后台"💎贵客名单"tab 存的独立 key)。此处留空占位, 判定优先读顶层。
+    // ★贵宾名单: 见顶层 EH_CONFIG.vipUids(后台"💎贵宾名单"tab 存的独立 key)。此处留空占位, 判定优先读顶层。
     vipUids: [],
-    vipTreatment: 'admin',  // 贵客享受的待遇档: 'admin'(管理员级) 或 'super'(超管级=进场加震屏+更炸)。保留💎紫身份, 只调隆重程度。
+    vipTreatment: 'admin',  // 贵宾享受的待遇档: 'admin'(管理员级) 或 'super'(超管级=进场加震屏+更炸)。保留💎紫身份, 只调隆重程度。
     tiers: {
       // label 入场词; icon 图标; cls CSS皮肤; sfx 音效名(空=不放);
       // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
       super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  },  // 超管: 全屏金光幕+皇冠雨+闪+震(最炸)
-      vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵客: 全屏紫光幕+钻石雨(默认管理员级; vipTreatment='super' 时自动加震屏升到超管级排面)
+      vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵宾: 全屏紫光幕+钻石雨(默认管理员级; vipTreatment='super' 时自动加震屏升到超管级排面)
       admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'receive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
       reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'receive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
       anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:'',        stage:false, burst:'',       flash:'',        shake:false },  // 临时: 低调淡入
     },
   },
-  // 贵客名单(独立 key, 后台"贵客"tab 增删): user_id 数组, 命中者进场享 vip 待遇。
+  // 贵宾名单(独立 key, 后台"贵宾"tab 增删): user_id 数组, 命中者进场享 vip 待遇。
   vipUids: [],
-  vipTreatment: 'admin',   // 贵客待遇档(独立key, 后台可改): 'admin'管理员级 / 'super'超管级(加震屏更炸)
+  vipTreatment: 'admin',   // 贵宾待遇档(独立key, 后台可改): 'admin'管理员级 / 'super'超管级(加震屏更炸)
   themePalettes: {
     cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#9C85FF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
     vapor: {"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,44,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#cb86bc","--dim":"#8d497e","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
@@ -1705,7 +1705,7 @@ const EH_CONFIG_DEFAULT = {
     publicEmpty:'还没有公开房，建一个吧', roomFirstMsg:'还没有人说话，来当第一个',
     connecting:'连接中…', loading:'加载中…',
     // 入场页
-    entrySlogan:'临时身份 · 无需注册',
+    entrySlogan:'临时用户 · 无需注册',
     entryBtn:'匿 名 进 入',
     // 大厅
     hallOfficial:'📡 官方频道', hallPublic:'🌐 公开房间', hallPrivate:'🔒 私密房间',
@@ -2151,9 +2151,9 @@ function paintIdentity(){
   const tag=$('#idTag'), rr=$('#rerollBtn'), eb=$('#enterBtn');
   if(isRegistered){
     if(!me.registered){ me.registered=true; try{saveIdentity();}catch(e){} }   // 兼容修复: 回写标志到 localStorage,避免下次再错
-    if(tag) tag.textContent='正式账号 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入';
+    if(tag) tag.textContent='正式用户 · 已登录'; if(rr) rr.style.display='none'; if(eb) eb.textContent='进 入';
   }
-  else { if(tag) tag.textContent='临时身份 · 无需注册'; if(rr) rr.style.display=''; if(eb) eb.textContent='匿 名 进 入'; }
+  else { if(tag) tag.textContent='临时用户 · 无需注册'; if(rr) rr.style.display=''; if(eb) eb.textContent='匿 名 进 入'; }
 }
 
 // supabase 库 defer 加载 → 用户可能在库就绪前就点"进入"。ensureAuth 等 sb 就位再跑。
@@ -3850,13 +3850,13 @@ async function fillReplyRef(el, mid){
 function sysMsg(html){ const el=document.createElement('div'); el.className='sysmsg'; el.innerHTML=html; $('#stream').appendChild(el); scrollStream(); return el; }
 
 // ---- 进场动效系统 ----
-// 判定用户档位: super > vip(后台名单钦定的贵客) > admin > reg(正式) > anon(临时)。灵魂无浏览器会话, 不走此路径。
+// 判定用户档位: super > vip(后台名单钦定的贵宾) > admin > reg(正式) > anon(临时)。灵魂无浏览器会话, 不走此路径。
 // uid 参数: 判他人时传其 user_id; 不传则判自己(me + myUid)。vip 只认 uid(名单里存的是 user_id)。
 function userTier(u, uid){
   u = u || me || {};
   if(u.role==='super') return 'super';
-  // 贵客名单(后台可配): 命中即享管理员级排面, 即便是普通/临时账号。
-  //   名单来源: 顶层 EH_CONFIG.vipUids(后台"💎贵客名单"tab 存的独立 key) 优先; 兼容 entranceFx.vipUids。
+  // 贵宾名单(后台可配): 命中即享管理员级排面, 即便是普通/临时账号。
+  //   名单来源: 顶层 EH_CONFIG.vipUids(后台"💎贵宾名单"tab 存的独立 key) 优先; 兼容 entranceFx.vipUids。
   try{
     const list = (Array.isArray(EH_CONFIG.vipUids) && EH_CONFIG.vipUids.length ? EH_CONFIG.vipUids
                  : (EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.vipUids)) || [];
@@ -3900,8 +3900,8 @@ function renderEntrance(info, isSelf){
   const cfg=(EH_CONFIG.entranceFx)||{};
   const tier=info.tier||'reg';
   let t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
-  // 贵客待遇档: vipTreatment='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留💎紫身份皮肤与入场词。
-  //   来源: 顶层 EH_CONFIG.vipTreatment(后台"贵客"tab 存的独立key) 优先; 兼容 entranceFx.vipTreatment。
+  // 贵宾待遇档: vipTreatment='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留💎紫身份皮肤与入场词。
+  //   来源: 顶层 EH_CONFIG.vipTreatment(后台"贵宾"tab 存的独立key) 优先; 兼容 entranceFx.vipTreatment。
   const _vipTreat = EH_CONFIG.vipTreatment || cfg.vipTreatment;
   if(tier==='vip' && (_vipTreat==='super')){
     const s=(cfg.tiers && cfg.tiers.super)||{};
@@ -3914,7 +3914,7 @@ function renderEntrance(info, isSelf){
     try{ setTimeout(()=>{ try{ _sm.remove(); }catch(_){} }, ENTRY_FADE_MS); }catch(_){}
     return;
   }
-  const tagTxt = tier==='super'?'超管':(tier==='vip'?'贵客':(tier==='admin'?'管理员':(tier==='reg'?'正式':'临时')));
+  const tagTxt = tier==='super'?'超级管理员':(tier==='vip'?'贵宾':(tier==='admin'?'管理员':(tier==='reg'?'正式用户':'临时用户')));
   const roomName = info.roomName || (curRoom&&curRoom.name) || '';
   // 全屏光幕: 自己按 t.stage; 别人按 othersStageMinTier(默认只有 admin+ 才惊动全场)
   const othersStageMin = TIER_RANK[cfg.othersStageMinTier||'admin'] ?? 2;
@@ -6094,8 +6094,8 @@ async function openMe(){
   // 管理员/超级管理员的徽章包成链接, 新窗口打开管理后台(不改徽章样式, a 继承外观)
   const roleLabel = isSuper ? '超级管理员' : (me && me.role==='admin' ? '管理员' : '');
   const badge = isAdmin ? `<a class="mh-badge ${isSuper?'super':'admin'} mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${roleLabel}</a>`
-    : isBound ? '<span class="mh-badge reg">正式账号</span>'
-    : '<span class="mh-badge anon">临时身份</span>';
+    : isBound ? '<span class="mh-badge reg">正式用户</span>'
+    : '<span class="mh-badge anon">临时用户</span>';
   const c=safeColor(me.color);
   // @用户名 取昵称色(与大昵称同色, 更好看), 加轻微辉光; 徽章/分隔符仍用默认灰
   const subLine = isBound
@@ -6167,7 +6167,7 @@ async function refreshMeData(scope, isBound, acctKnown){
   }
   // 账号信息首次读到后缓存
   if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
-    const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : (me.role==='admin' ? '<span class="mh-badge admin">管理员</span>' : '<span class="mh-badge reg">正式账号</span>');
+    const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : (me.role==='admin' ? '<span class="mh-badge admin">管理员</span>' : '<span class="mh-badge reg">正式用户</span>');
     if($('.mh-sub')){ const _c=safeColor(me.color); $('.mh-sub').innerHTML=`${me.username?`<span style="color:${_c};font-weight:600;text-shadow:0 0 8px color-mix(in srgb,${_c} 35%,transparent)">@${esc(me.username)}</span> · `:''}${badge2}`; }
   }
   // 停止转圈, 至少显示 300ms 让用户看到反馈
