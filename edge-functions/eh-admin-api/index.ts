@@ -383,6 +383,8 @@ Deno.serve(async (req)=>{
       b = await req.json();
     } catch  {}
     const username = String(b?.username || "").trim();
+    // role: 'admin'(默认) 或 'super'。超管任命由现任超管授予, 双超管并存(与 /transfer 转让不同——appoint 是"新增"一个超管)。
+    const newRole = String(b?.role || "admin") === "super" ? "super" : "admin";
     if (!username) return j({
       error: "请填写要任命的用户名"
     }, 400);
@@ -392,7 +394,7 @@ Deno.serve(async (req)=>{
       error: "该用户名不存在(需对方先在前台注册)"
     }, 404);
     const res = await sbWrite("eh_accounts?auth_uid=eq." + acc.auth_uid, "PATCH", {
-      role: "admin"
+      role: newRole
     }, {
       Prefer: "return=minimal"
     });

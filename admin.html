@@ -461,9 +461,8 @@
     <div class="tab" data-page="theme">外观</div>
     <div class="tab" data-page="songstyles">玩法</div>
     <div class="tab" data-page="text">文案参数</div>
-    <div class="tab" data-page="vip">贵客</div>
+    <div class="tab" data-page="people" id="peopleTab">人员</div>
     <div class="tab" data-page="audit">日志</div>
-    <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
   </div>
 
   <div class="page on" id="p-overview">
@@ -588,27 +587,49 @@
     </div>
   </div>
 
-  <div class="page" id="p-vip">
+  <div class="page" id="p-people">
+    <!-- 任命: 一套逻辑给三种身份 -->
     <div class="glass card">
-      <h3>💎 贵客名单</h3>
-      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
-        填用户 <b>user_id</b>(uuid),即使普通/临时账号进房也享贵客进场:全屏紫钻光幕 + 广播全房 + 灵魂相迎。
-        不知道 id?去「房间」翻该用户消息复制。
+      <h3>任命身份</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
+        选身份 → 填对象 → 任命。<b>超管/管理员</b>是后台权限(需对方已注册, 填用户名);<b>贵客</b>是进场待遇(任意账号可, 填 user_id)。
       </p>
-      <div style="margin-bottom:14px">
-        <label style="font-size:13px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">进场待遇档</label>
+      <div class="seg" id="roleSeg" style="margin-bottom:12px">
+        <button class="seg-btn on" data-role="admin">管理员</button>
+        <button class="seg-btn" data-role="super">超级管理员</button>
+        <button class="seg-btn" data-role="vip">贵客 💎</button>
+      </div>
+      <div class="inline-form" style="display:flex;gap:8px">
+        <input type="text" id="apInput" placeholder="对方的前台用户名" autocomplete="off" style="flex:1;min-width:0">
+        <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan)">任命</button>
+      </div>
+      <div id="apHint" style="font-size:11.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
+      <!-- 贵客待遇档(仅选贵客时显示) -->
+      <div id="vipTreatWrap" style="margin-top:12px;display:none">
+        <label style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">贵客进场待遇档</label>
         <div class="seg" id="vipTreatSeg">
           <button class="seg-btn on" data-v="admin">管理员级</button>
           <button class="seg-btn" data-v="super">超管级(加震屏更炸)</button>
         </div>
+        <div style="margin-top:10px"><button class="mini-btn" id="vipTreatSave" style="border-color:var(--cyan);color:var(--cyan)">保存待遇档</button></div>
       </div>
+    </div>
+
+    <!-- 管理员/超管 列表 -->
+    <div class="glass card">
+      <h3>🛡️ 管理员 & 超管</h3>
+      <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>任命时间</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
+    </div>
+
+    <!-- 贵客名单 -->
+    <div class="glass card">
+      <h3>💎 贵客名单</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
+        贵客进场享全屏紫钻光幕 + 广播全房 + 灵魂相迎。任意账号可(上方选「贵客」填 user_id 任命)。不知道 id?去「房间」翻该用户消息复制。
+      </p>
       <div id="vipList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-      <div class="inline-form" style="display:flex;gap:8px;margin-bottom:14px">
-        <input type="text" id="vipInput" placeholder="粘贴 user_id,回车或点添加" style="flex:1;min-width:0">
-        <button class="mini-btn" id="vipAddBtn" style="border-color:var(--cyan);color:var(--cyan)">＋ 添加</button>
-      </div>
       <div style="display:flex;gap:8px">
-        <button class="btn" id="vipSaveBtn">保存</button>
+        <button class="btn" id="vipSaveBtn">保存名单</button>
         <button class="mini-btn" id="vipResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 清空</button>
       </div>
     </div>
@@ -639,18 +660,7 @@
     </div>
   </div>
 
-  <div class="page" id="p-admins">
-    <div class="glass card"><h3>任命管理员</h3>
-      <div class="inline-form">
-        <input id="newAdminUser" placeholder="对方的前台用户名" autocomplete="off">
-        <button class="mini-btn" id="addAdminBtn">设为管理员</button>
-      </div>
-      <div style="font-size:11.5px;color:var(--dim);margin-top:10px">对方需先在前台注册账号，这里输入其用户名即可授予后台权限。</div>
-    </div>
-    <div class="glass card"><h3>管理员列表</h3>
-      <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>最近登录</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
-    </div>
-  </div>
+
 </div></div>
 
 <!-- 确认弹层 -->
@@ -734,7 +744,7 @@ function enterPanel(){
   $('#panel').style.display='block';
   $('#whoName').textContent=meAdmin.username;
   $('#whoRole').outerHTML=`<span class="badge-${meAdmin.role==='super'?'super':'normal'}" id="whoRole">${meAdmin.role==='super'?'超级管理员':'普通管理员'}</span>`;
-  $('#adminsTab').style.display=meAdmin.role==='super'?'block':'none';
+  $('#peopleTab').style.display=meAdmin.role==='super'?'block':'none';   // 人员(任命超管/管理员/贵客)仅超管可见
   renderSkinMenu();
   loadOverview(); loadRooms();
 }
@@ -1181,16 +1191,40 @@ async function loadAdmins(){
   const res=await api('/admins'); if(!res.ok){ if(!adminsCache) $('#adminsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
   adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
 }
-$('#addAdminBtn').onclick=async()=>{
-  const username=$('#newAdminUser').value.trim();
-  if(!username){ toast('请输入用户名'); return; }
-  const btn=$('#addAdminBtn'); btn.disabled=true;
-  const r=await api('/appoint',{method:'POST',body:{username}});
-  btn.disabled=false;
-  if(r.ok){ toast('已设为管理员'); $('#newAdminUser').value=''; adminsCache=null; loadAdmins(); }
-  else toast(r.body?.error||'失败');
+// ===== 统一任命: 一套 UI 给三种身份(超管/管理员=后台角色; 贵客=进场待遇) =====
+let _apRole='admin';
+const AP_META={
+  admin:{ ph:'对方的前台用户名', hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员' },
+  super:{ ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超管' },
+  vip:{   ph:'对方的 user_id (uuid)', hint:'贵客只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。', btn:'加为贵客' },
 };
-$('#newAdminUser').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#addAdminBtn').click(); });
+function setApRole(role){
+  _apRole=role;
+  document.querySelectorAll('#roleSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.role===role));
+  const m=AP_META[role];
+  $('#apInput').placeholder=m.ph; $('#apHint').textContent=m.hint; $('#apBtn').textContent=m.btn;
+  $('#vipTreatWrap').style.display = role==='vip' ? 'block' : 'none';
+}
+document.querySelectorAll('#roleSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>setApRole(b.dataset.role)));
+$('#apBtn').onclick=async()=>{
+  const val=$('#apInput').value.trim();
+  if(!val){ toast(_apRole==='vip'?'请粘贴 user_id':'请输入用户名'); return; }
+  const btn=$('#apBtn'); btn.disabled=true;
+  try{
+    if(_apRole==='vip'){
+      // 贵客: 加进 vipUids 配置(去重), 立即保存
+      if(!_vipDraft.includes(val)){ _vipDraft.push(val); }
+      if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); toast('已加为贵客 💎'); $('#apInput').value=''; renderVip(); }
+    } else {
+      // 超管/管理员: 走后端 /appoint(带 role)
+      const r=await api('/appoint',{method:'POST',body:{username:val, role:_apRole}});
+      if(r.ok){ toast(_apRole==='super'?'已设为超管':'已设为管理员'); $('#apInput').value=''; adminsCache=null; loadAdmins(); }
+      else toast(r.body?.error||'失败(超管任命可能需后端支持 role 参数)');
+    }
+  } finally { btn.disabled=false; }
+};
+$('#apInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#apBtn').click(); });
+$('#vipTreatSave')?.addEventListener('click',async()=>{ if(await saveConfigKey('vipTreatment',_vipTreat)){ if(CFG_CACHE) CFG_CACHE.vipTreatment=_vipTreat; toast('待遇档已保存'); } });
 
 // ============ 集中配置管理(config) ============
 let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTheme, officialFallbackC, roomBgm, text }
@@ -1946,11 +1980,7 @@ function addVip(){
 $('#vipAddBtn')?.addEventListener('click',addVip);
 $('#vipInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addVip(); } });
 $('#vipSaveBtn')?.addEventListener('click',async()=>{
-  const okList=await saveConfigKey('vipUids',_vipDraft);
-  const okTreat=await saveConfigKey('vipTreatment',_vipTreat);
-  if(okList && CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice();
-  if(okTreat && CFG_CACHE) CFG_CACHE.vipTreatment=_vipTreat;
-  if(okList&&okTreat){ try{clearDirty();}catch(_){} }
+  if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); try{clearDirty();}catch(_){} }
 });
 $('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵客名单吗?','清空贵客名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
 
@@ -2011,11 +2041,11 @@ $('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
 // tabs
 // 未保存防护: 编辑页(主题/BGM/文案/参数/身份池)输入框被改→dirty; 切tab/关页前拦截提醒, 防静默丢改动。
 let _pageDirty=false;
-const EDIT_PAGES=['theme','bgm','text','tuning','songstyles','vip'];
+const EDIT_PAGES=['theme','text','songstyles','people'];
 function markDirty(){ _pageDirty=true; }
 function clearDirty(){ _pageDirty=false; }
 // 事件委托: 这些页的输入框一改就置 dirty(保存/恢复默认后各处会重渲染, 用 clearDirty 复位)
-['p-theme','p-text','p-vip'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
+['p-theme','p-text','p-people'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',markDirty); el.addEventListener('change',markDirty); } });
 // 保存后清 dirty: saveConfigKey 内部末尾已调 clearDirty(见其定义), 这里只挂关页拦截
 window.addEventListener('beforeunload',e=>{ if(_pageDirty){ e.preventDefault(); e.returnValue=''; } });
 
@@ -2029,11 +2059,10 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   $('#p-'+t.dataset.page).classList.add('on');
-  if(t.dataset.page==='admins') loadAdmins();
   if(t.dataset.page==='rooms') loadRooms();
   if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
   if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
-  if(t.dataset.page==='vip') loadVip();
+  if(t.dataset.page==='people'){ loadAdmins(); loadVip(); }      // 人员 = 管理员/超管 + 贵客 合并
   if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }  // 玩法 = 曲风+互动+清唱
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位
