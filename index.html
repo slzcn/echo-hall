@@ -1149,7 +1149,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1640room10';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1653soul6';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1500,7 +1500,7 @@ const EH_CONFIG_DEFAULT = {
   // 对任意房手动钉主题(覆盖哈希结果): { '房间名':'主题id' }
   roomThemeOverride: {},
   // 灵魂专属色(按灵魂名匹配, 私密房召唤的副本同名共享)
-  soulColors: {'狼姐':'#FF6F61','老K':'#F7E7CE','阿夜':'#B57EDC','回音':'#4A5D7E','图灵':'#0ABAB5','小暖':'#1DE9B6'},
+  soulColors: {'狼姐':'#FF6F61','老K':'#F7E7CE','阿夜':'#B57EDC','回音':'#002FA7','图灵':'#1DE9B6','小暖':'#FD5E53'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
