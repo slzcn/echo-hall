@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0320resetloop';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0400summontok';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5352,11 +5352,15 @@ async function openGear(){
     // 私密房: 提交召唤(勾选且原本不在)/请离开(取消勾选且原本在), 成功后再存房间信息
     if(isPriv && window._ehSummonCtx){
       const { grid:_sg, API:_sapi } = window._ehSummonCtx;
-      // 🔴 token 必须在保存这一刻实时取最新(iOS Safari 上 openGear 打开时 getSession 可能 hang/返回空→缓存空 token→召唤必败)
-      // getSession 本身 iOS 上会 hang → 加 5s 超时保护; 拿不到再从 localStorage 直读 token 兜底
-      let _stk='';
-      try{ const { data:{ session:_ss } }=await withTimeout(sb.auth.getSession(), 5000, { data:{ session:null } }); _stk=(_ss&&_ss.access_token)||''; }catch(_){}
-      if(!_stk){ try{ const _raw=JSON.parse(localStorage.getItem('sb-cddkniwbhvcbfgkgomtl-auth-token')||'null'); _stk=(_raw&&_raw.access_token)||''; }catch(_){} }
+      // 实时取最新有效 token: 优先 resolveSession(统一解析, 带兜底重读, 会自动刷过期 token);
+      // 再退 getSession, 再退 localStorage 直读。任一拿到即可。
+      async function freshToken(){
+        try{ const s=await resolveSession(); if(s?.access_token) return s.access_token; }catch(_){}
+        try{ const { data:{ session:_ss } }=await withTimeout(sb.auth.getSession(), 6000, { data:{ session:null } }); if(_ss?.access_token) return _ss.access_token; }catch(_){}
+        try{ const _raw=JSON.parse(localStorage.getItem('sb-cddkniwbhvcbfgkgomtl-auth-token')||'null'); if(_raw?.access_token) return _raw.access_token; if(_raw?.currentSession?.access_token) return _raw.currentSession.access_token; }catch(_){}
+        return '';
+      }
+      let _stk=await freshToken();
       if(!_stk){ toast('登录状态失效, 请下拉刷新页面后重试'); _saveBtn.disabled=false; _saveBtn.textContent='保存修改'; return; }
       // diff: 勾了但初始没召唤=要召唤(on:true); 取消了但初始已召唤=要撤销(on:false)
       const _items=[..._sg.querySelectorAll('.summon-item')];
@@ -5365,10 +5369,13 @@ async function openGear(){
       if(_changes.length){
         _saveBtn.disabled=true; _saveBtn.textContent='处理中…';
         const _fails=[];   // 收集失败项, 最后统一一条友好提示(不再逐条弹原始错误码)
+        const _callSummon=(tok,ch)=>fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
         for(const ch of _changes){
           ch.it.classList.add('busy');
           try{
-            const r=await fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+_stk, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
+            let r=await _callSummon(_stk, ch);
+            // 401/403: token 可能刚过期 → 刷新一次 token 重试(而非直接判"登录失效")
+            if(r.status===401||r.status===403){ const nt=await freshToken(); if(nt && nt!==_stk){ _stk=nt; r=await _callSummon(_stk, ch); } }
             const d=await r.json().catch(()=>({}));
             if(r.ok&&(d.ok||d.note)){ ch.it.dataset.orig=ch.on?'1':'0'; try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key:ch.key,on:ch.on}); }catch(_){} }
             else{ _fails.push({nm:ch.nm, on:ch.on, code:r.status}); ch.it.classList.toggle('on'); }
