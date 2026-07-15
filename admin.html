@@ -290,6 +290,13 @@
   @keyframes shim{100%{transform:translateX(100%)}}
   .sk-kpi{height:88px;border-radius:14px}
   .sk-row{height:38px;margin-bottom:6px}
+  /* 一行文本骨架(用于列表名字/标题占位) */
+  .sk-shim{position:relative;overflow:hidden;background:rgba(120,140,220,.08);border-radius:4px}
+  .sk-shim::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cyan) 10%,transparent),transparent);animation:shim 1.3s infinite}
+  /* dm-item 骨架行(av+两行文本占位) */
+  .dm-item.sk-item{opacity:.6}
+  .dm-item.sk-item .av.sk-shim{width:36px;height:36px;border-radius:50%}
 
   /* ===== 确认弹层 ===== */
   .mask{position:fixed;inset:0;z-index:80;background:rgba(4,6,12,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
@@ -822,21 +829,97 @@ async function renderMessagesDetail(){
     <div class="tail">${(m.created_at||'').replace('T',' ').slice(5,16)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
 }
 
-// 用户 KPI: 调 /users(后端新增 route); 若后端未部署则友好提示
-async function renderUsersDetail(){
-  const res=await api('/users?limit=500');
-  if(!res.ok){
-    if(res.status===404) $('#dmBody').innerHTML='<div class="empty">用户明细接口未部署<br><span style="font-size:11px">后端 eh-admin-api 需新增 /users route</span></div>';
-    else $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败')}</div>`;
-    return;
-  }
-  const us=(res.body.users||[]);
-  $('#dmBody').innerHTML=(us.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">共 ${us.length} 位用户</div>`:'')+
-    us.map(u=>`<div class="dm-item">
+// 用户 KPI: 分页 50/页 + 骨架屏 + 触底加载 + 搜索(?q=&filter=&sort=)
+// 首屏渲染 50 条(1-2 页秒开), 用户滑到底自动追加下一页; 关闭抽屉重开保留搜索/筛选状态。
+let _userState = { page:1, pageSize:50, q:'', filter:'all', sort:'created_at.desc', total:0, items:[], loading:false, done:false };
+function _userItemHtml(u){
+  return `<div class="dm-item">
     <div class="av">${safeEmoji(u.emoji)||'👤'}</div>
     <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${esc(u.name)}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
       <div class="sub">注册 ${(u.created_at||'').slice(0,10)}</div></div>
-    <div class="tail">${u.last_seen?('活跃 '+(u.last_seen||'').slice(5,10)):''}</div></div>`).join('')||'<div class="empty">暂无用户</div>';
+    <div class="tail">${u.last_seen?('活跃 '+(u.last_seen||'').slice(5,10)):''}</div></div>`;
+}
+function _userSkeleton(n=6){
+  return Array(n).fill('<div class="dm-item sk-item"><div class="av sk-shim"></div><div class="main"><div class="sk-shim" style="height:14px;width:60%;border-radius:4px;margin-bottom:6px"></div><div class="sk-shim" style="height:11px;width:40%;border-radius:4px"></div></div></div>').join('');
+}
+async function renderUsersDetail(reset=true){
+  if(reset){ _userState.page=1; _userState.items=[]; _userState.done=false; _userState.total=0; }
+  const body=$('#dmBody'); if(!body) return;
+  if(_userState.items.length===0){
+    // 首屏骨架 + 工具栏
+    body.innerHTML=`<div class="dm-toolbar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="usrSearch" placeholder="搜索用户名..." style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px" value="${esc(_userState.q)}">
+      <select id="usrFilter" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px">
+        <option value="all"${_userState.filter==='all'?' selected':''}>全部</option>
+        <option value="real"${_userState.filter==='real'?' selected':''}>正式账号</option>
+        <option value="anon"${_userState.filter==='anon'?' selected':''}>匿名</option>
+      </select>
+      <select id="usrSort" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px">
+        <option value="created_at.desc"${_userState.sort==='created_at.desc'?' selected':''}>注册最新</option>
+        <option value="last_seen.desc"${_userState.sort==='last_seen.desc'?' selected':''}>最近活跃</option>
+        <option value="name.asc"${_userState.sort==='name.asc'?' selected':''}>用户名 A→Z</option>
+      </select>
+    </div>
+    <div id="usrCount" class="sub" style="font-size:11px;color:var(--dim);margin-bottom:8px">加载中…</div>
+    <div id="usrList">${_userSkeleton(8)}</div>
+    <div id="usrSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:11px;padding:12px 0"></div>`;
+    // 绑定搜索/筛选(debounce)
+    let _debT;
+    const kick=()=>{ clearTimeout(_debT); _debT=setTimeout(()=>{
+      _userState.q=$('#usrSearch').value.trim();
+      _userState.filter=$('#usrFilter').value;
+      _userState.sort=$('#usrSort').value;
+      renderUsersDetail(true);
+    },300);};
+    $('#usrSearch').oninput=kick; $('#usrFilter').onchange=kick; $('#usrSort').onchange=kick;
+    // 触底加载(IntersectionObserver)
+    const sentinel=$('#usrSentinel');
+    if(sentinel && 'IntersectionObserver' in window){
+      const io=new IntersectionObserver(async(entries)=>{
+        for(const e of entries){
+          if(e.isIntersecting && !_userState.loading && !_userState.done){
+            _userState.page++; await _userLoadPage(false);
+          }
+        }
+      },{root:body,threshold:0.1});
+      io.observe(sentinel);
+      _userState._io=io;
+    }
+  }
+  await _userLoadPage(true);
+}
+async function _userLoadPage(isFirst){
+  if(_userState.loading || _userState.done) return;
+  _userState.loading=true;
+  const {page,pageSize,q,filter,sort}=_userState;
+  const qs=`?page=${page}&pageSize=${pageSize}&q=${encodeURIComponent(q)}&filter=${filter}&sort=${sort}`;
+  const sentinel=$('#usrSentinel'); if(sentinel) sentinel.textContent='加载中…';
+  const res=await api('/users'+qs);
+  _userState.loading=false;
+  if(!res.ok){
+    const list=$('#usrList');
+    if(list && isFirst) list.innerHTML=`<div class="empty">${esc(res.body?.error||'加载失败 '+res.status)}</div>`;
+    if(sentinel) sentinel.textContent='';
+    return;
+  }
+  const items=res.body.users||[]; const total=res.body.total||0;
+  _userState.total=total;
+  _userState.items.push(...items);
+  if(items.length < pageSize) _userState.done=true;
+  // 首页刷新列表, 之后追加
+  const list=$('#usrList');
+  const count=$('#usrCount');
+  if(list){
+    if(isFirst) list.innerHTML='';
+    if(_userState.items.length===0){ list.innerHTML='<div class="empty">未找到匹配的用户</div>'; }
+    else {
+      // isFirst 时(重置)直接渲染所有已加载; 追加时只 append 新增
+      if(isFirst) list.innerHTML=_userState.items.map(_userItemHtml).join('');
+      else list.insertAdjacentHTML('beforeend', items.map(_userItemHtml).join(''));
+    }
+  }
+  if(count) count.textContent=`共 ${total} 位用户 · 已加载 ${_userState.items.length}`;
+  if(sentinel) sentinel.textContent=_userState.done ? '— 到底了 —' : '滑动加载更多…';
 }
 
 // ===== 房间列表(缓存 + 骨架屏) =====
@@ -1804,18 +1887,66 @@ function normalizeLogRow(row){
     raw: row
   };
 }
-async function loadAuditLog(){
+// 日志分页 50/页 + 触底加载 + 骨架屏(数据量 962+ 条, 一次拉 200 首屏卡 → 优化)
+let _auditState={ page:1, pageSize:50, scope:'', tag:'', total:0, items:[], loading:false, done:false };
+async function loadAuditLog(reset=true){
+  if(reset){ _auditState.page=1; _auditState.items=[]; _auditState.done=false; _auditState.total=0; }
   const box = $('#auditList'); if(!box) return;
-  box.innerHTML = '<p style="color:var(--dim);text-align:center;padding:20px">读取中…</p>';
-  const qs=[]; const sc=$('#auditScope')?.value||''; const tag=$('#auditTag')?.value||'';
-  if(sc) qs.push('scope='+encodeURIComponent(sc));
-  if(tag) qs.push('tag='+encodeURIComponent(tag));
-  qs.push('limit=200');
+  if(reset){
+    _auditState.scope = $('#auditScope')?.value || '';
+    _auditState.tag = $('#auditTag')?.value || '';
+    box.innerHTML=`<div id="auditCount" class="sub" style="font-size:11px;color:var(--dim);margin-bottom:8px">加载中…</div>
+      <div id="auditRows">${Array(6).fill('<div class="sk-shim" style="height:56px;border-radius:8px;margin-bottom:8px"></div>').join('')}</div>
+      <div id="auditSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:11px;padding:12px 0"></div>`;
+    // 触底 IO
+    const sentinel=$('#auditSentinel');
+    if(sentinel && 'IntersectionObserver' in window){
+      const io=new IntersectionObserver(async(entries)=>{
+        for(const e of entries){
+          if(e.isIntersecting && !_auditState.loading && !_auditState.done){
+            _auditState.page++; await _auditLoadPage(false);
+          }
+        }
+      },{threshold:0.1});
+      io.observe(sentinel);
+    }
+  }
+  await _auditLoadPage(true);
+}
+async function _auditLoadPage(isFirst){
+  if(_auditState.loading || _auditState.done) return;
+  _auditState.loading=true;
+  const {page,pageSize,scope,tag}=_auditState;
+  const qs=[`page=${page}`,`pageSize=${pageSize}`];
+  if(scope) qs.push('scope='+encodeURIComponent(scope));
+  if(tag) qs.push('key='+encodeURIComponent(tag)); // tag 在旧 UI 里既做 tag 又做 key, 后端支持 key 精确筛
+  const sentinel=$('#auditSentinel'); if(sentinel) sentinel.textContent='加载中…';
   const r = await api('/logs?'+qs.join('&'));
-  if(!r.ok){ box.innerHTML = '<p style="color:#E63946;text-align:center;padding:20px">读取失败: '+esc(r.body?.error||'unknown')+'</p>'; return; }
-  const log = (r.body?.logs || []).map(normalizeLogRow);
-  if(!log.length){ box.innerHTML = '<p style="color:var(--dim);text-align:center;padding:20px">还没有日志。配置保存或前台用户行为发生后会记录在这里。</p>'; return; }
-  box.innerHTML = log.map((e,i)=>auditItemHtml(e,i)).join('');
+  _auditState.loading=false;
+  if(!r.ok){
+    if(isFirst) $('#auditRows').innerHTML=`<p style="color:#E63946;text-align:center;padding:20px">读取失败: ${esc(r.body?.error||'unknown')}</p>`;
+    if(sentinel) sentinel.textContent='';
+    return;
+  }
+  const raw=(r.body?.logs||[]).map(normalizeLogRow);
+  _auditState.total=r.body?.total||0;
+  _auditState.items.push(...raw);
+  if(raw.length < pageSize) _auditState.done=true;
+  const rows=$('#auditRows'); const count=$('#auditCount');
+  if(rows){
+    if(_auditState.items.length===0){ rows.innerHTML='<p style="color:var(--dim);text-align:center;padding:20px">还没有日志。配置保存或前台用户行为发生后会记录在这里。</p>'; }
+    else {
+      if(isFirst) rows.innerHTML=_auditState.items.map((e,i)=>auditItemHtml(e,i)).join('');
+      else rows.insertAdjacentHTML('beforeend', raw.map((e,i)=>auditItemHtml(e,_auditState.items.length-raw.length+i)).join(''));
+      _auditBindRow(rows);
+    }
+  }
+  if(count) count.textContent=`共 ${_auditState.total} 条日志 · 已加载 ${_auditState.items.length}`;
+  if(sentinel) sentinel.textContent=_auditState.done ? '— 到底了 —' : '滑动加载更多…';
+}
+function _auditBindRow(box){
+  // 复用原 auditItemHtml 的 data-rbidx / data-vwidx 事件绑定(用 _auditState.items 索引)
+  const log=_auditState.items;
   box.querySelectorAll('[data-rbidx]').forEach(b=>b.onclick=async()=>{
     const i = +b.dataset.rbidx;
     const e = log[i];
