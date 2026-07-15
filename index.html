@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0430summonreason';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0500summonfast';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5307,19 +5307,22 @@ async function openGear(){
     if(!grid) return;
     // 骨架已直接显示(EH_SUMMONABLES_FALLBACK), 先给骨架卡片绑点击, 拉回真实态后 renderList 覆盖
     grid.querySelectorAll('.summon-item').forEach(it=>{ it.onclick=()=>{ if(it.classList.contains('busy'))return; it.classList.toggle('on'); }; });
-    let token='';
-    try{ const { data:{ session } }=await sb.auth.getSession(); token=session&&session.access_token||''; }catch(_){}
     const API=SB_URL+'/functions/v1/eh-admin-api';
+    // ★立即用本地数据渲染(勾选态真相靠 members/soulNameSet, openGear 开头已拉好, 无需等网络)。
+    //   不再"await loadRoomSouls + await /soul-summonables 两个往返后才显", 那是慢的根源。
+    try{ renderList(EH_SUMMONABLES_FALLBACK.map(x=>({key:x.key,name:x.name,emoji:x.emoji,blurb:x.blurb,on:false}))); }catch(_){}
+    // 后台静默校正一次(拿到 token + 端点真实召唤态), 覆盖本地判断; 失败无妨(本地判断已够准)。
     async function loadList(){
+      let token='';
+      try{ const s=await resolveSession(); token=(s&&s.access_token)||''; }catch(_){}
+      if(!token){ try{ const { data:{ session } }=await sb.auth.getSession(); token=session&&session.access_token||''; }catch(_){} }
+      window._ehSummonCtx = { grid, API };   // 保存按钮实时取 token(freshToken), 这里不用缓存 token
       try{
-        // 先确保本房灵魂名单是最新的(soulNameSet 用于按名字校正勾选态), 再拉召唤列表
-        try{ await loadRoomSouls(curRoom.id); }catch(_){}
+        loadRoomSouls(curRoom.id).catch(()=>{});   // 不 await: 光墙/名字兜底后台刷
         const r=await fetch(API+'/soul-summonables?room_id='+encodeURIComponent(curRoom.id),{ headers:{ 'Authorization':'Bearer '+token } });
         const d=await r.json();
-        if(r.ok&&d.list){ renderList(d.list); return; }  // 拉回真实召唤态, 覆盖骨架
+        if(r.ok&&d.list){ renderList(d.list); }  // 拿到端点真实态则覆盖(通常和本地一致, 无感)
       }catch(e){}
-      // 端点失败兜底: 用前端白名单 + members/soulNameSet 判定勾选, 不卡在骨架全空(根治"成员在房却不勾选")
-      try{ renderList(EH_SUMMONABLES_FALLBACK.map(x=>({key:x.key,name:x.name,emoji:x.emoji,blurb:x.blurb,on:false}))); }catch(_){}
     }
     // 所有灵魂都可勾选/取消: 勾上=要召唤, 取消已召唤的=要撤销; data-orig 记初始态, 保存时 diff
     function renderList(list){
@@ -5341,9 +5344,9 @@ async function openGear(){
 
       });
     }
-    // 暴露给保存按钮: 收集"新勾选(要召唤)"的 key + token/API
-    window._ehSummonCtx = { grid, token, API };
-    loadList();
+    // 暴露给保存按钮(token 由保存时 freshToken 实时取, 不缓存)
+    window._ehSummonCtx = { grid, API };
+    loadList();   // 后台静默校正(不阻塞已即时渲染的面板)
   })(); }
   // 以下管理操作仅房主有(普通用户无这些元素, 加空判防报错)
   const _saveBtn=$('#gSaveBtn'); if(_saveBtn) _saveBtn.onclick=async()=>{
