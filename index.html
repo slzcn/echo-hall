@@ -41,11 +41,11 @@
   /* ===== 皮肤: 蒸汽波(粉紫日落) ===== */
   html[data-theme="vapor"]{
     --bg:#160a1f; --bg2:#22103a; --panel:rgba(40,18,60,.72); --panel-solid:#241035;
-    --line:rgba(255,120,200,.18); --line2:rgba(255,120,200,.32);
+    --line:rgba(255,140,180,.18); --line2:rgba(255,140,180,.32);
     --ink:#FFE8F6; --sub:#D9A8D0; --dim:#9B77A8;
-    --cyan:#38E1D0; --magenta:#FF3D9A; --violet:#B36BFF; --amber:#FFC46B; --green:#66E6B0; --accent:#FF3D9A;
-    --grid:rgba(255,120,220,.06);
-    --glow-cyan:0 0 24px rgba(56,225,208,.5); --glow-mag:0 0 26px rgba(255,61,154,.55);
+    --cyan:#5FE6D0; --magenta:#FF6E9C; --violet:#B36BFF; --amber:#FD8A5E; --green:#66E6B0; --accent:#FF6E9C;
+    --grid:rgba(255,140,180,.06);
+    --glow-cyan:0 0 24px rgba(95,230,208,.5); --glow-mag:0 0 26px rgba(255,110,156,.55);
   }
   /* ===== 皮肤: 暗夜极简(纯黑金) ===== */
   html[data-theme="mono"]{
@@ -59,11 +59,11 @@
   /* ===== 皮肤: 极光渐变(蓝绿流光) ===== */
   html[data-theme="aurora"]{
     --bg:#0d0620; --bg2:#160a30; --panel:rgba(30,16,56,.72); --panel-solid:#1a0e34;
-    --line:rgba(165,92,255,.18); --line2:rgba(165,92,255,.32);
+    --line:rgba(120,180,220,.18); --line2:rgba(120,180,220,.32);
     --ink:#F2EAFF; --sub:#C4A8E8; --dim:#8A72B0;
-    --cyan:#A55CFF; --magenta:#C77DFF; --violet:#7B4DFF; --amber:#FFCE6B; --green:#9B7BFF; --accent:#A55CFF;
-    --grid:rgba(140,90,255,.05);
-    --glow-cyan:0 0 28px rgba(165,92,255,.6); --glow-mag:0 0 24px rgba(199,125,255,.5);
+    --cyan:#2FE0C0; --magenta:#B57BFF; --violet:#8B6BFF; --amber:#FFCE6B; --green:#34E89E; --accent:#2FE0C0;
+    --grid:rgba(90,170,220,.05);
+    --glow-cyan:0 0 28px rgba(47,224,192,.6); --glow-mag:0 0 24px rgba(139,107,255,.5);
   }
   /* ===== 日间模式(亮底): 覆盖底色层, 4 套主题共用亮底; 强调色按主题微调保证亮底对比度 ===== */
   html[data-mode="day"]{
@@ -261,8 +261,8 @@
   .reroll:active{transform:scale(.94)}
   .opt-email{font-size:11.5px;color:var(--dim);cursor:pointer;margin-bottom:14px;transition:.15s;user-select:none}
   .vbadge{font-size:10px;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
-  .vbadge.ok{background:rgba(77,227,138,.15);color:var(--green)}
-  .vbadge.no{background:rgba(255,184,77,.15);color:var(--amber)}
+  .vbadge.ok{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}
+  .vbadge.no{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber)}
   .opt-email:hover{color:var(--cyan)}
   .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
   .opt-email-box.on{max-height:70px;margin-bottom:16px}
@@ -439,20 +439,20 @@
   .pav .nm{font-size:9.5px;line-height:12px;height:12px;color:var(--sub);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
   .pav.me .nm{color:var(--pav-c,var(--cyan));font-weight:600}
   .pav-skel{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;pointer-events:none}
-  .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,rgba(120,140,200,.10),rgba(120,140,200,.20),rgba(120,140,200,.10));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
-  .pav-skel .sk-nm{width:30px;height:8px;margin:2px 0;border-radius:4px;background:rgba(120,140,200,.12);animation:skel-pulse 1.3s ease-in-out infinite}
+  .pav-skel .sk-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(90deg,color-mix(in srgb,var(--sub) 18%,transparent),color-mix(in srgb,var(--sub) 36%,transparent),color-mix(in srgb,var(--sub) 18%,transparent));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite}
+  .pav-skel .sk-nm{width:30px;height:8px;margin:2px 0;border-radius:4px;background:color-mix(in srgb,var(--sub) 22%,transparent);animation:skel-pulse 1.3s ease-in-out infinite}
   @keyframes skel-pulse{0%{background-position:200% 0;opacity:.6}50%{opacity:1}100%{background-position:-200% 0;opacity:.6}}
   /* 大厅频道卡骨架屏(慢网先占位, 结构与 .ch 一致, 避免全空白 + 数据到达时不跳版) */
   .ch-skel{padding:18px 20px;border-radius:14px;border:1px solid var(--line);background:var(--panel);position:relative;overflow:hidden;
     display:grid;grid-template-columns:auto 1fr;column-gap:15px;align-items:center;pointer-events:none}
-  .ch-skel::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(120,140,200,.18)}
-  .ch-skel .sk-b{background:linear-gradient(90deg,rgba(120,140,200,.08),rgba(120,140,200,.18),rgba(120,140,200,.08));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:8px}
+  .ch-skel::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:color-mix(in srgb,var(--sub) 32%,transparent)}
+  .ch-skel .sk-b{background:linear-gradient(90deg,color-mix(in srgb,var(--sub) 14%,transparent),color-mix(in srgb,var(--sub) 32%,transparent),color-mix(in srgb,var(--sub) 14%,transparent));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:8px}
   .ch-skel .sk-icon{grid-row:1/3;width:48px;height:48px;border-radius:12px}
   .ch-skel .sk-h{grid-column:2;height:15px;width:42%;border-radius:5px}
   .ch-skel .sk-d{grid-column:2;height:11px;width:66%;margin-top:6px;border-radius:5px}
   .ch-skel .sk-l{grid-column:1/3;height:11px;width:50%;margin-top:13px;border-radius:5px}
   .rm-skel{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:var(--panel);pointer-events:none}
-  .rm-skel .sk-b{background:linear-gradient(90deg,rgba(120,140,200,.08),rgba(120,140,200,.18),rgba(120,140,200,.08));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:6px}
+  .rm-skel .sk-b{background:linear-gradient(90deg,color-mix(in srgb,var(--sub) 14%,transparent),color-mix(in srgb,var(--sub) 32%,transparent),color-mix(in srgb,var(--sub) 14%,transparent));background-size:200% 100%;animation:skel-pulse 1.3s ease-in-out infinite;border-radius:6px}
   .rm-skel .sk-ric{width:22px;height:22px;border-radius:7px;flex-shrink:0}
   .rm-skel .sk-rnm{height:13px;width:40%;flex:none}
   .pav.me .av-ic::before{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
@@ -491,7 +491,7 @@
   .msg.me .meta{flex-direction:row-reverse}
   .msg.me .body{display:flex;flex-direction:column;align-items:flex-end}
   .msg.me .txt{border-radius:12px 4px 12px 12px;background:var(--bubble-me-bg, linear-gradient(120deg,color-mix(in srgb,var(--cyan) 14%,transparent),color-mix(in srgb,var(--violet) 14%,transparent)));border-color:var(--bubble-border, var(--line2))}
-  .msg.whisper .txt{background:rgba(255,184,77,.1);border-color:rgba(255,184,77,.3);font-style:italic}
+  .msg.whisper .txt{background:color-mix(in srgb,var(--amber) 10%,transparent);border-color:color-mix(in srgb,var(--amber) 30%,transparent);font-style:italic}
   .msg.whisper .txt::before{content:"🔒 悄悄话 · ";font-size:10px;color:var(--amber);font-style:normal}
   .msg.projmsg .txt{background:color-mix(in srgb,var(--violet) 8%,var(--card-bg));border-color:color-mix(in srgb,var(--violet) 26%,transparent)}
   .proj-chip{display:inline-flex;align-items:center;margin-right:6px;padding:1px 6px;border-radius:999px;background:color-mix(in srgb,var(--violet) 12%,transparent);color:var(--violet);font-size:10.5px;font-weight:700;vertical-align:1px}
@@ -506,7 +506,7 @@
   .ec-pill.mine{background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);border-color:var(--accent,var(--cyan));color:var(--accent,var(--cyan))}
   /* 消息达阈值共鸣时的高亮脉冲 */
   .msg.resonated .txt{animation:resoPulse 1.6s ease-out}
-  @keyframes resoPulse{0%{box-shadow:0 0 0 0 rgba(255,60,172,.5)}50%{box-shadow:0 0 30px 6px rgba(255,60,172,.45)}100%{box-shadow:0 0 0 0 rgba(255,60,172,0)}}
+  @keyframes resoPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--magenta) 50%,transparent)}50%{box-shadow:0 0 30px 6px color-mix(in srgb,var(--magenta) 45%,transparent)}100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--magenta) 0%,transparent)}}
   .actmsg{text-align:center;font-size:12.5px;color:var(--violet);font-style:italic;padding:6px;animation:slidein .3s}
   /* 互动系统消息(居中系统行) */
   .ixmsg{text-align:center;font-size:12.5px;color:var(--sub);padding:6px 10px;animation:slidein .3s}
@@ -525,7 +525,7 @@
   .recalled-tip .rc-ic{display:inline-block;font-size:12px;opacity:.7;margin-right:2px;transform:translateY(.5px)}
   /* 长按环里的撤回按钮: 用警示色区分于回复/投影 */
   .ar-actions .ar-recall{color:var(--magenta)}
-  .ar-actions .ar-recall:hover{background:rgba(255,60,172,.12)}
+  .ar-actions .ar-recall:hover{background:color-mix(in srgb,var(--magenta) 12%,transparent)}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
 
@@ -970,11 +970,11 @@
   a.mh-admin-link:hover{background:color-mix(in srgb,var(--magenta) 26%,transparent);box-shadow:0 0 12px -3px var(--magenta)}
   a.mh-admin-link::after{content:'↗';font-size:8px;margin-left:3px;opacity:.7}
   .me-hero .mh-badge.reg{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
-  .me-hero .mh-badge.anon{background:rgba(120,140,220,.12);color:var(--sub)}
+  .me-hero .mh-badge.anon{background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub)}
   .me-btns{display:flex;gap:8px;margin-top:14px;width:100%}
   .me-btns .dbtn{margin-top:0;flex:1}
   .dsec .dl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:7px}
-  .dsec .dl .dl-n{font-size:10px;color:var(--dim);background:rgba(120,140,220,.12);border-radius:20px;padding:1px 8px;font-weight:600;letter-spacing:0}
+  .dsec .dl .dl-n{font-size:10px;color:var(--dim);background:color-mix(in srgb,var(--sub) 20%,transparent);border-radius:20px;padding:1px 8px;font-weight:600;letter-spacing:0}
   .dsec .dl .dl-refresh{margin-left:auto;font-size:13px;color:var(--dim);cursor:pointer;padding:2px 6px;border-radius:6px;transition:.15s;user-select:none;letter-spacing:0}
   .dsec .dl .dl-refresh:hover{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
   .dsec .dl .dl-refresh.spinning{animation:dl-spin .8s linear infinite;pointer-events:none;color:var(--cyan)}
@@ -1011,9 +1011,9 @@
   .mitem.mitem-go{cursor:pointer}
   .mitem.mitem-go:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 22px -10px var(--cyan)}
   .mitem .mi-av{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:16px;flex-shrink:0;
-    background:rgba(120,140,220,.1)}
+    background:color-mix(in srgb,var(--sub) 18%,transparent)}
   .mitem .mi-nm{flex:1;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-  .mitem .mi-role{font-size:8.5px;padding:2px 6px;border-radius:5px;background:rgba(255,184,77,.15);color:var(--amber);flex-shrink:0}
+  .mitem .mi-role{font-size:8.5px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber);flex-shrink:0}
   .mitem .mi-kick{font-size:11px;color:var(--dim);cursor:pointer;padding:2px 6px;flex-shrink:0}
   .mitem .mi-kick:hover{color:var(--magenta)}
   .mlist .empty-hint{grid-column:1/-1}
@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0645cntlabel';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1310themetune';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1441,7 +1441,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     if(!enter||!hall) return;
     enter.classList.remove('on'); hall.classList.add('on'); document.body.classList.add('hall-on');
     var hi=document.getElementById('hallIcon'); if(hi){ hi.textContent=r.emoji||'💬';
-      var rc = (typeof roomAccentC==='function') ? roomAccentC(r) : (r.kind==='public'?'#4DE38A':(r.kind==='private'?'#8B5CFF':'#28E6D8'));
+      var rc = (typeof roomAccentC==='function') ? roomAccentC(r) : ((EH_CONFIG&&EH_CONFIG.roomKindC&&EH_CONFIG.roomKindC[r.kind]) || EH_CONFIG.identityDefaultC || '#28E6D8');
       hi.style.setProperty('--room-c', rc); }
     var nt=document.getElementById('hallNameTxt'); if(nt){
       var kl = r.kind==='private'?'私密':(r.kind==='public'?'公开':'官方');
@@ -1481,10 +1481,10 @@ const EH_CONFIG_DEFAULT = {
     },
     vapor: {
       '--bg':'#160a1f','--bg2':'#22103a','--panel':'rgba(40,18,60,.72)','--panel-solid':'#241035',
-      '--line':'rgba(255,120,200,.18)','--line2':'rgba(255,120,200,.32)',
+      '--line':'rgba(255,140,180,.18)','--line2':'rgba(255,140,180,.32)',
       '--ink':'#FFE8F6','--sub':'#D9A8D0','--dim':'#9B77A8',
-      '--cyan':'#38E1D0','--magenta':'#FF3D9A','--violet':'#B36BFF','--amber':'#FFC46B','--green':'#66E6B0','--accent':'#FF3D9A',
-      '--grid':'rgba(255,120,220,.06)','--glow-cyan':'0 0 24px rgba(56,225,208,.5)','--glow-mag':'0 0 26px rgba(255,61,154,.55)',
+      '--cyan':'#5FE6D0','--magenta':'#FF6E9C','--violet':'#B36BFF','--amber':'#FD8A5E','--green':'#66E6B0','--accent':'#FF6E9C',
+      '--grid':'rgba(255,140,180,.06)','--glow-cyan':'0 0 24px rgba(95,230,208,.5)','--glow-mag':'0 0 26px rgba(255,110,156,.55)',
     },
     mono: {
       '--bg':'#000000','--bg2':'#0a0a0c','--panel':'rgba(16,16,20,.82)','--panel-solid':'#0e0e12',
@@ -1495,25 +1495,29 @@ const EH_CONFIG_DEFAULT = {
     },
     aurora: {
       '--bg':'#0d0620','--bg2':'#160a30','--panel':'rgba(30,16,56,.72)','--panel-solid':'#1a0e34',
-      '--line':'rgba(165,92,255,.18)','--line2':'rgba(165,92,255,.32)',
+      '--line':'rgba(120,180,220,.18)','--line2':'rgba(120,180,220,.32)',
       '--ink':'#F2EAFF','--sub':'#C4A8E8','--dim':'#8A72B0',
-      '--cyan':'#A55CFF','--magenta':'#C77DFF','--violet':'#7B4DFF','--amber':'#FFCE6B','--green':'#9B7BFF','--accent':'#A55CFF',
-      '--grid':'rgba(140,90,255,.05)','--glow-cyan':'0 0 28px rgba(165,92,255,.6)','--glow-mag':'0 0 24px rgba(199,125,255,.5)',
+      '--cyan':'#2FE0C0','--magenta':'#B57BFF','--violet':'#8B6BFF','--amber':'#FFCE6B','--green':'#34E89E','--accent':'#2FE0C0',
+      '--grid':'rgba(90,170,220,.05)','--glow-cyan':'0 0 28px rgba(47,224,192,.6)','--glow-mag':'0 0 24px rgba(139,107,255,.5)',
     },
   },
   // 主题元数据(下拉菜单:id/名称/圆点色)
   themes: [
     { id:'cyber',  name:'赛博霓虹', dot:'#28E6D8' },
-    { id:'vapor',  name:'蒸汽波',   dot:'#FF5FA2' },
+    { id:'vapor',  name:'蒸汽波',   dot:'#FF6E9C' },
     { id:'mono',   name:'暗夜极简', dot:'#E9C877' },
-    { id:'aurora', name:'极光渐变', dot:'#A55CFF' },
+    { id:'aurora', name:'极光渐变', dot:'#2FE0C0' },
   ],
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'mono','虚空回音':'aurora' },
   // 官方房卡片兜底强调色
-  officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#FF3D9A','技术黑话':'#E9C877','虚空回音':'#A55CFF' },
+  officialFallbackC: { '闲聊广场':'#28E6D8','深夜电台':'#FF6E9C','技术黑话':'#E9C877','虚空回音':'#2FE0C0' },
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#4DE38A', private:'#8B5CFF', official:'#28E6D8' },
+  // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
+  identityDefaultC: '#28E6D8',   // 匿名/未设色时的默认身份色(全站 fallback)
+  voidC: '#8B5CFF',              // 虚空模式代表色
+  resonanceDefaultC: '#FF3CAC',  // 共鸣特效默认色
   // 官方房 BGM(分层合成器格式: bpm/steps/loopBars/layers.lead|bass|pad|kick|hat)
   //  闲聊广场: C大调五声 8-bit pop / 深夜电台: Fm7 蒸汽波lo-fi无鼓 / 技术黑话: Am极简techno / 虚空回音: E lydian ambient铃音
   // 官方房 BGM(MiniMax music-2.6 生成的真实音频, 存 Supabase Storage/eh-song/bgm/)
@@ -1777,7 +1781,7 @@ async function loadRemoteConfig(){
 function applyConfigMap(map){
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','roomKindC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -3326,7 +3330,7 @@ function buildMsgEl(m, isHistory){
   if(m.kind==='proj') return null;
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
-    el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,'#8B5CFF')}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
+    el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,EH_CONFIG.voidC)}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   if(m.kind==='interact'){
     // text = ixId|targetUid|文案; 渲染成居中系统行(带互动emoji)。特效在 realtime INSERT 时演(见订阅)。
@@ -3362,7 +3366,7 @@ function buildMsgEl(m, isHistory){
   const echoHtml = `<div class="echo-bar" data-mid="${m.id}"></div>`;
   const avIc = isVoid ? '🕳️' : (safeEmoji(m.emoji) || '👤');
   // 颜色: 灵魂(机器人)才联动房间主题色; 真人一律用自己的身份色(m.color), 别被房间色染掉
-  const avColor = isVoid ? '#8B5CFF' : (isBot ? soulThemeColor(m.color, safeColor(m.color)) : safeColor(m.color));
+  const avColor = isVoid ? EH_CONFIG.voidC : (isBot ? soulThemeColor(m.color, safeColor(m.color)) : safeColor(m.color));
   const expHtml = isVoid && m.expires_at ? `<span class="vexp" data-exp="${m.expires_at}"></span>` : '';
   // 灵魂签名：头像右下角一行细小字"AI"，比昵称旁的文字徽章更干净
   const soulDot = isBot ? `<span class="soul-dot" title="灵魂居民 · AI">AI</span>` : '';
@@ -3901,7 +3905,7 @@ async function send(){
     // 数据层就不落真实昵称/头像/色: 存匿名代号(据uid确定性生成)+中性紫, 避免raw行泄露身份
     payload.name = voidNameFor({user_id:myUid});
     payload.emoji = '🕳️';
-    payload.color = '#8B5CFF';
+    payload.color = EH_CONFIG.voidC;
   }
   // 乐观上屏
   const localId='local_'+Date.now();
@@ -4891,7 +4895,7 @@ function checkResonance(mid, emoji, count){
   if(count < RESONANCE_THRESHOLD()) return;
   const key=mid+emoji; if(resonatedMsgs.has(key)) return; resonatedMsgs.add(key);
   const el=document.querySelector(`.msg[data-mid="${mid}"]`);
-  const color = el ? (el.querySelector('.nm')?.style.color||'#FF3CAC') : '#FF3CAC';
+  const color = el ? (el.querySelector('.nm')?.style.color||EH_CONFIG.resonanceDefaultC) : EH_CONFIG.resonanceDefaultC;
   triggerResonance(emoji, color, `✨ 一条消息响彻回声厅 ${emoji}`);
   if(el){ el.classList.add('resonated'); setTimeout(()=>el.classList.remove('resonated'),1600); }
 }
@@ -5070,8 +5074,8 @@ function clearReply(){ replyTo=null; $('#replyPreview').classList.remove('on'); 
 
 // 投影弹幕：本地飞 + 广播(kind='proj'消息)，让房里所有人都看到
 function projectText(text,color){
-  const p=document.createElement('div'); p.className='proj'; p.textContent=text; p.style.color=color||'#28E6D8';
-  p.style.textShadow=`0 0 20px ${safeColor(color,'#28E6D8')}`;
+  const p=document.createElement('div'); p.className='proj'; p.textContent=text; p.style.color=color||EH_CONFIG.identityDefaultC;
+  p.style.textShadow=`0 0 20px ${safeColor(color,EH_CONFIG.identityDefaultC)}`;
   p.style.top=(15+secureRand()*60)+'vh'; document.body.appendChild(p);
   setTimeout(()=>p.remove(),8000);
 }
@@ -5102,7 +5106,7 @@ function maybeResonate(m){
 }
 function triggerResonance(emoji,color,msg){
   const r=$('#resonance');
-  r.style.background=`radial-gradient(circle at 50% 60%, ${safeColor(color,'#FF3CAC')}44, transparent 70%)`;
+  r.style.background=`radial-gradient(circle at 50% 60%, ${safeColor(color,EH_CONFIG.resonanceDefaultC)}44, transparent 70%)`;
   r.classList.add('on'); burst(emoji,40); toast(msg||`✨ 共鸣！大家都在发 ${safeEmoji(emoji)}`);
   setTimeout(()=>r.classList.remove('on'),1200);
 }
@@ -5878,8 +5882,8 @@ async function doLogin(){
   myUid=sess.user.id; resyncMsgOwnership();
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
   me = prof && prof.name
-    ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
-    : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||'#28E6D8', registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
+    ? { id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||EH_CONFIG.identityDefaultC, registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) }
+    : { id:myUid, name:account, emoji:(me&&me.emoji)||'🦊', color:(me&&me.color)||EH_CONFIG.identityDefaultC, registered:true, username:(/^\S+@\S+\.\S+$/.test(account)?undefined:account) };
   saveIdentity(); paintIdentity();
   saveCredential(account, password);   // 显式交给浏览器密码管理器保存(SPA无页面跳转, 不能只靠自动气泡)
   clearLastRoom();   // ★ 登录成功进大厅: 清掉前一账号可能残留的 eh_last_room, 防刷新进到别人/旧身份的房间
@@ -6011,7 +6015,7 @@ async function changeEmail(){
 let _profEmoji, _profColor;
 function openProfileEditor(){
   openModal('mProfile');
-  _profEmoji=me.emoji||'🦊'; _profColor=me.color||'#28E6D8';
+  _profEmoji=me.emoji||'🦊'; _profColor=me.color||EH_CONFIG.identityDefaultC;
   setTimeout(()=>{ $('#profName').value=me.name||''; },50);
   // 随机昵称按钮(复用词库), 昵称与登录无关可随意换
   $('#profDice').onclick=()=>{ $('#profName').value=rand(ADJ)+rand(ANI); $('#profName').focus(); };
@@ -6390,7 +6394,7 @@ function bootSupabase(){
             sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
             sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
           ]);
-          if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+          if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||EH_CONFIG.identityDefaultC, registered:true }; }
           else { me = me||{}; me.registered=true; }
           if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
           saveIdentity(); paintIdentity();
@@ -6417,7 +6421,7 @@ function bootSupabase(){
             sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle(),
             sb.from('eh_accounts').select('username,email,role,email_verified').eq('auth_uid',myUid).maybeSingle(),
           ]);
-          if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||'#28E6D8', registered:true }; }
+          if(prof && prof.name){ me={ id:myUid, name:prof.name, emoji:prof.emoji||'🦊', color:prof.color||EH_CONFIG.identityDefaultC, registered:true }; }
           else { me=me||{}; me.registered=true; }
           if(acc){ me.username=acc.username||''; me.email=acc.email||''; me.role=acc.role||'user'; me.emailVerified=!!acc.email_verified; }
           saveIdentity(); paintIdentity();
