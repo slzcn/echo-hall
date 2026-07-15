@@ -452,7 +452,7 @@
     <div class="who">
       <span id="whoName">—</span><span id="whoRole"></span>
       <div class="icon-btn" id="skinBtn" title="皮肤">🎨<div class="skin-menu" id="skinMenu"></div></div>
-      <span class="logout" id="logoutBtn">退出</span>
+      <span class="logout" id="logoutBtn">← 返回首页</span>
     </div>
   </div>
   <div class="tabs">
@@ -2070,27 +2070,30 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
 $('#authBtn').onclick=doAuth;
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
 $('#username').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#password').focus(); });
-$('#logoutBtn').onclick=async()=>{
-  if(!await confirmBox('确定退出登录？','退出')) return;
-  await sb.auth.signOut();
-  // ★ admin 退出必须同时清前台本地身份缓存，否则退出后前台从 localStorage 读到旧名字/头像但 auth 已登出
-  // → 显示“yiran · 临时身份”的错位 bug，点进入会新建临时用户。
-  try{ localStorage.removeItem('eh_identity_v2'); }catch(e){}
-  try{ localStorage.removeItem('eh_me_cache_v2'); }catch(e){}
-  try{ localStorage.removeItem('eh_me_cache_v1'); }catch(e){}
-  try{ localStorage.removeItem('eh_last_room'); }catch(e){}
-  location.reload();
+$('#logoutBtn').onclick=()=>{
+  // ★ admin 不再提供退出: 登录态收口后, 此按钮只做纯导航返回首页(列表页), 不碰任何身份/session/缓存。
+  // 退出登录的唯一入口已统一到前台个人空间(index.html logoutIdentity), 避免多入口登出逻辑不一致造成残留缓存/假临时身份 bug。
+  location.href='index.html';
 };
 
-// 启动: 先显示验证遮罩, 检查同源已有登录态(与前台共享 session)→
-// 有效直接进面板(无感,不重登); 无效/无权限才显示登录框。
+// 启动: 检查同源已有登录态(与前台共享 session)→
+// 有效且有后台权限 → 直接进面板(无感,不重登);
+// 无 session / 无权限 → 不再弹 admin 自己的登录框, 统一跳前台 index.html?redirect=admin 引导登录。
+//   登录成功后前台会根据 redirect=admin 自动回跳本页(且前台也做了管理员角色校验)。
 (async()=>{
-  function showLogin(){ $('#authBoot').classList.add('hide'); $('#auth').classList.add('show'); }
+  function gotoFrontLogin(){ location.replace('index.html?redirect=admin'); }
   try{
     const { data:{ session } } = await sb.auth.getSession();
-    if(session && await loadMe()){ enterPanel(); return; }
+    if(session){
+      if(await loadMe()){ enterPanel(); return; }
+      // 有登录态但不是管理员/超管 → 无权进后台, 回首页(不带 redirect, 避免无限弹回)
+      alert('当前账号无后台权限');
+      location.replace('index.html');
+      return;
+    }
   }catch(e){ console.warn('[EH后台] 登录态检查异常', e&&e.message); }
-  showLogin();
+  // 无 session → 跳前台引导登录
+  gotoFrontLogin();
 })();
 </script>
 </body>

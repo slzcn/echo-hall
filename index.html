@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0855nightbadge-3px';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0224optd-loginunify';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -6425,6 +6425,17 @@ async function doLogin(){
   saveIdentity(); paintIdentity();
   saveCredential(account, password);   // 显式交给浏览器密码管理器保存(SPA无页面跳转, 不能只靠自动气泡)
   clearLastRoom();   // ★ 登录成功进大厅: 清掉前一账号可能残留的 eh_last_room, 防刷新进到别人/旧身份的房间
+  // ★ 后台引导登录回跳: 从 admin.html 未登录被跳来(带 ?redirect=admin)时, 登录成功后自动回后台。
+  //   仅管理员/超管放行回跳(普通用户登录后即使带 redirect 也留在大厅, admin 侧还会再做权限校验兜底)。
+  try{
+    const _rd=new URLSearchParams(location.search).get('redirect');
+    if(_rd==='admin'){
+      const { data:acc }=await sb.from('eh_accounts').select('role').eq('auth_uid',myUid).maybeSingle();
+      if(acc && (acc.role==='admin'||acc.role==='super')){ location.href='admin.html'; return; }
+      // 非管理员: 清掉 redirect 参数留在大厅, 不回跳
+      try{ history.replaceState(null,'',location.pathname); }catch(e){}
+    }
+  }catch(e){ console.warn('[EH] redirect-admin 检查异常', e&&e.message); }
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
 }
 // SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
