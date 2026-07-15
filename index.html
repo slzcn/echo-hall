@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0230acctp1';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0320resetloop';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5944,9 +5944,28 @@ async function handleResetLink(){
     const gg=mask.querySelector('#rsGo'); gg.disabled=true; gg.textContent='提交中…';
     let r=null; try{ r=await authApi('/reset-confirm',{ token, password:pw }); }catch(_){}
     gg.disabled=false; gg.textContent='确认修改';
-    if(r && r.body && r.body.ok){ mask.remove(); toast('密码已重置，请用新密码登录'); }
+    if(r && r.body && r.body.ok){
+      mask.remove();
+      toast('密码已重置，请用新密码登录');
+      // ★闭环: 直接把登录框展开、填好用户名、聚焦密码框, 用户输新密码即可登录, 不再"改完没下文"。
+      try{ openLoginWith(r.body.username||''); }catch(_){}
+    }
     else{ mask.querySelector('#rsErr').textContent=(r&&r.body&&r.body.error)||'重置失败，链接可能已过期'; }
   };
+}
+// 展开登录框 + 预填用户名 + 聚焦密码(找回密码/主动登录复用)。确保在入场页且登录区可见。
+function openLoginWith(username){
+  try{ if(curRoom){ /* 已在房不打断 */ } else goScene('enter'); }catch(_){}
+  const c=$('#loginCollapse'), tgl=$('#loginToggle');
+  if(c && !c.classList.contains('on')){
+    c.classList.add('on');
+    const sp=tgl&&tgl.querySelector('span'); if(sp) sp.textContent='已有账号？收起 ▴';
+  }
+  const la=$('#loginAccount'), lp=$('#loginPassword');
+  if(la){ la.setAttribute('autocomplete','username'); if(username) la.value=username; }
+  if(lp){ lp.setAttribute('autocomplete','current-password'); lp.value=''; }
+  // 用户名已填好 → 直接聚焦密码框, 让用户输新密码
+  setTimeout(()=>{ try{ (username? (lp||la) : la).focus(); }catch(_){} }, 250);
 }
 // 修改邮箱: 更新 eh_accounts.email(真邮箱, 找回密码用)。不动 auth 登录邮箱(u_hex@eh.local)。
 async function changeEmail(){
