@@ -1257,7 +1257,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0120entrancemax';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0150entrancebcast';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1600,6 +1600,9 @@ const EH_CONFIG_DEFAULT = {
   entranceFx: {
     enabled: true,          // 总开关
     othersAvatar: true,     // 他人上光墙时按类型弹入动画
+    broadcast: true,        // 把进场事件广播给房里所有人(别人也能看到横幅/高阶档光幕)
+    broadcastMinTier: 'reg',// 最低广播档: reg=正式及以上广播(匿名进出不广播防刷屏); 设 'anon' 则全员广播
+    othersStageMinTier: 'admin', // 别人看到"全屏光幕"的最低档(admin=只有管理员/超管进场才惊动全场; 设 'reg' 则正式也全屏)
     tiers: {
       // label 入场词; icon 图标; cls CSS皮肤; sfx 音效名(空=不放);
       // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
@@ -3259,6 +3262,12 @@ function subscribeMessages(rid){
       if(m.kind==='proj'){ if(m.user_id!==myUid) projectText(m.text, m.color); return; }
       // whisper 只有目标能收(RLS 已挡，但 realtime 可能推来，再挡一次)
       if(m.kind==='whisper' && m.to_user!==myUid) return;
+      // 进场广播: 别人看到进场横幅(高阶档还全屏光幕)。自己的已在 entranceBanner 本地演过, 跳过。
+      //   enter 不进历史/不留气泡(text 存的是档位字符串, 非聊天内容)。
+      if(m.kind==='enter'){
+        if(m.user_id!==myUid){ try{ renderEntrance({ name:m.name, tier:String(m.text||'reg'), roomName:curRoom&&curRoom.name }, false); }catch(_){} }
+        return;
+      }
       // 互动: 播特效。震动/闪屏/抖动只给目标本人(挨打的才震), 旁观者看飞行物/撒花但不震。
       if(m.kind==='interact'){
         const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]); const targetUid=parts[1];
@@ -3618,6 +3627,8 @@ function fmtTime(ts){
 }
 
 function buildMsgEl(m, isHistory){
+  // 进场广播 enter: 只是"当场"特效, 不留气泡/不进历史(text 存的是档位, 非聊天内容)。历史里遇到直接跳过。
+  if(m.kind==='enter') return null;
   // ★撤回消息(A方案: 用 deleted_at 时间戳判定, 服务端 RPC 严格权限): 渲染占位气泡
   //   注: 保留 kind==='recalled' 作为向后兼容(万一 B 方案期间已有撤回过的消息)
   if(m.deleted_at || m.kind==='recalled'){
@@ -3788,6 +3799,7 @@ function replyPreviewText(text, kind){
   if(kind==='song'){ try{ const s=parseSong(text); return '🎵 '+(s.lyric||'神曲'); }catch(_){ return '🎵 神曲'; } }
   if(kind==='voice') return '🎙️ 语音消息';
   if(kind==='proj') return '📽️ 投影';
+  if(kind==='enter') return '✦ 进入了房间';
   if(kind==='interact'){ const parts=String(text||'').split('|'); const txt=parts.slice(2).join('|').trim(); if(txt) return txt; const ix=_interactions.find(i=>i.id===parts[0]); return (safeEmoji(ix&&ix.emoji)||'✨')+' 互动'; }
   return text||'';
 }
@@ -3813,7 +3825,8 @@ function userTier(u){
   if(u.registered || u.username || u.email) return 'reg';
   return 'anon';
 }
-// 自己进房 → 按类型渲染一张入场横幅(替代朴素"你以…进入"文字)。降级: 关了/减动效 → 回退纯文字 sysMsg。
+const TIER_RANK = { anon:0, reg:1, admin:2, super:3 };   // 档位高低比较用
+// 自己进房 → 按类型渲染入场特效(横幅+全屏光幕+闪/震/粒子) + 按配置广播给房里其他人。
 function entranceBanner(room){
   const cfg = (EH_CONFIG.entranceFx)||{};
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -3824,21 +3837,48 @@ function entranceBanner(room){
     sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);
     return;
   }
+  // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
+  renderEntrance({ name:me.name, tier, roomName:room.name }, true);
+  // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。enter 消息不进历史。
+  try{
+    const minBc = TIER_RANK[cfg.broadcastMinTier||'reg'] ?? 1;
+    if(cfg.broadcast!==false && curRoom && myUid && (TIER_RANK[tier]||0) >= minBc){
+      sb.from('eh_messages').insert({ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
+        text:tier, kind:'enter' }).then(({error})=>{ if(error) console.warn('enter broadcast', error.message); });
+    }
+  }catch(e){ console.warn('enter broadcast', e); }
+}
+// 统一入场渲染器(自己 isSelf=true 走全套; 别人 isSelf=false 只横幅+高阶档光幕, 不闪不震不打扰)
+function renderEntrance(info, isSelf){
+  const cfg=(EH_CONFIG.entranceFx)||{};
+  const tier=info.tier||'reg';
+  const t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可
+    if(!isSelf){ sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`); }
+    else sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
+    return;
+  }
   const tagTxt = tier==='super'?'超管':(tier==='admin'?'管理员':(tier==='reg'?'正式':'临时'));
-  // 全屏光幕(高阶档): 一道巨光带横扫 + 大字砸下, 用 --ent-c 定色(super/admin=金, 其余=青)
-  if(t.stage){ try{ playEntranceStage(t, room); }catch(_){} }
-  // 全屏色闪 + 震屏(复用互动特效引擎的原子能力)
-  if(t.flash || t.shake){ try{ playInteractionFx({flash:t.flash||'', shake:!!t.shake}, null); }catch(_){} }
-  // 横幅
+  const roomName = info.roomName || (curRoom&&curRoom.name) || '';
+  // 全屏光幕: 自己按 t.stage; 别人按 othersStageMinTier(默认只有 admin+ 才惊动全场)
+  const othersStageMin = TIER_RANK[cfg.othersStageMinTier||'admin'] ?? 2;
+  const wantStage = isSelf ? !!t.stage : ((TIER_RANK[tier]||0) >= othersStageMin);
+  if(wantStage){ try{ playEntranceStage(t, {name:info.name, roomName}); }catch(_){} }
+  // 闪屏/震屏: 只给本人(别人没进场却被闪/震很烦)
+  if(isSelf && (t.flash || t.shake)){ try{ playInteractionFx({flash:t.flash||'', shake:!!t.shake}, null); }catch(_){} }
+  // 横幅(自己/别人都显)
   const el=document.createElement('div');
   el.className='entry-banner '+(t.cls||'ent-reg');
+  const nm = isSelf ? info.name : info.name;
   el.innerHTML=`<span class="eb-ic">${safeEmoji(t.icon)||'✦'}</span>`+
-    `<span class="eb-txt"><span class="eb-nm">${esc(me.name)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(room.name)}」</span>`+
+    `<span class="eb-txt"><span class="eb-nm">${esc(nm)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(roomName)}」</span>`+
     `<span class="eb-tag">${tagTxt}</span>`;
   $('#stream').appendChild(el); scrollStream();
-  if(t.sfx){ try{ EhSfx.play(t.sfx); }catch(_){} }
-  // 粒子迸发(皇冠/火花从底部升起)
-  if(t.burst){ try{ burst(t.burst, tier==='super'?20:10); }catch(_){} }
+  // 音效: 自己必放; 别人只有高阶档(会全屏光幕的)才放, 避免频繁进场吵
+  if(t.sfx && (isSelf || wantStage)){ try{ EhSfx.play(t.sfx); }catch(_){} }
+  // 粒子迸发
+  if(t.burst && (isSelf || wantStage)){ try{ burst(t.burst, tier==='super'?20:10); }catch(_){} }
 }
 // 全屏入场光幕: 注入 sweep 光带 + flash 辐射 + 大字, 播完自动清。色由 tier 皮肤的 --ent-c 决定。
 function playEntranceStage(t, room){
@@ -4650,6 +4690,7 @@ function msgPreview(m){
     case 'act':   return '✦ '+m.text;
     case 'proj':  return '📽️ 投影';
     case 'voice': return '🎤 语音消息';
+    case 'enter': return '✦ 有人进入了房间';   // enter 广播: 预览别露原始档位字符串(reg/super)
     case 'song':  return '🎵 '+parseSong(m.text).lyric;
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
       const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
