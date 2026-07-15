@@ -1153,7 +1153,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-1923optc';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-1932optd';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1769,9 +1769,55 @@ async function loadRemoteConfig(){
       applyConfigMap(map);
       try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), map})); }catch(_){}
     }
-  }catch(e){ /* 表不存在或读取失败 → 用默认配置,不影响运行 */ }
+    try{ _ehDbg('[cfg] loadRemoteConfig done keys=', data?data.length:0); }catch(_){}
+  }catch(e){ /* 表不存在或读取失败 → 用默认配置,不影响运行 */
+    try{ console.warn('[EH cfg] loadRemoteConfig failed, using default', e&&e.message||e); }catch(_){}
+    try{ _ehDbg('[cfg] loadRemoteConfig fail', e&&e.message||String(e)); }catch(_){}
+  }
 }
-function applyConfigMap(map){
+// OPTD 批D: 远程配置 schema/类型校验(防后台写坏前端白屏)
+// 规则: 数组字段非数组=忽略; 对象字段非对象(null/字符串/数组)=忽略; 保留 EH_CONFIG_DEFAULT 默认值。
+// 返回校验后的 map 副本(不改输入)。
+function _validateConfigMap(map){
+  if(!map || typeof map!=='object' || Array.isArray(map)) return {};
+  var CFG_SCHEMA = {
+    themePalettes:'object', themes:'object', roomTheme:'object',
+    officialFallbackC:'object', roomThemeOverride:'object', soulColors:'object',
+    roomKindC:'object', identityDefaultC:'string', voidC:'string',
+    resonanceDefaultC:'string', roomBgm:'object', text:'object',
+    identityPool:'object', tuning:'object', songStyles:'object',
+    publicThemePool:'array', privateThemePool:'array'
+  };
+  var out = {};
+  for(var k in map){
+    if(!Object.prototype.hasOwnProperty.call(map, k)) continue;
+    var v = map[k]; var expect = CFG_SCHEMA[k];
+    if(!expect){ out[k]=v; continue; }
+    try{
+      if(expect==='object'){
+        if(v && typeof v==='object' && !Array.isArray(v)) out[k]=v;
+        else { try{ console.warn('[EH cfg] skip bad field', k, 'expect object got', Array.isArray(v)?'array':typeof v); }catch(_){}
+               try{ _ehDbg('[cfg] skip bad', k, Array.isArray(v)?'array':typeof v); }catch(_){} }
+      } else if(expect==='array'){
+        if(Array.isArray(v)) out[k]=v;
+        else { try{ console.warn('[EH cfg] skip bad field', k, 'expect array got', typeof v); }catch(_){}
+               try{ _ehDbg('[cfg] skip bad', k, typeof v); }catch(_){} }
+      } else if(expect==='string'){
+        if(typeof v==='string' && v) out[k]=v;
+        else { try{ console.warn('[EH cfg] skip bad field', k, 'expect string got', typeof v); }catch(_){}
+               try{ _ehDbg('[cfg] skip bad', k, typeof v); }catch(_){} }
+      }
+    }catch(err){ try{ console.warn('[EH cfg] validate err', k, err&&err.message); }catch(_){} }
+  }
+  return out;
+}
+function applyConfigMap(rawMap){
+  // OPTD 批D: schema 校验 + 全局 try/catch,任何脏配置回退默认,前端永不因脏配置白屏
+  var map;
+  try{ map = _validateConfigMap(rawMap); }
+  catch(e){ try{ console.warn('[EH cfg] validate throw, keep defaults', e&&e.message); }catch(_){} return; }
+  if(!map || typeof map!=='object') return;
+  try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
   ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','text','identityPool','tuning','songStyles'].forEach(k=>{
@@ -1791,6 +1837,7 @@ function applyConfigMap(map){
   applyTextConfig();
   try{ if(typeof applyTheme==='function' && document.documentElement.dataset.theme){ applyTheme(document.documentElement.dataset.theme); } }catch(_){}
   try{ checkCachePurge(); }catch(_){}
+  }catch(e){ try{ console.warn('[EH cfg] applyConfigMap threw, some fields kept default', e&&e.message); }catch(_){} try{ _ehDbg('[cfg] applyConfigMap throw', e&&e.message||String(e)); }catch(_){} }
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
 try{ injectThemeCSS(); applyTextConfig(); }catch(e){}
@@ -1822,9 +1869,39 @@ async function authApi(path, body){
 const $ = s => document.querySelector(s);
 
   // TOP10 #3: 生产日志静默,仅 ?debug=1 时输出
+  // OPTD 批D: 加轻量 ring buffer(上限200条), 无论 ?debug=1 都静默记录, 供出问题现场 dump
   const _EH_DBG = /[?&]debug=1(&|$)/.test(location.search);
-  function _ehDbg(){ if(_EH_DBG){ try{ console.log.apply(console, arguments); }catch(_){} } }
+  window.__EH_LOG = window.__EH_LOG || [];
+  const _EH_LOG_MAX = 200;
+  function _ehDbg(){
+    try{
+      const args = Array.prototype.slice.call(arguments);
+      // ring buffer: 无论 debug 与否都记录, 供出问题现场 dump
+      try{
+        window.__EH_LOG.push({ t: Date.now(), args: args.map(a=>{
+          try{ if(a===null||a===undefined) return String(a);
+               if(typeof a==='string') return a.slice(0,300);
+               if(typeof a==='number'||typeof a==='boolean') return a;
+               return JSON.stringify(a).slice(0,300);
+          }catch(_){ return String(a).slice(0,300); }
+        })});
+        if(window.__EH_LOG.length > _EH_LOG_MAX) window.__EH_LOG.splice(0, window.__EH_LOG.length - _EH_LOG_MAX);
+      }catch(_){}
+      if(_EH_DBG){ try{ console.log.apply(console, args); }catch(_){} }
+    }catch(_){}
+  }
   window._ehDbg = _ehDbg;
+  // ?debug=1 或出问题现场都可 window.ehDumpLog() 拿到全部日志
+  window.ehDumpLog = function(){
+    try{
+      const rows = (window.__EH_LOG||[]).map(r=>({
+        time: new Date(r.t).toISOString(),
+        args: r.args
+      }));
+      if(_EH_DBG){ try{ console.table(rows.slice(-50)); }catch(_){ console.log(rows); } }
+      return rows;
+    }catch(e){ return []; }
+  };
   // TOP10 日志合表: 前端 5 类行为埋点（scope=user）
   // 后端 admin 侧的 scope=admin 由 Edge Function 用 service_role 写入
   window.ehLog = function(tag, payload){
@@ -2695,6 +2772,7 @@ function preRestoreScene(){
   return true;
 }
 async function enterRoom(room){
+  try{ _ehDbg('[enter] rid=', room&&room.id, 'name=', room&&room.name); }catch(_){}
   try{ window.startMoodWeather && window.startMoodWeather(); }catch(_){}
   try{ window.ehLog && ehLog('room_enter',{room_id:room&&room.id,name:room&&room.name,kind:room&&room.kind}); }catch(_){}
   try{ EhSfx.play('enter'); }catch(e){}
@@ -3322,6 +3400,7 @@ let _sqbTarget=null;
 })();
 
 async function refreshPresence(){
+  try{ _ehDbg('[pres] refresh start rid=', curRoom&&curRoom.id); }catch(_){}
   if(!curRoom) return;
   const _rid = curRoom.id;   // 锁定本次刷新的目标房 id, 防 await 期间切房导致数据串房(公开房 presence 被打上私密房 rid)
   const since = new Date(Date.now()-ONLINE_WINDOW()).toISOString();
@@ -3997,6 +4076,7 @@ function removeSoulThinking(uid){
 
 // ============ 发送 ============
 async function send(){
+  try{ _ehDbg('[send] rid=', curRoom&&curRoom.id, 'len=', ($('#input')&&$('#input').value||'').length); }catch(_){}
   const inp=$('#cin'); let text=inp.value.trim();
   if(!text || !curRoom) return;
   // 斜杠命令
@@ -4842,6 +4922,7 @@ function _ehAcapellaTimeoutMark(mid){
   finally{ _EH_ACAPELLA_TIMERS.delete(String(mid)); }
 }
 async function generateAndPersistSong(mid, lyric, sid, el){
+  try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){}
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
@@ -5532,7 +5613,7 @@ async function openGear(){
       if(_changes.length){
         _saveBtn.disabled=true; _saveBtn.textContent='处理中…';
         const _fails=[];   // 收集失败项, 最后统一一条友好提示(不再逐条弹原始错误码)
-        const _callSummon=(tok,ch)=>fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) });
+        const _callSummon=(tok,ch)=>{ try{ _ehDbg('[summon] key=', ch&&ch.key, 'on=', ch&&ch.on, 'rid=', curRoom&&curRoom.id); }catch(_){} return fetch(_sapi+'/soul-summon',{ method:'POST', headers:{ 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' }, body:JSON.stringify({ room_id:curRoom.id, key:ch.key, on:ch.on }) }); };
         for(const ch of _changes){
           ch.it.classList.add('busy');
           try{
