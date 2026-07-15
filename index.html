@@ -1146,7 +1146,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-0400summontok';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260715-0430summonreason';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5378,7 +5378,7 @@ async function openGear(){
             if(r.status===401||r.status===403){ const nt=await freshToken(); if(nt && nt!==_stk){ _stk=nt; r=await _callSummon(_stk, ch); } }
             const d=await r.json().catch(()=>({}));
             if(r.ok&&(d.ok||d.note)){ ch.it.dataset.orig=ch.on?'1':'0'; try{ window.ehLog && ehLog('soul_summon',{room_id:curRoom.id,key:ch.key,on:ch.on}); }catch(_){} }
-            else{ _fails.push({nm:ch.nm, on:ch.on, code:r.status}); ch.it.classList.toggle('on'); }
+            else{ _fails.push({nm:ch.nm, on:ch.on, code:r.status, msg:(d&&d.error)||''}); ch.it.classList.toggle('on'); }
           }catch(e){ _fails.push({nm:ch.nm, on:ch.on, code:'net'}); ch.it.classList.toggle('on'); }
           ch.it.classList.remove('busy');
         }
@@ -5387,12 +5387,14 @@ async function openGear(){
         try{ soulsCache[curRoom.id]=null; }catch(_){}
         loadRoomSouls(curRoom.id).catch(()=>{});
         refreshPresence().catch(()=>{});
-        // 统一一条提示: 有失败只报失败(友好话, 不显原始错误码); 全成功报成功。提示后 return, 不再走后面的通用"已保存"(避免两条提示)
+        // 统一一条提示: 后端有明确原因就直接显后端的(如"仅房主可召唤"), 否则按状态码给友好话。
         if(_fails.length){
           const f=_fails[0];
-          const _authFail = _fails.some(x=>x.code===401||x.code===403);
-          toast(_authFail ? '登录状态失效, 请下拉刷新页面后重试' :
-                (_fails.length>1 ? '部分灵魂操作失败，请重试' : ((f.on?'召唤 ':'请走 ')+f.nm+(f.code===404?' 失败：后端暂不支持':'失败，请重试'))));
+          if(f.msg){ toast(f.msg); }                                  // 后端原因优先(最准)
+          else if(f.code===401){ toast('登录状态失效, 请下拉刷新页面后重试'); }
+          else if(f.code===403){ toast('没有权限召唤(需房主/超管)'); }
+          else if(_fails.length>1){ toast('部分灵魂操作失败，请重试'); }
+          else{ toast((f.on?'召唤 ':'请走 ')+f.nm+(f.code===404?' 失败：后端暂不支持':'失败，请重试')); }
         }else{
           const _sum=_changes.filter(c=>c.on).length, _rem=_changes.filter(c=>!c.on).length;
           toast(_sum&&_rem?'已更新陪聊灵魂~':_sum?'已召唤，稍等她/他进房~':'已请走~');
