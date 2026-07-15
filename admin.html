@@ -835,7 +835,7 @@ async function renderUsersDetail(reset=true){
   if(_userState.items.length===0){
     // 首屏骨架 + 工具栏
     body.innerHTML=`<div class="dm-toolbar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-      <input id="usrSearch" placeholder="搜索用户名..." style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px" value="${esc(_userState.q)}">
+      <input id="usrSearch" placeholder="搜索用户名 / 昵称..." style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px" value="${esc(_userState.q)}">
       <select id="usrFilter" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12px">
         <option value="all"${_userState.filter==='all'?' selected':''}>全部</option>
         <option value="real"${_userState.filter==='real'?' selected':''}>正式账号</option>
