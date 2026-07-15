@@ -451,6 +451,7 @@
     <div class="tab" data-page="songstyles">🎼 曲风</div>
     <div class="tab" data-page="text">📝 文案 & 绑定</div>
     <div class="tab" data-page="tuning">⚙️ 运行参数</div>
+    <div class="tab" data-page="vip">💎 贵客名单</div>
     <div class="tab" data-page="audit">📋 操作日志</div>
     <div class="tab" data-page="admins" id="adminsTab" style="display:none">管理员</div>
   </div>
@@ -582,6 +583,26 @@
       <div style="margin-top:14px;display:flex;gap:8px">
         <button class="btn" id="tuningSaveBtn">保存运行参数</button>
         <button class="mini-btn" id="tuningResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 全部恢复默认</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="p-vip">
+    <div class="glass card">
+      <h3>💎 贵客名单</h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
+        把用户的 <b>user_id</b> 加进来, 即使是普通/临时账号, 进房也享受<b>管理员级进场待遇</b>:
+        全屏紫金光幕 + 广播全房 + 灵魂有概率起身相迎。填 user_id(uuid), 一行一个或用下方输入框逐个加。
+        不知道 id? 去「房间 & 聊天记录」翻到该用户的消息, 或让 TA 发一条, 从记录里复制 user_id。
+      </p>
+      <div id="vipList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+      <div class="inline-form" style="display:flex;gap:8px;margin-bottom:14px">
+        <input type="text" id="vipInput" placeholder="粘贴 user_id (uuid), 回车或点添加" style="flex:1;min-width:0">
+        <button class="mini-btn" id="vipAddBtn" style="border-color:var(--cyan);color:var(--cyan)">＋ 添加</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="vipSaveBtn">保存贵客名单</button>
+        <button class="mini-btn" id="vipResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 清空</button>
       </div>
     </div>
   </div>
@@ -1880,6 +1901,39 @@ function collectTuning(){
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
 
+// ---- 💎 贵客名单 ----
+let _vipDraft=[];
+async function loadVip(){
+  const cfg=await loadConfig();
+  _vipDraft = Array.isArray(cfg.vipUids) ? cfg.vipUids.slice() : [];
+  renderVip();
+}
+function renderVip(){
+  const box=$('#vipList'); if(!box) return;
+  if(!_vipDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:8px 0">还没有贵客。粘贴 user_id 添加。</div>'; return; }
+  box.innerHTML=_vipDraft.map((uid,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--violet) 6%,transparent)">
+    <span style="font-size:16px">💎</span>
+    <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--ink)">${esc(uid)}</code>
+    <button class="mini-btn vip-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">移除</button>
+  </div>`).join('');
+  box.querySelectorAll('.vip-del').forEach(b=>b.onclick=()=>{ _vipDraft.splice(+b.dataset.i,1); markDirty(); renderVip(); });
+}
+function addVip(){
+  const inp=$('#vipInput'); const raw=(inp.value||'').trim();
+  if(!raw){ return; }
+  // 支持一次粘多行/逗号分隔; 去重; 简单校验像 uuid(含连字符, 长度>20)
+  const cands=raw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);
+  let added=0;
+  cands.forEach(u=>{ if(u.length<8){ return; } if(!_vipDraft.includes(u)){ _vipDraft.push(u); added++; } });
+  inp.value='';
+  if(added){ markDirty(); renderVip(); toast('已添加 '+added+' 个(记得点保存)'); }
+  else toast('没有新增(可能已存在或格式太短)');
+}
+$('#vipAddBtn')?.addEventListener('click',addVip);
+$('#vipInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addVip(); } });
+$('#vipSaveBtn')?.addEventListener('click',async()=>{ if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); try{clearDirty();}catch(_){} } });
+$('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵客名单吗?','清空贵客名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
+
 // ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
 $('#purgeCacheBtn')?.addEventListener('click',async()=>{
   if(!await confirmBox('确定重建全端客户端缓存吗？\n所有客户端将在下次进入时丢弃本地缓存、重新拉取最新聊天记录。','重建客户端缓存')) return;
@@ -1937,7 +1991,7 @@ $('#themePreviewSel')?.addEventListener('change',refreshThemePreview);
 // tabs
 // 未保存防护: 编辑页(主题/BGM/文案/参数/身份池)输入框被改→dirty; 切tab/关页前拦截提醒, 防静默丢改动。
 let _pageDirty=false;
-const EDIT_PAGES=['theme','bgm','text','tuning','songstyles'];
+const EDIT_PAGES=['theme','bgm','text','tuning','songstyles','vip'];
 function markDirty(){ _pageDirty=true; }
 function clearDirty(){ _pageDirty=false; }
 // 事件委托: 这些页的输入框一改就置 dirty(保存/恢复默认后各处会重渲染, 用 clearDirty 复位)
@@ -1961,6 +2015,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='bgm') loadBgm();
   if(t.dataset.page==='text') loadTextBind();
   if(t.dataset.page==='tuning') loadTuning();
+  if(t.dataset.page==='vip') loadVip();
   if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位
