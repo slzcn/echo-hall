@@ -656,19 +656,22 @@
   .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
+  /* 呼吸光环 = 单圈头像描边 + 一层柔和外发光(不再画第二道硬边框, 避免与头像自身 inset 描边形成"双重边框") */
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
-    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
+    border:1px solid transparent;
     animation:soulHalo 3.2s ease-in-out infinite}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 30%,transparent)}
-    50%{opacity:.85;transform:scale(1.08);box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}}
+  @keyframes soulHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 26%,transparent)}
+    50%{opacity:1;transform:scale(1.06);box-shadow:0 0 20px 3px color-mix(in srgb,var(--soul-c,var(--violet)) 52%,transparent)}}
   /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
+  /* 关键: 灵魂光墙头像的 ::after 改成"无边框·纯柔光", 覆盖基础 .pav .av-ic::after 的 1.5px 硬描边,
+     否则 头像 inset 环 + ::after 硬环 两道紧挨 = 视觉双重边框(主人反馈). 只留一道 inset 环 + 呼吸柔光. */
   .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
+  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
   .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
   .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.3;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent)}
-    50%{opacity:.8;transform:scale(1.08);box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}}
+  @keyframes pavHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 26%,transparent)}
+    50%{opacity:1;transform:scale(1.08);box-shadow:0 0 18px 3px color-mix(in srgb,var(--pav-c,var(--cyan)) 52%,transparent)}}
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -1185,7 +1188,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260715-2350harmony';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0010dedup';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2947,11 +2950,13 @@ async function refreshSnapshotTail(room){
     // 不去碰更早的历史消息——那些由 loadHistory 的 idle 分批渲染负责; 若补拉也去补,
     // 会和"还在队列里没进DOM"的分批消息撞车→重复渲染(实测见过一条消息×2)。
     let domMaxMid=0;
-    stream.querySelectorAll('.msg[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
+    // 扫所有带 mid 的行(含 .msg / .ixmsg 互动 / .actmsg / .recalled-tip), 别只扫 .msg——
+    // 否则互动/act 行不计入 domMaxMid, 且下面判重也漏, 刷新补拉会把它们反复 append(重复bug真因)。
+    stream.querySelectorAll('[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
-      const exist=stream.querySelector(`.msg[data-mid="${m.id}"]`);
+      const exist=stream.querySelector(`[data-mid="${m.id}"]`);
       if(!exist){
         // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
         if(m.id>domMaxMid){ const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; } }
@@ -2961,7 +2966,7 @@ async function refreshSnapshotTail(room){
       //   DOM 里 data-mid 存在但 .txt 是空框。这类不能跳过, 要用真实 data 原地重建修复空框。
       try{
         const kind=exist.dataset.kind||'msg';
-        if(kind==='voice'||kind==='song'||kind==='proj') return;   // 特效消息不判空(内容非纯文本)
+        if(kind==='voice'||kind==='song'||kind==='proj'||kind==='interact'||kind==='act') return;   // 特效/互动/act消息不判空(无.txt, 内容非纯文本)
         const t=exist.querySelector('.txt');
         const hasTxt = t && t.textContent.trim();
         if(!hasTxt && (m.text||'').trim()){
@@ -3161,7 +3166,7 @@ function subscribeMessages(rid){
       // 去重靠"真实 id 是否已在 DOM"(本浏览器发的消息 insert 后回填了真实 id, 故被挡)。
       // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
       // 这样同 id 多端发言能互相同步, 且 buildMsgEl 里 isMe=user_id===myUid 让它仍显示在"我的"位置(右侧)。
-      if(document.querySelector(`.msg[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id)，防重复
+      if(document.querySelector(`[data-mid="${m.id}"]`)) return; // 已渲染过(含本端乐观上屏已回填id + 互动/act行)，防重复
       // 投影：触发全屏飞幕，不进消息流。★自己发的投影已在 broadcastProject 里本地飞过一次,
       //   realtime 又把自己的 insert 推回来 → 会飞第二次(重复)。故自己的 proj 回声直接跳过。
       if(m.kind==='proj'){ if(m.user_id!==myUid) projectText(m.text, m.color); return; }
@@ -3551,6 +3556,7 @@ function buildMsgEl(m, isHistory){
   if(m.kind==='proj') return null;
   if(m.kind==='act'){
     const el=document.createElement('div'); el.className='actmsg';
+    if(m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='act'; }   // ★去重键: 无 mid 会在刷新/补拉时被反复 append
     el.innerHTML=`✦ <b class="ec-name" style="--ec:${safeColor(m.color,EH_CONFIG.voidC)}">${esc(m.name)}</b> ${esc(m.text)}`; return el;
   }
   if(m.kind==='interact'){
@@ -3558,6 +3564,7 @@ function buildMsgEl(m, isHistory){
     const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
     const txt=parts.slice(2).join('|')||'';
     const el=document.createElement('div'); el.className='ixmsg';
+    if(m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='interact'; }   // ★去重键: 无 mid 会在刷新/补拉时被反复 append(实测互动消息刷新后重复多条)
     el.innerHTML=`<span class="ix-em">${safeEmoji(ix&&ix.emoji)||'✨'}</span> ${esc(txt)}`;
     return el;
   }
