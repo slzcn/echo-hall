@@ -1260,7 +1260,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0143optd-atbadge';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0700fixes4';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1653,7 +1653,7 @@ const EH_CONFIG_DEFAULT = {
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
-  roomNameC: { '午夜聊天':'#FF3D92', '技术黑话':'#4A5D7E' },   // 午夜聊天=日暮品红(午夜暧昧荷尔蒙); 技术黑话=远山暮色(青灰蓝, 冷峻科技感)
+  roomNameC: { '午夜聊天':'#F5D06A', '技术黑话':'#4A5D7E' },   // 午夜聊天=暗夜奢华(香槟金, 深夜贵气); 技术黑话=远山暮色(青灰蓝, 冷峻科技感)
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色, 允许后台覆盖(可写 key)
   identityDefaultC: '#0ABAB5',   // 匿名/未设色时的默认身份色(全站 fallback)
   voidC: '#4A5D7E',              // 虚空模式代表色
@@ -1838,7 +1838,7 @@ const EH_CONFIG_DEFAULT = {
   // 神曲曲风池: id/展示/音乐参数完整定义(可后台增删改+拖排序)
   // scale 存字符串 key(minP/majP/major/minor), 运行时映射到 SCALE 对象
   songStyles:[
-    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#FF6F61', bpm:80,  bpc:0.5, base:0,  scale:'major',
+    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#8FA6E8', bpm:80,  bpc:0.5, base:0,  scale:'major',
       motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],  wave:'sine',     bass:'sine',     groove:'lofi', tts:{rate:1.0, pitch:1.0},  ttsStyle:'lazy',  playRate:1.0,
       coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
     { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#FF3D92', bpm:124, bpc:0.5, base:3,  scale:'minP',
@@ -4039,6 +4039,9 @@ function refreshRenderedSoulIdentity(){
     const nm=el.querySelector('.meta .nm');
     if(nm){ nm.style.color=c; nm.textContent=s.name; }
   });
+  // ★光墙同步: 灵魂 presence 行可能在 roomSouls 加载前就渲染了(此时不认得是灵魂→用了兜底紫)。
+  //   roomSouls 到位后重渲染一次光墙, 让灵魂头像立刻变成正确的房间主题色(免得要手动刷新, 见"狼姐先紫后正确")。
+  try{ if(lastUsersSnapshot && lastUsersSnapshot.length) renderPresenceAvatars(lastUsersSnapshot); }catch(_){}
 }
 
 
@@ -6058,10 +6061,11 @@ async function openMe(){
   const badge = isAdmin ? `<a class="mh-badge ${isSuper?'super':'admin'} mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${roleLabel}</a>`
     : isBound ? '<span class="mh-badge reg">正式账号</span>'
     : '<span class="mh-badge anon">临时身份</span>';
-  const subLine = isBound
-    ? `${username?'@'+esc(username)+' · ':''}${badge}`
-    : `无需注册 · ${badge}`;
   const c=safeColor(me.color);
+  // @用户名 取昵称色(与大昵称同色, 更好看), 加轻微辉光; 徽章/分隔符仍用默认灰
+  const subLine = isBound
+    ? `${username?`<span style="color:${c};font-weight:600;text-shadow:0 0 8px color-mix(in srgb,${c} 35%,transparent)">@${esc(username)}</span> · `:''}${badge}`
+    : `无需注册 · ${badge}`;
   const roomsN = _meCache.rooms ? _meCache.rooms.length : null;
   const msgsN  = _meCache.msgs  ? _meCache.msgs.length  : null;
   body.innerHTML=`
@@ -6098,7 +6102,7 @@ async function refreshMeData(scope, isBound, acctKnown){
   if(wantMsgs) $('#meMsgsRefresh')?.classList.add('spinning');
   if(wantRooms) $('#meRoomsRefresh')?.classList.add('spinning');
   const tasks=[];
-  if(wantMsgs) tasks.push(sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).order('id',{ascending:false}).limit(20));
+  if(wantMsgs) tasks.push(sb.from('eh_messages').select('text,created_at,kind').eq('user_id',myUid).neq('kind','enter').order('id',{ascending:false}).limit(20));   // enter=进场特效, 非发言内容, 不进"最近发言"
   else tasks.push(Promise.resolve(null));
   if(wantRooms) tasks.push(sb.from('eh_members').select('room_id,role,eh_rooms(name,emoji,kind)').eq('user_id',myUid).limit(50));
   else tasks.push(Promise.resolve(null));
@@ -6129,7 +6133,7 @@ async function refreshMeData(scope, isBound, acctKnown){
   // 账号信息首次读到后缓存
   if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
     const badge2 = me.role==='super' ? '<span class="mh-badge super">超级管理员</span>' : (me.role==='admin' ? '<span class="mh-badge admin">管理员</span>' : '<span class="mh-badge reg">正式账号</span>');
-    if($('.mh-sub')) $('.mh-sub').innerHTML=`${me.username?'@'+esc(me.username)+' · ':''}${badge2}`;
+    if($('.mh-sub')){ const _c=safeColor(me.color); $('.mh-sub').innerHTML=`${me.username?`<span style="color:${_c};font-weight:600;text-shadow:0 0 8px color-mix(in srgb,${_c} 35%,transparent)">@${esc(me.username)}</span> · `:''}${badge2}`; }
   }
   // 停止转圈, 至少显示 300ms 让用户看到反馈
   setTimeout(()=>{ $('#meMsgsRefresh')?.classList.remove('spinning'); $('#meRoomsRefresh')?.classList.remove('spinning'); }, 300);
