@@ -1257,7 +1257,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0150entrancebcast';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-0220colors';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1638,7 +1638,8 @@ const EH_CONFIG_DEFAULT = {
   // 对任意房手动钉主题(覆盖哈希结果): { '房间名':'主题id' }
   roomThemeOverride: {},
   // 灵魂专属色(按灵魂名匹配, 私密房召唤的副本同名共享)
-  soulColors: {'狼姐':'#FF6F61','老K':'#F7E7CE','阿夜':'#B57EDC','回音':'#002FA7','图灵':'#1DE9B6','小暖':'#FD5E53'},
+  // 灵魂专属色: 从新十主题 accent 里选(按性格), 与主题体系统一。空则跟房间主题色走。
+  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#3A5AFF','图灵':'#00E5D4','小暖':'#FF6F52'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
@@ -1827,25 +1828,25 @@ const EH_CONFIG_DEFAULT = {
   // 神曲曲风池: id/展示/音乐参数完整定义(可后台增删改+拖排序)
   // scale 存字符串 key(minP/majP/major/minor), 运行时映射到 SCALE 对象
   songStyles:[
-    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#F5F0E1', bpm:80,  bpc:0.5, base:0,  scale:'major',
+    { id:'acapella', name:'清唱',  sub:'月下独吟',    subEn:'Moonlit Solo', emoji:'🎤',  color:'#8FA6E8', bpm:80,  bpc:0.5, base:0,  scale:'major',
       motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3],  wave:'sine',     bass:'sine',     groove:'lofi', tts:{rate:1.0, pitch:1.0},  ttsStyle:'lazy',  playRate:1.0,
       coverPrompt:'Acappella, Human Voice, No Instruments, Pure Vocal' },
-    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#E63946', bpm:124, bpc:0.5, base:3,  scale:'minP',
+    { id:'dj',       name:'DJ',    sub:'烈焰红唇',    subEn:'Scarlet Kiss', emoji:'🕺',  color:'#FF3D92', bpm:124, bpc:0.5, base:3,  scale:'minP',
       motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square',   groove:'four', tts:{rate:1.3, pitch:1.0},  ttsStyle:'high',  playRate:1.12,
       coverPrompt:'EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏' },
-    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#C9A227', bpm:92,  bpc:0.5, base:-2, scale:'major',
+    { id:'jazz',     name:'爵士',  sub:'威士忌之吻',  subEn:'Whiskey Neat', emoji:'🎷',  color:'#F5D06A', bpm:92,  bpc:0.5, base:-2, scale:'major',
       motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3],  wave:'sine',     bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy',  playRate:0.95,
       coverPrompt:'Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松' },
-    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#7CFF6B', bpm:114, bpc:0.5, base:3,  scale:'major',
+    { id:'funk',     name:'Funk',  sub:'荧光心跳',    subEn:'Pulse Green',  emoji:'🪩',  color:'#22FF95', bpm:114, bpc:0.5, base:3,  scale:'major',
       motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2, pitch:1.1},  ttsStyle:'sweet', playRate:1.1,
       coverPrompt:'Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动' },
-    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#B57EDC', bpm:78,  bpc:0.5, base:0,  scale:'majP',
+    { id:'gufeng',   name:'古风',  sub:'午夜绸缎',    subEn:'Midnight Silk',emoji:'🏮',  color:'#C77DFF', bpm:78,  bpc:0.5, base:0,  scale:'majP',
       motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3],wave:'sine',    bass:'sine',     groove:'boom', tts:{rate:0.95,pitch:1.1},  ttsStyle:'gu',    playRate:0.96,
       coverPrompt:'Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美' },
-    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#0ABAB5', bpm:76,  bpc:0.5, base:-2, scale:'major',
+    { id:'rnb',      name:'R&B',   sub:'冰霞柔情',    subEn:'Frost Soul',   emoji:'🎙️',  color:'#12B0E0', bpm:76,  bpc:0.5, base:-2, scale:'major',
       motif:[0,3,5,3,2,0,3,5], chords:[0,5,-3,-5], wave:'sine',    bass:'sine',     groove:'lofi', tts:{rate:0.88,pitch:0.98}, ttsStyle:'lazy',  playRate:0.92,
       coverPrompt:'R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情' },
-    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#FF6EC7', bpm:108, bpc:0.5, base:5,  scale:'major',
+    { id:'kid',      name:'卡通',  sub:'暧昧微醺',    subEn:'Blush Tease',  emoji:'🧸',  color:'#E29AAE', bpm:108, bpc:0.5, base:5,  scale:'major',
       motif:[0,2,4,4,2,0,4,2], chords:[0,5,7,5],  wave:'triangle', bass:'triangle', groove:'boom', tts:{rate:1.05,pitch:1.5},  ttsStyle:'meng',  playRate:1.18,
       coverPrompt:'Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声, 大调' },
   ],
@@ -2083,7 +2084,8 @@ const ANI = EH_CONFIG.identityPool.animals;
 const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🦉','🦇','🐙','🦌','🐧','🐈‍⬛','🐬','🐯','🦔','🦋'];
 // 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
 const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
-const COLORS = ["#0ABAB5","#FF6F61","#B57EDC","#F7E7CE","#1DE9B6","#4A5D7E","#88D8C0","#FD5E53","#C9ADA1","#002FA7"]; // 十大色调色板
+// 真人随机身份色: 与新十主题 accent 对齐(cyber/vapor/aurora/mono/klein/coral/lagoon/dusk/rose/sunset)
+const COLORS = ["#00E5D4","#C77DFF","#22FF95","#F5D06A","#3A5AFF","#FF6F52","#12B0E0","#8FA6E8","#E29AAE","#FF3D92"]; // 十主题色
 const LS_ID = 'eh_identity_v2';
 
 let me = null;      // {id(uid), name, emoji, color}
@@ -2650,17 +2652,18 @@ function roomAccentC(r){
   }catch(_){}
   return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
 }
-// 灵魂取色优先级: soulColors[name](后台专属色) > custom(灵魂原始色, 合法非空 hex) > 所在房间强调色 > fallback
+// 灵魂取色优先级: custom(灵魂 DB 色, 即 admin 灵魂工坊调色板设的, 合法非空 hex) > soulColors[name](JS专属色兜底) > 所在房间强调色 > fallback
+// ★2026-07: custom 提到最高优先——原来 soulColors 硬编码盖过 DB, 导致 admin 里改灵魂色不生效(如老K DB设了#4A5D7E却显硬编码色)。
 // name 参数按灵魂名匹配(私密房召唤副本 uid 变但名字不变), 支持字符串或含 .name 的对象
 function soulThemeColor(custom, fallback, name){
-  // 0. 后台配的灵魂专属色(按名字匹配, 最高优先)
+  // 0. 灵魂自身 custom 色(DB eh_souls.color, admin 可视化调色板直接编辑, 用户显式设置优先级最高)
+  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
+  // 1. JS soulColors[name] 兜底专属色(DB 未设色的灵魂走这里, 从新十主题选)
   try{
     const nm = (typeof name==='string') ? name : (name && name.name) || '';
     const sc = (EH_CONFIG && EH_CONFIG.soulColors) || {};
     if(nm && sc[nm] && /^#[0-9a-fA-F]{3,8}$/.test(sc[nm])) return sc[nm];
   }catch(e){}
-  // 1. 灵魂自身 custom 色(合法 hex)
-  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
   // 2. 房间强调色
   try{
     if(curRoom && curRoom.kind){
