@@ -1417,7 +1417,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0030vip-rank-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0035trim-dom';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3326,7 +3326,7 @@ async function refreshSnapshotTail(room){
         }
       }catch(_){}
     });
-    if(near && appended) ensureBottom();   // 有补进新消息且原本贴底 → 精准落底
+    if(near && appended){ ensureBottom(); trimStreamHead(); }   // 有补进新消息且原本贴底 → 精准落底 + 修剪
   }catch(e){ console.warn('refreshSnapshotTail', e); }
   finally{ _snapTailBusy=false; }
 }
@@ -4430,7 +4430,8 @@ function playEntranceStage(t, room){
 }
 // 优化批A#1: 消息流条数上限,长时间挂机时防 DOM 无限累积卡顿。
 // 只在贴底状态下(新消息追加)触发修剪,避免用户往上翻看历史时误删刚加载的旧消息。
-const MAX_STREAM = 800, TRIM_TO = 600;
+// ★ 2026-07-17: 阀值从 800/600 降到 300/200 —— 实测 442 个直接子元素已致 reflow 单次 26ms，原阀值太高从不触发
+const MAX_STREAM = 300, TRIM_TO = 200;
 function trimStreamHead(){
   try{
     const s=$('#stream'); if(!s) return;
