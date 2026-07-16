@@ -1398,7 +1398,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1900bottle-mode';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1930bottle-feedback';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4102,6 +4102,7 @@ function subscribeWorld(){
   worldChan = sb.channel('world', { config:{ broadcast:{ self:false } } })
     .on('broadcast', { event:'announce' }, ({payload})=>{ try{ showWorldBanner(payload); }catch(_){} })
     .on('broadcast', { event:'bottle' }, ({payload})=>{ try{ onBottleDrift(payload); }catch(_){} })
+    .on('broadcast', { event:'bottle_seen' }, ({payload})=>{ try{ onBottleSeen(payload); }catch(_){} })
     .on('broadcast', { event:'bottle_reply' }, ({payload})=>{ try{ onBottleReply(payload); }catch(_){} })
     .subscribe();
 }
@@ -4152,12 +4153,13 @@ function throwBottleFromComposer(){
   if(!worldChan){ try{ subscribeWorld(); }catch(_){} }
   _lastBottleAt=now;
   const bid = (myUid||'anon').slice(0,6)+'-'+now.toString(36);
-  _myBottles[bid]={ text:raw };
+  _myBottles[bid]={ text:raw, seen:0 };
   const payload={ bid, text:raw, fromUid:myUid||'', roomId:(curRoom&&curRoom.id)||'' };
   try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle', payload }); }catch(e){ console.warn('throwBottle',e); }
   if(cin){ cin.value=''; try{ cin.dispatchEvent(new Event('input')); }catch(_){} }
   try{ EhSfx.play('void'); }catch(_){}
-  bottleSplash('🌊 心事已丢进海里…漂向某个陌生人');
+  // 丢瓶反馈: 说清后续机制(有人捞到会提示、回信会漂回来找你)
+  bottleSplash('🌊 漂走了 · 有人捞到或回信都会漂回来提醒你');
   if(bottleMode) setMode('none');   // 丢完退出漂流瓶模式, 复原输入框
 }
 // 收到别人丢的漂流瓶
@@ -4167,7 +4169,18 @@ function onBottleDrift(payload){
   if(payload.roomId && curRoom && payload.roomId===curRoom.id) return;
   if(payload.fromUid && payload.fromUid===myUid) return;   // 不捞自己的
   if(secureRand() > BOTTLE_CATCH_PROB) return;
+  // 给原作者回一个"已被捞起"的信号(匿名, 只带 bid), 让 TA 知道瓶子有人看到了
+  try{ worldChan && payload.bid && worldChan.send({ type:'broadcast', event:'bottle_seen', payload:{ bid:payload.bid } }); }catch(_){}
   showBottleCard({ mode:'recv', bid:payload.bid, text:payload.text, fromUid:payload.fromUid });
+}
+// 原作者收到"瓶子被捞起"信号 → 轻提示"有人看到了"(每个瓶只提示一次)
+function onBottleSeen(payload){
+  if(!payload || !payload.bid) return;
+  const m=_myBottles[payload.bid];
+  if(!m || m.seen) return;   // 不是我的瓶 / 已提示过
+  m.seen=1;
+  try{ EhSfx.play('receive'); }catch(_){}
+  toast('🍾 你丢的漂流瓶被人捞起了…');
 }
 // 收到"回信"(只有原作者匹配到自己丢的瓶才显)
 function onBottleReply(payload){
