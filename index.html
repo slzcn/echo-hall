@@ -1435,7 +1435,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0230ko-stun';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0300ko-cooldown';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4756,6 +4756,8 @@ const CB_KO_AT = 5;             // 挨打累计到几下(可多人叠加)触发 
 const KO_STUN_MS = 15000;       // 被 KO 后眩晕时长(禁打击+禁言)
 // ★按"被打者"聚合: 任何人(含灵魂)打某人都累加到该人挨打计数 → 多人围殴叠加, 凑够就 KO。
 const _victim = new Map();      // toUid → { count, last, lastFrom, lastFromName }
+const _koCooldown = new Map();  // toUid → 上次被 KO 结算时间(防同一人短时连续被 KO 刷屏; 覆盖眩晕期)
+const KO_COOLDOWN_MS = 20000;   // 同一被 KO 者结算冷却(≈眩晕时长, 晕着时别再 KO)
 let _stunnedUntil = 0;          // 自己被 KO 眩晕到期时间戳(0=没被晕)
 let _koTimer = null;            // 眩晕倒计时 timer
 let _counterFrom = null;        // 反击对象 { uid, name } (最近打我的人)
@@ -4780,9 +4782,12 @@ function combatOnHit(fromUid, fromName, toUid, toName, tx, ty){
   if(v.count>=2){ showCombo(v.count, tx, ty); }
   // KO: 该目标挨打累计够阈值
   if(v.count>=CB_KO_AT){
+    _victim.delete(toUid);
+    // 防刷屏: 同一被 KO 者 20s 内不重复结算(晕着的时候别再 KO 一遍)
+    if(now - (_koCooldown.get(toUid)||0) < KO_COOLDOWN_MS) return;
+    _koCooldown.set(toUid, now);
     const winnerName = fromName;          // 打出致命一击者
     const loserUid = toUid, loserName = toName || targetName(toUid);
-    _victim.delete(toUid);
     setTimeout(()=>{ try{ koFinale(winnerName, loserUid, loserName); }catch(_){} }, 560);  // 等这一击命中再结算
     if(toUid===myUid) clearCounter();
     return;
@@ -6552,7 +6557,7 @@ function ehConfirm(msg, title){
 // ============ 离开房间 ============
 async function leaveRoom(){
   try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
-  try{ _victim.clear(); clearCounter(); _fuse.clear(); if(isStunned()) exitStun(); }catch(_){}   // 连击/合体/眩晕态随离房清零
+  try{ _victim.clear(); _koCooldown.clear(); clearCounter(); _fuse.clear(); if(isStunned()) exitStun(); }catch(_){}   // 连击/合体/眩晕态随离房清零
   // 优化批A#6: 房外不空跑房间态 timer(_sqbTimer 歌曲队列条 2.5s 轮询)
   try{ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } }catch(_){}
   try{ if(typeof curRoom!=='undefined' && curRoom) window.ehLog && ehLog('room_leave',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
