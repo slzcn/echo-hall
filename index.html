@@ -1451,7 +1451,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0137p4-grid-glass';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0510bottle-db';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3298,6 +3298,9 @@ async function enterRoom(room){
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
   try{ entranceBanner(room); }catch(_){ try{ scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`)); }catch(__){} }
   setTimeout(()=>{ try{ maybeDailyTarot(); }catch(_){} }, 1400);   // 每日首次进房抽塔罗(自身按天去重, 进场特效稳定后再弹)
+  // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
+  setTimeout(()=>{ try{ fishMyBottleReplies(); }catch(_){} }, 2600);
+  setTimeout(()=>{ try{ if(secureRand()<0.5) fishBottleFromDB(); }catch(_){} }, 4200);
   ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
@@ -4222,7 +4225,7 @@ function showWorldBanner(info){
 const BOTTLE_CATCH_PROB = 0.5;        // 收到漂流瓶广播时"捞起"的概率(不是每个人都捞到, 更像缘分)
 let _myBottles = {};                  // bid → {text} 我丢出去的瓶子(收到回信时匹配)
 let _lastBottleAt = 0;
-function throwBottleFromComposer(){
+async function throwBottleFromComposer(){
   const cin=$('#cin'); const raw=(cin && cin.value||'').trim();
   if(!raw){ toast('先写点心事，再丢进海里~'); try{ cin && cin.focus(); }catch(_){} return; }
   if(raw.length>140){ toast('漂流瓶最多 140 字'); return; }
@@ -4230,15 +4233,37 @@ function throwBottleFromComposer(){
   if(now-_lastBottleAt < 30000){ toast('刚丢过一个，缓缓再丢~'); return; }
   if(!worldChan){ try{ subscribeWorld(); }catch(_){} }
   _lastBottleAt=now;
-  const bid = (myUid||'anon').slice(0,6)+'-'+now.toString(36);
-  _myBottles[bid]={ text:raw, seen:0 };
-  const payload={ bid, text:raw, fromUid:myUid||'', roomId:(curRoom&&curRoom.id)||'' };
-  try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle', payload }); }catch(e){ console.warn('throwBottle',e); }
   if(cin){ cin.value=''; try{ cin.dispatchEvent(new Event('input')); }catch(_){} }
   try{ EhSfx.play('void'); }catch(_){}
-  // 丢瓶反馈: 说清后续机制(有人捞到会提示、回信会漂回来找你)
   bottleSplash('🌊 漂走了 · 有人捞到或回信都会漂回来提醒你');
-  if(bottleMode) setMode('none');   // 丢完退出漂流瓶模式, 复原输入框
+  if(bottleMode) setMode('none');
+  // 落库(持久化, 离线也能被后来人捞到) + 拿真实 id 当 bid
+  let dbId=null;
+  try{
+    const { data } = await sb.from('eh_bottles').insert({ from_uid:myUid||'', from_name:(me&&me.name)||'', room_id:(curRoom&&curRoom.id)||'', text:raw }).select('id').single();
+    if(data) dbId=String(data.id);
+  }catch(e){ console.warn('throwBottle db', e); }
+  const bid = dbId || ((myUid||'anon').slice(0,6)+'-'+now.toString(36));   // 落库失败退回本地 id(仍可即时广播)
+  _myBottles[bid]={ text:raw, seen:0 };
+  // 即时广播(在线的人可能马上捞到; 离线的靠 DB 后续捞)
+  try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle', payload:{ bid, text:raw, fromUid:myUid||'', roomId:(curRoom&&curRoom.id)||'' } }); }catch(_){}
+}
+// 从 DB 捞一个"别房丢的、还没被捞的"漂流瓶(离线漂流的核心)。进房低概率触发。
+async function fishBottleFromDB(){
+  if(!sb || !myUid) return;
+  try{
+    // 取最近 50 条未捞的, 排除自己丢的 + 本房丢的, 随机挑一条
+    const { data } = await sb.from('eh_bottles').select('id,text,from_uid,room_id')
+      .eq('caught_by','').neq('from_uid',myUid||'x').order('created_at',{ascending:false}).limit(50);
+    let list=(data||[]).filter(b=> b.room_id!==(curRoom&&curRoom.id));
+    if(!list.length) return;
+    const b=list[Math.floor(secureRand()*list.length)];
+    // 抢占: 标记为我捞到(caught_by 从空→我; 并发下用 eq 条件避免重复捞)
+    const { data:upd } = await sb.from('eh_bottles').update({ caught_by:myUid, caught_at:new Date().toISOString() })
+      .eq('id',b.id).eq('caught_by','').select('id').maybeSingle();
+    if(!upd) return;   // 被别人抢先捞了
+    showBottleCard({ mode:'recv', bid:String(b.id), text:b.text, fromUid:b.from_uid, fromDB:true });
+  }catch(e){ /* 静默 */ }
 }
 // 收到别人丢的漂流瓶
 function onBottleDrift(payload){
@@ -4266,6 +4291,8 @@ function onBottleReply(payload){
   if(!_myBottles[payload.bid]) return;   // 不是回给我的瓶
   const orig=_myBottles[payload.bid].text;
   delete _myBottles[payload.bid];
+  // 即时收到了 → DB 里这条标记已读, 免得进房 fishMyBottleReplies 再弹一次
+  if(/^\d+$/.test(payload.bid)){ try{ sb.from('eh_bottles').update({ reply_read:true }).eq('id',payload.bid); }catch(_){} }
   showBottleCard({ mode:'reply', text:payload.text, orig });
 }
 // 漂流瓶浮层: mode=recv(捞到,可回) / reply(收到回信,只读)
@@ -4285,15 +4312,33 @@ function showBottleCard(o){
   const close=()=>mask.classList.remove('on');
   mask.querySelector('#btClose').onclick=close;
   if(isRecv){
-    mask.querySelector('#btReplySend').onclick=()=>{
+    mask.querySelector('#btReplySend').onclick=async()=>{
       const rv=(inp && inp.value||'').trim(); if(!rv){ close(); return; }
       if(rv.length>140){ toast('回信最多 140 字'); return; }
-      try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle_reply', payload:{ bid:o.bid, text:rv } }); }catch(_){}
       try{ EhSfx.play('send'); }catch(_){}
       close(); toast('回信已放回海里，漂向那个陌生人~');
+      // 即时广播(原作者在线则马上收到) + 落库(离线也能被 TA 之后捞到)
+      try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle_reply', payload:{ bid:o.bid, text:rv } }); }catch(_){}
+      if(o.fromDB){ try{ await sb.from('eh_bottles').update({ reply_text:rv, reply_at:new Date().toISOString() }).eq('id',o.bid); }catch(_){} }
     };
-    mask.querySelector('#btIgnore').onclick=()=>{ close(); bottleSplash('🌊 把瓶子又丢回了海里'); };
+    mask.querySelector('#btIgnore').onclick=async()=>{
+      close(); bottleSplash('🌊 把瓶子又丢回了海里');
+      // DB 捞的瓶不回信就丢回海(caught_by 清空, 让别人还能捞)
+      if(o.fromDB){ try{ await sb.from('eh_bottles').update({ caught_by:'', caught_at:null }).eq('id',o.bid); }catch(_){} }
+    };
   }
+}
+// 捞我自己丢的瓶收到的回信(离线漂回): 查我发的、有回信、还没读的瓶
+async function fishMyBottleReplies(){
+  if(!sb || !myUid) return;
+  try{
+    const { data } = await sb.from('eh_bottles').select('id,text,reply_text')
+      .eq('from_uid',myUid).eq('reply_read',false).neq('reply_text','').limit(5);
+    for(const b of (data||[])){
+      await sb.from('eh_bottles').update({ reply_read:true }).eq('id',b.id);
+      showBottleCard({ mode:'reply', text:b.reply_text, orig:b.text });
+    }
+  }catch(e){ /* 静默 */ }
 }
 // 丢瓶/回瓶时的小水花提示(复用 toast 语气但带海洋色)
 function bottleSplash(msg){ toast(msg); }
