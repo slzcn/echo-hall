@@ -1398,7 +1398,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1945enter-dedup';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-2010blowaway-waapi';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4372,11 +4372,24 @@ function scheduleEntryFade(el){
   if(!el) return;
   setTimeout(()=>{
     if(!el.isConnected) return;
-    // 锁高度再收拢, 避免消失时下方内容突然跳动
-    el.style.height=el.offsetHeight+'px'; el.style.overflow='hidden';
-    void el.offsetHeight;   // reflow, 让 height 生效再触发动画
-    el.classList.add('entry-blowaway');
-    setTimeout(()=>{ try{ el.remove(); }catch(_){} }, 1100);
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if(reduce){ try{ el.remove(); }catch(_){} return; }   // 减动效: 直接移除, 不做飘散
+    // ★用 Web Animations API 驱动"风吹散", 不走 CSS class:
+    //   进场横幅基础规则带 animation:entBannerIn(both 保留态) 占着 animation 属性, 加 class 换
+    //   animation-name 在"旧动画已 filled"时浏览器常不重放 → 表现为直接塌陷消失。改用 el.animate()
+    //   显式播关键帧, 完全绕开 CSS animation 重启的坑, 从 0% 100% 真播。
+    const h=el.offsetHeight;
+    el.style.overflow='hidden';
+    let anim;
+    try{
+      anim = el.animate([
+        { opacity:1, transform:'translate(0,0) skewX(0deg) scaleX(1)', filter:'blur(0px)', height:h+'px', marginTop:'12px', marginBottom:'12px', paddingTop:'13px', paddingBottom:'13px' },
+        { opacity:.85, transform:'translate(14px,-6px) skewX(-6deg) scaleX(1.03)', filter:'blur(.4px)', offset:.35 },
+        { opacity:0, transform:'translate(90px,-26px) skewX(-22deg) scaleX(.7)', filter:'blur(4px)', height:'0px', marginTop:'0px', marginBottom:'0px', paddingTop:'0px', paddingBottom:'0px' }
+      ], { duration:1000, easing:'cubic-bezier(.4,0,.7,1)', fill:'forwards' });
+    }catch(_){ anim=null; }
+    if(anim){ anim.onfinish=()=>{ try{ el.remove(); }catch(_){} }; setTimeout(()=>{ try{ el.remove(); }catch(_){} }, 1300); }
+    else { el.style.height=h+'px'; void el.offsetHeight; el.classList.add('entry-blowaway'); setTimeout(()=>{ try{ el.remove(); }catch(_){} }, 1200); }
   }, ENTRY_FADE_MS);
 }
 // 全屏入场光幕: 注入 sweep 光带 + flash 辐射 + 大字, 播完自动清。色由 tier 皮肤决定。
