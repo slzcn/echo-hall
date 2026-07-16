@@ -1079,6 +1079,26 @@
     color:var(--ink);font-size:13.5px;cursor:pointer;letter-spacing:.5px}
   #cardMask .card-btn.primary{border-color:var(--accent);color:var(--accent);font-weight:700}
   #cardMask .card-btn.ghost{border-color:var(--dim);color:var(--sub)}
+  /* ── 漂流瓶 捞到/回信 弹层 ── */
+  #bottleMask{position:fixed;inset:0;z-index:97;background:var(--mask);backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:24px 20px}
+  #bottleMask.on{display:flex;animation:tmFade .35s ease}
+  #bottleMask .bt-box{width:min(400px,92vw);padding:24px 22px;border-radius:18px;
+    background:linear-gradient(160deg,color-mix(in srgb,#12B0E0 16%,var(--bg2)),var(--panel-solid) 62%,var(--bg));
+    border:1.5px solid color-mix(in srgb,#12B0E0 50%,var(--line2));box-shadow:0 16px 50px var(--shadow-lg,rgba(0,0,0,.5)),0 0 30px color-mix(in srgb,#12B0E0 24%,transparent)}
+  #bottleMask .bt-title{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:1px;margin-bottom:14px;text-align:center}
+  #bottleMask .bt-orig{font-size:12px;color:var(--sub);opacity:.8;margin-bottom:10px;padding:8px 12px;border-left:2px solid color-mix(in srgb,#12B0E0 50%,transparent);background:color-mix(in srgb,#12B0E0 6%,transparent);border-radius:6px;line-height:1.6}
+  #bottleMask .bt-text{font-size:15.5px;line-height:1.8;color:var(--ink);margin-bottom:18px;white-space:pre-wrap;word-break:break-word;
+    max-height:36vh;overflow:auto}
+  #bottleMask .bt-reply-wrap{display:flex;gap:8px;margin-bottom:12px}
+  #bottleMask #btReplyInput{flex:1;min-width:0;padding:10px 13px;border-radius:11px;border:1px solid var(--line2);
+    background:var(--input-bg,rgba(10,12,24,.5));color:var(--ink);font-size:14px;font-family:inherit}
+  #bottleMask #btReplyInput:focus{outline:none;border-color:#12B0E0}
+  #bottleMask .bt-actions{display:flex;gap:8px;justify-content:center}
+  #bottleMask .bt-btn{padding:9px 18px;border-radius:20px;border:1.5px solid var(--line2);background:var(--panel);
+    color:var(--ink);font-size:13.5px;cursor:pointer;white-space:nowrap}
+  #bottleMask .bt-btn.primary{border-color:#12B0E0;color:#12B0E0;font-weight:700;flex:0 0 auto}
+  #bottleMask .bt-btn.ghost{border-color:var(--dim);color:var(--sub)}
   /* ── 每日赛博塔罗: 翻牌抽卡 ── */
   #tarotMask{position:fixed;inset:0;z-index:96;background:var(--mask);backdrop-filter:blur(6px);
     display:none;align-items:center;justify-content:center;flex-direction:column;gap:22px;
@@ -1373,7 +1393,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1710tarot-theme-world-dedup';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1800bottle';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1416,6 +1436,21 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div id="ixWord"></div><!-- 互动: 命中大字 -->
 <div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div><!-- 连击对战: 反击浮钮 -->
 <div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div><!-- 世界频道: 全站流光公告 -->
+<div id="bottleMask"><!-- 漂流瓶: 捞到/回信 -->
+  <div class="bt-box">
+    <div class="bt-title">🍾 捞到一个漂流瓶</div>
+    <div class="bt-orig"></div>
+    <div class="bt-text"></div>
+    <div class="bt-reply-wrap">
+      <input id="btReplyInput" maxlength="140" placeholder="匿名回一句…（可不回）" autocomplete="off">
+      <button id="btReplySend" class="bt-btn primary">回瓶</button>
+    </div>
+    <div class="bt-actions">
+      <button id="btIgnore" class="bt-btn ghost">丢回海里</button>
+      <button id="btClose" class="bt-btn ghost">关闭</button>
+    </div>
+  </div>
+</div>
 <div id="cardMask"><!-- 名场面分享卡片预览 -->
   <div class="card-box">
     <img id="cardImg" alt="名场面卡片">
@@ -4096,6 +4131,75 @@ function showWorldBanner(info){
   clearTimeout(showWorldBanner._t);
   showWorldBanner._t=setTimeout(()=>{ el.classList.remove('on'); }, reduce?3000:5000);
 }
+
+// ============ 匿名心事漂流瓶: 跨房匿名投递(走 world Realtime broadcast, 不落库不碰RLS) ============
+// 语义: 写一句丢进海里 → 随波漂给"此刻在别的房在线"的某个人; 没人接到就沉了(即时飘流, 不留档)。
+//   捞到的人可匿名回一句, 回信只飘回原作者。全程匿名(不带真实昵称)。
+const BOTTLE_CATCH_PROB = 0.5;        // 收到漂流瓶广播时"捞起"的概率(不是每个人都捞到, 更像缘分)
+let _myBottles = {};                  // bid → {text} 我丢出去的瓶子(收到回信时匹配)
+let _lastBottleAt = 0;
+function throwBottleFromComposer(){
+  const cin=$('#cin'); const raw=(cin && cin.value||'').trim();
+  if(!raw){ toast('先写点心事，再丢进海里~'); try{ cin && cin.focus(); }catch(_){} return; }
+  if(raw.length>140){ toast('漂流瓶最多 140 字'); return; }
+  const now=Date.now();
+  if(now-_lastBottleAt < 30000){ toast('刚丢过一个，缓缓再丢~'); return; }
+  if(!worldChan){ try{ subscribeWorld(); }catch(_){} }
+  _lastBottleAt=now;
+  const bid = (myUid||'anon').slice(0,6)+'-'+now.toString(36);
+  _myBottles[bid]={ text:raw };
+  const payload={ bid, text:raw, fromUid:myUid||'', roomId:(curRoom&&curRoom.id)||'' };
+  try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle', payload }); }catch(e){ console.warn('throwBottle',e); }
+  if(cin){ cin.value=''; try{ cin.dispatchEvent(new Event('input')); }catch(_){} }
+  try{ EhSfx.play('void'); }catch(_){}
+  bottleSplash('🌊 心事已丢进海里…漂向某个陌生人');
+}
+// 收到别人丢的漂流瓶
+function onBottleDrift(payload){
+  if(!payload || !payload.text) return;
+  // 只捞"别的房"丢来的(同房没意思); 且概率捞起(不是人人都接到)
+  if(payload.roomId && curRoom && payload.roomId===curRoom.id) return;
+  if(payload.fromUid && payload.fromUid===myUid) return;   // 不捞自己的
+  if(secureRand() > BOTTLE_CATCH_PROB) return;
+  showBottleCard({ mode:'recv', bid:payload.bid, text:payload.text, fromUid:payload.fromUid });
+}
+// 收到"回信"(只有原作者匹配到自己丢的瓶才显)
+function onBottleReply(payload){
+  if(!payload || !payload.bid || !payload.text) return;
+  if(!_myBottles[payload.bid]) return;   // 不是回给我的瓶
+  const orig=_myBottles[payload.bid].text;
+  delete _myBottles[payload.bid];
+  showBottleCard({ mode:'reply', text:payload.text, orig });
+}
+// 漂流瓶浮层: mode=recv(捞到,可回) / reply(收到回信,只读)
+function showBottleCard(o){
+  const mask=$('#bottleMask'); if(!mask) return;
+  const isRecv = o.mode==='recv';
+  mask.querySelector('.bt-title').textContent = isRecv ? '🍾 捞到一个漂流瓶' : '💌 你的漂流瓶收到了回信';
+  mask.querySelector('.bt-orig').style.display = o.mode==='reply' ? 'block' : 'none';
+  if(o.mode==='reply') mask.querySelector('.bt-orig').textContent = '你当初写的：'+o.orig;
+  mask.querySelector('.bt-text').textContent = o.text;
+  const rwrap=mask.querySelector('.bt-reply-wrap');
+  const inp=mask.querySelector('#btReplyInput');
+  rwrap.style.display = isRecv ? 'flex' : 'none';
+  if(inp) inp.value='';
+  mask.classList.add('on');
+  try{ EhSfx.play('receive'); }catch(_){}
+  const close=()=>mask.classList.remove('on');
+  mask.querySelector('#btClose').onclick=close;
+  if(isRecv){
+    mask.querySelector('#btReplySend').onclick=()=>{
+      const rv=(inp && inp.value||'').trim(); if(!rv){ close(); return; }
+      if(rv.length>140){ toast('回信最多 140 字'); return; }
+      try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle_reply', payload:{ bid:o.bid, text:rv } }); }catch(_){}
+      try{ EhSfx.play('send'); }catch(_){}
+      close(); toast('回信已放回海里，漂向那个陌生人~');
+    };
+    mask.querySelector('#btIgnore').onclick=()=>{ close(); bottleSplash('🌊 把瓶子又丢回了海里'); };
+  }
+}
+// 丢瓶/回瓶时的小水花提示(复用 toast 语气但带海洋色)
+function bottleSplash(msg){ toast(msg); }
 // ---- 每日赛博塔罗: 每日首次进房抽一张, 纯前端确定性(同一人同一天同一张), 无网络 ----
 const TAROT_DECK = [
   { emoji:'🌐', name:'万象之网', title:'The Network', c:'#00E5D4', desc:'今天你与人的连接会格外通畅，主动搭句话，会有回响。' },
