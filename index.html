@@ -1011,6 +1011,30 @@
   @keyframes ixGlow{0%{opacity:.7;transform:scale(.4)}100%{opacity:0;transform:scale(2.4)}}
   /* 纸屑雨(撒花庆祝, 从顶部落下) */
   .ix-rain{position:fixed;top:-30px;z-index:60;pointer-events:none;font-size:22px;will-change:transform,opacity}
+  /* ── 升级版原子特效(对齐进场系统的电影感) ── */
+  /* 冲击波环(打击类命中点炸开的能量环, 可叠多层) */
+  .ix-ring{position:fixed;z-index:59;pointer-events:none;border-radius:50%;border:3px solid var(--ixr-c,#fff);opacity:0;will-change:transform,opacity;box-shadow:0 0 24px var(--ixr-c,#fff),inset 0 0 18px var(--ixr-c,#fff)}
+  .ix-ring.on{animation:ixRing .62s cubic-bezier(.15,.6,.3,1) forwards}
+  @keyframes ixRing{0%{opacity:.85;transform:scale(.2)}70%{opacity:.5}100%{opacity:0;transform:scale(1)}}
+  /* 命中冲击: 整个 app 极短促的"顿一下"(比 shake 更有拳拳到肉的定格感) */
+  .ix-zoom{animation:ixZoom .28s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes ixZoom{0%{transform:scale(1)}30%{transform:scale(1.035)}60%{transform:scale(.992)}100%{transform:scale(1)}}
+  /* 全屏对角光带扫过(庆祝/高光时刻, 借进场 sweep 的语言) */
+  #ixSweep{position:fixed;inset:0;z-index:58;pointer-events:none;opacity:0;overflow:hidden}
+  #ixSweep.on{opacity:1}
+  #ixSweep .swp{position:absolute;top:-40%;left:-60%;width:60%;height:180%;transform:rotate(18deg);
+    background:linear-gradient(90deg,transparent,var(--ixs-c,#fff) 45%,#fff 50%,var(--ixs-c,#fff) 55%,transparent);
+    filter:blur(3px);opacity:.55;animation:ixSweep 1s cubic-bezier(.5,0,.3,1) forwards}
+  @keyframes ixSweep{0%{left:-60%;opacity:0}20%{opacity:.6}100%{left:130%;opacity:0}}
+  /* 命中大字(打击/庆祝的冲击标题, 借进场 ent-big 的语言) */
+  #ixWord{position:fixed;inset:0;z-index:62;pointer-events:none;display:flex;align-items:center;justify-content:center}
+  #ixWord .ixw{font-size:clamp(52px,16vw,140px);font-weight:900;letter-spacing:2px;
+    color:var(--ixw-c,#fff);text-shadow:0 0 30px var(--ixw-c,#fff),0 4px 20px rgba(0,0,0,.5);
+    -webkit-text-stroke:2px rgba(0,0,0,.25);opacity:0;transform:scale(.4) rotate(-8deg);will-change:transform,opacity}
+  #ixWord .ixw.on{animation:ixWord .9s cubic-bezier(.2,1.5,.4,1) forwards}
+  @keyframes ixWord{0%{opacity:0;transform:scale(.4) rotate(-8deg)}22%{opacity:1;transform:scale(1.08) rotate(2deg)}42%{transform:scale(1) rotate(0)}72%{opacity:1}100%{opacity:0;transform:scale(1.15) rotate(0)}}
+  /* 温情上浮物(送花/抱抱: 从目标处袅袅升起, 比生硬 burst 更柔) */
+  .ix-float{position:fixed;z-index:60;pointer-events:none;will-change:transform,opacity;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
   .proj{position:fixed;left:100%;white-space:nowrap;z-index:41;font-size:clamp(20px,4vw,34px);font-weight:800;pointer-events:none;
     color:var(--cyan);text-shadow:0 0 20px var(--cyan);animation:fly 8s linear forwards}
   @keyframes fly{from{transform:translateX(0)}to{transform:translateX(calc(-100vw - 100%))}}
@@ -1270,7 +1294,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1100customtiers';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1200ixfx-cinema';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1308,6 +1332,8 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
 <div id="resonance"></div>
 <div id="ixFlash"></div>
+<div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
+<div id="ixWord"></div><!-- 互动: 命中大字 -->
 <div id="toast"></div>
 
 <div class="stage">
@@ -4210,8 +4236,26 @@ document.addEventListener('pointerup',e=>{
 document.addEventListener('pointercancel',()=>{ if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; } _hlStart=null; });
 // ===== 互动系统: 配置 + 「对TA」菜单 + 发送 + 特效 =====
 let _interactions=[];   // eh_interactions 缓存
+// 内置互动的"电影感升级"补丁: 只补 DB 里没有的升级键(ring/zoom/word/sweep/float),
+// DB 已配的键永远优先(后台可覆盖)。老库无这些键时自动获得升级观感, 不必等 DB 迁移。
+const IX_FX_UPGRADE = {
+  punch:    { zoom:true, ring:'#E63946', word:'BAM',  word_c:'#FF5A5A' },
+  bomb:     { zoom:true, ring:'#FF6B00', word:'BOOM', word_c:'#FF9A3D' },
+  rose:     { float:'🌹🌸💗' },
+  hug:      { float:'💛✨🧡' },
+  coffee:   { float:'☕✨' },
+  confetti: { sweep:'#FFD84D', word:'🎉', word_c:'#FFD84D' },
+  firework: { sweep:'#8B5CFF', ring:'#8B5CFF' },
+};
+function enrichIxFx(ix){
+  if(!ix || !ix.id) return ix;
+  const up = IX_FX_UPGRADE[ix.id]; if(!up) return ix;
+  const fx = Object.assign({}, ix.fx||{});
+  for(const k in up){ if(fx[k]==null) fx[k]=up[k]; }   // 仅补空缺, DB 值优先
+  ix.fx = fx; return ix;
+}
 async function loadInteractions(){
-  try{ const { data }=await sb.from('eh_interactions').select('*').eq('enabled',true).order('sort'); if(Array.isArray(data)) _interactions=data; }catch(e){}
+  try{ const { data }=await sb.from('eh_interactions').select('*').eq('enabled',true).order('sort'); if(Array.isArray(data)) _interactions=data.map(enrichIxFx); }catch(e){}
 }
 const _ixCooldown=new Map();   // interactionId → 上次发的时间戳(本地冷却)
 const isSoulUid=(uid)=>soulUidSet && soulUidSet.has(uid);
@@ -4251,7 +4295,7 @@ async function sendInteraction(ix, targetUid, targetName){
   _ixCooldown.set(ix.id, now);
   // 发起者本地先演一遍(命中对方头像); 目标本人收到 realtime 再演(带震)
   const tEl=document.querySelector(`#presence .pav[data-uid="${targetUid}"]`)||null;
-  try{ playInteractionFx(Object.assign({}, ix.fx, {vibrate:null, shake:false, flash:null}), tEl); }catch(_){}  // 自己发不震自己屏
+  try{ playInteractionFx(Object.assign({}, ix.fx, {vibrate:null, shake:false, flash:null, zoom:false}), tEl); }catch(_){}  // 自己发不震/顿自己屏, 但保留飞行物/环/大字看命中
   const txt=(ix.text_tpl||'{from} 对 {to} 使用了 '+ix.name).replace('{from}',me.name).replace('{to}',targetName);
   // text 编码: ixId|targetUid|文案 ; kind=interact
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
@@ -5711,19 +5755,31 @@ function burst(str,count=10){
 }
 
 // ============ 互动特效引擎(数据驱动: 按 fx 参数组合原子能力) ============
-// fx: { vibrate:[..], flash:"#色", shake:true, fly:"👊", burst:"🌹", rain:true, glow:"#色", sfx:"名" }
+// fx 原子能力(可任意组合, 全部可选, 向后兼容):
+//   基础: vibrate:[..], flash:"#色", shake:true, fly:"👊", burst:"🌹", rain:true, glow:"#色", sfx:"名"
+//   升级(对齐进场系统的电影感):
+//     ring:"#色"     命中点冲击波环(打击类, 可与 shake/zoom 叠加成"拳拳到肉")
+//     zoom:true      命中瞬间整屏顿一下(定格冲击感, 比 shake 更"实")
+//     sweep:"#色"    全屏对角光带扫过(庆祝/高光时刻)
+//     word:"KO"      命中大字冲击标题(打击/庆祝, 借进场 ent-big 语言); word_c 可指定字色
+//     float:"🌹"     从目标处袅袅上浮(温情类, 比生硬 burst 更柔)
 // targetEl: 命中目标的 DOM(对方头像), 用于飞行物落点/发光定位; 没有则用屏幕中心。
 function playInteractionFx(fx, targetEl){
   if(!fx) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   try{ if(fx.sfx) EhSfx.play(fx.sfx); }catch(_){}
-  try{ if(fx.vibrate && navigator.vibrate) navigator.vibrate(fx.vibrate); }catch(_){}
+  try{ if(fx.vibrate && navigator.vibrate && !reduce) navigator.vibrate(fx.vibrate); }catch(_){}
   // 全屏闪色
   if(fx.flash){ const f=$('#ixFlash'); if(f){ f.style.background=`radial-gradient(circle at 50% 45%, ${safeColor(fx.flash)}66, transparent 72%)`; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),450); } }
   // 全屏抖动
-  if(fx.shake){ const app=document.querySelector('#app')||document.body; app.classList.remove('ix-shake'); void app.offsetWidth; app.classList.add('ix-shake'); setTimeout(()=>app.classList.remove('ix-shake'),520); }
+  if(fx.shake && !reduce){ const app=document.querySelector('#app')||document.body; app.classList.remove('ix-shake'); void app.offsetWidth; app.classList.add('ix-shake'); setTimeout(()=>app.classList.remove('ix-shake'),520); }
+  // 命中定格顿挫(与 shake 不冲突, 叠加更"实"; 用 body 避免与 shake 抢 #app transform)
+  if(fx.zoom && !reduce){ const z=document.querySelector('#app')||document.body; if(!fx.shake){ z.classList.remove('ix-zoom'); void z.offsetWidth; z.classList.add('ix-zoom'); setTimeout(()=>z.classList.remove('ix-zoom'),300); } }
   // 目标落点(对方头像中心); 无目标→屏幕中上
   let tx=window.innerWidth/2, ty=window.innerHeight*0.4;
   if(targetEl){ try{ const r=targetEl.getBoundingClientRect(); tx=r.left+r.width/2; ty=r.top+r.height/2; }catch(_){} }
+  // 全屏对角光带扫过(庆祝/高光)
+  if(fx.sweep && !reduce){ const s=$('#ixSweep'); if(s){ s.style.setProperty('--ixs-c', safeColor(fx.sweep)); s.innerHTML='<div class="swp"></div>'; s.classList.add('on'); clearTimeout(playInteractionFx._swp); playInteractionFx._swp=setTimeout(()=>{ s.classList.remove('on'); s.innerHTML=''; },1050); } }
   // 飞行物: 从底部中央飞向目标, 命中放大后消散
   if(fx.fly){
     const el=document.createElement('div'); el.className='ix-fly'; el.textContent=fx.fly;
@@ -5737,12 +5793,56 @@ function playInteractionFx(fx, targetEl){
       {transform:`translate(${dx}px,${dy}px) scale(.3) rotate(240deg)`,opacity:0,offset:1}
     ],{duration:620,easing:'cubic-bezier(.4,0,.5,1)'}).onfinish=()=>el.remove();
   }
+  // 命中冲击波环(打击类, 命中点炸开; fly 时等飞行物到达再炸)
+  if(fx.ring && !reduce){ const fire=()=>ixRingBurst(tx,ty,safeColor(fx.ring)); if(fx.fly) setTimeout(fire,540); else fire(); }
+  // 命中大字冲击标题(打击/庆祝)
+  if(fx.word && !reduce){ const fire=()=>ixImpactWord(fx.word, safeColor(fx.word_c||fx.flash||fx.ring||'#fff')); if(fx.fly) setTimeout(fire,520); else fire(); }
   // 命中光环(温情类头像发光)
   if(fx.glow){ const g=document.createElement('div'); g.className='ix-glow'; const sz=90; g.style.width=g.style.height=sz+'px'; g.style.left=(tx-sz/2)+'px'; g.style.top=(ty-sz/2)+'px'; g.style.background=`radial-gradient(circle, ${safeColor(fx.glow)}88, transparent 70%)`; document.body.appendChild(g); g.classList.add('on'); setTimeout(()=>g.remove(),1000); }
+  // 温情上浮物(从目标处袅袅升起)
+  if(fx.float){ setTimeout(()=>{ try{ ixFloatUp(fx.float, tx, ty); }catch(_){} }, fx.fly?520:0); }
   // 粒子撒射(命中点爆开)
   if(fx.burst){ setTimeout(()=>{ try{ burst(fx.burst, 24); }catch(_){} }, fx.fly?520:0); }
   // 纸屑雨(全屏从上落下)
-  if(fx.rain){ const chars=[...(fx.burst||'🎉🎊✨')]; for(let i=0;i<28;i++){ const r=document.createElement('div'); r.className='ix-rain'; r.textContent=chars[i%chars.length]; r.style.left=(secureRand()*100)+'vw'; document.body.appendChild(r); const dur=1600+secureRand()*1400; r.animate([{transform:'translateY(0) rotate(0)',opacity:1},{transform:`translateY(${window.innerHeight+60}px) rotate(${secureRand()*720-360}deg)`,opacity:.9}],{duration:dur,easing:'ease-in'}).onfinish=()=>r.remove(); } }
+  if(fx.rain && !reduce){ const chars=[...(fx.burst||'🎉🎊✨')]; for(let i=0;i<28;i++){ const r=document.createElement('div'); r.className='ix-rain'; r.textContent=chars[i%chars.length]; r.style.left=(secureRand()*100)+'vw'; document.body.appendChild(r); const dur=1600+secureRand()*1400; r.animate([{transform:'translateY(0) rotate(0)',opacity:1},{transform:`translateY(${window.innerHeight+60}px) rotate(${secureRand()*720-360}deg)`,opacity:.9}],{duration:dur,easing:'ease-in'}).onfinish=()=>r.remove(); } }
+}
+// 冲击波环: 命中点炸开的能量环, 双层错时更有层次
+function ixRingBurst(tx,ty,color){
+  for(let k=0;k<2;k++){
+    const ring=document.createElement('div'); ring.className='ix-ring';
+    const sz=k===0?120:190; ring.style.width=ring.style.height=sz+'px';
+    ring.style.left=(tx-sz/2)+'px'; ring.style.top=(ty-sz/2)+'px';
+    ring.style.setProperty('--ixr-c', color);
+    document.body.appendChild(ring);
+    setTimeout(()=>{ ring.classList.add('on'); }, k*110);
+    setTimeout(()=>ring.remove(), 800+k*110);
+  }
+}
+// 命中大字: 全屏中央砸出一个冲击标题
+function ixImpactWord(text, color){
+  const box=$('#ixWord'); if(!box) return;
+  box.innerHTML=`<div class="ixw" style="--ixw-c:${color}">${esc(String(text).slice(0,8))}</div>`;
+  const w=box.querySelector('.ixw'); if(w){ void w.offsetWidth; w.classList.add('on'); }
+  clearTimeout(ixImpactWord._t); ixImpactWord._t=setTimeout(()=>{ box.innerHTML=''; }, 1000);
+}
+// 温情上浮物: 从目标处若干 emoji 袅袅升起、左右轻摆、渐隐
+function ixFloatUp(str, tx, ty){
+  let chars;
+  try{ const seg=new Intl.Segmenter('zh',{granularity:'grapheme'}); chars=[...seg.segment(str||'')].map(s=>s.segment); }
+  catch(e){ chars=[...(str||'')]; }
+  chars=chars.filter(c=>/\p{Emoji}/u.test(c)); if(!chars.length) chars=['✨️'];
+  for(let i=0;i<7;i++){
+    const el=document.createElement('div'); el.className='ix-float'; el.textContent=rand(chars);
+    el.style.left=(tx-14+ (secureRand()*40-20))+'px'; el.style.top=(ty-6)+'px';
+    el.style.fontSize=(20+secureRand()*16)+'px';
+    document.body.appendChild(el);
+    const rise=110+secureRand()*90, sway=(secureRand()*44-22);
+    el.animate([
+      {transform:'translate(0,0) scale(.5)',opacity:0,offset:0},
+      {transform:`translate(${sway*0.4}px,${-rise*0.4}px) scale(1)`,opacity:1,offset:.25},
+      {transform:`translate(${sway}px,${-rise}px) scale(1)`,opacity:0,offset:1}
+    ],{duration:1300+secureRand()*500,easing:'cubic-bezier(.3,.6,.4,1)',delay:i*55}).onfinish=()=>el.remove();
+  }
 }
 
 // ============ toast ============

@@ -1789,8 +1789,9 @@ function renderIxList(){
       </div>
       <input class="ix-in" data-i="${i}" data-k="text_tpl" value="${esc(ix.text_tpl||'')}" placeholder="文案模板, 用 {from} {to}, 如: {from} 打了 {to} 一拳" style="width:100%;margin-top:6px">
       <div class="ix-fxrow">
-        ${chk('shake','抖动')}${chk('rain','纸屑雨')}
+        ${chk('shake','抖动')}${chk('zoom','命中顿挫')}${chk('rain','纸屑雨')}
         ${txt('flash','闪屏色#')} ${txt('fly','飞行物emoji')} ${txt('burst','撒射emoji')} ${txt('glow','光环色#')}
+        ${txt('ring','冲击波环色#')} ${txt('sweep','光带扫过色#')} ${txt('float','上浮emoji(温情)')} ${txt('word','命中大字(如KO)')}
         <input class="ix-fxin" data-i="${i}" data-fxv="1" value="${(fx.vibrate||[]).join(',')}" placeholder="震动 如40,30,60" style="width:110px">
         <input class="ix-fxin" data-i="${i}" data-fxs="sfx" value="${esc(fx.sfx||'')}" placeholder="音效 punch/echo/receive" style="width:150px">
       </div>
