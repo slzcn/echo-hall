@@ -583,61 +583,41 @@
   </div>
 
   <div class="page" id="p-people">
-    <!-- 任命: 一套逻辑给三种身份 -->
+    <!-- 任命: 一套逻辑给后台角色 + 任意自定义类型 -->
     <div class="glass card">
       <h3>任命身份</h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
-        选身份 → 填对象 → 任命。<b>超级管理员/管理员</b>是后台权限(需对方已注册, 填用户名);<b>贵宾</b>是进场待遇(任意账号可, 填 user_id)。
+        选身份 → 填对象 → 任命。<b>超级管理员/管理员</b>是后台权限(需对方已注册, 填用户名);<b>自定义类型(如贵宾)</b>只影响进场待遇, 任意账号可, 填 user_id。
       </p>
-      <div class="seg" id="roleSeg" style="margin-bottom:12px">
-        <button class="seg-btn on" data-role="admin">管理员</button>
-        <button class="seg-btn" data-role="super">超级管理员</button>
-        <button class="seg-btn" data-role="vip">贵宾 💎</button>
-      </div>
+      <div class="seg" id="roleSeg" style="margin-bottom:12px;flex-wrap:wrap"></div>
       <div class="inline-form" style="display:flex;gap:8px">
         <input type="text" id="apInput" placeholder="对方的前台用户名" autocomplete="off" style="flex:1;min-width:0">
         <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan)">任命</button>
       </div>
       <div id="apHint" style="font-size:11.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
-      <!-- 贵宾待遇档(仅选贵宾时显示) -->
-      <div id="vipTreatWrap" style="margin-top:12px;display:none">
-        <label style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">贵宾进场待遇档</label>
-        <div class="seg" id="vipTreatSeg">
-          <button class="seg-btn on" data-v="admin">管理员级</button>
-          <button class="seg-btn" data-v="super">超级管理员级(加震屏更炸)</button>
-        </div>
-        <div style="margin-top:10px"><button class="mini-btn" id="vipTreatSave" style="border-color:var(--cyan);color:var(--cyan)">保存待遇档</button></div>
-      </div>
     </div>
 
-    <!-- 角色显示名称(五档可改) -->
+    <!-- 角色类型管理: 4 个默认(仅改显示名, 不可删) + 自定义类型(可增改删) -->
     <div class="glass card">
-      <h3>角色显示名称</h3>
-      <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">五档身份在进场横幅角标/个人空间徽章上显示的名称。改后保存即全站生效(权限逻辑不受影响)。</p>
-      <div id="tierNamesTable" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div style="margin-top:12px;display:flex;gap:8px">
-        <button class="btn" id="tierNamesSave">保存名称</button>
-        <button class="mini-btn" id="tierNamesReset" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button>
+      <h3>角色类型
+        <button class="mini-btn" id="tierSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存全部</button>
+      </h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
+        身份在进场横幅角标 / 个人空间徽章上显示的名称与待遇。<b>默认四种</b>(超级管理员/管理员/正式用户/临时用户)只能改显示名, 不可删。<b>自定义类型</b>可改名称/图标/待遇档/名单, 也可删除。改后点「保存全部」全站生效。
+      </p>
+      <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:8px">默认类型(不可增删)</div>
+      <div id="tierDefTable" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span>自定义类型</span>
+        <button class="mini-btn" id="tierAddBtn" style="border-color:var(--cyan);color:var(--cyan)">＋ 新增类型</button>
       </div>
+      <div id="tierCustomList" style="display:flex;flex-direction:column;gap:14px"></div>
     </div>
 
     <!-- 管理员/超管 列表 -->
     <div class="glass card">
       <h3>🛡️ 管理员 & 超级管理员</h3>
       <div style="overflow-x:auto"><table class="admins-table"><thead><tr><th>用户名</th><th>角色</th><th>任命时间</th><th>操作</th></tr></thead><tbody id="adminsTbody"></tbody></table></div>
-    </div>
-
-    <!-- 贵宾名单 -->
-    <div class="glass card">
-      <h3>💎 贵宾名单</h3>
-      <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
-        贵宾进场享全屏紫钻光幕 + 广播全房 + 灵魂相迎。任意账号可(上方选「贵宾」填 user_id 任命)。不知道 id?去「房间」翻该用户消息复制。
-      </p>
-      <div id="vipList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn" id="vipSaveBtn">保存名单</button>
-        <button class="mini-btn" id="vipResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 清空</button>
-      </div>
     </div>
   </div>
 
@@ -1261,40 +1241,51 @@ async function loadAdmins(){
   const res=await api('/admins'); if(!res.ok){ if(!adminsCache) $('#adminsTbody').innerHTML='<tr><td colspan="4" class="empty">加载失败</td></tr>'; return; }
   adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
 }
-// ===== 统一任命: 一套 UI 给三种身份(超管/管理员=后台角色; 贵宾=进场待遇) =====
-let _apRole='admin';
-const AP_META={
-  admin:{ ph:'对方的前台用户名', hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员' },
-  super:{ ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超级管理员' },
-  vip:{   ph:'对方的 user_id (uuid)', hint:'贵宾只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。', btn:'加为贵宾' },
-};
+// ===== 统一任命: 一套 UI 给「后台角色(超管/管理员)」+「任意自定义类型(如贵宾)」 =====
+// 后台角色 → 走 /appoint(需用户名); 自定义类型 → 往该类型 uids 加 user_id(即时保存)。
+let _apRole='admin';   // 'super'|'admin' 或 自定义档 id
+function apRoleMeta(role){
+  if(role==='admin') return { ph:'对方的前台用户名', hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员', isRole:true };
+  if(role==='super') return { ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超级管理员', isRole:true };
+  const ct=(_customTiers||[]).find(c=>c.id===role);
+  const nm=ct?ct.name:role;
+  return { ph:'对方的 user_id (uuid)', hint:`${nm}只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。`, btn:'加为'+nm, isRole:false, tier:ct };
+}
+// 任命身份 seg 按钮: 固定 管理员/超管 + 每个自定义类型一个
+function renderRoleSeg(){
+  const seg=$('#roleSeg'); if(!seg) return;
+  const btns=[['admin','管理员'],['super','超级管理员']].concat((_customTiers||[]).map(c=>[c.id,(c.icon?c.icon+' ':'')+c.name]));
+  seg.innerHTML=btns.map(([r,label],i)=>`<button class="seg-btn${r===_apRole?' on':''}" data-role="${esc(r)}">${esc(label)}</button>`).join('');
+  seg.querySelectorAll('.seg-btn').forEach(b=>b.addEventListener('click',()=>setApRole(b.dataset.role)));
+}
 function setApRole(role){
   _apRole=role;
   document.querySelectorAll('#roleSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.role===role));
-  const m=AP_META[role];
+  const m=apRoleMeta(role);
   $('#apInput').placeholder=m.ph; $('#apHint').textContent=m.hint; $('#apBtn').textContent=m.btn;
-  $('#vipTreatWrap').style.display = role==='vip' ? 'block' : 'none';
 }
-document.querySelectorAll('#roleSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>setApRole(b.dataset.role)));
 $('#apBtn').onclick=async()=>{
   const val=$('#apInput').value.trim();
-  if(!val){ toast(_apRole==='vip'?'请粘贴 user_id':'请输入用户名'); return; }
+  const m=apRoleMeta(_apRole);
+  if(!val){ toast(m.isRole?'请输入用户名':'请粘贴 user_id'); return; }
   const btn=$('#apBtn'); btn.disabled=true;
   try{
-    if(_apRole==='vip'){
-      // 贵宾: 加进 vipUids 配置(去重), 立即保存
-      if(!_vipDraft.includes(val)){ _vipDraft.push(val); }
-      if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); toast('已加为贵宾 💎'); $('#apInput').value=''; renderVip(); }
-    } else {
+    if(m.isRole){
       // 超管/管理员: 走后端 /appoint(带 role)
       const r=await api('/appoint',{method:'POST',body:{username:val, role:_apRole}});
       if(r.ok){ toast(_apRole==='super'?'已设为超级管理员':'已设为管理员'); $('#apInput').value=''; adminsCache=null; loadAdmins(); }
       else toast(r.body?.error||'失败(超管任命可能需后端支持 role 参数)');
+    } else {
+      // 自定义类型: 往该类型 uids 加 user_id(去重), 立即保存整个 customTiers
+      const ct=(_customTiers||[]).find(c=>c.id===_apRole);
+      if(!ct){ toast('该类型已不存在'); return; }
+      ct.uids=Array.isArray(ct.uids)?ct.uids:[];
+      if(!ct.uids.includes(val)) ct.uids.push(val);
+      if(await saveConfigKey('customTiers',_customTiers)){ if(CFG_CACHE) CFG_CACHE.customTiers=JSON.parse(JSON.stringify(_customTiers)); toast('已加为'+ct.name+(ct.icon?' '+ct.icon:'')); $('#apInput').value=''; renderCustomTiers(); }
     }
   } finally { btn.disabled=false; }
 };
 $('#apInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#apBtn').click(); });
-$('#vipTreatSave')?.addEventListener('click',async()=>{ if(await saveConfigKey('vipTreatment',_vipTreat)){ if(CFG_CACHE) CFG_CACHE.vipTreatment=_vipTreat; toast('待遇档已保存'); } });
 
 // ============ 集中配置管理(config) ============
 let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTheme, officialFallbackC, roomBgm, text }
@@ -1321,8 +1312,9 @@ const CFG_DEFAULT = {
   soulColors:{"狼姐":"#FF3D92","老K":"#8FA6E8","阿夜":"#C77DFF","回音":"#6486FF","图灵":"#00E5D4","小暖":"#FF6F52"},
   roomKindC:{"public":"#1DE9B6","private":"#B57EDC","official":"#0ABAB5"},
   // 人员相关(需在 CFG_DEFAULT 里占位, loadConfig 才会 merge 远程值)
-  vipUids:[], vipTreatment:"admin",
-  tierNames:{ super:"超级管理员", vip:"贵宾", admin:"管理员", reg:"正式用户", anon:"临时用户" },
+  vipUids:[], vipTreatment:"admin",   // 遗留 key, 兼容旧数据; 现已并入 customTiers 的 vip 档
+  tierNames:{ super:"超级管理员", admin:"管理员", reg:"正式用户", anon:"临时用户" },
+  customTiers:[ { id:"vip", name:"贵宾", icon:"💎", level:"admin", uids:[] } ],
   // 白名单: 匿名/虚空/共鸣 3 个 JS 默认色(可写)
   identityDefaultC:"#0ABAB5",
   voidC:"#4A5D7E",
@@ -2063,68 +2055,75 @@ function collectTuning(){
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
 
-// ---- 角色显示名称 ----
-const TIER_DEF={ super:'超级管理员', vip:'贵宾', admin:'管理员', reg:'正式用户', anon:'临时用户' };
-const TIER_ROWS=[['super','超级管理员'],['vip','贵宾'],['admin','管理员'],['reg','正式用户'],['anon','临时用户']];
-let _tierDraft={};
-async function loadTierNames(){
+// ---- 角色类型: 4 默认(仅改显示名) + 自定义(增改删) ----
+// 默认档只有显示名可改, 存进 tierNames; 自定义档整份对象存进 customTiers 数组。
+const TIER_DEF_NAME={ super:'超级管理员', admin:'管理员', reg:'正式用户', anon:'临时用户' };
+const TIER_DEF_ROWS=[['super','超级管理员'],['admin','管理员'],['reg','正式用户'],['anon','临时用户']];
+let _tierNamesDraft={}, _customTiers=[];
+async function loadTiers(){
   const cfg=await loadConfig();
-  _tierDraft=Object.assign({}, TIER_DEF, (cfg&&cfg.tierNames)||{});
-  const box=$('#tierNamesTable'); if(!box) return;
-  box.innerHTML=TIER_ROWS.map(([k,def])=>`<div style="display:flex;align-items:center;gap:10px">
+  _tierNamesDraft=Object.assign({}, TIER_DEF_NAME, (cfg&&cfg.tierNames)||{});
+  // 兼容遗留: 老 tierNames.vip / vipUids / vipTreatment → 折进默认贵宾档
+  let cts = Array.isArray(cfg&&cfg.customTiers) ? JSON.parse(JSON.stringify(cfg.customTiers)) : null;
+  if(!cts){ cts=[{ id:'vip', name:(cfg&&cfg.tierNames&&cfg.tierNames.vip)||'贵宾', icon:'💎', level:(cfg&&cfg.vipTreatment==='super')?'super':'admin', uids:Array.isArray(cfg&&cfg.vipUids)?cfg.vipUids.slice():[] }]; }
+  _customTiers=cts;
+  renderTierDefaults(); renderCustomTiers(); renderRoleSeg();
+  if(_apRole!=='super'&&_apRole!=='admin'&&!_customTiers.some(c=>c.id===_apRole)) setApRole('admin');
+}
+function renderTierDefaults(){
+  const box=$('#tierDefTable'); if(!box) return;
+  box.innerHTML=TIER_DEF_ROWS.map(([k,def])=>`<div style="display:flex;align-items:center;gap:10px">
     <span style="flex:0 0 92px;font-size:12px;color:var(--dim);font-family:monospace">${k}</span>
-    <input data-tier="${k}" value="${esc(_tierDraft[k]||def)}" maxlength="12" style="flex:1;min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
+    <input data-tname="${k}" value="${esc(_tierNamesDraft[k]||def)}" maxlength="12" style="flex:1;min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
   </div>`).join('');
-  box.querySelectorAll('[data-tier]').forEach(el=>el.oninput=()=>{ _tierDraft[el.dataset.tier]=el.value; markDirty(); });
+  box.querySelectorAll('[data-tname]').forEach(el=>el.oninput=()=>{ _tierNamesDraft[el.dataset.tname]=el.value; markDirty(); });
 }
-$('#tierNamesSave')?.addEventListener('click',async()=>{
-  const out={}; $('#tierNamesTable').querySelectorAll('[data-tier]').forEach(el=>{ out[el.dataset.tier]=(el.value||'').trim()||TIER_DEF[el.dataset.tier]; });
-  if(await saveConfigKey('tierNames',out)){ if(CFG_CACHE) CFG_CACHE.tierNames=out; try{clearDirty();}catch(_){} }
-});
-$('#tierNamesReset')?.addEventListener('click',async()=>{ if(!await confirmBox('恢复五档默认名称?','恢复默认')) return; _tierDraft=Object.assign({},TIER_DEF); loadTierNames(); markDirty(); });
-
-// ---- 💎 贵宾名单 ----
-let _vipDraft=[], _vipTreat='admin';
-async function loadVip(){
-  const cfg=await loadConfig();
-  _vipDraft = Array.isArray(cfg.vipUids) ? cfg.vipUids.slice() : [];
-  _vipTreat = (cfg.vipTreatment==='super') ? 'super' : 'admin';
-  document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.v===_vipTreat));
-  loadTierNames();
-  renderVip();
-}
-document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>{
-  _vipTreat=b.dataset.v;
-  document.querySelectorAll('#vipTreatSeg .seg-btn').forEach(x=>x.classList.toggle('on',x===b));
-  markDirty();
-}));
-function renderVip(){
-  const box=$('#vipList'); if(!box) return;
-  if(!_vipDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:8px 0">还没有贵宾。粘贴 user_id 添加。</div>'; return; }
-  box.innerHTML=_vipDraft.map((uid,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--violet) 6%,transparent)">
-    <span style="font-size:16px">💎</span>
-    <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--ink)">${esc(uid)}</code>
-    <button class="mini-btn vip-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">移除</button>
+function renderCustomTiers(){
+  const box=$('#tierCustomList'); if(!box) return;
+  if(!_customTiers.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:6px 0">还没有自定义类型。点「＋ 新增类型」添加。</div>'; return; }
+  box.innerHTML=_customTiers.map((ct,i)=>`<div style="border:1px solid var(--line);border-radius:12px;padding:12px;background:color-mix(in srgb,var(--violet) 5%,transparent)">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <input data-ct="${i}" data-f="icon" value="${esc(ct.icon||'')}" maxlength="4" placeholder="💎" style="flex:0 0 52px;text-align:center;padding:7px 6px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:16px">
+      <input data-ct="${i}" data-f="name" value="${esc(ct.name||'')}" maxlength="12" placeholder="类型名称" style="flex:1;min-width:120px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
+      <span style="flex:0 0 auto;font-size:11px;color:var(--dim);font-family:monospace">id:${esc(ct.id)}</span>
+      <button class="mini-btn ct-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">删除类型</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="flex:0 0 auto;font-size:12px;color:var(--sub)">进场待遇档</span>
+      <div class="seg ct-treat" data-i="${i}" style="flex:0 0 auto">
+        <button class="seg-btn${ct.level!=='super'?' on':''}" data-lv="admin">管理员级</button>
+        <button class="seg-btn${ct.level==='super'?' on':''}" data-lv="super">超级管理员级(更炸)</button>
+      </div>
+    </div>
+    <div style="font-size:11.5px;color:var(--dim);margin-bottom:6px">名单(${(ct.uids||[]).length} 人; 上方「任命身份」选此类型可加, 这里可移除)</div>
+    <div class="ct-uids" data-i="${i}" style="display:flex;flex-direction:column;gap:6px">${
+      (ct.uids||[]).length ? (ct.uids||[]).map((uid,j)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px">
+        <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink)">${esc(uid)}</code>
+        <button class="mini-btn ct-uid-del" data-i="${i}" data-j="${j}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">移除</button>
+      </div>`).join('') : '<div style="color:var(--dim);font-size:12px">暂无成员</div>'
+    }</div>
   </div>`).join('');
-  box.querySelectorAll('.vip-del').forEach(b=>b.onclick=()=>{ _vipDraft.splice(+b.dataset.i,1); markDirty(); renderVip(); });
+  // 绑定
+  box.querySelectorAll('input[data-ct]').forEach(el=>el.oninput=()=>{ const ct=_customTiers[+el.dataset.ct]; if(ct){ ct[el.dataset.f]=el.value; markDirty(); } });
+  box.querySelectorAll('.ct-treat .seg-btn').forEach(b=>b.onclick=()=>{ const i=+b.parentElement.dataset.i; _customTiers[i].level=b.dataset.lv; b.parentElement.querySelectorAll('.seg-btn').forEach(x=>x.classList.toggle('on',x===b)); markDirty(); });
+  box.querySelectorAll('.ct-del').forEach(b=>b.onclick=async()=>{ const i=+b.dataset.i; if(!await confirmBox('删除类型「'+(_customTiers[i].name||_customTiers[i].id)+'」? 该类型的名单也一并清除。','删除类型')) return; _customTiers.splice(i,1); markDirty(); renderCustomTiers(); renderRoleSeg(); if(!_customTiers.some(c=>c.id===_apRole)&&_apRole!=='super'&&_apRole!=='admin') setApRole('admin'); });
+  box.querySelectorAll('.ct-uid-del').forEach(b=>b.onclick=()=>{ const ct=_customTiers[+b.dataset.i]; if(ct){ ct.uids.splice(+b.dataset.j,1); markDirty(); renderCustomTiers(); } });
 }
-function addVip(){
-  const inp=$('#vipInput'); const raw=(inp.value||'').trim();
-  if(!raw){ return; }
-  // 支持一次粘多行/逗号分隔; 去重; 简单校验像 uuid(含连字符, 长度>20)
-  const cands=raw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);
-  let added=0;
-  cands.forEach(u=>{ if(u.length<8){ return; } if(!_vipDraft.includes(u)){ _vipDraft.push(u); added++; } });
-  inp.value='';
-  if(added){ markDirty(); renderVip(); toast('已添加 '+added+' 个(记得点保存)'); }
-  else toast('没有新增(可能已存在或格式太短)');
-}
-$('#vipAddBtn')?.addEventListener('click',addVip);
-$('#vipInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addVip(); } });
-$('#vipSaveBtn')?.addEventListener('click',async()=>{
-  if(await saveConfigKey('vipUids',_vipDraft)){ if(CFG_CACHE) CFG_CACHE.vipUids=_vipDraft.slice(); try{clearDirty();}catch(_){} }
+$('#tierAddBtn')?.addEventListener('click',()=>{
+  // 生成唯一 id: t + 递增序号(避开已用 id)
+  const used=new Set(_customTiers.map(c=>c.id).concat(['super','admin','reg','anon']));
+  let n=1, id='t'+n; while(used.has(id)){ n++; id='t'+n; }
+  _customTiers.push({ id, name:'新类型', icon:'✨', level:'admin', uids:[] });
+  markDirty(); renderCustomTiers(); renderRoleSeg();
 });
-$('#vipResetBtn')?.addEventListener('click',async()=>{ if(!await confirmBox('确定清空贵宾名单吗?','清空贵宾名单')) return; _vipDraft=[]; markDirty(); renderVip(); });
+$('#tierSaveBtn')?.addEventListener('click',async()=>{
+  // 收集默认名 + 自定义档; 校验自定义档非空名
+  const names={}; $('#tierDefTable').querySelectorAll('[data-tname]').forEach(el=>{ names[el.dataset.tname]=(el.value||'').trim()||TIER_DEF_NAME[el.dataset.tname]; });
+  for(const ct of _customTiers){ ct.name=(ct.name||'').trim()||ct.id; ct.icon=(ct.icon||'').trim(); ct.level=(ct.level==='super')?'super':'admin'; ct.uids=Array.isArray(ct.uids)?ct.uids:[]; }
+  const okN=await saveConfigKey('tierNames',names);
+  const okC=await saveConfigKey('customTiers',_customTiers);
+  if(okN&&okC){ if(CFG_CACHE){ CFG_CACHE.tierNames=names; CFG_CACHE.customTiers=JSON.parse(JSON.stringify(_customTiers)); } try{clearDirty();}catch(_){} toast('已保存角色类型'); renderRoleSeg(); }
+});
 
 // ---- 🔄 重建客户端缓存: bump eh_config.tuning.cachePurgeAt = now → 客户端启动时对比丢弃旧缓存 ----
 $('#purgeCacheBtn')?.addEventListener('click',async()=>{
@@ -2204,7 +2203,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='rooms') loadRooms();
   if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
   if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
-  if(t.dataset.page==='people'){ loadAdmins(); loadVip(); }      // 人员 = 管理员/超管 + 贵宾 合并
+  if(t.dataset.page==='people'){ loadAdmins(); loadTiers(); }    // 人员 = 管理员/超管 + 角色类型(默认+自定义)
   if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }  // 玩法 = 曲风+互动+清唱
   if(t.dataset.page==='audit') loadAuditLog();
   clearDirty();   // 进入新页(重渲染)后复位

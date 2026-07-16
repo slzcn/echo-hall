@@ -1270,7 +1270,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-0316feat-usersearch-username';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1100customtiers';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1629,11 +1629,15 @@ const EH_CONFIG_DEFAULT = {
       anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:'',        stage:false, burst:'',       flash:'',        shake:false },  // 临时: 低调淡入
     },
   },
-  // 贵宾名单(独立 key, 后台"贵宾"tab 增删): user_id 数组, 命中者进场享 vip 待遇。
+  // 贵宾名单(遗留 key, 兼容旧数据; 现已并入 customTiers 的 vip 档, 见下)
   vipUids: [],
-  vipTreatment: 'admin',   // 贵宾待遇档(独立key, 后台可改): 'admin'管理员级 / 'super'超管级(加震屏更炸)
-  // 五档角色类型的显示名称(后台"人员"tab 可改): 进场横幅角标/个人空间徽章统一读这里, 不再散落硬编码
-  tierNames: { super:'超级管理员', vip:'贵宾', admin:'管理员', reg:'正式用户', anon:'临时用户' },
+  vipTreatment: 'admin',
+  // 五档默认角色显示名称(后台可改名, 但不可增删): 进场横幅角标/个人空间徽章统一读这里
+  tierNames: { super:'超级管理员', admin:'管理员', reg:'正式用户', anon:'临时用户' },
+  // 自定义角色档(后台"人员"tab 可增/改/删): 每档 {id,name,icon,level(admin/super 待遇档),uids[user_id]}。
+  //   命中某档 uid → 进场享该档待遇(紫钻光幕皮肤 + 按 level 隆重度)。贵宾(vip)是预置的第一个自定义档。
+  //   默认四档(super/admin/reg/anon)是系统身份, 不在此列(不可删)。
+  customTiers: [ { id:'vip', name:'贵宾', icon:'💎', level:'admin', uids:[] } ],
   themePalettes: {
     cyber: {"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#9C85FF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
     vapor: {"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,44,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#cb86bc","--dim":"#8d497e","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
@@ -1948,7 +1952,7 @@ function _validateConfigMap(map){
     resonanceDefaultC:'string', roomBgm:'object', text:'object',
     identityPool:'object', tuning:'object', songStyles:'object',
     fx:'object', entranceFx:'object',
-    publicThemePool:'array', privateThemePool:'array', vipUids:'array', vipTreatment:'string', tierNames:'object'
+    publicThemePool:'array', privateThemePool:'array', vipUids:'array', vipTreatment:'string', tierNames:'object', customTiers:'array'
   };
   var out = {};
   for(var k in map){
@@ -1982,7 +1986,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','vipTreatment','tierNames','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','vipTreatment','tierNames','customTiers','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -3499,8 +3503,8 @@ function renderPresenceAvatars(users){
     const isNewJoin = _presenceSettled && !el && !isMe && !isSoul;
     if(isNewJoin && EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.enabled && EH_CONFIG.entranceFx.othersAvatar!==false){
       div.classList.add('ent-pop');
-      const jt=userTier(p);   // 他人 presence 行一般无 role, 多为 reg/anon; 有 role 字段则识别 vip
-      if(jt==='super'||jt==='admin') div.classList.add('ent-vip');
+      const jt=userTier(p);   // 他人 presence 行一般无 role, 多为 reg/anon; 有 role/名单命中则升档
+      if(tierRank(jt)>=2) div.classList.add('ent-vip');   // 管理员级及以上(含贵宾/自定义档)才带尊贵光环
     }
     div.style.setProperty('--pav-c', c);
     div.title=isMe?'你':('点击 @'+ (p.name||''));
@@ -3857,22 +3861,33 @@ function sysMsg(html){ const el=document.createElement('div'); el.className='sys
 function userTier(u, uid){
   u = u || me || {};
   if(u.role==='super') return 'super';
-  // 贵宾名单(后台可配): 命中即享管理员级排面, 即便是普通/临时账号。
-  //   名单来源: 顶层 EH_CONFIG.vipUids(后台"💎贵宾名单"tab 存的独立 key) 优先; 兼容 entranceFx.vipUids。
+  const theUid = uid || (u===me ? myUid : u.user_id) || u.id || '';
+  // 自定义档名单(后台可配, 含默认"贵宾"档 id=vip): 命中即享该档待遇, 即便是普通/临时账号。
+  //   遗留 EH_CONFIG.vipUids / entranceFx.vipUids 视为并入 vip 档名单(向后兼容旧数据)。
   try{
-    const list = (Array.isArray(EH_CONFIG.vipUids) && EH_CONFIG.vipUids.length ? EH_CONFIG.vipUids
-                 : (EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.vipUids)) || [];
-    const theUid = uid || (u===me ? myUid : u.user_id) || u.id || '';
-    if(theUid && Array.isArray(list) && list.includes(theUid)) return 'vip';
+    const cts = Array.isArray(EH_CONFIG.customTiers) ? EH_CONFIG.customTiers : [];
+    const legacyVip = (Array.isArray(EH_CONFIG.vipUids) && EH_CONFIG.vipUids.length ? EH_CONFIG.vipUids
+                      : (EH_CONFIG.entranceFx && EH_CONFIG.entranceFx.vipUids)) || [];
+    for(const ct of cts){
+      if(!ct || !ct.id) continue;
+      const uids = Array.isArray(ct.uids) ? ct.uids.slice() : [];
+      if(ct.id==='vip' && Array.isArray(legacyVip)) uids.push(...legacyVip);
+      if(theUid && uids.includes(theUid)) return ct.id;
+    }
   }catch(e){}
   if(u.role==='admin') return 'admin';
   if(u.registered || u.username || u.email) return 'reg';
   return 'anon';
 }
-const TIER_RANK = { anon:0, reg:1, admin:2, vip:2, super:3 };   // 档位高低比较用(vip 与 admin 同级排面)
-// 档位显示名: 读后台可配的 EH_CONFIG.tierNames, 缺失回退默认全称
+// 内置档位高低(自定义档按其 level 动态取, 见 tierRank)
+const TIER_RANK = { anon:0, reg:1, admin:2, vip:2, super:3 };
+// 是否自定义档(非内置 4 种)。贵宾(vip)属自定义档但内置预置。
+function customTierDef(tier){ try{ return (EH_CONFIG.customTiers||[]).find(c=>c&&c.id===tier)||null; }catch(e){ return null; } }
+// 档位比较值: 内置直接查表; 自定义档按其 level('super'→3, 否则→2)
+function tierRank(tier){ if(TIER_RANK[tier]!=null) return TIER_RANK[tier]; const ct=customTierDef(tier); if(ct) return ct.level==='super'?3:2; return 0; }
+// 档位显示名: 读后台可配的 EH_CONFIG.tierNames(内置) / customTiers.name(自定义), 缺失回退默认全称
 const TIER_NAME_FALLBACK = { super:'超级管理员', vip:'贵宾', admin:'管理员', reg:'正式用户', anon:'临时用户' };
-function tierName(tier){ try{ return (EH_CONFIG.tierNames && EH_CONFIG.tierNames[tier]) || TIER_NAME_FALLBACK[tier] || tier; }catch(e){ return TIER_NAME_FALLBACK[tier]||tier; } }
+function tierName(tier){ try{ if(EH_CONFIG.tierNames && EH_CONFIG.tierNames[tier]) return EH_CONFIG.tierNames[tier]; const ct=customTierDef(tier); if(ct) return ct.name||ct.id; return TIER_NAME_FALLBACK[tier]||tier; }catch(e){ return TIER_NAME_FALLBACK[tier]||tier; } }
 // 自己进房 → 按类型渲染入场特效(横幅+全屏光幕+闪/震/粒子) + 按配置广播给房里其他人。
 function entranceBanner(room){
   const cfg = (EH_CONFIG.entranceFx)||{};
@@ -3890,8 +3905,8 @@ function entranceBanner(room){
   // ★enter 是"当场特效", 只需存活到 realtime 把它推给在场的人(几秒)。插入后 8s 自删——
   //   根治它污染历史/大厅预览/灵魂上下文/回声统计(治本, 前端过滤只是治标, 且已删存量24条)。
   try{
-    const minBc = TIER_RANK[cfg.broadcastMinTier||'reg'] ?? 1;
-    if(cfg.broadcast!==false && curRoom && myUid && (TIER_RANK[tier]||0) >= minBc){
+    const minBc = tierRank(cfg.broadcastMinTier||'reg') ?? 1;
+    if(cfg.broadcast!==false && curRoom && myUid && (tierRank(tier)||0) >= minBc){
       sb.from('eh_messages').insert({ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
         text:tier, kind:'enter' }).select('id').single().then(({data,error})=>{
           if(error){ console.warn('enter broadcast', error.message); return; }
@@ -3904,11 +3919,18 @@ function entranceBanner(room){
 function renderEntrance(info, isSelf){
   const cfg=(EH_CONFIG.entranceFx)||{};
   const tier=info.tier||'reg';
-  let t=(cfg.tiers && cfg.tiers[tier]); if(!t) return;
-  // 贵宾待遇档: vipTreatment='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留💎紫身份皮肤与入场词。
-  //   来源: 顶层 EH_CONFIG.vipTreatment(后台"贵宾"tab 存的独立key) 优先; 兼容 entranceFx.vipTreatment。
-  const _vipTreat = EH_CONFIG.vipTreatment || cfg.vipTreatment;
-  if(tier==='vip' && (_vipTreat==='super')){
+  const ctDef = customTierDef(tier);   // 自定义档(含贵宾)? 无内置特效, 借用💎贵宾皮肤 + 按其 level 定隆重度
+  let t=(cfg.tiers && cfg.tiers[tier]);
+  if(!t && ctDef){
+    // 自定义档统一用 vip 紫钻皮肤做底, 图标/入场词/待遇档按该档配置
+    const base=(cfg.tiers && cfg.tiers.vip) || { label:'莅 临', cls:'ent-vip-tier', sfx:'soul', stage:true, burst:'💎✨🌟', flash:'#C77DFF', shake:false };
+    t={ ...base, icon:ctDef.icon||base.icon };
+  }
+  if(!t) return;
+  // 待遇档 level='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留自定义档身份皮肤与入场词。
+  //   贵宾(vip)兼容遗留 EH_CONFIG.vipTreatment='super'; 其余自定义档看 customTiers[].level。
+  const _treatSuper = ctDef ? (ctDef.level==='super' || (tier==='vip' && (EH_CONFIG.vipTreatment||cfg.vipTreatment)==='super')) : false;
+  if(_treatSuper){
     const s=(cfg.tiers && cfg.tiers.super)||{};
     t={...t, shake:true, flash:t.flash||s.flash, stage:true};
   }
@@ -3922,8 +3944,8 @@ function renderEntrance(info, isSelf){
   const tagTxt = tierName(tier);
   const roomName = info.roomName || (curRoom&&curRoom.name) || '';
   // 全屏光幕: 自己按 t.stage; 别人按 othersStageMinTier(默认只有 admin+ 才惊动全场)
-  const othersStageMin = TIER_RANK[cfg.othersStageMinTier||'admin'] ?? 2;
-  const wantStage = isSelf ? !!t.stage : ((TIER_RANK[tier]||0) >= othersStageMin);
+  const othersStageMin = tierRank(cfg.othersStageMinTier||'admin') ?? 2;
+  const wantStage = isSelf ? !!t.stage : ((tierRank(tier)||0) >= othersStageMin);
   if(wantStage){ try{ playEntranceStage(t, {name:info.name, roomName}); }catch(_){} }
   // 闪屏/震屏: 只给本人(别人没进场却被闪/震很烦)
   if(isSelf && (t.flash || t.shake)){ try{ playInteractionFx({flash:t.flash||'', shake:!!t.shake}, null); }catch(_){} }
@@ -3939,7 +3961,7 @@ function renderEntrance(info, isSelf){
   // 音效: 自己必放; 别人只有高阶档(会全屏光幕的)才放, 避免频繁进场吵
   if(t.sfx && (isSelf || wantStage)){ try{ EhSfx.play(t.sfx); }catch(_){} }
   // 粒子迸发
-  if(t.burst && (isSelf || wantStage)){ try{ burst(t.burst, tier==='super'?20:10); }catch(_){} }
+  if(t.burst && (isSelf || wantStage)){ try{ burst(t.burst, tierRank(tier)>=3?20:10); }catch(_){} }
 }
 // 进场提醒 2 分钟后自动"风吹散"消失(横幅/纯文字通用)。风散=向右上飘 + 模糊 + 渐隐, 高度收拢不留空洞。
 const ENTRY_FADE_MS = 120000;
@@ -6101,7 +6123,7 @@ async function openMe(){
   const myTier = userTier();
   const roleLabel = isSuper ? tierName('super') : (me && me.role==='admin' ? tierName('admin') : '');
   const badge = isAdmin ? `<a class="mh-badge ${isSuper?'super':'admin'} mh-admin-link" href="admin.html" target="_blank" rel="noopener" title="进入管理后台">${esc(roleLabel)}</a>`
-    : myTier==='vip' ? `<span class="mh-badge super">${esc(tierName('vip'))}</span>`
+    : customTierDef(myTier) ? `<span class="mh-badge super">${esc(tierName(myTier))}</span>`
     : isBound ? `<span class="mh-badge reg">${esc(tierName('reg'))}</span>`
     : `<span class="mh-badge anon">${esc(tierName('anon'))}</span>`;
   const c=safeColor(me.color);
@@ -6175,7 +6197,7 @@ async function refreshMeData(scope, isBound, acctKnown){
   }
   // 账号信息首次读到后缓存
   if(scope==='all' && isBound && !acctKnown && accRes){ me.username=accRes.data?.username||''; me.email=accRes.data?.email||''; me.role=accRes.data?.role||'user'; me.emailVerified=!!accRes.data?.email_verified; saveIdentity();
-    const _t2=userTier(); const badge2 = me.role==='super' ? `<span class="mh-badge super">${esc(tierName('super'))}</span>` : (me.role==='admin' ? `<span class="mh-badge admin">${esc(tierName('admin'))}</span>` : (_t2==='vip'?`<span class="mh-badge super">${esc(tierName('vip'))}</span>`:`<span class="mh-badge reg">${esc(tierName('reg'))}</span>`));
+    const _t2=userTier(); const badge2 = me.role==='super' ? `<span class="mh-badge super">${esc(tierName('super'))}</span>` : (me.role==='admin' ? `<span class="mh-badge admin">${esc(tierName('admin'))}</span>` : (customTierDef(_t2)?`<span class="mh-badge super">${esc(tierName(_t2))}</span>`:`<span class="mh-badge reg">${esc(tierName('reg'))}</span>`));
     if($('.mh-sub')){ const _c=safeColor(me.color); $('.mh-sub').innerHTML=`${me.username?`<span style="color:${_c};font-weight:600;text-shadow:0 0 8px color-mix(in srgb,${_c} 35%,transparent)">@${esc(me.username)}</span> · `:''}${badge2}`; }
   }
   // 停止转圈, 至少显示 300ms 让用户看到反馈
