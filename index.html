@@ -684,6 +684,11 @@
   .composer.song-mode .cin-wrap{border-color:var(--song-c,var(--magenta));box-shadow:0 0 0 3px color-mix(in srgb,var(--song-c,var(--magenta)) 14%,transparent)}
   .composer.song-mode .cin{color:var(--song-c,var(--magenta));font-weight:600}
   .composer.song-mode .cin::placeholder{color:var(--song-c,var(--magenta));opacity:.6}
+  /* 漂流瓶模式输入框风格(海洋蓝) */
+  .composer.bottle-mode .cin-wrap{border-color:#12B0E0;box-shadow:0 0 0 3px color-mix(in srgb,#12B0E0 14%,transparent)}
+  .composer.bottle-mode .cin{color:#12B0E0}
+  .composer.bottle-mode .cin::placeholder{color:#12B0E0;opacity:.6}
+  .composer.bottle-mode .plus-btn.mode-on{border-color:#12B0E0;background:color-mix(in srgb,#12B0E0 16%,transparent);box-shadow:0 0 12px -3px #12B0E0}
 
   .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative;max-width:100%}
   .cin-wrap{flex:1;min-width:0;display:flex;align-items:flex-end;min-height:46px;background:var(--input-bg);box-shadow:var(--input-shadow);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
@@ -1393,7 +1398,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1845bottle-copy';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1900bottle-mode';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4153,6 +4158,7 @@ function throwBottleFromComposer(){
   if(cin){ cin.value=''; try{ cin.dispatchEvent(new Event('input')); }catch(_){} }
   try{ EhSfx.play('void'); }catch(_){}
   bottleSplash('🌊 心事已丢进海里…漂向某个陌生人');
+  if(bottleMode) setMode('none');   // 丢完退出漂流瓶模式, 复原输入框
 }
 // 收到别人丢的漂流瓶
 function onBottleDrift(payload){
@@ -4950,6 +4956,8 @@ async function send(){
   if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
   // 神曲模式: 走神曲发送(把这句话唱出来), 不落普通文本
   if(songMode && kind==='msg'){ const ly=text; resetInput(); await sendSong(ly, songSel); return; }
+  // 漂流瓶模式: 丢进海里(跨房匿名漂流), 不落本房消息; 丢完退出模式
+  if(bottleMode && kind==='msg'){ throwBottleFromComposer(); return; }
   // 引用的目标还是本地临时 id(原消息尚未落库/落库失败)时，不带 reply_to，避免整条发送失败
   const replyId = replyTo && !String(replyTo.id).startsWith('local_') ? replyTo.id : null;
   // 虚空模式: 匿名 + 限时消散(act/whisper 不走虚空)
@@ -4986,7 +4994,8 @@ function setVoidMode(on){ setMode(on?'void':'none'); }
 // ============ 统一发言模式: none / void / voice / song ============
 // ＋号是唯一入口: 选某模式→＋变该模式图标+输入框切风格; 再点该图标(＋位置)→退出复原。三者互斥。
 let curMode='none';
-const MODE_ICON={ void:'🕳️', voice:'🎙️', song:'🎵' };
+let bottleMode=false;
+const MODE_ICON={ void:'🕳️', voice:'🎙️', song:'🎵', bottle:'🌊' };
 function setMode(mode){
   if(mode===curMode) mode='none';        // 再点当前模式 = 退出
   // 先退出旧模式的副作用
@@ -4995,10 +5004,12 @@ function setMode(mode){
   voidMode = mode==='void';
   voiceMode = mode==='voice';
   songMode = mode==='song';
+  bottleMode = mode==='bottle';
   const composer=$('.composer');
   composer.classList.toggle('void-mode', voidMode);
   composer.classList.toggle('voice-mode', voiceMode);
   composer.classList.toggle('song-mode', songMode);
+  composer.classList.toggle('bottle-mode', bottleMode);
   // ＋号: 无模式显 ＋(可展开菜单); 有模式显该模式图标(点=退出)
   const pb=$('#plusBtn');
   // 有模式时显模式图标(神曲🎵与加号菜单一致); 无模式显 ＋
@@ -5009,10 +5020,11 @@ function setMode(mode){
   $('#pmVoid').classList.toggle('on', voidMode);
   $('#pmVoice').classList.toggle('on', voiceMode);
   $('#pmSong').classList.toggle('on', songMode);
+  { const pb2=$('#pmBottle'); if(pb2) pb2.classList.toggle('on', bottleMode); }
   // ⚠️ iOS 铁律: 进打字模式的 focus 必须最贴近用户手势的同步栈, 且在任何 DOM 重建(renderSongStrip
   //   会 innerHTML 重建曲风条)之前——否则重建打断同步性, iOS 不弹键盘(主人报"第一次进神曲不弹输入法")。
   //   故进 void/song 的 focus 提到这里最先做; 退出/语音的 blur 仍在下方。
-  { const cinEarly=$('#cin'); if((mode==='void'||mode==='song') && curRoom){ try{ cinEarly.focus(); }catch(e){} } }
+  { const cinEarly=$('#cin'); if((mode==='void'||mode==='song'||mode==='bottle') && curRoom){ try{ cinEarly.focus(); }catch(e){} } }
   // 神曲: 显示曲风细色条
   const strip=$('#songStrip');
   if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
@@ -5021,6 +5033,7 @@ function setMode(mode){
   if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; composer.style.setProperty('--song-c', safeColor(st.color)); }
   else { composer.style.removeProperty('--song-c'); }
   if(voidMode){ cin.placeholder=EH_CONFIG.text.voidPlaceholder; }
+  else if(bottleMode){ cin.placeholder='写句心事，丢进海里…漂给别房的陌生人'; }
   else if(voiceMode){ hideSlash(); $('#emojiTray').classList.remove('on'); }
   else if(!songMode){ cin.placeholder='说点什么… 打个 / 看命令'; }
   // ── 统一键盘策略(三模式 × 进入/退出, 跨 iOS/安卓一致)──
@@ -5030,8 +5043,8 @@ function setMode(mode){
   //   会被 iOS 拦截→安卓弹、iOS 不弹(即"两平台不一样"的根因)。setMode 由 onclick 同步调用,
   //   故这里必须【同步】focus, 不能 setTimeout defer。
   const cin2=$('#cin');
-  if(mode!=='void' && mode!=='song'){
-    // none(退出) 或 voice(录音): 一律收键盘, 主动 blur。(void/song 的 focus 已在上方提前做)
+  if(mode!=='void' && mode!=='song' && mode!=='bottle'){
+    // none(退出) 或 voice(录音): 一律收键盘, 主动 blur。(void/song/bottle 的 focus 已在上方提前做)
     try{ cin2.blur(); }catch(e){}
   }
   syncSendBtn();
@@ -7524,7 +7537,7 @@ $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
 $('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secureRand()*SONG_STYLES.length)].id; setMode('song'); };   // 随机挑个曲风进神曲, 换曲风用细色条
-$('#pmBottle') && ($('#pmBottle').onclick=()=>{ closePlusMenu(); throwBottleFromComposer(); });
+$('#pmBottle') && ($('#pmBottle').onclick=()=>{ closePlusMenu(); setMode('bottle'); });
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
