@@ -130,16 +130,32 @@
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:44px 44px;mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000 55%,transparent 100%)}
-  .bg-orb{position:fixed;border-radius:50%;filter:blur(48px);opacity:.4;z-index:0;pointer-events:none;will-change:transform;animation:float 14s ease-in-out infinite}
+  .bg-orb{position:fixed;border-radius:50%;filter:blur(32px);opacity:.4;z-index:0;pointer-events:none;
+    will-change:transform;transform:translateZ(0);contain:layout paint;
+    animation:float 14s ease-in-out infinite}
   body.hall-on .bg-orb{display:none}
   .orb1{width:420px;height:420px;background:radial-gradient(circle,var(--violet),transparent 70%);top:-120px;left:-80px}
   .orb2{width:380px;height:380px;background:radial-gradient(circle,var(--cyan),transparent 70%);bottom:-120px;right:-60px;animation-delay:-5s}
   .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
   @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,20px) scale(.95)}}
 
+  /* ===== ★性能降级: 系统开启“减少动效” / 小屏幕(手机) → 自动矮化或关闭重级背景特效 ===== */
+  @media (prefers-reduced-motion: reduce){
+    .bg-orb, body.hall-on .bg-orb{ animation:none !important; }
+    .bg-grid, body.hall-on .bg-grid{ animation:none !important; }
+    body.priv-heat::before{ animation:none !important; }
+    .msg.soul .av, .msg.soul .av::after, .pav.soul-av .av-ic, .pav.soul-av .av-ic::after,
+    .soul-thinking .av, .soul-thinking .av::after{ animation:none !important; }
+  }
+  @media (max-width: 480px){
+    .orb3{ display:none; } /* 手机上只保留 2 个背景光斑 */
+    .bg-orb{ filter:blur(24px); }
+    body.hall-on .bg-orb{ filter:blur(28px); }
+  }
+
   /* ===== 荷尔蒙特效 P0/P1(值由 EH_CONFIG.fx 变量控, 后台可调) ===== */
   /* ② 聊天页活背景: 不再进房关灯。底层两团极缓漂移的青/品红光晕 + 网格轻呼吸, 死场变活场。 */
-  body.hall-on .bg-orb{ display:block; opacity:calc(.32 * var(--fx-livebg,.55)*1.8); filter:blur(70px); animation-duration:var(--fx-livebg-speed,26s); }
+  body.hall-on .bg-orb{ display:block; opacity:calc(.32 * var(--fx-livebg,.55)*1.8); filter:blur(38px); animation-duration:var(--fx-livebg-speed,26s); }
   body.hall-on .bg-grid{ animation:gridBreath 9s ease-in-out infinite; }
   @keyframes gridBreath{0%,100%{opacity:.7}50%{opacity:1}}
 
@@ -743,20 +759,23 @@
   .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
   /* 呼吸光环 = 单圈头像描边 + 一层柔和外发光(不再画第二道硬边框, 避免与头像自身 inset 描边形成"双重边框") */
   .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
-    border:1px solid transparent;
+    border:1px solid transparent;will-change:opacity,transform;
+    /* ★优化: 将 box-shadow 以静态方式应用, 动画只跑 opacity+transform(合成层, 零重绘) */
+    box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 42%,transparent);
     animation:soulHalo 3.2s ease-in-out infinite}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 26%,transparent)}
-    50%{opacity:1;transform:scale(1.06);box-shadow:0 0 20px 3px color-mix(in srgb,var(--soul-c,var(--violet)) 52%,transparent)}}
+  @keyframes soulHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)}}
   /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
   /* 关键: 灵魂光墙头像的 ::after 改成"无边框·纯柔光", 覆盖基础 .pav .av-ic::after 的 1.5px 硬描边,
      否则 头像 inset 环 + ::after 硬环 两道紧挨 = 视觉双重边框(主人反馈). 只留一道 inset 环 + 呼吸柔光. */
   .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;animation:pavHalo 3.6s ease-in-out infinite}
+  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;will-change:opacity,transform;
+    /* ★优化: 静态 box-shadow + 动画只跑 opacity+transform */
+    box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 40%,transparent);
+    animation:pavHalo 3.6s ease-in-out infinite}
   .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
   .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.5;transform:scale(1);box-shadow:0 0 6px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 26%,transparent)}
-    50%{opacity:1;transform:scale(1.08);box-shadow:0 0 18px 3px color-mix(in srgb,var(--pav-c,var(--cyan)) 52%,transparent)}}
+  @keyframes pavHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.08)}}
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -1398,7 +1417,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-2030entry-10s';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0026perf-fx';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
