@@ -9,7 +9,7 @@
    但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
    localStorage 存已到达版本防循环; 断网恢复复检。*/
 (function(){
-  var ADMIN_VER='20260714-0610recallHall';
+  var ADMIN_VER='20260716-1504admin-ux';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -506,8 +506,7 @@
       <div style="margin-top:16px;padding:14px;border-radius:12px;background:rgba(10,12,24,.4);font-size:12px;color:var(--sub)">
         💡 预览:<span id="themePreviewBox" style="display:inline-block;width:80px;height:24px;border-radius:6px;margin-left:8px;vertical-align:middle;background:var(--cyan)"></span>
         <select id="themePreviewSel" style="margin-left:12px;padding:5px 10px;border-radius:8px;background:rgba(10,12,24,.6);color:var(--ink);border:1px solid var(--line2);font-family:inherit;font-size:12px">
-          <option value="cyber">cyber 赛博霓虹</option><option value="vapor">vapor 蒸汽波</option>
-          <option value="mono">mono 暗夜极简</option><option value="aurora">aurora 极光渐变</option>
+          <!-- 选项由 loadTheme() 动态从 CFG_DEFAULT.themes 填充全部 10 套(修复只能选 4 套的 bug) -->
         </select>
         选主题看当前 --cyan 效果
       </div>
@@ -587,12 +586,16 @@
     <div class="glass card">
       <h3>任命身份</h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 12px;line-height:1.7">
-        选身份 → 填对象 → 任命。<b>超级管理员/管理员</b>是后台权限(需对方已注册, 填用户名);<b>自定义类型(如贵宾)</b>只影响进场待遇, 任意账号可, 填 user_id。
+        选身份 → 搜索并选中真实用户 → 任命。<b>超级管理员/管理员</b>是后台权限(对方需先在前台注册);<b>自定义类型(如贵宾)</b>只影响进场待遇, 任意账号可。<span style="color:var(--cyan)">记不住名字?直接输入片段模糊搜索即可。</span>
       </p>
       <div class="seg" id="roleSeg" style="margin-bottom:12px;flex-wrap:wrap"></div>
-      <div class="inline-form" style="display:flex;gap:8px">
-        <input type="text" id="apInput" placeholder="对方的前台用户名" autocomplete="off" style="flex:1;min-width:0">
-        <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan)">任命</button>
+      <div class="inline-form" style="display:flex;gap:8px;position:relative">
+        <div style="flex:1;min-width:0;position:relative">
+          <input type="text" id="apInput" placeholder="输入用户名/昵称片段搜索…" autocomplete="off" style="width:100%;box-sizing:border-box">
+          <div id="apPicked" style="display:none;margin-top:6px;font-size:12px;color:var(--cyan)"></div>
+          <div id="apDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;margin-top:4px;max-height:260px;overflow:auto;background:var(--panel-solid);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)"></div>
+        </div>
+        <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan);flex:0 0 auto">任命</button>
       </div>
       <div id="apHint" style="font-size:11.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
     </div>
@@ -779,7 +782,7 @@ async function renderRoomsDetail(seg){
     <div class="av">${safeEmoji(r.emoji)||'💬'}</div>
     <div class="main"><div class="nm">${esc(r.name)}</div>
       <div class="sub">${KIND_LABEL[r.kind]||r.kind}${r.archived?' · 已归档':''}${r.topic?' · '+esc(r.topic):''}</div></div>
-    <div class="tail">${(r.created_at||'').slice(0,10)}</div></div>`).join('')||'<div class="empty">暂无数据</div>';
+    <div class="tail">${fmtTime(r.created_at)}</div></div>`).join('')||'<div class="empty">暂无数据</div>';
 }
 
 // 消息 KPI: 拉全站最近消息(super 不带 room_id 返回最近 N 条)
@@ -793,24 +796,49 @@ async function renderMessagesDetail(){
     <div class="main"><div class="nm" style="color:${safeColor(m.color,'#EAF0FF')}">${esc(m.name)}
       ${m.kind==='song'?'<span style="color:var(--magenta);font-size:9px"> 🎵</span>':''}${m.kind==='voice'?'<span style="color:var(--cyan);font-size:9px"> 🎙️</span>':''}${m.kind==='whisper'?'<span style="color:var(--amber);font-size:9px"> 🔒</span>':''}</div>
       <div class="sub" style="white-space:normal;line-height:1.4">${voiceOrText(m)}</div></div>
-    <div class="tail">${(m.created_at||'').replace('T',' ').slice(5,16)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
+    <div class="tail">${fmtTime(m.created_at)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
 }
 
 // 用户 KPI: 分页 50/页 + 骨架屏 + 触底加载 + 搜索(?q=&filter=&sort=)
 // 首屏渲染 50 条(1-2 页秒开), 用户滑到底自动追加下一页; 关闭抽屉重开保留搜索/筛选状态。
 let _userState = { page:1, pageSize:50, q:'', filter:'all', sort:'created_at.desc', total:0, items:[], loading:false, done:false };
 function _userItemHtml(u){
-  return `<div class="dm-item">
-    <div class="av">${safeEmoji(u.emoji)||'👤'}</div>
-    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${esc(u.name)}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
-      <div class="sub">注册 ${(u.created_at||'').slice(0,10)}</div></div>
-    <div class="tail">${u.last_seen?('活跃 '+(u.last_seen||'').slice(5,10)):''}</div></div>`;
+  const uid=String(u.id||'').replace(/"/g,'&quot;');
+  const nm=esc(u.name||'');
+  const emj=safeEmoji(u.emoji)||'👤';
+  return `<div class="dm-item" style="position:relative">
+    <div class="av">${emj}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${nm}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
+      <div class="sub">注册 ${fmtTime(u.created_at)}</div></div>
+    <div class="tail" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <span>${u.last_seen?('活跃 '+fmtTime(u.last_seen)):''}</span>
+      <button class="mini-btn user-quick-appoint" data-uid="${uid}" data-nm="${nm}" data-emj="${esc(u.emoji||'')}" style="border-color:var(--violet);color:var(--violet);font-size:10.5px;padding:2px 8px" title="快捷任命(跳到任命区并锁定此人)">⚡ 任命</button>
+    </div></div>`;
 }
+// 快捷任命: 点开后跳到人员 tab 并直接锁定选中该用户(无需再搜)
+document.addEventListener('click',function(e){
+  const b=e.target.closest('.user-quick-appoint'); if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const uid=b.dataset.uid; const nm=b.dataset.nm; const emj=b.dataset.emj;
+  if(!uid) return;
+  // 从已加载的用户数据里拿 username(后端已在列表里补全)
+  const u=(_userState.items||[]).find(x=>String(x.id)===String(uid));
+  const username=(u&&u.username)||'';
+  // 切到人员 tab + 锁定选中
+  document.querySelector('.tab-btn[data-page="p-people"]')?.click();
+  if(typeof _apPickUser==='function'){ _apPickUser({id:uid, name:nm, username, emoji:emj}); }
+  toast('已选中 '+nm+' · 选身份后点任命');
+  const ppl=document.getElementById('p-people'); if(ppl){ ppl.scrollIntoView({behavior:'smooth', block:'start'}); }
+});
 function _userSkeleton(n=6){
   return Array(n).fill('<div class="dm-item sk-item"><div class="av sk-shim"></div><div class="main"><div class="sk-shim" style="height:14px;width:60%;border-radius:4px;margin-bottom:6px"></div><div class="sk-shim" style="height:11px;width:40%;border-radius:4px"></div></div></div>').join('');
 }
 async function renderUsersDetail(reset=true){
-  if(reset){ _userState.page=1; _userState.items=[]; _userState.done=false; _userState.total=0; }
+  if(reset){
+    // P0 修复 IO 泄漏: reset 时先 disconnect 旧观察器
+    if(_userState._io){ try{ _userState._io.disconnect(); }catch(_){} _userState._io=null; }
+    _userState.page=1; _userState.items=[]; _userState.done=false; _userState.total=0;
+  }
   const body=$('#dmBody'); if(!body) return;
   if(_userState.items.length===0){
     // 首屏骨架 + 工具栏
@@ -900,7 +928,7 @@ function paintRooms(rooms){
       <td>${safeEmoji(r.emoji)||''} ${esc(r.name)}</td>
       <td><span class="k-tag k-${r.kind}">${kt}</span></td>
       <td>${arch||'—'}</td>
-      <td>${(r.created_at||'').slice(0,10)}</td>
+      <td>${fmtTime(r.created_at)}</td>
       <td><button class="mini-btn soul-open" data-rid="${r.id}" data-nm="${esc(r.name)}" style="border-color:var(--violet);color:var(--violet)">🌟 工坊</button></td></tr>`;
   }).join('')||'<tr><td colspan="5" class="empty">没有房间</td></tr>';
   $('#roomsTbody').querySelectorAll('.roomrow').forEach(el=>el.onclick=(e)=>{ if(e.target.closest('.soul-open')) return; loadMessages(el.dataset.rid,el.dataset.nm); });
@@ -939,7 +967,7 @@ async function loadMessages(rid,name){
   // 大列表用 fragment 一次性插入, 避免多次 reflow
   const html=msgs.map(m=>`<div class="msgline">
     <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji)||''} ${esc(m.name)}</span>
-    <span class="mm-tm">${(m.created_at||'').replace('T',' ').slice(0,16)}</span>
+    <span class="mm-tm">${fmtTime(m.created_at)}</span>
     ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
     ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
     ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎙️语音</span>':''}
@@ -1220,7 +1248,7 @@ function paintAdmins(admins){
     else if(isMe) ops='<span style="color:var(--dim)">（你）</span>';
     return `<tr><td>${esc(a.username)}</td>
       <td><span class="badge-${a.role==='super'?'super':'normal'}">${a.role==='super'?'超级管理员':'管理员'}</span></td>
-      <td>${(a.created_at||'').replace('T',' ').slice(0,16)}</td>
+      <td>${fmtTime(a.created_at)}</td>
       <td>${ops}</td></tr>`;
   }).join('')||'<tr><td colspan="4" class="empty">暂无管理员</td></tr>';
   $('#adminsTbody').querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{
@@ -1242,14 +1270,16 @@ async function loadAdmins(){
   adminsCache=res.body.admins||[]; paintAdmins(adminsCache);
 }
 // ===== 统一任命: 一套 UI 给「后台角色(超管/管理员)」+「任意自定义类型(如贵宾)」 =====
-// 后台角色 → 走 /appoint(需用户名); 自定义类型 → 往该类型 uids 加 user_id(即时保存)。
+// 后台角色 → 走 /appoint(用锁定用户的 username); 自定义类型 → 往该类型 uids 加锁定用户的 user_id。
+// 严谨性: 任命对象必须"从搜索候选中选中真实用户"才能提交, 杜绝手打错误用户名/乱填 uuid。
 let _apRole='admin';   // 'super'|'admin' 或 自定义档 id
+let _apPick=null;      // 锁定选中的用户 {id, name, username, emoji}
 function apRoleMeta(role){
-  if(role==='admin') return { ph:'对方的前台用户名', hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员', isRole:true };
-  if(role==='super') return { ph:'对方的前台用户名', hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超级管理员', isRole:true };
+  if(role==='admin') return { hint:'授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。', btn:'设为管理员', isRole:true };
+  if(role==='super') return { hint:'⚠️ 超级管理员权限最高(可任命/撤销他人、看全站含私密房)。对方需先注册。', btn:'设为超级管理员', isRole:true };
   const ct=(_customTiers||[]).find(c=>c.id===role);
   const nm=ct?ct.name:role;
-  return { ph:'对方的 user_id (uuid)', hint:`${nm}只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 填 user_id。`, btn:'加为'+nm, isRole:false, tier:ct };
+  return { hint:`${nm}只影响进场待遇(全屏光幕+广播+灵魂相迎), 不给后台权限。任意账号可, 搜索选中即可。`, btn:'加为'+nm, isRole:false, tier:ct };
 }
 // 任命身份 seg 按钮: 固定 管理员/超管 + 每个自定义类型一个
 function renderRoleSeg(){
@@ -1262,30 +1292,84 @@ function setApRole(role){
   _apRole=role;
   document.querySelectorAll('#roleSeg .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.role===role));
   const m=apRoleMeta(role);
-  $('#apInput').placeholder=m.ph; $('#apHint').textContent=m.hint; $('#apBtn').textContent=m.btn;
+  $('#apHint').textContent=m.hint; $('#apBtn').textContent=m.btn;
+  _apClearPick(); // 换身份档清空已选
 }
+// —— 选中/清空 —— 
+function _apClearPick(){
+  _apPick=null;
+  const p=$('#apPicked'); if(p){ p.style.display='none'; p.innerHTML=''; }
+  const inp=$('#apInput'); if(inp){ inp.disabled=false; }
+}
+function _apRenderPicked(){
+  const p=$('#apPicked'); if(!p||!_apPick) return;
+  p.style.display='block';
+  p.innerHTML=`✓ 已选:<b>${safeEmoji(_apPick.emoji)||'👤'} ${esc(_apPick.name||'')}</b>`
+    +(_apPick.username?` <span style="color:var(--dim)">@${esc(_apPick.username)}</span>`:'')
+    +` <span style="color:var(--dim);font-family:monospace;font-size:10px">${esc((_apPick.id||'').slice(0,8))}…</span>`
+    +` <a href="javascript:;" id="apPickClear" style="color:var(--magenta);margin-left:8px">✕ 重选</a>`;
+  const c=$('#apPickClear'); if(c) c.onclick=()=>{ _apClearPick(); const inp=$('#apInput'); if(inp){ inp.value=''; inp.focus(); } };
+}
+function _apPickUser(u){
+  _apPick={ id:u.id, name:u.name, username:u.username||'', emoji:u.emoji||'' };
+  const drop=$('#apDrop'); if(drop){ drop.style.display='none'; drop.innerHTML=''; }
+  const inp=$('#apInput'); if(inp){ inp.value=''; }
+  _apRenderPicked();
+}
+// —— 实时搜索下拉(debounce, 复用 /users?q=) —— 
+let _apSearchT=null, _apSearchSeq=0;
+async function _apDoSearch(q){
+  const drop=$('#apDrop'); if(!drop) return;
+  const seq=++_apSearchSeq;
+  drop.style.display='block';
+  drop.innerHTML='<div style="padding:10px 12px;color:var(--dim);font-size:12px">搜索中…</div>';
+  const res=await api('/users?page=1&pageSize=8&filter=all&sort=created_at.desc&q='+encodeURIComponent(q));
+  if(seq!==_apSearchSeq) return; // 过期结果丢弃
+  if(!res.ok){ drop.innerHTML=`<div style="padding:10px 12px;color:var(--magenta);font-size:12px">搜索失败: ${esc(res.body?.error||res.status)}</div>`; return; }
+  const list=res.body?.users||[];
+  if(!list.length){ drop.innerHTML='<div style="padding:10px 12px;color:var(--dim);font-size:12px">没有匹配的用户</div>'; return; }
+  drop.innerHTML=list.map((u,i)=>`<div class="ap-opt" data-i="${i}" style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px">
+    <span style="font-size:18px;flex:0 0 auto">${safeEmoji(u.emoji)||'👤'}</span>
+    <span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(u.name||'(无名)')}</b>${u.is_anonymous?' <span style="color:var(--dim);font-size:10px">匿名</span>':''}${u.username?` <span style="color:var(--cyan);font-size:11px">@${esc(u.username)}</span>`:''}${u.role&&u.role!=='user'?` <span style="color:var(--violet);font-size:10px;padding:1px 5px;border:1px solid var(--violet);border-radius:3px;margin-left:4px">${u.role==='super'?'超管':'管理员'}</span>`:''}<br><span style="color:var(--dim);font-family:monospace;font-size:10.5px">${esc((u.id||'').slice(0,13))}…</span></span>
+  </div>`).join('');
+  drop.querySelectorAll('.ap-opt').forEach(el=>{
+    el.onmouseenter=()=>el.style.background='rgba(255,255,255,.06)';
+    el.onmouseleave=()=>el.style.background='';
+    el.onclick=()=>_apPickUser(list[+el.dataset.i]);
+  });
+}
+$('#apInput').addEventListener('input',e=>{
+  if(_apPick) _apClearPick();
+  const q=e.target.value.trim();
+  const drop=$('#apDrop');
+  clearTimeout(_apSearchT);
+  if(q.length<1){ if(drop){ drop.style.display='none'; drop.innerHTML=''; } return; }
+  _apSearchT=setTimeout(()=>_apDoSearch(q),280);
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('#apInput')&&!e.target.closest('#apDrop')){ const d=$('#apDrop'); if(d) d.style.display='none'; } });
 $('#apBtn').onclick=async()=>{
-  const val=$('#apInput').value.trim();
   const m=apRoleMeta(_apRole);
-  if(!val){ toast(m.isRole?'请输入用户名':'请粘贴 user_id'); return; }
+  if(!_apPick){ toast('请先在上方搜索并选中一个真实用户'); const inp=$('#apInput'); if(inp) inp.focus(); return; }
   const btn=$('#apBtn'); btn.disabled=true;
   try{
     if(m.isRole){
-      // 超管/管理员: 走后端 /appoint(带 role)
-      const r=await api('/appoint',{method:'POST',body:{username:val, role:_apRole}});
-      if(r.ok){ toast(_apRole==='super'?'已设为超级管理员':'已设为管理员'); $('#apInput').value=''; adminsCache=null; loadAdmins(); }
-      else toast(r.body?.error||'失败(超管任命可能需后端支持 role 参数)');
+      // 超管/管理员: 走后端 /appoint(用锁定用户的 username; 后端再次校验存在性)
+      if(!_apPick.username){ toast('该用户尚未注册正式账号(无用户名), 不能授予后台权限'); return; }
+      const r=await api('/appoint',{method:'POST',body:{username:_apPick.username, role:_apRole}});
+      if(r.ok){ toast(_apRole==='super'?'已设为超级管理员':'已设为管理员'); _apClearPick(); adminsCache=null; loadAdmins(); }
+      else toast(r.body?.error||'任命失败');
     } else {
-      // 自定义类型: 往该类型 uids 加 user_id(去重), 立即保存整个 customTiers
+      // 自定义类型: 往该类型 uids 加锁定用户的 user_id(去重), 立即保存整个 customTiers
       const ct=(_customTiers||[]).find(c=>c.id===_apRole);
       if(!ct){ toast('该类型已不存在'); return; }
       ct.uids=Array.isArray(ct.uids)?ct.uids:[];
-      if(!ct.uids.includes(val)) ct.uids.push(val);
-      if(await saveConfigKey('customTiers',_customTiers)){ if(CFG_CACHE) CFG_CACHE.customTiers=JSON.parse(JSON.stringify(_customTiers)); toast('已加为'+ct.name+(ct.icon?' '+ct.icon:'')); $('#apInput').value=''; renderCustomTiers(); }
+      if(ct.uids.includes(_apPick.id)){ toast('该用户已在'+ct.name+'名单中'); return; }
+      ct.uids.push(_apPick.id);
+      if(await saveConfigKey('customTiers',_customTiers)){ if(CFG_CACHE) CFG_CACHE.customTiers=JSON.parse(JSON.stringify(_customTiers)); toast('已加为'+ct.name+(ct.icon?' '+ct.icon:'')); _apClearPick(); renderCustomTiers(); }
     }
   } finally { btn.disabled=false; }
 };
-$('#apInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#apBtn').click(); });
+$('#apInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const first=document.querySelector('#apDrop .ap-opt'); if(first&&!_apPick){ first.click(); } else { $('#apBtn').click(); } } });
 
 // ============ 集中配置管理(config) ============
 let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTheme, officialFallbackC, roomBgm, text }
@@ -1376,15 +1460,20 @@ async function saveConfigKey(key,value){
 // ---- 🎨 主题配色 ----
 async function loadTheme(){
   const cfg=await loadConfig();
-  const themes=['cyber','vapor','mono','aurora'];
-  const keys=Object.keys(cfg.themePalettes.cyber);
-  let html='<div style="overflow-x:auto"><table style="min-width:800px"><thead><tr><th style="min-width:150px">CSS 变量</th>';
-  themes.forEach(t=>{ html+=`<th style="min-width:150px">${t}</th>`; });
+  // 动态取全部主题(以 CFG_DEFAULT.themes 顺序为准, 修复"后台只能编辑4套"的bug)。缺失套用默认兜底。
+  const themeMeta=(CFG_DEFAULT.themes||[]).map(t=>[t.id,t.name]);
+  const themes=themeMeta.map(x=>x[0]);
+  const themeName=Object.fromEntries(themeMeta);
+  cfg.themePalettes=cfg.themePalettes||{};
+  themes.forEach(t=>{ if(!cfg.themePalettes[t]) cfg.themePalettes[t]=JSON.parse(JSON.stringify(CFG_DEFAULT.themePalettes[t]||{})); });
+  const keys=Object.keys(cfg.themePalettes.cyber||CFG_DEFAULT.themePalettes.cyber);
+  let html='<div style="overflow-x:auto"><table style="min-width:'+(150+themes.length*150)+'px"><thead><tr><th style="min-width:150px;position:sticky;left:0;background:var(--panel-solid);z-index:2">CSS 变量</th>';
+  themes.forEach(t=>{ html+=`<th style="min-width:150px"><span style="color:var(--ink)">${esc(themeName[t]||t)}</span><br><span style="font-size:10px;color:var(--dim);font-family:monospace">${t}</span></th>`; });
   html+='</tr></thead><tbody>';
   keys.forEach(k=>{
-    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px">${k}</td>`;
+    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px;position:sticky;left:0;background:var(--panel-solid);z-index:1">${k}</td>`;
     themes.forEach(t=>{
-      const v=cfg.themePalettes[t][k]||'';
+      const v=(cfg.themePalettes[t]||{})[k]||'';
       const isHex=/^#[0-9a-fA-F]{3,8}$/.test(v);
       const picker=isHex?`<input type="color" data-cpk="${t}|${k}" value="${v.length===4?'#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]:v.slice(0,7)}" style="width:28px;height:28px;padding:0;border:1px solid var(--line2);border-radius:5px;background:none;vertical-align:middle;cursor:pointer">`:'<span style="font-size:10px;color:var(--dim);vertical-align:middle;margin-right:4px">rgba/其他</span>';
       html+=`<td>${picker}<input data-cv="${t}|${k}" value="${esc(v)}" style="width:calc(100% - 40px);padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;outline:none;margin-left:4px" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
@@ -1398,6 +1487,13 @@ async function loadTheme(){
     cpk.oninput=()=>{ const t=$('#themeTable').querySelector(`[data-cv="${cpk.dataset.cpk}"]`); if(t) t.value=cpk.value; refreshThemePreview(); };
   });
   $('#themeTable').querySelectorAll('[data-cv]').forEach(el=>el.oninput=refreshThemePreview);
+  // 动态填充预览下拉全部 10 套(保留当前选中)
+  const sel=$('#themePreviewSel');
+  if(sel){
+    const cur=sel.value||'cyber';
+    sel.innerHTML=themeMeta.map(([id,name])=>`<option value="${esc(id)}"${id===cur?' selected':''}>${esc(name)} (${esc(id)})</option>`).join('');
+    if(!themeMeta.some(x=>x[0]===cur)) sel.value=themeMeta[0]?.[0]||'cyber';
+  }
   refreshThemePreview();
 }
 function collectThemePalettes(){
@@ -1535,7 +1631,27 @@ function filterText(q){
   });
 }
 
-$('#themeSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('themePalettes',collectThemePalettes()); });
+$('#themeSaveBtn')?.addEventListener('click',async()=>{
+  const p=collectThemePalettes();
+  // P0 严谨性: 校验hex格式, 拦下编辑途中写坏的大/少位颜色
+  const bad=[];
+  Object.keys(p).forEach(theme=>{
+    Object.keys(p[theme]||{}).forEach(k=>{
+      const v=String(p[theme][k]||'').trim();
+      if(!v) return;
+      // 允许: #rgb #rrggbb #rrggbbaa 或 rgba()/rgb()/hsla()/CSS 字面量(shadow 多值)
+      const isHex=/^#[0-9a-fA-F]{3,8}$/.test(v);
+      const isFunc=/^(rgb|rgba|hsl|hsla)\(/i.test(v);
+      const isCompound=v.includes(' ')||v.includes(',');
+      if(!isHex && !isFunc && !isCompound){ bad.push(theme+' · '+k+' = '+v); }
+    });
+  });
+  if(bad.length){
+    if(!await confirmBox('以下颜色格式可能有误(预期 #开头或 rgb/hsl/shadow):\n\n'+bad.slice(0,6).join('\n')+(bad.length>6?'\n…共'+bad.length+'项':'')+'\n\n仍然保存？','颜色格式校验')) return;
+  }
+  const btn=$('#themeSaveBtn'); const old=btn.textContent; btn.disabled=true; btn.textContent='保存中…';
+  try{ await saveConfigKey('themePalettes',p); } finally { btn.disabled=false; btn.textContent=old; }
+});
 $('#bgmSaveBtn')?.addEventListener('click',async()=>{ await saveConfigKey('roomBgm',collectBgm()); });
 $('#bindSaveBtn')?.addEventListener('click',async()=>{
   const rt={}; $('#roomThemeTable').querySelectorAll('[data-rt]').forEach(el=>rt[el.dataset.rt]=el.value);
@@ -1873,7 +1989,11 @@ function normalizeLogRow(row){
 // 日志分页 50/页 + 触底加载 + 骨架屏(数据量 962+ 条, 一次拉 200 首屏卡 → 优化)
 let _auditState={ page:1, pageSize:50, scope:'', tag:'', total:0, items:[], loading:false, done:false };
 async function loadAuditLog(reset=true){
-  if(reset){ _auditState.page=1; _auditState.items=[]; _auditState.done=false; _auditState.total=0; }
+  if(reset){
+    // P0 修复 IO 泄漏
+    if(_auditState._io){ try{ _auditState._io.disconnect(); }catch(_){} _auditState._io=null; }
+    _auditState.page=1; _auditState.items=[]; _auditState.done=false; _auditState.total=0;
+  }
   const box = $('#auditList'); if(!box) return;
   if(reset){
     _auditState.scope = $('#auditScope')?.value || '';
@@ -1892,6 +2012,7 @@ async function loadAuditLog(reset=true){
         }
       },{threshold:0.1});
       io.observe(sentinel);
+      _auditState._io=io;
     }
   }
   await _auditLoadPage(true);
@@ -2108,7 +2229,7 @@ function renderCustomTiers(){
   box.querySelectorAll('input[data-ct]').forEach(el=>el.oninput=()=>{ const ct=_customTiers[+el.dataset.ct]; if(ct){ ct[el.dataset.f]=el.value; markDirty(); } });
   box.querySelectorAll('.ct-treat .seg-btn').forEach(b=>b.onclick=()=>{ const i=+b.parentElement.dataset.i; _customTiers[i].level=b.dataset.lv; b.parentElement.querySelectorAll('.seg-btn').forEach(x=>x.classList.toggle('on',x===b)); markDirty(); });
   box.querySelectorAll('.ct-del').forEach(b=>b.onclick=async()=>{ const i=+b.dataset.i; if(!await confirmBox('删除类型「'+(_customTiers[i].name||_customTiers[i].id)+'」? 该类型的名单也一并清除。','删除类型')) return; _customTiers.splice(i,1); markDirty(); renderCustomTiers(); renderRoleSeg(); if(!_customTiers.some(c=>c.id===_apRole)&&_apRole!=='super'&&_apRole!=='admin') setApRole('admin'); });
-  box.querySelectorAll('.ct-uid-del').forEach(b=>b.onclick=()=>{ const ct=_customTiers[+b.dataset.i]; if(ct){ ct.uids.splice(+b.dataset.j,1); markDirty(); renderCustomTiers(); } });
+  box.querySelectorAll('.ct-uid-del').forEach(b=>b.onclick=async()=>{ const ct=_customTiers[+b.dataset.i]; if(!ct) return; const uid=ct.uids[+b.dataset.j]; if(!uid) return; if(!await confirmBox('从【'+(ct.name||ct.id)+'】名单中移除这个用户？\n\nuser_id: '+String(uid).slice(0,13)+'…','移除成员')) return; ct.uids.splice(+b.dataset.j,1); markDirty(); renderCustomTiers(); });
 }
 $('#tierAddBtn')?.addEventListener('click',()=>{
   // 生成唯一 id: t + 递增序号(避开已用 id)
@@ -2237,6 +2358,35 @@ $('#logoutBtn').onclick=()=>{
   // 无 session → 跳前台引导登录
   gotoFrontLogin();
 })();
+// ==================== P0 通用体验增强(2026-07-16) ====================
+// 1) 保存按钮自动 loading: 所有 id 以 SaveBtn/saveBtn 结尾的按钮点击时自动变灰+改文案, 防止重复提交
+(function installSaveBtnLoading(){
+  document.addEventListener('click',function(e){
+    const b=e.target.closest('button[id]'); if(!b) return;
+    if(!/SaveBtn$|saveBtn$/i.test(b.id)) return;
+    if(b.disabled || b.dataset._busy==='1') return;
+    b.dataset._busy='1'; const orig=b.textContent; b.disabled=true; b.textContent='保存中…';
+    setTimeout(()=>{ if(b.dataset._busy==='1'){ b.disabled=false; b.textContent=orig; b.dataset._busy=''; } }, 3000);
+  }, true);
+})();
+// 2) fmtTime: 将 ISO/时间戳格式化成人性化显示
+window.fmtTime=function(v){
+  if(!v) return '—';
+  const d = (v instanceof Date) ? v : new Date(v);
+  if(isNaN(d.getTime())) return String(v).slice(0,16);
+  const now=new Date();
+  const diff=(now-d)/1000;
+  const pad=n=>String(n).padStart(2,'0');
+  const hm=pad(d.getHours())+':'+pad(d.getMinutes());
+  if(diff<60) return '刚刚';
+  if(diff<3600) return Math.floor(diff/60)+' 分钟前';
+  const sameDay=d.toDateString()===now.toDateString();
+  if(sameDay) return '今天 '+hm;
+  const y=new Date(now); y.setDate(now.getDate()-1);
+  if(d.toDateString()===y.toDateString()) return '昨天 '+hm;
+  if(diff<7*86400) return Math.floor(diff/86400)+' 天前';
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+hm;
+};
 </script>
 </body>
 </html>
