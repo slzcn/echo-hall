@@ -1067,6 +1067,18 @@
   #worldBanner .wb-shine{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
     transform:translateX(-100%);animation:wbShine 2.4s ease-in-out infinite}
   @keyframes wbShine{0%{transform:translateX(-100%)}60%,100%{transform:translateX(200%)}}
+  /* ── 名场面分享卡片预览 ── */
+  #cardMask{position:fixed;inset:0;z-index:97;background:rgba(6,4,14,.84);backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px;
+    padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}
+  #cardMask.on{display:flex;animation:tmFade .35s ease}
+  #cardMask .card-box{display:flex;flex-direction:column;gap:16px;align-items:center;max-width:92vw}
+  #cardMask #cardImg{width:min(440px,90vw);height:auto;border-radius:16px;box-shadow:0 16px 50px rgba(0,0,0,.6)}
+  #cardMask .card-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #cardMask .card-btn{padding:10px 20px;border-radius:22px;border:1.5px solid var(--line2);background:var(--panel);
+    color:var(--ink);font-size:13.5px;cursor:pointer;letter-spacing:.5px}
+  #cardMask .card-btn.primary{border-color:var(--accent);color:var(--accent);font-weight:700}
+  #cardMask .card-btn.ghost{border-color:var(--dim);color:var(--sub)}
   /* ── 每日赛博塔罗: 翻牌抽卡 ── */
   #tarotMask{position:fixed;inset:0;z-index:96;background:rgba(6,4,14,.82);backdrop-filter:blur(6px);
     display:none;align-items:center;justify-content:center;flex-direction:column;gap:22px;
@@ -1360,7 +1372,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1634fullfix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1640moment-card';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1403,6 +1415,16 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div id="ixWord"></div><!-- 互动: 命中大字 -->
 <div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div><!-- 连击对战: 反击浮钮 -->
 <div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div><!-- 世界频道: 全站流光公告 -->
+<div id="cardMask"><!-- 名场面分享卡片预览 -->
+  <div class="card-box">
+    <img id="cardImg" alt="名场面卡片">
+    <div class="card-btns">
+      <button id="cardSave" class="card-btn">💾 保存图片</button>
+      <button id="cardShare" class="card-btn primary">↗ 分享</button>
+      <button id="cardClose" class="card-btn ghost">关闭</button>
+    </div>
+  </div>
+</div>
 <div id="tarotMask"><!-- 每日赛博塔罗 -->
   <div class="tm-hd">· 今日赛博塔罗 ·</div>
   <div class="tarot-card" id="tarotCard">
@@ -5962,6 +5984,7 @@ function showActRing(x,y,m){
     <div class="ar-actions">
       <button data-a="reply"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 4 12l5 6"/><path d="M4 12h9a7 7 0 0 1 7 7v0"/></svg></span>回复</button>
       <button data-a="project"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M10 11l4 1-4 1z" fill="currentColor" stroke="none"/></svg></span>投影</button>
+      <button data-a="card"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15l4-4 4 4M14 13l2-2 5 5"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor" stroke="none"/></svg></span>存卡</button>
       ${canRecall(m)?`<button data-a="recall" class="ar-recall"><span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg></span>撤回</button>`:''}
     </div>`;
   ring.querySelectorAll('.ar-echo').forEach(b=>b.onclick=(e)=>{
@@ -5971,6 +5994,7 @@ function showActRing(x,y,m){
   });
   ring.querySelector('[data-a="reply"]').onclick=()=>{ startReply(m); hideActRing(); };
   ring.querySelector('[data-a="project"]').onclick=()=>{ broadcastProject(m.text,m.color); hideActRing(); };
+  { const cb=ring.querySelector('[data-a="card"]'); if(cb) cb.onclick=()=>{ hideActRing(); makeMomentCard(m); }; }
   const recallBtn=ring.querySelector('[data-a="recall"]');
   if(recallBtn) recallBtn.onclick=()=>{ hideActRing(); recallMsg(mid, m); };
   ring.classList.add('on');
@@ -5980,6 +6004,88 @@ function showActRing(x,y,m){
 }
 function hideActRing(){ $('#actRing').classList.remove('on'); }
 document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
+
+// ============ 名场面分享卡片: 把一条消息画成赛博卡片(canvas), 可保存/分享 ============
+// 纯 canvas 绘制(渐变底+霓虹框+头像emoji+昵称+正文+回声+品牌页脚), 不依赖外部图/html2canvas → 无跨域污染。
+function momentCardText(m){
+  try{
+    if(m.kind==='song'){ const s=parseSong(m.text); return '🎵 '+(s.lyric||'神曲'); }
+    if(m.kind==='voice'){ const tx=(/[#&]tx=([^&]+)/.exec(m.text||'')||[])[1]; return '🎙️ '+(tx?decodeURIComponent(tx):'语音消息'); }
+    if(m.kind==='proj') return '📽️ '+(m.text||'');
+    if(m.kind==='interact'){ const parts=String(m.text||'').split('|'); return parts.slice(2).join('|')||'✨ 互动'; }
+  }catch(_){}
+  return m.text||'';
+}
+async function makeMomentCard(m){
+  try{
+    const dpr=Math.min(2, window.devicePixelRatio||1);
+    const W=720, H=420, pad=44;
+    const cv=document.createElement('canvas'); cv.width=W*dpr; cv.height=H*dpr;
+    const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+    // 取当前主题色(跟随房间氛围, 卡片和房一致)
+    const cs=getComputedStyle(document.documentElement);
+    const accent=(cs.getPropertyValue('--accent')||'#00E5D4').trim()||'#00E5D4';
+    const bg1=(cs.getPropertyValue('--bg')||'#070a12').trim(), bg2=(cs.getPropertyValue('--bg2')||'#0d1524').trim();
+    const ink=(cs.getPropertyValue('--ink')||'#EAF6FF').trim(), sub=(cs.getPropertyValue('--sub')||'#86cbc6').trim();
+    const nmColor=safeColor(m.color, accent);
+    // 底: 对角渐变
+    const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,bg1); g.addColorStop(1,bg2);
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // 霓虹外框 + 角落辉光
+    const rg=ctx.createRadialGradient(W,0,20,W,0,W*0.9); rg.addColorStop(0,accent+'33'); rg.addColorStop(1,'transparent');
+    ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=accent; ctx.lineWidth=2; ctx.shadowColor=accent; ctx.shadowBlur=18;
+    roundRect(ctx, 12,12, W-24,H-24, 22); ctx.stroke(); ctx.shadowBlur=0;
+    // 头部: 头像 emoji + 昵称
+    const nm = m.anon ? (m.name||'虚空') : (m.name||'匿名');
+    ctx.font='40px "Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif';
+    ctx.textBaseline='middle'; ctx.fillText(safeEmoji2(m.emoji)||'👤', pad, pad+24);
+    ctx.font='700 26px system-ui,-apple-system,"PingFang SC",sans-serif';
+    ctx.fillStyle=nmColor; ctx.shadowColor=nmColor; ctx.shadowBlur=10;
+    ctx.fillText(nm, pad+56, pad+24); ctx.shadowBlur=0;
+    // 正文(自动换行, 大字)
+    const txt=momentCardText(m).slice(0,140);
+    ctx.font='600 30px system-ui,-apple-system,"PingFang SC",sans-serif'; ctx.fillStyle=ink;
+    wrapText(ctx, txt, pad, pad+92, W-pad*2, 44, 6);
+    // 页脚: 房名 + 品牌
+    ctx.font='500 16px system-ui,sans-serif'; ctx.fillStyle=sub; ctx.textBaseline='alphabetic';
+    const room=(curRoom&&curRoom.name)?('# '+curRoom.name):'回声厅';
+    ctx.fillText(room, pad, H-pad+6);
+    ctx.textAlign='right'; ctx.fillStyle=accent; ctx.font='700 16px system-ui,sans-serif';
+    ctx.fillText('✦ 回声厅 · Echo Hall', W-pad, H-pad+6); ctx.textAlign='left';
+    // 输出 + 预览
+    const url=cv.toDataURL('image/png');
+    showCardPreview(url);
+  }catch(e){ toast('生成卡片失败'); console.warn('makeMomentCard',e); }
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function wrapText(ctx,text,x,y,maxW,lh,maxLines){
+  const chars=[...String(text)]; let line='',lines=0;
+  for(let i=0;i<chars.length;i++){
+    const test=line+chars[i];
+    if(ctx.measureText(test).width>maxW && line){ ctx.fillText(line,x,y); line=chars[i]; y+=lh; if(++lines>=maxLines-1){ // 最后一行截断加省略
+        let rest=chars.slice(i).join(''); while(ctx.measureText(rest+'…').width>maxW && rest.length>1) rest=rest.slice(0,-1); ctx.fillText(rest+'…',x,y); return; } }
+    else line=test;
+  }
+  if(line) ctx.fillText(line,x,y);
+}
+function safeEmoji2(e){ e=(e||'').trim(); return e?[...e][0]:''; }
+function showCardPreview(url){
+  const mask=$('#cardMask'); if(!mask) return;
+  $('#cardImg').src=url;
+  mask.classList.add('on');
+  $('#cardSave').onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download='echohall-'+Date.now()+'.png'; a.click(); };
+  $('#cardShare').onclick=async()=>{
+    try{
+      const blob=await (await fetch(url)).blob();
+      const file=new File([blob],'echohall.png',{type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'回声厅名场面'}); }
+      else { const a=document.createElement('a'); a.href=url; a.download='echohall-'+Date.now()+'.png'; a.click(); toast('已下载(此设备不支持直接分享)'); }
+    }catch(e){ /* 用户取消分享 */ }
+  };
+  $('#cardClose').onclick=()=>mask.classList.remove('on');
+}
+
 
 // ============ 消息撤回(软删除: UPDATE kind=recalled, 复用现有字段, 无需改 schema) ============
 // 权限: ①作者本人且 ≤120s  ②房主(curRoom.role==='owner')  ③管理员(me.role admin/super)
