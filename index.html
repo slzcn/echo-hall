@@ -1360,7 +1360,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1540mood-ambiance';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1634fullfix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2470,7 +2470,8 @@ const EhSfx=(function(){
   }
   function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
   try{
-    ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true}));
+    // ★补: 使用 { once:true } — 首次手势后自动解绑，避免长生命周期里每次点击都跑 ensure
+    ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true,once:true}));
     document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ctx&&ctx.state!=='running') ctx.resume(); },{passive:true});
   }catch(e){}
   return {play,playClick,setEnabled(v){enabled=!!v},isEnabled(){return enabled},unlock};
@@ -2580,8 +2581,14 @@ function startLobbyBGM(){ try{ if(!bgmOn()) return; AudioEngine.chain(bgmPool())
 function kickBgmOnGesture(){
   try{
     AudioEngine.resume();
-    if(bgmOn() && !AudioEngine.playing() && !curRoom && $('#lobby') && $('#lobby').classList.contains('on')) startLobbyBGM();
+    if(bgmOn() && !AudioEngine.playing() && !curRoom && $('#lobby') && $('#lobby').classList.contains('on')){
+      startLobbyBGM();
+      if(AudioEngine.playing()) detachBgmGestureUnlock();
+    }
   }catch(_){}
+}
+function detachBgmGestureUnlock(){
+  try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,kickBgmOnGesture,{capture:true})); }catch(_){}
 }
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){}
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
@@ -3416,13 +3423,13 @@ function addLoadMore(top){
 }
 
 // ---- Realtime 订阅新消息 + echo ----
-function subscribeMessages(rid){
-  if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
+async function subscribeMessages(rid){
+  // 先 await 清旧 channel, 根治旧房推送串进新房的竞态
+  if(msgChan){ try{ await sb.removeChannel(msgChan); }catch(_){} msgChan=null; }
   msgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
-      // ★防串房: 只处理"当前所在房 === 本订阅房"的推送。切房时旧 channel 可能还没被
-      //   removeChannel 清掉(非await, 有竞态), 旧房推送会串进新房。双保险: rid匹配 + m.room_id匹配。
+      // ★防串房: 双保险 — 既 await removeChannel 也已根治, 仍保留 rid 匹配 防奇奇怪怪注入
       if(!curRoom || curRoom.id!==rid || m.room_id!==rid) return;
       // 去重靠"真实 id 是否已在 DOM"(本浏览器发的消息 insert 后回填了真实 id, 故被挡)。
       // 不再用 user_id===myUid 一律跳过——否则同一账号在【另一浏览器/设备】发的消息本端收不到。
@@ -4032,6 +4039,13 @@ function subscribeWorld(){
     .on('broadcast', { event:'announce' }, ({payload})=>{ try{ showWorldBanner(payload); }catch(_){} })
     .subscribe();
 }
+async function unsubscribeWorld(){
+  if(!worldChan) return;
+  try{ await sb.removeChannel(worldChan); }catch(_){}
+  worldChan=null;
+}
+// 页面彻底退出时主动掉开 world 频道, 避免 "遗留连接"
+try{ window.addEventListener('pagehide',()=>{ try{ unsubscribeWorld(); }catch(_){} },{passive:true}); }catch(_){}
 function worldBroadcast(info){
   if(!worldChan) { try{ subscribeWorld(); }catch(_){}
   }
@@ -6711,6 +6725,7 @@ async function logoutIdentity(bound){
   if(!await ehConfirm(bound?'确定退出登录？':'确定退出并换一个新身份？', bound?'退出登录':'切换身份')) return;
   clearLastRoom();   // ★ 同步先清: 不在房间里登出(curRoom=null)时 leaveRoom 会被跳过, 避免 eh_last_room 残留 → 换账号后进错房
   try{ if(curRoom) await leaveRoom(); }catch(e){}
+  try{ await unsubscribeWorld(); }catch(e){}
   try{ await sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem(LS_ID); }catch(e){}
   myUid=null; me=null;
