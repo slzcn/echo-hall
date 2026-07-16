@@ -1072,6 +1072,24 @@
   @keyframes cbPulse{0%,100%{box-shadow:0 8px 28px rgba(230,57,70,.5),0 0 20px rgba(255,107,0,.4)}50%{box-shadow:0 8px 34px rgba(230,57,70,.7),0 0 30px rgba(255,107,0,.6)}}
   @keyframes cbShake{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
   @keyframes cbRing{0%{opacity:.9;clip-path:inset(0 0 0 0)}100%{opacity:.15;clip-path:inset(0 100% 0 0)}}
+  /* ── 被 KO 眩晕: 全屏大字倒计时遮罩 ── */
+  #koStun{position:fixed;inset:0;z-index:96;pointer-events:none;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 45%,rgba(20,6,30,.5),rgba(6,4,14,.82));backdrop-filter:blur(3px)}
+  #koStun.on{display:flex;animation:tmFade .3s ease}
+  #koStun .ks-stars{font-size:64px;animation:ksSpin 1.4s linear infinite}
+  #koStun .ks-title{font-size:26px;font-weight:900;letter-spacing:8px;color:#FFD84D;text-shadow:0 0 20px #FF6B00;margin-top:8px}
+  #koStun .ks-num{font-size:clamp(70px,20vw,150px);font-weight:900;color:#fff;line-height:1;
+    text-shadow:0 0 30px #FFD84D,0 4px 16px rgba(0,0,0,.6);animation:ksNum 1s ease-in-out infinite}
+  #koStun .ks-tip{font-size:13px;color:var(--sub);letter-spacing:2px;margin-top:6px;opacity:.85}
+  @keyframes ksSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes ksNum{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.12);opacity:1}}
+  /* 眩晕期输入区禁用观感 */
+  .composer.ko-stunned{opacity:.5;filter:grayscale(.5);pointer-events:none}
+  /* 被 KO 者头像挂 💫 转圈标记(旁人也看得到) */
+  .pav.ko-stun{position:relative}
+  .pav.ko-stun::after{content:"💫";position:absolute;top:-6px;right:-4px;font-size:15px;z-index:3;
+    animation:ksSpin 1.6s linear infinite;filter:drop-shadow(0 0 4px #FFD84D);pointer-events:none}
+  @media (prefers-reduced-motion:reduce){ #koStun .ks-stars,#koStun .ks-num,.pav.ko-stun::after{animation:none} }
   /* 连击计数飘字: 命中点上方弹出 ×2 ×3 … */
   .ix-combo{position:fixed;z-index:62;pointer-events:none;font-weight:900;font-style:italic;
     color:#FFD84D;text-shadow:0 0 16px #FF6B00,0 2px 6px rgba(0,0,0,.5);-webkit-text-stroke:1.5px rgba(0,0,0,.3);
@@ -1417,7 +1435,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0130badge-decr';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0230ko-stun';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1459,6 +1477,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
 <div id="ixWord"></div><!-- 互动: 命中大字 -->
 <div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div><!-- 连击对战: 反击浮钮 -->
+<div id="koStun"><!-- 被KO眩晕: 大字倒计时 --><div class="ks-stars">💫</div><div class="ks-title">被 打 晕 了</div><div class="ks-num" id="koStunNum"></div><div class="ks-tip">眩晕中 · 不能出手也不能说话</div></div>
 <div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div><!-- 世界频道: 全站流光公告 -->
 <div id="bottleMask"><!-- 漂流瓶: 捞到/回信 -->
   <div class="bt-box">
@@ -4707,6 +4726,8 @@ function hidePeerMenu(){ const m=$('#peerMenu'); if(m) m.remove(); }
 document.addEventListener('click',e=>{ if(!e.target.closest('#peerMenu') && !e.target.closest('.pav')&&!e.target.closest('.msg .av')) hidePeerMenu(); });
 // 发一个互动: 本地立即演特效 + 写 kind=interact 消息广播给房里所有人
 async function sendInteraction(ix, targetUid, targetName){
+  // 眩晕期禁打击类互动(温和的送花/抱抱放行, 让人还能表达善意)——提到最前
+  if(isStunned() && isHitIx(ix)){ toast('💫 你被打晕了，还手不了…'); return; }
   if(!curRoom||!myUid) return;
   const now=Date.now(), cd=ix.cooldown_ms||4000;
   if(now-(_ixCooldown.get(ix.id)||0) < cd){ toast('手速太快，歇会儿再来~'); return; }
@@ -4729,43 +4750,45 @@ async function sendInteraction(ix, targetUid, targetName){
 // 规则: 打击类(category='hit')互动才计入战斗; 同一对人(a↔b)在窗口内你来我往累加连击;
 //   挨打方 10s 内可点"反击"浮钮回敬(自动选一个打击类互动打回发起者);
 //   连击达阈值 → KO 结算(全屏大字 + 音效 + 定格), 战斗清零。
-const CB_WINDOW = 12000;        // 连击窗口: 两次对打间隔超过则连击断
+const CB_WINDOW = 12000;        // 连击窗口: 该目标两次挨打间隔超过则连击断
 const CB_COUNTER_MS = 10000;    // 反击浮钮可点时长
-const CB_KO_AT = 5;             // 连击到几次触发 KO 结算
-let _combat = null;             // { a, b, count, last, aName, bName } 当前这对的战斗态
+const CB_KO_AT = 5;             // 挨打累计到几下(可多人叠加)触发 KO
+const KO_STUN_MS = 15000;       // 被 KO 后眩晕时长(禁打击+禁言)
+// ★按"被打者"聚合: 任何人(含灵魂)打某人都累加到该人挨打计数 → 多人围殴叠加, 凑够就 KO。
+const _victim = new Map();      // toUid → { count, last, lastFrom, lastFromName }
+let _stunnedUntil = 0;          // 自己被 KO 眩晕到期时间戳(0=没被晕)
+let _koTimer = null;            // 眩晕倒计时 timer
 let _counterFrom = null;        // 反击对象 { uid, name } (最近打我的人)
 let _counterTimer = null;
 function isHitIx(ix){ return ix && (ix.category==='hit'); }
-function pairKey(x,y){ return [x,y].sort().join('~'); }
+function pairKey(x,y){ return [x,y].sort().join('~'); }   // (保留, 其它处可能引用)
 // uid → 显示名(取 presence 头像的 atname; 自己→me.name; 取不到→'某人')
 function targetName(uid){
   if(uid===myUid) return (me&&me.name)||'你';
   const el=document.querySelector(`#presence .pav[data-uid="${uid}"]`);
   return (el&&el.dataset.atname) || '某人';
 }
-// 收到一条打击类互动(from → to)时调用, 更新连击态并判 KO。isSelfSent: 我是发起者
+function isStunned(){ return Date.now() < _stunnedUntil; }
+// 收到一条打击类互动(from → to)时调用: 累加"该目标"挨打数(多人叠加), 判 KO。
 function combatOnHit(fromUid, fromName, toUid, toName, tx, ty){
+  if(!toUid) return;
   const now = Date.now();
-  const pk = pairKey(fromUid, toUid);
-  // 连击累加: 同一对人 + 在窗口内 → count+1; 否则重开一段(count=1)
-  if(_combat && _combat.pk===pk && (now-_combat.last)<CB_WINDOW){
-    _combat.count++;
-  }else{
-    _combat = { pk, count:1, last:now };
-  }
-  _combat.last = now;
-  // 连击飘字(≥2 才显, 命中点上方)
-  if(_combat.count>=2){ showCombo(_combat.count, tx, ty); }
-  // KO 结算
-  if(_combat.count>=CB_KO_AT){
-    const winnerName = fromName;   // 打出第 KO_AT 下的是赢家
-    setTimeout(()=>{ try{ koFinale(winnerName); }catch(_){} }, 560);   // 等这一拳命中再结算
-    _combat = null;
-    clearCounter();
+  let v = _victim.get(toUid);
+  if(!v || (now - v.last) >= CB_WINDOW){ v = { count:0, last:now }; _victim.set(toUid, v); }
+  v.count++; v.last=now; v.lastFrom=fromUid; v.lastFromName=fromName;
+  // 连击飘字(≥2 才显; 多人打同一人也一起涨)
+  if(v.count>=2){ showCombo(v.count, tx, ty); }
+  // KO: 该目标挨打累计够阈值
+  if(v.count>=CB_KO_AT){
+    const winnerName = fromName;          // 打出致命一击者
+    const loserUid = toUid, loserName = toName || targetName(toUid);
+    _victim.delete(toUid);
+    setTimeout(()=>{ try{ koFinale(winnerName, loserUid, loserName); }catch(_){} }, 560);  // 等这一击命中再结算
+    if(toUid===myUid) clearCounter();
     return;
   }
-  // 反击浮钮: 只有"我被打"时才提示我回敬(且发起者不是我自己)
-  if(toUid===myUid && fromUid!==myUid){ offerCounter(fromUid, fromName); }
+  // 反击浮钮: 只有"我被打"且没被晕时才提示回敬
+  if(toUid===myUid && fromUid!==myUid && !isStunned()){ offerCounter(fromUid, fromName); }
 }
 function showCombo(n, tx, ty){
   const el=document.createElement('div'); el.className='ix-combo';
@@ -4797,13 +4820,43 @@ function doCounter(){
   if(ix && tgt){ sendInteraction(ix, tgt.uid, tgt.name); }
   else toast('没有可用的反击招式');
 }
-// KO 结算: 全屏大字 + 音效 + 短震; 复用命中大字/音效原子能力
-function koFinale(winnerName){
+// KO 结算: 全屏大字 + 音效 + 短震 + 胜者横幅; 若被 KO 的是自己 → 进入 15s 眩晕(禁打击+禁言)。
+function koFinale(winnerName, loserUid, loserName){
   try{ ixImpactWord('K.O.', '#FFD84D'); }catch(_){}
   try{ EhSfx.play('boom'); }catch(_){}
   try{ if(navigator.vibrate) navigator.vibrate([60,40,120]); }catch(_){}
-  // 胜者横幅(系统行, 全房都看到; 复用 sysMsg + 风散淡出)
-  try{ scheduleEntryFade(sysMsg(`🏆 <b>${esc(winnerName)}</b> 一套连击打出 <b>K.O.</b>！`)); }catch(_){}
+  try{ scheduleEntryFade(sysMsg(`🏆 <b>${esc(winnerName)}</b> 把 <b>${esc(loserName||'对手')}</b> 打出 <b>K.O.</b>！`)); }catch(_){}
+  // 给被 KO 者头像挂 💫 转圈(旁人也看得到), 15s 后自动摘
+  try{ markKoStun(loserUid); }catch(_){}
+  // 被 KO 的是我 → 本地进入眩晕
+  if(loserUid && loserUid===myUid){ enterStun(); }
+}
+// 头像挂/摘 💫 眩晕标记(全房都渲染)
+function markKoStun(uid){
+  if(!uid) return;
+  const pav=document.querySelector(`#presence .pav[data-uid="${uid}"]`);
+  if(pav){ pav.classList.add('ko-stun'); setTimeout(()=>{ try{ pav.classList.remove('ko-stun'); }catch(_){} }, KO_STUN_MS); }
+}
+// 自己被 KO: 15s 眩晕。禁打击类互动 + 禁言(温和互动/表情放行), 屏幕中央大字倒计时 + 输入区遮罩。
+function enterStun(){
+  _stunnedUntil = Date.now()+KO_STUN_MS;
+  clearCounter();   // 被晕了就别提示反击
+  const ov=$('#koStun'); if(ov){ ov.classList.add('on'); }
+  const composer=$('.composer'); if(composer) composer.classList.add('ko-stunned');
+  clearInterval(_koTimer);
+  const tick=()=>{
+    const left=Math.ceil((_stunnedUntil-Date.now())/1000);
+    const num=$('#koStunNum'); if(num) num.textContent = left>0?left:'';
+    if(left<=0){ clearInterval(_koTimer); _koTimer=null; exitStun(); }
+  };
+  tick(); _koTimer=setInterval(tick, 250);
+}
+function exitStun(){
+  _stunnedUntil=0; clearInterval(_koTimer); _koTimer=null;
+  const ov=$('#koStun'); if(ov) ov.classList.remove('on');
+  const composer=$('.composer'); if(composer) composer.classList.remove('ko-stunned');
+  try{ EhSfx.play('receive'); }catch(_){}
+  try{ toast('💫 眩晕解除，满血复活！'); }catch(_){}
 }
 $('#counterBtn') && ($('#counterBtn').onclick=()=>{ try{ EhSfx.playClick(); }catch(_){} doCounter(); });
 // ============ 合体特效(同心共振): 多人短时对同一人发同一互动 → 升级名场面 ============
@@ -5008,6 +5061,8 @@ function removeSoulThinking(uid){
 async function send(){
   try{ _ehDbg('[send] rid=', curRoom&&curRoom.id, 'len=', ($('#input')&&$('#input').value||'').length); }catch(_){}
   const inp=$('#cin'); let text=inp.value.trim();
+  // 眩晕期禁言(被 KO 后 15s 说不出话)——提到最前, 有内容才提示
+  if(text && isStunned()){ const left=Math.ceil((_stunnedUntil-Date.now())/1000); toast(`💫 被打晕了，${left>0?left:1}秒后才能说话…`); return; }
   if(!text || !curRoom) return;
   // 斜杠命令
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
@@ -6497,7 +6552,7 @@ function ehConfirm(msg, title){
 // ============ 离开房间 ============
 async function leaveRoom(){
   try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
-  try{ _combat=null; clearCounter(); _fuse.clear(); }catch(_){}   // 连击对战/合体态随离房清零
+  try{ _victim.clear(); clearCounter(); _fuse.clear(); if(isStunned()) exitStun(); }catch(_){}   // 连击/合体/眩晕态随离房清零
   // 优化批A#6: 房外不空跑房间态 timer(_sqbTimer 歌曲队列条 2.5s 轮询)
   try{ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } }catch(_){}
   try{ if(typeof curRoom!=='undefined' && curRoom) window.ehLog && ehLog('room_leave',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
