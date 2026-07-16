@@ -1075,6 +1075,19 @@
   @keyframes cbPulse{0%,100%{box-shadow:0 8px 28px rgba(230,57,70,.5),0 0 20px rgba(255,107,0,.4)}50%{box-shadow:0 8px 34px rgba(230,57,70,.7),0 0 30px rgba(255,107,0,.6)}}
   @keyframes cbShake{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
   @keyframes cbRing{0%{opacity:.9;clip-path:inset(0 0 0 0)}100%{opacity:.15;clip-path:inset(0 100% 0 0)}}
+  /* 格挡浮钮: 反击钮左侧, 挨打时同时出现, 点了本次免伤 */
+  #guardBtn{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(calc(-50% - 108px)) translateY(20px);
+    z-index:63;pointer-events:auto;cursor:pointer;user-select:none;display:none;align-items:center;gap:6px;
+    padding:11px 18px;border-radius:26px;font-size:14px;font-weight:800;letter-spacing:.5px;color:#fff;
+    background:linear-gradient(135deg,#2E86DE,#12B0E0);border:1.5px solid rgba(255,255,255,.35);
+    box-shadow:0 8px 28px rgba(46,134,222,.5),0 0 20px rgba(18,176,224,.4);opacity:0;transition:opacity .25s,transform .25s}
+  #guardBtn.on{display:flex;opacity:1;transform:translateX(calc(-50% - 108px)) translateY(0)}
+  #guardBtn .gb-ic{font-size:17px}
+  /* 格挡命中: 蓝盾光环一闪 */
+  .guard-flash{position:fixed;z-index:64;pointer-events:none;border-radius:50%;
+    border:3px solid #29E0E6;box-shadow:0 0 30px #12B0E0,inset 0 0 20px #29E0E6;opacity:0;will-change:transform,opacity}
+  .guard-flash.on{animation:guardFlash .6s cubic-bezier(.2,.7,.3,1) forwards}
+  @keyframes guardFlash{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(1.6)}}
   /* ── 被 KO 眩晕: 全屏大字倒计时遮罩 ── */
   #koStun{position:fixed;inset:0;z-index:96;pointer-events:none;display:none;flex-direction:column;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 45%,rgba(20,6,30,.5),rgba(6,4,14,.82));backdrop-filter:blur(3px)}
@@ -1438,7 +1451,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0121cv-msg';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0410wave1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1480,6 +1493,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
 <div id="ixWord"></div><!-- 互动: 命中大字 -->
 <div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div><!-- 连击对战: 反击浮钮 -->
+<div id="guardBtn"><span class="gb-ic">🛡️</span><span class="gb-txt">格挡</span></div><!-- 挨打时格挡免伤 -->
 <div id="koStun"><!-- 被KO眩晕: 大字倒计时 --><div class="ks-stars">💫</div><div class="ks-title">被 打 晕 了</div><div class="ks-num" id="koStunNum"></div><div class="ks-tip">眩晕中 · 不能出手也不能说话</div></div>
 <div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div><!-- 世界频道: 全站流光公告 -->
 <div id="bottleMask"><!-- 漂流瓶: 捞到/回信 -->
@@ -2760,6 +2774,27 @@ function pickTheme(id){
 }
 function currentTheme(){ try{ return localStorage.getItem(LS_THEME)||'cyber'; }catch(e){ return 'cyber'; } }
 function themeLocked(){ try{ return localStorage.getItem(LS_THEME_LOCK)==='1'; }catch(e){ return false; } }
+// ---- 主题随场景: 未锁主题时, 深夜/节日给个应景皮肤建议(手动锁了则完全不干预) ----
+// 节日按 月-日 匹配(可扩展); 深夜(23:00-05:00)偏暗色系。返回皮肤 id 或 null(用默认)。
+const FESTIVAL_THEME = {
+  '1-1':'sunset', '2-14':'rose', '12-24':'klein', '12-25':'klein', '12-31':'sunset',
+  '10-31':'mono',   // 万圣: 暗金
+};
+function sceneTheme(){
+  try{
+    const d=new Date();
+    const fk=(d.getMonth()+1)+'-'+d.getDate();
+    if(FESTIVAL_THEME[fk]) return FESTIVAL_THEME[fk];   // 节日优先
+    const h=d.getHours();
+    if(h>=23 || h<5) return 'mono';   // 深夜 → 暗夜奢华(暗金, 护眼有格调)
+  }catch(e){}
+  return null;
+}
+// 大厅/无房主题(未锁时叠加场景建议; 锁了或场景无建议则用用户默认)
+function sceneOrDefaultTheme(){
+  if(themeLocked()) return currentTheme();
+  return sceneTheme() || currentTheme();
+}
 // 房间名稳定哈希: djb2 变种(charCodeAt 累加*31), 同名永远同结果
 function roomThemeHash(name){
   const s = String(name||'');
@@ -2838,7 +2873,7 @@ function initThemeUI(){
   if(bhall){
     bhall.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
   }
-  applyTheme(currentTheme());
+  applyTheme(sceneOrDefaultTheme());   // 启动全局主题(未锁时叠加深夜/节日场景皮肤)
   initBgmUI();
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
@@ -4287,15 +4322,38 @@ function dailyTarotDraw(){
   return { card, luck, dayKey:key.split('|')[1] };
 }
 const LS_TAROT='eh_tarot_day';
+const LS_TAROT_STREAK='eh_tarot_streak';   // {days,last:'YYYY-M-D'}
+// 连续签到天数: 昨天抽过→+1, 断了→重置1。返回本次抽卡后的连续天数。
+function tarotStreakOnDraw(dayKey){
+  let st={ days:0, last:'' };
+  try{ st=JSON.parse(localStorage.getItem(LS_TAROT_STREAK))||st; }catch(_){}
+  // dayKey 形如 '2026-7-17'; 算前一天的 key
+  const [y,m,d]=dayKey.split('-').map(Number);
+  const prev=new Date(y, m-1, d); prev.setDate(prev.getDate()-1);
+  const prevKey=prev.getFullYear()+'-'+(prev.getMonth()+1)+'-'+prev.getDate();
+  st.days = (st.last===prevKey) ? (st.days+1) : 1;   // 昨天签过→连上; 否则重新算第1天
+  st.last = dayKey;
+  try{ localStorage.setItem(LS_TAROT_STREAK, JSON.stringify(st)); }catch(_){}
+  return st.days;
+}
+// 连签里程碑奖励文案(达标才有)
+function tarotStreakReward(days){
+  if(days>=30) return { badge:'🏆', title:'塔罗宗师', tip:'连签满月 · 命运眷顾者' };
+  if(days>=14) return { badge:'💠', title:'星辰常客', tip:'连签两周 · 稀有签' };
+  if(days>=7)  return { badge:'🌟', title:'七日之约', tip:'连签一周 · 好运加成' };
+  if(days>=3)  return { badge:'✨', title:'初结缘', tip:'连签三日' };
+  return null;
+}
 function maybeDailyTarot(){
   try{
     const { card, luck, dayKey }=dailyTarotDraw();
     if(localStorage.getItem(LS_TAROT)===dayKey) return;   // 今天已抽过
     localStorage.setItem(LS_TAROT, dayKey);
-    showTarot(card, luck);
+    const streak=tarotStreakOnDraw(dayKey);
+    showTarot(card, luck, streak);
   }catch(_){}
 }
-function showTarot(card, luck){
+function showTarot(card, luck, streak){
   const mask=$('#tarotMask'); if(!mask) return;
   const cardEl=$('#tarotCard'), closeEl=$('#tarotClose');
   cardEl.classList.remove('flipped'); closeEl.classList.remove('show');
@@ -4304,12 +4362,16 @@ function showTarot(card, luck){
   mask.querySelector('.tc-name').textContent=card.name;
   mask.querySelector('.tc-title').textContent=card.title;
   mask.querySelector('.tc-desc').textContent=card.desc;
-  mask.querySelector('.tc-luck').innerHTML=`今日 · <b>${esc(luck.replace('宜 ',''))}</b>`;
+  const reward=(streak>0)?tarotStreakReward(streak):null;
+  const streakLine = (streak>0) ? `　·　🔥连签 <b>${streak}</b> 天${reward?` · ${reward.badge}<b>${esc(reward.title)}</b>`:''}` : '';
+  mask.querySelector('.tc-luck').innerHTML=`今日 · <b>${esc(luck.replace('宜 ',''))}</b>${streakLine}`;
   mask.classList.add('on');
   let flipped=false;
   const doFlip=()=>{ if(flipped) return; flipped=true; cardEl.classList.add('flipped');
     try{ EhSfx.play('sparkle'); }catch(_){}
     try{ burst(card.emoji, 14); }catch(_){}
+    // 连签里程碑(3/7/14/30)达标 → 额外庆祝 + 提示
+    if(reward){ setTimeout(()=>{ try{ burst(reward.badge, 18); EhSfx.play('bloom'); toast(`${reward.badge} ${reward.title} · ${reward.tip}`); }catch(_){} }, 500); }
     setTimeout(()=>closeEl.classList.add('show'), 700);
   };
   cardEl.onclick=doFlip;
@@ -4807,17 +4869,18 @@ function showCombo(n, tx, ty){
   document.body.appendChild(el); void el.offsetWidth; el.classList.add('on');
   setTimeout(()=>el.remove(), 850);
 }
-// 提示反击: 浮钮 10s 可点; 点了就回敬发起者一个打击类互动
+// 提示反击+格挡: 浮钮 10s 可点; 反击=回敬发起者, 格挡=本次免伤
 function offerCounter(fromUid, fromName){
   _counterFrom = { uid:fromUid, name:fromName };
   const btn=$('#counterBtn'); if(!btn) return;
   const ring=btn.querySelector('.cb-ring'); if(ring){ ring.style.animation='none'; void ring.offsetWidth; ring.style.animation=''; }
   btn.querySelector('.cb-txt').textContent='反击 '+fromName;
   btn.classList.add('on');
+  const gb=$('#guardBtn'); if(gb) gb.classList.add('on');   // 同时给格挡选项
   clearTimeout(_counterTimer);
   _counterTimer=setTimeout(clearCounter, CB_COUNTER_MS);
 }
-function clearCounter(){ const btn=$('#counterBtn'); if(btn) btn.classList.remove('on'); _counterFrom=null; clearTimeout(_counterTimer); }
+function clearCounter(){ const btn=$('#counterBtn'); if(btn) btn.classList.remove('on'); const gb=$('#guardBtn'); if(gb) gb.classList.remove('on'); _counterFrom=null; clearTimeout(_counterTimer); }
 function doCounter(){
   if(!_counterFrom) return;
   // 选一个可用的打击类互动回敬(优先"打一拳", 没有则任意 hit)
@@ -4827,6 +4890,23 @@ function doCounter(){
   clearCounter();
   if(ix && tgt){ sendInteraction(ix, tgt.uid, tgt.name); }
   else toast('没有可用的反击招式');
+}
+// 格挡: 抵消自己最近这次挨打(连击计数 -1, 更难被 KO) + 蓝盾光环一闪
+function doGuard(){
+  const v=_victim.get(myUid);
+  if(v && v.count>0){ v.count--; }   // 免这一下
+  clearCounter();
+  try{ EhSfx.play('receive'); }catch(_){}
+  try{ if(navigator.vibrate) navigator.vibrate(20); }catch(_){}
+  // 盾光环在自己头像处一闪(取不到则屏幕中下)
+  let x=window.innerWidth/2, y=window.innerHeight*0.5;
+  const pav=document.querySelector(`#presence .pav[data-uid="${myUid}"]`);
+  if(pav){ try{ const r=pav.getBoundingClientRect(); x=r.left+r.width/2; y=r.top+r.height/2; }catch(_){} }
+  const g=document.createElement('div'); g.className='guard-flash'; const sz=80;
+  g.style.width=g.style.height=sz+'px'; g.style.left=(x-sz/2)+'px'; g.style.top=(y-sz/2)+'px';
+  document.body.appendChild(g); void g.offsetWidth; g.classList.add('on');
+  setTimeout(()=>g.remove(), 650);
+  toast('🛡️ 格挡成功，免伤一击！');
 }
 // KO 结算: 全屏大字 + 音效 + 短震 + 胜者横幅; 若被 KO 的是自己 → 进入 15s 眩晕(禁打击+禁言)。
 function koFinale(winnerName, loserUid, loserName){
@@ -4867,6 +4947,7 @@ function exitStun(){
   try{ toast('💫 眩晕解除，满血复活！'); }catch(_){}
 }
 $('#counterBtn') && ($('#counterBtn').onclick=()=>{ try{ EhSfx.playClick(); }catch(_){} doCounter(); });
+$('#guardBtn') && ($('#guardBtn').onclick=()=>{ try{ EhSfx.playClick(); }catch(_){} doGuard(); });
 // ============ 合体特效(同心共振): 多人短时对同一人发同一互动 → 升级名场面 ============
 // 纯前端, 从共享 interact 流推导。窗口内"同一目标 + 同一互动 id"的不同发起者 ≥ 阈值 → 触发一次盛大结算。
 const FUSE_WINDOW = 8000;   // 汇聚窗口
@@ -7102,7 +7183,7 @@ function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
   try{ document.body.classList.remove('priv-heat'); }catch(_){}   // 离房去掉暧昧红氛围
   // 丝滑续播: 不打断当前房 BGM, 只切成大厅随机连播模式——当前曲放完后随机连播任意房间 BGM
   try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){}
-  applyTheme(currentTheme());  // 离房恢复全局主题(官方房临时皮肤不写 localStorage)
+  applyTheme(sceneOrDefaultTheme());  // 离房恢复全局主题(未锁主题时叠加深夜/节日场景皮肤)
   clearLastRoom();   // ★ 同步立即清标记: 用户明确返回大厅 → 即使立即刷新也不再回旧房间(不等异步 leaveRoom)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
   goScene('lobby'); renderLobby(true);
