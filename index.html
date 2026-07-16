@@ -1080,7 +1080,7 @@
   #cardMask .card-btn.primary{border-color:var(--accent);color:var(--accent);font-weight:700}
   #cardMask .card-btn.ghost{border-color:var(--dim);color:var(--sub)}
   /* ── 每日赛博塔罗: 翻牌抽卡 ── */
-  #tarotMask{position:fixed;inset:0;z-index:96;background:rgba(6,4,14,.82);backdrop-filter:blur(6px);
+  #tarotMask{position:fixed;inset:0;z-index:96;background:var(--mask);backdrop-filter:blur(6px);
     display:none;align-items:center;justify-content:center;flex-direction:column;gap:22px;
     padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))}
   #tarotMask.on{display:flex;animation:tmFade .4s ease}
@@ -1092,14 +1092,15 @@
   .tarot-card.flipped .tc-inner{transform:rotateY(180deg)}
   .tc-face{position:absolute;inset:0;border-radius:20px;backface-visibility:hidden;-webkit-backface-visibility:hidden;
     display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center;overflow:hidden}
-  .tc-back{background:linear-gradient(155deg,#1a1030,#2a1550 55%,#12122a);border:2px solid var(--tc-c,#C77DFF);
-    box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 30px color-mix(in srgb,var(--tc-c,#C77DFF) 40%,transparent)}
+  /* 卡面: 主题底色(--bg2/--panel-solid, 随日夜翻转)混入该牌专属色 --tc-c, 既跟主题又保留每张牌个性 */
+  .tc-back{background:linear-gradient(155deg,color-mix(in srgb,var(--tc-c,#C77DFF) 22%,var(--bg2)),var(--panel-solid) 60%,var(--bg));border:2px solid var(--tc-c,#C77DFF);
+    box-shadow:0 12px 40px var(--shadow-lg,rgba(0,0,0,.5)),0 0 30px color-mix(in srgb,var(--tc-c,#C77DFF) 40%,transparent)}
   .tc-back .tc-rune{font-size:64px;filter:drop-shadow(0 0 16px var(--tc-c,#C77DFF));animation:tcFloat 3s ease-in-out infinite}
   .tc-back .tc-tip{position:absolute;bottom:20px;font-size:12px;color:var(--sub);letter-spacing:1px;animation:tcBlink 1.6s ease-in-out infinite}
   @keyframes tcFloat{0%,100%{transform:translateY(-4px)}50%{transform:translateY(4px)}}
   @keyframes tcBlink{0%,100%{opacity:.4}50%{opacity:1}}
-  .tc-front{transform:rotateY(180deg);background:linear-gradient(160deg,#140c26,#241246 60%,#0e0e22);
-    border:2px solid var(--tc-c,#C77DFF);box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 34px color-mix(in srgb,var(--tc-c,#C77DFF) 50%,transparent)}
+  .tc-front{transform:rotateY(180deg);background:linear-gradient(160deg,color-mix(in srgb,var(--tc-c,#C77DFF) 18%,var(--bg2)),var(--panel-solid) 62%,var(--bg));
+    border:2px solid var(--tc-c,#C77DFF);box-shadow:0 12px 40px var(--shadow-lg,rgba(0,0,0,.5)),0 0 34px color-mix(in srgb,var(--tc-c,#C77DFF) 50%,transparent)}
   .tc-front .tc-emoji{font-size:66px;filter:drop-shadow(0 0 18px var(--tc-c,#C77DFF))}
   .tc-front .tc-name{font-size:23px;font-weight:900;margin:14px 0 4px;color:var(--tc-c,#C77DFF);letter-spacing:2px;text-shadow:0 0 14px color-mix(in srgb,var(--tc-c,#C77DFF) 55%,transparent)}
   .tc-front .tc-title{font-size:12.5px;color:var(--sub);letter-spacing:3px;margin-bottom:14px;text-transform:uppercase}
@@ -1372,7 +1373,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1640moment-card';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1710tarot-theme-world-dedup';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1543,6 +1544,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
         <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
         <div class="pm-item" id="pmVoid"><span class="pm-ic"><span style="display:inline-block;transform:translateY(-3px)">🕳️</span></span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
         <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
+        <div class="pm-item" id="pmBottle"><span class="pm-ic">🌊</span><span class="pm-tx"><b>漂流瓶</b><i>匿名 · 随波漂给别房的某人</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
@@ -4059,6 +4061,8 @@ function subscribeWorld(){
   if(worldChan||!sb) return;
   worldChan = sb.channel('world', { config:{ broadcast:{ self:false } } })
     .on('broadcast', { event:'announce' }, ({payload})=>{ try{ showWorldBanner(payload); }catch(_){} })
+    .on('broadcast', { event:'bottle' }, ({payload})=>{ try{ onBottleDrift(payload); }catch(_){} })
+    .on('broadcast', { event:'bottle_reply' }, ({payload})=>{ try{ onBottleReply(payload); }catch(_){} })
     .subscribe();
 }
 async function unsubscribeWorld(){
@@ -4072,12 +4076,14 @@ function worldBroadcast(info){
   if(!worldChan) { try{ subscribeWorld(); }catch(_){}
   }
   try{ worldChan && worldChan.send({ type:'broadcast', event:'announce', payload:info }); }catch(e){ console.warn('worldBroadcast', e); }
-  // 自己也演一遍(broadcast self:false 不回推自己)
-  try{ showWorldBanner(info); }catch(_){}
+  // 进场者本人不看世界公告(TA已在自己房里看到完整进场特效, 再飘一条顶部公告是重复)。
+  // 同房其他人也不看(他们看到的是房内进场横幅)——由 showWorldBanner 里按 roomId 排除。
 }
 // 顶部流光公告: 从上滑入、悬停约 5s、淡出。色随档位(超管金/贵宾等自定义档紫)。
+// 收到广播者: 若正好在进场者所在的那个房 → 跳过(房内已有进场横幅, 别上下重复)。
 function showWorldBanner(info){
   if(!info || !info.name) return;
+  if(info.roomId && curRoom && curRoom.id===info.roomId) return;   // 同房不重复(房内横幅已覆盖)
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   const el=$('#worldBanner'); if(!el) return;
   const rank = tierRank(info.tier);
@@ -4174,7 +4180,7 @@ function entranceBanner(room){
   try{
     const wa = (cfg.worldAnnounce!==false);
     const isHighTier = tierRank(tier)>=3 || !!customTierDef(tier);
-    if(wa && isHighTier && curRoom){ worldBroadcast({ name:me.name, tier, tierName:tierName(tier), roomName:room.name, icon:(t&&t.icon)||'✦' }); }
+    if(wa && isHighTier && curRoom){ worldBroadcast({ name:me.name, tier, tierName:tierName(tier), roomName:room.name, roomId:room.id, icon:(t&&t.icon)||'✦' }); }
   }catch(e){ console.warn('world announce', e); }
 }
 // 统一入场渲染器(自己 isSelf=true 走全套; 别人 isSelf=false 只横幅+高阶档光幕, 不闪不震不打扰)
@@ -7413,6 +7419,7 @@ $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
 $('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secureRand()*SONG_STYLES.length)].id; setMode('song'); };   // 随机挑个曲风进神曲, 换曲风用细色条
+$('#pmBottle') && ($('#pmBottle').onclick=()=>{ closePlusMenu(); throwBottleFromComposer(); });
 document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
