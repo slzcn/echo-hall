@@ -1417,7 +1417,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0035trim-dom';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0130badge-decr';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3218,8 +3218,8 @@ async function enterRoom(room){
   }
   // ---- 无快照: 原全量流程 ----
   $('#stream').innerHTML=''; oldestId=null; echoState={};
-  _mentionQueue=[]; _mentionIdx=0; updateMentionJump();   // 切房清空@我提醒
-  _songReadyQueue=[]; _songReadyIdx=0; _songGenQueue=[]; _songGenIdx=0; updateSongJump();   // 切房清空神曲谱好+谱曲中提醒
+  _mentionQueue=[]; updateMentionJump();   // 切房清空@我提醒
+  _songReadyQueue=[]; _songGenQueue=[]; _songGenIdx=0; updateSongJump();   // 切房清空神曲谱好+谱曲中提醒
   $('#hallCnt').innerHTML=optimisticCnt(room);
   $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3));
   renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
@@ -4898,11 +4898,11 @@ function updateMentionJump(){
   b.classList.add('on'); b.classList.toggle('multi', n>1);
   const d=$('#mjDot'); if(d) d.textContent = n>9?'9+':String(n);
 }
-let _mentionIdx=0;
 function jumpToMention(){
   if(!_mentionQueue.length) return;
-  // 轮流跳(最近的先): 每点一次跳下一条
-  const mid=_mentionQueue[_mentionIdx % _mentionQueue.length]; _mentionIdx++;
+  // 每点一次"消费"最近的一条: 取出队首(最新)→跳过去→从队列移除→角标 -1
+  const mid=_mentionQueue.shift();
+  updateMentionJump();   // 立即 -1(不管那条在不在当前列表, 点了就算看过)
   const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
   if(msg){
     msg.scrollIntoView({behavior:'smooth',block:'center'});
@@ -4910,8 +4910,6 @@ function jumpToMention(){
   } else {
     toast('那条消息不在当前列表里');
   }
-  // 全部看过一轮后清空提醒(下次@再攒)
-  if(_mentionIdx % _mentionQueue.length===0){ _mentionQueue=[]; _mentionIdx=0; updateMentionJump(); }
 }
 (function bindMentionJump(){ const b=document.getElementById('mentionJump'); if(b) b.addEventListener('click',jumpToMention); })();
 // 神曲谱好提醒队列: 记录我点的、刚谱好的神曲 id, 点"神"按钮轮流跳转+高亮(仿@提醒)
@@ -4965,7 +4963,9 @@ function jumpToSongReady(){
     }
     return;
   }
-  const mid=_songReadyQueue[_songReadyIdx % _songReadyQueue.length]; _songReadyIdx++;
+  // 每点一次"消费"最近谱好的一首: 取出队首→跳过去→移除→角标 -1
+  const mid=_songReadyQueue.shift();
+  updateSongJump();   // 立即 -1
   const msg=document.querySelector(`.msg[data-mid="${mid}"]`);
   if(msg){
     msg.scrollIntoView({behavior:'smooth',block:'center'});
@@ -4975,7 +4975,6 @@ function jumpToSongReady(){
     const nc=msg.querySelector('.song-card');
     if(nc){ nc.classList.add('arrived'); setTimeout(()=>nc.classList.remove('arrived'),3000); }
   } else { toast('那首歌不在当前列表里'); }
-  if(_songReadyIdx % _songReadyQueue.length===0){ _songReadyQueue=[]; _songReadyIdx=0; updateSongJump(); }
 }
 (function bindSongJump(){ const b=document.getElementById('songJump'); if(b) b.addEventListener('click',jumpToSongReady); })();
 function pickAt(i){
