@@ -1417,7 +1417,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0026perf-fx';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0030vip-rank-fix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4106,12 +4106,13 @@ function userTier(u, uid){
   if(u.registered || u.username || u.email) return 'reg';
   return 'anon';
 }
-// 内置档位高低(自定义档按其 level 动态取, 见 tierRank)
-const TIER_RANK = { anon:0, reg:1, admin:2, vip:2, super:3 };
+// 内置档位高低(自定义档按其 level 动态取, 见 tierRank)。vip 不在此表——它是自定义档, 按 customTiers.level 算。
+const TIER_RANK = { anon:0, reg:1, admin:2, super:3 };
 // 是否自定义档(非内置 4 种)。贵宾(vip)属自定义档但内置预置。
 function customTierDef(tier){ try{ return (EH_CONFIG.customTiers||[]).find(c=>c&&c.id===tier)||null; }catch(e){ return null; } }
-// 档位比较值: 内置直接查表; 自定义档按其 level('super'→3, 否则→2)
-function tierRank(tier){ if(TIER_RANK[tier]!=null) return TIER_RANK[tier]; const ct=customTierDef(tier); if(ct) return ct.level==='super'?3:2; return 0; }
+// 档位比较值: ★自定义档(含vip)优先按其 level('super'→3, 否则→2), 否则内置查表。
+//   (旧版把 vip 硬编码进 TIER_RANK=2, 导致后台把贵宾设成超管级也永远返回2, 全屏光幕/世界频道/助攻等级全卡在管理员档)
+function tierRank(tier){ const ct=customTierDef(tier); if(ct) return ct.level==='super'?3:2; if(TIER_RANK[tier]!=null) return TIER_RANK[tier]; return 0; }
 // 档位显示名: 读后台可配的 EH_CONFIG.tierNames(内置) / customTiers.name(自定义), 缺失回退默认全称
 const TIER_NAME_FALLBACK = { super:'超级管理员', vip:'贵宾', admin:'管理员', reg:'正式用户', anon:'临时用户' };
 function tierName(tier){ try{ if(EH_CONFIG.tierNames && EH_CONFIG.tierNames[tier]) return EH_CONFIG.tierNames[tier]; const ct=customTierDef(tier); if(ct) return ct.name||ct.id; return TIER_NAME_FALLBACK[tier]||tier; }catch(e){ return TIER_NAME_FALLBACK[tier]||tier; } }
