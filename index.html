@@ -1294,7 +1294,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1200ixfx-cinema';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1300ixfx-sfx';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2339,6 +2339,20 @@ const EhSfx=(function(){
     o.connect(g); g.connect(master); o.start(t0); o.stop(t0+dur+.03);
     o.onended=function(){ try{o.disconnect();g.disconnect();}catch(e){} };
   }
+  // 噪声爆(打击/爆炸的"实体感"): 一段白噪 → 低通扫频 + 快速衰减
+  function noise(start,dur,peak,lpFrom,lpTo){
+    if(!ctx||!master) return;
+    const t0=ctx.currentTime+start, n=Math.floor(ctx.sampleRate*dur);
+    const buf=ctx.createBuffer(1,n,ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);   // 白噪, 尾部渐弱
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(lpFrom||2400,t0);
+    if(lpTo) lp.frequency.exponentialRampToValueAtTime(Math.max(80,lpTo),t0+dur);
+    const g=ctx.createGain(); g.gain.setValueAtTime(peak||.3,t0); g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    src.connect(lp); lp.connect(g); g.connect(master); src.start(t0); src.stop(t0+dur+.02);
+    src.onended=function(){ try{src.disconnect();lp.disconnect();g.disconnect();}catch(e){} };
+  }
   const lib={
     click(){ tone(1180,0,.045,'triangle',.17); tone(1760,.012,.04,'sine',.09); },
     enter(){ tone(392,0,.16,'sine',.18); tone(587,.055,.18,'triangle',.16); tone(784,.12,.22,'sine',.13); },
@@ -2349,7 +2363,13 @@ const EhSfx=(function(){
     mention(){ tone(988,0,.09,'triangle',.18); tone(1480,.07,.12,'sine',.12); },
     void(){ tone(220,0,.22,'sine',.16,130); tone(440,.04,.18,'triangle',.08,300); },
     error(){ tone(360,0,.12,'sine',.16,260); tone(220,.09,.18,'triangle',.13,160); },
-    back(){ tone(660,0,.13,'sine',.15,494); tone(392,.06,.17,'triangle',.11,330); }
+    back(){ tone(660,0,.13,'sine',.15,494); tone(392,.06,.17,'triangle',.11,330); },
+    // ── 互动电影感音效 ──
+    punch(){ noise(0,.13,.42,1800,180); tone(150,0,.14,'sine',.28,55); tone(90,.02,.12,'triangle',.18,40); },   // 拳拳到肉: 噪声撞击 + 低频闷响
+    boom(){ noise(0,.34,.5,2600,90); tone(74,0,.42,'sine',.34,32); tone(120,.03,.3,'triangle',.2,44); tone(300,0,.06,'sawtooth',.16,120); },   // 爆炸: 长噪声 + 深低频轰
+    whoosh(){ noise(0,.5,.22,600,4200); tone(520,0,.42,'sine',.06,1500); },   // 光带扫过: 低→高扫频噪声
+    sparkle(){ tone(1568,0,.1,'sine',.13); tone(2093,.06,.12,'triangle',.1); tone(2637,.13,.14,'sine',.09); tone(3136,.2,.16,'triangle',.06); },  // 庆祝: 上行铃音闪烁
+    bloom(){ tone(523,0,.2,'sine',.12); tone(784,.07,.22,'sine',.1); tone(1046,.15,.26,'triangle',.075); }   // 温情绽放: 柔和上行大三和弦
   };
   function unlock(){ ensure(); }
   function play(name){
@@ -4236,22 +4256,27 @@ document.addEventListener('pointerup',e=>{
 document.addEventListener('pointercancel',()=>{ if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; } _hlStart=null; });
 // ===== 互动系统: 配置 + 「对TA」菜单 + 发送 + 特效 =====
 let _interactions=[];   // eh_interactions 缓存
-// 内置互动的"电影感升级"补丁: 只补 DB 里没有的升级键(ring/zoom/word/sweep/float),
-// DB 已配的键永远优先(后台可覆盖)。老库无这些键时自动获得升级观感, 不必等 DB 迁移。
+// 内置互动的"电影感升级"补丁: 补 DB 里没有的升级键(ring/zoom/word/sweep/float) + 配套音效。
+// 视觉键: 仅补空缺, DB 已配的永远优先(后台可覆盖)。
+// sfx: 这 7 条内置互动的种子音效是占位(旧库只有 punch/echo/receive), 与新特效不搭 →
+//   用 sfxForce 把它们换成配套的电影感音效; 自定义互动不在此表, sfx 完全由后台决定。
 const IX_FX_UPGRADE = {
-  punch:    { zoom:true, ring:'#E63946', word:'BAM',  word_c:'#FF5A5A' },
-  bomb:     { zoom:true, ring:'#FF6B00', word:'BOOM', word_c:'#FF9A3D' },
-  rose:     { float:'🌹🌸💗' },
-  hug:      { float:'💛✨🧡' },
-  coffee:   { float:'☕✨' },
-  confetti: { sweep:'#FFD84D', word:'🎉', word_c:'#FFD84D' },
-  firework: { sweep:'#8B5CFF', ring:'#8B5CFF' },
+  punch:    { zoom:true, ring:'#E63946', word:'BAM',  word_c:'#FF5A5A', sfxForce:'punch' },
+  bomb:     { zoom:true, ring:'#FF6B00', word:'BOOM', word_c:'#FF9A3D', sfxForce:'boom' },
+  rose:     { float:'🌹🌸💗', sfxForce:'bloom' },
+  hug:      { float:'💛✨🧡', sfxForce:'bloom' },
+  coffee:   { float:'☕✨', sfxForce:'receive' },
+  confetti: { sweep:'#FFD84D', word:'🎉', word_c:'#FFD84D', sfxForce:'sparkle' },
+  firework: { sweep:'#8B5CFF', ring:'#8B5CFF', sfxForce:'boom' },
 };
 function enrichIxFx(ix){
   if(!ix || !ix.id) return ix;
   const up = IX_FX_UPGRADE[ix.id]; if(!up) return ix;
   const fx = Object.assign({}, ix.fx||{});
-  for(const k in up){ if(fx[k]==null) fx[k]=up[k]; }   // 仅补空缺, DB 值优先
+  for(const k in up){
+    if(k==='sfxForce'){ fx.sfx=up[k]; continue; }   // 内置互动音效强制换配套的
+    if(fx[k]==null) fx[k]=up[k];                     // 视觉键仅补空缺, DB 值优先
+  }
   ix.fx = fx; return ix;
 }
 async function loadInteractions(){
@@ -5767,18 +5792,23 @@ function burst(str,count=10){
 function playInteractionFx(fx, targetEl){
   if(!fx) return;
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  try{ if(fx.sfx) EhSfx.play(fx.sfx); }catch(_){}
-  try{ if(fx.vibrate && navigator.vibrate && !reduce) navigator.vibrate(fx.vibrate); }catch(_){}
-  // 全屏闪色
-  if(fx.flash){ const f=$('#ixFlash'); if(f){ f.style.background=`radial-gradient(circle at 50% 45%, ${safeColor(fx.flash)}66, transparent 72%)`; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),450); } }
-  // 全屏抖动
-  if(fx.shake && !reduce){ const app=document.querySelector('#app')||document.body; app.classList.remove('ix-shake'); void app.offsetWidth; app.classList.add('ix-shake'); setTimeout(()=>app.classList.remove('ix-shake'),520); }
-  // 命中定格顿挫(与 shake 不冲突, 叠加更"实"; 用 body 避免与 shake 抢 #app transform)
-  if(fx.zoom && !reduce){ const z=document.querySelector('#app')||document.body; if(!fx.shake){ z.classList.remove('ix-zoom'); void z.offsetWidth; z.classList.add('ix-zoom'); setTimeout(()=>z.classList.remove('ix-zoom'),300); } }
   // 目标落点(对方头像中心); 无目标→屏幕中上
   let tx=window.innerWidth/2, ty=window.innerHeight*0.4;
   if(targetEl){ try{ const r=targetEl.getBoundingClientRect(); tx=r.left+r.width/2; ty=r.top+r.height/2; }catch(_){} }
-  // 全屏对角光带扫过(庆祝/高光)
+  // 有飞行物时, 命中类效果(音效/闪/震/顿/环/大字/撒射/上浮)都等飞到再一起爆 → "命中同步"更带感;
+  //   无飞行物则即时触发。sweep/glow 是氛围性、不属命中冲击, 一律即时。
+  const IMP = fx.fly ? 520 : 0;
+  const atImpact = fn => { if(IMP) setTimeout(()=>{ try{fn();}catch(_){} }, IMP); else { try{fn();}catch(_){} } };
+  // 音效(命中同步)
+  if(fx.sfx) atImpact(()=>EhSfx.play(fx.sfx));
+  if(fx.vibrate && navigator.vibrate && !reduce) atImpact(()=>{ try{ navigator.vibrate(fx.vibrate); }catch(_){} });
+  // 全屏闪色(命中同步)
+  if(fx.flash) atImpact(()=>{ const f=$('#ixFlash'); if(f){ f.style.background=`radial-gradient(circle at 50% 45%, ${safeColor(fx.flash)}66, transparent 72%)`; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),450); } });
+  // 全屏抖动(命中同步)
+  if(fx.shake && !reduce) atImpact(()=>{ const app=document.querySelector('#app')||document.body; app.classList.remove('ix-shake'); void app.offsetWidth; app.classList.add('ix-shake'); setTimeout(()=>app.classList.remove('ix-shake'),520); });
+  // 命中定格顿挫(与 shake 不冲突, 叠加更"实"; 用 body 避免与 shake 抢 #app transform)
+  if(fx.zoom && !reduce && !fx.shake) atImpact(()=>{ const z=document.querySelector('#app')||document.body; z.classList.remove('ix-zoom'); void z.offsetWidth; z.classList.add('ix-zoom'); setTimeout(()=>z.classList.remove('ix-zoom'),300); });
+  // 全屏对角光带扫过(庆祝/高光, 氛围性即时)
   if(fx.sweep && !reduce){ const s=$('#ixSweep'); if(s){ s.style.setProperty('--ixs-c', safeColor(fx.sweep)); s.innerHTML='<div class="swp"></div>'; s.classList.add('on'); clearTimeout(playInteractionFx._swp); playInteractionFx._swp=setTimeout(()=>{ s.classList.remove('on'); s.innerHTML=''; },1050); } }
   // 飞行物: 从底部中央飞向目标, 命中放大后消散
   if(fx.fly){
@@ -5793,16 +5823,16 @@ function playInteractionFx(fx, targetEl){
       {transform:`translate(${dx}px,${dy}px) scale(.3) rotate(240deg)`,opacity:0,offset:1}
     ],{duration:620,easing:'cubic-bezier(.4,0,.5,1)'}).onfinish=()=>el.remove();
   }
-  // 命中冲击波环(打击类, 命中点炸开; fly 时等飞行物到达再炸)
-  if(fx.ring && !reduce){ const fire=()=>ixRingBurst(tx,ty,safeColor(fx.ring)); if(fx.fly) setTimeout(fire,540); else fire(); }
+  // 命中冲击波环(打击类, 命中点炸开)
+  if(fx.ring && !reduce) atImpact(()=>ixRingBurst(tx,ty,safeColor(fx.ring)));
   // 命中大字冲击标题(打击/庆祝)
-  if(fx.word && !reduce){ const fire=()=>ixImpactWord(fx.word, safeColor(fx.word_c||fx.flash||fx.ring||'#fff')); if(fx.fly) setTimeout(fire,520); else fire(); }
-  // 命中光环(温情类头像发光)
+  if(fx.word && !reduce) atImpact(()=>ixImpactWord(fx.word, safeColor(fx.word_c||fx.flash||fx.ring||'#fff')));
+  // 命中光环(温情类头像发光, 氛围性即时)
   if(fx.glow){ const g=document.createElement('div'); g.className='ix-glow'; const sz=90; g.style.width=g.style.height=sz+'px'; g.style.left=(tx-sz/2)+'px'; g.style.top=(ty-sz/2)+'px'; g.style.background=`radial-gradient(circle, ${safeColor(fx.glow)}88, transparent 70%)`; document.body.appendChild(g); g.classList.add('on'); setTimeout(()=>g.remove(),1000); }
-  // 温情上浮物(从目标处袅袅升起)
-  if(fx.float){ setTimeout(()=>{ try{ ixFloatUp(fx.float, tx, ty); }catch(_){} }, fx.fly?520:0); }
-  // 粒子撒射(命中点爆开)
-  if(fx.burst){ setTimeout(()=>{ try{ burst(fx.burst, 24); }catch(_){} }, fx.fly?520:0); }
+  // 温情上浮物(命中同步)
+  if(fx.float) atImpact(()=>ixFloatUp(fx.float, tx, ty));
+  // 粒子撒射(命中同步)
+  if(fx.burst) atImpact(()=>{ try{ burst(fx.burst, 24); }catch(_){} });
   // 纸屑雨(全屏从上落下)
   if(fx.rain && !reduce){ const chars=[...(fx.burst||'🎉🎊✨')]; for(let i=0;i<28;i++){ const r=document.createElement('div'); r.className='ix-rain'; r.textContent=chars[i%chars.length]; r.style.left=(secureRand()*100)+'vw'; document.body.appendChild(r); const dur=1600+secureRand()*1400; r.animate([{transform:'translateY(0) rotate(0)',opacity:1},{transform:`translateY(${window.innerHeight+60}px) rotate(${secureRand()*720-360}deg)`,opacity:.9}],{duration:dur,easing:'ease-in'}).onfinish=()=>r.remove(); } }
 }

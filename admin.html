@@ -537,7 +537,7 @@
 
     <div class="glass card">
       <h3>👊 互动管理</h3>
-      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">点头像「对TA」菜单里的互动(打一拳/送花/撒花等)。特效由 fx 参数组合: 勾选震动/闪屏/抖动/飞行物/撒射/纸屑雨/光环 + 音效。改后点「保存」。</p>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">点头像「对TA」菜单里的互动(打一拳/送花/撒花等)。特效由 fx 参数组合: 震动/闪屏/抖动/命中顿挫/飞行物/撒射/纸屑雨/光环/冲击波环/光带扫过/温情上浮/命中大字 + 音效。音效可选 punch(拳)/boom(爆)/whoosh(扫过)/sparkle(庆祝)/bloom(温情)/echo/receive。改后点「保存」。</p>
       <div id="ixList"></div>
       <div style="margin-top:10px"><button class="mini-btn" id="ixAddBtn" style="border-color:var(--cyan);color:var(--cyan)">+ 新增互动</button></div>
     </div>
@@ -1793,7 +1793,7 @@ function renderIxList(){
         ${txt('flash','闪屏色#')} ${txt('fly','飞行物emoji')} ${txt('burst','撒射emoji')} ${txt('glow','光环色#')}
         ${txt('ring','冲击波环色#')} ${txt('sweep','光带扫过色#')} ${txt('float','上浮emoji(温情)')} ${txt('word','命中大字(如KO)')}
         <input class="ix-fxin" data-i="${i}" data-fxv="1" value="${(fx.vibrate||[]).join(',')}" placeholder="震动 如40,30,60" style="width:110px">
-        <input class="ix-fxin" data-i="${i}" data-fxs="sfx" value="${esc(fx.sfx||'')}" placeholder="音效 punch/echo/receive" style="width:150px">
+        <input class="ix-fxin" data-i="${i}" data-fxs="sfx" value="${esc(fx.sfx||'')}" placeholder="音效 punch/boom/whoosh/sparkle/bloom/echo/receive" style="width:200px">
       </div>
       <div class="ix-row2">
         <label class="ix-chk"><input type="checkbox" data-i="${i}" data-k2="can_target_soul" ${ix.can_target_soul!==false?'checked':''}>可对灵魂</label>
