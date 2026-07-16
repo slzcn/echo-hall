@@ -156,8 +156,8 @@
   /* ===== 荷尔蒙特效 P0/P1(值由 EH_CONFIG.fx 变量控, 后台可调) ===== */
   /* ② 聊天页活背景: 不再进房关灯。底层两团极缓漂移的青/品红光晕 + 网格轻呼吸, 死场变活场。 */
   body.hall-on .bg-orb{ display:block; opacity:calc(.32 * var(--fx-livebg,.55)*1.8); filter:blur(38px); animation-duration:var(--fx-livebg-speed,26s); }
-  body.hall-on .bg-grid{ animation:gridBreath 9s ease-in-out infinite; }
-  @keyframes gridBreath{0%,100%{opacity:.7}50%{opacity:1}}
+  body.hall-on .bg-grid{ opacity:.88; } /* ★ 2026-07-17 P4: gridBreath 实测木20行就吃 52ms，改静态固定亮度。视觉均值(0.7Ω1 → 0.88)不变 */
+  @keyframes gridBreath{0%,100%{opacity:.7}50%{opacity:1}} /* 保留 keyframes 定义不删，以防其他地方引用 */
 
   /* ① 辉光打满: 卡片/气泡/头像的外发光强度统一由 --fx-bloom 放大(基于主题的 --glow-* 色) */
   .enter-card,.identity{ box-shadow:0 8px 40px var(--shadow-lg), 0 0 calc(30px*var(--fx-bloom,1)) -6px color-mix(in srgb,var(--accent) calc(40%*var(--fx-bloom,1)),transparent); }
@@ -189,8 +189,8 @@
     box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04) inset;
     cursor:pointer;user-select:none;
     opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
-    transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  .to-latest.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+    transition:opacity .22s,transform .22s}
+  .to-latest.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)} /* ★ P4: blur 只在显示时加 */
   .to-latest:hover{transform:translateY(-2px) scale(1.06)}
   .to-latest:active{transform:translateY(0) scale(.94)}
   .to-latest .tl-arrow{display:block;width:18px;height:18px;opacity:.82}
@@ -210,8 +210,8 @@
     box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--magenta,#FF6F61);
     font-size:19px;font-weight:800;line-height:1;
     opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
-    transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  .mention-jump.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;animation:mjPulse 1.8s ease-in-out infinite}
+    transition:opacity .22s,transform .22s}
+  .mention-jump.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;animation:mjPulse 1.8s ease-in-out infinite;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)} /* ★ P4 */
   .mention-jump:hover{transform:translateY(-2px) scale(1.06)}
   .mention-jump:active{transform:translateY(0) scale(.94)}
   .mention-jump .mj-dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
@@ -228,8 +228,8 @@
     box-shadow:0 6px 20px -6px rgba(0,0,0,.5),0 0 14px -4px var(--violet,#B57EDC);
     font-size:17px;font-weight:800;line-height:1;
     opacity:0;transform:translateY(12px) scale(.92);pointer-events:none;
-    transition:opacity .22s,transform .22s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  .song-jump.on{opacity:1;pointer-events:auto;
+    transition:opacity .22s,transform .22s}
+  .song-jump.on{opacity:1;pointer-events:auto;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px); /* ★ P4 */
     background:color-mix(in srgb,var(--violet,#B57EDC) 18%,var(--panel-solid,rgba(20,24,38,.9)));
     border-color:var(--violet,#B57EDC);color:#fff;
     animation:sjReadyBounce 1.1s cubic-bezier(.3,1.3,.5,1) infinite}
@@ -1451,7 +1451,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0410wave1';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0137p4-grid-glass';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
