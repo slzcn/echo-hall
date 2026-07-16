@@ -1294,7 +1294,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1300ixfx-sfx';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1330sfx-louder';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1650,8 +1650,8 @@ const EH_CONFIG_DEFAULT = {
       // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
       super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  },  // 超管: 全屏金光幕+皇冠雨+闪+震(最炸)
       vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵宾: 全屏紫光幕+钻石雨(默认管理员级; vipTreatment='super' 时自动加震屏升到超管级排面)
-      admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'receive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
-      reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'receive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
+      admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'arrive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
+      reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'arrive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
       anon:   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',   sfx:'',        stage:false, burst:'',       flash:'',        shake:false },  // 临时: 低调淡入
     },
   },
@@ -2365,11 +2365,13 @@ const EhSfx=(function(){
     error(){ tone(360,0,.12,'sine',.16,260); tone(220,.09,.18,'triangle',.13,160); },
     back(){ tone(660,0,.13,'sine',.15,494); tone(392,.06,.17,'triangle',.11,330); },
     // ── 互动电影感音效 ──
-    punch(){ noise(0,.13,.42,1800,180); tone(150,0,.14,'sine',.28,55); tone(90,.02,.12,'triangle',.18,40); },   // 拳拳到肉: 噪声撞击 + 低频闷响
-    boom(){ noise(0,.34,.5,2600,90); tone(74,0,.42,'sine',.34,32); tone(120,.03,.3,'triangle',.2,44); tone(300,0,.06,'sawtooth',.16,120); },   // 爆炸: 长噪声 + 深低频轰
-    whoosh(){ noise(0,.5,.22,600,4200); tone(520,0,.42,'sine',.06,1500); },   // 光带扫过: 低→高扫频噪声
-    sparkle(){ tone(1568,0,.1,'sine',.13); tone(2093,.06,.12,'triangle',.1); tone(2637,.13,.14,'sine',.09); tone(3136,.2,.16,'triangle',.06); },  // 庆祝: 上行铃音闪烁
-    bloom(){ tone(523,0,.2,'sine',.12); tone(784,.07,.22,'sine',.1); tone(1046,.15,.26,'triangle',.075); }   // 温情绽放: 柔和上行大三和弦
+    punch(){ noise(0,.14,.72,2000,180); tone(150,0,.16,'sine',.5,52); tone(90,.02,.14,'triangle',.34,38); },   // 拳拳到肉: 噪声撞击 + 低频闷响
+    boom(){ noise(0,.36,.82,2800,80); tone(70,0,.46,'sine',.55,30); tone(120,.03,.32,'triangle',.34,42); tone(300,0,.07,'sawtooth',.26,120); },   // 爆炸: 长噪声 + 深低频轰
+    whoosh(){ noise(0,.5,.42,600,4600); tone(520,0,.42,'sine',.1,1500); },   // 光带扫过: 低→高扫频噪声
+    sparkle(){ tone(1568,0,.11,'sine',.22); tone(2093,.06,.13,'triangle',.17); tone(2637,.13,.15,'sine',.15); tone(3136,.2,.17,'triangle',.11); },  // 庆祝: 上行铃音闪烁
+    bloom(){ tone(523,0,.22,'sine',.2); tone(784,.07,.24,'sine',.17); tone(1046,.15,.28,'triangle',.13); },   // 温情绽放: 柔和上行大三和弦
+    // 进场专属(比 receive 更有仪式感、够响): 上行三连音亮起
+    arrive(){ tone(587,0,.14,'triangle',.24); tone(880,.06,.16,'sine',.2); tone(1175,.14,.2,'triangle',.15); }
   };
   function unlock(){ ensure(); }
   function play(name){
