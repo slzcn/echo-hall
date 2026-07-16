@@ -1286,6 +1286,13 @@
   .mood-aura.mood-excited{animation:moodPulse 2.2s ease-in-out infinite}
   .mood-aura.mood-caring{animation:moodPulse 5s ease-in-out infinite}
   @keyframes moodPulse{0%,100%{opacity:.32}50%{opacity:.6}}
+  /* 灵魂心情联动全房氛围: 主导心情把 --mood-tint 平滑融进底部氛围光带(输入区上方一层暖/冷色雾),
+     不动房间主题色本身(边框/字色不乱), 只在底部叠一层情绪雾, 强度克制。calm 无 tint → 自动隐藏。 */
+  #moodTintLayer{position:fixed;left:0;right:0;bottom:0;height:180px;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.8s ease;
+    background:radial-gradient(ellipse 90% 100% at 50% 100%,var(--mood-tint,transparent),transparent 70%)}
+  body.mood-tinted #moodTintLayer{opacity:.22}
+  body.mood-tinted[data-mood="excited"] #moodTintLayer{opacity:.3;animation:moodPulse 2.6s ease-in-out infinite}
+  body.mood-tinted[data-mood="caring"] #moodTintLayer{opacity:.24;animation:moodPulse 6s ease-in-out infinite}
   /* 进房空间穿越转场: 隧道径向线条一闪 */
   #warp{position:fixed;inset:0;z-index:9997;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 50%,transparent 0%,transparent 30%,color-mix(in srgb,var(--accent,var(--cyan)) 22%,transparent) 55%,transparent 72%)}
@@ -1353,7 +1360,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-1537selfheal-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-1540mood-ambiance';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1388,6 +1395,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div id="warp"></div>
 <div id="soundwave"></div>
 <div class="mood-aura" id="moodAura"></div>
+<div id="moodTintLayer"></div><!-- 灵魂心情联动: 底部情绪雾 -->
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
 <div id="resonance"></div>
 <div id="ixFlash"></div>
@@ -7516,25 +7524,41 @@ function fillAndLogin(id, pwv){
     check(); setInterval(check, 5*60*1000);
   })();
 
-  // ---- 3. 灵魂心情天气: 轮询 roomSouls 主导情绪, 染 mood-aura ----
+  // ---- 3. 灵魂心情天气: 轮询 roomSouls 主导情绪, 染 mood-aura + 微调全房氛围色 ----
   // TOP10 #4: moodWeather 轮询按进/离房启停,离房后不再吃CPU
   (function(){
     const aura=document.getElementById('moodAura');
-    const MOOD={ excited:{c:'#FF6B35',cls:'mood-excited'}, happy:{c:'#FFD24D',cls:''},
-      caring:{c:'#B57EDC',cls:'mood-caring'}, calm:{c:'#0ABAB5',cls:''} };
-    let _moodT=null;
+    // 每种心情: 光晕色 c + 动画类 cls + 氛围叠加色 tint(用于给全房 --mood-tint, 融进边框/辉光)
+    const MOOD={ excited:{c:'#FF6B35',cls:'mood-excited',tint:'#FF6B35'}, happy:{c:'#FFD24D',cls:'',tint:'#FFC24D'},
+      caring:{c:'#B57EDC',cls:'mood-caring',tint:'#C77DFF'}, calm:{c:'#0ABAB5',cls:'',tint:''} };
+    let _moodT=null, _lastDom=null;
     function tick(){
       try{
-        if(!document.body.classList.contains('hall-on') || typeof roomSouls==='undefined' || !roomSouls.length){ aura.classList.remove('on'); return; }
+        if(!document.body.classList.contains('hall-on') || typeof roomSouls==='undefined' || !roomSouls.length){ aura.classList.remove('on'); if(_lastDom!==null){ clearMoodTint(); _lastDom=null; } return; }
         const cnt={}; roomSouls.forEach(s=>{ const e=s.emotion||'calm'; cnt[e]=(cnt[e]||0)+1; });
         let dom='calm',mx=0; Object.keys(cnt).forEach(e=>{ if(cnt[e]>mx){mx=cnt[e];dom=e;} });
         const m=MOOD[dom]||MOOD.calm;
         aura.style.setProperty('--mood-c', m.c);
         aura.className='mood-aura on '+(m.cls||'');
+        // 主导心情变化时, 平滑把氛围色融进全房(边框/辉光轻微偏移), calm 则恢复房间原主题色
+        if(dom!==_lastDom){ _lastDom=dom; applyMoodTint(m.tint, dom); }
       }catch(_){}
     }
+    // 用 --mood-tint(色) + body class 让 CSS 把灵魂心情融进边框光晕; calm=清空回归房间主题
+    function applyMoodTint(tint, dom){
+      const root=document.documentElement;
+      if(!tint){ clearMoodTint(); return; }
+      root.style.setProperty('--mood-tint', tint);
+      document.body.classList.add('mood-tinted');
+      document.body.setAttribute('data-mood', dom);
+    }
+    function clearMoodTint(){
+      document.documentElement.style.removeProperty('--mood-tint');
+      document.body.classList.remove('mood-tinted');
+      document.body.removeAttribute('data-mood');
+    }
     window.startMoodWeather = function(){ if(_moodT) return; _moodT=setInterval(tick, 3000); tick(); };
-    window.stopMoodWeather  = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; if(aura) aura.classList.remove('on'); } };
+    window.stopMoodWeather  = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; if(aura) aura.classList.remove('on'); } clearMoodTint(); _lastDom=null; };
   })();
 
   // ---- 供主脚本调用的钩子 ----
