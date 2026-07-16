@@ -1451,7 +1451,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260717-0510bottle-db';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260717-0157ent-admin';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4447,6 +4447,31 @@ function entranceBanner(room){
   }
   // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
   renderEntrance({ name:me.name, tier, roomName:room.name }, true);
+  // ★ 2026-07-17 后台预览挂钩: ?entPreview=<tier> 或 __custom__ 时自动触发一次入场特效
+  try{
+    const pv=new URLSearchParams(location.search).get('entPreview');
+    if(pv){
+      setTimeout(()=>{
+        try{
+          let previewTier=pv;
+          let previewName='预览者';
+          if(pv==='__custom__'){
+            const raw=localStorage.getItem('__eh_ent_preview_custom');
+            if(raw){
+              const c=JSON.parse(raw);
+              // 临时推入 EH_CONFIG.customTiers 让 renderEntrance 能命中自定义档
+              if(!Array.isArray(EH_CONFIG.customTiers)) EH_CONFIG.customTiers=[];
+              EH_CONFIG.customTiers.push({...c, uids:[myUid]});
+              previewTier=c.id;
+              previewName=c.name||'预览';
+            }
+          }
+          renderEntrance({ name:previewName, tier:previewTier, roomName:room.name }, true);
+          try{ toast('预览: '+previewTier); }catch(_){}
+        }catch(e){ console.warn('entPreview',e); }
+      }, 1500);   // 等自己入场特效演完再放预览，不盖掉
+    }
+  }catch(_){}
   // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。
   // ★enter 是"当场特效", 只需存活到 realtime 把它推给在场的人(几秒)。插入后 8s 自删——
   //   根治它污染历史/大厅预览/灵魂上下文/回声统计(治本, 前端过滤只是治标, 且已删存量24条)。
@@ -4477,6 +4502,17 @@ function renderEntrance(info, isSelf){
     // 自定义档统一用 vip 紫钻皮肤做底, 图标/入场词/待遇档按该档配置
     const base=(cfg.tiers && cfg.tiers.vip) || { label:'莅 临', cls:'ent-vip-tier', sfx:'soul', stage:true, burst:'💎✨🌟', flash:'#C77DFF', shake:false };
     t={ ...base, icon:ctDef.icon||base.icon };
+    // ★ 2026-07-17: 后台可为自定义档写入 fx 整套自定覆盖(label/cls/sfx/stage/burst/flash/shake), 实现"添加新方式"
+    if(ctDef.fx && typeof ctDef.fx==='object'){
+      const fx=ctDef.fx;
+      if(fx.label!=null) t.label=fx.label;
+      if(fx.cls) t.cls=fx.cls;
+      if(fx.sfx!=null) t.sfx=fx.sfx;
+      if(fx.stage!=null) t.stage=!!fx.stage;
+      if(fx.burst!=null) t.burst=fx.burst;
+      if(fx.flash!=null) t.flash=fx.flash;
+      if(fx.shake!=null) t.shake=!!fx.shake;
+    }
   }
   if(!t) return;
   // 待遇档 level='super' → 借超管的隆重度(震屏+更炸的皇冠雨/金闪), 但保留自定义档身份皮肤与入场词。

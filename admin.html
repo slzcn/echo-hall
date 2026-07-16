@@ -9,7 +9,7 @@
    但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
    localStorage 存已到达版本防循环; 断网恢复复检。*/
 (function(){
-  var ADMIN_VER='20260716-1634admin-fullfix';
+  var ADMIN_VER='20260717-0157ent-panel';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
     fetch('ver-admin.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -546,6 +546,7 @@
     <div class="tab" data-page="users">用户</div>
     <div class="tab" data-page="rooms">房间</div>
     <div class="tab" data-page="theme">外观</div>
+    <div class="tab" data-page="entrance">✨ 进场</div>
     <div class="tab" data-page="songstyles">玩法</div>
     <div class="tab" data-page="text">文案参数</div>
     <div class="tab" data-page="people" id="peopleTab">人员</div>
@@ -665,6 +666,33 @@
         root 根音Hz · chord 和弦半音程(如 0,4,7,11) · wave 波形 · pulse 律动ms(0=纯pad) · cut 低通Hz
       </div>
       <div id="bgmTable"></div>
+    </div>
+  </div>
+
+  <!-- ✨ 进场特效 tab: 身份化入场横幅 + 全屏光幕 + 可自定义新方式 -->
+  <div class="page" id="p-entrance">
+    <div class="glass card">
+      <h3>✨ 总开关 & 全局参数
+        <button class="btn" id="entGlobalSaveBtn" style="font-size:12px;padding:6px 14px">💾 保存</button>
+        <button class="mini-btn" id="entGlobalResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button></h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">控制进场特效总开关、广播范围、贵宾待遇。保存后前台启动拉取生效。</p>
+      <div id="entGlobalTable"></div>
+    </div>
+
+    <div class="glass card">
+      <h3>🎭 五档标准身份进场效果
+        <button class="btn" id="entTiersSaveBtn" style="font-size:12px;padding:6px 14px">💾 保存</button>
+        <button class="mini-btn" id="entTiersResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 默认</button></h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">超管/贵宾/管理员/正式/临时进场横幅的文案、图标、音效、全屏光幕、粒子、闪屏、震屏。预览需先保存。</p>
+      <div id="entTiersTable"></div>
+    </div>
+
+    <div class="glass card">
+      <h3>➕ 自定义进场方式 (自由新增)
+        <button class="btn" id="entCustomSaveBtn" style="font-size:12px;padding:6px 14px">💾 保存</button>
+        <button class="mini-btn" id="entCustomAddBtn" style="border-color:var(--cyan);color:var(--cyan)">➕ 新增一档</button></h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px">为特定用户(如官方主持/名人/VIP1/VIP2…)自由设计一套入场效果。id 唯一不能与预置档(super/vip/admin/reg/anon) 重。UID 列表在“人员” tab 维护，此处仅配效果。</p>
+      <div id="entCustomList"></div>
     </div>
   </div>
 
@@ -2509,6 +2537,239 @@ function collectTuning(){
   return out;
 }
 $('#tuningSaveBtn')?.addEventListener('click',async()=>{ const v=collectTuning(); if(await saveConfigKey('tuning',v)){ if(CFG_CACHE) CFG_CACHE.tuning=v; loadTuning(); } });
+
+// ================ ✨ 进场特效配置 ================
+// entranceFx 写回 eh_config 同名键; customTiers 也同时支持携带 fx 自定义整套效果。
+// 预览→直接打开前台 index.html?entPreview=<tier>, index 拉取新配后自动触发一次进场。
+
+const ENT_TIER_ROWS=[
+  ['super','👑 超管',    { label:'降 临',  icon:'👑', cls:'ent-super',    sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  }],
+  ['vip',   '💎 贵宾',    { label:'菅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',    stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false }],
+  ['admin', '🛡️ 管理员',[ { label:'菅 临',  icon:'🛡️', cls:'ent-admin',    sfx:'arrive',  stage:true,  burst:'✨🛡️',    flash:'',         shake:false }][0]],
+  ['reg',   '✴ 正式',    { label:'进 入',  icon:'✴',  cls:'ent-reg',      sfx:'arrive',  stage:false, burst:'✴✨',       flash:'',         shake:false }],
+  ['anon',  '🕯️ 临时',   { label:'飘 入',  icon:'🕯️', cls:'ent-anon',     sfx:'',        stage:false, burst:'',           flash:'',         shake:false }],
+];
+const ENT_GLOBAL_FIELDS=[
+  ['enabled',            '总开关',           'true=开启所有进场特效; false=全部关闭', 'bool'],
+  ['othersAvatar',       '他人头像弹入',       '他人上光墙时头像弹入动画', 'bool'],
+  ['broadcast',          '广播给房里',        '把进场事件广播给房里所有人(别人看到横幅/光幕)', 'bool'],
+  ['broadcastMinTier',   '广播最低档',        'anon/reg/admin/vip/super; anon=全员广播, reg=包含匿名不广播', 'enum:tier'],
+  ['othersStageMinTier', '全屏光幕最低档',    '别人看到全屏光幕的最低身份档(默认 admin 及以上才惊动全场)', 'enum:tier'],
+  ['worldAnnounce',      '全站流光公告',      '高阶档进场在全站报幕顶部卡片公告', 'bool'],
+  ['vipTreatment',       '贵宾待遇档',        'admin=管理员级隆重度; super=超管级(震屏+更炸). 保留紫钻身份皮肤', 'enum:treat'],
+];
+const ENT_TIER_ENUM=[['anon','anon'],['reg','reg'],['admin','admin'],['vip','vip'],['super','super']];
+const ENT_TREAT_ENUM=[['admin','admin (管理员级)'],['super','super (超管级+震屏)']];
+const ENT_CLS_ENUM=[['ent-super','超管金彩'],['ent-vip-tier','贵宾紫钻'],['ent-admin','管理金光'],['ent-reg','正式青青'],['ent-anon','临时低调']];
+const ENT_SFX_ENUM=[['','(无音效)'],['soul','soul (灵魂空青)'],['arrive','arrive (轻益)']];
+
+function _entDefault(){
+  const d=CFG_DEFAULT.entranceFx||{};
+  return { enabled:true, othersAvatar:true, broadcast:true, broadcastMinTier:'reg',
+           othersStageMinTier:'admin', worldAnnounce:true, vipTreatment:'admin',
+           ...d,
+           tiers: Object.assign({}, ...ENT_TIER_ROWS.map(([id,,def])=>({[id]:def})), (d.tiers||{})) };
+}
+
+let _entCustomDraft=[];  // customTiers 草稿
+
+async function loadEntrance(){
+  const cfg=await loadConfig();
+  const cur=Object.assign({}, _entDefault(), (cfg&&cfg.entranceFx)||{});
+  const curTiers=Object.assign({}, _entDefault().tiers, cur.tiers||{});
+  const def=_entDefault();
+
+  // 全局参数表
+  let g='<div style="overflow-x:auto"><table><thead><tr><th>参数</th><th>值</th><th>说明</th></tr></thead><tbody>';
+  ENT_GLOBAL_FIELDS.forEach(([k,label,hint,type])=>{
+    const v=cur[k]!=null?cur[k]:def[k];
+    const changed=String(v)!==String(def[k]);
+    let ctrl;
+    if(type==='bool'){
+      ctrl=`<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-entg="${k}" ${v?'checked':''}> <span style="font-family:monospace;color:var(--sub)">${v}</span></label>`;
+    } else if(type==='enum:tier'){
+      const opts=ENT_TIER_ENUM.map(([vv,ll])=>`<option value="${esc(vv)}"${vv===v?' selected':''}>${esc(ll)}</option>`).join('');
+      ctrl=`<select data-entg="${k}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px">${opts}</select>`;
+    } else if(type==='enum:treat'){
+      const opts=ENT_TREAT_ENUM.map(([vv,ll])=>`<option value="${esc(vv)}"${vv===v?' selected':''}>${esc(ll)}</option>`).join('');
+      ctrl=`<select data-entg="${k}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px">${opts}</select>`;
+    }
+    g+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:10px">改</span>':''}<div style="font-family:monospace;font-size:10px;color:var(--dim)">${k}</div></td><td>${ctrl}</td><td style="color:var(--dim);font-size:11.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${esc(String(def[k]))}</span></td></tr>`;
+  });
+  g+='</tbody></table></div>';
+  $('#entGlobalTable').innerHTML=g;
+
+  // 五档表
+  let t='<div style="overflow-x:auto"><table style="width:100%"><thead><tr><th>身份</th><th>入场词</th><th>图标</th><th>皮肤</th><th>音效</th><th>全屏光幕</th><th>粒子</th><th>闪屏色</th><th>震屏</th><th>预览</th></tr></thead><tbody>';
+  ENT_TIER_ROWS.forEach(([id,dname,defT])=>{
+    const c=Object.assign({}, defT, curTiers[id]||{});
+    const cls=ENT_CLS_ENUM.map(([v,l])=>`<option value="${esc(v)}"${v===c.cls?' selected':''}>${esc(l)}</option>`).join('');
+    const sfx=ENT_SFX_ENUM.map(([v,l])=>`<option value="${esc(v)}"${v===(c.sfx||'')?' selected':''}>${esc(l)}</option>`).join('');
+    t+=`<tr data-tier="${id}">
+      <td style="white-space:nowrap"><b>${esc(dname)}</b><div style="font-family:monospace;font-size:10px;color:var(--dim)">${id}</div></td>
+      <td><input data-ent="label" value="${esc(c.label||'')}" maxlength="6" style="width:70px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px"></td>
+      <td><input data-ent="icon" value="${esc(c.icon||'')}" maxlength="4" style="width:50px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:14px;text-align:center"></td>
+      <td><select data-ent="cls" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${cls}</select></td>
+      <td><select data-ent="sfx" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${sfx}</select></td>
+      <td style="text-align:center"><input type="checkbox" data-ent="stage" ${c.stage?'checked':''}></td>
+      <td><input data-ent="burst" value="${esc(c.burst||'')}" maxlength="20" placeholder="emoji串" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px"></td>
+      <td><input data-ent="flash" value="${esc(c.flash||'')}" maxlength="20" placeholder="#F5D06A" style="width:80px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11.5px"></td>
+      <td style="text-align:center"><input type="checkbox" data-ent="shake" ${c.shake?'checked':''}></td>
+      <td><button class="mini-btn" data-preview="${id}" style="border-color:var(--cyan);color:var(--cyan);font-size:11px">▶ 预览</button></td>
+    </tr>`;
+  });
+  t+='</tbody></table></div>';
+  $('#entTiersTable').innerHTML=t;
+
+  // 开玩预览按钮
+  $('#entTiersTable').querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewEntrance(b.dataset.preview));
+
+  // 自定义档
+  _entCustomDraft=Array.isArray(cfg&&cfg.customTiers)?JSON.parse(JSON.stringify(cfg.customTiers)):(_entDefault().customTiers||[]);
+  renderEntCustom();
+}
+function renderEntCustom(){
+  const box=$('#entCustomList'); if(!box) return;
+  if(!_entCustomDraft.length){ box.innerHTML='<div style="color:var(--dim);font-size:12px;padding:8px 0">尚无自定义方式。点右上 “➕ 新增一档” 开始。</div>'; return; }
+  const clsOpts=ENT_CLS_ENUM.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  const sfxOpts=ENT_SFX_ENUM.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  const levelOpts=[['admin','admin 管理员级'],['super','super 超管级']].map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  box.innerHTML=_entCustomDraft.map((c,i)=>{
+    const fx=c.fx||{};
+    return `<div class="ent-cust-item" data-idx="${i}" style="border:1px solid var(--line2);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:rgba(10,12,24,.35)">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+      <span style="font-size:11px;color:var(--dim);font-family:monospace">id</span>
+      <input data-ec="id" value="${esc(c.id||'')}" maxlength="20" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px">
+      <span style="font-size:11px;color:var(--dim)">名称</span>
+      <input data-ec="name" value="${esc(c.name||'')}" maxlength="12" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12.5px">
+      <span style="font-size:11px;color:var(--dim)">图标</span>
+      <input data-ec="icon" value="${esc(c.icon||'')}" maxlength="4" style="width:50px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:14px;text-align:center">
+      <span style="font-size:11px;color:var(--dim)">待遇</span>
+      <select data-ec="level" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${levelOpts.replace(`value="${c.level||'admin'}"`,`value="${c.level||'admin'}" selected`)}</select>
+      <span style="font-size:11px;color:var(--dim)">命中 UID</span>
+      <span style="font-family:monospace;font-size:11px;color:var(--sub)">${(c.uids||[]).length} 人</span>
+      <button class="mini-btn" data-ec-preview="${i}" style="margin-left:auto;border-color:var(--cyan);color:var(--cyan);font-size:11px">▶ 预览</button>
+      <button class="mini-btn" data-ec-del="${i}" style="border-color:var(--magenta);color:var(--magenta);font-size:11px">× 删除</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 10px;background:rgba(0,0,0,.2);border-radius:8px">
+      <span style="font-size:11px;color:var(--dim);font-weight:600">✨ 自定义入场效果</span>
+      <span style="font-size:11px;color:var(--dim)">入场词</span>
+      <input data-ec-fx="label" value="${esc(fx.label||'')}" maxlength="6" placeholder="菅 临" style="width:70px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">
+      <span style="font-size:11px;color:var(--dim)">皮肤</span>
+      <select data-ec-fx="cls" style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${clsOpts.replace(`value="${fx.cls||''}"`, `value="${fx.cls||''}" selected`)}</select>
+      <span style="font-size:11px;color:var(--dim)">音效</span>
+      <select data-ec-fx="sfx" style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${sfxOpts.replace(`value="${fx.sfx==null?'soul':fx.sfx}"`, `value="${fx.sfx==null?'soul':fx.sfx}" selected`)}</select>
+      <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="stage" ${fx.stage!==false?'checked':''}> 全屏光幕</label>
+      <span style="font-size:11px;color:var(--dim)">粒子</span>
+      <input data-ec-fx="burst" value="${esc(fx.burst||'')}" maxlength="20" placeholder="💎✨🌟" style="width:100px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">
+      <span style="font-size:11px;color:var(--dim)">闪屏</span>
+      <input data-ec-fx="flash" value="${esc(fx.flash||'')}" maxlength="20" placeholder="#C77DFF" style="width:80px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11.5px">
+      <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="shake" ${fx.shake?'checked':''}> 震屏</label>
+    </div>
+  </div>`;
+  }).join('');
+  // 完善 select selected 修复（replace 上面可能匿名）
+  box.querySelectorAll('.ent-cust-item').forEach(root=>{
+    const idx=+root.dataset.idx; const c=_entCustomDraft[idx]||{}; const fx=c.fx||{};
+    root.querySelector('[data-ec="level"]').value = c.level || 'admin';
+    root.querySelector('[data-ec-fx="cls"]').value = fx.cls || 'ent-vip-tier';
+    root.querySelector('[data-ec-fx="sfx"]').value = fx.sfx==null?'soul':fx.sfx;
+  });
+  box.querySelectorAll('[data-ec-del]').forEach(b=>b.onclick=()=>{ if(confirm('确定删除这个自定义方式?(仅删当前草稿，未保存前仍可“默认”回退)')){ _entCustomDraft.splice(+b.dataset.ecDel,1); renderEntCustom(); } });
+  box.querySelectorAll('[data-ec-preview]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.ecPreview; const c=collectCustomItem(i); if(!c) return; previewEntranceCustom(c); });
+}
+function collectCustomItem(i){
+  const root=$('.ent-cust-item[data-idx="'+i+'"]'); if(!root) return null;
+  const g=k=>root.querySelector('[data-ec="'+k+'"]');
+  const f=k=>root.querySelector('[data-ec-fx="'+k+'"]');
+  const orig=_entCustomDraft[i]||{};
+  return {
+    id:(g('id').value||'').trim(),
+    name:(g('name').value||'').trim(),
+    icon:(g('icon').value||'').trim(),
+    level:g('level').value,
+    uids:Array.isArray(orig.uids)?orig.uids.slice():[],
+    fx:{
+      label:(f('label').value||'').trim()||undefined,
+      cls:f('cls').value,
+      sfx:f('sfx').value,
+      stage:f('stage').checked,
+      burst:(f('burst').value||'').trim(),
+      flash:(f('flash').value||'').trim(),
+      shake:f('shake').checked,
+    }
+  };
+}
+function collectAllCustom(){
+  const out=[]; const seen={};
+  _entCustomDraft.forEach((_,i)=>{ const c=collectCustomItem(i); if(!c) return;
+    if(!c.id){ throw new Error('第 '+(i+1)+' 行 id 不能为空'); }
+    if(/^(super|vip|admin|reg|anon)$/.test(c.id)){ throw new Error('id 不能与预置档重: '+c.id); }
+    if(seen[c.id]){ throw new Error('id 重复: '+c.id); }
+    seen[c.id]=1; out.push(c); });
+  return out;
+}
+function collectEntGlobal(){
+  const out={}; const def=_entDefault();
+  ENT_GLOBAL_FIELDS.forEach(([k,,,type])=>{
+    const el=$('#entGlobalTable [data-entg="'+k+'"]'); if(!el){ out[k]=def[k]; return; }
+    if(type==='bool') out[k]=!!el.checked;
+    else out[k]=el.value||def[k];
+  });
+  return out;
+}
+function collectEntTiers(){
+  const out={};
+  ENT_TIER_ROWS.forEach(([id,,defT])=>{
+    const row=$('#entTiersTable [data-tier="'+id+'"]'); if(!row){ out[id]=defT; return; }
+    const q=k=>row.querySelector('[data-ent="'+k+'"]');
+    out[id]={
+      label:(q('label').value||'').trim()||defT.label,
+      icon:(q('icon').value||'').trim()||defT.icon,
+      cls:q('cls').value||defT.cls,
+      sfx:q('sfx').value,
+      stage:q('stage').checked,
+      burst:(q('burst').value||'').trim(),
+      flash:(q('flash').value||'').trim(),
+      shake:q('shake').checked,
+    };
+  });
+  return out;
+}
+
+// 预览: 开新窗口到 index.html?entPreview=<tier>, index 拉取新配后自动触发一次进场。
+function previewEntrance(tier){ window.open('index.html?entPreview='+encodeURIComponent(tier),'_blank'); }
+function previewEntranceCustom(c){
+  // 自定义档预览：先自存一条致 localStorage 让前台拿到，再打开
+  try{ localStorage.setItem('__eh_ent_preview_custom', JSON.stringify(c)); }catch(_){}
+  window.open('index.html?entPreview=__custom__','_blank');
+}
+
+// 保存全局 & 五档：一块封装一个 entranceFx
+async function saveEntranceFx(kind){
+  const cur=(CFG_CACHE&&CFG_CACHE.entranceFx)||{};
+  let merged=Object.assign({}, _entDefault(), cur);
+  if(kind==='global'||!kind){ Object.assign(merged, collectEntGlobal()); }
+  if(kind==='tiers'||!kind){ merged.tiers=collectEntTiers(); }
+  if(await saveConfigKey('entranceFx', merged)){
+    if(!CFG_CACHE) CFG_CACHE={}; CFG_CACHE.entranceFx=merged;
+    loadEntrance();
+  }
+}
+$('#entGlobalSaveBtn')?.addEventListener('click',()=>saveEntranceFx('global'));
+$('#entTiersSaveBtn')?.addEventListener('click',()=>saveEntranceFx('tiers'));
+$('#entGlobalResetBtn')?.addEventListener('click',()=>resetConfigKeys(['entranceFx'], loadEntrance, '进场全局参数'));
+$('#entTiersResetBtn')?.addEventListener('click',()=>resetConfigKeys(['entranceFx'], loadEntrance, '五档入场效果'));
+$('#entCustomAddBtn')?.addEventListener('click',()=>{ _entCustomDraft.push({ id:'', name:'', icon:'⭐', level:'admin', uids:[], fx:{ cls:'ent-vip-tier', sfx:'soul', stage:true, burst:'⭐✨', flash:'#C77DFF', shake:false } }); renderEntCustom(); });
+$('#entCustomSaveBtn')?.addEventListener('click',async()=>{
+  try{
+    const list=collectAllCustom();
+    if(await saveConfigKey('customTiers', list)){
+      if(!CFG_CACHE) CFG_CACHE={}; CFG_CACHE.customTiers=list;
+      loadEntrance();
+    }
+  }catch(e){ toast(e.message||'保存失败'); }
+});
 
 // ---- 角色类型: 4 默认(仅改显示名) + 自定义(增改删) ----
 // 默认档只有显示名可改, 存进 tierNames; 自定义档整份对象存进 customTiers 数组。
