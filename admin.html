@@ -9,7 +9,7 @@
    但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
    localStorage 存已到达版本防循环; 断网恢复复检。*/
 (function(){
-  var ADMIN_VER='20260716-1504admin-ux';
+  var ADMIN_VER='20260716-1517user-page';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -33,6 +33,9 @@
   window.addEventListener('online', function(){ check('online'); });
 })();
 </script>
+<!-- 与前台共用: eh_theme(主题皮) + eh_mode(日间/夜晚). 同步前台切什么后台就什么. -->
+<script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+<script>try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();var _day=(_m==='day')||(_m==='auto'&&_h>=7&&_h<19);document.documentElement.setAttribute('data-mode',_day?'day':'night');}catch(e){}</script>
 <style>
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
@@ -70,6 +73,53 @@
   html[data-theme="sunset"]{ --bg:#180818; --bg2:#2c0e26; --panel:rgba(50,21,34,.8); --panel-solid:#2a131d;
     --line:rgba(255,61,146,.24); --line2:rgba(255,61,146,.38); --ink:#FFEAF2; --sub:#cb86a4; --dim:#8d4967;
     --cyan:#FF3D92; --magenta:#FF7A3D; --violet:#C476FF; --amber:#FFB04D; --green:#5FE0B0; --grid:rgba(255,61,146,.05); }
+
+  /* ===== 日间模式(亮底): 每套主题都必须显式覆盖夜间注入的强调色(v2踩过坑) ===== */
+  html[data-mode="day"]{
+    --input-bg:#FFFFFF; --input-shadow:inset 0 1px 2px rgba(30,50,110,.06);
+    --card-bg:rgba(255,255,255,.72); --card-bg-soft:rgba(255,255,255,.55);
+    --mask:rgba(28,38,66,.32); --hover:rgba(40,70,150,.07);
+    --bubble-bg:#FFFFFF; --bubble-border:rgba(60,80,140,.22);
+    --bubble-me-bg:linear-gradient(120deg,#EAF7F5,#EFEAFB);
+    --btn-ink:#FFFFFF;
+    --shadow-lg:rgba(60,80,140,.20); --shadow-md:rgba(60,80,140,.14);
+    --ch-shadow:rgba(60,80,140,.16);
+    --name-halo:rgba(255,255,255,.9); --text-halo:rgba(255,255,255,.7);
+  }
+  html[data-mode="day"][data-theme="cyber"]{
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+  }
+  html[data-mode="day"][data-theme="vapor"]{
+    --bg:#f8eff6; --bg2:#f1daec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(220,0,172,0.28); --line2:rgba(220,0,172,0.42); --ink:#310c29; --sub:#8f3d7d; --dim:#bb81ae; --cyan:#dc00ac; --magenta:#eb0071; --violet:#17877b; --amber:#C8892E; --green:#1c8c34; --accent:#dc00ac; --grid:rgba(220,0,172,0.06); --glow-cyan:0 2px 10px rgba(220,0,172,0.18); --glow-mag:0 2px 10px rgba(235,0,113,0.16);
+  }
+  html[data-mode="day"][data-theme="aurora"]{
+    --bg:#eff8f4; --bg2:#daf1e6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,136,71,0.28); --line2:rgba(0,136,71,0.42); --ink:#0c311f; --sub:#3d8f68; --dim:#81bb9f; --cyan:#008847; --magenta:#bd2eff; --violet:#00809f; --amber:#C8892E; --green:#008847; --accent:#008847; --grid:rgba(0,136,71,0.06); --glow-cyan:0 2px 10px rgba(0,136,71,0.18); --glow-mag:0 2px 10px rgba(189,46,255,0.16);
+  }
+  html[data-mode="day"][data-theme="mono"]{
+    --bg:#f8f6ef; --bg2:#f1ebda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(147,111,10,0.28); --line2:rgba(147,111,10,0.42); --ink:#31270c; --sub:#8a7742; --dim:#b8aa85; --cyan:#936f0a; --magenta:#db3666; --violet:#9f7130; --amber:#C8892E; --green:#97732c; --accent:#936f0a; --grid:rgba(147,111,10,0.06); --glow-cyan:0 2px 10px rgba(147,111,10,0.18); --glow-mag:0 2px 10px rgba(219,54,102,0.16);
+  }
+  html[data-mode="day"][data-theme="klein"]{
+    --bg:#eff1f8; --bg2:#dadff1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(59,102,255,0.28); --line2:rgba(59,102,255,0.42); --ink:#0c1431; --sub:#3d4f8f; --dim:#818ebb; --cyan:#3b66ff; --magenta:#cc5100; --violet:#108185; --amber:#C8892E; --green:#178762; --accent:#3b66ff; --grid:rgba(59,102,255,0.06); --glow-cyan:0 2px 10px rgba(59,102,255,0.18); --glow-mag:0 2px 10px rgba(204,81,0,0.16);
+  }
+  html[data-mode="day"][data-theme="coral"]{
+    --bg:#f8f1ef; --bg2:#f1dfda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(222,53,0,0.28); --line2:rgba(222,53,0,0.42); --ink:#31150c; --sub:#8f513d; --dim:#bb8f81; --cyan:#de3500; --magenta:#ef0054; --violet:#198878; --amber:#C8892E; --green:#1b8b61; --accent:#de3500; --grid:rgba(222,53,0,0.06); --glow-cyan:0 2px 10px rgba(222,53,0,0.18); --glow-mag:0 2px 10px rgba(239,0,84,0.16);
+  }
+  html[data-mode="day"][data-theme="lagoon"]{
+    --bg:#eff6f8; --bg2:#daecf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(13,124,158,0.28); --line2:rgba(13,124,158,0.42); --ink:#0c2831; --sub:#437989; --dim:#85abb7; --cyan:#0d7c9e; --magenta:#e33e00; --violet:#17876f; --amber:#C8892E; --green:#158559; --accent:#0d7c9e; --grid:rgba(13,124,158,0.06); --glow-cyan:0 2px 10px rgba(13,124,158,0.18); --glow-mag:0 2px 10px rgba(227,62,0,0.16);
+  }
+  html[data-mode="day"][data-theme="dusk"]{
+    --bg:#eff1f8; --bg2:#dae0f1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(75,112,218,0.28); --line2:rgba(75,112,218,0.42); --ink:#0c1631; --sub:#4b5981; --dim:#8b95b1; --cyan:#4b70da; --magenta:#e04000; --violet:#5671e4; --amber:#C8892E; --green:#2a8963; --accent:#4b70da; --grid:rgba(75,112,218,0.06); --glow-cyan:0 2px 10px rgba(75,112,218,0.18); --glow-mag:0 2px 10px rgba(224,64,0,0.16);
+  }
+  html[data-mode="day"][data-theme="rose"]{
+    --bg:#f8eff1; --bg2:#f1dae0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(201,67,104,0.28); --line2:rgba(201,67,104,0.42); --ink:#310d17; --sub:#7d4f5c; --dim:#ae8e97; --cyan:#c94368; --magenta:#cc4f7b; --violet:#6772c5; --amber:#C8892E; --green:#2d8857; --accent:#c94368; --grid:rgba(201,67,104,0.06); --glow-cyan:0 2px 10px rgba(201,67,104,0.18); --glow-mag:0 2px 10px rgba(204,79,123,0.16);
+  }
+  html[data-mode="day"][data-theme="sunset"]{
+    --bg:#f8eff3; --bg2:#f1dae4; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,0,98,0.28); --line2:rgba(224,0,98,0.42); --ink:#310c1c; --sub:#8f3d61; --dim:#bb819b; --cyan:#e00062; --magenta:#d64300; --violet:#a939ff; --amber:#C8892E; --green:#1b8b61; --accent:#e00062; --grid:rgba(224,0,98,0.06); --glow-cyan:0 2px 10px rgba(224,0,98,0.18); --glow-mag:0 2px 10px rgba(214,67,0,0.16);
+  }
+  /* cyber 默认走 :root(无 data-theme),所以日间也要单独给 html[data-mode="day"]:not([data-theme]) 覆盖 */
+  html[data-mode="day"]:not([data-theme]){
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+  }
 
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{overscroll-behavior:none}
@@ -164,6 +214,47 @@
   .kpi.clickable:active{transform:translateY(-1px) scale(.99)}
 
   /* ===== ★ KPI 详情弹层 ===== */
+  /* 保留供房间/消息 KPI 等级过渡使用；用户已改用页内 tab, 不再弹。 */
+
+  /* ===== 用户管理页（页内表格 + 真分页）===== */
+  .users-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .users-toolbar input, .users-toolbar select{
+    padding:7px 10px;border-radius:8px;border:1px solid var(--line2);
+    background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:13px;outline:none;
+  }
+  html[data-mode="day"] .users-toolbar input, html[data-mode="day"] .users-toolbar select{ background:var(--input-bg,#fff); }
+  .users-toolbar input#usersQ{flex:1;min-width:180px;max-width:280px}
+  table.users-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
+  table.users-table th, table.users-table td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
+  table.users-table thead th{position:sticky;top:0;background:var(--panel-solid);color:var(--sub);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;z-index:1}
+  table.users-table tbody tr:hover{background:rgba(120,140,220,.06)}
+  table.users-table td.u-nick{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+  table.users-table td.u-uid{font-family:"SF Mono",Menlo,Consolas,monospace;color:var(--dim);font-size:11px}
+  table.users-table .u-av{width:32px;height:32px;border-radius:8px;display:inline-grid;place-items:center;font-size:17px;background:rgba(120,140,220,.1)}
+  table.users-table .u-badge{display:inline-block;padding:1.5px 7px;border-radius:5px;font-size:10.5px;line-height:1.4;font-weight:600}
+  .u-badge.b-anon{background:rgba(113,126,169,.18);color:var(--dim)}
+  .u-badge.b-real{background:rgba(10,186,181,.16);color:var(--cyan)}
+  .u-badge.b-super{background:rgba(255,111,97,.16);color:var(--magenta)}
+  .u-badge.b-admin{background:rgba(181,126,220,.16);color:var(--violet)}
+  .u-badge.b-user{color:var(--dim)}
+  .u-actions{display:flex;gap:5px;flex-wrap:wrap}
+  .u-actions .mini-btn{font-size:10.5px;padding:2.5px 8px}
+  .users-pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:var(--sub)}
+  .users-pager .pg-btn{min-width:32px;padding:5px 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(10,12,24,.4);color:var(--ink);cursor:pointer;font-family:inherit;font-size:12.5px}
+  .users-pager .pg-btn:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan)}
+  .users-pager .pg-btn.on{background:var(--cyan);color:#0a0c18;border-color:var(--cyan);font-weight:700}
+  html[data-mode="day"] .users-pager .pg-btn.on{color:#fff}
+  .users-pager .pg-btn:disabled{opacity:.35;cursor:not-allowed}
+  .users-pager .pg-jump{display:inline-flex;align-items:center;gap:6px;margin-left:8px}
+  .users-pager .pg-jump input{width:56px;padding:4px 7px;border-radius:6px;border:1px solid var(--line2);background:rgba(10,12,24,.4);color:var(--ink);font-size:12.5px;text-align:center}
+  .users-pager .pg-ellipsis{color:var(--dim);padding:0 4px}
+  #userDetailBody dl{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;font-size:12.5px}
+  #userDetailBody dt{color:var(--dim);font-weight:600}
+  #userDetailBody dd{margin:0;color:var(--ink);word-break:break-all}
+  @media (max-width:640px){
+    .users-toolbar input#usersQ{max-width:none;flex:1 0 100%}
+    #userDetailBody dl{grid-template-columns:88px 1fr;font-size:12px}
+  }
   .detail-modal{width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;padding:0;overflow:hidden;animation:pop .28s cubic-bezier(.2,.9,.3,1.3)}
   .dm-head{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
   .dm-title{font-size:15px;font-weight:800;flex:1}
@@ -452,6 +543,7 @@
   </div>
   <div class="tabs">
     <div class="tab on" data-page="overview">概览</div>
+    <div class="tab" data-page="users">用户</div>
     <div class="tab" data-page="rooms">房间</div>
     <div class="tab" data-page="theme">外观</div>
     <div class="tab" data-page="songstyles">玩法</div>
@@ -468,6 +560,62 @@
         · <b>普通管理员</b>只能查看公开房间记录；<b>超级管理员</b>可查看全站（含私密房）。<br>
         · 私密房消息永久保留，不自动清理。
       </div>
+    </div>
+  </div>
+
+  <!-- 用户管理(页内展开、表格式、真分页): 不再走弹层 -->
+  <div class="page" id="p-users">
+    <div class="glass card" style="padding:14px">
+      <div class="users-toolbar">
+        <input type="text" id="usersQ" placeholder="搜索昵称/用户名…" autocomplete="off">
+        <select id="usersFilter">
+          <option value="all">全部用户</option>
+          <option value="real">正式账号</option>
+          <option value="anon">匿名访客</option>
+        </select>
+        <select id="usersSort">
+          <option value="created_at.desc">注册时间 ↓</option>
+          <option value="created_at.asc">注册时间 ↑</option>
+          <option value="last_seen.desc">最后活跃 ↓</option>
+          <option value="last_seen.asc">最后活跃 ↑</option>
+          <option value="name.asc">昵称 A→Z</option>
+          <option value="name.desc">昵称 Z→A</option>
+        </select>
+        <select id="usersPageSize" title="每页条数">
+          <option value="20">20 条/页</option>
+          <option value="50" selected>50 条/页</option>
+          <option value="100">100 条/页</option>
+          <option value="200">200 条/页</option>
+        </select>
+        <button class="mini-btn" id="usersRefreshBtn" style="border-color:var(--cyan);color:var(--cyan)">↻ 刷新</button>
+        <span id="usersTotalHint" style="margin-left:auto;color:var(--dim);font-size:12px"></span>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="users-table" id="usersTable">
+          <thead><tr>
+            <th style="min-width:52px">头像</th>
+            <th style="min-width:120px">昵称</th>
+            <th style="min-width:110px">用户名</th>
+            <th style="min-width:75px">类型</th>
+            <th style="min-width:90px">后台身份</th>
+            <th style="min-width:130px">注册时间</th>
+            <th style="min-width:130px">最后活跃</th>
+            <th style="min-width:132px">user_id</th>
+            <th style="min-width:160px">操作</th>
+          </tr></thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+      <div class="users-pager" id="usersPager"></div>
+    </div>
+
+    <!-- 页内详情区(不弹层, 点某行或搜索结果展开在下方) -->
+    <div class="glass card" id="userDetailCard" style="display:none;padding:14px;margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h3 style="margin:0">用户详情</h3>
+        <button class="mini-btn" id="userDetailClose">✕ 收起</button>
+      </div>
+      <div id="userDetailBody"></div>
     </div>
   </div>
 
@@ -759,12 +907,16 @@ $('#dmask').onclick=e=>{ if(e.target===$('#dmask')) closeDetailMask(); };
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('#dmask').classList.contains('on')) closeDetailMask(); });
 
 async function openKpiDetail(dt, label){
+  // 用户: 不再弹层, 切到页内 tab
+  if(dt==='users'){
+    document.querySelector('.tab[data-page="users"]')?.click();
+    return;
+  }
   $('#dmTitle').textContent=label||'详情';
   $('#dmBody').innerHTML=Array(5).fill('<div class="sk sk-row" style="height:46px"></div>').join('');
   openDetailMask();
   try{
-    if(dt==='users'){ await renderUsersDetail(); }
-    else if(dt==='messages'){ await renderMessagesDetail(); }
+    if(dt==='messages'){ await renderMessagesDetail(); }
     else if(dt && dt.startsWith('rooms:')){ await renderRoomsDetail(dt.split(':')[1]); }
     else $('#dmBody').innerHTML='<div class="empty">暂无详情</div>';
   }catch(e){ $('#dmBody').innerHTML='<div class="empty">加载出错</div>'; }
@@ -825,7 +977,7 @@ document.addEventListener('click',function(e){
   const u=(_userState.items||[]).find(x=>String(x.id)===String(uid));
   const username=(u&&u.username)||'';
   // 切到人员 tab + 锁定选中
-  document.querySelector('.tab-btn[data-page="p-people"]')?.click();
+  document.querySelector('.tab[data-page="people"]')?.click();
   if(typeof _apPickUser==='function'){ _apPickUser({id:uid, name:nm, username, emoji:emj}); }
   toast('已选中 '+nm+' · 选身份后点任命');
   const ppl=document.getElementById('p-people'); if(ppl){ ppl.scrollIntoView({behavior:'smooth', block:'start'}); }
@@ -916,6 +1068,187 @@ async function _userLoadPage(isFirst){
   if(count) count.textContent=`共 ${total} 位用户 · 已加载 ${_userState.items.length}`;
   if(sentinel) sentinel.textContent=_userState.done ? '— 到底了 —' : '滑动加载更多…';
 }
+
+// ================= 页内用户管理页(真分页 · 无弹层) =================
+// state与弹层版分开, 互不干扰
+_userPageState = window._userPageState || { page:1, pageSize:50, q:'', filter:'all', sort:'created_at.desc', total:0, items:[], loading:false, initialized:false, detailUid:null };
+async function loadUsersPage(reset){
+  const st=_userPageState;
+  const tbody=$('#usersTbody'); if(!tbody) return;
+  if(reset===true){ st.page=1; st.items=[]; st.total=0; }
+  st.loading=true;
+  // 骨架行
+  const skRow='<tr><td colspan="9"><div class="sk-shim" style="height:36px;border-radius:6px"></div></td></tr>';
+  tbody.innerHTML=Array(6).fill(skRow).join('');
+  $('#usersTotalHint').textContent='加载中…';
+  const params=new URLSearchParams({ page:String(st.page), pageSize:String(st.pageSize), filter:st.filter, sort:st.sort });
+  if(st.q) params.set('q',st.q);
+  const res=await api('/users?'+params.toString());
+  st.loading=false;
+  if(!res.ok){
+    tbody.innerHTML='<tr><td colspan="9" class="empty" style="color:var(--magenta)">'+esc(res.body?.error||('加载失败 '+res.status))+'</td></tr>';
+    $('#usersTotalHint').textContent='';
+    return;
+  }
+  st.items=res.body?.users||[];
+  st.total=res.body?.total||0;
+  paintUsersTable();
+  paintUsersPager();
+}
+function paintUsersTable(){
+  const st=_userPageState;
+  const tbody=$('#usersTbody');
+  if(!st.items.length){
+    tbody.innerHTML='<tr><td colspan="9" class="empty">没有匹配的用户</td></tr>';
+    $('#usersTotalHint').textContent='共 0 条';
+    return;
+  }
+  const rows=st.items.map(u=>{
+    const uid=String(u.id||'');
+    const uidShort=uid.slice(0,8)+'…'+uid.slice(-4);
+    const kind=u.is_anonymous ? '<span class="u-badge b-anon">匿名</span>' : '<span class="u-badge b-real">正式</span>';
+    let role='<span class="u-badge b-user">—</span>';
+    if(u.role==='super') role='<span class="u-badge b-super">超管</span>';
+    else if(u.role==='admin') role='<span class="u-badge b-admin">管理员</span>';
+    const uname=u.username?('@'+esc(u.username)):'<span style="color:var(--dim)">—</span>';
+    return `<tr data-uid="${esc(uid)}">
+      <td><span class="u-av">${safeEmoji(u.emoji)||'👤'}</span></td>
+      <td class="u-nick" style="color:${safeColor(u.color,'var(--ink)')}"><b>${esc(u.name||'(无名)')}</b></td>
+      <td>${uname}</td>
+      <td>${kind}</td>
+      <td>${role}</td>
+      <td>${fmtTime(u.created_at)}</td>
+      <td>${u.last_seen?fmtTime(u.last_seen):'<span style="color:var(--dim)">—</span>'}</td>
+      <td class="u-uid" title="${esc(uid)}">${esc(uidShort)}</td>
+      <td class="u-actions">
+        <button class="mini-btn u-detail" data-uid="${esc(uid)}" style="border-color:var(--cyan);color:var(--cyan)">详情</button>
+        <button class="mini-btn u-appoint" data-uid="${esc(uid)}" data-nm="${esc(u.name||'')}" data-un="${esc(u.username||'')}" data-emj="${esc(u.emoji||'')}" style="border-color:var(--violet);color:var(--violet)">⚡ 任命</button>
+        <button class="mini-btn u-copy" data-uid="${esc(uid)}" style="border-color:var(--dim);color:var(--dim)">复制id</button>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML=rows;
+  const from=(st.page-1)*st.pageSize+1;
+  const to=Math.min(st.page*st.pageSize, st.total);
+  $('#usersTotalHint').textContent=`第 ${from}-${to} 条 / 共 ${st.total} 条`;
+  tbody.querySelectorAll('.u-detail').forEach(b=>b.onclick=()=>openUserDetail(b.dataset.uid));
+  tbody.querySelectorAll('.u-copy').forEach(b=>b.onclick=async()=>{
+    try{ await navigator.clipboard.writeText(b.dataset.uid); toast('user_id 已复制'); }
+    catch(_){ prompt('手动复制 user_id:', b.dataset.uid); }
+  });
+  tbody.querySelectorAll('.u-appoint').forEach(b=>b.onclick=()=>{
+    const uid=b.dataset.uid, nm=b.dataset.nm, un=b.dataset.un, emj=b.dataset.emj;
+    document.querySelector('.tab[data-page="people"]')?.click();
+    if(typeof _apPickUser==='function'){ _apPickUser({id:uid, name:nm, username:un, emoji:emj}); }
+    toast('已选中 '+nm+' · 选身份后点任命');
+    setTimeout(()=>{ const ppl=document.getElementById('p-people'); if(ppl) ppl.scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
+  });
+  tbody.querySelectorAll('tr[data-uid]').forEach(tr=>{
+    tr.addEventListener('click',e=>{
+      // 行身点击也开详情(但避免按钮冲突)
+      if(e.target.closest('button')) return;
+      openUserDetail(tr.dataset.uid);
+    });
+  });
+}
+function paintUsersPager(){
+  const st=_userPageState;
+  const box=$('#usersPager'); if(!box) return;
+  const total=Math.max(1, Math.ceil(st.total/st.pageSize));
+  if(st.total===0){ box.innerHTML=''; return; }
+  const cur=st.page;
+  // 页码: 1 当前∓两 total, 中间 ...
+  const pages=[]; const push=v=>pages.push(v);
+  push(1);
+  if(cur-2>2) push('...');
+  for(let i=Math.max(2,cur-2); i<=Math.min(total-1,cur+2); i++) push(i);
+  if(cur+2<total-1) push('...');
+  if(total>1) push(total);
+  const btn=(label, page, dis, on)=>`<button class="pg-btn${on?' on':''}" data-p="${page}"${dis?' disabled':''}>${label}</button>`;
+  const parts=[];
+  parts.push(btn('«', 1, cur===1));
+  parts.push(btn('‹', cur-1, cur===1));
+  pages.forEach(p=>{
+    if(p==='...') parts.push('<span class="pg-ellipsis">…</span>');
+    else parts.push(btn(String(p), p, false, p===cur));
+  });
+  parts.push(btn('›', cur+1, cur===total));
+  parts.push(btn('»', total, cur===total));
+  parts.push(`<span class="pg-jump">跳至 <input type="number" id="usersJumpInput" min="1" max="${total}" placeholder="${cur}"> 页 <button class="pg-btn" id="usersJumpBtn">去</button></span>`);
+  box.innerHTML=parts.join('');
+  box.querySelectorAll('.pg-btn[data-p]').forEach(b=>b.onclick=()=>{
+    const p=parseInt(b.dataset.p||'1');
+    if(p<1||p>total||p===cur) return;
+    st.page=p; loadUsersPage(false);
+  });
+  const jb=$('#usersJumpBtn'), ji=$('#usersJumpInput');
+  if(jb&&ji){
+    const jump=()=>{ const v=parseInt(ji.value||'0'); if(v>=1&&v<=total&&v!==cur){ st.page=v; loadUsersPage(false); } };
+    jb.onclick=jump;
+    ji.addEventListener('keydown',e=>{ if(e.key==='Enter') jump(); });
+  }
+}
+async function openUserDetail(uid){
+  const st=_userPageState;
+  st.detailUid=uid;
+  const card=$('#userDetailCard'), body=$('#userDetailBody');
+  if(!card||!body) return;
+  card.style.display='block';
+  body.innerHTML='<div style="padding:8px 0;color:var(--dim);font-size:12.5px">加载中…</div>';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+  // 从当前页数据中先展示，后续可拉更多(房间历史/消息统计)
+  const u=(st.items||[]).find(x=>String(x.id)===String(uid));
+  if(!u){ body.innerHTML='<div class="empty">未在当前页找到该用户</div>'; return; }
+  const roleLabel=u.role==='super'?'超级管理员':(u.role==='admin'?'管理员':'普通用户');
+  const kindLabel=u.is_anonymous?'匿名访客':'正式账号';
+  const roomsRes=await api('/rooms').catch(()=>({ok:false}));
+  const roomsMap={}; if(roomsRes&&roomsRes.ok){ (roomsRes.body?.rooms||[]).forEach(r=>roomsMap[r.id]=r); }
+  // 拉该用户最近消息(用 /messages?user_id, 后端如不支持则降级为不展)
+  let recentMsgs=[];
+  try{
+    const mr=await api('/messages?limit=20&user_id='+encodeURIComponent(uid));
+    if(mr.ok) recentMsgs=(mr.body?.messages||[]).slice(0,20);
+  }catch(_){}
+  const uidFull=String(uid||'');
+  const colorSwatch=u.color?`<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${esc(u.color)};vertical-align:middle;margin-right:6px;border:1px solid var(--line2)"></span>${esc(u.color)}`:'—';
+  body.innerHTML=`
+    <dl>
+      <dt>头像</dt><dd><span class="u-av" style="vertical-align:middle">${safeEmoji(u.emoji)||'👤'}</span> <span style="margin-left:6px;color:var(--dim);font-family:monospace">${esc(u.emoji||'—')}</span></dd>
+      <dt>昵称</dt><dd style="color:${safeColor(u.color,'var(--ink)')}"><b>${esc(u.name||'(无名)')}</b></dd>
+      <dt>用户名</dt><dd>${u.username?('@'+esc(u.username)):'<span style="color:var(--dim)">— (匿名用户无正式账号)</span>'}</dd>
+      <dt>类型</dt><dd>${kindLabel}</dd>
+      <dt>后台身份</dt><dd>${roleLabel}</dd>
+      <dt>颜色</dt><dd>${colorSwatch}</dd>
+      <dt>注册时间</dt><dd>${fmtTime(u.created_at)}<span style="color:var(--dim);margin-left:8px;font-size:11px">${esc(u.created_at||'')}</span></dd>
+      <dt>最后活跃</dt><dd>${u.last_seen?fmtTime(u.last_seen):'—'}${u.last_seen?`<span style="color:var(--dim);margin-left:8px;font-size:11px">${esc(u.last_seen)}</span>`:''}</dd>
+      <dt>user_id</dt><dd style="font-family:monospace;font-size:11.5px">${esc(uidFull)}</dd>
+      <dt>最近消息</dt><dd>${recentMsgs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:rgba(10,12,24,.3)">'+recentMsgs.map(m=>`<div style="padding:4px 0;border-bottom:1px dashed var(--line);font-size:12px"><span style="color:var(--dim);font-family:monospace">${fmtTime(m.created_at)}</span> <span style="color:var(--sub)">[${esc(roomsMap[m.room_id]?.name||m.room_id?.slice(0,6)||'')}]</span> ${esc(String(m.content||m.body||'').slice(0,80))}${m.kind==='song'?' 🎵':''}${m.kind==='voice'?' 🎙️':''}${m.kind==='whisper'?' 🔒':''}</div>`).join('')+'</div>'):'<span style="color:var(--dim)">暂无/未拉取</span>'}</dd>
+    </dl>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <button class="mini-btn" id="udCopyId" style="border-color:var(--cyan);color:var(--cyan)">📋 复制 user_id</button>
+      <button class="mini-btn" id="udAppoint" style="border-color:var(--violet);color:var(--violet)">⚡ 任命为…</button>
+    </div>`;
+  $('#udCopyId').onclick=async()=>{ try{ await navigator.clipboard.writeText(uidFull); toast('已复制'); } catch(_){ prompt('手动复制:', uidFull); } };
+  $('#udAppoint').onclick=()=>{
+    document.querySelector('.tab[data-page="people"]')?.click();
+    if(typeof _apPickUser==='function') _apPickUser({id:uidFull, name:u.name||'', username:u.username||'', emoji:u.emoji||''});
+    toast('已选中、去人员 tab 选身份并任命');
+    setTimeout(()=>{ const ppl=document.getElementById('p-people'); if(ppl) ppl.scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
+  };
+}
+// 工具栏事件绑定(一次性, DOM 已在 HTML 中)
+(function bindUsersToolbar(){
+  document.addEventListener('DOMContentLoaded',()=>{}); // no-op
+  const q=$('#usersQ'), fl=$('#usersFilter'), sr=$('#usersSort'), ps=$('#usersPageSize'), rf=$('#usersRefreshBtn'), cl=$('#userDetailClose');
+  if(!q||!fl||!sr||!ps||!rf) return;
+  let qTimer=null;
+  q.addEventListener('input',e=>{ clearTimeout(qTimer); qTimer=setTimeout(()=>{ _userPageState.q=q.value.trim(); _userPageState.page=1; loadUsersPage(true); }, 260); });
+  fl.addEventListener('change',()=>{ _userPageState.filter=fl.value; _userPageState.page=1; loadUsersPage(true); });
+  sr.addEventListener('change',()=>{ _userPageState.sort=sr.value; _userPageState.page=1; loadUsersPage(true); });
+  ps.addEventListener('change',()=>{ _userPageState.pageSize=parseInt(ps.value||'50'); _userPageState.page=1; loadUsersPage(true); });
+  rf.addEventListener('click',()=>loadUsersPage(true));
+  if(cl) cl.addEventListener('click',()=>{ const c=$('#userDetailCard'); if(c) c.style.display='none'; _userPageState.detailUid=null; });
+})();
 
 // ===== 房间列表(缓存 + 骨架屏) =====
 let roomsCache=null;
@@ -2323,6 +2656,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   $('#p-'+t.dataset.page).classList.add('on');
   if(t.dataset.page==='rooms') loadRooms();
+  if(t.dataset.page==='users') loadUsersPage();
   if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
   if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
   if(t.dataset.page==='people'){ loadAdmins(); loadTiers(); }    // 人员 = 管理员/超管 + 角色类型(默认+自定义)
