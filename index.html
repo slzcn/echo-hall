@@ -1398,7 +1398,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260716-2010blowaway-waapi';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260716-2030entry-10s';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4366,8 +4366,9 @@ function renderEntrance(info, isSelf){
   // 粒子迸发
   if(t.burst && (isSelf || wantStage)){ try{ burst(t.burst, tierRank(tier)>=3?20:10); }catch(_){} }
 }
-// 进场提醒 2 分钟后自动"风吹散"消失(横幅/纯文字通用)。风散=向右上飘 + 模糊 + 渐隐, 高度收拢不留空洞。
-const ENTRY_FADE_MS = 120000;
+// 进场提醒 10 秒后自动"风吹散"消失(横幅/纯文字通用)。风散=向右上飘 + 模糊 + 渐隐, 高度收拢不留空洞。
+//   (原 2 分钟太长, 横幅早被新消息顶出屏幕, 看不到飘散动效; 10 秒够看清谁进来又能亲眼看到风散)
+const ENTRY_FADE_MS = 10000;
 function scheduleEntryFade(el){
   if(!el) return;
   setTimeout(()=>{
