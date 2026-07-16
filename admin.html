@@ -12,8 +12,8 @@
   var ADMIN_VER='20260716-1517user-page';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
-    fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
-      if(!r.ok){ console.warn('[EH后台自愈] ver.txt HTTP', r.status); return null; }
+    fetch('ver-admin.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
+      if(!r.ok){ console.warn('[EH后台自愈] ver-admin.txt HTTP', r.status); return null; }
       return r.text();
     }).then(function(t){
       if(t===null||t===undefined) return;
