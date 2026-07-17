@@ -9,7 +9,7 @@
    但自己存一个 ADMIN_VER, 与线上 ver.txt 不一致时自动重载——避免后台改动后主人要手动强刷才能看到新功能。
    localStorage 存已到达版本防循环; 断网恢复复检。*/
 (function(){
-  var ADMIN_VER='20260717-0157ent-panel';
+  var ADMIN_VER='20260717-1305legib-admin';
   window.__EH_ADMIN_VER=ADMIN_VER;
   function check(reason){
     fetch('ver-admin.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -39,7 +39,7 @@
 <style>
   :root{
     --bg:#07080d; --bg2:#0d0f1a; --panel:rgba(18,21,36,.72); --panel-solid:#121524;
-    --line:rgba(120,140,220,.16); --line2:rgba(120,140,220,.28);
+    --line:rgba(120,140,220,.26); --line2:rgba(120,140,220,.28);
     --ink:#EAF0FF; --sub:#98A3C7; --dim:#717EA9;
     --cyan:#0ABAB5; --magenta:#FF6F61; --violet:#B57EDC; --amber:#F7C873; --green:#1DE9B6;
     --grid:rgba(80,120,255,.05);
@@ -47,31 +47,31 @@
   }
   /* 皮肤(与前台共用 localStorage eh_theme) */
   html[data-theme="vapor"]{ --bg:#1c081f; --bg2:#320f38; --panel:rgba(50,21,43,.8); --panel-solid:#2a1325;
-    --line:rgba(255,77,216,.24); --line2:rgba(255,77,216,.38); --ink:#FFEAF7; --sub:#c68bb7; --dim:#884e7a;
+    --line:rgba(255,77,216,.34); --line2:rgba(255,77,216,.38); --ink:#FFEAF7; --sub:#c68bb7; --dim:#A96A9A;
     --cyan:#FF4DD8; --magenta:#FF66B0; --violet:#4DE0D0; --amber:#FFB84D; --green:#8CE8A0; --grid:rgba(255,77,216,.05); }
   html[data-theme="mono"]{ --bg:#0a0708; --bg2:#151011; --panel:rgba(50,42,21,.8); --panel-solid:#2a2413;
-    --line:rgba(245,208,106,.24); --line2:rgba(245,208,106,.38); --ink:#FBEEE4; --sub:#c7b68a; --dim:#89794d;
+    --line:rgba(245,208,106,.34); --line2:rgba(245,208,106,.38); --ink:#FBEEE4; --sub:#c7b68a; --dim:#89794d;
     --cyan:#F5D06A; --magenta:#E0507A; --violet:#C9964D; --amber:#F5D06A; --green:#D8B87A; --grid:rgba(245,208,106,.05); }
   html[data-theme="aurora"]{ --bg:#03130d; --bg2:#08261a; --panel:rgba(21,50,36,.8); --panel-solid:#132a1f;
-    --line:rgba(34,255,149,.24); --line2:rgba(34,255,149,.38); --ink:#EAFFF3; --sub:#86cbaa; --dim:#498d6c;
+    --line:rgba(34,255,149,.34); --line2:rgba(34,255,149,.38); --ink:#EAFFF3; --sub:#86cbaa; --dim:#498d6c;
     --cyan:#22FF95; --magenta:#C74DFF; --violet:#39D9FF; --amber:#EBC85A; --green:#22FF95; --grid:rgba(34,255,149,.05); }
   html[data-theme="klein"]{ --bg:#050818; --bg2:#0a1030; --panel:rgba(21,26,50,.8); --panel-solid:#13172a;
-    --line:rgba(100,134,255,.24); --line2:rgba(100,134,255,.38); --ink:#E8ECFF; --sub:#8691cb; --dim:#49548d;
+    --line:rgba(100,134,255,.34); --line2:rgba(100,134,255,.38); --ink:#E8ECFF; --sub:#8691cb; --dim:#6B77B2;
     --cyan:#6486FF; --magenta:#FF8A3D; --violet:#29E0E6; --amber:#FFB84D; --green:#4DE0B0; --grid:rgba(100,134,255,.05); }
   html[data-theme="coral"]{ --bg:#20100c; --bg2:#3a1c14; --panel:rgba(50,28,21,.8); --panel-solid:#2a1913;
-    --line:rgba(255,129,89,.24); --line2:rgba(255,129,89,.38); --ink:#FFEFE8; --sub:#cb9686; --dim:#8d5949;
+    --line:rgba(255,129,89,.34); --line2:rgba(255,129,89,.38); --ink:#FFEFE8; --sub:#cb9686; --dim:#AB705E;
     --cyan:#FF8159; --magenta:#FF6098; --violet:#2ED9C0; --amber:#FFB84D; --green:#5FE0B0; --grid:rgba(255,129,89,.05); }
   html[data-theme="lagoon"]{ --bg:#04141c; --bg2:#082832; --panel:rgba(21,43,50,.8); --panel-solid:#13252a;
-    --line:rgba(18,176,224,.24); --line2:rgba(18,176,224,.38); --ink:#E6FBFF; --sub:#8bb8c6; --dim:#4e7b88;
+    --line:rgba(18,176,224,.34); --line2:rgba(18,176,224,.38); --ink:#E6FBFF; --sub:#8bb8c6; --dim:#558795;
     --cyan:#12B0E0; --magenta:#FF8A5E; --violet:#4DE0C0; --amber:#FFC97A; --green:#3FE0A0; --grid:rgba(18,176,224,.05); }
   html[data-theme="dusk"]{ --bg:#0a0e18; --bg2:#151b2c; --panel:rgba(24,30,47,.8); --panel-solid:#161a28;
-    --line:rgba(143,166,232,.24); --line2:rgba(143,166,232,.38); --ink:#EEF2FC; --sub:#919dbf; --dim:#556082;
+    --line:rgba(143,166,232,.34); --line2:rgba(143,166,232,.38); --ink:#EEF2FC; --sub:#919dbf; --dim:#727EA3;
     --cyan:#8FA6E8; --magenta:#FFA07A; --violet:#C0CAF5; --amber:#F0C878; --green:#7ED8B4; --grid:rgba(143,166,232,.05); }
   html[data-theme="rose"]{ --bg:#15100f; --bg2:#261b1a; --panel:rgba(46,26,31,.8); --panel-solid:#26171b;
-    --line:rgba(226,154,174,.24); --line2:rgba(226,154,174,.4); --ink:#F9EFEC; --sub:#bc95a0; --dim:#7e5863;
+    --line:rgba(226,154,174,.34); --line2:rgba(226,154,174,.4); --ink:#F9EFEC; --sub:#bc95a0; --dim:#9E7581;
     --cyan:#E29AAE; --magenta:#D06A8E; --violet:#9AA0D0; --amber:#E6BE86; --green:#95BAA6; --grid:rgba(226,154,174,.05); }
   html[data-theme="sunset"]{ --bg:#180818; --bg2:#2c0e26; --panel:rgba(50,21,34,.8); --panel-solid:#2a131d;
-    --line:rgba(255,61,146,.24); --line2:rgba(255,61,146,.38); --ink:#FFEAF2; --sub:#cb86a4; --dim:#8d4967;
+    --line:rgba(255,61,146,.34); --line2:rgba(255,61,146,.38); --ink:#FFEAF2; --sub:#cb86a4; --dim:#AF6485;
     --cyan:#FF3D92; --magenta:#FF7A3D; --violet:#C476FF; --amber:#FFB04D; --green:#5FE0B0; --grid:rgba(255,61,146,.05); }
 
   /* ===== 日间模式(亮底): 每套主题都必须显式覆盖夜间注入的强调色(v2踩过坑) ===== */
@@ -87,38 +87,38 @@
     --name-halo:rgba(255,255,255,.9); --text-halo:rgba(255,255,255,.7);
   }
   html[data-mode="day"][data-theme="cyber"]{
-    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#347A74; --dim:#407773; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
   html[data-mode="day"][data-theme="vapor"]{
-    --bg:#f8eff6; --bg2:#f1daec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(220,0,172,0.28); --line2:rgba(220,0,172,0.42); --ink:#310c29; --sub:#8f3d7d; --dim:#bb81ae; --cyan:#dc00ac; --magenta:#eb0071; --violet:#17877b; --amber:#C8892E; --green:#1c8c34; --accent:#dc00ac; --grid:rgba(220,0,172,0.06); --glow-cyan:0 2px 10px rgba(220,0,172,0.18); --glow-mag:0 2px 10px rgba(235,0,113,0.16);
+    --bg:#f8eff6; --bg2:#f1daec; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(220,0,172,0.28); --line2:rgba(220,0,172,0.42); --ink:#310c29; --sub:#8f3d7d; --dim:#985289; --cyan:#dc00ac; --magenta:#eb0071; --violet:#17877b; --amber:#C8892E; --green:#1c8c34; --accent:#dc00ac; --grid:rgba(220,0,172,0.06); --glow-cyan:0 2px 10px rgba(220,0,172,0.18); --glow-mag:0 2px 10px rgba(235,0,113,0.16);
   }
   html[data-mode="day"][data-theme="aurora"]{
-    --bg:#eff8f4; --bg2:#daf1e6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,136,71,0.28); --line2:rgba(0,136,71,0.42); --ink:#0c311f; --sub:#3d8f68; --dim:#81bb9f; --cyan:#008847; --magenta:#bd2eff; --violet:#00809f; --amber:#C8892E; --green:#008847; --accent:#008847; --grid:rgba(0,136,71,0.06); --glow-cyan:0 2px 10px rgba(0,136,71,0.18); --glow-mag:0 2px 10px rgba(189,46,255,0.16);
+    --bg:#eff8f4; --bg2:#daf1e6; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,136,71,0.28); --line2:rgba(0,136,71,0.42); --ink:#0c311f; --sub:#347A58; --dim:#40775D; --cyan:#008847; --magenta:#bd2eff; --violet:#00809f; --amber:#C8892E; --green:#008847; --accent:#008847; --grid:rgba(0,136,71,0.06); --glow-cyan:0 2px 10px rgba(0,136,71,0.18); --glow-mag:0 2px 10px rgba(189,46,255,0.16);
   }
   html[data-mode="day"][data-theme="mono"]{
-    --bg:#f8f6ef; --bg2:#f1ebda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(147,111,10,0.28); --line2:rgba(147,111,10,0.42); --ink:#31270c; --sub:#8a7742; --dim:#b8aa85; --cyan:#936f0a; --magenta:#db3666; --violet:#9f7130; --amber:#C8892E; --green:#97732c; --accent:#936f0a; --grid:rgba(147,111,10,0.06); --glow-cyan:0 2px 10px rgba(147,111,10,0.18); --glow-mag:0 2px 10px rgba(219,54,102,0.16);
+    --bg:#f8f6ef; --bg2:#f1ebda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(147,111,10,0.28); --line2:rgba(147,111,10,0.42); --ink:#31270c; --sub:#7C6B3B; --dim:#7B6D48; --cyan:#936f0a; --magenta:#db3666; --violet:#9f7130; --amber:#C8892E; --green:#97732c; --accent:#936f0a; --grid:rgba(147,111,10,0.06); --glow-cyan:0 2px 10px rgba(147,111,10,0.18); --glow-mag:0 2px 10px rgba(219,54,102,0.16);
   }
   html[data-mode="day"][data-theme="klein"]{
-    --bg:#eff1f8; --bg2:#dadff1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(59,102,255,0.28); --line2:rgba(59,102,255,0.42); --ink:#0c1431; --sub:#3d4f8f; --dim:#818ebb; --cyan:#3b66ff; --magenta:#cc5100; --violet:#108185; --amber:#C8892E; --green:#178762; --accent:#3b66ff; --grid:rgba(59,102,255,0.06); --glow-cyan:0 2px 10px rgba(59,102,255,0.18); --glow-mag:0 2px 10px rgba(204,81,0,0.16);
+    --bg:#eff1f8; --bg2:#dadff1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(59,102,255,0.28); --line2:rgba(59,102,255,0.42); --ink:#0c1431; --sub:#3d4f8f; --dim:#596AA5; --cyan:#3b66ff; --magenta:#cc5100; --violet:#108185; --amber:#C8892E; --green:#178762; --accent:#3b66ff; --grid:rgba(59,102,255,0.06); --glow-cyan:0 2px 10px rgba(59,102,255,0.18); --glow-mag:0 2px 10px rgba(204,81,0,0.16);
   }
   html[data-mode="day"][data-theme="coral"]{
-    --bg:#f8f1ef; --bg2:#f1dfda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(222,53,0,0.28); --line2:rgba(222,53,0,0.42); --ink:#31150c; --sub:#8f513d; --dim:#bb8f81; --cyan:#de3500; --magenta:#ef0054; --violet:#198878; --amber:#C8892E; --green:#1b8b61; --accent:#de3500; --grid:rgba(222,53,0,0.06); --glow-cyan:0 2px 10px rgba(222,53,0,0.18); --glow-mag:0 2px 10px rgba(239,0,84,0.16);
+    --bg:#f8f1ef; --bg2:#f1dfda; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(222,53,0,0.28); --line2:rgba(222,53,0,0.42); --ink:#31150c; --sub:#8f513d; --dim:#925F4F; --cyan:#de3500; --magenta:#ef0054; --violet:#198878; --amber:#C8892E; --green:#1b8b61; --accent:#de3500; --grid:rgba(222,53,0,0.06); --glow-cyan:0 2px 10px rgba(222,53,0,0.18); --glow-mag:0 2px 10px rgba(239,0,84,0.16);
   }
   html[data-mode="day"][data-theme="lagoon"]{
-    --bg:#eff6f8; --bg2:#daecf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(13,124,158,0.28); --line2:rgba(13,124,158,0.42); --ink:#0c2831; --sub:#437989; --dim:#85abb7; --cyan:#0d7c9e; --magenta:#e33e00; --violet:#17876f; --amber:#C8892E; --green:#158559; --accent:#0d7c9e; --grid:rgba(13,124,158,0.06); --glow-cyan:0 2px 10px rgba(13,124,158,0.18); --glow-mag:0 2px 10px rgba(227,62,0,0.16);
+    --bg:#eff6f8; --bg2:#daecf1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(13,124,158,0.28); --line2:rgba(13,124,158,0.42); --ink:#0c2831; --sub:#407382; --dim:#4C7480; --cyan:#0d7c9e; --magenta:#e33e00; --violet:#17876f; --amber:#C8892E; --green:#158559; --accent:#0d7c9e; --grid:rgba(13,124,158,0.06); --glow-cyan:0 2px 10px rgba(13,124,158,0.18); --glow-mag:0 2px 10px rgba(227,62,0,0.16);
   }
   html[data-mode="day"][data-theme="dusk"]{
-    --bg:#eff1f8; --bg2:#dae0f1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(75,112,218,0.28); --line2:rgba(75,112,218,0.42); --ink:#0c1631; --sub:#4b5981; --dim:#8b95b1; --cyan:#4b70da; --magenta:#e04000; --violet:#5671e4; --amber:#C8892E; --green:#2a8963; --accent:#4b70da; --grid:rgba(75,112,218,0.06); --glow-cyan:0 2px 10px rgba(75,112,218,0.18); --glow-mag:0 2px 10px rgba(224,64,0,0.16);
+    --bg:#eff1f8; --bg2:#dae0f1; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(75,112,218,0.28); --line2:rgba(75,112,218,0.42); --ink:#0c1631; --sub:#4b5981; --dim:#5E6A8C; --cyan:#4b70da; --magenta:#e04000; --violet:#5671e4; --amber:#C8892E; --green:#2a8963; --accent:#4b70da; --grid:rgba(75,112,218,0.06); --glow-cyan:0 2px 10px rgba(75,112,218,0.18); --glow-mag:0 2px 10px rgba(224,64,0,0.16);
   }
   html[data-mode="day"][data-theme="rose"]{
-    --bg:#f8eff1; --bg2:#f1dae0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(201,67,104,0.28); --line2:rgba(201,67,104,0.42); --ink:#310d17; --sub:#7d4f5c; --dim:#ae8e97; --cyan:#c94368; --magenta:#cc4f7b; --violet:#6772c5; --amber:#C8892E; --green:#2d8857; --accent:#c94368; --grid:rgba(201,67,104,0.06); --glow-cyan:0 2px 10px rgba(201,67,104,0.18); --glow-mag:0 2px 10px rgba(204,79,123,0.16);
+    --bg:#f8eff1; --bg2:#f1dae0; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(201,67,104,0.28); --line2:rgba(201,67,104,0.42); --ink:#310d17; --sub:#7d4f5c; --dim:#89626D; --cyan:#c94368; --magenta:#cc4f7b; --violet:#6772c5; --amber:#C8892E; --green:#2d8857; --accent:#c94368; --grid:rgba(201,67,104,0.06); --glow-cyan:0 2px 10px rgba(201,67,104,0.18); --glow-mag:0 2px 10px rgba(204,79,123,0.16);
   }
   html[data-mode="day"][data-theme="sunset"]{
-    --bg:#f8eff3; --bg2:#f1dae4; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,0,98,0.28); --line2:rgba(224,0,98,0.42); --ink:#310c1c; --sub:#8f3d61; --dim:#bb819b; --cyan:#e00062; --magenta:#d64300; --violet:#a939ff; --amber:#C8892E; --green:#1b8b61; --accent:#e00062; --grid:rgba(224,0,98,0.06); --glow-cyan:0 2px 10px rgba(224,0,98,0.18); --glow-mag:0 2px 10px rgba(214,67,0,0.16);
+    --bg:#f8eff3; --bg2:#f1dae4; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(224,0,98,0.28); --line2:rgba(224,0,98,0.42); --ink:#310c1c; --sub:#8f3d61; --dim:#9F5677; --cyan:#e00062; --magenta:#d64300; --violet:#a939ff; --amber:#C8892E; --green:#1b8b61; --accent:#e00062; --grid:rgba(224,0,98,0.06); --glow-cyan:0 2px 10px rgba(224,0,98,0.18); --glow-mag:0 2px 10px rgba(214,67,0,0.16);
   }
   /* cyber 默认走 :root(无 data-theme),所以日间也要单独给 html[data-mode="day"]:not([data-theme]) 覆盖 */
   html[data-mode="day"]:not([data-theme]){
-    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
+    --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#347A74; --dim:#407773; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
 
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -148,7 +148,7 @@
   .auth-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1px;
     background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
-  .auth-logo{text-align:center;font-size:11px;letter-spacing:6px;color:var(--cyan);font-weight:600;margin-bottom:4px}
+  .auth-logo{text-align:center;font-size:12px;letter-spacing:6px;color:var(--cyan);font-weight:600;margin-bottom:4px}
   .auth-card h1{font-size:25px;font-weight:800;letter-spacing:1px;text-align:center;
     background:linear-gradient(120deg,var(--ink),var(--cyan) 45%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
   .auth-card .sub{text-align:center;color:var(--sub);font-size:12.5px;margin:8px 0 24px}
@@ -161,7 +161,7 @@
     cursor:pointer;color:#04060c;background:linear-gradient(120deg,var(--cyan),var(--violet));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 22%,transparent)}
   .btn:hover{transform:translateY(-2px)} .btn:active{transform:translateY(0) scale(.99)} .btn:disabled{opacity:.55;cursor:wait;transform:none}
   .err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:8px;text-align:center}
-  .auth-note{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6;text-align:center}
+  .auth-note{font-size:12.5px;color:var(--dim);margin-top:14px;line-height:1.6;text-align:center}
 
   /* ===== 顶栏 ===== */
   #panel{display:none}
@@ -174,7 +174,7 @@
   .icon-btn:hover{border-color:var(--cyan);color:var(--cyan)}
   .logout{cursor:pointer;color:var(--dim);border:1px solid var(--line);padding:7px 13px;border-radius:9px;transition:.15s;font-size:12.5px}
   .logout:hover{color:var(--magenta);border-color:var(--magenta)}
-  .badge-super,.badge-normal{font-size:10px;padding:2px 9px;border-radius:6px;font-weight:600}
+  .badge-super,.badge-normal{font-size:11px;padding:2px 9px;border-radius:6px;font-weight:600}
   .badge-super{background:color-mix(in srgb,var(--magenta) 16%,transparent);color:var(--magenta)}
   .badge-normal{background:color-mix(in srgb,var(--sub) 16%,transparent);color:var(--sub)}
   /* ===== tabs (多端自适应: 桌面自动换行, 手机横向滑动不挤成一坨) ===== */
@@ -206,7 +206,7 @@
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc);opacity:.85}
   .kpi .ic{font-size:17px;opacity:.9}
   .kpi .n{font-size:27px;font-weight:800;color:var(--kc);line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums}
-  .kpi .l{font-size:11.5px;color:var(--sub);margin-top:3px}
+  .kpi .l{font-size:12.5px;color:var(--sub);margin-top:3px}
   /* ★ 可点击的 KPI(看详情) */
   .kpi.clickable{cursor:pointer}
   .kpi.clickable::before{content:"→";position:absolute;right:14px;top:14px;font-size:13px;color:var(--kc);opacity:0;transition:.2s}
@@ -226,19 +226,19 @@
   .users-toolbar input#usersQ{flex:1;min-width:180px;max-width:280px}
   table.users-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
   table.users-table th, table.users-table td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
-  table.users-table thead th{position:sticky;top:0;background:var(--panel-solid);color:var(--sub);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;z-index:1}
+  table.users-table thead th{position:sticky;top:0;background:var(--panel-solid);color:var(--sub);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;z-index:1}
   table.users-table tbody tr:hover{background:rgba(120,140,220,.06)}
   table.users-table td.u-nick{max-width:180px;overflow:hidden;text-overflow:ellipsis}
-  table.users-table td.u-uid{font-family:"SF Mono",Menlo,Consolas,monospace;color:var(--dim);font-size:11px}
+  table.users-table td.u-uid{font-family:"SF Mono",Menlo,Consolas,monospace;color:var(--dim);font-size:12px}
   table.users-table .u-av{width:32px;height:32px;border-radius:8px;display:inline-grid;place-items:center;font-size:17px;background:rgba(120,140,220,.1)}
-  table.users-table .u-badge{display:inline-block;padding:1.5px 7px;border-radius:5px;font-size:10.5px;line-height:1.4;font-weight:600}
+  table.users-table .u-badge{display:inline-block;padding:1.5px 7px;border-radius:5px;font-size:11.5px;line-height:1.4;font-weight:600}
   .u-badge.b-anon{background:rgba(113,126,169,.18);color:var(--dim)}
   .u-badge.b-real{background:rgba(10,186,181,.16);color:var(--cyan)}
   .u-badge.b-super{background:rgba(255,111,97,.16);color:var(--magenta)}
   .u-badge.b-admin{background:rgba(181,126,220,.16);color:var(--violet)}
   .u-badge.b-user{color:var(--dim)}
   .u-actions{display:flex;gap:5px;flex-wrap:wrap}
-  .u-actions .mini-btn{font-size:10.5px;padding:2.5px 8px}
+  .u-actions .mini-btn{font-size:11.5px;padding:2.5px 8px}
   .users-pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:var(--sub)}
   .users-pager .pg-btn{min-width:32px;padding:5px 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(10,12,24,.4);color:var(--ink);cursor:pointer;font-family:inherit;font-size:12.5px}
   .users-pager .pg-btn:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan)}
@@ -266,30 +266,30 @@
   .dm-item .av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;flex-shrink:0;background:rgba(120,140,220,.1)}
   .dm-item .main{flex:1;min-width:0}
   .dm-item .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .dm-item .sub{font-size:11px;color:var(--dim);margin-top:2px}
-  .dm-item .tail{font-size:11px;color:var(--sub);flex-shrink:0;text-align:right}
+  .dm-item .sub{font-size:12px;color:var(--dim);margin-top:2px}
+  .dm-item .tail{font-size:12px;color:var(--sub);flex-shrink:0;text-align:right}
 
   /* ===== card / table ===== */
   .card{padding:18px;border-radius:14px;margin-bottom:16px}
   .card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--line);
     display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .card h3 .hint{font-size:11px;color:var(--dim);font-weight:400}
+  .card h3 .hint{font-size:12px;color:var(--dim);font-weight:400}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
-  th{color:var(--dim);font-weight:600;font-size:11px;letter-spacing:.3px}
+  th{color:var(--dim);font-weight:600;font-size:12px;letter-spacing:.3px}
   td{color:var(--ink)}
   tr:last-child td{border-bottom:none}
   .roomrow{cursor:pointer;transition:.12s}
   .roomrow:hover td{background:color-mix(in srgb,var(--cyan) 7%,transparent)}
   .roomrow td:first-child{border-radius:8px 0 0 8px}.roomrow td:last-child{border-radius:0 8px 8px 0}
-  .k-tag{font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600}
+  .k-tag{font-size:10.5px;padding:2px 7px;border-radius:5px;font-weight:600}
   .k-official{background:color-mix(in srgb,var(--cyan) 15%,transparent);color:var(--cyan)}
   .k-public{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}
   .k-private{background:color-mix(in srgb,var(--magenta) 15%,transparent);color:var(--magenta)}
   .k-arch{background:color-mix(in srgb,var(--sub) 12%,transparent);color:var(--dim)}
   .msgline{padding:9px 11px;border-radius:9px;background:rgba(10,12,24,.4);margin-bottom:6px;font-size:12.5px}
   .msgline .mm-nm{font-weight:700}
-  .msgline .mm-tm{font-size:10px;color:var(--dim);margin-left:8px}
+  .msgline .mm-tm{font-size:11px;color:var(--dim);margin-left:8px}
   .mini-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--line2);background:none;color:var(--sub);
     font-family:inherit;font-size:12px;cursor:pointer;transition:.15s}
   .mini-btn:hover{border-color:var(--cyan);color:var(--cyan)}
@@ -319,7 +319,7 @@
   .sw-soul .av{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;flex-shrink:0}
   .sw-soul .info{flex:1;min-width:0}
   .sw-soul .nm{font-weight:700;font-size:14px}
-  .sw-soul .meta{font-size:11px;color:var(--dim);margin-top:2px}
+  .sw-soul .meta{font-size:12px;color:var(--dim);margin-top:2px}
   .sw-soul .ops{display:flex;gap:6px;flex-wrap:wrap}
   .sw-switch{position:relative;width:42px;height:23px;border-radius:12px;background:var(--line2);cursor:pointer;transition:.2s;flex-shrink:0}
   .sw-switch.on{background:var(--green)}
@@ -331,13 +331,13 @@
   .persona-card.sel{border-color:var(--pc);box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 18%,transparent)}
   .persona-card .pc-ic{font-size:28px;margin-bottom:6px}
   .persona-card .pc-nm{font-weight:700;font-size:14px;color:var(--pc)}
-  .persona-card .pc-tag{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4}
+  .persona-card .pc-tag{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.4}
   .persona-card .pc-traits{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-  .persona-card .pc-traits span{font-size:9px;padding:2px 7px;border-radius:5px;background:color-mix(in srgb,var(--pc) 14%,transparent);color:var(--pc)}
+  .persona-card .pc-traits span{font-size:10.5px;padding:2px 7px;border-radius:5px;background:color-mix(in srgb,var(--pc) 14%,transparent);color:var(--pc)}
   .sw-form{display:flex;flex-direction:column;gap:14px;margin-top:16px}
   .sw-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
   .sw-fld{flex:1;min-width:120px}
-  .sw-fld label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:5px;font-weight:600}
+  .sw-fld label{display:block;font-size:12.5px;color:var(--sub);margin-bottom:5px;font-weight:600}
   .sw-fld input[type=text],.sw-fld input[type=number],.sw-fld textarea{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line2);background:rgba(10,12,24,.55);color:var(--ink);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box}
   .sw-fld input:focus,.sw-fld textarea:focus{border-color:var(--cyan)}
   .sw-fld textarea{resize:vertical;line-height:1.6}
@@ -347,7 +347,7 @@
   /* 风格标签选择器 */
   .style-chips{display:flex;flex-direction:column;gap:7px}
   .sc-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-  .sc-gl{font-size:11px;color:var(--dim);flex:0 0 56px}
+  .sc-gl{font-size:12px;color:var(--dim);flex:0 0 56px}
   .sc-tag{padding:4px 11px;border-radius:14px;border:1px solid var(--line2);background:none;color:var(--sub);cursor:pointer;font-size:12px;transition:.13s;user-select:none}
   .sc-tag:hover{border-color:var(--violet);color:var(--ink)}
   .sc-tag.on{border-color:var(--violet);color:#fff;background:color-mix(in srgb,var(--violet) 30%,transparent)}
@@ -407,7 +407,7 @@
     .mini-btn{padding:9px 14px;min-height:40px}
     .tab{padding:11px 16px;min-height:42px}
     /* 极小字号在手机上提到可读(时间戳/tag/key 原 9-10px 几乎看不清) */
-    .k-tag,.mm-tm,.txt-row-key,.persona-card .pc-traits span{font-size:11px !important}
+    .k-tag,.mm-tm,.txt-row-key,.persona-card .pc-traits span{font-size:12px !important}
     th{font-size:12px}
     /* iOS 输入框聚焦不缩放: 可编辑 input 提到 16px */
     .txt-row-input,table input[type=text],table input:not([type]){font-size:16px !important}
@@ -416,15 +416,15 @@
   .txt-group{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;overflow:hidden}
   .txt-grp-head{padding:10px 12px;cursor:pointer;user-select:none;background:rgba(255,255,255,.02);font-size:13px;display:flex;align-items:center;gap:6px}
   .txt-grp-head:hover{background:rgba(255,255,255,.05)}
-  .txt-grp-caret{color:var(--cyan);font-size:11px;width:12px;display:inline-block}
-  .txt-grp-cnt{color:var(--dim);font-size:11px;margin-left:2px}
+  .txt-grp-caret{color:var(--cyan);font-size:12px;width:12px;display:inline-block}
+  .txt-grp-cnt{color:var(--dim);font-size:12px;margin-left:2px}
   .txt-grp-reset{margin-left:auto}
   .txt-grp-body{padding:8px 12px 12px}
   .txt-row{margin-bottom:11px}
   .txt-row-label{font-size:12px;color:var(--sub);margin-bottom:3px}
-  .txt-row-key{color:var(--dim);font-family:monospace;font-size:10px;margin-left:5px;opacity:.6}
+  .txt-row-key{color:var(--dim);font-family:monospace;font-size:11px;margin-left:5px;opacity:.6}
   .txt-row-input{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;box-sizing:border-box}
-  .txt-row-def{font-size:10.5px;color:var(--dim);margin-top:3px;padding-left:2px}
+  .txt-row-def{font-size:11.5px;color:var(--dim);margin-top:3px;padding-left:2px}
 
   /* ===== ★ 兼容性兼底: 旧浏览器(Safari<16.2/Chrome<111/老安卓)不支持 color-mix 时的降级 ===== */
   /* 不支持 color-mix 时, 上面那些 color-mix 值会整个失效(背景/阴影/边框变无)。
@@ -490,7 +490,7 @@
     .tab{flex:0 0 auto;white-space:nowrap;padding:8px 13px;font-size:12.5px}
     .top{gap:8px}
     .top h1{font-size:17px;flex-shrink:0}
-    .top .who{margin-left:auto;font-size:11.5px;gap:6px}
+    .top .who{margin-left:auto;font-size:12.5px;gap:6px}
     .inline-form input{min-width:0;flex:1 1 100%;font-size:16px}
     .inline-form button{flex:1 1 100%}
     .card h3{font-size:13px;flex-wrap:wrap;gap:6px}
@@ -744,7 +744,7 @@
 
     <div class="glass card"><h3>🎭 身份随机池(匿名昵称生成)
       <button class="mini-btn" id="poolSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存身份池</button> <button class="mini-btn" id="poolResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
-      <div style="color:var(--dim);font-size:11.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匿名。每个词逗号分隔,保存后立即生效。</div>
+      <div style="color:var(--dim);font-size:12.5px;margin-bottom:10px;line-height:1.7">形容词 + 动物 构成匿名名字(如“量子水獭”)。虚空名是“说给虚空”模式下匿名。每个词逗号分隔,保存后立即生效。</div>
       <div id="poolPanel"></div>
     </div>
 
@@ -773,7 +773,7 @@
         </div>
         <button class="mini-btn" id="apBtn" style="border-color:var(--cyan);color:var(--cyan);flex:0 0 auto">任命</button>
       </div>
-      <div id="apHint" style="font-size:11.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
+      <div id="apHint" style="font-size:12.5px;color:var(--dim);margin-top:9px">授予后台权限:管理全站配置、房间、灵魂等。对方需先在前台注册。</div>
     </div>
 
     <!-- 角色类型管理: 4 个默认(仅改显示名, 不可删) + 自定义类型(可增改删) -->
@@ -803,7 +803,7 @@
   <div class="page" id="p-audit">
     <div class="glass card">
       <h3>📋 全站日志
-        <button class="mini-btn" id="auditRefreshBtn" style="border-color:var(--cyan);color:var(--cyan);font-size:11px;padding:3px 10px">↻ 刷新</button>
+        <button class="mini-btn" id="auditRefreshBtn" style="border-color:var(--cyan);color:var(--cyan);font-size:12px;padding:3px 10px">↻ 刷新</button>
       </h3>
       <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">
         合并展示后台配置日志与前台用户行为日志。后台日志 scope=admin, 前台行为 scope=user；发言内容不重复记录, 直接看聊天记录表。
@@ -970,11 +970,11 @@ async function renderMessagesDetail(){
   const res=await api('/messages?limit=200');
   if(!res.ok){ $('#dmBody').innerHTML=`<div class="empty">${esc(res.body?.error||'无权查看')}</div>`; return; }
   const msgs=(res.body.messages||[]);
-  $('#dmBody').innerHTML=(msgs.length?`<div class="sub" style="font-size:11px;color:var(--dim);margin-bottom:10px">全站最近 ${msgs.length} 条消息</div>`:'')+
+  $('#dmBody').innerHTML=(msgs.length?`<div class="sub" style="font-size:12px;color:var(--dim);margin-bottom:10px">全站最近 ${msgs.length} 条消息</div>`:'')+
     msgs.map(m=>`<div class="dm-item">
     <div class="av">${safeEmoji(m.emoji)||'💬'}</div>
     <div class="main"><div class="nm" style="color:${safeColor(m.color,'#EAF0FF')}">${esc(m.name)}
-      ${m.kind==='song'?'<span style="color:var(--magenta);font-size:9px"> 🎵</span>':''}${m.kind==='voice'?'<span style="color:var(--cyan);font-size:9px"> 🎙️</span>':''}${m.kind==='whisper'?'<span style="color:var(--amber);font-size:9px"> 🔒</span>':''}</div>
+      ${m.kind==='song'?'<span style="color:var(--magenta);font-size:10.5px"> 🎵</span>':''}${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10.5px"> 🎙️</span>':''}${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10.5px"> 🔒</span>':''}</div>
       <div class="sub" style="white-space:normal;line-height:1.4">${voiceOrText(m)}</div></div>
     <div class="tail">${fmtTime(m.created_at)}</div></div>`).join('')||'<div class="empty">暂无消息</div>';
 }
@@ -988,11 +988,11 @@ function _userItemHtml(u){
   const emj=safeEmoji(u.emoji)||'👤';
   return `<div class="dm-item" style="position:relative">
     <div class="av">${emj}</div>
-    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${nm}${u.is_anonymous?'<span style="color:var(--dim);font-size:9px"> 匿名</span>':''}</div>
+    <div class="main"><div class="nm" style="color:${safeColor(u.color,'#EAF0FF')}">${nm}${u.is_anonymous?'<span style="color:var(--dim);font-size:10.5px"> 匿名</span>':''}</div>
       <div class="sub">注册 ${fmtTime(u.created_at)}</div></div>
     <div class="tail" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
       <span>${u.last_seen?('活跃 '+fmtTime(u.last_seen)):''}</span>
-      <button class="mini-btn user-quick-appoint" data-uid="${uid}" data-nm="${nm}" data-emj="${esc(u.emoji||'')}" style="border-color:var(--violet);color:var(--violet);font-size:10.5px;padding:2px 8px" title="快捷任命(跳到任命区并锁定此人)">⚡ 任命</button>
+      <button class="mini-btn user-quick-appoint" data-uid="${uid}" data-nm="${nm}" data-emj="${esc(u.emoji||'')}" style="border-color:var(--violet);color:var(--violet);font-size:11.5px;padding:2px 8px" title="快捷任命(跳到任命区并锁定此人)">⚡ 任命</button>
     </div></div>`;
 }
 // 快捷任命: 点开后跳到人员 tab 并直接锁定选中该用户(无需再搜)
@@ -1035,9 +1035,9 @@ async function renderUsersDetail(reset=true){
         <option value="name.asc"${_userState.sort==='name.asc'?' selected':''}>用户名 A→Z</option>
       </select>
     </div>
-    <div id="usrCount" class="sub" style="font-size:11px;color:var(--dim);margin-bottom:8px">加载中…</div>
+    <div id="usrCount" class="sub" style="font-size:12px;color:var(--dim);margin-bottom:8px">加载中…</div>
     <div id="usrList">${_userSkeleton(8)}</div>
-    <div id="usrSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:11px;padding:12px 0"></div>`;
+    <div id="usrSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:12px;padding:12px 0"></div>`;
     // 绑定搜索/筛选(debounce)
     let _debT;
     const kick=()=>{ clearTimeout(_debT); _debT=setTimeout(()=>{
@@ -1247,9 +1247,9 @@ async function openUserDetail(uid){
       <dt>类型</dt><dd>${kindLabel}</dd>
       <dt>后台身份</dt><dd>${roleLabel}</dd>
       <dt>颜色</dt><dd>${colorSwatch}</dd>
-      <dt>注册时间</dt><dd>${fmtTime(u.created_at)}<span style="color:var(--dim);margin-left:8px;font-size:11px">${esc(u.created_at||'')}</span></dd>
-      <dt>最后活跃</dt><dd>${u.last_seen?fmtTime(u.last_seen):'—'}${u.last_seen?`<span style="color:var(--dim);margin-left:8px;font-size:11px">${esc(u.last_seen)}</span>`:''}</dd>
-      <dt>user_id</dt><dd style="font-family:monospace;font-size:11.5px">${esc(uidFull)}</dd>
+      <dt>注册时间</dt><dd>${fmtTime(u.created_at)}<span style="color:var(--dim);margin-left:8px;font-size:12px">${esc(u.created_at||'')}</span></dd>
+      <dt>最后活跃</dt><dd>${u.last_seen?fmtTime(u.last_seen):'—'}${u.last_seen?`<span style="color:var(--dim);margin-left:8px;font-size:12px">${esc(u.last_seen)}</span>`:''}</dd>
+      <dt>user_id</dt><dd style="font-family:monospace;font-size:12.5px">${esc(uidFull)}</dd>
       <dt>最近消息</dt><dd>${recentMsgs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:rgba(10,12,24,.3)">'+recentMsgs.map(m=>`<div style="padding:4px 0;border-bottom:1px dashed var(--line);font-size:12px"><span style="color:var(--dim);font-family:monospace">${fmtTime(m.created_at)}</span> <span style="color:var(--sub)">[${esc(roomsMap[m.room_id]?.name||m.room_id?.slice(0,6)||'')}]</span> ${esc(String(m.content||m.body||'').slice(0,80))}${m.kind==='song'?' 🎵':''}${m.kind==='voice'?' 🎙️':''}${m.kind==='whisper'?' 🔒':''}</div>`).join('')+'</div>'):'<span style="color:var(--dim)">暂无/未拉取</span>'}</dd>
     </dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
@@ -1329,10 +1329,10 @@ async function loadMessages(rid,name){
   const html=msgs.map(m=>`<div class="msgline">
     <span class="mm-nm" style="color:${safeColor(m.color,'#98A3C7')}">${safeEmoji(m.emoji)||''} ${esc(m.name)}</span>
     <span class="mm-tm">${fmtTime(m.created_at)}</span>
-    ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:10px"> 🔒悄悄话</span>':''}
-    ${m.kind==='act'?'<span style="color:var(--violet);font-size:10px"> ✦动作</span>':''}
-    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:10px"> 🎙️语音</span>':''}
-    ${m.kind==='song'?'<span style="color:var(--magenta);font-size:10px"> 🎵神曲</span>':''}
+    ${m.kind==='whisper'?'<span style="color:var(--amber);font-size:11px"> 🔒悄悄话</span>':''}
+    ${m.kind==='act'?'<span style="color:var(--violet);font-size:11px"> ✦动作</span>':''}
+    ${m.kind==='voice'?'<span style="color:var(--cyan);font-size:11px"> 🎙️语音</span>':''}
+    ${m.kind==='song'?'<span style="color:var(--magenta);font-size:11px"> 🎵神曲</span>':''}
     <div style="margin-top:4px">${voiceOrText(m)}</div></div>`).join('');
   $('#msgList').innerHTML=html||'<div class="empty">这个房间还没有消息</div>';
 }
@@ -1468,9 +1468,9 @@ function renderSoulForm(){
         <div class="sw-fld" style="flex:0 0 150px"><label>主题色</label><div style="display:flex;align-items:center;gap:7px"><input type="color" id="sf-color-pick" value="${/^#[0-9a-fA-F]{6}$/.test(s.color)?s.color:'#B57EDC'}" style="width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;flex:0 0 auto"><input type="text" id="sf-color" value="${esc(s.color)}" placeholder="#B57EDC" style="flex:1;min-width:0"></div></div>
       </div>
       <div class="sw-fld"><label>性格强度(含蓄 ← → 话痨)：<span id="sf-int-v" style="color:var(--violet)">${s.intensity}</span></label>
-        <div class="sw-range"><span style="font-size:11px;color:var(--dim)">含蓄</span>
+        <div class="sw-range"><span style="font-size:12px;color:var(--dim)">含蓄</span>
           <input type="range" id="sf-intensity" min="0" max="100" value="${s.intensity}">
-          <span style="font-size:11px;color:var(--dim)">话痨</span></div>
+          <span style="font-size:12px;color:var(--dim)">话痨</span></div>
       </div>
       <div class="sw-row">
         <div class="sw-fld"><label>破冰间隔(冷场多少分钟后主动抛话题)</label>
@@ -1667,7 +1667,7 @@ function _apRenderPicked(){
   p.style.display='block';
   p.innerHTML=`✓ 已选:<b>${safeEmoji(_apPick.emoji)||'👤'} ${esc(_apPick.name||'')}</b>`
     +(_apPick.username?` <span style="color:var(--dim)">@${esc(_apPick.username)}</span>`:'')
-    +` <span style="color:var(--dim);font-family:monospace;font-size:10px">${esc((_apPick.id||'').slice(0,8))}…</span>`
+    +` <span style="color:var(--dim);font-family:monospace;font-size:11px">${esc((_apPick.id||'').slice(0,8))}…</span>`
     +` <a href="javascript:;" id="apPickClear" style="color:var(--magenta);margin-left:8px">✕ 重选</a>`;
   const c=$('#apPickClear'); if(c) c.onclick=()=>{ _apClearPick(); const inp=$('#apInput'); if(inp){ inp.value=''; inp.focus(); } };
 }
@@ -1691,7 +1691,7 @@ async function _apDoSearch(q){
   if(!list.length){ drop.innerHTML='<div style="padding:10px 12px;color:var(--dim);font-size:12px">没有匹配的用户</div>'; return; }
   drop.innerHTML=list.map((u,i)=>`<div class="ap-opt" data-i="${i}" style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px">
     <span style="font-size:18px;flex:0 0 auto">${safeEmoji(u.emoji)||'👤'}</span>
-    <span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(u.name||'(无名)')}</b>${u.is_anonymous?' <span style="color:var(--dim);font-size:10px">匿名</span>':''}${u.username?` <span style="color:var(--cyan);font-size:11px">@${esc(u.username)}</span>`:''}${u.role&&u.role!=='user'?` <span style="color:var(--violet);font-size:10px;padding:1px 5px;border:1px solid var(--violet);border-radius:3px;margin-left:4px">${u.role==='super'?'超管':'管理员'}</span>`:''}<br><span style="color:var(--dim);font-family:monospace;font-size:10.5px">${esc((u.id||'').slice(0,13))}…</span></span>
+    <span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(u.name||'(无名)')}</b>${u.is_anonymous?' <span style="color:var(--dim);font-size:11px">匿名</span>':''}${u.username?` <span style="color:var(--cyan);font-size:12px">@${esc(u.username)}</span>`:''}${u.role&&u.role!=='user'?` <span style="color:var(--violet);font-size:11px;padding:1px 5px;border:1px solid var(--violet);border-radius:3px;margin-left:4px">${u.role==='super'?'超管':'管理员'}</span>`:''}<br><span style="color:var(--dim);font-family:monospace;font-size:11.5px">${esc((u.id||'').slice(0,13))}…</span></span>
   </div>`).join('');
   drop.querySelectorAll('.ap-opt').forEach(el=>{
     el.onmouseenter=()=>el.style.background='rgba(255,255,255,.06)';
@@ -1738,15 +1738,15 @@ let CFG_CACHE = null;   // 从 /config 拉到的 { themePalettes, themes, roomTh
 const CFG_DEFAULT = {
   themePalettes:{
     cyber:{"--bg":"#070a12","--bg2":"#0d1524","--panel":"rgba(21,50,48,0.8)","--panel-solid":"#132a29","--line":"rgba(0,229,212,0.24)","--line2":"rgba(0,229,212,0.38)","--ink":"#EAF6FF","--sub":"#86cbc6","--dim":"#498d88","--cyan":"#00E5D4","--magenta":"#FF2D8E","--violet":"#9C85FF","--amber":"#FFC24D","--green":"#34E0B0","--accent":"#00E5D4","--grid":"rgba(0,229,212,0.05)","--glow-cyan":"0 0 22px rgba(0,229,212,0.6)","--glow-mag":"0 0 20px rgba(255,45,142,0.55)"},
-    vapor:{"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,43,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#c68bb7","--dim":"#884e7a","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
+    vapor:{"--bg":"#1c081f","--bg2":"#320f38","--panel":"rgba(50,21,43,0.8)","--panel-solid":"#2a1325","--line":"rgba(255,77,216,0.24)","--line2":"rgba(255,77,216,0.38)","--ink":"#FFEAF7","--sub":"#c68bb7","--dim":"#A96A9A","--cyan":"#FF4DD8","--magenta":"#FF66B0","--violet":"#4DE0D0","--amber":"#FFB84D","--green":"#8CE8A0","--accent":"#FF4DD8","--grid":"rgba(255,77,216,0.05)","--glow-cyan":"0 0 22px rgba(255,77,216,0.6)","--glow-mag":"0 0 20px rgba(255,102,176,0.55)"},
     aurora:{"--bg":"#03130d","--bg2":"#08261a","--panel":"rgba(21,50,36,0.8)","--panel-solid":"#132a1f","--line":"rgba(34,255,149,0.24)","--line2":"rgba(34,255,149,0.38)","--ink":"#EAFFF3","--sub":"#86cbaa","--dim":"#498d6c","--cyan":"#22FF95","--magenta":"#C74DFF","--violet":"#39D9FF","--amber":"#EBC85A","--green":"#22FF95","--accent":"#22FF95","--grid":"rgba(34,255,149,0.05)","--glow-cyan":"0 0 22px rgba(34,255,149,0.6)","--glow-mag":"0 0 20px rgba(199,77,255,0.55)"},
     mono:{"--bg":"#0a0708","--bg2":"#151011","--panel":"rgba(50,42,21,0.8)","--panel-solid":"#2a2413","--line":"rgba(245,208,106,0.24)","--line2":"rgba(245,208,106,0.38)","--ink":"#FBEEE4","--sub":"#c7b68a","--dim":"#89794d","--cyan":"#F5D06A","--magenta":"#E0507A","--violet":"#C9964D","--amber":"#F5D06A","--green":"#D8B87A","--accent":"#F5D06A","--grid":"rgba(245,208,106,0.05)","--glow-cyan":"0 0 22px rgba(245,208,106,0.6)","--glow-mag":"0 0 20px rgba(224,80,122,0.55)"},
-    klein:{"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(21,26,50,0.8)","--panel-solid":"#13172a","--line":"rgba(100,134,255,0.24)","--line2":"rgba(100,134,255,0.38)","--ink":"#E8ECFF","--sub":"#8691cb","--dim":"#49548d","--cyan":"#6486FF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#6486FF","--grid":"rgba(100,134,255,0.05)","--glow-cyan":"0 0 22px rgba(100,134,255,0.6)","--glow-mag":"0 0 20px rgba(255,138,61,0.55)"},
-    coral:{"--bg":"#20100c","--bg2":"#3a1c14","--panel":"rgba(50,28,21,0.8)","--panel-solid":"#2a1913","--line":"rgba(255,129,89,0.24)","--line2":"rgba(255,129,89,0.38)","--ink":"#FFEFE8","--sub":"#cb9686","--dim":"#8d5949","--cyan":"#FF8159","--magenta":"#FF6098","--violet":"#2ED9C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF8159","--grid":"rgba(255,129,89,0.05)","--glow-cyan":"0 0 22px rgba(255,129,89,0.6)","--glow-mag":"0 0 20px rgba(255,96,152,0.55)"},
-    lagoon:{"--bg":"#04141c","--bg2":"#082832","--panel":"rgba(21,43,50,0.8)","--panel-solid":"#13252a","--line":"rgba(18,176,224,0.24)","--line2":"rgba(18,176,224,0.38)","--ink":"#E6FBFF","--sub":"#8bb8c6","--dim":"#4e7b88","--cyan":"#12B0E0","--magenta":"#FF8A5E","--violet":"#4DE0C0","--amber":"#FFC97A","--green":"#3FE0A0","--accent":"#12B0E0","--grid":"rgba(18,176,224,0.05)","--glow-cyan":"0 0 22px rgba(18,176,224,0.6)","--glow-mag":"0 0 20px rgba(255,138,94,0.55)"},
-    dusk:{"--bg":"#0a0e18","--bg2":"#151b2c","--panel":"rgba(24,30,47,0.8)","--panel-solid":"#161a28","--line":"rgba(143,166,232,0.24)","--line2":"rgba(143,166,232,0.38)","--ink":"#EEF2FC","--sub":"#919dbf","--dim":"#556082","--cyan":"#8FA6E8","--magenta":"#FFA07A","--violet":"#C0CAF5","--amber":"#F0C878","--green":"#7ED8B4","--accent":"#8FA6E8","--grid":"rgba(143,166,232,0.05)","--glow-cyan":"0 0 22px rgba(143,166,232,0.6)","--glow-mag":"0 0 20px rgba(255,160,122,0.55)"},
-    rose:{"--bg":"#15100f","--bg2":"#261b1a","--panel":"rgba(46,26,31,0.8)","--panel-solid":"#26171b","--line":"rgba(226,154,174,0.24)","--line2":"rgba(226,154,174,0.38)","--ink":"#F9EFEC","--sub":"#bc95a0","--dim":"#7e5863","--cyan":"#E29AAE","--magenta":"#D06A8E","--violet":"#9AA0D0","--amber":"#E6BE86","--green":"#95BAA6","--accent":"#E29AAE","--grid":"rgba(226,154,174,0.05)","--glow-cyan":"0 0 22px rgba(226,154,174,0.6)","--glow-mag":"0 0 20px rgba(208,106,142,0.55)"},
-    sunset:{"--bg":"#180818","--bg2":"#2c0e26","--panel":"rgba(50,21,34,0.8)","--panel-solid":"#2a131d","--line":"rgba(255,61,146,0.24)","--line2":"rgba(255,61,146,0.38)","--ink":"#FFEAF2","--sub":"#cb86a4","--dim":"#8d4967","--cyan":"#FF3D92","--magenta":"#FF7A3D","--violet":"#C476FF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FF3D92","--grid":"rgba(255,61,146,0.05)","--glow-cyan":"0 0 22px rgba(255,61,146,0.6)","--glow-mag":"0 0 20px rgba(255,122,61,0.55)"},
+    klein:{"--bg":"#050818","--bg2":"#0a1030","--panel":"rgba(21,26,50,0.8)","--panel-solid":"#13172a","--line":"rgba(100,134,255,0.24)","--line2":"rgba(100,134,255,0.38)","--ink":"#E8ECFF","--sub":"#8691cb","--dim":"#6B77B2","--cyan":"#6486FF","--magenta":"#FF8A3D","--violet":"#29E0E6","--amber":"#FFB84D","--green":"#4DE0B0","--accent":"#6486FF","--grid":"rgba(100,134,255,0.05)","--glow-cyan":"0 0 22px rgba(100,134,255,0.6)","--glow-mag":"0 0 20px rgba(255,138,61,0.55)"},
+    coral:{"--bg":"#20100c","--bg2":"#3a1c14","--panel":"rgba(50,28,21,0.8)","--panel-solid":"#2a1913","--line":"rgba(255,129,89,0.24)","--line2":"rgba(255,129,89,0.38)","--ink":"#FFEFE8","--sub":"#cb9686","--dim":"#AB705E","--cyan":"#FF8159","--magenta":"#FF6098","--violet":"#2ED9C0","--amber":"#FFB84D","--green":"#5FE0B0","--accent":"#FF8159","--grid":"rgba(255,129,89,0.05)","--glow-cyan":"0 0 22px rgba(255,129,89,0.6)","--glow-mag":"0 0 20px rgba(255,96,152,0.55)"},
+    lagoon:{"--bg":"#04141c","--bg2":"#082832","--panel":"rgba(21,43,50,0.8)","--panel-solid":"#13252a","--line":"rgba(18,176,224,0.24)","--line2":"rgba(18,176,224,0.38)","--ink":"#E6FBFF","--sub":"#8bb8c6","--dim":"#558795","--cyan":"#12B0E0","--magenta":"#FF8A5E","--violet":"#4DE0C0","--amber":"#FFC97A","--green":"#3FE0A0","--accent":"#12B0E0","--grid":"rgba(18,176,224,0.05)","--glow-cyan":"0 0 22px rgba(18,176,224,0.6)","--glow-mag":"0 0 20px rgba(255,138,94,0.55)"},
+    dusk:{"--bg":"#0a0e18","--bg2":"#151b2c","--panel":"rgba(24,30,47,0.8)","--panel-solid":"#161a28","--line":"rgba(143,166,232,0.24)","--line2":"rgba(143,166,232,0.38)","--ink":"#EEF2FC","--sub":"#919dbf","--dim":"#727EA3","--cyan":"#8FA6E8","--magenta":"#FFA07A","--violet":"#C0CAF5","--amber":"#F0C878","--green":"#7ED8B4","--accent":"#8FA6E8","--grid":"rgba(143,166,232,0.05)","--glow-cyan":"0 0 22px rgba(143,166,232,0.6)","--glow-mag":"0 0 20px rgba(255,160,122,0.55)"},
+    rose:{"--bg":"#15100f","--bg2":"#261b1a","--panel":"rgba(46,26,31,0.8)","--panel-solid":"#26171b","--line":"rgba(226,154,174,0.24)","--line2":"rgba(226,154,174,0.38)","--ink":"#F9EFEC","--sub":"#bc95a0","--dim":"#9E7581","--cyan":"#E29AAE","--magenta":"#D06A8E","--violet":"#9AA0D0","--amber":"#E6BE86","--green":"#95BAA6","--accent":"#E29AAE","--grid":"rgba(226,154,174,0.05)","--glow-cyan":"0 0 22px rgba(226,154,174,0.6)","--glow-mag":"0 0 20px rgba(208,106,142,0.55)"},
+    sunset:{"--bg":"#180818","--bg2":"#2c0e26","--panel":"rgba(50,21,34,0.8)","--panel-solid":"#2a131d","--line":"rgba(255,61,146,0.24)","--line2":"rgba(255,61,146,0.38)","--ink":"#FFEAF2","--sub":"#cb86a4","--dim":"#AF6485","--cyan":"#FF3D92","--magenta":"#FF7A3D","--violet":"#C476FF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FF3D92","--grid":"rgba(255,61,146,0.05)","--glow-cyan":"0 0 22px rgba(255,61,146,0.6)","--glow-mag":"0 0 20px rgba(255,122,61,0.55)"},
   },
   themes:[{id:"cyber",name:"赛博夜城",dot:"#00E5D4"},{id:"vapor",name:"迈阿密日落",dot:"#FF4DD8"},{id:"aurora",name:"极光迷幻",dot:"#22FF95"},{id:"mono",name:"暗夜奢华",dot:"#F5D06A"},{id:"klein",name:"克莱因之夜",dot:"#6486FF"},{id:"coral",name:"珊瑚热恋",dot:"#FF8159"},{id:"lagoon",name:"湖水迷情",dot:"#12B0E0"},{id:"dusk",name:"远山暮色",dot:"#8FA6E8"},{id:"rose",name:"莫兰迪玫瑰",dot:"#E29AAE"},{id:"sunset",name:"日暮狂欢",dot:"#FF3D92"}],
   roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"klein","虚空回音":"aurora"},
@@ -1829,15 +1829,15 @@ async function loadTheme(){
   themes.forEach(t=>{ if(!cfg.themePalettes[t]) cfg.themePalettes[t]=JSON.parse(JSON.stringify(CFG_DEFAULT.themePalettes[t]||{})); });
   const keys=Object.keys(cfg.themePalettes.cyber||CFG_DEFAULT.themePalettes.cyber);
   let html='<div style="overflow-x:auto"><table style="min-width:'+(150+themes.length*150)+'px"><thead><tr><th style="min-width:150px;position:sticky;left:0;background:var(--panel-solid);z-index:2">CSS 变量</th>';
-  themes.forEach(t=>{ html+=`<th style="min-width:150px"><span style="color:var(--ink)">${esc(themeName[t]||t)}</span><br><span style="font-size:10px;color:var(--dim);font-family:monospace">${t}</span></th>`; });
+  themes.forEach(t=>{ html+=`<th style="min-width:150px"><span style="color:var(--ink)">${esc(themeName[t]||t)}</span><br><span style="font-size:11px;color:var(--dim);font-family:monospace">${t}</span></th>`; });
   html+='</tr></thead><tbody>';
   keys.forEach(k=>{
-    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:11.5px;position:sticky;left:0;background:var(--panel-solid);z-index:1">${k}</td>`;
+    html+=`<tr><td style="color:var(--cyan);font-family:monospace;font-size:12.5px;position:sticky;left:0;background:var(--panel-solid);z-index:1">${k}</td>`;
     themes.forEach(t=>{
       const v=(cfg.themePalettes[t]||{})[k]||'';
       const isHex=/^#[0-9a-fA-F]{3,8}$/.test(v);
-      const picker=isHex?`<input type="color" data-cpk="${t}|${k}" value="${v.length===4?'#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]:v.slice(0,7)}" style="width:28px;height:28px;padding:0;border:1px solid var(--line2);border-radius:5px;background:none;vertical-align:middle;cursor:pointer">`:'<span style="font-size:10px;color:var(--dim);vertical-align:middle;margin-right:4px">rgba/其他</span>';
-      html+=`<td>${picker}<input data-cv="${t}|${k}" value="${esc(v)}" style="width:calc(100% - 40px);padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;outline:none;margin-left:4px" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
+      const picker=isHex?`<input type="color" data-cpk="${t}|${k}" value="${v.length===4?'#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]:v.slice(0,7)}" style="width:28px;height:28px;padding:0;border:1px solid var(--line2);border-radius:5px;background:none;vertical-align:middle;cursor:pointer">`:'<span style="font-size:11px;color:var(--dim);vertical-align:middle;margin-right:4px">rgba/其他</span>';
+      html+=`<td>${picker}<input data-cv="${t}|${k}" value="${esc(v)}" style="width:calc(100% - 40px);padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px;outline:none;margin-left:4px" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
     });
     html+='</tr>';
   });
@@ -1879,12 +1879,12 @@ async function loadBgm(){
   rooms.forEach(r=>{
     const b=cfg.roomBgm[r];
     html+=`<tr><td>${esc(r)}</td>
-      <td><input data-bgm="${r}|root"   value="${b.root}"  type="number" step="0.01" min="20" max="2000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
-      <td><input data-bgm="${r}|chord"  value="${(b.chord||[]).join(',')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
-      <td><select data-bgm="${r}|wave" style="padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px">${waveOpts.map(w=>`<option ${w===b.wave?'selected':''}>${w}</option>`).join('')}</select></td>
-      <td><input data-bgm="${r}|pulse"  value="${b.pulse}" type="number" min="0" max="10000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
-      <td><input data-bgm="${r}|cut"    value="${b.cut}"   type="number" min="50" max="20000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px"></td>
-      <td><input data-bgm="${r}|name"   value="${esc(b.name||'')}" style="width:130px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:11px"></td>
+      <td><input data-bgm="${r}|root"   value="${b.root}"  type="number" step="0.01" min="20" max="2000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px"></td>
+      <td><input data-bgm="${r}|chord"  value="${(b.chord||[]).join(',')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px"></td>
+      <td><select data-bgm="${r}|wave" style="padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12px">${waveOpts.map(w=>`<option ${w===b.wave?'selected':''}>${w}</option>`).join('')}</select></td>
+      <td><input data-bgm="${r}|pulse"  value="${b.pulse}" type="number" min="0" max="10000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px"></td>
+      <td><input data-bgm="${r}|cut"    value="${b.cut}"   type="number" min="50" max="20000" style="width:80px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px"></td>
+      <td><input data-bgm="${r}|name"   value="${esc(b.name||'')}" style="width:130px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12px"></td>
     </tr>`;
   });
   html+='</tbody></table></div>';
@@ -1915,7 +1915,7 @@ async function loadTextBind(){
   let fc='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>兜底色</th></tr></thead><tbody>';
   Object.keys(cfg.officialFallbackC).forEach(r=>{
     const v=cfg.officialFallbackC[r];
-    fc+=`<tr><td>${esc(r)}</td><td><input type="color" data-fc-picker="${r}" value="${v}" style="width:32px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;vertical-align:middle;cursor:pointer"> <input data-fc="${r}" value="${esc(v)}" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11px;margin-left:6px"></td></tr>`;
+    fc+=`<tr><td>${esc(r)}</td><td><input type="color" data-fc-picker="${r}" value="${v}" style="width:32px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;vertical-align:middle;cursor:pointer"> <input data-fc="${r}" value="${esc(v)}" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px;margin-left:6px"></td></tr>`;
   });
   fc+='</tbody></table></div>'; $('#fallbackCTable').innerHTML=fc;
   $('#fallbackCTable').querySelectorAll('[data-fc-picker]').forEach(p=>p.oninput=()=>{ const t=$('#fallbackCTable').querySelector(`[data-fc="${p.dataset.fcPicker}"]`); if(t) t.value=p.value; });
@@ -1935,7 +1935,7 @@ function renderTextGroups(cfg){
     html+=`<div class="txt-group" data-group="${gi}">`;
     html+=`<div class="txt-grp-head" onclick="toggleTxtGroup(${gi})">`;
     html+=`<span class="txt-grp-caret">▸</span> <b>${esc(gname)}</b> <span class="txt-grp-cnt">${items.length}条${changed?` · <span style="color:var(--amber)">${changed}改</span>`:''}</span>`;
-    html+=`<button class="mini-btn txt-grp-reset" onclick="event.stopPropagation();resetTextGroup(${gi})" style="border-color:var(--dim);color:var(--sub);float:right;font-size:10.5px;padding:2px 8px">↺ 本组</button>`;
+    html+=`<button class="mini-btn txt-grp-reset" onclick="event.stopPropagation();resetTextGroup(${gi})" style="border-color:var(--dim);color:var(--sub);float:right;font-size:11.5px;padding:2px 8px">↺ 本组</button>`;
     html+=`</div>`;
     html+=`<div class="txt-grp-body" style="display:none">`;
     items.forEach(([k,label])=>{
@@ -2087,20 +2087,20 @@ function ssItemHtml(s,i){
       <span class="ss-drag" data-dragidx="${i}" style="cursor:grab;color:var(--dim);font-size:16px;user-select:none;padding:0 4px" title="拖动排序">≡</span>
       <span class="ss-heademoji" style="font-size:20px">${s.emoji||'🎵'}</span>
       <div style="flex:1;min-width:200px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:11px;color:var(--dim)">ID</label>
+        <label style="font-size:12px;color:var(--dim)">ID</label>
         <input data-ssidx="${i}" data-sskey="id" value="${esc(s.id||'')}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
-        <label style="font-size:11px;color:var(--dim)">名字</label>
+        <label style="font-size:12px;color:var(--dim)">名字</label>
         <input data-ssidx="${i}" data-sskey="name" value="${esc(s.name||'')}" style="width:90px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
-        <label style="font-size:11px;color:var(--dim)">副标</label>
+        <label style="font-size:12px;color:var(--dim)">副标</label>
         <input data-ssidx="${i}" data-sskey="sub" value="${esc(s.sub||'')}" style="width:100px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
-        <label style="font-size:11px;color:var(--dim)">emoji</label>
+        <label style="font-size:12px;color:var(--dim)">emoji</label>
         <input data-ssidx="${i}" data-sskey="emoji" value="${esc(s.emoji||'')}" style="width:50px;text-align:center;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:14px">
-        <label style="font-size:11px;color:var(--dim)">色</label>
+        <label style="font-size:12px;color:var(--dim)">色</label>
         <input type="color" data-ssidx="${i}" data-sskey="color" value="${/^#[0-9a-fA-F]{6}$/.test(color)?color:'#0ABAB5'}" style="width:28px;height:24px;padding:0;border:1px solid var(--line2);border-radius:4px;background:none;cursor:pointer">
-        <input data-ssidx="${i}" data-sskey="color" value="${esc(color)}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:11px">
+        <input data-ssidx="${i}" data-sskey="color" value="${esc(color)}" style="width:80px;font-family:monospace;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
       </div>
-      <button class="mini-btn ss-toggle" data-togidx="${i}" style="font-size:11px;padding:3px 8px">⌄ 高级</button>
-      <button class="mini-btn ss-del" data-delidx="${i}" style="font-size:11px;padding:3px 8px;border-color:#E63946;color:#E63946">删</button>
+      <button class="mini-btn ss-toggle" data-togidx="${i}" style="font-size:12px;padding:3px 8px">⌄ 高级</button>
+      <button class="mini-btn ss-del" data-delidx="${i}" style="font-size:12px;padding:3px 8px;border-color:#E63946;color:#E63946">删</button>
     </div>
     <div data-adv="${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:12px">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
@@ -2135,19 +2135,19 @@ function advField(i,key,label,val,type){
   const num = type==='num' ? ` data-ssnum="1"` : '';
   const jsn = type==='json' ? ` data-ssjson="1"` : '';
   if(type==='textarea'){
-    return `<div style="grid-column:1 / -1"><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
-      <textarea ${common} style="width:100%;min-height:44px;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:11.5px;font-family:monospace">${esc(val)}</textarea></div>`;
+    return `<div style="grid-column:1 / -1"><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:3px">${label}</label>
+      <textarea ${common} style="width:100%;min-height:44px;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12.5px;font-family:monospace">${esc(val)}</textarea></div>`;
   }
   if(type==='json'){
-    return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
-      <input ${common}${jsn} value="${esc(val)}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-family:monospace;font-size:11px"></div>`;
+    return `<div><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:3px">${label}</label>
+      <input ${common}${jsn} value="${esc(val)}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-family:monospace;font-size:12px"></div>`;
   }
   const kind = type==='num'||type==='nested' ? 'number step=0.01' : 'text';
-  return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+  return `<div><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:3px">${label}</label>
     <input type="${kind}" ${common}${nested}${num} value="${esc(val)}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px"></div>`;
 }
 function advSelect(i,key,label,val,opts){
-  return `<div><label style="display:block;color:var(--dim);font-size:11px;margin-bottom:3px">${label}</label>
+  return `<div><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:3px">${label}</label>
     <select data-ssidx="${i}" data-sskey="${key}" style="width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);font-size:12px">
       ${opts.map(o=>`<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('')}
     </select></div>`;
@@ -2359,9 +2359,9 @@ async function loadAuditLog(reset=true){
   if(reset){
     _auditState.scope = $('#auditScope')?.value || '';
     _auditState.tag = $('#auditTag')?.value || '';
-    box.innerHTML=`<div id="auditCount" class="sub" style="font-size:11px;color:var(--dim);margin-bottom:8px">加载中…</div>
+    box.innerHTML=`<div id="auditCount" class="sub" style="font-size:12px;color:var(--dim);margin-bottom:8px">加载中…</div>
       <div id="auditRows">${Array(6).fill('<div class="sk-shim" style="height:56px;border-radius:8px;margin-bottom:8px"></div>').join('')}</div>
-      <div id="auditSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:11px;padding:12px 0"></div>`;
+      <div id="auditSentinel" style="height:24px;text-align:center;color:var(--dim);font-size:12px;padding:12px 0"></div>`;
     // 触底 IO
     const sentinel=$('#auditSentinel');
     if(sentinel && 'IntersectionObserver' in window){
@@ -2429,7 +2429,7 @@ function _auditBindRow(box){
     const old = document.getElementById('auditDetail'); if(old && old.dataset.open===String(i)){ old.remove(); return; }
     const detail = document.createElement('div');
     detail.id = 'auditDetail'; detail.dataset.open = i;
-    detail.style.cssText = 'margin-top:8px;padding:10px 12px;border:1px dashed var(--line2);border-radius:6px;background:rgba(0,0,0,.3);font-size:11px;font-family:monospace;max-height:300px;overflow:auto';
+    detail.style.cssText = 'margin-top:8px;padding:10px 12px;border:1px dashed var(--line2);border-radius:6px;background:rgba(0,0,0,.3);font-size:12px;font-family:monospace;max-height:300px;overflow:auto';
     detail.innerHTML = `<div style="color:var(--dim);margin-bottom:6px">◆ 原始日志 raw:</div>
       <pre style="margin:0;white-space:pre-wrap;word-break:break-all;color:var(--sub)">${esc(JSON.stringify(e.raw,null,2))}</pre>`;
     const row = document.querySelector(`[data-auditrow="${i}"]`);
@@ -2440,25 +2440,25 @@ function auditItemHtml(e,i){
   const ts = e.ts ? new Date(e.ts).toLocaleString('zh-CN',{hour12:false}) : '?';
   const isAdmin=e.scope==='admin';
   const scopeTag = isAdmin
-    ? '<span style="background:var(--cyan);color:#000;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">admin</span>'
-    : '<span style="background:#B57EDC;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">user</span>';
+    ? '<span style="background:var(--cyan);color:#000;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600">admin</span>'
+    : '<span style="background:#B57EDC;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600">user</span>';
   const tagLabel = LOG_TAG_LABEL[e.tag] || e.tag;
   const rbBtn = (isAdmin && e.hadPrev && e.key)
-    ? `<button class="mini-btn" data-rbidx="${i}" style="border-color:#F7C873;color:#F7C873;font-size:11px;padding:3px 10px">↩ 恢复到变更前</button>`
-    : `<span style="color:var(--dim);font-size:11px">${isAdmin?'无可回滚历史':'前台行为日志'}</span>`;
-  const room = e.room ? `<span style="color:var(--sub);font-size:11.5px">🏠 ${esc(e.room)}</span>` : '';
+    ? `<button class="mini-btn" data-rbidx="${i}" style="border-color:#F7C873;color:#F7C873;font-size:12px;padding:3px 10px">↩ 恢复到变更前</button>`
+    : `<span style="color:var(--dim);font-size:12px">${isAdmin?'无可回滚历史':'前台行为日志'}</span>`;
+  const room = e.room ? `<span style="color:var(--sub);font-size:12.5px">🏠 ${esc(e.room)}</span>` : '';
   return `<div data-auditrow="${i}" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(10,12,24,.3)">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${scopeTag}
       <span style="font-weight:600;color:var(--ink);font-size:13px">${esc(tagLabel)}</span>
-      <span style="color:var(--sub);font-size:11.5px;font-family:monospace">${esc(e.key||e.tag)}</span>
+      <span style="color:var(--sub);font-size:12.5px;font-family:monospace">${esc(e.key||e.tag)}</span>
       ${room}
       <span style="flex:1"></span>
-      <span style="color:var(--dim);font-size:11.5px">🕒 ${esc(ts)}</span>
-      <span style="color:var(--sub);font-size:11.5px">👤 ${esc(e.actor||'?')}</span>
+      <span style="color:var(--dim);font-size:12.5px">🕒 ${esc(ts)}</span>
+      <span style="color:var(--sub);font-size:12.5px">👤 ${esc(e.actor||'?')}</span>
     </div>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="mini-btn" data-vwidx="${i}" style="border-color:var(--line2);color:var(--sub);font-size:11px;padding:3px 10px">⌄ 查看详情</button>
+      <button class="mini-btn" data-vwidx="${i}" style="border-color:var(--line2);color:var(--sub);font-size:12px;padding:3px 10px">⌄ 查看详情</button>
       ${rbBtn}
     </div>
   </div>`;
@@ -2505,7 +2505,7 @@ async function loadTuning(){
   TUNING_FIELDS.forEach(([k,label,hint,options])=>{
     const cur=(t[k]!=null)?t[k]:def[k];
     const changed=cur!==def[k];
-    html+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:10px">改</span>':''}<div style="font-family:monospace;font-size:10px;color:var(--dim)">${k}</div></td>`;
+    html+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:11px">改</span>':''}<div style="font-family:monospace;font-size:11px;color:var(--dim)">${k}</div></td>`;
     if(options && options.length){
       // 枚举下拉
       const opts=options.map(([v,label])=>`<option value="${esc(v)}"${String(v)===String(cur)?' selected':''}>${esc(label)}</option>`).join('');
@@ -2513,7 +2513,7 @@ async function loadTuning(){
     } else {
       html+=`<td><input type="number" data-tune="${k}" value="${cur}" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px;outline:none" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'"></td>`;
     }
-    html+=`<td style="color:var(--dim);font-size:11.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${def[k]}</span></td></tr>`;
+    html+=`<td style="color:var(--dim);font-size:12.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${def[k]}</span></td></tr>`;
   });
   html+='</tbody></table></div>';
   $('#tuningTable').innerHTML=html;
@@ -2594,7 +2594,7 @@ async function loadEntrance(){
       const opts=ENT_TREAT_ENUM.map(([vv,ll])=>`<option value="${esc(vv)}"${vv===v?' selected':''}>${esc(ll)}</option>`).join('');
       ctrl=`<select data-entg="${k}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px">${opts}</select>`;
     }
-    g+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:10px">改</span>':''}<div style="font-family:monospace;font-size:10px;color:var(--dim)">${k}</div></td><td>${ctrl}</td><td style="color:var(--dim);font-size:11.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${esc(String(def[k]))}</span></td></tr>`;
+    g+=`<tr><td style="white-space:nowrap"><b>${esc(label)}</b>${changed?' <span style="color:var(--amber);font-size:11px">改</span>':''}<div style="font-family:monospace;font-size:11px;color:var(--dim)">${k}</div></td><td>${ctrl}</td><td style="color:var(--dim);font-size:12.5px">${esc(hint)}<br><span style="color:var(--sub);opacity:.6">默认 ${esc(String(def[k]))}</span></td></tr>`;
   });
   g+='</tbody></table></div>';
   $('#entGlobalTable').innerHTML=g;
@@ -2606,16 +2606,16 @@ async function loadEntrance(){
     const cls=ENT_CLS_ENUM.map(([v,l])=>`<option value="${esc(v)}"${v===c.cls?' selected':''}>${esc(l)}</option>`).join('');
     const sfx=ENT_SFX_ENUM.map(([v,l])=>`<option value="${esc(v)}"${v===(c.sfx||'')?' selected':''}>${esc(l)}</option>`).join('');
     t+=`<tr data-tier="${id}">
-      <td style="white-space:nowrap"><b>${esc(dname)}</b><div style="font-family:monospace;font-size:10px;color:var(--dim)">${id}</div></td>
+      <td style="white-space:nowrap"><b>${esc(dname)}</b><div style="font-family:monospace;font-size:11px;color:var(--dim)">${id}</div></td>
       <td><input data-ent="label" value="${esc(c.label||'')}" maxlength="6" style="width:70px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px"></td>
       <td><input data-ent="icon" value="${esc(c.icon||'')}" maxlength="4" style="width:50px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:14px;text-align:center"></td>
       <td><select data-ent="cls" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${cls}</select></td>
       <td><select data-ent="sfx" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${sfx}</select></td>
       <td style="text-align:center"><input type="checkbox" data-ent="stage" ${c.stage?'checked':''}></td>
       <td><input data-ent="burst" value="${esc(c.burst||'')}" maxlength="20" placeholder="emoji串" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px"></td>
-      <td><input data-ent="flash" value="${esc(c.flash||'')}" maxlength="20" placeholder="#F5D06A" style="width:80px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11.5px"></td>
+      <td><input data-ent="flash" value="${esc(c.flash||'')}" maxlength="20" placeholder="#F5D06A" style="width:80px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px"></td>
       <td style="text-align:center"><input type="checkbox" data-ent="shake" ${c.shake?'checked':''}></td>
-      <td><button class="mini-btn" data-preview="${id}" style="border-color:var(--cyan);color:var(--cyan);font-size:11px">▶ 预览</button></td>
+      <td><button class="mini-btn" data-preview="${id}" style="border-color:var(--cyan);color:var(--cyan);font-size:12px">▶ 预览</button></td>
     </tr>`;
   });
   t+='</tbody></table></div>';
@@ -2638,33 +2638,33 @@ function renderEntCustom(){
     const fx=c.fx||{};
     return `<div class="ent-cust-item" data-idx="${i}" style="border:1px solid var(--line2);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:rgba(10,12,24,.35)">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
-      <span style="font-size:11px;color:var(--dim);font-family:monospace">id</span>
+      <span style="font-size:12px;color:var(--dim);font-family:monospace">id</span>
       <input data-ec="id" value="${esc(c.id||'')}" maxlength="20" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12px">
-      <span style="font-size:11px;color:var(--dim)">名称</span>
+      <span style="font-size:12px;color:var(--dim)">名称</span>
       <input data-ec="name" value="${esc(c.name||'')}" maxlength="12" style="width:100px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12.5px">
-      <span style="font-size:11px;color:var(--dim)">图标</span>
+      <span style="font-size:12px;color:var(--dim)">图标</span>
       <input data-ec="icon" value="${esc(c.icon||'')}" maxlength="4" style="width:50px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:14px;text-align:center">
-      <span style="font-size:11px;color:var(--dim)">待遇</span>
+      <span style="font-size:12px;color:var(--dim)">待遇</span>
       <select data-ec="level" style="padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${levelOpts.replace(`value="${c.level||'admin'}"`,`value="${c.level||'admin'}" selected`)}</select>
-      <span style="font-size:11px;color:var(--dim)">命中 UID</span>
-      <span style="font-family:monospace;font-size:11px;color:var(--sub)">${(c.uids||[]).length} 人</span>
-      <button class="mini-btn" data-ec-preview="${i}" style="margin-left:auto;border-color:var(--cyan);color:var(--cyan);font-size:11px">▶ 预览</button>
-      <button class="mini-btn" data-ec-del="${i}" style="border-color:var(--magenta);color:var(--magenta);font-size:11px">× 删除</button>
+      <span style="font-size:12px;color:var(--dim)">命中 UID</span>
+      <span style="font-family:monospace;font-size:12px;color:var(--sub)">${(c.uids||[]).length} 人</span>
+      <button class="mini-btn" data-ec-preview="${i}" style="margin-left:auto;border-color:var(--cyan);color:var(--cyan);font-size:12px">▶ 预览</button>
+      <button class="mini-btn" data-ec-del="${i}" style="border-color:var(--magenta);color:var(--magenta);font-size:12px">× 删除</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 10px;background:rgba(0,0,0,.2);border-radius:8px">
-      <span style="font-size:11px;color:var(--dim);font-weight:600">✨ 自定义入场效果</span>
-      <span style="font-size:11px;color:var(--dim)">入场词</span>
+      <span style="font-size:12px;color:var(--dim);font-weight:600">✨ 自定义入场效果</span>
+      <span style="font-size:12px;color:var(--dim)">入场词</span>
       <input data-ec-fx="label" value="${esc(fx.label||'')}" maxlength="6" placeholder="菅 临" style="width:70px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">
-      <span style="font-size:11px;color:var(--dim)">皮肤</span>
+      <span style="font-size:12px;color:var(--dim)">皮肤</span>
       <select data-ec-fx="cls" style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${clsOpts.replace(`value="${fx.cls||''}"`, `value="${fx.cls||''}" selected`)}</select>
-      <span style="font-size:11px;color:var(--dim)">音效</span>
+      <span style="font-size:12px;color:var(--dim)">音效</span>
       <select data-ec-fx="sfx" style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">${sfxOpts.replace(`value="${fx.sfx==null?'soul':fx.sfx}"`, `value="${fx.sfx==null?'soul':fx.sfx}" selected`)}</select>
-      <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="stage" ${fx.stage!==false?'checked':''}> 全屏光幕</label>
-      <span style="font-size:11px;color:var(--dim)">粒子</span>
+      <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="stage" ${fx.stage!==false?'checked':''}> 全屏光幕</label>
+      <span style="font-size:12px;color:var(--dim)">粒子</span>
       <input data-ec-fx="burst" value="${esc(fx.burst||'')}" maxlength="20" placeholder="💎✨🌟" style="width:100px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:12px">
-      <span style="font-size:11px;color:var(--dim)">闪屏</span>
-      <input data-ec-fx="flash" value="${esc(fx.flash||'')}" maxlength="20" placeholder="#C77DFF" style="width:80px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:11.5px">
-      <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="shake" ${fx.shake?'checked':''}> 震屏</label>
+      <span style="font-size:12px;color:var(--dim)">闪屏</span>
+      <input data-ec-fx="flash" value="${esc(fx.flash||'')}" maxlength="20" placeholder="#C77DFF" style="width:80px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:monospace;font-size:12.5px">
+      <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dim);cursor:pointer"><input type="checkbox" data-ec-fx="shake" ${fx.shake?'checked':''}> 震屏</label>
     </div>
   </div>`;
   }).join('');
@@ -2801,7 +2801,7 @@ function renderCustomTiers(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       <input data-ct="${i}" data-f="icon" value="${esc(ct.icon||'')}" maxlength="4" placeholder="💎" style="flex:0 0 52px;text-align:center;padding:7px 6px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:16px">
       <input data-ct="${i}" data-f="name" value="${esc(ct.name||'')}" maxlength="12" placeholder="类型名称" style="flex:1;min-width:120px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
-      <span style="flex:0 0 auto;font-size:11px;color:var(--dim);font-family:monospace">id:${esc(ct.id)}</span>
+      <span style="flex:0 0 auto;font-size:12px;color:var(--dim);font-family:monospace">id:${esc(ct.id)}</span>
       <button class="mini-btn ct-del" data-i="${i}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">删除类型</button>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -2811,7 +2811,7 @@ function renderCustomTiers(){
         <button class="seg-btn${ct.level==='super'?' on':''}" data-lv="super">超级管理员级(更炸)</button>
       </div>
     </div>
-    <div style="font-size:11.5px;color:var(--dim);margin-bottom:6px">名单(${(ct.uids||[]).length} 人; 上方「任命身份」选此类型可加, 这里可移除)</div>
+    <div style="font-size:12.5px;color:var(--dim);margin-bottom:6px">名单(${(ct.uids||[]).length} 人; 上方「任命身份」选此类型可加, 这里可移除)</div>
     <div class="ct-uids" data-i="${i}" style="display:flex;flex-direction:column;gap:6px">${
       (ct.uids||[]).length ? (ct.uids||[]).map((uid,j)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px">
         <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink)">${esc(uid)}</code>
@@ -2875,7 +2875,7 @@ async function renderIdentityPool(){
   let html='';
   rows.forEach(([k,label,hint])=>{
     const arr=p[k]||[];
-    html+=`<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">${label} <span style="color:var(--dim);font-size:10.5px">${hint} · ${arr.length}个</span></div>`;
+    html+=`<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">${label} <span style="color:var(--dim);font-size:11.5px">${hint} · ${arr.length}个</span></div>`;
     html+=`<textarea data-pool="${k}" rows="3" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none;resize:vertical;box-sizing:border-box" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line)'">${esc(arr.join(', '))}</textarea></div>`;
   });
   $('#poolPanel').innerHTML=html;
