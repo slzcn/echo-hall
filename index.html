@@ -1455,7 +1455,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260719-review-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260719-bottle-ignore-fix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4335,6 +4335,9 @@ function showBottleCard(o){
   try{ EhSfx.play('receive'); }catch(_){}
   const close=()=>mask.classList.remove('on');
   mask.querySelector('#btClose').onclick=close;
+  // "丢回海里"只在"捞到瓶"(recv)时有意义; 读回信(reply)时你是原作者, 没瓶可丢 → 隐藏, 且清掉旧 handler 防误触上一张卡的瓶
+  const ignoreBtn=mask.querySelector('#btIgnore');
+  if(ignoreBtn){ ignoreBtn.style.display = isRecv ? '' : 'none'; ignoreBtn.onclick=null; }
   if(isRecv){
     mask.querySelector('#btReplySend').onclick=async()=>{
       const rv=(inp && inp.value||'').trim(); if(!rv){ close(); return; }
@@ -4345,7 +4348,7 @@ function showBottleCard(o){
       try{ worldChan && worldChan.send({ type:'broadcast', event:'bottle_reply', payload:{ bid:o.bid, text:rv } }); }catch(_){}
       if(/^\d+$/.test(String(o.bid))){ try{ await sb.from('eh_bottles').update({ reply_text:rv, reply_at:new Date().toISOString() }).eq('id',o.bid); }catch(_){} }
     };
-    mask.querySelector('#btIgnore').onclick=async()=>{
+    if(ignoreBtn) ignoreBtn.onclick=async()=>{
       close(); bottleSplash('🌊 把瓶子又丢回了海里');
       // DB 捞的瓶不回信就丢回海(caught_by 清空, 让别人还能捞)
       if(/^\d+$/.test(String(o.bid))){ try{ await sb.from('eh_bottles').update({ caught_by:'', caught_at:null }).eq('id',o.bid); }catch(_){} }
