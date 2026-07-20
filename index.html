@@ -124,6 +124,37 @@
     --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:rgba(0,127,118,0.28); --line2:rgba(0,127,118,0.42); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:#007f76; --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:rgba(0,127,118,0.06); --glow-cyan:0 2px 10px rgba(0,127,118,0.18); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* ============ EH_MOBILE_COMPAT 移动端兼容性增强 ============ */
+  /* 1. 去掉 iOS/安卓对表单控件的系统默认样式(内阴影/圆角/箭头),让 EH 自定义样式生效 */
+  input,textarea,select,button{
+    -webkit-appearance:none;appearance:none;
+    border-radius:0;  /* 各控件自己的 border-radius 会覆盖这条,这里只是清系统默认 */
+    background-clip:padding-box;
+  }
+  /* select 需要保留下拉能力,只去外观不去功能 */
+  select{background-image:none}
+  /* 2. 防 iOS 横竖屏切换时字号被系统自动放大 */
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  /* 3. 声明支持深色配色,让系统表单控件(如日期选择/滚动条)跟随暗色, 不被浅色模式反色 */
+  :root{color-scheme:dark}
+  html[data-theme="day"],html[data-theme="light"]{color-scheme:light}
+  /* 4. 密码/账号 autofill 自动填充: 覆盖浏览器强制的黄白底,保持 EH 深色输入框风格 */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active{
+    -webkit-text-fill-color:var(--ink,#e8f4f4) !important;
+    -webkit-box-shadow:0 0 0 1000px var(--input-bg,rgba(255,255,255,.04)) inset !important;
+    box-shadow:0 0 0 1000px var(--input-bg,rgba(255,255,255,.04)) inset !important;
+    caret-color:var(--ink,#e8f4f4);
+    transition:background-color 9999s ease-in-out 0s;  /* 拖死 autofill 的背景过渡,防闪黄 */
+  }
+  /* 5. 长按聊天文字/头像不弹 iOS 系统菜单(拷贝/查询),避免误触遮挡; 输入框内仍允许选择编辑 */
+  body{-webkit-touch-callout:none}
+  input,textarea,[contenteditable]{-webkit-touch-callout:default;-webkit-user-select:text;user-select:text}
+  /* 6. 消息气泡等文字内容允许选中复制(EH 是聊天,复制是刚需),但界面按钮/装饰不选 */
+  .msg,.msg-text,.bubble,.chat-text,.reply-quote{-webkit-user-select:text;user-select:text}
+  /* ============ /EH_MOBILE_COMPAT ============ */
   /* ★ 禁掉按钮/可交互元素点击后的浏览器默认黑色 focus outline(手机上一点就出一圈黑边),
      保留 :focus-visible(仅键盘 tab 导航触发, 触屏/鼠标点击不触发) 的主题色描边保无障碍。 */
   button,[role="button"],.song-play,.tool-btn,.me-btn,.plus-btn,.emoji-btn{outline:none}
