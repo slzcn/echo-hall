@@ -1548,7 +1548,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-overlay3';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-overlay4';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8119,7 +8119,8 @@ syncViewportH();
       'appvh='+getComputedStyle(document.documentElement).getPropertyValue('--appvh').trim(),
       'hall.h='+Math.round(hr.height||0)+' hall.bot='+Math.round(hr.bottom||0),
       'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
-      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight?' ❌超屏':' ✅')
+      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight?' ❌超屏':' ✅'),
+      'unpinSrc='+(window.__ehUnpinSrc||'-')
     ];
     box.textContent=lines.join('\n');
     box.style.display='block';
@@ -8152,22 +8153,29 @@ syncViewportH();
     try{ scrollStream(); }catch(_){}
   };
   cin.addEventListener('focus', pin);
-  // 失焦: 键盘收起, 复位。overlay 键盘下 visualViewport 不变(不触发 resize),
-  //   复位完全靠这里。搜狗/百度键盘收起有动画延迟, blur 只打一拍(60ms)抵不住
-  //   → 多打几拍确保 #hall 复位满屏(与 focus 对称)。
-  const unpin=()=>{
+  // 失焦: 键盘收起, 复位。⚠️ overlay 键盘(搜狗/百度)真机上收起时 visualViewport 不变(不触发 resize),
+  //   且 blur/focusout 也可能不发→单靠 blur 复位不可靠。多源触发 + 轮询兑底。
+  window.__ehUnpinSrc='(none)';   // 诊断: 记录最后一次触发复位的事件源
+  const unpin=(src)=>{
+    if(src) window.__ehUnpinSrc=src;
     // 仍在输入不复位(防收起过程中 activeElement 短暂误判又收缩回去)
     if(document.activeElement && document.activeElement.id==='cin') return;
     document.body.classList.remove('kb-open');
     const vv=window.visualViewport;
     document.documentElement.style.setProperty('--appvh', (vv?vv.height:window.innerHeight)+'px');
+    try{ if(window.__ehKbDiagUpd) window.__ehKbDiagUpd(); }catch(_){}
   };
-  cin.addEventListener('blur', ()=>{
-    unpin();
-    setTimeout(unpin,60); setTimeout(unpin,200); setTimeout(unpin,450);
-  });
-  // document 级 focusout 兜底: cin 的 blur 偶发不触发时, 焦点离开 cin 能被 focusout 冒泡兜住。
-  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin'){ setTimeout(unpin,60); setTimeout(unpin,300); } });
+  window.__ehUnpin=unpin;
+  cin.addEventListener('blur', ()=>{ unpin('blur'); setTimeout(()=>unpin('blur+60'),60); setTimeout(()=>unpin('blur+200'),200); setTimeout(()=>unpin('blur+450'),450); });
+  // document 级 focusout 兑底: cin 的 blur 偶发不触发时, 焦点离开 cin 能被 focusout 冒泡兑住。
+  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin'){ setTimeout(()=>unpin('focusout'),60); setTimeout(()=>unpin('focusout+300'),300); } });
+  // ★ overlay 键盘收起真凶兑底: 用户点输入框以外区域(pointerdown/touchend)时, 若 cin 不再聚焦则复位。
+  //   overlay 键盘收起多数伴随这个手势, 不依赖 blur 事件。
+  const outsideCheck=(e)=>{ if(e.target && e.target.id==='cin') return; setTimeout(()=>unpin('outside'),50); setTimeout(()=>unpin('outside+250'),250); };
+  document.addEventListener('pointerdown', outsideCheck, {passive:true});
+  document.addEventListener('touchend', outsideCheck, {passive:true});
+  // ★ 轮询兑底(最可靠): kb-open 但 cin 已不再聚焦 → 键盘已收起但事件都没接住, 强制复位。
+  setInterval(()=>{ if(document.body.classList.contains('kb-open') && !(document.activeElement && document.activeElement.id==='cin')) unpin('poll'); }, 400);
   // 键盘开着时, 任何把 body 顶起来的滚动都拉回去(iOS 偶发)
   window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
 })();
