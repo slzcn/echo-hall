@@ -7955,6 +7955,118 @@ syncViewportH();
   window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
 })();
 
+// ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
+// 覆盖: 登录/注册/邀请码/建房/找回密码/改邮箱/个人资料 等所有弹窗输入框
+// 已在 #cin 单独处理的场景不受影响(#cin 走 hall 保护,不进 modal 分支)
+(function(){
+  const KB_THRESH = 120;  // 可视区比 window 矮 >120px 判为键盘开
+  const SAFE_PAD  = 20;   // 输入框底部距键盘顶至少 20px
+  let activeInput = null;
+
+  function isKbOpen(){
+    const vv = window.visualViewport;
+    return vv ? (window.innerHeight - vv.height > KB_THRESH) : false;
+  }
+  function isTextInput(el){
+    if(!el) return false;
+    if(el.tagName === 'TEXTAREA') return true;
+    if(el.tagName !== 'INPUT') return false;
+    const t = (el.type||'text').toLowerCase();
+    return ['text','password','email','search','tel','url','number'].includes(t);
+  }
+  function ensureVisible(el){
+    if(!el || !document.body.contains(el)) return;
+    const vv = window.visualViewport;
+    const r = el.getBoundingClientRect();
+    const kbTop = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
+    // 已完全在可视区(留 SAFE_PAD 余量)则不动
+    if(r.bottom <= kbTop - SAFE_PAD && r.top >= 8) return;
+    // 先重要: 弹窗本身需要先被压缩到可视区高, 不然算 modal.scrollTo 也没滚动空间
+    // EH 的 .modal max-height:90dvh, dvh 不响应键盘, 需手工改成 kbTop 上方的可用高
+    const modalHost = el.closest('.modal');
+    if(modalHost){
+      const hostTop = modalHost.getBoundingClientRect().top;
+      const availH = Math.max(200, kbTop - Math.max(0,hostTop) - 8);
+      modalHost.style.maxHeight = availH + 'px';
+    }
+    // 找真实的可滚动祖先(EH 的弹窗真实容器是 #modal.glass, 不是 .modal)
+    let scrollable = null;
+    let p = el.parentElement;
+    while(p && p !== document.body){
+      const oy = getComputedStyle(p).overflowY;
+      if((oy==='auto'||oy==='scroll') && p.scrollHeight > p.clientHeight + 1){
+        scrollable = p; break;
+      }
+      p = p.parentElement;
+    }
+    if(scrollable){
+      // 有自己的滚动容器(弹窗场景): 在容器内滚,不动 body
+      let y = 0, node = el;
+      while(node && node !== scrollable){ y += node.offsetTop; node = node.offsetParent; }
+      const visibleH = Math.min(scrollable.clientHeight, kbTop - scrollable.getBoundingClientRect().top);
+      const target = Math.max(0, y - Math.max(60, visibleH * 0.25));
+      try{ scrollable.scrollTo({top:target, behavior:'smooth'}); }
+      catch(_){ scrollable.scrollTop = target; }
+    } else {
+      // 无独立滚动容器(如 loginCollapse 在 enter 场景内): 没有滚动容器, 直接把输入框手动 translate 上推
+      // 默认的 scrollIntoView 在 enter 场景里无效(所有层都 overflow:visible/hidden)
+      const need = r.bottom - (kbTop - SAFE_PAD);
+      if(need > 0){
+        const stage = el.closest('.stage') || document.body;
+        if(stage){
+          // 上推 stage 一个距离, 把输入框露出可视区
+          const cur = parseFloat(stage.getAttribute('data-kb-offset')||'0');
+          const total = cur + need + 8;
+          stage.style.transition = 'transform 0.25s';
+          stage.style.transform = `translateY(-${total}px)`;
+          stage.setAttribute('data-kb-offset', String(total));
+        }
+      }
+    }
+  }
+
+  // 失焦时恢复 modal 的 max-height + stage transform
+  function restoreModalHeight(){
+    document.querySelectorAll('.modal[style*="max-height"]').forEach(m=>{
+      m.style.maxHeight = '';
+    });
+    document.querySelectorAll('[data-kb-offset]').forEach(s=>{
+      s.style.transform = '';
+      s.removeAttribute('data-kb-offset');
+    });
+  }
+
+  // focus 时记录目标输入框,并在键盘弹起过程多次纠正(iOS 键盘弹起有 lag)
+  document.addEventListener('focusin', (e)=>{
+    const el = e.target;
+    if(!isTextInput(el)) return;
+    // #cin 已由 hall 保护接管,这里不重复
+    if(el.id === 'cin') return;
+    activeInput = el;
+    const tick = ()=>{ if(activeInput===el && isKbOpen()) ensureVisible(el); };
+    // iOS 键盘弹起 ~300ms 内可视区才真正变化,多次纠正抹平 lag
+    setTimeout(tick, 80);
+    setTimeout(tick, 250);
+    setTimeout(tick, 500);
+    setTimeout(tick, 900);
+  }, {passive:true});
+
+  document.addEventListener('focusout', (e)=>{
+    if(e.target === activeInput){
+      activeInput = null;
+      // 输入完成后延时恢复 modal 高度(给键盘收回时间)
+      setTimeout(restoreModalHeight, 300);
+    }
+  }, {passive:true});
+
+  // visualViewport resize(键盘弹/收) 时,还有 active 输入框就再纠一次
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', ()=>{
+      if(activeInput && isKbOpen()) ensureVisible(activeInput);
+    });
+  }
+})();
+
 // ============ 启动 ============
 loadOrRollIdentity();
 paintIdentity();
