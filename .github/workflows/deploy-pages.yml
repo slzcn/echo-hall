@@ -29,6 +29,8 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html admin.html jianghu.html README.md ver.txt _site/
+          cp manifest.webmanifest service-worker.js _site/
+          cp -R icons _site/icons
           cp -R masters _site/masters
       # enablement:true 让 configure-pages 首次运行时自动开启 Pages(build type=Actions)，
       # 不声明 environment，避免在 Pages 尚未启用时 job 无法调度

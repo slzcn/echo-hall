@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>回声厅 · Echo Hall</title>
+<!-- ===== PWA: 可安装到主屏 / 离线秒开 ===== -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#070a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="回声厅">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <!-- 加速: 提前握手 CDN 与 Supabase 域名, 首屏并行拉取 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://cddkniwbhvcbfgkgomtl.supabase.co" crossorigin>
@@ -8195,6 +8207,29 @@ function fillAndLogin(id, pwv){
     }catch(_){}
   },2000);
 })();
+</script>
+<!-- ===== PWA: 注册 Service Worker(离线秒开) ===== -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').then(function (reg) {
+        // 发现新版自动接管,下次进入生效
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function () {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              nw.postMessage('SKIP_WAITING');
+            }
+          });
+        });
+      }).catch(function (e) { console.warn('SW register failed:', e && e.message); });
+      var reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (reloaded) return; reloaded = true; location.reload();
+      });
+    });
+  }
 </script>
 </body>
 </html>
