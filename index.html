@@ -1409,24 +1409,14 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    /* 聊天页(用 body.hall-on 而非 :has, 兼容不支持:has的iOS WebView): 满高+顶对齐, 输入框贴键盘 */
-    /* v6-android-height100: height:100% 打底 —— 安卓键盘弹起 innerHeight 变小时,
-       body(height:100%) 原生跟随收缩, stage/#hall 继承, 无需 JS/dvh(安卓真机不跟随 dvh/--appvh 的坑).
-       --appvh 作 iOS 兜底覆盖(iOS 键盘不改 innerHeight, 靠 JS 写 visualViewport 高). */
-    body.hall-on .stage{padding:0;height:100%;height:var(--appvh,100%);align-items:stretch}
-    #hall{width:100%;height:100%;height:var(--appvh,100%);border-radius:0;border:none}
-    /* v5 iOS 键盘根治: 靠 interactive-widget=resizes-content 让键盘压缩布局视口,
-       #hall/stage 用 var(--appvh)(=visualViewport 高) 自然收缩, .composer(flex-shrink:0)自然贴键盘上方.
-       废除旧 fixed 硬钉(fixed 与 iOS 键盘冲突, 见 html,body 注释)。保留 kb-open 仅作微调 hook。 */
-    body.kb-open .stage{height:var(--appvh,100%)}
-    body.kb-open #hall{height:var(--appvh,100%)}
+    /* 聊天页键盘处理(极简版, 重写): 靠 meta viewport interactive-widget=resizes-content —
+       键盘弹起时浏览器自动压缩"布局视口"(100% 高), body(height:100%) 跟着收缩, stage/#hall 继承,
+       .stream(flex:1;min-height:0)吃剩余高并滚动, .composer(flex-shrink:0)自然贴到收缩后的底部=键盘上方。
+       全程零 JS 干预高度。删掉旧的 --appvh 估算 / kb-open / sticky 兜底 / fixed 硬钉一切 hack。 */
+    body.hall-on .stage{padding:0;height:100%;align-items:stretch}
+    #hall{width:100%;height:100%;border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-    /* 键盘弹起时: 给输入法工具栏(搜狗/百度等第三方 IME 在系统键盘上方额外叠一层候选词/快捷栏, 典型 48~56px)
-       留出安全区: padding-bottom 从 8px 抬到 56px 兼容 iOS/安卓各家 IME 工具栏 */
-    body.kb-open .composer{padding-bottom:56px}
-    /* v7 兜底: composer sticky 钉 #hall 底部, 即便 flex 计算异常也贴住可视区底 */
-    body.hall-on .composer{position:sticky;bottom:0;background:var(--bg,#070a12);z-index:5}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1551,7 +1541,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-stream-minh0';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-kb-rewrite';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2987,8 +2977,8 @@ function initThemeUI(){
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
-  // 切场景清掉可能残留的全屏遮挡(录音浮层/键盘态), 防其挡住点击
-  document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
+  // 切场景清掉可能残留的全屏遮挡(录音浮层), 防其挡住点击
+  const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
   // 落到大厅 → 大厅氛围随机连播(chain 会保留正在播的曲, 从房间返回时丝滑续播, 不打断)
   if(id==='lobby'){ try{ startLobbyBGM(); }catch(_){} }
   else if(id==='enter'){ try{ AudioEngine.stop(); }catch(_){} }   // 回到入场/登出页: 停 BGM
@@ -8055,141 +8045,23 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
-// ============ iOS 键盘遮挡修复 ============
-// iOS Safari 键盘弹起时不压缩 100dvh，会盖住底部输入框。
-// 用 visualViewport 实时把可视高度写进 --appvh，移动端 #hall 用它做高度。
-let _stableInnerH = window.innerHeight;   // 无键盘(cin 未聚焦)时的 innerHeight 基线, 用于识别"浏览器是否已压缩布局视口"
-function syncViewportH(){
-  const vv = window.visualViewport;
-  const inHall = document.body.classList.contains('hall-on');
-  const cinFocused = document.activeElement && document.activeElement.id==='cin';
-  // cin 未聚焦时刷新基线(此刻键盘必然收起, innerHeight=满高)
-  if(!cinFocused && window.innerHeight > 0) _stableInnerH = window.innerHeight;
-  // 标准键盘: visualViewport 收缩 >120px (iOS 系统键盘, 布局视口不动、可视区变矮)
-  const kbShrink = vv ? (window.innerHeight - vv.height > 120) : false;
-  // Android(Chrome) interactive-widget=resizes-content: 键盘直接压缩 innerHeight 本身,
-  //   此时 innerHeight 比基线矮一大截、而 innerHeight≈vv.height(差值≈0, kbShrink=false)。
-  //   这不是 overlay 键盘, 浏览器已正确调整可视区, 直接用 vv.height 即可, 绝不能套 0.74 估算(会二次收缩→输入框偏高)。
-  const innerShrank = (_stableInnerH - window.innerHeight > 120);
-  // overlay 键盘: 输入框已聚焦但 innerHeight 和 visualViewport 都没收缩 (搜狗/百度等第三方 IME 在部分 iOS 上是
-  //   "覆盖式"弹出, 浮在页面上方 → 页面拿不到键盘高度信息)。仅此情况才用预估可视高强制收缩 #hall。
-  const kbOverlay = inHall && cinFocused && !kbShrink && !innerShrank;
-  let h;
-  if(kbShrink || innerShrank){
-    h = vv ? vv.height : window.innerHeight;   // 标准 iOS / Android 已压缩: 用真实可视高
-  } else if(kbOverlay){
-    // overlay 键盘预估: 第三方 IME(搜狗/百度)含工具栏约占屏 30~34%,
-    //   用 innerHeight*0.74 作可视高(输入框贴键盘上方)。真机标定见历史 commit。
-    h = Math.round(window.innerHeight * 0.74);
-  } else {
-    h = vv ? vv.height : window.innerHeight; // 无键盘: 满屏
-  }
-  document.documentElement.style.setProperty('--appvh', h + 'px');
-  const kbOpen = kbShrink || innerShrank || kbOverlay;
-  if(kbOpen && inHall){
-    // 把 #hall 固定钉到可视区顶部, 抵消 iOS 自动上滚, 页面不再"跳走"
-    document.documentElement.style.setProperty('--kb-top', (vv&&vv.offsetTop||0)+'px');
-    document.body.classList.add('kb-open');
-    window.scrollTo(0,0);
-    if(cinFocused) scrollStream();
-  } else {
-    document.body.classList.remove('kb-open');
-  }
-}
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize', syncViewportH);
-  window.visualViewport.addEventListener('scroll', syncViewportH);
-}
-window.addEventListener('resize', syncViewportH);
-syncViewportH();
-
-// ============ EH_KB_DIAG 真机键盘自诊断浮层(默认关闭, 仅 ?kbdiag 时启用) ============
-(function(){
-  // 生产环境绝不显示: 只有 URL 带 ?kbdiag / #kbdiag 或 localStorage.eh_kbdiag=1 时才挂诊断浮层
-  try{
-    const on = /[?&#]kbdiag\b/.test(location.href) || localStorage.getItem('eh_kbdiag')==='1';
-    if(!on){ window.__ehKbDiagUpd=function(){}; return; }
-  }catch(_){ window.__ehKbDiagUpd=function(){}; return; }
-  var box=document.createElement('div');
-  box.id='ehKbDiag';
-  box.style.cssText='position:fixed;top:calc(2px + env(safe-area-inset-top));left:2px;z-index:2147483647;'
-    +'font:9px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.82);padding:3px 5px;border-radius:4px;'
-    +'pointer-events:none;max-width:70vw;white-space:pre;display:none';
-  document.body.appendChild(box);
-  function upd(){
-    if(!document.body.classList.contains('hall-on')){ box.style.display='none'; return; }
-    var vv=window.visualViewport;
-    var hall=document.getElementById('hall');
-    var comp=document.querySelector('.composer');
-    var cin=document.getElementById('cin');
-    var hr=hall?hall.getBoundingClientRect():{};
-    var cr=comp?comp.getBoundingClientRect():{};
-    var cir=cin?cin.getBoundingClientRect():{};
-    var lines=[
-      'innerH='+window.innerHeight+' vvH='+(vv?Math.round(vv.height):'-')+' vvTop='+(vv?Math.round(vv.offsetTop):'-'),
-      'scrollY='+Math.round(window.scrollY)+' kbOpen='+document.body.classList.contains('kb-open'),
-      'appvh='+getComputedStyle(document.documentElement).getPropertyValue('--appvh').trim(),
-      'hall.h='+Math.round(hr.height||0)+' hall.bot='+Math.round(hr.bottom||0),
-      'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
-      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight?' ❌超屏':' ✅'),
-      'unpinSrc='+(window.__ehUnpinSrc||'-')
-    ];
-    box.textContent=lines.join('\n');
-    box.style.display='block';
-  }
-  if(window.visualViewport){ vv=window.visualViewport; vv.addEventListener('resize',upd); vv.addEventListener('scroll',upd); }
-  window.addEventListener('resize',upd);
-  document.addEventListener('focusin',function(){ setTimeout(upd,50); setTimeout(upd,300); setTimeout(upd,600); });
-  document.addEventListener('focusout',function(){ setTimeout(upd,200); });
-  setInterval(upd, 500);
-  window.__ehKbDiagUpd=upd;
-})();
-
-// iOS 补丁: 点输入框瞬间, Safari 会先把整个 document 上滚去露出输入框(此时 kb-open 还没挂,
-// #hall 未 fixed → 页面被顶飞留白, 见截图)。改为 focus 立刻钉 kb-open + 把 document 归零,
-// 抢在 iOS 自动滚动之前, 并在键盘开着时持续吸收残留的 body 滚动。
+// ============ 聊天页键盘处理(极简版, 重写) ============
+// 原理: meta viewport interactive-widget=resizes-content 让键盘弹起时浏览器自动压缩"布局视口"
+// (Android Chrome 与现代 iOS 均支持)。#hall 用 height:100%(继承 body 的 100%)随之自然收缩,
+// .stream(flex:1;min-height:0) 吃掉剩余高度并滚动, .composer(flex-shrink:0) 自然贴在收缩后的底部,
+// 即键盘正上方。全程零 JS 干预高度——之前那套 visualViewport 估算/--appvh/pin-unpin/轮询全删。
+// 唯一需要 JS 的: 输入框聚焦后把最新消息滚到可见(键盘弹起会遮住底部消息)。
 (function(){
   const cin=$('#cin'); if(!cin) return;
-  const pin=()=>{
-    if(!document.body.classList.contains('hall-on')) return;
-    document.body.classList.add('kb-open');
-    // document 归零(iOS 把 body 顶上去时 scrollY>0), 用 rAF 多次抢在其自动滚动之后
-    const zero=()=>{ if(window.scrollY||document.documentElement.scrollTop){ window.scrollTo(0,0); } };
-    zero(); requestAnimationFrame(zero); setTimeout(zero,60); setTimeout(zero,180);
-    // 调 syncViewportH 触发 overlay 键盘分支(搜狗/百度覆盖式键盘下 visualViewport 不收缩,
-    //   靠预估可视高强制收缩 #hall)。键盘弹出有延迟, 多打几拍确保命中。
-    try{ syncViewportH(); }catch(_){}
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,120);
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,350);
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,650);
-    try{ scrollStream(); }catch(_){}
-  };
-  cin.addEventListener('focus', pin);
-  // 失焦: 键盘收起, 复位。⚠️ overlay 键盘(搜狗/百度)真机上收起时 visualViewport 不变(不触发 resize),
-  //   且 blur/focusout 也可能不发→单靠 blur 复位不可靠。多源触发 + 轮询兑底。
-  window.__ehUnpinSrc='(none)';   // 诊断: 记录最后一次触发复位的事件源
-  const unpin=(src)=>{
-    if(src) window.__ehUnpinSrc=src;
-    // 仍在输入不复位(防收起过程中 activeElement 短暂误判又收缩回去)
-    if(document.activeElement && document.activeElement.id==='cin') return;
-    document.body.classList.remove('kb-open');
-    const vv=window.visualViewport;
-    document.documentElement.style.setProperty('--appvh', (vv?vv.height:window.innerHeight)+'px');
-    try{ if(window.__ehKbDiagUpd) window.__ehKbDiagUpd(); }catch(_){}
-  };
-  window.__ehUnpin=unpin;
-  cin.addEventListener('blur', ()=>{ unpin('blur'); setTimeout(()=>unpin('blur+60'),60); setTimeout(()=>unpin('blur+200'),200); setTimeout(()=>unpin('blur+450'),450); });
-  // document 级 focusout 兑底: cin 的 blur 偶发不触发时, 焦点离开 cin 能被 focusout 冒泡兑住。
-  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin'){ setTimeout(()=>unpin('focusout'),60); setTimeout(()=>unpin('focusout+300'),300); } });
-  // ★ overlay 键盘收起真凶兑底: 用户点输入框以外区域(pointerdown/touchend)时, 若 cin 不再聚焦则复位。
-  //   overlay 键盘收起多数伴随这个手势, 不依赖 blur 事件。
-  const outsideCheck=(e)=>{ if(e.target && e.target.id==='cin') return; setTimeout(()=>unpin('outside'),50); setTimeout(()=>unpin('outside+250'),250); };
-  document.addEventListener('pointerdown', outsideCheck, {passive:true});
-  document.addEventListener('touchend', outsideCheck, {passive:true});
-  // ★ 轮询兑底(最可靠): kb-open 但 cin 已不再聚焦 → 键盘已收起但事件都没接住, 强制复位。
-  setInterval(()=>{ if(document.body.classList.contains('kb-open') && !(document.activeElement && document.activeElement.id==='cin')) unpin('poll'); }, 400);
-  // 键盘开着时, 任何把 body 顶起来的滚动都拉回去(iOS 偶发)
-  window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
+  const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
+  // 键盘弹起有 lag(布局视口收缩晚于 focus), 多打几拍确保最后消息可见
+  cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,150); setTimeout(scrollLast,400); });
+  // 布局视口尺寸变化(键盘弹/收)时, 若还在输入则保持最后消息可见
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', ()=>{
+      if(document.activeElement && document.activeElement.id==='cin') scrollLast();
+    });
+  }
 })();
 
 // ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
