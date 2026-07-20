@@ -1548,7 +1548,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-overlay2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-overlay3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8152,8 +8152,22 @@ syncViewportH();
     try{ scrollStream(); }catch(_){}
   };
   cin.addEventListener('focus', pin);
-  // 失焦: 键盘收起, 复位(兜底: 某些情形 visualViewport.resize 不触发)
-  cin.addEventListener('blur', ()=>{ setTimeout(syncViewportH, 60); });
+  // 失焦: 键盘收起, 复位。overlay 键盘下 visualViewport 不变(不触发 resize),
+  //   复位完全靠这里。搜狗/百度键盘收起有动画延迟, blur 只打一拍(60ms)抵不住
+  //   → 多打几拍确保 #hall 复位满屏(与 focus 对称)。
+  const unpin=()=>{
+    // 仍在输入不复位(防收起过程中 activeElement 短暂误判又收缩回去)
+    if(document.activeElement && document.activeElement.id==='cin') return;
+    document.body.classList.remove('kb-open');
+    const vv=window.visualViewport;
+    document.documentElement.style.setProperty('--appvh', (vv?vv.height:window.innerHeight)+'px');
+  };
+  cin.addEventListener('blur', ()=>{
+    unpin();
+    setTimeout(unpin,60); setTimeout(unpin,200); setTimeout(unpin,450);
+  });
+  // document 级 focusout 兜底: cin 的 blur 偶发不触发时, 焦点离开 cin 能被 focusout 冒泡兜住。
+  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin'){ setTimeout(unpin,60); setTimeout(unpin,300); } });
   // 键盘开着时, 任何把 body 顶起来的滚动都拉回去(iOS 偶发)
   window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
 })();
