@@ -1,1 +1,1 @@
-20260720-kb-rewrite
+20260720-kb-pwa-standalone

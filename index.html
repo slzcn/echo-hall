@@ -1409,12 +1409,17 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    /* 聊天页键盘处理(极简版, 重写): 靠 meta viewport interactive-widget=resizes-content —
-       键盘弹起时浏览器自动压缩"布局视口"(100% 高), body(height:100%) 跟着收缩, stage/#hall 继承,
-       .stream(flex:1;min-height:0)吃剩余高并滚动, .composer(flex-shrink:0)自然贴到收缩后的底部=键盘上方。
-       全程零 JS 干预高度。删掉旧的 --appvh 估算 / kb-open / sticky 兜底 / fixed 硬钉一切 hack。 */
+    /* 聊天页键盘处理:
+       浏览器模式 — 靠 meta viewport interactive-widget=resizes-content 让键盘弹起时浏览器压缩布局视口,
+         body(height:100%)跟着收缩, stage/#hall 继承, .stream(flex:1;min-height:0)吃剩余高并滚动,
+         .composer(flex-shrink:0)自然贴到底部=键盘上方。零 JS 干预。
+       PWA standalone 模式 — interactive-widget 不生效, 由 JS 检测到 standalone 后给 <html> 挂
+         .pwa-standalone 并用 visualViewport 实测高写 --kvh, 下面覆盖规则让 #hall/stage 用 var(--kvh)。 */
     body.hall-on .stage{padding:0;height:100%;align-items:stretch}
     #hall{width:100%;height:100%;border-radius:0;border:none}
+    /* standalone: 用 visualViewport 实测可视高(键盘弹起时会正确收缩), 而非布局视口 100% */
+    html.pwa-standalone body.hall-on .stage{height:var(--kvh,100%)}
+    html.pwa-standalone #hall{height:var(--kvh,100%)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -1541,7 +1546,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-kb-rewrite';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-kb-pwa-standalone';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8045,23 +8050,49 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
-// ============ 聊天页键盘处理(极简版, 重写) ============
-// 原理: meta viewport interactive-widget=resizes-content 让键盘弹起时浏览器自动压缩"布局视口"
-// (Android Chrome 与现代 iOS 均支持)。#hall 用 height:100%(继承 body 的 100%)随之自然收缩,
-// .stream(flex:1;min-height:0) 吃掉剩余高度并滚动, .composer(flex-shrink:0) 自然贴在收缩后的底部,
-// 即键盘正上方。全程零 JS 干预高度——之前那套 visualViewport 估算/--appvh/pin-unpin/轮询全删。
-// 唯一需要 JS 的: 输入框聚焦后把最新消息滚到可见(键盘弹起会遮住底部消息)。
+// ============ 聊天页键盘处理 ============
+// 两种运行时, 行为不同:
+//  A. 普通浏览器(Safari/Chrome): meta viewport interactive-widget=resizes-content 生效,
+//     键盘弹起时浏览器自动压缩"布局视口"(body height:100% 随之收缩), #hall 用 height:100%
+//     即可自然贴合, 零 JS 干预。
+//  B. PWA standalone(添加到主屏, iOS WKWebView 尤甚): interactive-widget 基本不生效,
+//     键盘弹起时布局视口/innerHeight 不收缩 → height:100% 仍是全屏 → composer 被键盘盖住。
+//     此时必须用 visualViewport.height(浏览器实测可视高, 始终可靠, 不需任何估算)驱动容器高。
+// 方案: 仅在 standalone 下, 用 visualViewport 实测高写 --kvh, CSS 让 #hall 用 var(--kvh)。
+//     浏览器模式不写 --kvh, 仍走纯 CSS height:100%(已双引擎验证 OK)。
 (function(){
   const cin=$('#cin'); if(!cin) return;
   const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
-  // 键盘弹起有 lag(布局视口收缩晚于 focus), 多打几拍确保最后消息可见
   cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,150); setTimeout(scrollLast,400); });
-  // 布局视口尺寸变化(键盘弹/收)时, 若还在输入则保持最后消息可见
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', ()=>{
-      if(document.activeElement && document.activeElement.id==='cin') scrollLast();
-    });
+
+  // standalone 检测: display-mode:standalone(装到主屏) 或 iOS 老属性 navigator.standalone
+  const isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
+    || window.navigator.standalone === true;
+  if(!isStandalone){
+    // 浏览器模式: 只需在视口变化时保持最后消息可见, 高度全交给 CSS
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', ()=>{
+        if(document.activeElement && document.activeElement.id==='cin') scrollLast();
+      });
+    }
+    return;
   }
+  // ---- standalone 补偿: 用 visualViewport 实测可视高驱动 #hall ----
+  document.documentElement.classList.add('pwa-standalone');   // CSS hook: #hall 改用 var(--kvh)
+  const vv = window.visualViewport;
+  const applyKvh = ()=>{
+    const h = vv ? Math.round(vv.height) : window.innerHeight;
+    document.documentElement.style.setProperty('--kvh', h + 'px');
+  };
+  applyKvh();
+  if(vv){
+    vv.addEventListener('resize', ()=>{ applyKvh(); if(document.activeElement && document.activeElement.id==='cin') scrollLast(); });
+    // iOS standalone 键盘弹起时 visualViewport 可能带 offsetTop(页面被上推), scroll 也要跟
+    vv.addEventListener('scroll', applyKvh);
+  }
+  window.addEventListener('resize', applyKvh);
+  // 键盘弹起有 lag, focus 后多打几拍写 kvh(vv.resize 有时晚于 focus)
+  cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
 })();
 
 // ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
