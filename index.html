@@ -576,6 +576,15 @@
     background:var(--pav-c,var(--cyan));border:1.5px solid var(--panel-solid);z-index:1}
   @keyframes popin{from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 
+  /* EH_PULL_REFRESH 下拉刷新指示器 */
+  #pullRefresh{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:center;
+    gap:8px;color:var(--cyan,#00E5D4);font-size:12.5px;pointer-events:none;z-index:6;
+    transform:translateY(-56px);opacity:0;transition:opacity .15s}
+  #pullRefresh .pr-spin{width:16px;height:16px;border:2px solid color-mix(in srgb,var(--cyan) 30%,transparent);
+    border-top-color:var(--cyan,#00E5D4);border-radius:50%}
+  #pullRefresh.spinning .pr-spin{animation:sjSpin .8s linear infinite}
+  #pullRefresh .pr-arrow{transition:transform .2s}
+  #pullRefresh.ready .pr-arrow{transform:rotate(180deg)}
   .stream{flex:1;overflow-y:auto;padding:16px 18px 26px;display:flex;flex-direction:column;gap:2px;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:auto}
   .stream::-webkit-scrollbar{width:5px}
@@ -1690,6 +1699,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
+    <div id="pullRefresh"><span class="pr-spin"></span><span class="pr-arrow">↓</span><span class="pr-txt">下拉刷新</span></div>
     <!-- (神曲"谱曲中"提示已集成到右下角"神"按钮的生成中态, 顶部浮条已移除) -->
     <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 5 12 10 18 5"></polyline><polyline points="6 15 12 20 18 15"></polyline></svg></div>
     <!-- @我提醒: 被@时常驻浮现, 点击定位到最近一条@我的消息(多条则轮流) -->
@@ -8430,6 +8440,87 @@ function fillAndLogin(id, pwv){
       });
     });
   }
+</script>
+
+<script>
+/* ============ EH_PULL_REFRESH 下拉刷新 (PWA 全屏无地址栏时刷新页面) ============
+   仅当聊天流已滚到顶部(scrollTop<=0)继续下拉超阈值时触发, 松手 reload.
+   与 longpress(绑 .msg)/曲风条拖拽(绑 strip) 无冲突: 只在 #stream 顶部生效. */
+(function(){
+  var stream = document.getElementById('stream');
+  var ind = document.getElementById('pullRefresh');
+  if(!stream || !ind) return;
+  var THRESH = 70;        // 触发刷新的下拉距离
+  var MAX = 90;           // 指示器最大下移
+  var startY = 0, pulling = false, dist = 0, armed = false;
+  var txt = ind.querySelector('.pr-txt');
+
+  stream.addEventListener('touchstart', function(e){
+    // 只在真正滚到顶 + 单指时才可能进入下拉刷新
+    if(stream.scrollTop <= 0 && e.touches.length === 1){
+      startY = e.touches[0].clientY;
+      armed = true; pulling = false; dist = 0;
+    } else {
+      armed = false;
+    }
+  }, {passive:true});
+
+  stream.addEventListener('touchmove', function(e){
+    if(!armed || e.touches.length !== 1) return;
+    var dy = e.touches[0].clientY - startY;
+    // 只处理向下拉, 且此刻仍在顶部
+    if(dy > 0 && stream.scrollTop <= 0){
+      pulling = true;
+      dist = Math.min(dy * 0.5, MAX);   // 阻尼: 拉动打对折, 手感自然
+      ind.style.opacity = '1';
+      ind.style.transform = 'translateY(' + (dist - 56) + 'px)';
+      if(dist >= THRESH){ ind.classList.add('ready'); if(txt) txt.textContent = '松开刷新'; }
+      else { ind.classList.remove('ready'); if(txt) txt.textContent = '下拉刷新'; }
+    } else if(dy <= 0){
+      // 反向滑动 → 放弃下拉刷新, 交还给正常滚动
+      pulling = false; armed = false;
+      reset();
+    }
+  }, {passive:true});
+
+  function reset(){
+    ind.classList.remove('ready');
+    ind.style.opacity = '0';
+    ind.style.transform = 'translateY(-56px)';
+    if(txt) txt.textContent = '下拉刷新';
+  }
+
+  stream.addEventListener('touchend', function(){
+    if(!armed){ return; }
+    if(pulling && dist >= THRESH){
+      // 触发刷新
+      ind.classList.add('spinning');
+      ind.classList.remove('ready');
+      ind.style.transform = 'translateY(' + (56 - 56) + 'px)';   // 停在顶部 spin
+      ind.style.transform = 'translateY(0px)';
+      if(txt) txt.textContent = '刷新中…';
+      // SW 是 SWR: reload 会走后台已拉到的新版; 强制绕缓存更稳
+      setTimeout(function(){
+        try{
+          // 让 SW 立即取最新(若有等待中的新 SW, 触发 skipWaiting)
+          if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
+            navigator.serviceWorker.getRegistration().then(function(reg){
+              if(reg && reg.waiting){ reg.waiting.postMessage('SKIP_WAITING'); }
+              location.reload();
+            }, function(){ location.reload(); });
+          } else {
+            location.reload();
+          }
+        }catch(_){ location.reload(); }
+      }, 350);
+    } else {
+      reset();
+    }
+    armed = false; pulling = false; dist = 0;
+  }, {passive:true});
+
+  stream.addEventListener('touchcancel', function(){ armed=false; pulling=false; dist=0; reset(); }, {passive:true});
+})();
 </script>
 </body>
 </html>
