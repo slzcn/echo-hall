@@ -156,6 +156,9 @@
      浏览器主动 dispatch touchcancel 打断 EH 的 longpress 判定(→互动环出不来).
      复制刚需通过长按互动环里的「复制」按钮走(下方 attachLongPress 里已加). */
   .msg,.msg-text,.bubble,.chat-text,.reply-quote{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  /* EH_INTERACT_FIX: 图片放开 touch-callout, 让 iOS 长按能弹「存储图片/拷贝」系统菜单
+     (body 级 none 会挡掉长按存图, 图片是用户想保存的内容, 必须放开) */
+  img,.msg-img,#cardImg,.song-cover,.moment-img{-webkit-touch-callout:default}
   /* ============ /EH_MOBILE_COMPAT ============ */
   /* ★ 禁掉按钮/可交互元素点击后的浏览器默认黑色 focus outline(手机上一点就出一圈黑边),
      保留 :focus-visible(仅键盘 tab 导航触发, 触屏/鼠标点击不触发) 的主题色描边保无障碍。 */
@@ -1788,7 +1791,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <label class="fld"><span>密码</span>
         <input id="regPass" type="password" data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
       <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
-        <input id="regEmail" type="email" data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
+        <input id="regEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
       <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
@@ -1796,7 +1799,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
       <h3 data-txt="forgotTitle">找回密码</h3>
       <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
-        <input id="resetEmail" type="email" data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
+        <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
@@ -1810,7 +1813,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
         <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div>
       <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
-        <input id="newEmail" type="email" placeholder="you@example.com"></label>
+        <input id="newEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
     </div>
