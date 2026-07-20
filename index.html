@@ -322,6 +322,33 @@
   .glass{background:var(--panel);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
     border:1px solid var(--line);border-radius:18px}
 
+  /* ============ EH_PERF_MOBILE 移动端性能优化 ============ */
+  /* 触屏设备(手机/平板)GPU 远弱于桌面, backdrop-filter/大半径 blur 是首要卡顿源.
+     用 (hover:none)+(pointer:coarse) 精准命中触屏, 桌面视觉完全不变. */
+  @media (hover:none) and (pointer:coarse){
+    /* 1. 主面板毛玻璃: blur 20→10, 去 saturate(saturate 在 blur 之上再采样一遍, 移动端很贵) → GPU 开销近乎砍半 */
+    .glass{
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+    }
+    /* 2. 各弹窗遮罩的 backdrop blur 统一压到 ≤6px(遮罩本就有半透明底色, 视觉损失极小) */
+    .modal-mask,.drawer-mask{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+    #cardMask,#bottleMask,#tarotMask{backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    /* 3. 入场光晕 orb: blur 32→18(orb 是纯装饰, 半径小一点肉眼几乎无差, GPU 省一大截) */
+    .bg-orb{filter:blur(18px)}
+    /* 4. 给聊天滚动流加 content-visibility, 屏幕外消息跳过渲染(长列表滚动流畅关键) */
+    .stream .msg,.msgs .msg{content-visibility:auto;contain-intrinsic-size:auto 80px}
+  }
+  /* 5. 尊重系统「减弱动态效果」: 关掉纯装饰性无限动画(呼吸/漂移/脉冲), 保留功能性过渡.
+     iOS 设置→辅助功能→动态效果 打开后, 或低电量时系统会置位这个偏好. */
+  @media (prefers-reduced-motion:reduce){
+    .bg-orb,.mood-aura{animation:none !important}
+    .bgm-btn:not(.muted){animation:none !important}
+    .msg.soul .av,.pav.soul-av .av-ic{animation:none !important}
+    *{scroll-behavior:auto !important}
+  }
+  /* ============ /EH_PERF_MOBILE ============ */
+
   /* ============ 场景1：入场 ============ */
   #enter{align-items:center;justify-content:center;flex-direction:column}
   .enter-card{width:min(var(--card-max),92vw);padding:38px 34px;text-align:center;position:relative;overflow:hidden}
