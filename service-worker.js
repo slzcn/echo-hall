@@ -5,7 +5,7 @@
  *   3. CDN 静态库(jsdelivr supabase.js 等): cache-first,离线也能起
  * 版本号跟随 EH 发布递增,换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v3-20260720';
+const SW_VERSION = 'eh-sw-v4-20260720';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -71,7 +71,31 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 同源外壳(index.html 等): stale-while-revalidate
+  // 导航请求(index.html / ver.txt 等HTML入口): network-first
+  // —— 关键: 旧版 stale-while-revalidate 用 `cached||network` 永远先返回旧缓存,
+  // 新版要下下次才生效, 安卓卡死在旧版(自愈 location.replace 也被旧缓存应答, 死循环)。
+  // 改 network-first: 有网必拿最新, 断网才用缓存兜底 → 主人一开就是新版。
+  const isNav = req.mode === 'navigate' ||
+    (req.destination === 'document') ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('index.html') ||
+    url.pathname.endsWith('ver.txt');
+  if (isNav) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(() =>
+        caches.open(SHELL_CACHE).then((cache) => cache.match(req).then((c) => c || cache.match('./index.html')))
+      )
+    );
+    return;
+  }
+
+  // 其余同源静态资源(css内联在html里, 主要是图标等): stale-while-revalidate
   e.respondWith(
     caches.open(SHELL_CACHE).then((cache) =>
       cache.match(req).then((cached) => {
