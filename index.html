@@ -1547,7 +1547,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-kbv7-diag';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-optE2E';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1935,20 +1935,25 @@ const EH_CONFIG_DEFAULT = {
   // ★进场动效系统: 按用户类型(超管/管理员/正式/临时)给不同的"进房横幅"。
   //   自己进房时替换朴素文字为一张类型化入场卡(粒子/扫光/光爆), 且光墙他人头像按类型弹入。
   //   尊重系统"减少动态效果"设置(prefers-reduced-motion → 降级为纯文字)。后台 eh_config.entranceFx 可改。
+  // EH_OPT_ENTRY_QUIET(2026-07-20): 主人要求降低贵宾/管理员进场干扰。
+  //   1) worldAnnounce 默认关(高阶档不再全站流光公告, 跨房打扰太强)
+  //   2) othersStageMinTier 提到 super(只有超管进场才全屏光幕; 管理员/贵宾降为只横幅, 不再惊动全场)
+  //   3) super.flash/shake 去掉(超管也不再全屏闪光+震屏, 只留光幕+皇冠雨的排面)
+  //   身份识别(横幅样式/颜色/图标/光墙光环)保留不变。
   entranceFx: {
     enabled: true,          // 总开关
     othersAvatar: true,     // 他人上光墙时按类型弹入动画
     broadcast: true,        // 把进场事件广播给房里所有人(别人也能看到横幅/高阶档光幕)
     broadcastMinTier: 'reg',// 最低广播档: reg=正式及以上广播(匿名进出不广播防刷屏); 设 'anon' 则全员广播
-    othersStageMinTier: 'admin', // 别人看到"全屏光幕"的最低档(admin/vip=只有管理员级进场才惊动全场; 设 'reg' 则正式也全屏)
-    worldAnnounce: true,    // 超管级/贵宾等高阶档进场 → 全站流光公告(跨房广播); false 关
+    othersStageMinTier: 'super', // 别人看到"全屏光幕"的最低档: super=只有超管进场才惊动全场(EH_OPT_ENTRY_QUIET); 原默认 admin
+    worldAnnounce: false,   // 高阶档进场 → 全站流光公告(跨房广播); EH_OPT_ENTRY_QUIET 默认关
     // ★贵宾名单: 见顶层 EH_CONFIG.vipUids(后台"💎贵宾名单"tab 存的独立 key)。此处留空占位, 判定优先读顶层。
     vipUids: [],
     vipTreatment: 'admin',  // 贵宾享受的待遇档: 'admin'(管理员级) 或 'super'(超管级=进场加震屏+更炸)。保留💎紫身份, 只调隆重程度。
     tiers: {
       // label 入场词; icon 图标; cls CSS皮肤; sfx 音效名(空=不放);
       // stage 全屏光幕(true=一道巨光带横扫+大字砸下); burst 迸发的emoji(空=不撒); flash 全屏色闪(空=不闪); shake 进场震屏
-      super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'#F5D06A', shake:true  },  // 超管: 全屏金光幕+皇冠雨+闪+震(最炸)
+      super:  { label:'降 临',  icon:'👑', cls:'ent-super',  sfx:'soul',    stage:true,  burst:'👑✨🌟', flash:'', shake:false },  // 超管: 全屏金光幕+皇冠雨(EH_OPT_ENTRY_QUIET: 去掉 flash 全屏闪 + shake 震屏, 太扰)
       vip:    { label:'莅 临',  icon:'💎', cls:'ent-vip-tier', sfx:'soul',  stage:true,  burst:'💎✨🌟', flash:'#C77DFF', shake:false },  // 贵宾: 全屏紫光幕+钻石雨(默认管理员级; vipTreatment='super' 时自动加震屏升到超管级排面)
       admin:  { label:'莅 临',  icon:'🛡️', cls:'ent-admin',  sfx:'arrive', stage:true,  burst:'✨🛡️',   flash:'',        shake:false },  // 管理员: 全屏光幕+火花
       reg:    { label:'进 入',  icon:'✦',  cls:'ent-reg',    sfx:'arrive', stage:false, burst:'✦✨',    flash:'',        shake:false },  // 正式: 横幅流光+小火花
@@ -2775,7 +2780,7 @@ const AudioEngine=(function(){
       // 若当前没在播(比如已被静音/停了), 直接随机起一首
       if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } },
     stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
-    resume(){ if(!el||!cur) return; if(el.paused){ try{el.play();}catch(_){} } },
+    resume(){ if(!el||!cur) return; if(el.paused){ try{ const pr=el.play(); if(pr&&pr.catch) pr.catch(()=>{}); }catch(_){} } },
     playing(){ return !!(el && cur && !el.paused); },
     curName(){ return cur?cur.name:null; },
     // 神曲播放时把 BGM 压低, 结束再恢复
@@ -3403,7 +3408,8 @@ async function enterRoom(room){
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
   try{ entranceBanner(room); }catch(_){ try{ scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`)); }catch(__){} }
-  setTimeout(()=>{ try{ maybeDailyTarot(); }catch(_){} }, 1400);   // 每日首次进房抽塔罗(自身按天去重, 进场特效稳定后再弹)
+  // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
+  scheduleDailyTarot(room && room.id);
   // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
   setTimeout(()=>{ try{ fishMyBottleReplies(); }catch(_){} }, 2600);
   setTimeout(()=>{ try{ if(secureRand()<0.5) fishBottleFromDB(); }catch(_){} }, 4200);
@@ -4511,6 +4517,33 @@ function tarotStreakReward(days){
   if(days>=3)  return { badge:'✨', title:'初结缘', tip:'连签三日' };
   return null;
 }
+// EH_OPT_TAROT_DELAY: 塔罗延迟调度 —— 进房后约60分钟(+0~30分随机)且仍在同一房、当天没弹过时弹一次。
+//   离房/换房会取消上一个待触发的定时器, 避免切房后误弹或多房叠弹。
+let _tarotTimer=null, _tarotRoomId=null;
+function scheduleDailyTarot(roomId){
+  try{
+    // 今天已抽过 → 不再排期
+    const { dayKey }=dailyTarotDraw();
+    const DK=_tarotKey('eh_tarot_day');
+    if(localStorage.getItem(DK)===dayKey) return;
+    // 取消上一个待触发的
+    if(_tarotTimer){ clearTimeout(_tarotTimer); _tarotTimer=null; }
+    _tarotRoomId=roomId||null;
+    // 60分钟基准 + 0~30分钟随机偏移 = 60~90 分钟后弹
+    const delay = 60*60*1000 + Math.floor((typeof secureRand==='function'?secureRand():Math.random())*30*60*1000);
+    _tarotTimer=setTimeout(()=>{
+      _tarotTimer=null;
+      try{
+        // 仍在聊天页 + 还在当初排期的那个房(没换房/没离房)才弹
+        if(!document.body.classList.contains('hall-on')) return;
+        if(_tarotRoomId && curRoom && curRoom.id!==_tarotRoomId) return;
+        maybeDailyTarot();
+      }catch(_){}
+    }, delay);
+  }catch(_){}
+}
+// 离房时取消待触发的塔罗定时器
+function cancelDailyTarot(){ if(_tarotTimer){ clearTimeout(_tarotTimer); _tarotTimer=null; } }
 function maybeDailyTarot(){
   try{
     const { card, luck, dayKey }=dailyTarotDraw();
