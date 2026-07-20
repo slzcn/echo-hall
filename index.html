@@ -1419,8 +1419,9 @@
     body.kb-open #hall{height:var(--appvh,100%)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-    /* 键盘弹起时: 底部 safe-area 留白多余(键盘已盖住底部横条区), 压掉让输入框紧贴键盘, 不留空隙 */
-    body.kb-open .composer{padding-bottom:8px}
+    /* 键盘弹起时: 给输入法工具栏(搜狗/百度等第三方 IME 在系统键盘上方额外叠一层候选词/快捷栏, 典型 48~56px)
+       留出安全区: padding-bottom 从 8px 抬到 56px 兼容 iOS/安卓各家 IME 工具栏 */
+    body.kb-open .composer{padding-bottom:56px}
     /* v7 兜底: composer sticky 钉 #hall 底部, 即便 flex 计算异常也贴住可视区底 */
     body.hall-on .composer{position:sticky;bottom:0;background:var(--bg,#070a12);z-index:5}
     .channels{grid-template-columns:1fr}
@@ -1547,7 +1548,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-optE2E';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-imesafe';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
