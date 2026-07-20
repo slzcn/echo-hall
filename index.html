@@ -1421,6 +1421,8 @@
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     /* 键盘弹起时: 底部 safe-area 留白多余(键盘已盖住底部横条区), 压掉让输入框紧贴键盘, 不留空隙 */
     body.kb-open .composer{padding-bottom:8px}
+    /* v7 兜底: composer sticky 钉 #hall 底部, 即便 flex 计算异常也贴住可视区底 */
+    body.hall-on .composer{position:sticky;bottom:0;background:var(--bg,#070a12);z-index:5}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1545,7 +1547,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-kbv6-h100';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-kbv7-diag';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8042,6 +8044,42 @@ if(window.visualViewport){
 }
 window.addEventListener('resize', syncViewportH);
 syncViewportH();
+
+// ============ EH_KB_DIAG 真机键盘自诊断浮层 ============
+(function(){
+  var box=document.createElement('div');
+  box.id='ehKbDiag';
+  box.style.cssText='position:fixed;top:calc(2px + env(safe-area-inset-top));left:2px;z-index:2147483647;'
+    +'font:9px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.82);padding:3px 5px;border-radius:4px;'
+    +'pointer-events:none;max-width:70vw;white-space:pre;display:none';
+  document.body.appendChild(box);
+  function upd(){
+    if(!document.body.classList.contains('hall-on')){ box.style.display='none'; return; }
+    var vv=window.visualViewport;
+    var hall=document.getElementById('hall');
+    var comp=document.querySelector('.composer');
+    var cin=document.getElementById('cin');
+    var hr=hall?hall.getBoundingClientRect():{};
+    var cr=comp?comp.getBoundingClientRect():{};
+    var cir=cin?cin.getBoundingClientRect():{};
+    var lines=[
+      'innerH='+window.innerHeight+' vvH='+(vv?Math.round(vv.height):'-')+' vvTop='+(vv?Math.round(vv.offsetTop):'-'),
+      'scrollY='+Math.round(window.scrollY)+' kbOpen='+document.body.classList.contains('kb-open'),
+      'appvh='+getComputedStyle(document.documentElement).getPropertyValue('--appvh').trim(),
+      'hall.h='+Math.round(hr.height||0)+' hall.bot='+Math.round(hr.bottom||0),
+      'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
+      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight?' ❌超屏':' ✅')
+    ];
+    box.textContent=lines.join('\n');
+    box.style.display='block';
+  }
+  if(window.visualViewport){ vv=window.visualViewport; vv.addEventListener('resize',upd); vv.addEventListener('scroll',upd); }
+  window.addEventListener('resize',upd);
+  document.addEventListener('focusin',function(){ setTimeout(upd,50); setTimeout(upd,300); setTimeout(upd,600); });
+  document.addEventListener('focusout',function(){ setTimeout(upd,200); });
+  setInterval(upd, 500);
+  window.__ehKbDiagUpd=upd;
+})();
 
 // iOS 补丁: 点输入框瞬间, Safari 会先把整个 document 上滚去露出输入框(此时 kb-open 还没挂,
 // #hall 未 fixed → 页面被顶飞留白, 见截图)。改为 focus 立刻钉 kb-open + 把 document 归零,

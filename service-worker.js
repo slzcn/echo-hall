@@ -5,7 +5,7 @@
  *   3. CDN 静态库(jsdelivr supabase.js 等): cache-first,离线也能起
  * 版本号跟随 EH 发布递增,换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v5-20260720';
+const SW_VERSION = 'eh-sw-v6-20260720';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
