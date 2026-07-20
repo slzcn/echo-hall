@@ -1542,7 +1542,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-kbv5-pull-global';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-verbadge';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1579,6 +1579,8 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="mood-aura" id="moodAura"></div>
 <div id="moodTintLayer"></div><!-- 灵魂心情联动: 底部情绪雾 -->
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
+<div id="ehVerBadge" style="position:fixed;right:6px;bottom:6px;z-index:99999;font-size:10px;color:rgba(0,229,212,.55);background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;font-family:monospace"></div>
+<script>try{document.getElementById('ehVerBadge').textContent='v'+(window.__EH_BUILD_VER||'?');}catch(e){}</script>
 <div id="resonance"></div>
 <div id="ixFlash"></div>
 <div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
