@@ -440,6 +440,10 @@
     background:color-mix(in srgb,#00E5D4 8%,transparent);color:#00E5D4;font-family:inherit;font-size:13px;font-weight:600;
     letter-spacing:.5px;cursor:pointer;transition:.18s}
   .install-btn:active{transform:scale(.96)}
+  /* prompt 就绪(浏览器已允许一键安装): 高亮脉冲, 提示"这次真能装" */
+  .install-btn.ready{background:color-mix(in srgb,#00E5D4 18%,transparent);border-color:#00E5D4;color:#00E5D4;
+    box-shadow:0 0 0 0 color-mix(in srgb,#00E5D4 55%,transparent);animation:instPulse 1.8s ease-out infinite}
+  @keyframes instPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,#00E5D4 50%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
   .ver-line{font-size:10.5px;color:var(--dim);letter-spacing:.5px;font-family:monospace;opacity:.7}
   .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
@@ -1562,7 +1566,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-install-race-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-install-ready-state';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8515,6 +8519,12 @@ function fillAndLogin(id, pwv){
   // 默认就显示按钮(HTML 里已无 display:none), 保证小米/UC/任何浏览器都能看到入口。
 
   // beforeinstallprompt 已由 <head> 里的早期捕获器存到 window.__ehDeferredPrompt(避免时序竞态)。
+  var READY_TXT='📲 立即安装 App', IDLE_TXT='📲 安装到桌面';
+  function markReady(){ try{ btn.textContent=READY_TXT; btn.classList.add('ready'); }catch(_){} }
+  // 若事件已在 <head> 捕获阶段就到了(比本脚本早) → 立即标记就绪
+  if(window.__ehDeferredPrompt){ markReady(); }
+  // 事件晚到时也能刷新按钮状态(回调由 <head> 捕获器触发)
+  window.__ehOnInstallReady = markReady;
   window.__ehOnInstalled = function(){ try{ btn.style.display='none'; toast('已添加到桌面 🎉'); }catch(_){} };
 
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);

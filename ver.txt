@@ -1,1 +1,1 @@
-20260720-install-race-fix
+20260720-install-ready-state
