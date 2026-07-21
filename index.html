@@ -411,7 +411,7 @@
   /* 通用确认弹层 */
   .confirm-box{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
   .confirm-title{font-size:17px;font-weight:800;margin-bottom:10px;letter-spacing:.5px}
-  .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px;white-space:pre-line}
   .confirm-btns{display:flex;gap:10px}
   .confirm-btns button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
   .cf-cancel{background:var(--card-bg);color:var(--sub)}
@@ -1554,7 +1554,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-installbtn-show';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-install-guide';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8523,7 +8523,21 @@ function fillAndLogin(id, pwv){
       try{ toast('点底部「分享」→「添加到主屏幕」即可装成 App'); }catch(_){ alert('点底部分享按钮 → 添加到主屏幕'); }
       return;
     }
-    // 其它(如小米自带浏览器)未给 beforeinstallprompt: 指路菜单
+    // 无 beforeinstallprompt 的安卓浏览器。小米自带/UC/QQ 等自研内核不支持标准 PWA,
+    // "添加到桌面"只会生成带地址栏的网页快捷方式 → 明确告知, 并给"复制链接用 Chrome 打开"的出路。
+    var ua = navigator.userAgent || '';
+    var isMiui = /MiuiBrowser|MiBrowser|XiaoMi/i.test(ua);
+    var isQuirkyAndroid = isMiui || /UCBrowser|QQBrowser|Quark|Heytap|VivoBrowser|OppoBrowser|baiduboxapp|MicroMessenger/i.test(ua);
+    var url = location.href.split('#')[0];
+    var copyLink = function(){
+      try{ navigator.clipboard.writeText(url).then(function(){ toast('链接已复制，去 Chrome 粘贴打开即可装成真 App'); }, function(){ prompt('复制这个链接，用 Chrome 打开:', url); }); }
+      catch(_){ try{ prompt('复制这个链接，用 Chrome 打开:', url); }catch(__){} }
+    };
+    if(isQuirkyAndroid && typeof ehConfirm==='function'){
+      ehConfirm('当前浏览器只能把网页存成快捷方式（打开仍带地址栏），不是真正的 App。\n\n想要无地址栏的独立 App，请用 Chrome 打开本站再安装。\n\n点「确定」复制本站链接。', '安装成 App').then(function(ok){ if(ok) copyLink(); });
+      return;
+    }
+    // 其它安卓浏览器: 指路菜单
     try{ toast('点浏览器菜单 → 添加到主屏幕/安装应用'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕'); }
   });
 })();
