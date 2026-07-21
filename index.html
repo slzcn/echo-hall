@@ -1554,7 +1554,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-footer';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-installbtn-show';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1695,7 +1695,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     <div class="my-rooms" id="myRooms"></div>
     <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
     <div class="lobby-footer">
-      <button class="install-btn" id="installBtn" style="display:none">📲 安装到桌面</button>
+      <button class="install-btn" id="installBtn">📲 安装到桌面</button>
       <div class="ver-line" id="lobbyVer"></div>
     </div>
   </div>
@@ -8501,22 +8501,17 @@ function fillAndLogin(id, pwv){
   try{ var vl=document.getElementById('lobbyVer'); if(vl) vl.textContent='回声厅 · v'+(window.__EH_BUILD_VER||'?'); }catch(_){}
   var btn = document.getElementById('installBtn');
   if(!btn) return;
-  // 已经是 standalone(装过了) → 不显示安装按钮(版本号仍显示)
+  // 已经是 standalone(装过了) → 隐藏安装按钮(版本号仍显示)。其它一切浏览器都显示按钮。
   var isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
-  if(isStandalone) return;
+  if(isStandalone){ btn.style.display='none'; return; }
+  // 默认就显示按钮(HTML 里已无 display:none), 保证小米/UC/任何浏览器都能看到入口。
 
   var deferred = null;
-  // 安卓/桌面 Chrome 系: 拦截原生安装提示, 点按钮时再唤起 → 装出真 standalone PWA
-  window.addEventListener('beforeinstallprompt', function(e){
-    e.preventDefault();
-    deferred = e;
-    btn.style.display = '';   // 支持一键安装 → 显示按钮
-  });
+  // 安卓/桌面 Chrome 系: 拦截原生安装提示, 点按钮时唤起 → 装出真 standalone PWA
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred = e; });
   window.addEventListener('appinstalled', function(){ btn.style.display='none'; deferred=null; try{ toast('已添加到桌面 🎉'); }catch(_){} });
 
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  // iOS Safari 不支持 beforeinstallprompt, 只能引导手动"分享→添加到主屏幕"
-  if(isIOS && !isStandalone){ btn.style.display=''; }
 
   btn.addEventListener('click', function(){
     if(deferred){
@@ -8532,7 +8527,6 @@ function fillAndLogin(id, pwv){
     try{ toast('点浏览器菜单 → 添加到主屏幕/安装应用'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕'); }
   });
 })();
-</script>
 </script>
 
 <script>
