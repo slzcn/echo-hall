@@ -425,6 +425,14 @@
   /* ============ 场景2：大厅 ============ */
   #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
   #lobby .sec-label{margin-top:10px}
+  /* 大厅底部页脚: 安装按钮 + 版本号 */
+  .lobby-footer{width:100%;max-width:var(--content-max);margin-top:14px;padding-top:16px;border-top:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:10px}
+  .install-btn{padding:9px 20px;border-radius:20px;border:1px solid color-mix(in srgb,#00E5D4 45%,transparent);
+    background:color-mix(in srgb,#00E5D4 8%,transparent);color:#00E5D4;font-family:inherit;font-size:13px;font-weight:600;
+    letter-spacing:.5px;cursor:pointer;transition:.18s}
+  .install-btn:active{transform:scale(.96)}
+  .ver-line{font-size:10.5px;color:var(--dim);letter-spacing:.5px;font-family:monospace;opacity:.7}
   .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
@@ -1546,7 +1554,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-install-btn';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-footer';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1583,8 +1591,6 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="mood-aura" id="moodAura"></div>
 <div id="moodTintLayer"></div><!-- 灵魂心情联动: 底部情绪雾 -->
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
-<div id="ehVerBadge" style="position:fixed;right:6px;bottom:6px;z-index:99999;font-size:10px;color:rgba(0,229,212,.55);background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;font-family:monospace;display:none"></div>
-<script>try{var _vb=document.getElementById('ehVerBadge'); if(/[?&#](kbdiag|ver)\b/.test(location.href)||localStorage.getItem('eh_kbdiag')==='1'){ _vb.textContent='v'+(window.__EH_BUILD_VER||'?'); _vb.style.display='block'; }}catch(e){}</script>
 <div id="resonance"></div>
 <div id="ixFlash"></div>
 <div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
@@ -1670,7 +1676,6 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     <div class="lobby-head">
       <h2>回声厅</h2>
       <div class="hall-tools lobby-tools">
-        <div class="tool-btn" id="installBtn" title="安装到桌面" aria-label="安装到桌面" style="display:none">📲</div>
         <div class="tool-btn bgm-btn" id="bgmBtnLobby" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
         <div class="tool-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
@@ -1689,6 +1694,10 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     </div>
     <div class="my-rooms" id="myRooms"></div>
     <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
+    <div class="lobby-footer">
+      <button class="install-btn" id="installBtn" style="display:none">📲 安装到桌面</button>
+      <div class="ver-line" id="lobbyVer"></div>
+    </div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -8488,9 +8497,11 @@ function fillAndLogin(id, pwv){
 <!-- ===== PWA: 页面内"安装到桌面"按钮 ===== -->
 <script>
 (function(){
+  // 大厅底部版本号(常显)
+  try{ var vl=document.getElementById('lobbyVer'); if(vl) vl.textContent='回声厅 · v'+(window.__EH_BUILD_VER||'?'); }catch(_){}
   var btn = document.getElementById('installBtn');
   if(!btn) return;
-  // 已经是 standalone(装过了) → 不显示
+  // 已经是 standalone(装过了) → 不显示安装按钮(版本号仍显示)
   var isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
   if(isStandalone) return;
 
