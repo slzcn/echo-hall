@@ -1,1 +1,1 @@
-20260720-install-ready-state
+20260720-manifest-id
