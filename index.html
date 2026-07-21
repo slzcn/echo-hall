@@ -16,6 +16,14 @@
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
 <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<!-- ★ 最早期捕获 beforeinstallprompt: 该事件浏览器在页面加载极早期就 fire, 若等文件末尾的
+     安装脚本注册 listener 就晚了(事件早过去、拿不到 prompt)。这里在 <head> 抢先存到全局,
+     后面安装按钮读 window.__ehDeferredPrompt 即可一键唤起真安装。 -->
+<script>
+  window.__ehDeferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.__ehDeferredPrompt = e; try{ window.__ehOnInstallReady && window.__ehOnInstallReady(); }catch(_){} });
+  window.addEventListener('appinstalled', function(){ window.__ehDeferredPrompt = null; try{ window.__ehOnInstalled && window.__ehOnInstalled(); }catch(_){} });
+</script>
 <!-- 加速: 提前握手 CDN 与 Supabase 域名, 首屏并行拉取 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://cddkniwbhvcbfgkgomtl.supabase.co" crossorigin>
@@ -1554,7 +1562,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-install-guide';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260720-install-race-fix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8506,39 +8514,38 @@ function fillAndLogin(id, pwv){
   if(isStandalone){ btn.style.display='none'; return; }
   // 默认就显示按钮(HTML 里已无 display:none), 保证小米/UC/任何浏览器都能看到入口。
 
-  var deferred = null;
-  // 安卓/桌面 Chrome 系: 拦截原生安装提示, 点按钮时唤起 → 装出真 standalone PWA
-  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred = e; });
-  window.addEventListener('appinstalled', function(){ btn.style.display='none'; deferred=null; try{ toast('已添加到桌面 🎉'); }catch(_){} });
+  // beforeinstallprompt 已由 <head> 里的早期捕获器存到 window.__ehDeferredPrompt(避免时序竞态)。
+  window.__ehOnInstalled = function(){ try{ btn.style.display='none'; toast('已添加到桌面 🎉'); }catch(_){} };
 
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   btn.addEventListener('click', function(){
-    if(deferred){
-      deferred.prompt();
-      deferred.userChoice.finally(function(){ deferred=null; btn.style.display='none'; });
+    var dp = window.__ehDeferredPrompt;
+    if(dp){
+      // 支持标准安装(含小米新版): 直接唤起系统原生安装弹窗 → 真 standalone PWA
+      dp.prompt();
+      dp.userChoice.finally(function(){ window.__ehDeferredPrompt=null; btn.style.display='none'; });
       return;
     }
     if(isIOS){
       try{ toast('点底部「分享」→「添加到主屏幕」即可装成 App'); }catch(_){ alert('点底部分享按钮 → 添加到主屏幕'); }
       return;
     }
-    // 无 beforeinstallprompt 的安卓浏览器。小米自带/UC/QQ 等自研内核不支持标准 PWA,
-    // "添加到桌面"只会生成带地址栏的网页快捷方式 → 明确告知, 并给"复制链接用 Chrome 打开"的出路。
     var ua = navigator.userAgent || '';
-    var isMiui = /MiuiBrowser|MiBrowser|XiaoMi/i.test(ua);
-    var isQuirkyAndroid = isMiui || /UCBrowser|QQBrowser|Quark|Heytap|VivoBrowser|OppoBrowser|baiduboxapp|MicroMessenger/i.test(ua);
     var url = location.href.split('#')[0];
     var copyLink = function(){
-      try{ navigator.clipboard.writeText(url).then(function(){ toast('链接已复制，去 Chrome 粘贴打开即可装成真 App'); }, function(){ prompt('复制这个链接，用 Chrome 打开:', url); }); }
+      try{ navigator.clipboard.writeText(url).then(function(){ toast('链接已复制，去 Chrome 粘贴打开即可安装'); }, function(){ prompt('复制这个链接，用 Chrome 打开:', url); }); }
       catch(_){ try{ prompt('复制这个链接，用 Chrome 打开:', url); }catch(__){} }
     };
-    if(isQuirkyAndroid && typeof ehConfirm==='function'){
-      ehConfirm('当前浏览器只能把网页存成快捷方式（打开仍带地址栏），不是真正的 App。\n\n想要无地址栏的独立 App，请用 Chrome 打开本站再安装。\n\n点「确定」复制本站链接。', '安装成 App').then(function(ok){ if(ok) copyLink(); });
+    // 微信/QQ/飞书等 App 内置 webview: 确实不能装 PWA, 引导用系统浏览器打开
+    var isInAppWebview = /MicroMessenger|QQ\/|Lark|Feishu|DingTalk|WeiBo/i.test(ua);
+    if(isInAppWebview && typeof ehConfirm==='function'){
+      ehConfirm('当前是 App 内置浏览器，无法安装。\n\n请点右上角「⋯」→用系统浏览器(Chrome等)打开，再点安装。\n\n点「确定」复制链接。', '安装到桌面').then(function(ok){ if(ok) copyLink(); });
       return;
     }
-    // 其它安卓浏览器: 指路菜单
-    try{ toast('点浏览器菜单 → 添加到主屏幕/安装应用'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕'); }
+    // 其它安卓浏览器(含小米/UC等): 安装事件可能还没到(晚到)或需走浏览器菜单。
+    // 不再断言"装不了"——多数现代安卓浏览器支持, 只是 prompt 未就绪。提示两条路。
+    try{ toast('若无自动弹窗，请点浏览器菜单 →「添加到主屏幕/安装应用」'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕/安装应用'); }
   });
 })();
 </script>
