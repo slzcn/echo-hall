@@ -1,1 +1,1 @@
-20260720-install-feedback
+20260721-pwa-v2-rewrite

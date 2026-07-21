@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>回声厅 · Echo Hall</title>
-<!-- ===== PWA: 可安装到主屏 / 离线秒开 ===== -->
-<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#070a12">
+<!-- ===== PWA v2 (整体重写): manifest + apple meta + beforeinstallprompt 早期捕获 =====
+     用新 manifest 文件名 + 新 id + 新 SW 缓存名, 让浏览器视为全新 App, 绕过旧安装的"防打扰"冷却。 -->
+<link rel="manifest" href="app.webmanifest?v=2">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,10 +17,8 @@
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
 <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<!-- ★ 最早期捕获 beforeinstallprompt: 该事件浏览器在页面加载极早期就 fire, 若等文件末尾的
-     安装脚本注册 listener 就晚了(事件早过去、拿不到 prompt)。这里在 <head> 抢先存到全局,
-     后面安装按钮读 window.__ehDeferredPrompt 即可一键唤起真安装。 -->
 <script>
+  // 最早期捕获 beforeinstallprompt(浏览器在加载极早期 fire, 晚注册就丢)。存全局供安装按钮用。
   window.__ehDeferredPrompt = null;
   window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.__ehDeferredPrompt = e; try{ window.__ehOnInstallReady && window.__ehOnInstallReady(); }catch(_){} });
   window.addEventListener('appinstalled', function(){ window.__ehDeferredPrompt = null; try{ window.__ehOnInstalled && window.__ehOnInstalled(); }catch(_){} });
@@ -1566,7 +1565,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-install-feedback';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260721-pwa-v2-rewrite';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8482,19 +8481,16 @@ function fillAndLogin(id, pwv){
   },2000);
 })();
 </script>
-<!-- ===== PWA: 注册 Service Worker(离线秒开) ===== -->
+<!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js').then(function (reg) {
-        // 发现新版自动接管,下次进入生效
+      // 新文件名 sw.js + 新缓存名, 让浏览器当成全新 SW 注册(旧 service-worker.js 已删)
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
         reg.addEventListener('updatefound', function () {
-          var nw = reg.installing;
-          if (!nw) return;
+          var nw = reg.installing; if (!nw) return;
           nw.addEventListener('statechange', function () {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              nw.postMessage('SKIP_WAITING');
-            }
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('SKIP_WAITING');
           });
         });
       }).catch(function (e) { console.warn('SW register failed:', e && e.message); });
@@ -8506,67 +8502,40 @@ function fillAndLogin(id, pwv){
   }
 </script>
 
-<!-- ===== PWA: 页面内"安装到桌面"按钮 ===== -->
+<!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
 <script>
 (function(){
-  // 大厅底部版本号(常显)
+  // 版本号常显
   try{ var vl=document.getElementById('lobbyVer'); if(vl) vl.textContent='回声厅 · v'+(window.__EH_BUILD_VER||'?'); }catch(_){}
   var btn = document.getElementById('installBtn');
   if(!btn) return;
-  // 已经是 standalone(装过了) → 隐藏安装按钮(版本号仍显示)。其它一切浏览器都显示按钮。
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   var isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
+  // 已装(standalone 打开) → 藏按钮
   if(isStandalone){ btn.style.display='none'; return; }
-  // 默认就显示按钮(HTML 里已无 display:none), 保证小米/UC/任何浏览器都能看到入口。
 
-  // beforeinstallprompt 已由 <head> 里的早期捕获器存到 window.__ehDeferredPrompt(避免时序竞态)。
-  var READY_TXT='📲 立即安装 App', IDLE_TXT='📲 安装到桌面';
-  function markReady(){ try{ btn.textContent=READY_TXT; btn.classList.add('ready'); }catch(_){} }
-  // 若事件已在 <head> 捕获阶段就到了(比本脚本早) → 立即标记就绪
-  if(window.__ehDeferredPrompt){ markReady(); }
-  // 事件晚到时也能刷新按钮状态(回调由 <head> 捕获器触发)
+  var READY='📲 立即安装 App', IDLE='📲 安装到桌面';
+  function markReady(){ btn.textContent=READY; btn.classList.add('ready'); }
+  // 事件已就绪(head 捕获器早于本脚本接到)→ 立即高亮; 晚到则由回调高亮
+  if(window.__ehDeferredPrompt) markReady();
   window.__ehOnInstallReady = markReady;
   window.__ehOnInstalled = function(){ try{ btn.style.display='none'; toast('已添加到桌面 🎉'); }catch(_){} };
 
-  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
   btn.addEventListener('click', function(){
     var dp = window.__ehDeferredPrompt;
-    if(dp){
-      // 支持标准安装(含小米新版): 直接唤起系统原生安装弹窗 → 真 standalone PWA
+    if(dp){   // 标准安装(Chrome/小米新版等): 唤起系统原生安装弹窗
       try{
-        var pr = dp.prompt();   // 部分实现返回 Promise, 部分返回 undefined
-        Promise.resolve(pr).catch(function(){});   // 吞掉可能的 reject(如重复调用), 防未捕获
-        dp.userChoice.then(function(res){
-          if(res && res.outcome==='accepted'){ btn.style.display='none'; try{ toast('正在添加到桌面…'); }catch(_){} }
-          else { try{ toast('已取消安装'); }catch(_){} }
-        }).catch(function(){ try{ toast('安装未完成，请重试或用浏览器菜单添加'); }catch(_){} })
-          .then(function(){ window.__ehDeferredPrompt=null; });
-      }catch(e){
-        // prompt() 同步抛错(已安装过/事件已消费): 明确告知
-        try{ toast('无法调起安装（可能已装过），请检查桌面或用菜单添加'); }catch(_){}
-        window.__ehDeferredPrompt=null; btn.classList.remove('ready'); btn.textContent=IDLE_TXT;
-      }
+        Promise.resolve(dp.prompt()).catch(function(){});
+        dp.userChoice.then(function(r){
+          if(r && r.outcome==='accepted'){ btn.style.display='none'; toast('正在添加到桌面…'); }
+          else toast('已取消安装');
+        }).catch(function(){ toast('安装未完成，请重试'); }).then(function(){ window.__ehDeferredPrompt=null; });
+      }catch(e){ toast('无法调起安装（可能已装过），请查桌面或用菜单添加'); window.__ehDeferredPrompt=null; btn.classList.remove('ready'); btn.textContent=IDLE; }
       return;
     }
-    if(isIOS){
-      try{ toast('点底部「分享」→「添加到主屏幕」即可装成 App'); }catch(_){ alert('点底部分享按钮 → 添加到主屏幕'); }
-      return;
-    }
-    var ua = navigator.userAgent || '';
-    var url = location.href.split('#')[0];
-    var copyLink = function(){
-      try{ navigator.clipboard.writeText(url).then(function(){ toast('链接已复制，去 Chrome 粘贴打开即可安装'); }, function(){ prompt('复制这个链接，用 Chrome 打开:', url); }); }
-      catch(_){ try{ prompt('复制这个链接，用 Chrome 打开:', url); }catch(__){} }
-    };
-    // 微信/QQ/飞书等 App 内置 webview: 确实不能装 PWA, 引导用系统浏览器打开
-    var isInAppWebview = /MicroMessenger|QQ\/|Lark|Feishu|DingTalk|WeiBo/i.test(ua);
-    if(isInAppWebview && typeof ehConfirm==='function'){
-      ehConfirm('当前是 App 内置浏览器，无法安装。\n\n请点右上角「⋯」→用系统浏览器(Chrome等)打开，再点安装。\n\n点「确定」复制链接。', '安装到桌面').then(function(ok){ if(ok) copyLink(); });
-      return;
-    }
-    // 其它安卓浏览器(含小米/UC等): 安装事件可能还没到(晚到)或需走浏览器菜单。
-    // 不再断言"装不了"——多数现代安卓浏览器支持, 只是 prompt 未就绪。提示两条路。
-    try{ toast('若无自动弹窗，请点浏览器菜单 →「添加到主屏幕/安装应用」'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕/安装应用'); }
+    if(isIOS){ try{ toast('点底部「分享」→「添加到主屏幕」即可装成 App'); }catch(_){ alert('分享 → 添加到主屏幕'); } return; }
+    // 其它安卓浏览器: 事件未就绪, 走菜单添加
+    try{ toast('若无弹窗，请点浏览器菜单 →「添加到主屏幕/安装应用」'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕'); }
   });
 })();
 </script>
