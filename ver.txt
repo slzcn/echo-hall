@@ -1,1 +1,1 @@
-20260720-kb-pwa-standalone
+20260720-install-btn
