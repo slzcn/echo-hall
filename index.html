@@ -1565,7 +1565,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260721-android-apk';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260721-pwa-only';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1707,7 +1707,6 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
     <div class="lobby-footer">
       <button class="install-btn" id="installBtn">📲 安装到桌面</button>
-      <a class="install-btn apk-btn" id="apkBtn" href="#" style="display:none;text-decoration:none">📦 下载安卓 App</a>
       <div class="ver-line" id="lobbyVer"></div>
     </div>
   </div>
@@ -8511,22 +8510,11 @@ function fillAndLogin(id, pwv){
   var btn = document.getElementById('installBtn');
   if(!btn) return;
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  var isAndroid = /android/i.test(navigator.userAgent);
   var isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
-  // 已装(standalone 打开) → 藏所有安装入口
-  if(isStandalone){ btn.style.display='none'; var _ab=document.getElementById('apkBtn'); if(_ab)_ab.style.display='none'; return; }
-
-  // ★ 安卓: 直接给 apk 下载(体验最好, 下载即装成独立 App), 藏 PWA 安装按钮。
-  //   apk 地址见 EH_APK_URL(打包后填); 未就绪(占位#)则退回 PWA 安装按钮。
-  var EH_APK_URL = 'https://slzcn.github.io/echo-hall/echohall.apk';   // bubblewrap(TWA)打包的安卓安装包, 下载即装成独立 App
-  var apkBtn = document.getElementById('apkBtn');
-  if(isAndroid && apkBtn && EH_APK_URL){
-    apkBtn.href = EH_APK_URL;
-    apkBtn.style.display = '';
-    btn.style.display = 'none';   // 安卓有 apk 就不显示"安装到桌面"(PWA)
-    return;
-  }
-  // iOS 或 无 apk 的安卓 → 走下面 PWA 安装按钮逻辑
+  // 已装(standalone 打开) → 藏安装按钮
+  if(isStandalone){ btn.style.display='none'; return; }
+  // 统一走 PWA 安装(iOS 分享添加 / 安卓 Chrome 一键装): 无安全警告、独立图标、自动更新。
+  // (放弃 apk 方案: 自签名 apk 在 MIUI 等会被安全扫描拦, 体验差; PWA 才是最顺的。)
 
   var READY='📲 立即安装 App', IDLE='📲 安装到桌面';
   function markReady(){ btn.textContent=READY; btn.classList.add('ready'); }

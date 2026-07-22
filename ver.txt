@@ -1,1 +1,1 @@
-20260721-android-apk
+20260721-pwa-only
