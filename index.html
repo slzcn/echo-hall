@@ -1429,16 +1429,15 @@
   @media(max-width:600px){
     .title{font-size:30px}
     /* 聊天页键盘处理:
-       浏览器模式 — 靠 meta viewport interactive-widget=resizes-content 让键盘弹起时浏览器压缩布局视口,
-         body(height:100%)跟着收缩, stage/#hall 继承, .stream(flex:1;min-height:0)吃剩余高并滚动,
-         .composer(flex-shrink:0)自然贴到底部=键盘上方。零 JS 干预。
-       PWA standalone 模式 — interactive-widget 不生效, 由 JS 检测到 standalone 后给 <html> 挂
-         .pwa-standalone 并用 visualViewport 实测高写 --kvh, 下面覆盖规则让 #hall/stage 用 var(--kvh)。 */
+       兜底 — meta viewport interactive-widget=resizes-content 让支持的浏览器键盘弹起时压缩布局视口,
+         body(height:100%)跟着收缩, .stream(flex:1;min-height:0)吃剩余高并滚动, .composer(flex-shrink:0)贴底=键盘上方。
+       统一补偿 — JS 给 <html> 挂 .kb-vv 并用 visualViewport 实测高写 --kvh, 下面让 #hall/stage 用 var(--kvh)。
+         这样无论 interactive-widget 生不生效(安卓Chrome/第三方IME/iOS PWA 各异), 都用真实可视高精确收缩。 */
     body.hall-on .stage{padding:0;height:100%;align-items:stretch}
     #hall{width:100%;height:100%;border-radius:0;border:none}
-    /* standalone: 用 visualViewport 实测可视高(键盘弹起时会正确收缩), 而非布局视口 100% */
-    html.pwa-standalone body.hall-on .stage{height:var(--kvh,100%)}
-    html.pwa-standalone #hall{height:var(--kvh,100%)}
+    /* .kb-vv: 用 visualViewport 实测可视高(键盘弹起时会正确收缩), 覆盖布局视口 100% */
+    html.kb-vv body.hall-on .stage{height:var(--kvh,100%)}
+    html.kb-vv #hall{height:var(--kvh,100%)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     .channels{grid-template-columns:1fr}
@@ -1565,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-new-id';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-unified-vv';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8071,49 +8070,72 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
-// ============ 聊天页键盘处理 ============
-// 两种运行时, 行为不同:
-//  A. 普通浏览器(Safari/Chrome): meta viewport interactive-widget=resizes-content 生效,
-//     键盘弹起时浏览器自动压缩"布局视口"(body height:100% 随之收缩), #hall 用 height:100%
-//     即可自然贴合, 零 JS 干预。
-//  B. PWA standalone(添加到主屏, iOS WKWebView 尤甚): interactive-widget 基本不生效,
-//     键盘弹起时布局视口/innerHeight 不收缩 → height:100% 仍是全屏 → composer 被键盘盖住。
-//     此时必须用 visualViewport.height(浏览器实测可视高, 始终可靠, 不需任何估算)驱动容器高。
-// 方案: 仅在 standalone 下, 用 visualViewport 实测高写 --kvh, CSS 让 #hall 用 var(--kvh)。
-//     浏览器模式不写 --kvh, 仍走纯 CSS height:100%(已双引擎验证 OK)。
+// ============ 聊天页键盘处理(统一 visualViewport 驱动, 不再分 standalone/浏览器) ============
+// 核心认知: 决定输入框贴不贴键盘的, 不是"是否 standalone", 而是"键盘弹起时布局视口(innerHeight)
+//   压不压缩"——而这点因浏览器/输入法/PWA 而异, 无法靠 UA 或 display-mode 判定。
+// 唯一在所有情况下都可靠的信号是 window.visualViewport.height(浏览器实测的真实可视高)。
+// 方案: 一律给 <html> 挂 .kb-vv, #hall 高度用 var(--kvh)=visualViewport.height。
+//   - interactive-widget 生效时: vv.height ≈ 布局视口高, --kvh 与 CSS 100% 等价, 无副作用。
+//   - interactive-widget 不生效时(部分安卓Chrome/第三方IME覆盖式键盘/iOS PWA): vv.height 给出真实
+//     收缩高, #hall 随之收缩, composer(flex-shrink:0)贴到键盘正上方。
+//   一套逻辑覆盖全部, 不再靠猜。visualViewport.height 本身就是浏览器测好的, 零估算(不用 0.74 那种)。
 (function(){
   const cin=$('#cin'); if(!cin) return;
   const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
-  cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,150); setTimeout(scrollLast,400); });
-
-  // standalone 检测: display-mode:standalone(装到主屏) 或 iOS 老属性 navigator.standalone
-  const isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
-    || window.navigator.standalone === true;
-  if(!isStandalone){
-    // 浏览器模式: 只需在视口变化时保持最后消息可见, 高度全交给 CSS
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize', ()=>{
-        if(document.activeElement && document.activeElement.id==='cin') scrollLast();
-      });
-    }
+  const vv = window.visualViewport;
+  // 无 visualViewport 的老浏览器: 退回纯 CSS(meta interactive-widget), 只保证滚到底
+  if(!vv){
+    cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,200); setTimeout(scrollLast,450); });
     return;
   }
-  // ---- standalone 补偿: 用 visualViewport 实测可视高驱动 #hall ----
-  document.documentElement.classList.add('pwa-standalone');   // CSS hook: #hall 改用 var(--kvh)
-  const vv = window.visualViewport;
+  document.documentElement.classList.add('kb-vv');   // CSS hook: #hall/stage 改用 var(--kvh)
+  let raf = 0;
   const applyKvh = ()=>{
-    const h = vv ? Math.round(vv.height) : window.innerHeight;
+    const h = Math.round(vv.height);
     document.documentElement.style.setProperty('--kvh', h + 'px');
+    // 键盘弹起(页面可能被上推产生 offsetTop)时, cin 聚焦则保持最后消息可见
+    if(document.activeElement && document.activeElement.id==='cin') scrollLast();
   };
+  const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
   applyKvh();
-  if(vv){
-    vv.addEventListener('resize', ()=>{ applyKvh(); if(document.activeElement && document.activeElement.id==='cin') scrollLast(); });
-    // iOS standalone 键盘弹起时 visualViewport 可能带 offsetTop(页面被上推), scroll 也要跟
-    vv.addEventListener('scroll', applyKvh);
+  vv.addEventListener('resize', schedule);
+  vv.addEventListener('scroll', schedule);   // iOS 键盘弹起时 vv 会 scroll(带 offsetTop)
+  window.addEventListener('resize', schedule);
+  // 键盘弹起有 lag(vv.resize 常晚于 focus), focus 后多打几拍确保 --kvh 及时更新
+  cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
+  // 失焦(键盘收起): vv.height 恢复满高, applyKvh 会把 --kvh 复位; 再补一拍防个别机型不触发 resize
+  cin.addEventListener('blur', ()=>{ setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
+})();
+
+// ============ 键盘诊断浮层(默认关, 仅 URL 带 ?kbdiag 时显示, 真机排查用) ============
+(function(){
+  try{ if(!/[?&#]kbdiag\b/.test(location.href) && localStorage.getItem('eh_kbdiag')!=='1') return; }catch(_){ return; }
+  var box=document.createElement('div');
+  box.style.cssText='position:fixed;top:calc(2px + env(safe-area-inset-top));left:2px;z-index:2147483647;'
+    +'font:9px/1.35 monospace;color:#0f0;background:rgba(0,0,0,.85);padding:4px 6px;border-radius:5px;'
+    +'pointer-events:none;max-width:82vw;white-space:pre';
+  document.body.appendChild(box);
+  function upd(){
+    var vv=window.visualViewport;
+    var comp=document.querySelector('.composer'); var cin=document.getElementById('cin');
+    var hall=document.getElementById('hall');
+    var cr=comp?comp.getBoundingClientRect():{}; var cir=cin?cin.getBoundingClientRect():{};
+    var hr=hall?hall.getBoundingClientRect():{};
+    var kvh=getComputedStyle(document.documentElement).getPropertyValue('--kvh').trim()||'(未设)';
+    box.textContent=[
+      'innerH='+window.innerHeight+' vvH='+(vv?Math.round(vv.height):'-')+' vvTop='+(vv?Math.round(vv.offsetTop):'-'),
+      '--kvh='+kvh+' kb-vv='+document.documentElement.classList.contains('kb-vv'),
+      'hall.h='+Math.round(hr.height||0)+' scrollY='+Math.round(window.scrollY),
+      'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
+      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight+2?' ❌超屏':' ✅'),
+      'kbFocus='+(document.activeElement&&document.activeElement.id==='cin')
+    ].join('\n');
   }
-  window.addEventListener('resize', applyKvh);
-  // 键盘弹起有 lag, focus 后多打几拍写 kvh(vv.resize 有时晚于 focus)
-  cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize',upd); window.visualViewport.addEventListener('scroll',upd); }
+  window.addEventListener('resize',upd);
+  document.addEventListener('focusin',function(){ setTimeout(upd,50); setTimeout(upd,300); setTimeout(upd,600); });
+  document.addEventListener('focusout',function(){ setTimeout(upd,200); });
+  setInterval(upd,500); upd();
 })();
 
 // ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
