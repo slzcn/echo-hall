@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#070a12">
 <!-- ===== PWA v2 (整体重写): manifest + apple meta + beforeinstallprompt 早期捕获 =====
      用新 manifest 文件名 + 新 id + 新 SW 缓存名, 让浏览器视为全新 App, 绕过旧安装的"防打扰"冷却。 -->
-<link rel="manifest" href="app.webmanifest?v=2">
+<link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1565,7 +1565,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260721-manifest-clean';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-mf-step1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
