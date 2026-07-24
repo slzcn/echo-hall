@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-runtime-detect';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-delaygate';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8104,19 +8104,22 @@ window.addEventListener('beforeunload',()=>{
   let raf = 0;
   const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
   const clearKvh = ()=>{ document.documentElement.style.removeProperty('--kvh'); };  // 回归原生(#hall 用 CSS 100%)
+  // ★关键: focus 瞬间无法区分"浏览器(稍后会收缩视口)"和"覆盖式(永不收缩)"——都表现为"聚焦但还没收缩"。
+  //   若 focus 就补偿, 会破坏浏览器 interactive-widget(它稍后压缩视口, 两机制打架)。
+  //   对策: 只在 vv 已收缩时立即清(走原生); 是否"覆盖式需补偿"交给下面 focus 后的延时门判定, 给浏览器反应时间。
   const applyKvh = ()=>{
     const vh = Math.round(vv.height);
-    // cin 未聚焦=键盘必然收起, 刷新基线(取当前 vv 满高, 与 innerHeight 取大防偏小)
-    if(!cinFocused() && vh>0) baseVV = Math.max(vh, window.innerHeight||0);
-    if(!cinFocused()){ clearKvh(); return; }    // 无输入焦点 → 清 --kvh, 完全交给浏览器原生(自动回收)
-    const shrunk = baseVV - vh;                 // vv 相比基线收缩了多少
-    if(shrunk > 60){
-      // interactive-widget 生效(浏览器已压缩视口): 原生就能贴合 → 不干预, 清 --kvh 让 CSS 100% 生效
-      clearKvh();
-    } else {
-      // interactive-widget 失效(cin 聚焦但视口没收缩, 如 PWA/覆盖式键盘): 输入框会被盖 → JS 补偿收缩
-      document.documentElement.style.setProperty('--kvh', Math.max(240, baseVV - KB_PX) + 'px');
-    }
+    if(!cinFocused() && vh>0) baseVV = Math.max(vh, window.innerHeight||0);  // 无焦点刷新满高基线
+    if(!cinFocused()){ clearKvh(); return; }    // 无输入焦点 → 清 --kvh, 交给原生(自动回收)
+    if(baseVV - vh > 60){ clearKvh(); }         // vv 已收缩=interactive-widget 生效 → 走原生, 绝不补偿(不破坏浏览器)
+    // 未收缩时这里"按兵不动"(既不清也不补偿), 等延时门 decideOverlay 判定
+    if(cinFocused()) scrollLast();
+  };
+  // 延时门: focus 后给浏览器 interactive-widget 充分反应时间(450ms), 到点若 vv 仍没收缩 → 判定覆盖式, 补偿
+  const decideOverlay = ()=>{
+    if(!cinFocused()) { clearKvh(); return; }
+    if(baseVV - Math.round(vv.height) > 60){ clearKvh(); return; }  // 已收缩=浏览器生效, 不补偿
+    document.documentElement.style.setProperty('--kvh', Math.max(240, baseVV - KB_PX) + 'px');  // 仍没收缩=覆盖式, 补偿
     scrollLast();
   };
   const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
@@ -8124,9 +8127,8 @@ window.addEventListener('beforeunload',()=>{
   vv.addEventListener('resize', schedule);
   vv.addEventListener('scroll', schedule);   // iOS 键盘弹起时 vv 会 scroll(带 offsetTop)
   window.addEventListener('resize', schedule);
-  // 键盘弹起有 lag(vv.resize 常晚于 focus), focus 后多打几拍确保 --kvh 及时更新
-  //   同时武装返回键 guard: 这样按返回键会先被 navTopLayer 的 'kbd' 层吃掉(收键盘+复位), 不直接退页面
-  cin.addEventListener('focus', ()=>{ try{ if(window.ehArm) ehArm(); }catch(_){} applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
+  // focus: 武装返回键 guard + 滚到底; 补偿判定延到 450/750ms(给浏览器 interactive-widget 先反应, 不打架)
+  cin.addEventListener('focus', ()=>{ try{ if(window.ehArm) ehArm(); }catch(_){} scrollLast(); setTimeout(decideOverlay,450); setTimeout(decideOverlay,750); });
   // 失焦(键盘收起): 强制复位到满高。★不能只靠 applyKvh——覆盖式键盘 blur 后 vv.height 一直是满高、
   //   applyKvh 的 else 分支本应复位, 但安卓 blur 瞬间 activeElement 可能仍短暂=cin, 误走覆盖式分支不复位。
   //   故 blur 直接强制把 --kvh 设回满高(baseVV/innerHeight), 不依赖 cinFocused 判断。

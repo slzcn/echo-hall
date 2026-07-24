@@ -1,1 +1,1 @@
-20260724-kb-runtime-detect
+20260724-kb-delaygate
