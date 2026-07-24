@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-reset';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-touchreset';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8132,13 +8132,22 @@ window.addEventListener('beforeunload',()=>{
     document.documentElement.style.setProperty('--kvh', full + 'px');
   };
   cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,150); setTimeout(resetFull,400); });
-  // 轮询兜底: 点输入框外空白收起键盘时 blur 可能不触发。若 cin 已失焦但 --kvh 仍是收缩值→强制复位。
-  setInterval(()=>{
-    if(cinFocused()) return;
+  // ★覆盖式键盘收起的死结: 键盘收起时 vv/innerH/vvTop 全不变、activeElement 仍=cin(kbFocus恒true),
+  //   web 端拿不到任何"键盘收起"信号→blur/轮询复位全失效, 页面卡在收缩态。
+  //   破局: "下一次交互即复位"——用户收起键盘后必然会碰屏幕(滚消息/点别处), 只要触碰的不是输入区就复位满高。
+  //   不依赖检测收起, 且永不卡死(碰一下就恢复)。
+  const isComposerArea = (el)=> el && (el.id==='cin' || (el.closest && el.closest('.composer')));
+  const maybeReset = (e)=>{
+    if(isComposerArea(e.target)) return;           // 碰的是输入框/输入栏 → 保持
     const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--kvh'),10)||0;
     const full = Math.max(baseVV, window.innerHeight||0);
-    if(cur && full && cur < full - 20) resetFull();   // 收缩态但已无焦点 → 复位
-  }, 500);
+    if(cur && full && cur < full - 20){            // 当前是收缩态 → 说明键盘该收起了
+      try{ cin.blur(); }catch(_){}                 // 主动 blur 收键盘(顺带触发上面的 blur 复位)
+      resetFull();
+    }
+  };
+  document.addEventListener('touchstart', maybeReset, {passive:true, capture:true});
+  document.addEventListener('pointerdown', maybeReset, {passive:true, capture:true});
 })();
 
 // ============ 键盘诊断浮层(默认关; ?kbdiag 开启并持久化到 localStorage, PWA 无地址栏也能显; ?kbdiag=off 关) ============
