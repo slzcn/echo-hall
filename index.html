@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-touchreset';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-px300b';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8093,9 +8093,9 @@ window.addEventListener('beforeunload',()=>{
   //   完全不收缩(实测 innerH=vvH=805 不变), 纯 vv 方案失效→输入框被键盘盖住。
   //   对策: 维护无键盘时的 vv 基线; cin 聚焦后若 vv 没收缩(覆盖式)→ 用估算比例收缩 #hall。
   // 覆盖式键盘(vv 不收缩)时用"基线 - 键盘估高(像素)"算可视高——比乘屏比稳(键盘物理高不随屏比走)。
-  // ★KB_PX 精确标定(2026-07-24): 同机浏览器里键盘弹起 innerH/vvH 一起收缩到 447(=真实可视高), PWA 里 innerH
-  //   不收缩仍 805 → 键盘物理高 = 805-447 = 358px。PWA 用 baseVV-358 即得到与浏览器一致的 447, 输入框贴键盘上方。
-  const KB_PX = 358;
+  // ★KB_PX 真机标定(2026-07-24 安卓讯飞): 300 时 --kvh=505, 输入框位置正确(主人确认 ok)。
+  //   (曾试 358 使 --kvh=447 对齐浏览器 vv, 但真机偏低不行; 300/505 才对。)
+  const KB_PX = 300;
   let baseVV = Math.round(vv.height);   // 无键盘基线
   let raf = 0;
   const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
