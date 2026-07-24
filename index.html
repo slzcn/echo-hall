@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-unified-vv';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kbdiag-pwa';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8107,9 +8107,13 @@ window.addEventListener('beforeunload',()=>{
   cin.addEventListener('blur', ()=>{ setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
 })();
 
-// ============ 键盘诊断浮层(默认关, 仅 URL 带 ?kbdiag 时显示, 真机排查用) ============
+// ============ 键盘诊断浮层(默认关; ?kbdiag 开启并持久化到 localStorage, PWA 无地址栏也能显; ?kbdiag=off 关) ============
 (function(){
-  try{ if(!/[?&#]kbdiag\b/.test(location.href) && localStorage.getItem('eh_kbdiag')!=='1') return; }catch(_){ return; }
+  try{
+    if(/[?&#]kbdiag=off\b/.test(location.href)){ localStorage.removeItem('eh_kbdiag'); return; }
+    if(/[?&#]kbdiag\b/.test(location.href)) localStorage.setItem('eh_kbdiag','1');   // 开一次→持久, PWA(同源)打开也显
+    if(localStorage.getItem('eh_kbdiag')!=='1') return;
+  }catch(_){ return; }
   var box=document.createElement('div');
   box.style.cssText='position:fixed;top:calc(2px + env(safe-area-inset-top));left:2px;z-index:2147483647;'
     +'font:9px/1.35 monospace;color:#0f0;background:rgba(0,0,0,.85);padding:4px 6px;border-radius:5px;'
@@ -8122,7 +8126,10 @@ window.addEventListener('beforeunload',()=>{
     var cr=comp?comp.getBoundingClientRect():{}; var cir=cin?cin.getBoundingClientRect():{};
     var hr=hall?hall.getBoundingClientRect():{};
     var kvh=getComputedStyle(document.documentElement).getPropertyValue('--kvh').trim()||'(未设)';
+    var sa=(window.matchMedia&&matchMedia('(display-mode:standalone)').matches)||window.navigator.standalone===true;
+    var winH=(window.screen&&window.screen.height)||0;
     box.textContent=[
+      'standalone(PWA)='+sa+' screenH='+winH,
       'innerH='+window.innerHeight+' vvH='+(vv?Math.round(vv.height):'-')+' vvTop='+(vv?Math.round(vv.offsetTop):'-'),
       '--kvh='+kvh+' kb-vv='+document.documentElement.classList.contains('kb-vv'),
       'hall.h='+Math.round(hr.height||0)+' scrollY='+Math.round(window.scrollY),
