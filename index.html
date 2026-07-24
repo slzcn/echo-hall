@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-fix-revert';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-backkey';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -7495,6 +7495,8 @@ let _navArmed=false;
 function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({eh:1},''); }catch(e){} }
 // 从最上层往下判定"这次返回该关掉谁"
 function navTopLayer(){
+  // 键盘开着(输入框聚焦)时, 返回键第一优先收键盘 + 输入框失焦 + 复位, 符合安卓习惯(先收键盘再退层)
+  if(document.activeElement && document.activeElement.id==='cin') return 'kbd';
   if($('#recOverlay')?.classList.contains('on')) return 'rec';
   if($('#wallMask')?.classList.contains('on')) return 'wall';
   if($('#modalMask')?.classList.contains('on')) return 'modal';
@@ -7509,6 +7511,7 @@ function navTopLayer(){
 }
 function navConsume(layer){
   switch(layer){
+    case 'kbd': try{ var _c=$('#cin'); if(_c) _c.blur(); if(window.__ehKbReset) window.__ehKbReset(); }catch(_){} break;
     case 'rec': if(recActive){ recCanceled=true; setRecCancel(true); micRelease(); } break;
     case 'wall': $('#wallMask')?.classList.remove('on'); break;
     case 'modal': closeModal(); break;
@@ -8123,7 +8126,8 @@ window.addEventListener('beforeunload',()=>{
   vv.addEventListener('scroll', schedule);   // iOS 键盘弹起时 vv 会 scroll(带 offsetTop)
   window.addEventListener('resize', schedule);
   // 键盘弹起有 lag(vv.resize 常晚于 focus), focus 后多打几拍确保 --kvh 及时更新
-  cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
+  //   同时武装返回键 guard: 这样按返回键会先被 navTopLayer 的 'kbd' 层吃掉(收键盘+复位), 不直接退页面
+  cin.addEventListener('focus', ()=>{ try{ if(window.ehArm) ehArm(); }catch(_){} applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
   // 失焦(键盘收起): 强制复位到满高。★不能只靠 applyKvh——覆盖式键盘 blur 后 vv.height 一直是满高、
   //   applyKvh 的 else 分支本应复位, 但安卓 blur 瞬间 activeElement 可能仍短暂=cin, 误走覆盖式分支不复位。
   //   故 blur 直接强制把 --kvh 设回满高(baseVV/innerHeight), 不依赖 cinFocused 判断。
@@ -8131,6 +8135,7 @@ window.addEventListener('beforeunload',()=>{
     const full = Math.max(baseVV, window.innerHeight||0, Math.round(vv.height));
     document.documentElement.style.setProperty('--kvh', full + 'px');
   };
+  window.__ehKbReset = resetFull;   // 供返回键(navConsume 'kbd')收键盘时调用复位
   cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,150); setTimeout(resetFull,400); });
   // ★覆盖式键盘收起的死结: 键盘收起时 vv/innerH/vvTop 全不变、activeElement 仍=cin(kbFocus恒true),
   //   web 端拿不到任何"键盘收起"信号→blur/轮询复位全失效, 页面卡在收缩态。
