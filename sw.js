@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v4-overlaykb';
+const SW_VERSION = 'eh-sw-v5-kbsplit';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
