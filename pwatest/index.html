@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PWA 测试</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a84ff">
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#0a84ff;color:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;text-align:center;padding:24px;box-sizing:border-box}
+  h1{font-size:28px;margin:0 0 8px}
+  p{font-size:15px;opacity:.9;line-height:1.7}
+  #st{margin-top:20px;font-size:13px;background:rgba(0,0,0,.25);padding:12px 16px;border-radius:12px;font-family:monospace;white-space:pre-line}
+  button{margin-top:20px;padding:12px 28px;font-size:16px;border:none;border-radius:24px;
+    background:#fff;color:#0a84ff;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+  <h1>🧪 PWA 安装测试</h1>
+  <p>这是一个最小 PWA。<br>如果这个能装出桌面图标，<br>说明设备/浏览器 OK。</p>
+  <button id="installBtn" style="display:none">📲 安装此测试 App</button>
+  <div id="st">检测中…</div>
+<script>
+  var st = document.getElementById('st');
+  var btn = document.getElementById('installBtn');
+  var lines = [];
+  function log(s){ lines.push(s); st.textContent = lines.join('\n'); }
+
+  // 是否已 standalone(装过后打开)
+  var standalone = (matchMedia && matchMedia('(display-mode:standalone)').matches) || navigator.standalone===true;
+  log('standalone(已装打开): ' + standalone);
+  log('UA: ' + (navigator.userAgent.match(/Chrome\/[\d.]+|Version\/[\d.]+|MiuiBrowser\/[\d.]+|Quark|UCBrowser/)||['未知'])[0]);
+
+  // SW 注册
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js')
+      .then(function(){ log('SW: 注册成功 ✓'); })
+      .catch(function(e){ log('SW: 失败 ✗ ' + e.message); });
+  } else { log('SW: 浏览器不支持 ✗'); }
+
+  // beforeinstallprompt
+  var dp = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); dp = e;
+    log('beforeinstallprompt: 触发 ✓ (可一键安装)');
+    btn.style.display = 'inline-block';
+  });
+  window.addEventListener('appinstalled', function(){ log('appinstalled: 已安装 ✓'); btn.style.display='none'; });
+
+  // 3 秒后若事件没来, 提示
+  setTimeout(function(){
+    if(!dp && !standalone) log('beforeinstallprompt: 3秒内未触发 ⚠\n(可能已装过/浏览器不支持/需手动菜单安装)');
+  }, 3000);
+
+  btn.addEventListener('click', function(){
+    if(dp){ dp.prompt(); dp.userChoice.then(function(r){ log('用户选择: ' + r.outcome); }); }
+  });
+</script>
+</body>
+</html>
