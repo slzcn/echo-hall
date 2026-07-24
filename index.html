@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-autoreset';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-fix-revert';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8148,13 +8148,8 @@ window.addEventListener('beforeunload',()=>{
   };
   document.addEventListener('touchstart', maybeReset, {passive:true, capture:true});
   document.addEventListener('pointerdown', maybeReset, {passive:true, capture:true});
-  // 自动收起兜底(不依赖触碰): 安卓键盘收起时多会 fire focusout / window.resize(哪怕 vv 数值不变)。
-  //   收到这些事件后延时复查: 若仍是收缩态但已"不在活跃输入"(用几拍延时给 activeElement 脱离的机会)→复位。
-  const autoResetSoon = ()=>{ setTimeout(resetFull, 250); setTimeout(resetFull, 600); };
-  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin') autoResetSoon(); });
-  window.addEventListener('resize', ()=>{ if(!cinFocused()) autoResetSoon(); });
-  // 滚动消息列表(用户看历史)也视为已不在输入 → 复位
-  try{ var _st=document.getElementById('stream'); if(_st) _st.addEventListener('scroll', ()=>{ maybeReset({target:_st}); }, {passive:true}); }catch(_){}
+  // (曾试 focusout/window.resize 自动复位, 但在键盘弹起过程中误触发→刚弹就被复位, 键盘弹不上去。已撤除,
+  //  只保留上面的"触碰输入区外即复位": 弹起稳定, 收起后碰一下屏幕即恢复。覆盖式键盘无可靠收起信号, 这是现实折中。)
 })();
 
 // ============ 键盘诊断浮层(默认关; ?kbdiag 开启并持久化到 localStorage, PWA 无地址栏也能显; ?kbdiag=off 关) ============
