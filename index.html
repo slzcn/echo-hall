@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-backkey';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-split';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8073,24 +8073,25 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
-// ============ 聊天页键盘处理(统一 visualViewport 驱动, 不再分 standalone/浏览器) ============
-// 核心认知: 决定输入框贴不贴键盘的, 不是"是否 standalone", 而是"键盘弹起时布局视口(innerHeight)
-//   压不压缩"——而这点因浏览器/输入法/PWA 而异, 无法靠 UA 或 display-mode 判定。
-// 唯一在所有情况下都可靠的信号是 window.visualViewport.height(浏览器实测的真实可视高)。
-// 方案: 一律给 <html> 挂 .kb-vv, #hall 高度用 var(--kvh)=visualViewport.height。
-//   - interactive-widget 生效时: vv.height ≈ 布局视口高, --kvh 与 CSS 100% 等价, 无副作用。
-//   - interactive-widget 不生效时(部分安卓Chrome/第三方IME覆盖式键盘/iOS PWA): vv.height 给出真实
-//     收缩高, #hall 随之收缩, composer(flex-shrink:0)贴到键盘正上方。
-//   一套逻辑覆盖全部, 不再靠猜。visualViewport.height 本身就是浏览器测好的, 零估算(不用 0.74 那种)。
+// ============ 聊天页键盘处理(按运行时分流, 浏览器走原生自动 / PWA 走 JS 补偿) ============
+// ★2026-07-24 教训: 曾"统一 vv 驱动"把浏览器也拽进 JS 管, 反而破坏了浏览器原生的自动弹出/回收。
+//   正解回到分流(即重构前的可用方案):
+//  A. 普通浏览器: meta viewport interactive-widget=resizes-content 生效, 浏览器自己压缩布局视口、
+//     自己回收 → 纯 CSS(height:100%)自然贴合, 零 JS 干预 = 弹出/回收全自动。只需 focus 后滚到底。
+//  B. PWA standalone: interactive-widget 不生效, 键盘弹起布局视口/vv 常不收缩(尤其覆盖式第三方输入法)
+//     → 必须 JS 补偿: 挂 .kb-vv, 用 baseVV-KB_PX 估算收缩 #hall; 收起靠触碰/返回键复位。
 (function(){
   const cin=$('#cin'); if(!cin) return;
   const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
   const vv = window.visualViewport;
-  // 无 visualViewport 的老浏览器: 退回纯 CSS(meta interactive-widget), 只保证滚到底
-  if(!vv){
+  const isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
+  // A. 浏览器模式(或无 vv): 完全交给浏览器原生 interactive-widget, 只滚到底, 绝不碰 --kvh(否则破坏自动回收)
+  if(!isStandalone || !vv){
     cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,200); setTimeout(scrollLast,450); });
+    if(vv){ vv.addEventListener('resize', ()=>{ if(document.activeElement && document.activeElement.id==='cin') scrollLast(); }); }
     return;
   }
+  // B. PWA standalone: JS 补偿
   document.documentElement.classList.add('kb-vv');   // CSS hook: #hall/stage 改用 var(--kvh)
   // ★真机实测(2026-07-24)关键发现: 部分第三方输入法(讯飞/搜狗等覆盖式键盘)弹起时 vv.height
   //   完全不收缩(实测 innerH=vvH=805 不变), 纯 vv 方案失效→输入框被键盘盖住。
