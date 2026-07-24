@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kbdiag-pwa';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-overlay-kb';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8089,12 +8089,30 @@ window.addEventListener('beforeunload',()=>{
     return;
   }
   document.documentElement.classList.add('kb-vv');   // CSS hook: #hall/stage 改用 var(--kvh)
+  // ★真机实测(2026-07-24)关键发现: 部分第三方输入法(讯飞/搜狗等覆盖式键盘)弹起时 vv.height
+  //   完全不收缩(实测 innerH=vvH=805 不变), 纯 vv 方案失效→输入框被键盘盖住。
+  //   对策: 维护无键盘时的 vv 基线; cin 聚焦后若 vv 没收缩(覆盖式)→ 用估算比例收缩 #hall。
+  const OVERLAY_RATIO = 0.55;   // 覆盖式键盘(含工具栏)约占屏 45%, 留 55% 可视高。真机可调。
+  let baseVV = Math.round(vv.height);   // 无键盘基线
   let raf = 0;
+  const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
   const applyKvh = ()=>{
-    const h = Math.round(vv.height);
+    const vh = Math.round(vv.height);
+    // cin 未聚焦=键盘必然收起, 刷新基线(取当前 vv 满高)
+    if(!cinFocused() && vh>0) baseVV = vh;
+    let h;
+    if(cinFocused()){
+      const shrunk = baseVV - vh;               // vv 相比基线收缩了多少
+      if(shrunk > 100){
+        h = vh;                                 // 标准键盘: vv 如实收缩, 直接用(准)
+      } else {
+        h = Math.round(baseVV * OVERLAY_RATIO); // 覆盖式键盘: vv 没收缩, 用估算比例
+      }
+    } else {
+      h = vh;                                   // 无键盘: 满高
+    }
     document.documentElement.style.setProperty('--kvh', h + 'px');
-    // 键盘弹起(页面可能被上推产生 offsetTop)时, cin 聚焦则保持最后消息可见
-    if(document.activeElement && document.activeElement.id==='cin') scrollLast();
+    if(cinFocused()) scrollLast();
   };
   const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
   applyKvh();
@@ -8103,7 +8121,7 @@ window.addEventListener('beforeunload',()=>{
   window.addEventListener('resize', schedule);
   // 键盘弹起有 lag(vv.resize 常晚于 focus), focus 后多打几拍确保 --kvh 及时更新
   cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
-  // 失焦(键盘收起): vv.height 恢复满高, applyKvh 会把 --kvh 复位; 再补一拍防个别机型不触发 resize
+  // 失焦(键盘收起): 复位到满高; 多打几拍防个别机型不触发 resize
   cin.addEventListener('blur', ()=>{ setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
 })();
 
@@ -8134,7 +8152,7 @@ window.addEventListener('beforeunload',()=>{
       '--kvh='+kvh+' kb-vv='+document.documentElement.classList.contains('kb-vv'),
       'hall.h='+Math.round(hr.height||0)+' scrollY='+Math.round(window.scrollY),
       'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
-      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight+2?' ❌超屏':' ✅'),
+      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>(vv?vv.height:window.innerHeight)-2?' ❌可能被盖':' ✅'),
       'kbFocus='+(document.activeElement&&document.activeElement.id==='cin')
     ].join('\n');
   }
