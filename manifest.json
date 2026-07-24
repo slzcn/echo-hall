@@ -4,7 +4,7 @@
   "description": "实时回声聊天空间——匿名身份、灵魂对话、神曲共鸣。",
   "lang": "zh-CN",
   "dir": "ltr",
-  "id": "/echo-hall/",
+  "id": "/echo-hall/?pwa=20260724",
   "start_url": "/echo-hall/",
   "scope": "/echo-hall/",
   "display": "standalone",
