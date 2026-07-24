@@ -1564,7 +1564,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-kb-px358';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-reset';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8124,8 +8124,21 @@ window.addEventListener('beforeunload',()=>{
   window.addEventListener('resize', schedule);
   // 键盘弹起有 lag(vv.resize 常晚于 focus), focus 后多打几拍确保 --kvh 及时更新
   cin.addEventListener('focus', ()=>{ applyKvh(); setTimeout(applyKvh,150); setTimeout(applyKvh,400); setTimeout(applyKvh,700); });
-  // 失焦(键盘收起): 复位到满高; 多打几拍防个别机型不触发 resize
-  cin.addEventListener('blur', ()=>{ setTimeout(applyKvh,150); setTimeout(applyKvh,400); });
+  // 失焦(键盘收起): 强制复位到满高。★不能只靠 applyKvh——覆盖式键盘 blur 后 vv.height 一直是满高、
+  //   applyKvh 的 else 分支本应复位, 但安卓 blur 瞬间 activeElement 可能仍短暂=cin, 误走覆盖式分支不复位。
+  //   故 blur 直接强制把 --kvh 设回满高(baseVV/innerHeight), 不依赖 cinFocused 判断。
+  const resetFull = ()=>{
+    const full = Math.max(baseVV, window.innerHeight||0, Math.round(vv.height));
+    document.documentElement.style.setProperty('--kvh', full + 'px');
+  };
+  cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,150); setTimeout(resetFull,400); });
+  // 轮询兜底: 点输入框外空白收起键盘时 blur 可能不触发。若 cin 已失焦但 --kvh 仍是收缩值→强制复位。
+  setInterval(()=>{
+    if(cinFocused()) return;
+    const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--kvh'),10)||0;
+    const full = Math.max(baseVV, window.innerHeight||0);
+    if(cur && full && cur < full - 20) resetFull();   // 收缩态但已无焦点 → 复位
+  }, 500);
 })();
 
 // ============ 键盘诊断浮层(默认关; ?kbdiag 开启并持久化到 localStorage, PWA 无地址栏也能显; ?kbdiag=off 关) ============
