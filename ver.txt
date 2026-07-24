@@ -1,1 +1,1 @@
-20260724-sw-clean-manifest
+20260724-pwa-fixed
