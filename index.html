@@ -1567,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-longpress-align';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260725-ios-kbd-fit';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8122,7 +8122,8 @@ window.addEventListener('beforeunload',()=>{
   // ★KB_PX 真机标定(2026-07-24 安卓讯飞): 300 时 --kvh=505, 输入框位置正确(主人确认 ok)。
   //   (曾试 358 使 --kvh=447 对齐浏览器 vv, 但真机偏低不行; 300/505 才对。)
   const KB_PX = 300;
-  let baseVV = Math.round(vv.height);   // 无键盘基线
+  let baseVV = Math.round(vv.height);   // 无键盘 vv 基线
+  let baseInner = window.innerHeight || baseVV;   // 无键盘布局视口基线(区分 iOS系统键盘 vs 安卓interactive-widget)
   let raf = 0;
   let compensating = false;   // ★缓存补偿态(替代 getComputedStyle 读 --kvh, 免强制 reflow)
   let lastKvh = -1;           // ★缓存已写的 --kvh 值, 相同则跳过 setProperty(免无效 reflow)
@@ -8139,21 +8140,33 @@ window.addEventListener('beforeunload',()=>{
     if(!compensating){ document.documentElement.classList.add('kb-compensating'); compensating=true; }
     lastKvh=px;
   };
-  // focus 瞬间无法区分浏览器(稍后收缩)vs覆盖式(永不收缩), 若立即补偿会与浏览器 interactive-widget 打架。
-  // 对策: vv 已收缩→立即清走原生; 未收缩→按兵不动, 交延时门 decideOverlay 判定。
+  // 三种键盘模式, 判据不同(见 mobile-keyboard-viewport 记忆):
+  //  ① 安卓 interactive-widget: 布局视口(innerHeight)本身被压缩, vv 也缩 → 纯 CSS height:100%(=已缩的innerH)
+  //     即贴合, 清 --kvh 走原生。
+  //  ② iOS 系统键盘: 只有 vv.height 缩, innerHeight 不变 → 100% 仍是满高盖不住键盘, 必须 --kvh=真实 vv.height。
+  //  ③ 覆盖式第三方IME: vv/innerH 都不缩 → 无信号, 用 baseVV-KB_PX 估算。
+  const decideNow = (allowOverlay)=>{
+    if(!cinFocused()){ clearKvh(); return; }
+    const vh = Math.round(vv.height);
+    const innerH = window.innerHeight || baseInner;
+    const vvShrank = baseVV - vh > 60;
+    const innerShrank = baseInner - innerH > 60;
+    if(vvShrank){
+      if(innerShrank){ clearKvh(); }        // ① 安卓: 布局视口已压缩, 原生 100% 就对 → 走原生
+      else { setKvh(Math.max(240, vh)); }   // ② iOS 系统键盘: 用真实可视高精确贴合(不估算、不留黑)
+      return;
+    }
+    // vv 未收缩: 弹起过程中(还没跳)按兵不动; 延时门到点仍不缩=覆盖式→估算
+    if(allowOverlay){ setKvh(Math.max(240, baseVV - KB_PX)); scrollLast(); }
+  };
   const applyKvh = ()=>{
     const vh = Math.round(vv.height);
-    if(!cinFocused()){ if(vh>0) baseVV = Math.max(vh, window.innerHeight||0); clearKvh(); return; }
-    if(baseVV - vh > 60) clearKvh();          // vv 已收缩=浏览器原生生效 → 走原生
-    // 未收缩→不动, 等 decideOverlay
+    const innerH = window.innerHeight || 0;
+    if(!cinFocused()){ if(vh>0){ baseVV = Math.max(vh, innerH); baseInner = Math.max(innerH, vh); } clearKvh(); return; }
+    decideNow(false);   // resize 阶段: 只处理已收缩(iOS/安卓), 覆盖式交延时门
   };
-  // 延时门: focus 后给浏览器 interactive-widget 反应时间, 到点仍没收缩=覆盖式, 补偿
-  const decideOverlay = ()=>{
-    if(!cinFocused()){ clearKvh(); return; }
-    if(baseVV - Math.round(vv.height) > 60){ clearKvh(); return; }
-    setKvh(Math.max(240, baseVV - KB_PX));
-    scrollLast();
-  };
+  // 延时门: focus 后给浏览器 interactive-widget 反应时间, 到点仍没收缩=覆盖式, 才估算补偿
+  const decideOverlay = ()=>{ decideNow(true); };
   const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
   applyKvh();
   vv.addEventListener('resize', schedule, {passive:true});
