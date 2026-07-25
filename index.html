@@ -1567,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-msg-notcovered';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-send-scroll';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -5444,7 +5444,10 @@ async function send(){
   // 乐观上屏
   const localId='local_'+Date.now();
   const optimistic={...payload, id:localId, created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
-  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream(); ehFx(el,'fx-send',650); }
+  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream();
+    // 键盘态下 DOM/布局稳定晚于插入, 单次滚动常滚不到底(最后一条被输入栏盖) → 多拍兜底确保完全可见
+    setTimeout(scrollStream,60); setTimeout(scrollStream,200); setTimeout(scrollStream,450);
+    ehFx(el,'fx-send',650); }
   try{ EhSfx.play(useVoid?'void':'send'); }catch(e){}
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
