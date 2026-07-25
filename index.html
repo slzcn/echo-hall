@@ -1567,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-song-acapella';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-longpress-align';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3052,7 +3052,7 @@ function echoQuickList(){
   const push=(e,label)=>{ if(e&&!seen.has(e)){ seen.add(e); out.push({e,label:label||''}); } };
   mru.forEach(e=>push(e, (ECHO_KINDS.find(k=>k.e===e)||{}).label));
   ECHO_KINDS.forEach(k=>push(k.e,k.label));
-  return out.slice(0,4);
+  return out.slice(0, arguments[0]||4);   // 可传数量: 让上方表情行(表情+➕)与下方操作行数量对齐
 }
 const RESONANCE_THRESHOLD = ()=>TUNE('resonanceThreshold',5);   // 共鸣触发阈值(后台可配)
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
@@ -4983,7 +4983,7 @@ document.addEventListener('pointerdown',e=>{
   const el=headEl(e.target); if(!el) return;
   const nm=el.dataset.atname; const uid=el.dataset.uid||''; if(!nm) return;
   _hlFired=false; _hlStart={x:e.clientX,y:e.clientY};
-  _hlTimer=setTimeout(()=>{ _hlFired=true; try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} openPeerMenu(el, nm, uid); }, 500);
+  _hlTimer=setTimeout(()=>{ _hlFired=true; try{ ehLongPressFx(); }catch(_){} openPeerMenu(el, nm, uid); }, 500);
 },{passive:true});
 document.addEventListener('pointermove',e=>{ if(_hlTimer && _hlStart && (Math.abs(e.clientX-_hlStart.x)>10||Math.abs(e.clientY-_hlStart.y)>10)){ clearTimeout(_hlTimer); _hlTimer=null; } },{passive:true});
 document.addEventListener('pointerup',e=>{
@@ -6280,8 +6280,8 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱排队中'; }catch(_){}
-    try{ toast('清唱排队中,由后台生成…'); }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='生成中'; }catch(_){}
+    try{ toast('生成中,由后台生成…'); }catch(_){}
     // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
     try{
       const key=String(mid);
@@ -6574,12 +6574,17 @@ function attachLongPress(el, m){
 // ★ 截屏/切后台时系统 UI 介入会让页面失焦/隐藏 → 取消待弹长按 + 关掉已开的互动环，防“截屏误触菜单”
 window.addEventListener('blur',()=>{ cancelLongPress(); try{ hideActRing(); }catch(_){} },{passive:true});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ cancelLongPress(); try{ hideActRing(); }catch(_){} } });
+function ehLongPressFx(){ try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_){} try{ EhSfx.play('tick'); }catch(_){} }  // 长按触发统一触感: 震动(安卓)+轻音效(iOS无震动API的补偿)
 function showActRing(x,y,m){
+  ehLongPressFx();
   const ring=$('#actRing');
   const isMine = m.user_id===myUid;
   const mid = isNaN(+m.id)?m.id:+m.id;
   // 自己的消息也可点回声(点赞等)——真人对自己内容盖章/强调是合理表达
-  const echoRow = `<div class="ar-echoes">${echoQuickList().map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span></button></div>`;
+  // 上方表情行(N表情+➕)与下方操作行数量对齐: 下方固定4(回复/投影/存卡/复制), 自己消息多撤回=5。
+  //   故有撤回时上方取4表情(4+➕=5), 无撤回取3表情(3+➕=4), 上下对齐。
+  const _echoN = canRecall(m) ? 4 : 3;
+  const echoRow = `<div class="ar-echoes">${echoQuickList(_echoN).map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span></button></div>`;
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
