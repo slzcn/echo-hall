@@ -174,15 +174,32 @@
   button:focus-visible,.song-play:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:2px}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
   /* ★iOS standalone PWA: body(height:100%)不覆盖底部 home 条安全区, 那块露 html;
-     html 无背景→透 WebView 默认黑底=底部黑边割裂。给 html 上 app 底色(随主题变), 黑边消失。 */
-  html{width:100%;background:var(--bg)}
+     html 无背景→透 WebView 默认黑底=底部黑边割裂。给 html 上 app 底色(随主题变), 黑边消失。
+     ★2026-07-26 再修: 页内氛围光(bg-orb / deep-night::after / mood 层)全是 position:fixed,
+     iOS standalone 下被钉在"布局视口"里、够不到底部安全区那条 → 安全区只由 html 的纯色兜底,
+     于是"发光的内容区" vs "纯色安全区"之间出现一条硬缝(看着像底部黑边)。根治: 把同样的
+     底部径向氛围光【也画到 html 背景上】(html 是唯一铁定铺满整屏含安全区的层), 缝就消失。
+     用 --accent 跟随主题; 平时极淡、深夜加强, 与页内 deep-night::after 观感对齐。 */
+  html{width:100%;background:var(--bg);
+    background-image:radial-gradient(ellipse 120% 42% at 50% 100%,
+      color-mix(in srgb,var(--accent) 6%,transparent),transparent 70%);
+    background-repeat:no-repeat;background-attachment:fixed}
+  html:has(body.deep-night){background-image:radial-gradient(ellipse 120% 48% at 50% 100%,
+      color-mix(in srgb,var(--accent) 12%,transparent),transparent 72%)}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
      禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
     background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
+    /* ★与 html 同一条底部氛围光(视口锚定 background-attachment:fixed): body 铺内容区、html 铺安全区,
+       两层画同一条从屏幕底部升起的径向光 → 无论 fixed 特效层够不够得到安全区, 基底都连续无缝。 */
+    background-image:radial-gradient(ellipse 120% 42% at 50% 100%,
+      color-mix(in srgb,var(--accent) 6%,transparent),transparent 70%);
+    background-repeat:no-repeat;background-attachment:fixed;
   }
+  body.deep-night{background-image:radial-gradient(ellipse 120% 48% at 50% 100%,
+      color-mix(in srgb,var(--accent) 12%,transparent),transparent 72%)}
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -1627,7 +1644,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-fastboot';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-btmglow';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
