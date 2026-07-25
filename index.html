@@ -1567,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-send-scroll';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-kb-perf';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8117,55 +8117,54 @@ window.addEventListener('beforeunload',()=>{
   const KB_PX = 300;
   let baseVV = Math.round(vv.height);   // 无键盘基线
   let raf = 0;
+  let compensating = false;   // ★缓存补偿态(替代 getComputedStyle 读 --kvh, 免强制 reflow)
+  let lastKvh = -1;           // ★缓存已写的 --kvh 值, 相同则跳过 setProperty(免无效 reflow)
   const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
-  const clearKvh = ()=>{ document.documentElement.style.removeProperty('--kvh'); document.documentElement.classList.remove('kb-compensating'); };  // 回归原生(#hall 用 CSS 100%)
-  const setKvh = (px)=>{ document.documentElement.style.setProperty('--kvh', px + 'px'); document.documentElement.classList.add('kb-compensating'); };  // 补偿介入(去 composer safe-area padding)
-  // ★关键: focus 瞬间无法区分"浏览器(稍后会收缩视口)"和"覆盖式(永不收缩)"——都表现为"聚焦但还没收缩"。
-  //   若 focus 就补偿, 会破坏浏览器 interactive-widget(它稍后压缩视口, 两机制打架)。
-  //   对策: 只在 vv 已收缩时立即清(走原生); 是否"覆盖式需补偿"交给下面 focus 后的延时门判定, 给浏览器反应时间。
+  const clearKvh = ()=>{
+    if(!compensating && lastKvh<0) return;   // 已是原生态, 无需重复清(免 reflow)
+    document.documentElement.style.removeProperty('--kvh');
+    document.documentElement.classList.remove('kb-compensating');
+    compensating=false; lastKvh=-1;
+  };
+  const setKvh = (px)=>{
+    if(px===lastKvh) return;                 // 值没变→跳过, 不 reflow
+    document.documentElement.style.setProperty('--kvh', px + 'px');
+    if(!compensating){ document.documentElement.classList.add('kb-compensating'); compensating=true; }
+    lastKvh=px;
+  };
+  // focus 瞬间无法区分浏览器(稍后收缩)vs覆盖式(永不收缩), 若立即补偿会与浏览器 interactive-widget 打架。
+  // 对策: vv 已收缩→立即清走原生; 未收缩→按兵不动, 交延时门 decideOverlay 判定。
   const applyKvh = ()=>{
     const vh = Math.round(vv.height);
-    if(!cinFocused() && vh>0) baseVV = Math.max(vh, window.innerHeight||0);  // 无焦点刷新满高基线
-    if(!cinFocused()){ clearKvh(); return; }    // 无输入焦点 → 清 --kvh, 交给原生(自动回收)
-    if(baseVV - vh > 60){ clearKvh(); }         // vv 已收缩=interactive-widget 生效 → 走原生, 绝不补偿(不破坏浏览器)
-    // 未收缩时这里"按兵不动"(既不清也不补偿), 等延时门 decideOverlay 判定
-    if(cinFocused()) scrollLast();
+    if(!cinFocused()){ if(vh>0) baseVV = Math.max(vh, window.innerHeight||0); clearKvh(); return; }
+    if(baseVV - vh > 60) clearKvh();          // vv 已收缩=浏览器原生生效 → 走原生
+    // 未收缩→不动, 等 decideOverlay
   };
-  // 延时门: focus 后给浏览器 interactive-widget 充分反应时间(450ms), 到点若 vv 仍没收缩 → 判定覆盖式, 补偿
+  // 延时门: focus 后给浏览器 interactive-widget 反应时间, 到点仍没收缩=覆盖式, 补偿
   const decideOverlay = ()=>{
-    if(!cinFocused()) { clearKvh(); return; }
-    if(baseVV - Math.round(vv.height) > 60){ clearKvh(); return; }  // 已收缩=浏览器生效, 不补偿
-    setKvh(Math.max(240, baseVV - KB_PX));  // 仍没收缩=覆盖式, 补偿(--kvh + kb-compensating class)
+    if(!cinFocused()){ clearKvh(); return; }
+    if(baseVV - Math.round(vv.height) > 60){ clearKvh(); return; }
+    setKvh(Math.max(240, baseVV - KB_PX));
     scrollLast();
   };
   const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
   applyKvh();
-  vv.addEventListener('resize', schedule);
-  vv.addEventListener('scroll', schedule);   // iOS 键盘弹起时 vv 会 scroll(带 offsetTop)
-  window.addEventListener('resize', schedule);
-  // focus: 武装返回键 guard + 滚到底; 补偿判定延到 450/750ms(给浏览器 interactive-widget 先反应, 不打架)
+  vv.addEventListener('resize', schedule, {passive:true});
+  vv.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('resize', schedule, {passive:true});
+  // focus: 武装返回键 guard + 滚到底; 补偿判定延时(给浏览器先反应)
   cin.addEventListener('focus', ()=>{ try{ if(window.ehArm) ehArm(); }catch(_){} scrollLast(); setTimeout(decideOverlay,450); setTimeout(decideOverlay,750); });
-  // 失焦(键盘收起): 强制复位到满高。★不能只靠 applyKvh——覆盖式键盘 blur 后 vv.height 一直是满高、
-  //   applyKvh 的 else 分支本应复位, 但安卓 blur 瞬间 activeElement 可能仍短暂=cin, 误走覆盖式分支不复位。
-  //   故 blur 直接强制把 --kvh 设回满高(baseVV/innerHeight), 不依赖 cinFocused 判断。
-  const resetFull = ()=>{ clearKvh(); };   // 复位=清 --kvh 回归原生(#hall CSS 100%), 而非设满高
-  window.__ehKbReset = resetFull;   // 供返回键(navConsume 'kbd')收键盘时调用复位
-  cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,150); setTimeout(resetFull,400); });
-  // ★覆盖式键盘收起的死结: 键盘收起时 vv/innerH/vvTop 全不变、activeElement 仍=cin(kbFocus恒true),
-  //   web 端拿不到任何"键盘收起"信号→blur/轮询复位全失效, 页面卡在收缩态。
-  //   破局: "下一次交互即复位"——用户收起键盘后必然会碰屏幕(滚消息/点别处), 只要触碰的不是输入区就复位满高。
-  //   不依赖检测收起, 且永不卡死(碰一下就恢复)。
-  const isComposerArea = (el)=> el && (el.id==='cin' || (el.closest && el.closest('.composer')));
+  const resetFull = ()=>{ clearKvh(); };
+  window.__ehKbReset = resetFull;   // 供返回键(navConsume 'kbd')收键盘时调用
+  cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,300); });
+  // 覆盖式键盘收起无 web 信号(vv/innerH/activeElement 全不变)→靠"触碰输入区外即复位"兜底(用缓存 compensating,
+  //   免 getComputedStyle 强制 reflow)。返回键复位见 navConsume 'kbd'。
   const maybeReset = (e)=>{
-    if(isComposerArea(e.target)) return;           // 碰的是输入框/输入栏 → 保持
-    // --kvh 有值 = 补偿收缩态(键盘该收起了) → 主动 blur + 清 --kvh 回归原生
-    if(getComputedStyle(document.documentElement).getPropertyValue('--kvh').trim()){
-      try{ cin.blur(); }catch(_){}
-      resetFull();
-    }
+    if(!compensating) return;                                          // 非补偿态→直接跳过(零开销)
+    const t=e.target; if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;  // 碰输入区→保持
+    try{ cin.blur(); }catch(_){} resetFull();
   };
   document.addEventListener('touchstart', maybeReset, {passive:true, capture:true});
-  document.addEventListener('pointerdown', maybeReset, {passive:true, capture:true});
   // (曾试 focusout/window.resize 自动复位, 但在键盘弹起过程中误触发→刚弹就被复位, 键盘弹不上去。已撤除,
   //  只保留上面的"触碰输入区外即复位": 弹起稳定, 收起后碰一下屏幕即恢复。覆盖式键盘无可靠收起信号, 这是现实折中。)
 })();
