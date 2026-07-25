@@ -1567,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-perf-leak';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-entry-stay';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3429,7 +3429,7 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  try{ entranceBanner(room); }catch(_){ try{ scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`)); }catch(__){} }
+  try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){} }
   // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
   scheduleDailyTarot(room && room.id);
   // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
@@ -4620,7 +4620,7 @@ function entranceBanner(room){
   const t = (cfg.tiers && cfg.tiers[tier]) || null;
   // 关闭/减动效/配置缺失 → 老行为(纯文字), 保证永不空场
   if(!cfg.enabled || reduce || !t){
-    scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`));
+    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);   // 进场提示不消失, 留在流里
     return;
   }
   // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
@@ -4706,10 +4706,9 @@ function renderEntrance(info, isSelf){
     t={...t, shake:true, flash:t.flash||s.flash, stage:true};
   }
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可(减动效时不做风散动画, 但仍到点移除)
-    const _sm = !isSelf ? sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`)
-                        : sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
-    try{ setTimeout(()=>{ try{ _sm.remove(); }catch(_){} }, ENTRY_FADE_MS); }catch(_){}
+  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可(进场提示不消失, 留在流里)
+    if(!isSelf) sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`);
+    else sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
     return;
   }
   const tagTxt = tierName(tier);
@@ -4728,7 +4727,7 @@ function renderEntrance(info, isSelf){
     `<span class="eb-txt"><span class="eb-nm">${esc(nm)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(roomName)}」</span>`+
     `<span class="eb-tag">${tagTxt}</span>`;
   $('#stream').appendChild(el); scrollStream();
-  scheduleEntryFade(el);   // 2分钟后"风吹散"淡出移除(进场提醒是氛围, 不留档堆积)
+  // 进场提示不做消失处理: 就留在消息流里(再次进房 2 分钟内去重, 本来不会重复出现, 留着不堆积)
   // 音效: 自己必放; 别人只有高阶档(会全屏光幕的)才放, 避免频繁进场吵
   if(t.sfx && (isSelf || wantStage)){ try{ EhSfx.play(t.sfx); }catch(_){} }
   // 粒子迸发
