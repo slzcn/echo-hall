@@ -1565,11 +1565,63 @@
 </style>
 </head>
 <body>
+  <!-- ===== PWA 进站动态 logo 开屏(仅 standalone 装成 App 时显示; 浏览器直接开不显, 避免每次刷新都挡一下) =====
+       动画呼应 app 图标"回声波纹": 中心核心呼吸 + 三圈声波一圈圈向外涟漪扩散。~1.4s 后淡出。
+       内联在 body 最前、样式自带, 不依赖后面的 CSS/JS 就能立即绘制, 真·开屏。 -->
+  <div id="pwaSplash" aria-hidden="true">
+    <div class="ps-logo">
+      <span class="ps-ring"></span><span class="ps-ring"></span><span class="ps-ring"></span>
+      <span class="ps-core"></span>
+    </div>
+    <div class="ps-word">回声厅</div>
+  </div>
+  <style>
+    #pwaSplash{position:fixed;inset:0;z-index:100000;display:none;flex-direction:column;
+      align-items:center;justify-content:center;gap:26px;background:#070a12;
+      transition:opacity .5s ease;opacity:1}
+    html.pwa-standalone #pwaSplash{display:flex}
+    #pwaSplash.ps-hide{opacity:0;pointer-events:none}
+    .ps-logo{position:relative;width:132px;height:132px;display:grid;place-items:center}
+    .ps-core{width:34px;height:34px;border-radius:50%;
+      background:radial-gradient(circle at 50% 45%,#7CFFE9,#00E5D4 60%,#00b7a8);
+      box-shadow:0 0 22px 4px rgba(0,229,212,.7),0 0 44px 8px rgba(0,229,212,.35);
+      animation:psCore 1.6s ease-in-out infinite}
+    .ps-ring{position:absolute;top:50%;left:50%;border-radius:50%;
+      border:2px solid rgba(0,229,212,.55);transform:translate(-50%,-50%) scale(.3);
+      opacity:0;animation:psRipple 1.8s cubic-bezier(.2,.6,.3,1) infinite}
+    .ps-ring:nth-child(1){width:132px;height:132px;animation-delay:0s}
+    .ps-ring:nth-child(2){width:132px;height:132px;animation-delay:.5s}
+    .ps-ring:nth-child(3){width:132px;height:132px;animation-delay:1s}
+    .ps-word{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;
+      letter-spacing:8px;color:#EAF6FF;text-indent:8px;
+      text-shadow:0 0 18px rgba(0,229,212,.5);opacity:.92;
+      animation:psWord 1.6s ease-in-out infinite}
+    @keyframes psCore{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.14);filter:brightness(1.25)}}
+    @keyframes psRipple{0%{transform:translate(-50%,-50%) scale(.28);opacity:0}
+      18%{opacity:.85}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+    @keyframes psWord{0%,100%{opacity:.72}50%{opacity:1}}
+    @media(prefers-reduced-motion:reduce){.ps-core,.ps-ring,.ps-word{animation:none}.ps-ring:nth-child(1){opacity:.5;transform:translate(-50%,-50%) scale(1)}}
+  </style>
+  <script>
+    /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
+    (function(){try{
+      var standalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
+        || window.navigator.standalone === true
+        || document.referrer.indexOf('android-app://') === 0;
+      if(standalone){
+        document.documentElement.classList.add('pwa-standalone');
+        var hide=function(){ var s=document.getElementById('pwaSplash'); if(!s) return; s.classList.add('ps-hide'); setTimeout(function(){ try{ s.remove(); }catch(_){}} , 600); };
+        // 1.4s 后淡出(动画放两轮涟漪); 兜底 window.load 也触发, 谁先到算谁
+        setTimeout(hide, 1400);
+        window.addEventListener('load', function(){ setTimeout(hide, 900); });
+      }
+    }catch(_){}})();
+  </script>
   <div id="pullRefresh"><span class="pr-spin"></span><span class="pr-arrow">↓</span><span class="pr-txt">下拉刷新</span></div>
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260725-ios-bottom-bg';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260725-lamb-splash-fixes';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2020,7 +2072,7 @@ const EH_CONFIG_DEFAULT = {
   roomThemeOverride: {},
   // 灵魂专属色(按灵魂名匹配, 私密房召唤的副本同名共享)
   // 灵魂专属色: 从新十主题 accent 里选(按性格), 与主题体系统一。空则跟房间主题色走。
-  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#6486FF','图灵':'#00E5D4','小暖':'#FF6F52'},
+  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#6486FF','图灵':'#00E5D4','小暖':'#FF6F52','小绵羊':'#A8E6A1'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
@@ -4820,7 +4872,16 @@ function bumpUnread(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()
   const attach=()=>{
     const s=$('#stream'), b=$('#toLatestBtn'); if(!s||!b) return false;
     if(s._tlBound) return true; s._tlBound=true;
-    let raf=0; s.addEventListener('scroll',()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); }); }, {passive:true});
+    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); }); };
+    s.addEventListener('scroll', kick, {passive:true});
+    // ★偶发不显示的根因: 翻历史时消息到达打字机/图片加载/神曲卡/特效会"事后撑高" stream,
+    //   离底距离变大却不触发 scroll → updateToLatest 不跑 → 按钮该现不现。用 MutationObserver
+    //   监听内容变化(节流到 rAF), 内容一长就重判显隐, 补上纯靠 scroll 覆盖不到的场景。
+    try{
+      const mo=new MutationObserver(kick);
+      mo.observe(s, {childList:true, subtree:true, characterData:true});
+      s._tlMO=mo;
+    }catch(_){}
     b.addEventListener('click',()=>{ try{ s.scrollTo({top:s.scrollHeight,behavior:'smooth'}); }catch(_){ s.scrollTop=s.scrollHeight; } hideToLatest(); setTimeout(()=>{ s.scrollTop=s.scrollHeight; hideToLatest(); },420); });
     return true;
   };
