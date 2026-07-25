@@ -1627,7 +1627,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260725-splash-logo';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-nobar-edge';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1655,6 +1655,9 @@
 <script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <script>/* 首屏外观模式: auto(按本地时间自动日/夜)/day/night, 提前定 data-mode 避免闪白 */
 try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();var _day=(_m==='day')||(_m==='auto'&&_h>=7&&_h<19);if(_day)document.documentElement.setAttribute('data-mode','day');else document.documentElement.setAttribute('data-mode','night');}catch(e){}</script>
+<script>/* 首帧无黑边: data-theme/data-mode 定好后, 立即用生效的 --bg 覆盖 theme-color(原硬编码 #070a12) + 钉 html/body 底色。
+   避免大 JS 加载前, 浏览器状态栏/工具栏带与页面(尤其日间浅色)割裂成上下黑边。首帧CSS已在head解析, --bg此刻可读。 */
+try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();if(_bg){var _mc=document.querySelector('meta[name="theme-color"]');if(_mc)_mc.content=_bg;document.documentElement.style.backgroundColor=_bg;}}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
 <div id="particles"></div>
@@ -2308,6 +2311,8 @@ function injectThemeCSS(){
   // 主题变量 + 荷尔蒙特效可调值(fx→注入 :root, 供 CSS 结构/keyframes 引用; 后台可覆盖)
   const fxCss = EH_CONFIG.fx ? (':root{'+Object.entries(EH_CONFIG.fx).map(([k,v])=>k+':'+v+';').join('')+'}\n') : '';
   el.textContent = fxCss + buildThemeCSS(EH_CONFIG.themePalettes);
+  // 主题变量注入后, 立即同步 theme-color/html/body 底色, 让状态栏带+安全区无黑边(启动路径也覆盖)
+  try{ if(typeof syncThemeColor==='function') syncThemeColor(); }catch(_){}
 }
 // ---- 把 EH_CONFIG.text 应用到所有 data-txt / data-txt-ph 标记的元素 ----
 function applyTextConfig(){
@@ -2930,10 +2935,29 @@ function resolveDay(mode){
   // auto: 按本地时间自动切日/夜——白天 7:00-18:59 日间, 其余时间夜间(符合"自动日间/夜间"字面直觉)
   try{ const h=new Date().getHours(); return h>=7 && h<19; }catch(e){ return false; }
 }
+// ★全屏无黑边(浏览器+PWA, 上+下): 参考 vc 的思路——不去精确算高度, 而是让"任何露出的区域"都是主题色。
+//   根因: <meta theme-color> 原来硬编码 #070a12, 而页面 --bg 随主题/日夜变(如日间是浅色 #eff8f8);
+//   → 浏览器顶部地址栏带 + 底部工具栏带 保持深色, 与页面割裂 = 上下黑边。PWA(black-translucent)则靠 html/body 铺色。
+//   对策: 每次换肤/切日夜后, 读实时生效的 --bg, 同步写进 ① theme-color meta(浏览器状态栏/工具栏带 + PWA状态栏)
+//   ② html/body 的 backgroundColor(iOS 橡皮筋回弹区/安全区/键盘残留露出的兜底色)。任何缝隙露出的都成主题色。
+function syncThemeColor(){
+  try{
+    // 读真正生效的背景色(injectThemeCSS 注入的 --bg, 已含 data-theme×data-mode 的最终值)
+    var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if(!bg) return;
+    var mc=document.querySelector('meta[name="theme-color"]');
+    if(!mc){ mc=document.createElement('meta'); mc.name='theme-color'; document.head.appendChild(mc); }
+    if(mc.content!==bg) mc.content=bg;
+    // html/body 显式刷底色(CSS 已给 var(--bg), 这里再钉一次 backgroundColor 作兜底, 对齐 vc 做法)
+    document.documentElement.style.backgroundColor=bg;
+    document.body && (document.body.style.backgroundColor=bg);
+  }catch(e){}
+}
 function applyMode(mode){
   const day=resolveDay(mode);
   document.documentElement.setAttribute('data-mode', day?'day':'night');
   document.querySelectorAll('.mode-opt').forEach(el=>el.classList.toggle('active', el.dataset.mode===(mode||currentMode())));
+  syncThemeColor();
 }
 function pickMode(mode){
   try{ EhSfx.playClick(); }catch(e){}
@@ -2952,6 +2976,7 @@ function applyTheme(id){
   if(id==='cyber') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme',id);
   document.querySelectorAll('.skin-opt').forEach(el=>el.classList.toggle('active', el.dataset.theme===id));
+  syncThemeColor();
 }
 // 用户手动选皮肤 → 全站生效 + 锁定(进官方房不再自动覆盖)
 function pickTheme(id){
