@@ -1440,6 +1440,9 @@
     html.kb-vv #hall{height:var(--kvh,100%)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+    /* ★补偿态(PWA 覆盖式键盘, JS 加 kb-compensating): #hall 已收缩到键盘上方, 键盘盖住底部 home 条,
+       composer 不该再留 safe-area 底部间距(否则输入框被额外上推、上方新消息被盖)。去掉。 */
+    html.kb-compensating .composer{padding-bottom:10px}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1564,7 +1567,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260724-send-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260724-msg-notcovered';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8112,7 +8115,8 @@ window.addEventListener('beforeunload',()=>{
   let baseVV = Math.round(vv.height);   // 无键盘基线
   let raf = 0;
   const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
-  const clearKvh = ()=>{ document.documentElement.style.removeProperty('--kvh'); };  // 回归原生(#hall 用 CSS 100%)
+  const clearKvh = ()=>{ document.documentElement.style.removeProperty('--kvh'); document.documentElement.classList.remove('kb-compensating'); };  // 回归原生(#hall 用 CSS 100%)
+  const setKvh = (px)=>{ document.documentElement.style.setProperty('--kvh', px + 'px'); document.documentElement.classList.add('kb-compensating'); };  // 补偿介入(去 composer safe-area padding)
   // ★关键: focus 瞬间无法区分"浏览器(稍后会收缩视口)"和"覆盖式(永不收缩)"——都表现为"聚焦但还没收缩"。
   //   若 focus 就补偿, 会破坏浏览器 interactive-widget(它稍后压缩视口, 两机制打架)。
   //   对策: 只在 vv 已收缩时立即清(走原生); 是否"覆盖式需补偿"交给下面 focus 后的延时门判定, 给浏览器反应时间。
@@ -8128,7 +8132,7 @@ window.addEventListener('beforeunload',()=>{
   const decideOverlay = ()=>{
     if(!cinFocused()) { clearKvh(); return; }
     if(baseVV - Math.round(vv.height) > 60){ clearKvh(); return; }  // 已收缩=浏览器生效, 不补偿
-    document.documentElement.style.setProperty('--kvh', Math.max(240, baseVV - KB_PX) + 'px');  // 仍没收缩=覆盖式, 补偿
+    setKvh(Math.max(240, baseVV - KB_PX));  // 仍没收缩=覆盖式, 补偿(--kvh + kb-compensating class)
     scrollLast();
   };
   const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
