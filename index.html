@@ -1573,13 +1573,14 @@
 </style>
 </head>
 <body>
-  <!-- ===== PWA 进站动态 logo 开屏(仅 standalone 装成 App 时显示; 浏览器直接开不显, 避免每次刷新都挡一下) =====
-       动画呼应 app 图标"回声波纹": 中心核心呼吸 + 三圈声波一圈圈向外涟漪扩散。~1.4s 后淡出。
-       内联在 body 最前、样式自带, 不依赖后面的 CSS/JS 就能立即绘制, 真·开屏。 -->
+  <!-- ===== PWA 进站开屏(仅 standalone 装成 App 时显示; 浏览器直接开不显, 避免每次刷新都挡一下) =====
+       ★直接用主 logo 图片(app 图标本体 icon-512.png), 保证开屏 logo 与桌面图标像素级完全一致;
+       叠加动画: 整体呼吸缩放 + 图标下青色辉光脉冲发散(呼应"回声波纹")。~1.4s 后淡出。
+       内联在 body 最前, 不依赖后面的 CSS/JS 就能立即绘制, 真·开屏。 -->
   <div id="pwaSplash" aria-hidden="true">
     <div class="ps-logo">
-      <span class="ps-ring"></span><span class="ps-ring"></span><span class="ps-ring"></span>
-      <span class="ps-core"></span>
+      <span class="ps-glow"></span>
+      <img class="ps-img" src="icons/icon-512.png" alt="回声厅" draggable="false">
     </div>
     <div class="ps-word">回声厅</div>
   </div>
@@ -1590,25 +1591,22 @@
     html.pwa-standalone #pwaSplash{display:flex}
     #pwaSplash.ps-hide{opacity:0;pointer-events:none}
     .ps-logo{position:relative;width:132px;height:132px;display:grid;place-items:center}
-    .ps-core{width:34px;height:34px;border-radius:50%;
-      background:radial-gradient(circle at 50% 45%,#7CFFE9,#00E5D4 60%,#00b7a8);
-      box-shadow:0 0 22px 4px rgba(0,229,212,.7),0 0 44px 8px rgba(0,229,212,.35);
-      animation:psCore 1.6s ease-in-out infinite}
-    .ps-ring{position:absolute;top:50%;left:50%;border-radius:50%;
-      border:2px solid rgba(0,229,212,.55);transform:translate(-50%,-50%) scale(.3);
-      opacity:0;animation:psRipple 1.8s cubic-bezier(.2,.6,.3,1) infinite}
-    .ps-ring:nth-child(1){width:132px;height:132px;animation-delay:0s}
-    .ps-ring:nth-child(2){width:132px;height:132px;animation-delay:.5s}
-    .ps-ring:nth-child(3){width:132px;height:132px;animation-delay:1s}
+    /* 主 logo 图片本体: 整体缓慢呼吸缩放, 与桌面图标一模一样 */
+    .ps-img{width:132px;height:132px;border-radius:29px;position:relative;z-index:2;
+      animation:psBreathe 2.4s ease-in-out infinite}
+    /* 图标下方一层青色辉光, 脉冲呼吸, 增强"声波发散"氛围 */
+    .ps-glow{position:absolute;top:50%;left:50%;width:132px;height:132px;border-radius:50%;
+      transform:translate(-50%,-50%);z-index:1;pointer-events:none;
+      background:radial-gradient(circle,rgba(0,229,212,.55),rgba(0,229,212,.12) 55%,transparent 72%);
+      filter:blur(6px);animation:psGlow 2.4s ease-in-out infinite}
     .ps-word{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;
       letter-spacing:8px;color:#EAF6FF;text-indent:8px;
       text-shadow:0 0 18px rgba(0,229,212,.5);opacity:.92;
-      animation:psWord 1.6s ease-in-out infinite}
-    @keyframes psCore{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.14);filter:brightness(1.25)}}
-    @keyframes psRipple{0%{transform:translate(-50%,-50%) scale(.28);opacity:0}
-      18%{opacity:.85}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+      animation:psWord 2.4s ease-in-out infinite}
+    @keyframes psBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+    @keyframes psGlow{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.28)}}
     @keyframes psWord{0%,100%{opacity:.72}50%{opacity:1}}
-    @media(prefers-reduced-motion:reduce){.ps-core,.ps-ring,.ps-word{animation:none}.ps-ring:nth-child(1){opacity:.5;transform:translate(-50%,-50%) scale(1)}}
+    @media(prefers-reduced-motion:reduce){.ps-img,.ps-glow,.ps-word{animation:none}.ps-glow{opacity:.6}}
   </style>
   <script>
     /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
@@ -1629,7 +1627,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260725-dvh-halo2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260725-splash-logo';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
