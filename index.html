@@ -1475,11 +1475,18 @@
        键盘态交给下面 .kb-vv/--kvh 那套, 两者不打架。 */
     body.hall-on .stage{padding:0;height:var(--vvh,100dvh);align-items:stretch}
     #hall{width:100%;height:var(--vvh,100dvh);border-radius:0;border:none}
+    /* ★输入框聚焦(键盘弹起)时: 丢弃固定像素 --vvh, 改回 100dvh —— 让 iOS interactive-widget 原生随键盘
+       收缩布局视口(输入框自动停在键盘正上方)。否则固定的 --vvh(无键盘时的全屏高)会让 #hall 高度对不上
+       键盘上方可视区 → 输入框和键盘之间空一大条黑(主人截图那样)。收键盘后 cin-focused 去掉, 回 --vvh 沉底。 */
+    body.hall-on.cin-focused .stage{height:100dvh}
+    body.hall-on.cin-focused #hall{height:100dvh}
     /* .kb-vv 仅用于覆盖式第三方键盘(dvh 也不收缩的极端情况): JS 实测写 --kvh 兜底。
        iOS系统键盘/安卓 interactive-widget 都不进补偿, 交给 dvh 原生(避免收起时 --kvh 残留→下方黑边)。
-       ★未补偿时(--kvh 未设)回落到 --vvh(真实可视高)而非 100dvh, 否则会盖掉上面的沉底修复。 */
+       ★未补偿时(--kvh 未设)回落: 聚焦态用 100dvh(键盘原生), 非聚焦用 --vvh(沉底)。 */
     html.kb-vv body.hall-on .stage{height:var(--kvh,var(--vvh,100dvh))}
     html.kb-vv #hall{height:var(--kvh,var(--vvh,100dvh))}
+    html.kb-vv body.hall-on.cin-focused .stage{height:var(--kvh,100dvh)}
+    html.kb-vv body.hall-on.cin-focused #hall{height:var(--kvh,100dvh)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     /* ★补偿态(PWA 覆盖式键盘, JS 加 kb-compensating): #hall 已收缩到键盘上方, 键盘盖住底部 home 条,
@@ -1659,7 +1666,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-vvh-bottom';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-kbfocus';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8330,6 +8337,10 @@ window.addEventListener('beforeunload',()=>{
 (function(){
   const cin=$('#cin'); if(!cin) return;
   const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
+  // ★body.cin-focused: 输入框聚焦(键盘弹起)时挂上 → 聊天页高度从固定 --vvh 切回 100dvh, 交给 iOS 原生
+  //   随键盘收缩布局视口(输入框停键盘正上方); 收键盘去掉 → 回 --vvh 沉底。修"输入框和键盘间空一大条黑"。
+  cin.addEventListener('focus', ()=>{ document.body.classList.add('cin-focused'); }, true);
+  cin.addEventListener('blur', ()=>{ document.body.classList.remove('cin-focused'); }, true);
   const vv = window.visualViewport;
   // 无 vv 的老浏览器: 交给原生, 只滚到底
   if(!vv){
