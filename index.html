@@ -1469,24 +1469,19 @@
          这样无论 interactive-widget 生不生效(安卓Chrome/第三方IME/iOS PWA 各异), 都用真实可视高精确收缩。 */
     /* ★用 100dvh 而非 100%: iOS 系统键盘弹起时 dvh 会自动跟随 visualViewport 收缩、收起自动恢复(原生,
        不残留)。100% 链到布局视口(iOS键盘不压)→盖不住键盘。改 dvh 让 iOS 系统键盘全自动, 无需 JS 补偿。 */
-    /* ★聊天页"输入框沉到底"(2026-07-26): iOS 上 100dvh 有时结算成"地址栏可见时"的偏矮高度, 地址栏滑动
-       隐藏后不重算 → #hall 还是矮的, 底部空出一条(输入框离底很远)。用 JS 实测的 visualViewport 像素高
-       var(--vvh) 兜底(它就是"当下真实可视区高"), 无 --vvh(桌面/JS没跑)时回落 100dvh。--vvh 只在无键盘时更新,
-       键盘态交给下面 .kb-vv/--kvh 那套, 两者不打架。 */
+    /* ★聊天页高度 = 当下真实可视高 var(--vvh) (2026-07-26 修正真机行为):
+       关键认知: interactive-widget=resizes-content 是 Chrome/安卓特性, 【iOS Safari 根本不认】——iOS 上
+       键盘弹起既不缩 dvh 也不缩布局视口, 只缩 visualViewport。所以之前"聚焦→100dvh 让原生收缩"在 iOS 是空砸
+       (dvh 仍是全屏高)→ 输入框和键盘间空一大条黑。
+       正解: #hall 高度始终跟 visualViewport 实测高 --vvh(JS 每次 vv resize 都写, 含键盘弹起/收起)——
+       键盘弹起 vv 变矮→#hall 跟着矮→输入框停键盘正上方; 收起 vv 恢复→#hall 铺满→输入框沉到底。
+       无 --vvh(桌面/JS没跑)回落 100dvh。 */
     body.hall-on .stage{padding:0;height:var(--vvh,100dvh);align-items:stretch}
     #hall{width:100%;height:var(--vvh,100dvh);border-radius:0;border:none}
-    /* ★输入框聚焦(键盘弹起)时: 丢弃固定像素 --vvh, 改回 100dvh —— 让 iOS interactive-widget 原生随键盘
-       收缩布局视口(输入框自动停在键盘正上方)。否则固定的 --vvh(无键盘时的全屏高)会让 #hall 高度对不上
-       键盘上方可视区 → 输入框和键盘之间空一大条黑(主人截图那样)。收键盘后 cin-focused 去掉, 回 --vvh 沉底。 */
-    body.hall-on.cin-focused .stage{height:100dvh}
-    body.hall-on.cin-focused #hall{height:100dvh}
-    /* .kb-vv 仅用于覆盖式第三方键盘(dvh 也不收缩的极端情况): JS 实测写 --kvh 兜底。
-       iOS系统键盘/安卓 interactive-widget 都不进补偿, 交给 dvh 原生(避免收起时 --kvh 残留→下方黑边)。
-       ★未补偿时(--kvh 未设)回落: 聚焦态用 100dvh(键盘原生), 非聚焦用 --vvh(沉底)。 */
+    /* .kb-vv 仅用于覆盖式第三方键盘(vv 都不收缩的极端情况, 安卓讯飞等): JS 估算写 --kvh 兜底。
+       未补偿时(--kvh 未设)回落 --vvh(真实可视高, 含 iOS 键盘态)。 */
     html.kb-vv body.hall-on .stage{height:var(--kvh,var(--vvh,100dvh))}
     html.kb-vv #hall{height:var(--kvh,var(--vvh,100dvh))}
-    html.kb-vv body.hall-on.cin-focused .stage{height:var(--kvh,100dvh)}
-    html.kb-vv body.hall-on.cin-focused #hall{height:var(--kvh,100dvh)}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     /* ★补偿态(PWA 覆盖式键盘, JS 加 kb-compensating): #hall 已收缩到键盘上方, 键盘盖住底部 home 条,
@@ -1666,7 +1661,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-kbfocus';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-vvh-kb2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8298,21 +8293,21 @@ window.addEventListener('beforeunload',()=>{
 });
 
 // ============ EH_VVH_FULLSCREEN 聊天页"真实可视高"跟踪 (2026-07-26) ============
-// 目的: iOS 上 100dvh 常结算成"地址栏可见时"的偏矮值, 地址栏滑动隐藏后不重算 → #hall 偏矮、输入框离底远。
-// 用 visualViewport.height(当下真实可视区高)写入 --vvh, 全屏聊天页高度用它, 输入框永远贴真底。
-// 只在【无键盘态】更新: 键盘弹起会让 vv 变矮, 那是 .kb-vv/--kvh 那套的活, 这里不插手(有 kb-compensating 就跳过);
-// 键盘用的是布局视口收缩, 这里的 --vvh 只管"没键盘时把全屏铺满真实可视区"。桌面无 vv → 不设, CSS 回落 100dvh。
+// 目的(修正版): #hall 高度始终 = visualViewport 实测高 --vvh, 覆盖两个场景:
+//  ① iOS 地址栏滑动隐藏后 dvh 不重算 → 用 vv 高铺满, 输入框沉底;
+//  ② iOS 键盘弹起(iOS 不认 interactive-widget, 只缩 visualViewport)→ vv 变矮, #hall 跟着矮,
+//     输入框停键盘正上方(不再和键盘间空一条黑)。故【键盘态也要更新】, 不能在聚焦时跳过。
+// 只在 hall-on 时管(大厅是文档滚动, 入口固定); kb-compensating(覆盖式第三方键盘 JS 估算态)交给 --kvh, 跳过。
+// 桌面无 vv → 不设, CSS 回落 100dvh。
 (function(){
   var vv = window.visualViewport; if(!vv) return;
   var last = -1, raf = 0;
   function apply(){
     raf = 0;
-    // 键盘补偿态交给 --kvh; 非全屏聊天页也不需要(大厅是文档滚动, 入口固定)
+    // 覆盖式第三方键盘补偿态交给 --kvh; 非全屏聊天页不需要
     if(document.documentElement.classList.contains('kb-compensating')) return;
     if(!document.body.classList.contains('hall-on')) return;
-    // 输入框聚焦(键盘可能在弹)时不抢着写, 避免和键盘逻辑打架
-    var ae = document.activeElement;
-    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
+    // ★不再因输入框聚焦而跳过——iOS 键盘弹起正是靠 vv 变矮来收缩 #hall, 跳过就会留黑条。
     var px = Math.round(vv.height);
     if(px<=0 || px===last) return;
     last = px;
