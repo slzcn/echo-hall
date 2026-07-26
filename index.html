@@ -890,28 +890,28 @@
   /* 狼姐专属：脑门上贴一个小红色蝴蝶结 🎀(消息头像 + 光墙头像通用) */
   .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
-  .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
-  /* 呼吸光环 = 单圈头像描边 + 一层柔和外发光(不再画第二道硬边框, 避免与头像自身 inset 描边形成"双重边框") */
-  .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
-    border:1px solid transparent;will-change:opacity,transform;
-    /* ★优化: 将 box-shadow 以静态方式应用, 动画只跑 opacity+transform(合成层, 零重绘) */
-    /* 光晕收敛到 13px(原18+2): 头像呼吸/光环放大后, box-shadow 若太大会越出 .stream(overflow裁剪)左沿被切
-       (主人反馈"光晕不完整")。13px 配合 stream 24px 内边距, 峰值仍留余量不裁, 视觉发光依旧。 */
-    box-shadow:0 0 13px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 46%,transparent);
-    animation:soulHalo 3.2s ease-in-out infinite}
-  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)}}
-  /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
-  /* 关键: 灵魂光墙头像的 ::after 改成"无边框·纯柔光", 覆盖基础 .pav .av-ic::after 的 1.5px 硬描边,
-     否则 头像 inset 环 + ::after 硬环 两道紧挨 = 视觉双重边框(主人反馈). 只留一道 inset 环 + 呼吸柔光. */
-  .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;will-change:opacity,transform;
-    /* ★优化: 静态 box-shadow + 动画只跑 opacity+transform */
-    box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 40%,transparent);
-    animation:pavHalo 3.6s ease-in-out infinite}
-  .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
-  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.08)}}
+  /* ===== 灵魂呼吸光环 v3 (2026-07-26 重设计) =====
+     旧版问题: ① 头像整体 transform:scale 呼吸 → 连带那块半透明底色一起一胀一缩, 像"色块在跳";
+     ② box-shadow 外发光 + inset 硬描边叠一起, 日间浅底上糊成一坨死板的圆角色块(主人截图反馈)。
+     新版: 头像本体完全静止(不 scale, 不动布局); 只用一圈【纯外发光 ring】做呼吸, 且只跑 opacity,
+     不跑 scale/位移 → 灵动的"光在明灭"而非"块在胀缩"; 光环用 box-shadow 双层(近实+远柔)营造辉光层次,
+     日夜都通透不糊。头像底色/描边由 JS inline(见 buildMsgEl)给, 这里不重复画避免叠死。 */
+  .msg.soul .av{position:relative}
+  .msg.soul .av::after{content:"";position:absolute;inset:-2px;border-radius:12px;pointer-events:none;
+    will-change:opacity;
+    /* 双层辉光: 近处一圈勾边光(2px)+外圈柔光(9px), 收在 stream 内边距内不裁; 只 opacity 呼吸 */
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent),
+               0 0 9px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 42%,transparent);
+    animation:soulHalo 3.4s ease-in-out infinite}
+  @keyframes soulHalo{0%,100%{opacity:.4} 50%{opacity:.92}}
+  /* ===== 光墙灵魂头像: 同款纯光环呼吸; 活跃(.soul-live)时呼吸更快更亮, 像心跳加速 ===== */
+  .pav.soul-av .av-ic{position:relative}
+  .pav.soul-av .av-ic::after{content:"";border-color:transparent;inset:-2px;border-radius:13px;will-change:opacity;
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent),
+               0 0 10px 1px color-mix(in srgb,var(--pav-c,var(--cyan)) 44%,transparent);
+    animation:soulHalo 3.8s ease-in-out infinite}
+  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.5s}   /* 活跃→呼吸急促 */
+  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}  /* 保留供 soul-thinking 用 */
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -919,8 +919,10 @@
     position:relative;animation:soulBreathe 2s ease-in-out infinite;
     background:color-mix(in srgb,var(--soul-c,var(--violet)) 14%,transparent);color:var(--soul-c,var(--violet));
     box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}
-  .soul-thinking .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
-    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 50%,transparent);animation:soulHalo 2s ease-in-out infinite}
+  .soul-thinking .av::after{content:"";position:absolute;inset:-2px;border-radius:12px;pointer-events:none;
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent),
+               0 0 9px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 42%,transparent);
+    animation:soulHalo 2s ease-in-out infinite}
   .soul-thinking .tk{display:flex;align-items:center;gap:8px;margin-top:9px}
   .soul-thinking .tk-label{font-size:12px;color:var(--soul-c,var(--violet));opacity:.85}
   .soul-thinking .tk-dots{display:inline-flex;gap:3px}
@@ -1642,7 +1644,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-libheal';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-halo-v3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
