@@ -198,6 +198,13 @@
     background:transparent;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
+  /* ★大厅"整文档滚动"模式(2026-07-26): 移动浏览器只有【根文档滚动】时才自动收起顶/底地址栏→真全屏沉浸。
+     原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
+     lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
+     #lobby 交还外层滚动。入口/聊天页(hall)不受影响, 仍固定视口。 */
+  body.lobby-on, html:has(body.lobby-on){height:auto;min-height:100%;overflow:visible;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
+  body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -1647,7 +1654,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-edgefade';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-docscroll';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3144,6 +3151,10 @@ function initThemeUI(){
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
+  // ★lobby-on: 大厅改"整文档滚动"(而非内层容器滚), 让移动浏览器下滑时自动收起顶/底地址栏→真沉浸无黑边。
+  //   入口/聊天页仍是固定视口(hall 有固定输入框, 不能整页滚)。切走大厅时把文档滚动位置归零, 防残留。
+  document.body.classList.toggle('lobby-on', id==='lobby');
+  if(id!=='lobby'){ try{ window.scrollTo(0,0); }catch(_){} }
   // 切场景清掉可能残留的全屏遮挡(录音浮层), 防其挡住点击
   const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
   // 落到大厅 → 大厅氛围随机连播(chain 会保留正在播的曲, 从房间返回时丝滑续播, 不打断)
@@ -8810,7 +8821,9 @@ function fillAndLogin(id, pwv){
       }
       el = el.parentElement;
     }
-    return true;   // 没有可滚祖先 → 视为顶部
+    // 没有可滚内层祖先: 大厅"整文档滚动"模式下要看文档本身是否在顶(否则滑到大厅中段下拉会误触发刷新)
+    var docTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    return docTop <= 0;
   }
 
   function reset(){
