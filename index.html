@@ -173,20 +173,23 @@
   button:focus,[role="button"]:focus,.song-play:focus{outline:none}
   button:focus-visible,.song-play:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:2px}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
-  /* ★iOS standalone PWA 底部安全区黑缝根治(2026-07-26 v2, 真机 WebKit 验证):
-     - body(height:100%) 不覆盖底部 home 条安全区, 那条只由 html 兜底(这点已被"给 html 上纯色黑边消失"证实);
-     - 页内氛围光(bg-orb / deep-night::after / mood 层)全是 position:fixed, 够不到安全区那条 →
-       发光内容区 vs 纯色安全区之间一条硬缝(看着像底部黑边)。
-     - 上一版试图给 html+body 都用 background-attachment:fixed 补光, 但【iOS Safari 对 fixed 背景支持不可靠, 常被忽略】→ 真机没生效。
-     根治(单层、不依赖 fixed 背景): 氛围光只画在 html 上(html 的背景绘制区铁定铺满整屏含安全区, 用默认
-     scroll attachment 即可), 再把 body 背景设为 transparent —— 于是整屏(内容区+安全区)由 html 这一层
-     连续绘制, 结构上不可能再有缝。--accent 跟主题, 平时极淡、深夜加强。 */
+  /* ★上下"黑边"根治 v3 (2026-07-26, 真机截图确认真凶):
+     那两条"黑边"其实是【浏览器自己的系统条】——顶部状态栏带 + 底部导航/地址栏带, 颜色由 <meta theme-color>
+     决定(= 纯色 --bg #070a12)。页面本体夹在两条中间画。问题: 页面上下边缘有氛围光/orb 顶到边, 紧挨纯黑
+     系统条 → 亮光 vs 纯黑 = 刺眼"黑边"。vc 没这问题, 因它整页(含边缘)同一纯色, 系统条无缝融进去。
+     对策(学 vc 原则, 且一次盖住所有发光层): ① 底部氛围光只画在 html; ② 再叠一层 fixed 的【上下边缘 vignette】
+     (#edgeFade), 把最上/最下各约 90px 强制压回纯 --bg → 无论 orb/氛围光/mood 层怎么发光, 页面上下边缘
+     都是纯 --bg, 与 theme-color 系统条同色无缝, 上下黑边消失。 */
   html{width:100%;background-color:var(--bg);
     background-image:radial-gradient(ellipse 130% 40% at 50% 100%,
       color-mix(in srgb,var(--accent) 7%,transparent),transparent 68%);
     background-repeat:no-repeat}
   html:has(body.deep-night){background-image:radial-gradient(ellipse 130% 46% at 50% 100%,
       color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%)}
+  /* 上下边缘 vignette: fixed 覆盖全屏, 只在最上/最下各约 90px 用 --bg 实色→透明渐隐, 中间完全透明不挡内容。
+     z-index 压在内容(scene z2)之下、装饰层(orb/grid z0)之上, 只吃掉边缘发光不影响可读性与交互。 */
+  #edgeFade{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom, var(--bg) 0, transparent 90px, transparent calc(100% - 90px), var(--bg) 100%)}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
      禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
      ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
@@ -1644,7 +1647,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260726-halo-v3';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260726-edgefade';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1677,6 +1680,7 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();if(_bg){var _mc=document.querySelector('meta[name="theme-color"]');if(_mc)_mc.content=_bg;document.documentElement.style.backgroundColor=_bg;}}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
+<div id="edgeFade"></div>
 <div id="particles"></div>
 <div id="entStage"></div><!-- 进场全屏光幕(高阶档) -->
 <div id="warp"></div>
