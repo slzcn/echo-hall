@@ -631,11 +631,14 @@
   .skin-menu.bgm-menu .bgm-sec-title{font-size:10.5px;color:var(--sub);padding:6px 12px 2px;letter-spacing:.4px;opacity:.75}
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
 
-  /* 顶部「自动 / 关闭」二选一：完全复用通用 .mode-row/.mode-opt（背景风格第一行同款）
-     选中态 = 主题色实心底 + 白字；dimmed = 手动选曲时把「自动」暗化，表示"回自动"入口 */
+  /* 顶部「自动 / 关闭」二选一：完全复用通用 .mode-row/.mode-opt 样式
+     选中态 = 背景风格 tab 同款（panel-solid + 微阴影）；dimmed = 手动选曲时把「自动」暗化，表示"回自动"入口 */
   .skin-menu.bgm-menu .mode-row{margin:4px 6px 8px}
-  .skin-menu.bgm-menu .mode-opt.active{background:var(--accent,var(--cyan));color:#fff;font-weight:600}
   .skin-menu.bgm-menu .mode-opt.dimmed{color:color-mix(in srgb,var(--sub) 65%,transparent)}
+  /* 关闭态：下方列表保留，仅视觉弱化，点任一首 = 自动开机+播放 */
+  .skin-menu.bgm-menu.off-mode .bgm-sec-title,
+  .skin-menu.bgm-menu.off-mode .skin-opt{opacity:.55}
+  .skin-menu.bgm-menu.off-mode .skin-opt:hover{opacity:1}
   .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
   .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
@@ -3202,7 +3205,8 @@ async function buildBgmMenu(m){
     <div class="mode-opt${(on&&isAuto)?' active':(isManualPicked?' dimmed':'')}" data-action="auto" title="随机播放本房间官方曲目">自动</div>
     <div class="mode-opt${on?'':' active'}" data-action="off" title="关闭背景音乐">关闭</div>
   </div>`);
-  if(on){
+  m.classList.toggle('off-mode', !on);
+  // 即使关闭，下方列表也展示（只做视觉弱化）；点任一首 = 自动开机+播放
     // ③ 官方曲目组
     if(cands.length){
       html.push(`<div class="bgm-sec-title">官方曲目</div>`);
@@ -3247,7 +3251,6 @@ async function buildBgmMenu(m){
     if(room){
       html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">请灵魂制作一首…</span></div>`);
     }
-  }
   m.innerHTML=html.join('');
   // 顶部两颗胶囊：自动 / 关闭 互斥
   m.querySelectorAll('.mode-row .mode-opt').forEach(el=>{
