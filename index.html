@@ -3073,36 +3073,44 @@ function _bgmActiveUrl(){
 }
 async function buildBgmMenu(m){
   if(!m) return;
-  const on=bgmOn();
   const room=curRoom||null;
   const active=_bgmActiveUrl();
+  const isAuto=room?!bgmManualUrl(room.name):true;
   const cands=bgmCandidatesForRoom(room);
   const mine=await bgmMyLibraryForRoom(room);
   const esc=(t)=>String(t||'').replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"})[c]);
-  const rowsDefault=cands.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}"><span class="bg-ic">🎵</span><span class="bg-nm">${esc(c.name)}</span>${c.tag?`<span class="bg-tag">${esc(c.tag)}</span>`:''}<span class="ck">✓</span></div>`).join('');
-  const rowsMine=mine.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="bg-ic">✨</span><span class="bg-nm">${esc(c.title||'灵魂曲')}</span><span class="bg-tag">我</span><span class="ck">✓</span></div>`).join('');
-  const genRow=room?`<div class="bgm-opt" data-action="gen"><span class="bg-ic">🌀</span><span class="bg-nm">灵魂生成</span><span class="bg-tag">/bgm</span></div>`:'';
-  const autoRow=room?`<div class="bgm-opt${!bgmManualUrl(room.name)?' active':''}" data-action="auto"><span class="bg-ic">🎲</span><span class="bg-nm">跟随氛围</span><span class="ck">✓</span></div>`:'';
-  m.innerHTML=[
-    `<div class="bgm-toggle${on?'':' muted'}" data-action="toggle">${on?'🎵':'🔇'} 音乐 <span class="sw">${on?'开':'关'}</span></div>`,
-    `<div class="bgm-divider"></div>`,
-    autoRow,
-    rowsDefault?`<div class="bgm-sec">曲目</div>${rowsDefault}`:'',
-    rowsMine?`<div class="bgm-divider"></div><div class="bgm-sec">我的</div>${rowsMine}`:'',
-    genRow?`<div class="bgm-divider"></div>${genRow}`:'',
-    room?'':`<div class="bgm-hint">进房后可选曲</div>`
-  ].join('');
-  // 绑定点击
+  // 用 CSS 变量当圆点色（不同分类给一个色带，视觉上像皮肤菜单那样一眼可辨）
+  const dotFor=(tag)=>{
+    const t=String(tag||'');
+    if(t==='默认') return 'var(--accent, var(--cyan))';
+    if(t==='扩展') return 'var(--violet)';
+    if(t==='公开房'||t.indexOf('公')>=0) return 'var(--cyan)';
+    if(t==='私密房'||t.indexOf('私')>=0) return 'var(--magenta)';
+    return 'var(--sub)';
+  };
+  const opts=[];
+  opts.push(`<div class="skin-opt${isAuto?' active':''}" data-action="auto"><span class="dot" style="color:var(--accent,var(--cyan));background:var(--accent,var(--cyan))"></span>自动<span class="ck" style="color:var(--accent,var(--cyan))">✓</span></div>`);
+  cands.forEach(c=>{
+    const dc=dotFor(c.tag);
+    opts.push(`<div class="skin-opt${active===c.url?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span>${esc(c.name)}<span class="ck" style="color:${dc}">✓</span></div>`);
+  });
+  mine.forEach(c=>{
+    opts.push(`<div class="skin-opt${active===c.url?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span>${esc(c.title||'灵魂曲')}<span class="ck" style="color:var(--amber)">✓</span></div>`);
+  });
+  if(room){
+    opts.push(`<div class="skin-opt" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span>灵魂生成…<span class="ck" style="color:var(--green)">✓</span></div>`);
+  }
+  m.innerHTML=opts.join('');
   m.querySelectorAll('.skin-opt').forEach(el=>{
     el.onclick=async (e)=>{
       e.stopPropagation();
       const act=el.dataset.action;
-      if(act==='toggle'){ AudioEngine.resume(); setBgm(!bgmOn()); await buildBgmMenu(m); return; }
       if(act==='auto'){ pickBgmAuto(); m.classList.remove('on'); syncBgmActive(); return; }
       if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
       const url=el.dataset.url; if(!url) return;
-      if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||'灵魂曲',mine:true});
-      else pickBgmManual({url,name:el.querySelector('.bg-nm')?.textContent||''});
+      const name=(el.textContent||'').replace('✓','').trim();
+      if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||name,mine:true});
+      else pickBgmManual({url,name});
       m.classList.remove('on'); syncBgmActive();
     };
   });
