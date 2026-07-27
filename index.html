@@ -598,6 +598,25 @@
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
+  /* BGM 选曲下拉：复用 skin-menu 骨架，最大高度限制 + 内部滚动，不遮住整屏 */
+  .bgm-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:52;box-shadow:0 12px 40px var(--shadow-lg);min-width:220px;max-width:78vw;max-height:52vh;overflow-y:auto;overscroll-behavior:contain}
+  .bgm-menu.on{display:flex}
+  .hall-bgm-menu{position:absolute;top:58px;right:64px;left:auto}
+  .bgm-menu .bgm-sec{font-size:11px;color:var(--sub);padding:8px 12px 4px;letter-spacing:.5px;opacity:.85}
+  .bgm-menu .bgm-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s;line-height:1.35;white-space:normal}
+  .bgm-menu .bgm-opt:hover{background:var(--panel);color:var(--ink)}
+  .bgm-menu .bgm-opt.active{color:var(--ink);background:var(--hover)}
+  .bgm-menu .bgm-opt .bg-ic{width:18px;flex:0 0 auto;text-align:center;font-size:14px;opacity:.85}
+  .bgm-menu .bgm-opt .bg-nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .bgm-menu .bgm-opt .bg-tag{margin-left:6px;font-size:10px;color:var(--sub);opacity:.75;flex:0 0 auto}
+  .bgm-menu .bgm-opt .ck{margin-left:6px;opacity:0;color:var(--accent,var(--cyan));font-size:12px;flex:0 0 auto}
+  .bgm-menu .bgm-opt.active .ck{opacity:1}
+  .bgm-menu .bgm-toggle{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;font-size:13px;color:var(--ink);cursor:pointer;transition:.15s}
+  .bgm-menu .bgm-toggle:hover{background:var(--panel)}
+  .bgm-menu .bgm-toggle .sw{margin-left:auto;font-size:11px;padding:3px 8px;border-radius:99px;background:color-mix(in srgb,var(--accent,var(--cyan)) 18%,transparent);color:var(--accent,var(--cyan))}
+  .bgm-menu .bgm-toggle.muted .sw{background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub)}
+  .bgm-menu .bgm-divider{height:1px;background:var(--line2);margin:4px 6px;opacity:.6}
+  .bgm-menu .bgm-hint{padding:8px 12px;font-size:11.5px;color:var(--sub);opacity:.85;line-height:1.5}
 
   /* ★上下 padding 22px: 灵魂头像呼吸光环(box-shadow 0 0 16px 2px + inset -3px + 呼吸 scale 1.08)峰值向外约 ~21px。
      .presence 有 overflow-x:auto → 浏览器把 overflow-y 也算成 auto(会纵向裁剪), 原 10px padding 只留 9px 余量,
@@ -1812,6 +1831,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <div class="tool-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
       </div>
       <div class="skin-menu" id="skinMenu"></div>
+      <div class="bgm-menu" id="bgmMenu"></div>
     </div>
     <div class="sec-label"><span class="sl-t" data-txt="hallOfficial">📡 官方频道</span></div>
     <div class="channels" id="channels"></div>
@@ -1849,6 +1869,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
+      <div class="bgm-menu hall-bgm-menu" id="bgmMenuHall"></div>
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream"></div>
@@ -2958,6 +2979,7 @@ const AudioEngine=(function(){
     resume(){ if(!el||!cur) return; if(el.paused){ try{ const pr=el.play(); if(pr&&pr.catch) pr.catch(()=>{}); }catch(_){} } },
     playing(){ return !!(el && cur && !el.paused); },
     curName(){ return cur?cur.name:null; },
+    curUrl(){ return cur?cur.url:null; },
     // 神曲播放时把 BGM 压低, 结束再恢复
     duck(on){ if(!el||!cur) return; fadeTo(on?VOL_DUCK:VOL_ON, 300); },
   };
@@ -3001,6 +3023,11 @@ function startRoomBGM(room){
     if(!room){ AudioEngine.stop(); return; }
     // 官方房按 name 精确绑, 公共/私密房走 _fallback (支持任意用户建的房间)
     let cfg=null;
+    // 用户手动选择记忆：进房时优先播放上次手动选的那首（跨会话记住）
+    try{
+      const mu=bgmManualUrl(room.name);
+      if(mu){ _ehBgmOverride={ url:mu, name:'手动曲', title:'手动曲', room_name:room.name }; }
+    }catch(_){}
     // 用户生成曲默认本地覆盖：同房间重新进入时继续播放，不影响其他人。
     if(typeof _ehBgmOverride!=='undefined' && _ehBgmOverride && _ehBgmOverride.room_name===room.name && _ehBgmOverride.url) cfg=_ehBgmOverride;
     else if(room.kind==='official' && ROOM_BGM[room.name]){
@@ -3013,11 +3040,145 @@ function startRoomBGM(room){
     if(cfg) AudioEngine.start(cfg); else AudioEngine.stop();
   }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
+// 手动选曲：允许用户从下拉菜单直接挑本房 BGM
+const LS_BGM_MANUAL='eh_bgm_manual_v1';   // { [roomKey]: url }  按房间名维度记住最后一次手动选择
+function bgmManualStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MANUAL)||'{}')||{}; }catch(_){ return {}; } }
+function bgmManualSave(roomKey,url){ try{ const m=bgmManualStore(); if(url) m[roomKey]=url; else delete m[roomKey]; localStorage.setItem(LS_BGM_MANUAL, JSON.stringify(m)); }catch(_){} }
+function bgmManualUrl(roomKey){ try{ return bgmManualStore()[roomKey]||''; }catch(_){ return ''; } }
+// 收集给用户看的曲目候选（默认曲、当前房 variants、我的灵魂曲库）
+function bgmCandidatesForRoom(room){
+  const out=[]; const seen=new Set();
+  const push=(cfg,tag)=>{ if(!cfg||!cfg.url||seen.has(cfg.url)) return; seen.add(cfg.url); out.push({url:cfg.url,name:cfg.name||'未命名',tag:tag||''}); };
+  if(room){
+    if(room.kind==='official' && ROOM_BGM[room.name]){
+      const base=ROOM_BGM[room.name]; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
+    }else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public){
+      const base=ROOM_BGM._fallback.public; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
+    }else if(room.kind==='private' && ROOM_BGM._fallback && ROOM_BGM._fallback.private){
+      push(ROOM_BGM._fallback.private,'默认');
+    }
+  }else{
+    // 大厅：把所有官方房+fallback 都列出来
+    Object.keys(ROOM_BGM).forEach(k=>{ if(k==='_fallback') return; const b=ROOM_BGM[k]; push(b,k); (b.variants||[]).forEach(v=>push(v,k)); });
+    if(ROOM_BGM._fallback){ push(ROOM_BGM._fallback.public,'公开房'); (ROOM_BGM._fallback.public.variants||[]).forEach(v=>push(v,'公开房')); push(ROOM_BGM._fallback.private,'私密房'); }
+  }
+  return out;
+}
+async function bgmMyLibraryForRoom(room){
+  if(!room||!myUid) return [];
+  try{
+    const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(50);
+    const rows=(q.data||[]).filter(x=>x&&x.url);
+    const rn=room.name;
+    const here=rows.filter(x=>x.room_name===rn);
+    const local=bgmLocalLibrary().filter(x=>x&&x.url&&x.room_name===rn);
+    const merged=[...here,...local].filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i);
+    return merged.slice(0,20);
+  }catch(_){ return []; }
+}
+function bgmMenuCurrentUrl(){
+  try{ return (AudioEngine.curUrl && AudioEngine.curUrl())||''; }catch(_){ return ''; }
+}
+function _bgmActiveUrl(){
+  try{
+    if(_ehBgmOverride && _ehBgmOverride.url) return _ehBgmOverride.url;
+    // 兜底：从当前实际播放取
+    return bgmMenuCurrentUrl();
+  }catch(_){ return ''; }
+}
+async function buildBgmMenu(m){
+  if(!m) return;
+  const on=bgmOn();
+  const room=curRoom||null;
+  const active=_bgmActiveUrl();
+  const cands=bgmCandidatesForRoom(room);
+  const mine=await bgmMyLibraryForRoom(room);
+  const esc=(t)=>String(t||'').replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"})[c]);
+  const rowsDefault=cands.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}"><span class="bg-ic">🎵</span><span class="bg-nm">${esc(c.name)}</span>${c.tag?`<span class="bg-tag">${esc(c.tag)}</span>`:''}<span class="ck">✓</span></div>`).join('');
+  const rowsMine=mine.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="bg-ic">✨</span><span class="bg-nm">${esc(c.title||'灵魂曲')}</span><span class="bg-tag">我生成</span><span class="ck">✓</span></div>`).join('');
+  const genRow=room?`<div class="bgm-opt" data-action="gen"><span class="bg-ic">🌀</span><span class="bg-nm">让灵魂现场生成…</span><span class="bg-tag">/bgm</span></div>`:'';
+  const autoRow=room?`<div class="bgm-opt${!bgmManualUrl(room.name)?' active':''}" data-action="auto"><span class="bg-ic">🎲</span><span class="bg-nm">跟随房间氛围（默认）</span><span class="ck">✓</span></div>`:'';
+  m.innerHTML=[
+    `<div class="bgm-toggle${on?'':' muted'}" data-action="toggle">${on?'🎵':'🔇'} 氛围音乐 <span class="sw">${on?'ON':'OFF'}</span></div>`,
+    `<div class="bgm-divider"></div>`,
+    autoRow,
+    rowsDefault?`<div class="bgm-sec">${room?'本房曲目':'全部曲目'}</div>${rowsDefault}`:'',
+    rowsMine?`<div class="bgm-divider"></div><div class="bgm-sec">我的灵魂曲</div>${rowsMine}`:'',
+    genRow?`<div class="bgm-divider"></div>${genRow}`:'',
+    room?'':`<div class="bgm-hint">进入房间后可手动选曲/生成灵魂曲</div>`
+  ].join('');
+  // 绑定点击
+  m.querySelectorAll('.bgm-opt,.bgm-toggle').forEach(el=>{
+    el.onclick=async (e)=>{
+      e.stopPropagation();
+      const act=el.dataset.action;
+      if(act==='toggle'){ AudioEngine.resume(); setBgm(!bgmOn()); await buildBgmMenu(m); return; }
+      if(act==='auto'){ pickBgmAuto(); m.classList.remove('on'); syncBgmActive(); return; }
+      if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
+      const url=el.dataset.url; if(!url) return;
+      if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||'灵魂曲',mine:true});
+      else pickBgmManual({url,name:el.querySelector('.bg-nm')?.textContent||''});
+      m.classList.remove('on'); syncBgmActive();
+    };
+  });
+}
+function pickBgmManual(row){
+  if(!row||!row.url) return;
+  if(!bgmOn()) setBgm(true);
+  AudioEngine.resume();
+  if(curRoom) bgmManualSave(curRoom.name, row.url);
+  _ehBgmOverride={ url:row.url, name:row.name||'手动曲', title:row.name||'手动曲', room_name:(curRoom&&curRoom.name)||'' };
+  try{ AudioEngine.start({name:'🎵 '+(row.name||'手动曲'),url:row.url}); }catch(_){}
+  try{ toast('🎵 已切到：'+(row.name||'手动曲')); }catch(_){}
+}
+function pickBgmAuto(){
+  if(curRoom) bgmManualSave(curRoom.name, '');
+  _ehBgmOverride=null;
+  if(!bgmOn()){ AudioEngine.stop(); return; }
+  AudioEngine.resume();
+  if(curRoom) startRoomBGM(curRoom); else startLobbyBGM();
+  try{ toast('🎲 已切回房间默认氛围'); }catch(_){}
+}
 function initBgmUI(){
   paintBgmBtn(bgmOn());
-  const toggle=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
-  const bh=$('#bgmBtnHall'); if(bh) bh.onclick=toggle;
-  const bl=$('#bgmBtnLobby'); if(bl) bl.onclick=toggle;
+  const menuLobby=$('#bgmMenu'); const menuHall=$('#bgmMenuHall');
+  window.syncBgmActive=()=>{
+    const bl=$('#bgmBtnLobby'), bh=$('#bgmBtnHall');
+    if(bl) bl.classList.toggle('active', !!(menuLobby&&menuLobby.classList.contains('on')));
+    if(bh) bh.classList.toggle('active', !!(menuHall&&menuHall.classList.contains('on')));
+  };
+  const openMenu=async (m,other)=>{
+    if(!m) return;
+    if(other) other.classList.remove('on');
+    // 关别的下拉
+    ['#skinMenu','#skinMenuHall'].forEach(sel=>{ const x=$(sel); if(x) x.classList.remove('on'); });
+    try{ window.syncSkinActive&&window.syncSkinActive(); }catch(_){}
+    await buildBgmMenu(m);
+    m.classList.toggle('on');
+    syncBgmActive();
+  };
+  const bind=(btn,menu,other)=>{
+    if(!btn) return;
+    let pressT=null; let longPressed=false;
+    btn.onclick=async (e)=>{ e.stopPropagation(); if(longPressed){ longPressed=false; return; } AudioEngine.resume(); await openMenu(menu,other); };
+    // 长按快速静音（保留原有一键开关手感）
+    const start=()=>{ longPressed=false; pressT=setTimeout(()=>{ longPressed=true; setBgm(!bgmOn()); if(menu) menu.classList.remove('on'); syncBgmActive(); }, 550); };
+    const cancel=()=>{ if(pressT){ clearTimeout(pressT); pressT=null; } };
+    btn.addEventListener('touchstart', start, {passive:true});
+    btn.addEventListener('touchend', cancel);
+    btn.addEventListener('touchmove', cancel, {passive:true});
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('mouseup', cancel);
+    btn.addEventListener('mouseleave', cancel);
+  };
+  bind($('#bgmBtnLobby'), menuLobby, menuHall);
+  bind($('#bgmBtnHall'), menuHall, menuLobby);
+  document.addEventListener('click', e=>{
+    [menuLobby,menuHall].forEach(m=>{ if(m && m.classList.contains('on') && !m.contains(e.target)) m.classList.remove('on'); });
+    syncBgmActive();
+  });
+  // 曲目变化时刷新已开菜单（新生成一首后菜单立刻能看到）
+  window.addEventListener('eh:bgm-changed', ()=>{ [menuLobby,menuHall].forEach(m=>{ if(m && m.classList.contains('on')) buildBgmMenu(m); }); });
 }
 
 
@@ -3177,11 +3338,7 @@ function initThemeUI(){
     syncSkinActive();
   });
   applyMode(currentMode());   // 初始同步外观模式高亮态 + 确保 data-mode 与首屏一致
-  // 聊天页 BGM 按钮绑定(和大厅共用 setBgm)
-  const bhall=$('#bgmBtnHall');
-  if(bhall){
-    bhall.onclick=(e)=>{ e.stopPropagation(); AudioEngine.resume(); setBgm(!bgmOn()); };
-  }
+  // BGM 按钮绑定统一交给 initBgmUI() 里的下拉菜单实现；此处不再重复挂 onclick
   applyTheme(sceneOrDefaultTheme());   // 启动全局主题(未锁时叠加深夜/节日场景皮肤)
   initBgmUI();
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
@@ -6500,6 +6657,7 @@ async function sendBgmGen(desc){
       toast('🎼 已让全房间听到这首新曲');
     }
     try{ ehLog('bgm_generated',{title:row.title,broadcast,room_name:room.name}); }catch(_){}
+    try{ window.dispatchEvent(new CustomEvent('eh:bgm-changed')); }catch(_){}
   }catch(e){ console.warn('sendBgmGen',e); toast('灵魂暂时走神了，稍后再试'); }
   finally{ _ehBgmGenerating=false; }
 }
