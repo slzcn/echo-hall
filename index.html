@@ -3793,7 +3793,7 @@ async function renderOfficial(soft){
     return;
   }
   if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic,bgm_show_official,bgm_show_soul').eq('kind','official').order('created_at'));
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at'));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试, 不清空也不卡死
   const { data } = _r;
   box.innerHTML=(data||[]).map(r=>{
@@ -3816,7 +3816,7 @@ async function renderPublic(soft){
     return;
   }
   if(!box.children.length) box.innerHTML=chSkel(2);   // 慢网先占位
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic,bgm_show_official,bgm_show_soul').eq('kind','public').eq('archived',false).order('created_at',{ascending:false}));
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false}));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
   const { data } = _r;
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
@@ -3890,7 +3890,7 @@ async function renderMyRooms(soft){
     return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
   }
   if(!boxE.children.length) boxE.innerHTML=rmSkel(2);   // 慢网先占位
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner,bgm_show_official,bgm_show_soul').eq('kind','private').order('created_at',{ascending:false}));
+  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false}));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
   const { data } = _r;
   const box=$('#myRooms'); const pe=$('#privEmpty');
@@ -7869,7 +7869,7 @@ async function openGear(){
   // 进房时 room 对象不带 topic，这里补拉一次，否则保存会把已有公告清空
   const [{ data:members },{ data:roomRow }] = await Promise.all([
     sb.from('eh_members').select('user_id,name,emoji,color,role').eq('room_id',curRoom.id),
-    sb.from('eh_rooms').select('name,topic,emoji,bgm_show_official,bgm_show_soul').eq('id',curRoom.id).maybeSingle(),
+    sb.from('eh_rooms').select('name,topic,emoji').eq('id',curRoom.id).maybeSingle(),
   ]);
   if(roomRow){ if(roomRow.name) curRoom.name=roomRow.name; curRoom.topic=(roomRow.topic!=null?roomRow.topic:'')||''; if(roomRow.emoji) curRoom.emoji=roomRow.emoji; }
   else { /* roomRow 补拉失败: 保留 curRoom 已有 topic, 不清空 */ }
