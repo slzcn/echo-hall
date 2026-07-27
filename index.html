@@ -3170,8 +3170,10 @@ async function buildBgmMenu(m){
     // ③ 官方曲目组
     if(cands.length){
       html.push(`<div class="bgm-sec-title">官方曲目</div>`);
-      cands.forEach(c=>{
-        const dc=dotFor(c.tag);
+      // 按 index 循环取主题色变量，让相邻曲目点点不同色；主题切换自动跟随
+      const OFFICIAL_HUES=['var(--cyan)','var(--violet)','var(--magenta)','var(--green)','var(--amber)'];
+      cands.forEach((c,i)=>{
+        const dc=OFFICIAL_HUES[i%OFFICIAL_HUES.length];
         const pinned=!isAuto && active===c.url;
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
@@ -3198,10 +3200,12 @@ async function buildBgmMenu(m){
         }catch(_){ if(x.length>10) x=x.slice(0,10)+'…'; }
         return x;
       };
-      mine.forEach(c=>{
+      const SOUL_HUES=['var(--amber)','var(--magenta)','var(--violet)','var(--green)','var(--cyan)'];
+      mine.forEach((c,i)=>{
+        const dc=SOUL_HUES[i%SOUL_HUES.length];
         const pinned=!isAuto && active===c.url;
         const st=shortTitle(c.title);
-        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:var(--amber)">✓</span></div>`);
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }else{
       html.push(`<div class="bgm-empty">还没有 · @灵魂 生成一首</div>`);
