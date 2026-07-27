@@ -3096,17 +3096,17 @@ async function buildBgmMenu(m){
   const mine=await bgmMyLibraryForRoom(room);
   const esc=(t)=>String(t||'').replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"})[c]);
   const rowsDefault=cands.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}"><span class="bg-ic">🎵</span><span class="bg-nm">${esc(c.name)}</span>${c.tag?`<span class="bg-tag">${esc(c.tag)}</span>`:''}<span class="ck">✓</span></div>`).join('');
-  const rowsMine=mine.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="bg-ic">✨</span><span class="bg-nm">${esc(c.title||'灵魂曲')}</span><span class="bg-tag">我生成</span><span class="ck">✓</span></div>`).join('');
-  const genRow=room?`<div class="bgm-opt" data-action="gen"><span class="bg-ic">🌀</span><span class="bg-nm">让灵魂现场生成…</span><span class="bg-tag">/bgm</span></div>`:'';
-  const autoRow=room?`<div class="bgm-opt${!bgmManualUrl(room.name)?' active':''}" data-action="auto"><span class="bg-ic">🎲</span><span class="bg-nm">跟随房间氛围（默认）</span><span class="ck">✓</span></div>`:'';
+  const rowsMine=mine.map(c=>`<div class="bgm-opt${active===c.url?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="bg-ic">✨</span><span class="bg-nm">${esc(c.title||'灵魂曲')}</span><span class="bg-tag">我</span><span class="ck">✓</span></div>`).join('');
+  const genRow=room?`<div class="bgm-opt" data-action="gen"><span class="bg-ic">🌀</span><span class="bg-nm">灵魂生成</span><span class="bg-tag">/bgm</span></div>`:'';
+  const autoRow=room?`<div class="bgm-opt${!bgmManualUrl(room.name)?' active':''}" data-action="auto"><span class="bg-ic">🎲</span><span class="bg-nm">跟随氛围</span><span class="ck">✓</span></div>`:'';
   m.innerHTML=[
-    `<div class="bgm-toggle${on?'':' muted'}" data-action="toggle">${on?'🎵':'🔇'} 氛围音乐 <span class="sw">${on?'ON':'OFF'}</span></div>`,
+    `<div class="bgm-toggle${on?'':' muted'}" data-action="toggle">${on?'🎵':'🔇'} 音乐 <span class="sw">${on?'开':'关'}</span></div>`,
     `<div class="bgm-divider"></div>`,
     autoRow,
-    rowsDefault?`<div class="bgm-sec">${room?'本房曲目':'全部曲目'}</div>${rowsDefault}`:'',
-    rowsMine?`<div class="bgm-divider"></div><div class="bgm-sec">我的灵魂曲</div>${rowsMine}`:'',
+    rowsDefault?`<div class="bgm-sec">曲目</div>${rowsDefault}`:'',
+    rowsMine?`<div class="bgm-divider"></div><div class="bgm-sec">我的</div>${rowsMine}`:'',
     genRow?`<div class="bgm-divider"></div>${genRow}`:'',
-    room?'':`<div class="bgm-hint">进入房间后可手动选曲/生成灵魂曲</div>`
+    room?'':`<div class="bgm-hint">进房后可选曲</div>`
   ].join('');
   // 绑定点击
   m.querySelectorAll('.bgm-opt,.bgm-toggle').forEach(el=>{
