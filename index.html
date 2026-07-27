@@ -1714,7 +1714,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-bgm9-logofx';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-ring-guard';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -7220,12 +7220,15 @@ function showActRing(x,y,m){
   const recallBtn=ring.querySelector('[data-a="recall"]');
   if(recallBtn) recallBtn.onclick=()=>{ hideActRing(); recallMsg(mid, m); };
   ring.classList.add('on');
+  ring._openedAt=Date.now();   // ★记录开启时刻: 长按在 480ms 触发(手指仍按着), 抬指会补发一次 synthetic click 落在气泡上(环外)→ 立即关。加窗口挡住这一下, 免得"弹出即收回"
   const rw=ring.offsetWidth||240, rh=ring.offsetHeight||100;
   ring.style.left=Math.max(8,Math.min(x-rw/2, innerWidth-rw-8))+'px';
   ring.style.top=Math.max(8,Math.min(y-rh-10, innerHeight-rh-8))+'px';
 }
 function hideActRing(){ $('#actRing').classList.remove('on'); }
-document.addEventListener('click',e=>{ if(!$('#actRing').contains(e.target)) hideActRing(); });
+document.addEventListener('click',e=>{ const r=$('#actRing'); if(r.contains(e.target)) return;
+  if(r._openedAt && (Date.now()-r._openedAt)<350) return;   // 刚开 350ms 内的抬指 click 不关(长按误关防护, 同 BGM 菜单)
+  hideActRing(); });
 
 // ============ 名场面分享卡片: 把一条消息画成赛博卡片(canvas), 可保存/分享 ============
 // 纯 canvas 绘制(渐变底+霓虹框+头像emoji+昵称+正文+回声+品牌页脚), 不依赖外部图/html2canvas → 无跨域污染。
