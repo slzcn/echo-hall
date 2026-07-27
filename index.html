@@ -1146,7 +1146,8 @@
   .msg.fx-in{animation:msgInGlow .52s ease-out}
   @keyframes msgInGlow{0%{transform:translateY(6px);opacity:.78}55%{filter:brightness(1.16)}100%{transform:none;opacity:1;filter:none}}
   .msg.fx-soul .av{animation:soulSpeakPulse 1.2s ease-out}
-  @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 currentColor}65%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 13px transparent}100%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 transparent}}
+  /* 灵魂发言瞬间: 内辉光猛地亮一下再回落, 纯 inset 全在盒内(不用外扩波纹, 免得跟老光环一样被 content-visibility 裁左侧) */
+  @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 2px var(--soul-c,var(--violet)),inset 0 0 15px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 85%,transparent)}55%{box-shadow:inset 0 0 0 1.5px var(--soul-c,var(--violet)),inset 0 0 7px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 45%,transparent)}100%{box-shadow:inset 0 0 0 1.5px transparent,inset 0 0 0 0 transparent}}
   .msg.fx-mention{animation:mentionPulse 2s ease-out, msgMentionNudge .55s ease-out}
   @keyframes msgMentionNudge{0%,100%{transform:none}18%{transform:translateX(3px)}36%{transform:translateX(-2px)}54%{transform:translateX(1px)}}
   .ec-pill.fx-echo,.echo-bar .ec-pill.fx-echo{animation:echoPop .5s cubic-bezier(.2,.9,.25,1.25)}
@@ -1674,7 +1675,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-orbday-atcolor';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-soulpulse-inset';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
