@@ -619,27 +619,27 @@
   .tool-btn.ic svg,.gear.ic svg{width:18px;height:18px}
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
-  /* BGM 选曲下拉：复用 skin-menu 骨架，最大高度限制 + 内部滚动，不遮住整屏 */
-  /* BGM 菜单：完全复用 skin-menu 样式，仅补一个 max-height 让曲目多时可滚动 */
-  .skin-menu.bgm-menu{max-height:52vh;overflow-y:auto;overscroll-behavior:contain}
+  /* BGM 菜单：完全复用 skin-menu 样式，仅补一个 max-height 让曲目多时可滚动
+     【居中源根因 07-28 02:37】列表页 #bgmMenu 的 DOM 祖先链：.lobby-tools ← .lobby-head（L504 text-align:center）← #lobby。
+     text-align 是继承属性，不受 position:absolute 影响；→ 无 text-align 定义的子元素（.bgm-sec-title、.bgm-empty等）全部继承居中。
+     直接在容器级 .skin-menu.bgm-menu 上 text-align:left 一次性截断继承（.mode-opt 自己写 center 不受影响）*/
+  .skin-menu.bgm-menu{max-height:52vh;overflow-y:auto;overscroll-behavior:contain;text-align:left}
   .skin-menu.bgm-menu .bgm-auto-row{border-radius:9px;padding:9px 12px;background:transparent;font-weight:500}
   .skin-menu.bgm-menu .bgm-auto-row.active{background:color-mix(in srgb, var(--accent,var(--cyan)) 14%, transparent);color:var(--ink)}
   .skin-menu.bgm-menu .bgm-auto-row .bgm-auto-label{flex:1}
   .skin-menu.bgm-menu .bgm-auto-row .bgm-auto-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-auto-row.active .bgm-auto-sw{background:color-mix(in srgb,var(--accent,var(--cyan)) 22%,transparent);color:var(--accent,var(--cyan))}
   .skin-menu.bgm-menu .bgm-sep{height:1px;background:var(--line2);margin:4px 6px;opacity:.55}
-  /* 分组标题：【定稿 07-28 02:32】强制左对齐 padding-left:12px（与曲目行圆点左缘对齐）
-     主人截图确认前面历版本实际渲染为居中（虽然没 grep 到 text-align:center 来源，无论归因只能病吧的）
-     因此直接加 text-align:left !important 防守型压住任何隐性居中源 */
-  .skin-menu.bgm-menu .bgm-sec-title,
-  .skin-menu.bgm-menu .bgm-sub-title{
+  /* 分组标题：【定稿 07-28 02:37】左对齐（容器级已截断继承，只需写 padding）
+     text-align 默认从容器 .skin-menu.bgm-menu 继承 left；padding-left:12px 与曲目行圆点左缘对齐 */
+  .skin-menu.bgm-menu .bgm-sec-title{
     font-size:10.5px;color:var(--sub);letter-spacing:.4px;opacity:.75;
     padding:6px 12px 2px;
-    text-align:left !important;
-    display:block;width:100%;box-sizing:border-box;
-    align-self:stretch;
   }
-  .skin-menu.bgm-menu .bgm-sub-title{padding-top:8px;opacity:.6}
+  .skin-menu.bgm-menu .bgm-sub-title{
+    font-size:10.5px;color:var(--sub);letter-spacing:.4px;opacity:.6;
+    padding:8px 12px 2px;
+  }
 
   /* 顶部「自动 / 关闭」二选一：完全复用通用 .mode-row/.mode-opt 样式
      选中态 = 背景风格 tab 同款（panel-solid + 微阴影）；dimmed = 手动选曲时把「自动」暗化，表示"回自动"入口 */
@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-bgm32-force-left';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-bgm33-center-source-fixed';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
