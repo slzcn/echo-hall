@@ -629,6 +629,9 @@
   .skin-menu.bgm-menu .bgm-sec-title{font-size:10.5px;color:var(--sub);padding:6px 12px 2px;letter-spacing:.4px;opacity:.75}
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
 
+  .skin-menu.bgm-menu .bgm-mode-row{margin:2px 2px 4px}
+  .skin-menu.bgm-menu .bgm-mode-opt{font-size:12.5px;font-weight:600;padding:8px 10px;letter-spacing:.2px}
+  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.42;pointer-events:none}
   .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
   .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
@@ -3155,20 +3158,12 @@ async function buildBgmMenu(m){
     return 'var(--cyan)';
   };
   const html=[];
-  // ① 音乐开关
-  html.push(`<div class="skin-opt bgm-power-row${on?' active':''}" data-action="power">
-    <span class="dot" style="color:${on?'var(--green)':'var(--sub)'};background:${on?'var(--green)':'var(--sub)'}"></span>
-    <span class="bgm-flex">背景音乐</span>
-    <span class="bgm-sw">${on?'开':'关'}</span>
+  // ① 顶部一行：音乐开关 + 随机（借鉴风格菜单的分段胶囊 .mode-row/.mode-opt）
+  html.push(`<div class="mode-row bgm-mode-row">
+    <div class="mode-opt bgm-mode-opt${on?' active':''}" data-action="power" title="打开或关闭背景音乐">${on?'🎵 音乐开':'🔇 音乐关'}</div>
+    <div class="mode-opt bgm-mode-opt${(on&&isAuto)?' active':''}${on?'':' disabled'}" data-action="auto" title="随机播放本房间官方曲目">🎲 随机</div>
   </div>`);
   if(on){
-    html.push(`<div class="bgm-sep"></div>`);
-    // ② 随机官方（默认项）
-    html.push(`<div class="skin-opt bgm-auto-row${isAuto?' active':''}" data-action="auto" title="随机播放本房间官方曲目">
-      <span class="dot" style="color:var(--accent,var(--cyan));background:var(--accent,var(--cyan))"></span>
-      <span class="bgm-flex">随机官方曲</span>
-      <span class="ck" style="color:var(--accent,var(--cyan))">✓</span>
-    </div>`);
     // ③ 官方曲目组
     if(cands.length){
       html.push(`<div class="bgm-sec-title">官方曲目</div>`);
@@ -3181,9 +3176,29 @@ async function buildBgmMenu(m){
     // ④ 灵魂曲目组
     html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
     if(mine.length){
+      const shortTitle=(t)=>{
+        let x=String(t||'灵魂曲').trim();
+        // 去掉常见前缀「房间名·」/ 「房间名-」
+        if(room && room.name){
+          const rn=room.name;
+          if(x.startsWith(rn+'·')) x=x.slice(rn.length+1);
+          if(x.startsWith(rn+'-')) x=x.slice(rn.length+1);
+          if(x.startsWith(rn)) x=x.slice(rn.length);
+        }
+        x=x.replace(/^[·\-\s]+/,'').trim();
+        if(!x) x='灵魂曲';
+        // 中文按字符截断到 10
+        try{
+          const seg=new Intl.Segmenter('zh',{granularity:'grapheme'});
+          const chars=[...seg.segment(x)].map(s=>s.segment);
+          if(chars.length>10) x=chars.slice(0,10).join('')+'…';
+        }catch(_){ if(x.length>10) x=x.slice(0,10)+'…'; }
+        return x;
+      };
       mine.forEach(c=>{
         const pinned=!isAuto && active===c.url;
-        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span><span class="bgm-flex">${esc(c.title||'灵魂曲')}</span><span class="ck" style="color:var(--amber)">✓</span></div>`);
+        const st=shortTitle(c.title);
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:var(--amber)">✓</span></div>`);
       });
     }else{
       html.push(`<div class="bgm-empty">还没有 · @灵魂 生成一首</div>`);
@@ -3223,7 +3238,6 @@ function pickBgmManual(row){
   if(!curRoom) bgmModeSaveGlobal('manual',row.url);
   _ehBgmOverride={ url:row.url, name:row.name||'手动曲', title:row.name||'手动曲', room_name:(curRoom&&curRoom.name)||'' };
   try{ AudioEngine.start({name:'🎵 '+(row.name||'手动曲'),url:row.url}); }catch(_){}
-  try{ toast('🎵 '+(row.name||'手动曲')); }catch(_){}
 }
 function pickBgmAuto(){
   const key=bgmRoomKey(curRoom);
@@ -3233,7 +3247,6 @@ function pickBgmAuto(){
   if(!bgmOn()){ AudioEngine.stop(); return; }
   AudioEngine.resume();
   if(curRoom) startRoomBGM(curRoom); else startLobbyBGM();
-  try{ toast('🎲 随机官方曲'); }catch(_){}
 }
 function initBgmUI(){
   paintBgmBtn(bgmOn());
@@ -6753,7 +6766,7 @@ async function sendBgmGen(desc){
   try{
     const session=await sb.auth.getSession();
     const token=session&&session.data&&session.data.session&&session.data.session.access_token;
-    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:`${room.name}·${clean.slice(0,24)}`,broadcast};
+    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:`${clean.slice(0,12)}`,broadcast};
     const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
     const out=await r.json().catch(()=>({}));
     if(!r.ok||!out.ok){
