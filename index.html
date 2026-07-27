@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-noauto-fill';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-bgm-fill';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2294,12 +2294,12 @@ const EH_CONFIG_DEFAULT = {
   // 官方房按 name 精确绑; public/private 走 _fallback (支持任意用户建的公共/私密房)
   roomBgm: {
     '闲聊广场':{ name:'浩浩人流', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3', variants:[{name:'晚风集市',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_daylit.mp3'},{name:'夜市霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3'}] },
-    '深夜电台':{ name:'一个人的午夜塔', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
+    '深夜电台':{ name:'一个人的午夜塔', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3', variants:[{name:'深夜频率',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio_late.mp3'},{name:'电波未眠',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio_signal.mp3'}] },
     '技术黑话':{ name:'凌晨三点的代码', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3', variants:[{name:'深夜 debug',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_focus.mp3'},{name:'阵雨服务器',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_neon.mp3'}] },
     '虚空回音':{ name:'一句话碰到月亮', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3', variants:[{name:'海底诗集',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_glacier.mp3'},{name:'行星间的回信',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_astral.mp3'}] },
     _fallback:{
       public: { name:'饭后的阳台', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3', variants:[{name:'周六早上十点',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_dawn.mp3'},{name:'晴天的窗台',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_glow.mp3'}] },
-      private:{ name:'只有我们两个人', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
+      private:{ name:'只有我们两个人', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3', variants:[{name:'耳畔低语',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_whisper.mp3'},{name:'暖房时光',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_glow.mp3'}] },
       generated:{ name:'当场召唤', url:'' },
     },
   },
@@ -3168,7 +3168,7 @@ function bgmCandidatesForRoom(room){
     }else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public){
       const base=ROOM_BGM._fallback.public; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
     }else if(room.kind==='private' && ROOM_BGM._fallback && ROOM_BGM._fallback.private){
-      push(ROOM_BGM._fallback.private,'默认');
+      const base=ROOM_BGM._fallback.private; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
     }
   }else{
     // 大厅：把所有官方房+fallback 都列出来
