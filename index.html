@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>回声厅 · Echo Hall</title>
-<!-- ===== PWA: 可安装到主屏 / 离线秒开 ===== -->
-<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#070a12">
+<!-- ===== PWA v2 (整体重写): manifest + apple meta + beforeinstallprompt 早期捕获 =====
+     用新 manifest 文件名 + 新 id + 新 SW 缓存名, 让浏览器视为全新 App, 绕过旧安装的"防打扰"冷却。 -->
+<link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,6 +17,12 @@
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
 <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<script>
+  // 最早期捕获 beforeinstallprompt(浏览器在加载极早期 fire, 晚注册就丢)。存全局供安装按钮用。
+  window.__ehDeferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.__ehDeferredPrompt = e; try{ window.__ehOnInstallReady && window.__ehOnInstallReady(); }catch(_){} });
+  window.addEventListener('appinstalled', function(){ window.__ehDeferredPrompt = null; try{ window.__ehOnInstalled && window.__ehOnInstalled(); }catch(_){} });
+</script>
 <!-- 加速: 提前握手 CDN 与 Supabase 域名, 首屏并行拉取 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://cddkniwbhvcbfgkgomtl.supabase.co" crossorigin>
@@ -166,14 +173,38 @@
   button:focus,[role="button"]:focus,.song-play:focus{outline:none}
   button:focus-visible,.song-play:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:2px}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
-  html{width:100%}
+  /* ★上下"黑边"根治 v3 (2026-07-26, 真机截图确认真凶):
+     那两条"黑边"其实是【浏览器自己的系统条】——顶部状态栏带 + 底部导航/地址栏带, 颜色由 <meta theme-color>
+     决定(= 纯色 --bg #070a12)。页面本体夹在两条中间画。问题: 页面上下边缘有氛围光/orb 顶到边, 紧挨纯黑
+     系统条 → 亮光 vs 纯黑 = 刺眼"黑边"。vc 没这问题, 因它整页(含边缘)同一纯色, 系统条无缝融进去。
+     对策(学 vc 原则, 且一次盖住所有发光层): ① 底部氛围光只画在 html; ② 再叠一层 fixed 的【上下边缘 vignette】
+     (#edgeFade), 把最上/最下各约 90px 强制压回纯 --bg → 无论 orb/氛围光/mood 层怎么发光, 页面上下边缘
+     都是纯 --bg, 与 theme-color 系统条同色无缝, 上下黑边消失。 */
+  html{width:100%;background-color:var(--bg);
+    background-image:radial-gradient(ellipse 130% 40% at 50% 100%,
+      color-mix(in srgb,var(--accent) 7%,transparent),transparent 68%);
+    background-repeat:no-repeat}
+  html:has(body.deep-night){background-image:radial-gradient(ellipse 130% 46% at 50% 100%,
+      color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%)}
+  /* 上下边缘 vignette: fixed 覆盖全屏, 只在最上/最下各约 90px 用 --bg 实色→透明渐隐, 中间完全透明不挡内容。
+     z-index 压在内容(scene z2)之下、装饰层(orb/grid z0)之上, 只吃掉边缘发光不影响可读性与交互。 */
+  #edgeFade{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom, var(--bg) 0, transparent 90px, transparent calc(100% - 90px), var(--bg) 100%)}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
-     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
+     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
+     ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
-    background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
+    background:transparent;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
+  /* ★大厅"整文档滚动"模式(2026-07-26): 移动浏览器只有【根文档滚动】时才自动收起顶/底地址栏→真全屏沉浸。
+     原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
+     lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
+     #lobby 交还外层滚动。入口/聊天页(hall)不受影响, 仍固定视口。 */
+  body.lobby-on, html:has(body.lobby-on){height:auto;min-height:100%;overflow:visible;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
+  body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -186,6 +217,12 @@
   .orb2{width:380px;height:380px;background:radial-gradient(circle,var(--cyan),transparent 70%);bottom:-120px;right:-60px;animation-delay:-5s}
   .orb3{width:300px;height:300px;background:radial-gradient(circle,var(--magenta),transparent 70%);top:40%;left:55%;animation-delay:-9s;opacity:.25}
   @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,20px) scale(.95)}}
+  /* ★日间模式(浅底)氛围光斑收敛(2026-07-27): 暗色主题下 orb 是"发光"，浅底下同样的饱和色+opacity .4 反而糊成
+     一坨脏色块(用户实测: 标题上方紫斑/中部粉斑/角落青斑, 不协调)。日间大幅降透明度+加大模糊, 让它退成
+     几乎无感的极淡染色, 不再抢眼成"色块"。 */
+  html[data-mode="day"] .bg-orb{opacity:.1;filter:blur(60px)}
+  html[data-mode="day"] .orb3{opacity:.07}
+  html[data-mode="day"] .bg-grid{opacity:.6}
 
   /* ★页面切后台(隐藏)时暂停所有持续动画, 省电省GPU(切回自动恢复)。只暂停装饰动画, 不影响功能。 */
   body.page-hidden .bg-orb, body.page-hidden .bg-grid, body.page-hidden .mood-aura,
@@ -411,7 +448,7 @@
   /* 通用确认弹层 */
   .confirm-box{width:100%;max-width:340px;padding:26px 24px 20px;text-align:center;position:relative;animation:popin .28s cubic-bezier(.2,.9,.3,1.3)}
   .confirm-title{font-size:17px;font-weight:800;margin-bottom:10px;letter-spacing:.5px}
-  .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px}
+  .confirm-msg{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:22px;white-space:pre-line}
   .confirm-btns{display:flex;gap:10px}
   .confirm-btns button{flex:1;padding:12px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;border:1px solid var(--line2)}
   .cf-cancel{background:var(--card-bg);color:var(--sub)}
@@ -425,6 +462,18 @@
   /* ============ 场景2：大厅 ============ */
   #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
   #lobby .sec-label{margin-top:10px}
+  /* 大厅底部页脚: 安装按钮 + 版本号 */
+  .lobby-footer{width:100%;max-width:var(--content-max);margin-top:14px;padding-top:16px;border-top:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:10px}
+  .install-btn{padding:9px 20px;border-radius:20px;border:1px solid color-mix(in srgb,#00E5D4 45%,transparent);
+    background:color-mix(in srgb,#00E5D4 8%,transparent);color:#00E5D4;font-family:inherit;font-size:13px;font-weight:600;
+    letter-spacing:.5px;cursor:pointer;transition:.18s}
+  .install-btn:active{transform:scale(.96)}
+  /* prompt 就绪(浏览器已允许一键安装): 高亮脉冲, 提示"这次真能装" */
+  .install-btn.ready{background:color-mix(in srgb,#00E5D4 18%,transparent);border-color:#00E5D4;color:#00E5D4;
+    box-shadow:0 0 0 0 color-mix(in srgb,#00E5D4 55%,transparent);animation:instPulse 1.8s ease-out infinite}
+  @keyframes instPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,#00E5D4 50%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .ver-line{font-size:10.5px;color:var(--dim);letter-spacing:.5px;font-family:monospace;opacity:.7}
   .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
   .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
@@ -544,7 +593,10 @@
   .gear.ic{place-items:center}
   .hall-skin-menu{position:absolute;top:58px;right:14px;left:auto}
 
-  .presence{display:flex;gap:12px;padding:10px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;touch-action:pan-x;overscroll-behavior-x:contain}
+  /* ★上下 padding 22px: 灵魂头像呼吸光环(box-shadow 0 0 16px 2px + inset -3px + 呼吸 scale 1.08)峰值向外约 ~21px。
+     .presence 有 overflow-x:auto → 浏览器把 overflow-y 也算成 auto(会纵向裁剪), 原 10px padding 只留 9px 余量,
+     光环顶/底被切一条(主人反馈"光晕不完整")。提到 22px 让呼吸峰值仍留余量不裁。 */
+  .presence{display:flex;gap:12px;padding:22px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;touch-action:pan-x;overscroll-behavior-x:contain}
   .presence::-webkit-scrollbar{height:0}
   /* 每个成员 = 头像 + 名字, 竖排一列 */
   .pav{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;position:relative;
@@ -589,7 +641,13 @@
   #pullRefresh.spinning .pr-spin{animation:sjSpin .8s linear infinite}
   #pullRefresh .pr-arrow{transition:transform .2s}
   #pullRefresh.ready .pr-arrow{transform:rotate(180deg)}
-  .stream{flex:1;overflow-y:auto;padding:16px 18px 26px;display:flex;flex-direction:column;gap:2px;
+  /* min-height:0 关键: flex item 默认 min-height:auto 不肯缩到小于内容高 → 有消息时 #stream 撑高、
+     把 .composer 顶出 #hall(overflow:hidden)可视区 → 输入框掉到键盘后被遮(空房无内容不撑高故正常)。
+     加 min-height:0 让它能收缩, 溢出交给自身 overflow-y:auto 滚动。这是"空房正常/有消息被遮"的真根因。 */
+  /* 左右 padding 24px: 灵魂头像呼吸光环(box-shadow外发光)在呼吸放大峰值时向外约 ~15px, 加头像 scale 占用,
+     容器 overflow-y:auto 会把 overflow-x 也算成裁剪 → padding 不足时贴左沿的头像光环被切一条(主人反馈"光晕不完整")。
+     24px + 光晕收敛到13px, webkit实测峰值不裁。 */
+  .stream{flex:1;min-height:0;overflow-y:auto;padding:16px 24px 26px;display:flex;flex-direction:column;gap:2px;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:auto}
   .stream::-webkit-scrollbar{width:5px}
   .stream::-webkit-scrollbar-track{background:transparent}
@@ -752,13 +810,13 @@
      宽度自适应内容(不铺满整行), 小圆角半透明胶囊, 贴左显示 */
   /* 简洁: 无边框/背景/阴影, 只留文字+动画点浮在输入框上方 */
   .typing-bar{position:absolute;left:16px;bottom:calc(100% + 4px);width:max-content;max-width:calc(100% - 32px);
-    font-size:11.5px;color:var(--accent,var(--cyan));display:flex;align-items:center;gap:6px;
+    font-size:11.5px;color:var(--typing-c,var(--accent,var(--cyan)));display:flex;align-items:center;gap:6px;
     opacity:0;transform:translateY(4px);pointer-events:none;
     transition:opacity .18s,transform .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5;
     text-shadow:0 1px 4px var(--text-halo)}
   .typing-bar.on{opacity:1;transform:translateY(0)}
   .typing-bar .d{display:inline-flex;gap:3px}
-  .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--accent,var(--cyan));animation:bounce 1.2s infinite}
+  .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--typing-c,var(--accent,var(--cyan)));animation:bounce 1.2s infinite}
   .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
   @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
   /* 神曲谱曲队列条: 悬浮在消息流顶部中央, 仅当有歌在谱且滚出视野时显示 */
@@ -802,8 +860,13 @@
   .cin-wrap{flex:1;min-width:0;display:flex;align-items:flex-end;min-height:46px;background:var(--input-bg);box-shadow:var(--input-shadow);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .cin{flex:1;min-width:0;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
-    word-break:break-word;overflow-wrap:anywhere;
-    line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block}
+    word-break:break-word;overflow-wrap:anywhere;overflow-y:auto;
+    line-height:1.5;max-height:100px;height:40px;min-height:40px;padding:8px 0;display:block;
+    scrollbar-width:none;-ms-overflow-style:none}
+  /* ★安卓 WebView/部分浏览器会给可滚动 textarea 渲染滚动条增减箭头(⌃⌄), 出现在输入框右侧很违和。
+     隐藏原生滚动条 UI(仍可拖动滚动), 消除那对箭头。 */
+  .cin::-webkit-scrollbar{width:0;height:0;display:none}
+  .cin::-webkit-scrollbar-button{display:none;width:0;height:0}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:var(--hover);transform:scale(1.15)}
@@ -848,26 +911,28 @@
   /* 狼姐专属：脑门上贴一个小红色蝴蝶结 🎀(消息头像 + 光墙头像通用) */
   .av-bow{position:absolute;left:50%;top:4px;transform:translateX(-50%) rotate(-6deg);font-size:8px;line-height:1;z-index:4;pointer-events:none;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px rgba(255,60,120,.5))}
-  .msg.soul .av{position:relative;animation:soulBreathe 3.2s ease-in-out infinite}
-  /* 呼吸光环 = 单圈头像描边 + 一层柔和外发光(不再画第二道硬边框, 避免与头像自身 inset 描边形成"双重边框") */
-  .msg.soul .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;transform-origin:center;
-    border:1px solid transparent;will-change:opacity,transform;
-    /* ★优化: 将 box-shadow 以静态方式应用, 动画只跑 opacity+transform(合成层, 零重绘) */
-    box-shadow:0 0 18px 2px color-mix(in srgb,var(--soul-c,var(--violet)) 42%,transparent);
-    animation:soulHalo 3.2s ease-in-out infinite}
-  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  @keyframes soulHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)}}
-  /* ===== 光墙灵魂头像"呼吸=活跃度":平稳缓吸, 思考/刚说话(.soul-live)时急促强烈, 像心跳加速 ===== */
-  /* 关键: 灵魂光墙头像的 ::after 改成"无边框·纯柔光", 覆盖基础 .pav .av-ic::after 的 1.5px 硬描边,
-     否则 头像 inset 环 + ::after 硬环 两道紧挨 = 视觉双重边框(主人反馈). 只留一道 inset 环 + 呼吸柔光. */
-  .pav.soul-av .av-ic{animation:soulBreathe 3.6s ease-in-out infinite}
-  .pav.soul-av .av-ic::after{border-color:transparent;inset:-3px;transform-origin:center;will-change:opacity,transform;
-    /* ★优化: 静态 box-shadow + 动画只跑 opacity+transform */
-    box-shadow:0 0 16px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 40%,transparent);
-    animation:pavHalo 3.6s ease-in-out infinite}
-  .pav.soul-av.soul-live .av-ic{animation-duration:1.3s}          /* 活跃→呼吸急促 */
-  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.3s}
-  @keyframes pavHalo{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.08)}}
+  /* ===== 灵魂头像标识 v4 (2026-07-27 彻底重设计, 根治光环被裁) =====
+     真凶: 消息行 .msg 有 content-visibility:auto(=contain layout paint), 会把任何【外发光 box-shadow】
+     裁到元素盒子内; 头像贴在行左沿, 左侧没有可溢出空间 → 光环左边永远被切(主人反复反馈"左侧没特效")。
+     加 padding 也没用(paint containment 按盒子裁, 不看 padding)。
+     新设计: 彻底不用【外】发光, 改成完全长在头像盒子【内】的标识——inset 呼吸辉光环 + 头像本体静止。
+     inset box-shadow 画在头像内部, 无论容器怎么 contain/overflow 都不会被裁, 四边一致。
+     底色/描边仍由 JS inline(buildMsgEl)给; 这里只加一圈会呼吸的 inset 内辉光 + 提亮描边。 */
+  .msg.soul .av{position:relative}
+  .msg.soul .av::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;will-change:opacity;
+    /* inset 双层: 内描边亮环 + 内侧柔辉, 全在盒内, 呼吸只跑 opacity */
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 90%,transparent),
+               inset 0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
+    animation:soulHalo 3.4s ease-in-out infinite}
+  @keyframes soulHalo{0%,100%{opacity:.5} 50%{opacity:1}}
+  /* ===== 光墙灵魂头像: 同款 inset 内辉光呼吸; 活跃(.soul-live)时呼吸更快, 像心跳加速 ===== */
+  .pav.soul-av .av-ic{position:relative}
+  .pav.soul-av .av-ic::after{content:"";border:none;inset:0;border-radius:inherit;will-change:opacity;
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pav-c,var(--cyan)) 90%,transparent),
+               inset 0 0 8px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent);
+    animation:soulHalo 3.8s ease-in-out infinite}
+  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.5s}   /* 活跃→呼吸急促 */
+  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}  /* 保留供 soul-thinking 用 */
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
   .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
@@ -875,8 +940,10 @@
     position:relative;animation:soulBreathe 2s ease-in-out infinite;
     background:color-mix(in srgb,var(--soul-c,var(--violet)) 14%,transparent);color:var(--soul-c,var(--violet));
     box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}
-  .soul-thinking .av::after{content:"";position:absolute;inset:-3px;border-radius:12px;pointer-events:none;
-    border:1.5px solid color-mix(in srgb,var(--soul-c,var(--violet)) 50%,transparent);animation:soulHalo 2s ease-in-out infinite}
+  .soul-thinking .av::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 90%,transparent),
+               inset 0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
+    animation:soulHalo 2s ease-in-out infinite}
   .soul-thinking .tk{display:flex;align-items:center;gap:8px;margin-top:9px}
   .soul-thinking .tk-label{font-size:12px;color:var(--soul-c,var(--violet));opacity:.85}
   .soul-thinking .tk-dots{display:inline-flex;gap:3px}
@@ -1055,12 +1122,13 @@
   /* 消息正文里的 @提及高亮标签 */
   .at-mention{color:var(--accent,var(--cyan));font-weight:600;background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);
     padding:0 4px;border-radius:5px;white-space:nowrap}
-  .at-mention.at-soul{color:var(--at-c,var(--violet));background:color-mix(in srgb,var(--at-c,var(--violet)) 14%,transparent)}
+  .at-mention.at-soul,.at-mention.at-user{color:var(--at-c,var(--violet));background:color-mix(in srgb,var(--at-c,var(--violet)) 14%,transparent)}
   .at-mention.at-me{color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
-  /* ★日间模式(白底): 暗色主题的霓虹青/紫/琥珀在白底上对比度不足(几乎看不清), 压成可读的深色 */
+  /* ★日间模式(白底): 暗色主题的霓虹青/琥珀在白底上对比度不足(几乎看不清), 压成可读的深色。
+     @灵魂/@真人走各自身份色(--at-c), 身份色本身已按日间调过(soulThemeColor/color-pick), 不强压, 仅微降底色 */
   html[data-mode="day"] .at-mention{color:#0C8E82;background:rgba(15,181,166,.14)}
   html[data-mode="day"] .at-mention.at-me{color:#B87614;background:rgba(217,138,31,.17)}
-  html[data-mode="day"] .at-mention.at-soul{color:#5A3DA6;background:rgba(94,63,175,.13)}
+  html[data-mode="day"] .at-mention.at-soul,html[data-mode="day"] .at-mention.at-user{color:var(--at-c,#5A3DA6);background:color-mix(in srgb,var(--at-c,#5A3DA6) 13%,transparent)}
   /* 被@强提醒：消息卡脉冲高亮 2s */
   .msg.mentioned-flash{animation:mentionPulse 2s ease-out}
   @keyframes mentionPulse{0%{background:color-mix(in srgb,var(--amber) 32%,transparent);border-radius:12px}
@@ -1078,7 +1146,8 @@
   .msg.fx-in{animation:msgInGlow .52s ease-out}
   @keyframes msgInGlow{0%{transform:translateY(6px);opacity:.78}55%{filter:brightness(1.16)}100%{transform:none;opacity:1;filter:none}}
   .msg.fx-soul .av{animation:soulSpeakPulse 1.2s ease-out}
-  @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 currentColor}65%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 13px transparent}100%{box-shadow:inset 0 0 0 1.5px currentColor,0 0 0 0 transparent}}
+  /* 灵魂发言瞬间: 内辉光猛地亮一下再回落, 纯 inset 全在盒内(不用外扩波纹, 免得跟老光环一样被 content-visibility 裁左侧) */
+  @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 2px var(--soul-c,var(--violet)),inset 0 0 15px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 85%,transparent)}55%{box-shadow:inset 0 0 0 1.5px var(--soul-c,var(--violet)),inset 0 0 7px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 45%,transparent)}100%{box-shadow:inset 0 0 0 1.5px transparent,inset 0 0 0 0 transparent}}
   .msg.fx-mention{animation:mentionPulse 2s ease-out, msgMentionNudge .55s ease-out}
   @keyframes msgMentionNudge{0%,100%{transform:none}18%{transform:translateX(3px)}36%{transform:translateX(-2px)}54%{transform:translateX(1px)}}
   .ec-pill.fx-echo,.echo-bar .ec-pill.fx-echo{animation:echoPop .5s cubic-bezier(.2,.9,.25,1.25)}
@@ -1089,15 +1158,17 @@
     padding:8px;display:none;flex-direction:column;gap:6px;box-shadow:0 16px 40px var(--shadow-lg);animation:popin .2s}
   .act-ring.on{display:flex}
   .act-ring .ar-echoes{display:flex;gap:2px}
-  .act-ring .ar-echo{background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 8px;border-radius:10px;
-    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:46px}
+  /* ★上下两行等分对齐(2026-07-27): 表情行与操作行数量已配平(见 showActRing 注释), 但表情按钮原来是
+     内容宽左packed、操作按钮是 flex:1 撑满 → 列错位、➕悬空。改表情按钮也 flex:1 等分, 两行同列对齐。 */
+  .act-ring .ar-echo{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;padding:7px 4px;border-radius:10px;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:52px}
   /* emoji 各自字形高度/基线不一(👍❤️😂 渲染尺寸有别), 给固定高度盒子+居中, 消除高低不平 */
   .act-ring .ar-echo .ai{font-size:20px;height:24px;line-height:24px;display:flex;align-items:center;justify-content:center}
   .act-ring .ar-echo .al{font-size:10px;color:var(--sub)}
   .act-ring .ar-echo:hover{background:var(--hover);transform:translateY(-2px)}
   .act-ring .ar-actions{display:flex;gap:2px;border-top:1px solid var(--line);padding-top:6px}
-  .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 12px;
-    border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:56px}
+  .act-ring .ar-actions button{flex:1;background:none;border:none;color:var(--ink);font-family:inherit;font-size:12px;padding:9px 4px;
+    border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.12s;min-width:52px}
   /* 回复/投影统一用线性SVG图标(灰描边、等大), 不再混用文字符号↳与彩色emoji📽️→风格一致协调 */
   .act-ring .ar-actions .ai{height:22px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
   .act-ring .ar-actions .ai svg{width:20px;height:20px}
@@ -1406,24 +1477,30 @@
 
   @media(max-width:600px){
     .title{font-size:30px}
-    /* 聊天页(用 body.hall-on 而非 :has, 兼容不支持:has的iOS WebView): 满高+顶对齐, 输入框贴键盘 */
-    /* v6-android-height100: height:100% 打底 —— 安卓键盘弹起 innerHeight 变小时,
-       body(height:100%) 原生跟随收缩, stage/#hall 继承, 无需 JS/dvh(安卓真机不跟随 dvh/--appvh 的坑).
-       --appvh 作 iOS 兜底覆盖(iOS 键盘不改 innerHeight, 靠 JS 写 visualViewport 高). */
-    body.hall-on .stage{padding:0;height:100%;height:var(--appvh,100%);align-items:stretch}
-    #hall{width:100%;height:100%;height:var(--appvh,100%);border-radius:0;border:none}
-    /* v5 iOS 键盘根治: 靠 interactive-widget=resizes-content 让键盘压缩布局视口,
-       #hall/stage 用 var(--appvh)(=visualViewport 高) 自然收缩, .composer(flex-shrink:0)自然贴键盘上方.
-       废除旧 fixed 硬钉(fixed 与 iOS 键盘冲突, 见 html,body 注释)。保留 kb-open 仅作微调 hook。 */
-    body.kb-open .stage{height:var(--appvh,100%)}
-    body.kb-open #hall{height:var(--appvh,100%)}
+    /* 聊天页键盘处理:
+       兜底 — meta viewport interactive-widget=resizes-content 让支持的浏览器键盘弹起时压缩布局视口,
+         body(height:100%)跟着收缩, .stream(flex:1;min-height:0)吃剩余高并滚动, .composer(flex-shrink:0)贴底=键盘上方。
+       统一补偿 — JS 给 <html> 挂 .kb-vv 并用 visualViewport 实测高写 --kvh, 下面让 #hall/stage 用 var(--kvh)。
+         这样无论 interactive-widget 生不生效(安卓Chrome/第三方IME/iOS PWA 各异), 都用真实可视高精确收缩。 */
+    /* ★键盘协同(2026-07-27 v3, 修 PWA 不沉底): 容器高度直接用 JS 实测的可视高 --appvh, 而非 100dvh。
+       真凶: standalone PWA 下 100dvh 比真实可视高(visualViewport.height)大一截(iOS 把状态栏/安全区算进
+       dvh)→ calc(100dvh−--kb) 即便 --kb=0 也超出屏幕→ #hall 底(输入框)被顶到可视区下方, 露一段空白不沉底。
+       --appvh = 无键盘时的 visualViewport.height(JS 每帧写), 就是"当下真实可视高", PWA/Safari 都准;
+       键盘弹起再扣 --kb(=基线−当前vv高)。无 JS(--appvh 未设)才回落 100dvh。 */
+    body.hall-on .stage{padding:0;height:calc(var(--appvh,100dvh) - var(--kb,0px));align-items:stretch}
+    #hall{width:100%;height:calc(var(--appvh,100dvh) - var(--kb,0px));border-radius:0;border:none}
+    /* .kb-vv/--kvh 仅用于覆盖式第三方键盘(安卓讯飞等 vv 完全不收缩→--kb≈0 顶不起来): JS 估算写 --kvh 兜底。 */
+    html.kb-compensating body.hall-on .stage{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
+    html.kb-compensating #hall{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-    /* 键盘弹起时: 给输入法工具栏(搜狗/百度等第三方 IME 在系统键盘上方额外叠一层候选词/快捷栏, 典型 48~56px)
-       留出安全区: padding-bottom 从 8px 抬到 56px 兼容 iOS/安卓各家 IME 工具栏 */
-    body.kb-open .composer{padding-bottom:56px}
-    /* v7 兜底: composer sticky 钉 #hall 底部, 即便 flex 计算异常也贴住可视区底 */
-    body.hall-on .composer{position:sticky;bottom:0;background:var(--bg,#070a12);z-index:5}
+    /* ★补偿态(PWA 覆盖式键盘, JS 加 kb-compensating): #hall 已收缩到键盘上方, 键盘盖住底部 home 条,
+       composer 不该再留 safe-area 底部间距(否则输入框被额外上推、上方新消息被盖)。去掉。 */
+    html.kb-compensating .composer{padding-bottom:10px}
+    /* ★键盘弹起时去掉输入框与键盘间的死间距(2026-07-27): 无键盘态 composer 底部留 safe-area(home 条避让),
+       但键盘弹起后键盘本身已盖住 home 条那条安全区, 这段 padding 就变成"输入框浮在键盘上方一截"的空隙。
+       JS 在 --kb>0 时给 <html> 挂 .kb-up → 键盘态下 composer 底部只留极小间距, 输入框紧贴键盘顶。 */
+    html.kb-up .composer{padding-bottom:6px}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1544,11 +1621,61 @@
 </style>
 </head>
 <body>
+  <!-- ===== PWA 进站开屏(仅 standalone 装成 App 时显示; 浏览器直接开不显, 避免每次刷新都挡一下) =====
+       ★直接用主 logo 图片(app 图标本体 icon-512.png), 保证开屏 logo 与桌面图标像素级完全一致;
+       叠加动画: 整体呼吸缩放 + 图标下青色辉光脉冲发散(呼应"回声波纹")。~1.4s 后淡出。
+       内联在 body 最前, 不依赖后面的 CSS/JS 就能立即绘制, 真·开屏。 -->
+  <div id="pwaSplash" aria-hidden="true">
+    <div class="ps-logo">
+      <span class="ps-glow"></span>
+      <img class="ps-img" src="icons/icon-512.png" alt="回声厅" draggable="false">
+    </div>
+    <div class="ps-word">回声厅</div>
+  </div>
+  <style>
+    #pwaSplash{position:fixed;inset:0;z-index:100000;display:none;flex-direction:column;
+      align-items:center;justify-content:center;gap:26px;background:#070a12;
+      transition:opacity .5s ease;opacity:1}
+    html.pwa-standalone #pwaSplash{display:flex}
+    #pwaSplash.ps-hide{opacity:0;pointer-events:none}
+    .ps-logo{position:relative;width:132px;height:132px;display:grid;place-items:center}
+    /* 主 logo 图片本体: 整体缓慢呼吸缩放, 与桌面图标一模一样 */
+    .ps-img{width:132px;height:132px;border-radius:29px;position:relative;z-index:2;
+      animation:psBreathe 2.4s ease-in-out infinite}
+    /* 图标下方一层青色辉光, 脉冲呼吸, 增强"声波发散"氛围 */
+    .ps-glow{position:absolute;top:50%;left:50%;width:132px;height:132px;border-radius:50%;
+      transform:translate(-50%,-50%);z-index:1;pointer-events:none;
+      background:radial-gradient(circle,rgba(0,229,212,.55),rgba(0,229,212,.12) 55%,transparent 72%);
+      filter:blur(6px);animation:psGlow 2.4s ease-in-out infinite}
+    .ps-word{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;
+      letter-spacing:8px;color:#EAF6FF;text-indent:8px;
+      text-shadow:0 0 18px rgba(0,229,212,.5);opacity:.92;
+      animation:psWord 2.4s ease-in-out infinite}
+    @keyframes psBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+    @keyframes psGlow{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.28)}}
+    @keyframes psWord{0%,100%{opacity:.72}50%{opacity:1}}
+    @media(prefers-reduced-motion:reduce){.ps-img,.ps-glow,.ps-word{animation:none}.ps-glow{opacity:.6}}
+  </style>
+  <script>
+    /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
+    (function(){try{
+      var standalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
+        || window.navigator.standalone === true
+        || document.referrer.indexOf('android-app://') === 0;
+      if(standalone){
+        document.documentElement.classList.add('pwa-standalone');
+        var hide=function(){ var s=document.getElementById('pwaSplash'); if(!s) return; s.classList.add('ps-hide'); setTimeout(function(){ try{ s.remove(); }catch(_){}} , 600); };
+        // 1.4s 后淡出(动画放两轮涟漪); 兜底 window.load 也触发, 谁先到算谁
+        setTimeout(hide, 1400);
+        window.addEventListener('load', function(){ setTimeout(hide, 900); });
+      }
+    }catch(_){}})();
+  </script>
   <div id="pullRefresh"><span class="pr-spin"></span><span class="pr-arrow">↓</span><span class="pr-txt">下拉刷新</span></div>
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260720-overlay4';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-kb-browser-split';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1576,8 +1703,12 @@
 <script>try{var _t=localStorage.getItem('eh_theme');if(_t&&_t!=='cyber')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <script>/* 首屏外观模式: auto(按本地时间自动日/夜)/day/night, 提前定 data-mode 避免闪白 */
 try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();var _day=(_m==='day')||(_m==='auto'&&_h>=7&&_h<19);if(_day)document.documentElement.setAttribute('data-mode','day');else document.documentElement.setAttribute('data-mode','night');}catch(e){}</script>
+<script>/* 首帧无黑边: data-theme/data-mode 定好后, 立即用生效的 --bg 覆盖 theme-color(原硬编码 #070a12) + 钉 html/body 底色。
+   避免大 JS 加载前, 浏览器状态栏/工具栏带与页面(尤其日间浅色)割裂成上下黑边。首帧CSS已在head解析, --bg此刻可读。 */
+try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();if(_bg){var _mc=document.querySelector('meta[name="theme-color"]');if(_mc)_mc.content=_bg;document.documentElement.style.backgroundColor=_bg;}}catch(e){}</script>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
+<div id="edgeFade"></div>
 <div id="particles"></div>
 <div id="entStage"></div><!-- 进场全屏光幕(高阶档) -->
 <div id="warp"></div>
@@ -1585,8 +1716,6 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <div class="mood-aura" id="moodAura"></div>
 <div id="moodTintLayer"></div><!-- 灵魂心情联动: 底部情绪雾 -->
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
-<div id="ehVerBadge" style="position:fixed;right:6px;bottom:6px;z-index:99999;font-size:10px;color:rgba(0,229,212,.55);background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;font-family:monospace"></div>
-<script>try{document.getElementById('ehVerBadge').textContent='v'+(window.__EH_BUILD_VER||'?');}catch(e){}</script>
 <div id="resonance"></div>
 <div id="ixFlash"></div>
 <div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
@@ -1690,6 +1819,10 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
     </div>
     <div class="my-rooms" id="myRooms"></div>
     <div class="empty-hint" id="privEmpty" style="display:none" data-txt="lobbyPrivateHint">凭邀请码加入，或创建一个只有你和朋友的房间</div>
+    <div class="lobby-footer">
+      <button class="install-btn" id="installBtn">📲 安装到桌面</button>
+      <div class="ver-line" id="lobbyVer"></div>
+    </div>
   </div>
 
   <!-- ===== 场景3：聊天厅 ===== -->
@@ -1912,7 +2045,37 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
   }catch(e){}
 })();
 </script>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" onerror="__ehSbLibFail('jsdelivr')"></script>
+<script>
+// ★supabase 库加载自愈: 单 <script> 标签若首次加载失败(弱网/CDN抖动)不会自己重试 → sb 永不建 →
+//   大厅数据永远拉不出来(主人反馈"列表页数据加载不出来"的一个硬根因)。这里挂 onerror 依次回退到
+//   备用 CDN(unpkg→cdnjs), 每个也带一次重试; 库到位后 awaitSb 的轮询会自动接上 bootSupabase。
+(function(){
+  // ★这些 URL 都实测 200 + JS mime。注意: 该包的 UMD 只有 jsdelivr 提供 .min.js;
+  //   unpkg/其它按包 package.json 的 unpkg 字段走的是未压缩 dist/umd/supabase.js(同样可用)。
+  var SB_LIB_URLS=[
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'
+  ];
+  var _i=0, _tries=0;
+  window.__ehSbLibFail=function(from){
+    if(window.supabase&&window.supabase.createClient) return;   // 已就绪, 忽略迟到的 error
+    _tries++;
+    _i++;
+    if(_i>=SB_LIB_URLS.length){
+      if(_tries<=SB_LIB_URLS.length+1){ _i=0; }   // 全轮完一遍还没成→再从头轮一次(共两轮)兜网络恢复
+      else { console.warn('[EHsb] 备用CDN均失败, 停止重试; 靠用户重试入口/刷新恢复'); return; }
+    }
+    var url=SB_LIB_URLS[_i];
+    console.warn('[EHsb] 库加载失败('+from+'), 回退→', url);
+    var s=document.createElement('script'); s.defer=true; s.src=url;
+    s.onerror=function(){ __ehSbLibFail(url); };
+    s.onload=function(){ try{ if(window.supabase&&window.supabase.createClient && typeof bootSupabase==='function'){ bootSupabase(); } }catch(e){} };   // bootSupabase 自带 if(sb)return 幂等
+    document.head.appendChild(s);
+  };
+})();
+</script>
 <script>
 // ============================================================
 //  EH_CONFIG — 集中配置(四套主题配色/主题元数据/官方房绑定/BGM/文案)
@@ -1997,7 +2160,7 @@ const EH_CONFIG_DEFAULT = {
   roomThemeOverride: {},
   // 灵魂专属色(按灵魂名匹配, 私密房召唤的副本同名共享)
   // 灵魂专属色: 从新十主题 accent 里选(按性格), 与主题体系统一。空则跟房间主题色走。
-  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#6486FF','图灵':'#00E5D4','小暖':'#FF6F52'},
+  soulColors: {'狼姐':'#FF3D92','老K':'#8FA6E8','阿夜':'#C77DFF','回音':'#6486FF','图灵':'#00E5D4','小暖':'#FF6F52','小绵羊':'#A8E6A1'},
   // 房间类型代表色(公开房/私密房卡片强调色; 官方房用 officialFallbackC)
   roomKindC: { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' },
   // 按房名定制主色(优先级高于 kind 色, 任意房型可用): 只给特定房换调, 其它同类型仍用 roomKindC
@@ -2228,6 +2391,8 @@ function injectThemeCSS(){
   // 主题变量 + 荷尔蒙特效可调值(fx→注入 :root, 供 CSS 结构/keyframes 引用; 后台可覆盖)
   const fxCss = EH_CONFIG.fx ? (':root{'+Object.entries(EH_CONFIG.fx).map(([k,v])=>k+':'+v+';').join('')+'}\n') : '';
   el.textContent = fxCss + buildThemeCSS(EH_CONFIG.themePalettes);
+  // 主题变量注入后, 立即同步 theme-color/html/body 底色, 让状态栏带+安全区无黑边(启动路径也覆盖)
+  try{ if(typeof syncThemeColor==='function') syncThemeColor(); }catch(_){}
 }
 // ---- 把 EH_CONFIG.text 应用到所有 data-txt / data-txt-ph 标记的元素 ----
 function applyTextConfig(){
@@ -2524,12 +2689,14 @@ function withTimeout(promise, ms, fallback){
 // 匿名登录(路线C：默认匿名，可 magic link 升级，uid 不变)
 // ★统一的 session 解析(ensureAuth / bootSupabase 共用, 避免两套恢复逻辑各修各的漂移)。
 // getSession 本质是【本地读】(读 localStorage 里的 token), 正常几毫秒返回; 它偶发 hang 是内部
-// 顺带 autoRefresh 的网络卡了。故: 给一个较宽的超时(12s)只做安全网; 超时/拿到 null 时对"曾登录过"
+// 顺带 autoRefresh 的网络卡了。故: 给一个较紧的超时(3.5s)只做安全网; 超时/拿到 null 时对"曾登录过"
 // 的情形再做一次不带超时的兜底重读——真 session 往往就在, 别因网络抖动误判成"没登录"。
+// ★2026-07: 原 12s 太宽——它卡在整个大厅渲染之前(进入按钮/webview 兜底路径都 await 它), autoRefresh
+//   网络一 hang 用户就干等最多12s空骨架。降到 3.5s: 本地读几毫秒即返回, 真慢也快速放行走兜底重读/匿名。
 async function resolveSession(){
   if(!sb) return null;
   let session=null;
-  try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 12000, { data:{ session:null } })); }
+  try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 3500, { data:{ session:null } })); }
   catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
   // 曾登录过(本地 me.registered 或有 username/email) 但这次没读到 → 不带超时再读一次兜底
   const everReg = !!(me && (me.registered || me.username || me.email));
@@ -2856,10 +3023,30 @@ function resolveDay(mode){
   // auto: 按本地时间自动切日/夜——白天 7:00-18:59 日间, 其余时间夜间(符合"自动日间/夜间"字面直觉)
   try{ const h=new Date().getHours(); return h>=7 && h<19; }catch(e){ return false; }
 }
+// ★全屏无黑边(浏览器+PWA, 上+下): 参考 vc 的思路——不去精确算高度, 而是让"任何露出的区域"都是主题色。
+//   根因: <meta theme-color> 原来硬编码 #070a12, 而页面 --bg 随主题/日夜变(如日间是浅色 #eff8f8);
+//   → 浏览器顶部地址栏带 + 底部工具栏带 保持深色, 与页面割裂 = 上下黑边。PWA(black-translucent)则靠 html/body 铺色。
+//   对策: 每次换肤/切日夜后, 读实时生效的 --bg, 同步写进 ① theme-color meta(浏览器状态栏/工具栏带 + PWA状态栏)
+//   ② html/body 的 backgroundColor(iOS 橡皮筋回弹区/安全区/键盘残留露出的兜底色)。任何缝隙露出的都成主题色。
+function syncThemeColor(){
+  try{
+    // 读真正生效的背景色(injectThemeCSS 注入的 --bg, 已含 data-theme×data-mode 的最终值)
+    var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if(!bg) return;
+    var mc=document.querySelector('meta[name="theme-color"]');
+    if(!mc){ mc=document.createElement('meta'); mc.name='theme-color'; document.head.appendChild(mc); }
+    if(mc.content!==bg) mc.content=bg;
+    // html 显式刷底色(它是铺满整屏含安全区的层, 且叠着底部氛围光渐变作兜底)。
+    // ★不要动 body: body 背景故意透明, 好让 html 那层氛围光透上来铺满整屏(含安全区)消除底部硬缝;
+    //   若这里给 body 钉 backgroundColor 会盖住 html 的光 → 内容区变纯色、安全区仍带光 = 缝又出现。
+    document.documentElement.style.backgroundColor=bg;
+  }catch(e){}
+}
 function applyMode(mode){
   const day=resolveDay(mode);
   document.documentElement.setAttribute('data-mode', day?'day':'night');
   document.querySelectorAll('.mode-opt').forEach(el=>el.classList.toggle('active', el.dataset.mode===(mode||currentMode())));
+  syncThemeColor();
 }
 function pickMode(mode){
   try{ EhSfx.playClick(); }catch(e){}
@@ -2878,6 +3065,7 @@ function applyTheme(id){
   if(id==='cyber') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme',id);
   document.querySelectorAll('.skin-opt').forEach(el=>el.classList.toggle('active', el.dataset.theme===id));
+  syncThemeColor();
 }
 // 用户手动选皮肤 → 全站生效 + 锁定(进官方房不再自动覆盖)
 function pickTheme(id){
@@ -2991,8 +3179,14 @@ function initThemeUI(){
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
-  // 切场景清掉可能残留的全屏遮挡(录音浮层/键盘态), 防其挡住点击
-  document.body.classList.remove('kb-open'); const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
+  // ★lobby-on: 大厅改"整文档滚动"(而非内层容器滚), 让移动浏览器下滑时自动收起顶/底地址栏→真沉浸无黑边。
+  //   入口/聊天页仍是固定视口(hall 有固定输入框, 不能整页滚)。切走大厅时把文档滚动位置归零, 防残留。
+  document.body.classList.toggle('lobby-on', id==='lobby');
+  if(id!=='lobby'){ try{ window.scrollTo(0,0); }catch(_){} }
+  // 进聊天页: 立即按真实可视高铺满(输入框沉到底), 见 EH_VVH_FULLSCREEN
+  if(id==='hall'){ try{ window.__ehApplyVVH && window.__ehApplyVVH(); setTimeout(()=>window.__ehApplyVVH&&window.__ehApplyVVH(),250); }catch(_){} }
+  // 切场景清掉可能残留的全屏遮挡(录音浮层), 防其挡住点击
+  const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
   // 落到大厅 → 大厅氛围随机连播(chain 会保留正在播的曲, 从房间返回时丝滑续播, 不打断)
   if(id==='lobby'){ try{ startLobbyBGM(); }catch(_){} }
   else if(id==='enter'){ try{ AudioEngine.stop(); }catch(_){} }   // 回到入场/登出页: 停 BGM
@@ -3038,7 +3232,7 @@ function echoQuickList(){
   const push=(e,label)=>{ if(e&&!seen.has(e)){ seen.add(e); out.push({e,label:label||''}); } };
   mru.forEach(e=>push(e, (ECHO_KINDS.find(k=>k.e===e)||{}).label));
   ECHO_KINDS.forEach(k=>push(k.e,k.label));
-  return out.slice(0,4);
+  return out.slice(0, arguments[0]||4);   // 可传数量: 让上方表情行(表情+➕)与下方操作行数量对齐
 }
 const RESONANCE_THRESHOLD = ()=>TUNE('resonanceThreshold',5);   // 共鸣触发阈值(后台可配)
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
@@ -3102,15 +3296,37 @@ let _themeUIInit=false;
 // 8s 超时后抛错, 由 renderLobby 的重试兜底; 不再无限挂骨架。
 function roomsQuery(q, ms=8000){ return withTimeout(q, ms).catch(()=>({data:null,__timeout:true})); }
 let _lobbyRetryTimer=null;
+let _lobbyRetryN=0;   // 已自动重试次数(有成功即清零); 超上限停自动重试, 改给用户可点的"重试"入口
+const LOBBY_RETRY_MAX=4;
 async function renderLobby(soft){
   if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
   const _ln=$('#lobbyName'); if(_ln){ _ln.textContent=me.name; _ln.style.color=me.color; }
   const rs=await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
-  // 任一区块因超时/失败没拿到数据 → 稍后自动重试(最多几次), 避免骨架永久卡住
+  // 任一区块因超时/失败没拿到数据 → 稍后自动重试(有上限), 避免骨架永久卡住 + 无限重试空转
   const anyFail=rs.some(x=>x&&x.failed);
-  if(anyFail && !_lobbyRetryTimer){
+  if(!anyFail){ _lobbyRetryN=0; return; }   // 全部成功: 重置计数
+  if(_lobbyRetryTimer) return;
+  if(_lobbyRetryN < LOBBY_RETRY_MAX){
+    _lobbyRetryN++;
     _lobbyRetryTimer=setTimeout(()=>{ _lobbyRetryTimer=null; if($('#lobby')&&$('#lobby').classList.contains('on')) renderLobby(false); }, 2500);
+  } else {
+    // 重试到上限仍失败(真·慢网/离线): 把还卡着骨架的官方区换成可点重试, 给用户反馈+控制权, 不再干耗
+    lobbyShowRetry();
   }
+}
+// 大厅加载多次失败 → 官方频道区显示"网络较慢，点击重试"(点了清零计数重新拉)
+function lobbyShowRetry(){
+  const box=$('#channels'); if(!box) return;
+  if(box.querySelector('.lobby-retry')) return;   // 已在则不重复插
+  box.innerHTML='<div class="lobby-retry" style="grid-column:1/-1;text-align:center;padding:22px 16px;color:var(--sub);font-size:13px;cursor:pointer;border:1px dashed var(--line2);border-radius:14px">网络较慢，点击重试 ↻</div>';
+  const el=box.querySelector('.lobby-retry');
+  // 点重试: 先确保 supabase 库/session 就绪(可能上次是库都没加载出来→sb 为空, 光 renderLobby 拉不到),
+  //   再清零计数重渲。库仍拉不到→重新显示重试入口, 不静默卡死。
+  if(el) el.onclick=async()=>{
+    _lobbyRetryN=0; box.innerHTML=chSkel(4);
+    try{ await awaitSb(8000); if(!myUid){ ensureAuth().then(()=>renderLobby(true)).catch(()=>{}); } renderLobby(false); }
+    catch(_){ lobbyShowRetry(); }
+  };
 }
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
 function chSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="ch-skel"><div class="sk-b sk-icon"></div><div class="sk-b sk-h"></div><div class="sk-b sk-d"></div><div class="sk-b sk-l"></div></div>'; return s; }
@@ -3415,7 +3631,7 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  try{ entranceBanner(room); }catch(_){ try{ scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`)); }catch(__){} }
+  try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){} }
   // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
   scheduleDailyTarot(room && room.id);
   // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
@@ -3950,7 +4166,8 @@ function renderPresenceAvatars(users){
 
 function renderTyping(users){
   const now=Date.now();
-  const typers=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.name);
+  const typersP=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500);
+  const typers=typersP.map(p=>p.name);
   const bar=$('#typingBar');
   if(typers.length){
     // 文案: 1人"XX 正在输入"; 2人"甲、乙 正在输入"; ≥3人"甲、乙、丙等N人正在输入"(最多列3名防超长, 胶囊再兜底ellipsis)
@@ -3959,6 +4176,16 @@ function renderTyping(users){
     else if(typers.length===2) txt=`${typers[0]}、${typers[1]} 正在输入`;
     else txt=`${typers.slice(0,3).join('、')}等${typers.length}人正在输入`;
     $('#typingTxt').textContent=txt; bar.classList.add('on');
+    // ★配色规范化: 单人输入时, 用该人自己的颜色(灵魂走 soulThemeColor 与其头像/昵称/@统一, 真人走其身份色);
+    //   多人输入用主题 accent。这样"小绵羊 正在输入"是清华紫、"狼姐"是粉, 与全局一致, 不再一律青。
+    try{
+      let c='';
+      if(typers.length===1){
+        const p=typersP[0], isSoul=soulUidSet.has(p.user_id)||(soulNameSet&&soulNameSet.has(p.name));
+        c = isSoul ? soulThemeColor(p.color||'', undefined, p.name) : safeColor(p.color);
+      }
+      bar.style.setProperty('--typing-c', c || '');
+    }catch(_){ bar.style.removeProperty('--typing-c'); }
   }
   else bar.classList.remove('on');
   // 呼吸=活跃度: 正在输入/思考(typing_at 3.5s内)的灵魂 → 头像急促呼吸(soul-live), 否则平稳。
@@ -4601,7 +4828,7 @@ function showTarot(card, luck, streak){
 }
 
 // 进场提示去重: 同一人(uid)2分钟内只提示一次, 避免快速进出/来回切房重复弹进场(甚至同时冒两个)。
-const ENTER_DEDUP_MS = 120000;
+const ENTER_DEDUP_MS = 15 * 60 * 1000;   // ★15分钟: 同一人15分钟内重复进出只提示一次(主人要求, 原2min)
 const _enterSeen = new Map();   // uid → 上次提示时间戳
 function enterDedupOk(uid){
   const now=Date.now(); const last=_enterSeen.get(uid)||0;
@@ -4619,7 +4846,7 @@ function entranceBanner(room){
   const t = (cfg.tiers && cfg.tiers[tier]) || null;
   // 关闭/减动效/配置缺失 → 老行为(纯文字), 保证永不空场
   if(!cfg.enabled || reduce || !t){
-    scheduleEntryFade(sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`));
+    sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`);   // 进场提示不消失, 留在流里
     return;
   }
   // 自己: 完整体验(横幅 + 光幕 + 闪屏 + 震屏 + 粒子)
@@ -4649,11 +4876,15 @@ function entranceBanner(room){
       }, 1500);   // 等自己入场特效演完再放预览，不盖掉
     }
   }catch(_){}
-  // ★发送端去重: keep-alive 30s 内快速回同一房会再进 entranceBanner, 别重复 insert enter 行/重发世界公告
-  //   (接收端 enterDedupOk 只挡视觉, 挡不住这里的白写 DB + 重复全站公告)。同房 2min 内只广播一次。
+  // ★发送端去重: 快速回同一房会再进 entranceBanner, 别重复 insert enter 行/重发世界公告
+  //   (接收端 enterDedupOk 只挡视觉, 挡不住这里的白写 DB + 重复全站公告)。★同房 15min 内只广播一次(原2min)。
+  //   用 Map 按房记录, 避免只存单房导致 A→B→A 来回切时 A 被重播。
   const _now=Date.now();
-  if(entranceBanner._bc && entranceBanner._bc.rid===room.id && (_now-entranceBanner._bc.at)<120000) return;
-  entranceBanner._bc={ rid:room.id, at:_now };
+  if(!entranceBanner._bc) entranceBanner._bc=new Map();
+  const _lastBc=entranceBanner._bc.get(room.id)||0;
+  if(_now-_lastBc < 15*60*1000) return;
+  entranceBanner._bc.set(room.id, _now);
+  if(entranceBanner._bc.size>50){ for(const [k,v] of entranceBanner._bc){ if(_now-v>15*60*1000) entranceBanner._bc.delete(k); } }
   // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。
   // ★enter 是"当场特效", 只需存活到 realtime 把它推给在场的人(几秒)。插入后 8s 自删——
   //   根治它污染历史/大厅预览/灵魂上下文/回声统计(治本, 前端过滤只是治标, 且已删存量24条)。
@@ -4705,10 +4936,9 @@ function renderEntrance(info, isSelf){
     t={...t, shake:true, flash:t.flash||s.flash, stage:true};
   }
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可(减动效时不做风散动画, 但仍到点移除)
-    const _sm = !isSelf ? sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`)
-                        : sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
-    try{ setTimeout(()=>{ try{ _sm.remove(); }catch(_){} }, ENTRY_FADE_MS); }catch(_){}
+  if(reduce){ // 别人减动效时也别硬塞, 给一行朴素提示即可(进场提示不消失, 留在流里)
+    if(!isSelf) sysMsg(`<b>${esc(info.name)}</b> ${esc((t.label||'进入').replace(/\s/g,''))}了`);
+    else sysMsg(`你以 <b>${esc(info.name)}</b> 的身份进入了「${esc(info.roomName||'')}」`);
     return;
   }
   const tagTxt = tierName(tier);
@@ -4727,7 +4957,7 @@ function renderEntrance(info, isSelf){
     `<span class="eb-txt"><span class="eb-nm">${esc(nm)}</span> <span class="eb-act">${esc(t.label||'进入')}</span> 「${esc(roomName)}」</span>`+
     `<span class="eb-tag">${tagTxt}</span>`;
   $('#stream').appendChild(el); scrollStream();
-  scheduleEntryFade(el);   // 2分钟后"风吹散"淡出移除(进场提醒是氛围, 不留档堆积)
+  // 进场提示不做消失处理: 就留在消息流里(再次进房 2 分钟内去重, 本来不会重复出现, 留着不堆积)
   // 音效: 自己必放; 别人只有高阶档(会全屏光幕的)才放, 避免频繁进场吵
   if(t.sfx && (isSelf || wantStage)){ try{ EhSfx.play(t.sfx); }catch(_){} }
   // 粒子迸发
@@ -4818,7 +5048,16 @@ function bumpUnread(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()
   const attach=()=>{
     const s=$('#stream'), b=$('#toLatestBtn'); if(!s||!b) return false;
     if(s._tlBound) return true; s._tlBound=true;
-    let raf=0; s.addEventListener('scroll',()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); }); }, {passive:true});
+    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); }); };
+    s.addEventListener('scroll', kick, {passive:true});
+    // ★偶发不显示的根因: 翻历史时消息到达打字机/图片加载/神曲卡/特效会"事后撑高" stream,
+    //   离底距离变大却不触发 scroll → updateToLatest 不跑 → 按钮该现不现。用 MutationObserver
+    //   监听内容变化(节流到 rAF), 内容一长就重判显隐, 补上纯靠 scroll 覆盖不到的场景。
+    try{
+      const mo=new MutationObserver(kick);
+      mo.observe(s, {childList:true, subtree:true, characterData:true});
+      s._tlMO=mo;
+    }catch(_){}
     b.addEventListener('click',()=>{ try{ s.scrollTo({top:s.scrollHeight,behavior:'smooth'}); }catch(_){ s.scrollTop=s.scrollHeight; } hideToLatest(); setTimeout(()=>{ s.scrollTop=s.scrollHeight; hideToLatest(); },420); });
     return true;
   };
@@ -4915,15 +5154,23 @@ function renderAtMentions(escHtml){
   // 存"原始"颜色(可能为空), 不要先 safeColor——safeColor 会把空色兜成 #B57EDC 紫,
   // 再喂给 soulThemeColor 会被当"合法自定义色"直接返回, 于是灵魂@永远紫、无视房间主题(与头像/名字色不一致)。
   const soulColorByName={}; cands.forEach(c=>{ if(c.isSoul) soulColorByName[c.name]=(c.color||''); });
+  // 真人各自的身份色(color-pick 选的, 与其头像/昵称同色)。@真人用它自己的身份色。
+  const userColorByName={}; cands.forEach(c=>{ if(!c.isSoul && c.color) userColorByName[c.name]=c.color; });
+  if(myName && me && me.color) userColorByName[myName]=me.color;
   let out=escHtml;
   for(const nm of names){
     const enm=esc(nm);
     // 匹配 @名字(名字用转义后的字面量),g 全局
     const re=new RegExp('@'+enm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
     const isSoul=soulNames.has(nm);
-    const cls='at-mention'+(nm===myName?' at-me':(isSoul?' at-soul':''));
-    // @灵魂 色跟房间主题(soulThemeColor, 与消息头像/光墙/角标统一), 取色失败兜底灵魂自身色; @真人/@我 走 CSS(主题/amber)
-    const style=isSoul ? ` style="--at-c:${soulThemeColor(soulColorByName[nm]||'', undefined, nm)}"` : '';
+    const isMe=(nm===myName);
+    // 统一走 --at-c: @灵魂=房间主题色(soulThemeColor,与头像/光墙/角标统一); @我=琥珀(强提醒信号,盖过身份色);
+    //   @其他真人=其自己的身份色(与其头像/昵称同色)。都取不到时回落 CSS 默认主题色。
+    let atc='';
+    if(isSoul) atc=soulThemeColor(soulColorByName[nm]||'', undefined, nm);
+    else if(!isMe && userColorByName[nm]) atc=safeColor(userColorByName[nm]);
+    const cls='at-mention'+(isMe?' at-me':(isSoul?' at-soul':(atc?' at-user':'')));
+    const style=(atc && !isMe) ? ` style="--at-c:${atc}"` : '';
     out=out.replace(re, '<span class="'+cls+'"'+style+'>@'+enm+'</span>');
   }
   return out;
@@ -4983,7 +5230,7 @@ document.addEventListener('pointerdown',e=>{
   const el=headEl(e.target); if(!el) return;
   const nm=el.dataset.atname; const uid=el.dataset.uid||''; if(!nm) return;
   _hlFired=false; _hlStart={x:e.clientX,y:e.clientY};
-  _hlTimer=setTimeout(()=>{ _hlFired=true; try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} openPeerMenu(el, nm, uid); }, 500);
+  _hlTimer=setTimeout(()=>{ _hlFired=true; try{ ehLongPressFx(); }catch(_){} openPeerMenu(el, nm, uid); }, 500);
 },{passive:true});
 document.addEventListener('pointermove',e=>{ if(_hlTimer && _hlStart && (Math.abs(e.clientX-_hlStart.x)>10||Math.abs(e.clientY-_hlStart.y)>10)){ clearTimeout(_hlTimer); _hlTimer=null; } },{passive:true});
 document.addEventListener('pointerup',e=>{
@@ -5448,7 +5695,10 @@ async function send(){
   // 乐观上屏
   const localId='local_'+Date.now();
   const optimistic={...payload, id:localId, created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
-  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream(); ehFx(el,'fx-send',650); }
+  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream();
+    // 键盘态下 DOM/布局稳定晚于插入, 单次滚动常滚不到底(最后一条被输入栏盖) → 多拍兜底确保完全可见
+    setTimeout(scrollStream,60); setTimeout(scrollStream,200); setTimeout(scrollStream,450);
+    ehFx(el,'fx-send',650); }
   try{ EhSfx.play(useVoid?'void':'send'); }catch(e){}
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
@@ -5652,6 +5902,7 @@ async function startRec(){
   catch(e){ stream.getTracks().forEach(t=>t.stop()); toast(EH_CONFIG.text.err_recInit); return; }
   recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop=()=>{
+    clearInterval(recTimer); recTimer=null;   // ★所有停止路径的共同终点, 在此清计时器: 录音中离房(leaveRoom裸调recorder.stop)也不残留每秒空跑的interval
     stream.getTracks().forEach(t=>t.stop());
     const tx=stopSR();   // 拿到转写文字(不支持/无语音则空)
     stopWave(); hideRecUI();
@@ -6349,8 +6600,8 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱排队中'; }catch(_){}
-    try{ toast('清唱排队中,由后台生成…'); }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='生成中'; }catch(_){}
+    try{ toast('生成中,由后台生成…'); }catch(_){}
     // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
     try{
       const key=String(mid);
@@ -6419,7 +6670,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
-let songSel=SONG_STYLES[0].id;
+let songSel=(SONG_STYLES.find(s=>s.id==='acapella')||SONG_STYLES[0]).id;   // 神曲默认用清唱
 let songMode=false;
 function setSongMode(on){ setMode(on?'song':'none'); }
 // 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
@@ -6544,7 +6795,9 @@ async function fetchEchoes(ids){
 // 共鸣涟漪: 某条消息某情绪达阈值 → 全房视觉涟漪(复用 resonance 层 + 粒子)
 function checkResonance(mid, emoji, count){
   if(count < RESONANCE_THRESHOLD()) return;
-  const key=mid+emoji; if(resonatedMsgs.has(key)) return; resonatedMsgs.add(key);
+  const key=mid+emoji; if(resonatedMsgs.has(key)) return;
+  if(resonatedMsgs.size>500) resonatedMsgs.clear();   // 防泄漏: 去重只需防短期重复, 老记录无价值, 超限清空
+  resonatedMsgs.add(key);
   const el=document.querySelector(`.msg[data-mid="${mid}"]`);
   const color = el ? (el.querySelector('.nm')?.style.color||EH_CONFIG.resonanceDefaultC) : EH_CONFIG.resonanceDefaultC;
   triggerResonance(emoji, color, `✨ 一条消息响彻回声厅 ${emoji}`);
@@ -6654,12 +6907,17 @@ function attachLongPress(el, m){
 // ★ 截屏/切后台时系统 UI 介入会让页面失焦/隐藏 → 取消待弹长按 + 关掉已开的互动环，防“截屏误触菜单”
 window.addEventListener('blur',()=>{ cancelLongPress(); try{ hideActRing(); }catch(_){} },{passive:true});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ cancelLongPress(); try{ hideActRing(); }catch(_){} } });
+function ehLongPressFx(){ try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_){} try{ EhSfx.play('tick'); }catch(_){} }  // 长按触发统一触感: 震动(安卓)+轻音效(iOS无震动API的补偿)
 function showActRing(x,y,m){
+  ehLongPressFx();
   const ring=$('#actRing');
   const isMine = m.user_id===myUid;
   const mid = isNaN(+m.id)?m.id:+m.id;
   // 自己的消息也可点回声(点赞等)——真人对自己内容盖章/强调是合理表达
-  const echoRow = `<div class="ar-echoes">${echoQuickList().map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span></button></div>`;
+  // 上方表情行(N表情+➕)与下方操作行数量对齐: 下方固定4(回复/投影/存卡/复制), 自己消息多撤回=5。
+  //   故有撤回时上方取4表情(4+➕=5), 无撤回取3表情(3+➕=4), 上下对齐。
+  const _echoN = canRecall(m) ? 4 : 3;
+  const echoRow = `<div class="ar-echoes">${echoQuickList(_echoN).map(k=>`<button class="ar-echo" data-e="${k.e}" title="${k.label}"><span class="ai">${k.e}</span></button>`).join('')}<button class="ar-echo ar-more" data-more="1" title="更多表情"><span class="ai">➕</span></button></div>`;
   ring.innerHTML=`
     ${echoRow}
     <div class="ar-actions">
@@ -7583,6 +7841,8 @@ let _navArmed=false;
 function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({eh:1},''); }catch(e){} }
 // 从最上层往下判定"这次返回该关掉谁"
 function navTopLayer(){
+  // 键盘开着(输入框聚焦)时, 返回键第一优先收键盘 + 输入框失焦 + 复位, 符合安卓习惯(先收键盘再退层)
+  if(document.activeElement && document.activeElement.id==='cin') return 'kbd';
   if($('#recOverlay')?.classList.contains('on')) return 'rec';
   if($('#wallMask')?.classList.contains('on')) return 'wall';
   if($('#modalMask')?.classList.contains('on')) return 'modal';
@@ -7597,6 +7857,7 @@ function navTopLayer(){
 }
 function navConsume(layer){
   switch(layer){
+    case 'kbd': try{ var _c=$('#cin'); if(_c) _c.blur(); if(window.__ehKbReset) window.__ehKbReset(); }catch(_){} break;
     case 'rec': if(recActive){ recCanceled=true; setRecCancel(true); micRelease(); } break;
     case 'wall': $('#wallMask')?.classList.remove('on'); break;
     case 'modal': closeModal(); break;
@@ -7972,9 +8233,16 @@ on('enterBtn','click',async()=>{
   goScene('lobby');
   { const ch=$('#channels'); if(ch && !ch.children.length) ch.innerHTML=chSkel(4);
     const pr=$('#publicRooms'); if(pr && !pr.children.length) pr.innerHTML=chSkel(2); }
-  await ensureAuth();
-  btn.disabled=false;
-  renderLobby();
+  // ★不把官方/公开房列表卡在 ensureAuth 之后——它们只读公开 eh_rooms(anon key 即可), 无需 session。
+  //   仅等 supabase 库就绪(awaitSb, 本地轮询几十ms), 立即渲染大厅(官方/公开秒出); 认证并行跑,
+  //   完成后再补渲染一次(私密房 renderMyRooms 需 myUid)。
+  // ★2026-07-26 修回归: awaitSb 超时(弱网库慢)时不能静默吞掉——否则骨架永久卡死且无重试入口。
+  //   超时→显示"点击重试"给出口; 成功→渲染。ensureAuth 无论成败都放开按钮并补渲一次(拿到myUid补私密房;
+  //   失败也补渲一次, 保证官方/公开至少出来, 不整页空)。
+  awaitSb(8000).then(()=>renderLobby())
+               .catch(()=>{ try{ lobbyShowRetry(); }catch(_){} });
+  ensureAuth().then(()=>{ btn.disabled=false; renderLobby(myUid?true:false); })
+              .catch(()=>{ btn.disabled=false; renderLobby(false); });
 });
 on('backBtn','click',()=>backToLobby());
 // 房间头像 = 房间信息/设置入口(所有人看信息, 房主/管理另有编辑区), 替代原顶部齿轮
@@ -8111,6 +8379,15 @@ cin.addEventListener('keydown',e=>{
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
 });
 $('#goBtn').onclick=send;
+// ★移动端发送键标准做法: pointerdown/mousedown 时 preventDefault, 阻止点发送导致输入框失焦。
+//   否则(尤其 PWA/覆盖式键盘)点发送瞬间 cin blur→键盘收起→composer 位置变化→click 落到原位空处→发不出去。
+//   preventDefault 让焦点留在输入框, 键盘不收、位置不动, click 稳落 goBtn 触发 send。
+(function(){ var go=$('#goBtn'); if(!go) return;
+  var keepFocus=function(e){ e.preventDefault(); };   // 不 blur 输入框
+  go.addEventListener('pointerdown', keepFocus);
+  go.addEventListener('mousedown', keepFocus);
+  go.addEventListener('touchstart', keepFocus, {passive:false});
+})();
 syncSendBtn();  // 初始：空输入→显示麦克风
 // ＋ 花样菜单：虚空 / 语音 / 神曲。有模式时 ＋变模式图标, 点它=退出; 无模式时=展开菜单
 function closePlusMenu(){ $('#plusMenu').classList.remove('on'); if(curMode==='none') $('#plusBtn').classList.remove('on'); }
@@ -8123,7 +8400,7 @@ $('#plusBtn').onclick=e=>{ e.stopPropagation();
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=SONG_STYLES[Math.floor(secureRand()*SONG_STYLES.length)].id; setMode('song'); };   // 随机挑个曲风进神曲, 换曲风用细色条
+$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=(SONG_STYLES.find(s=>s.id==='acapella')||SONG_STYLES[0]).id; setMode('song'); };   // 神曲默认清唱, 换曲风用细色条
 $('#pmBottle') && ($('#pmBottle').onclick=()=>{ closePlusMenu(); setMode('bottle'); });
 document.addEventListener('click',closePlusMenu);
 
@@ -8158,132 +8435,163 @@ window.addEventListener('beforeunload',()=>{
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
 
-// ============ iOS 键盘遮挡修复 ============
-// iOS Safari 键盘弹起时不压缩 100dvh，会盖住底部输入框。
-// 用 visualViewport 实时把可视高度写进 --appvh，移动端 #hall 用它做高度。
-function syncViewportH(){
-  const vv = window.visualViewport;
-  const inHall = document.body.classList.contains('hall-on');
-  const cinFocused = document.activeElement && document.activeElement.id==='cin';
-  // 标准键盘: visualViewport 收缩 >120px (iOS 系统键盘 / 安卓多数输入法)
-  const kbShrink = vv ? (window.innerHeight - vv.height > 120) : false;
-  // overlay 键盘: 输入框已聚焦但 visualViewport 没收缩 (搜狗/百度等第三方 IME 在部分 iOS 上是
-  //   "覆盖式"弹出, 浮在页面上方, window.innerHeight 和 visualViewport.height 都不变 → 页面拿不到
-  //   键盘高度信息, 无论怎么按 innerHeight 收缩都盖住输入框)。此时用预估可视高强制收缩 #hall。
-  const kbOverlay = inHall && cinFocused && !kbShrink;
-  let h;
-  if(kbShrink){
-    h = vv.height;                          // 标准: 用真实可视高
-  } else if(kbOverlay){
-    // overlay 键盘预估: 第三方 IME(搜狗/百度)含工具栏约占屏 30~34%,
-    //   用 innerHeight*0.68 作可视高(输入框贴键盘上方, 不多留白)。
-    //   真机标定(21:47): 键盘顶部工具栏物理 y≈552/805≈占屏 31%, 0.52 扣多了→输入框偏高。
-    //   二校(21:47): 0.68 仍留 64px 空隙→提到 0.74(cin.bot≈540 贴键盘顶部约 12px)。
-    h = Math.round(window.innerHeight * 0.74);
-  } else {
-    h = vv ? vv.height : window.innerHeight; // 无键盘: 满屏
-  }
-  document.documentElement.style.setProperty('--appvh', h + 'px');
-  const kbOpen = kbShrink || kbOverlay;
-  if(kbOpen && inHall){
-    // 把 #hall 固定钉到可视区顶部, 抵消 iOS 自动上滚, 页面不再"跳走"
-    document.documentElement.style.setProperty('--kb-top', (vv&&vv.offsetTop||0)+'px');
-    document.body.classList.add('kb-open');
-    window.scrollTo(0,0);
-    if(cinFocused) scrollStream();
-  } else {
-    document.body.classList.remove('kb-open');
-  }
-}
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize', syncViewportH);
-  window.visualViewport.addEventListener('scroll', syncViewportH);
-}
-window.addEventListener('resize', syncViewportH);
-syncViewportH();
-
-// ============ EH_KB_DIAG 真机键盘自诊断浮层 ============
+// ============ EH_KB_INSET 聊天页键盘协同 = 行业标准 inset 方案 (2026-07-27 重写) ============
+// 参考 MDN visualViewport(device-fixed transform 例) / Chrome DevRel(三事件+rAF, window scroll 必监听) /
+// 多个开源聊天库(TownSquare/frugalgpt/doctor-ai 的 keyboard util)。核心:
+//  · iOS 键盘只缩 visualViewport、不缩 dvh/布局视口, 且弹起会自动把页面滚动 → 产生 vv.offsetTop 偏移。
+//  · 键盘高度 --kb = innerHeight − vv.height − vv.offsetTop (减 offsetTop → 天然抵消 iOS 自动滚动漂移)。
+//    容器高度 = 100dvh − --kb, 于是输入框贴键盘顶; 键盘收起 --kb→0, 输入框沉回底。
+//  · focusin 捕获期抢先锁 overflow + scrollTo(0,0), 让 vv.offsetTop 保持 0, 杜绝"自动滚动把输入框顶出屏幕=消失"。
+// 只在 hall-on 时驱动; kb-compensating(覆盖式第三方键盘, vv 不缩)交给 --kvh 那套, 跳过。
 (function(){
-  var box=document.createElement('div');
-  box.id='ehKbDiag';
-  box.style.cssText='position:fixed;top:calc(2px + env(safe-area-inset-top));left:2px;z-index:2147483647;'
-    +'font:9px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.82);padding:3px 5px;border-radius:4px;'
-    +'pointer-events:none;max-width:70vw;white-space:pre;display:none';
-  document.body.appendChild(box);
-  function upd(){
-    if(!document.body.classList.contains('hall-on')){ box.style.display='none'; return; }
-    var vv=window.visualViewport;
-    var hall=document.getElementById('hall');
-    var comp=document.querySelector('.composer');
-    var cin=document.getElementById('cin');
-    var hr=hall?hall.getBoundingClientRect():{};
-    var cr=comp?comp.getBoundingClientRect():{};
-    var cir=cin?cin.getBoundingClientRect():{};
-    var lines=[
-      'innerH='+window.innerHeight+' vvH='+(vv?Math.round(vv.height):'-')+' vvTop='+(vv?Math.round(vv.offsetTop):'-'),
-      'scrollY='+Math.round(window.scrollY)+' kbOpen='+document.body.classList.contains('kb-open'),
-      'appvh='+getComputedStyle(document.documentElement).getPropertyValue('--appvh').trim(),
-      'hall.h='+Math.round(hr.height||0)+' hall.bot='+Math.round(hr.bottom||0),
-      'comp.top='+Math.round(cr.top||0)+' comp.bot='+Math.round(cr.bottom||0),
-      'cin.bot='+Math.round(cir.bottom||0)+(cir.bottom>window.innerHeight?' ❌超屏':' ✅'),
-      'unpinSrc='+(window.__ehUnpinSrc||'-')
-    ];
-    box.textContent=lines.join('\n');
-    box.style.display='block';
+  var vv = window.visualViewport; if(!vv) return;
+  var raf = 0, lastKb = -1, cinFocused = false;
+  // ★基线法(2026-07-27 修 PWA 默认态不沉底): 不用 innerHeight 当基线——PWA standalone 下无键盘时
+  //   innerHeight 与 vv.height 也可能差一截(安全区/状态栏计法不同)→ --kb 被误算成正数→输入框悬空不沉底。
+  //   改用"输入框没聚焦时的 vv.height"当基线: 无键盘态 --kb 恒 0(输入框必沉底); 只有聚焦(键盘弹起)
+  //   才用 基线 − 当前vv.height 求真实键盘高。基线在无焦点时随 vv 变化(地址栏显隐/转屏)持续刷新。
+  // ★运行时分流(2026-07-27 修安卓浏览器输入框间歇隐藏): --appvh 只在 PWA standalone 生效。
+  //   真凶: --appvh(=JS实测vv高)本为修 iOS PWA "100dvh偏大不沉底"引入, 但原来无条件对所有环境生效。
+  //   安卓浏览器地址栏显隐会让 vv.height 反复抖动 → --appvh 跟着跳 → #hall 高忽大忽小 → composer 被推到
+  //   浏览器工具栏后面, 输入框间歇隐藏。浏览器本有 interactive-widget/dvh 原生自适应, 不该被 JS 覆盖。
+  var isPWA = document.documentElement.classList.contains('pwa-standalone');
+  var baseH = Math.round(vv.height), lastAppvh = -1;
+  var baseInner = window.innerHeight || baseH;   // 无键盘布局视口基线(区分安卓interactive-widget vs iOS只缩vv)
+  function apply(){
+    raf = 0;
+    if(document.documentElement.classList.contains('kb-compensating')) return;   // 覆盖式键盘交 --kvh
+    var inHall = document.body.classList.contains('hall-on');
+    var kb;
+    if(!inHall || !cinFocused){
+      var h = Math.round(vv.height); if(h>0) baseH = h;   // 无键盘态: 刷新基线(=当下真实可视高)
+      var ih = window.innerHeight; if(ih>0) baseInner = ih;
+      kb = 0;                                             // --kb 归 0 → 输入框沉底
+    } else {
+      // 布局视口(innerHeight)也收缩了 = 浏览器已靠 interactive-widget/dvh 自动让位(安卓Chrome),
+      // 纯 CSS 100dvh 已贴合键盘, JS 不该再扣 --kb(否则双重让位→容器过矮/输入框被推到工具栏后)。
+      var innerShrunk = (baseInner - (window.innerHeight||baseInner)) > 40;
+      if(innerShrunk){ kb = 0; }
+      else { kb = Math.max(0, Math.round(baseH - vv.height - vv.offsetTop)); if(kb<40) kb=0; }   // iOS 只缩 vv, 才补偿
+    }
+    // --appvh 仅 PWA standalone 用(修 100dvh 偏大不沉底); 浏览器回落纯 100dvh(原生自适应, 免地址栏抖动误伤)。
+    if(isPWA && baseH>0 && baseH!==lastAppvh){ lastAppvh=baseH; document.documentElement.style.setProperty('--appvh', baseH + 'px'); }
+    if(kb===lastKb) return;
+    lastKb = kb;
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+    // 键盘弹起(kb>0) → 挂 .kb-up, 让 composer 收掉 safe-area 底部间距(输入框紧贴键盘, 消除死空隙)
+    document.documentElement.classList.toggle('kb-up', kb>0);
   }
-  if(window.visualViewport){ vv=window.visualViewport; vv.addEventListener('resize',upd); vv.addEventListener('scroll',upd); }
-  window.addEventListener('resize',upd);
-  document.addEventListener('focusin',function(){ setTimeout(upd,50); setTimeout(upd,300); setTimeout(upd,600); });
-  document.addEventListener('focusout',function(){ setTimeout(upd,200); });
-  setInterval(upd, 500);
-  window.__ehKbDiagUpd=upd;
+  function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
+  vv.addEventListener('resize', schedule, {passive:true});
+  vv.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('scroll', schedule, {passive:true});   // 普通滚动 vv.scroll 不触发, 必须补 window scroll
+  window.addEventListener('resize', schedule, {passive:true});
+  window.addEventListener('orientationchange', function(){ setTimeout(schedule,300); });
+  // ★focusin 捕获期抢先锁滚动: iOS focus 会自动把页面滚动(产生 offsetTop→输入框被顶出屏幕), 先 scrollTo(0,0)
+  //   + 锁 overflow 让它没得滚。仅聊天页输入框 #cin(大厅/弹窗输入框不锁, 免误伤)。
+  document.addEventListener('focusin', function(e){
+    var t=e.target; if(!t || t.id!=='cin') return;
+    if(!document.body.classList.contains('hall-on')) return;
+    cinFocused = true;
+    try{ window.scrollTo(0,0); }catch(_){}
+    schedule(); setTimeout(schedule,250); setTimeout(schedule,500);
+  }, {capture:true});
+  document.addEventListener('focusout', function(e){
+    var t=e.target; if(!t || t.id!=='cin') return;
+    cinFocused = false;
+    // 收起: 立即+延时几帧等 vv 恢复, 把 --kb 归零(平滑, transition 收尾)
+    schedule(); setTimeout(schedule,60); setTimeout(schedule,300);
+  }, {capture:true});
+  window.__ehApplyVVH = schedule;   // 兼容旧调用名(goScene 进 hall 时调)
+  schedule(); setTimeout(schedule,200); setTimeout(schedule,600);
 })();
 
-// iOS 补丁: 点输入框瞬间, Safari 会先把整个 document 上滚去露出输入框(此时 kb-open 还没挂,
-// #hall 未 fixed → 页面被顶飞留白, 见截图)。改为 focus 立刻钉 kb-open + 把 document 归零,
-// 抢在 iOS 自动滚动之前, 并在键盘开着时持续吸收残留的 body 滚动。
+// ============ 聊天页键盘处理(按运行时分流, 浏览器走原生自动 / PWA 走 JS 补偿) ============
+// ★2026-07-24 教训: 曾"统一 vv 驱动"把浏览器也拽进 JS 管, 反而破坏了浏览器原生的自动弹出/回收。
+//   正解回到分流(即重构前的可用方案):
+//  A. 普通浏览器: meta viewport interactive-widget=resizes-content 生效, 浏览器自己压缩布局视口、
+//     自己回收 → 纯 CSS(height:100%)自然贴合, 零 JS 干预 = 弹出/回收全自动。只需 focus 后滚到底。
+//  B. PWA standalone: interactive-widget 不生效, 键盘弹起布局视口/vv 常不收缩(尤其覆盖式第三方输入法)
+//     → 必须 JS 补偿: 挂 .kb-vv, 用 baseVV-KB_PX 估算收缩 #hall; 收起靠触碰/返回键复位。
 (function(){
   const cin=$('#cin'); if(!cin) return;
-  const pin=()=>{
-    if(!document.body.classList.contains('hall-on')) return;
-    document.body.classList.add('kb-open');
-    // document 归零(iOS 把 body 顶上去时 scrollY>0), 用 rAF 多次抢在其自动滚动之后
-    const zero=()=>{ if(window.scrollY||document.documentElement.scrollTop){ window.scrollTo(0,0); } };
-    zero(); requestAnimationFrame(zero); setTimeout(zero,60); setTimeout(zero,180);
-    // 调 syncViewportH 触发 overlay 键盘分支(搜狗/百度覆盖式键盘下 visualViewport 不收缩,
-    //   靠预估可视高强制收缩 #hall)。键盘弹出有延迟, 多打几拍确保命中。
-    try{ syncViewportH(); }catch(_){}
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,120);
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,350);
-    setTimeout(()=>{try{syncViewportH();}catch(_){}} ,650);
-    try{ scrollStream(); }catch(_){}
+  const scrollLast=()=>{ try{ scrollStream(); }catch(_){} };
+  const vv = window.visualViewport;
+  // 无 vv 的老浏览器: 交给原生, 只滚到底
+  if(!vv){
+    cin.addEventListener('focus', ()=>{ scrollLast(); setTimeout(scrollLast,200); setTimeout(scrollLast,450); });
+    return;
+  }
+  // ★判据不是 standalone(实测该PWA display-mode报false不可靠), 而是"interactive-widget 到底生不生效":
+  //   默认按兵不动、让浏览器原生跑(自动弹出/回收); 仅当检测到"cin 聚焦但视口完全没收缩"(interactive-widget
+  //   失效, 输入框会被盖)时, 才动态挂 .kb-vv 介入 JS 补偿。这样浏览器(生效)不受干扰、PWA(失效)得到补偿。
+  document.documentElement.classList.add('kb-vv');   // CSS hook: #hall/stage 改用 var(--kvh)（仅补偿介入后 --kvh 才生效, 未设时 fallback 100% 不影响原生）
+  // ★真机实测(2026-07-24)关键发现: 部分第三方输入法(讯飞/搜狗等覆盖式键盘)弹起时 vv.height
+  //   完全不收缩(实测 innerH=vvH=805 不变), 纯 vv 方案失效→输入框被键盘盖住。
+  //   对策: 维护无键盘时的 vv 基线; cin 聚焦后若 vv 没收缩(覆盖式)→ 用估算比例收缩 #hall。
+  // 覆盖式键盘(vv 不收缩)时用"基线 - 键盘估高(像素)"算可视高——比乘屏比稳(键盘物理高不随屏比走)。
+  // ★KB_PX 真机标定(2026-07-24 安卓讯飞): 300 时 --kvh=505, 输入框位置正确(主人确认 ok)。
+  //   (曾试 358 使 --kvh=447 对齐浏览器 vv, 但真机偏低不行; 300/505 才对。)
+  const KB_PX = 300;
+  let baseVV = Math.round(vv.height);   // 无键盘 vv 基线
+  let baseInner = window.innerHeight || baseVV;   // 无键盘布局视口基线(区分 iOS系统键盘 vs 安卓interactive-widget)
+  let raf = 0;
+  let compensating = false;   // ★缓存补偿态(替代 getComputedStyle 读 --kvh, 免强制 reflow)
+  let lastKvh = -1;           // ★缓存已写的 --kvh 值, 相同则跳过 setProperty(免无效 reflow)
+  const cinFocused = ()=> document.activeElement && document.activeElement.id==='cin';
+  const clearKvh = ()=>{
+    if(!compensating && lastKvh<0) return;   // 已是原生态, 无需重复清(免 reflow)
+    document.documentElement.style.removeProperty('--kvh');
+    document.documentElement.classList.remove('kb-compensating');
+    compensating=false; lastKvh=-1;
   };
-  cin.addEventListener('focus', pin);
-  // 失焦: 键盘收起, 复位。⚠️ overlay 键盘(搜狗/百度)真机上收起时 visualViewport 不变(不触发 resize),
-  //   且 blur/focusout 也可能不发→单靠 blur 复位不可靠。多源触发 + 轮询兑底。
-  window.__ehUnpinSrc='(none)';   // 诊断: 记录最后一次触发复位的事件源
-  const unpin=(src)=>{
-    if(src) window.__ehUnpinSrc=src;
-    // 仍在输入不复位(防收起过程中 activeElement 短暂误判又收缩回去)
-    if(document.activeElement && document.activeElement.id==='cin') return;
-    document.body.classList.remove('kb-open');
-    const vv=window.visualViewport;
-    document.documentElement.style.setProperty('--appvh', (vv?vv.height:window.innerHeight)+'px');
-    try{ if(window.__ehKbDiagUpd) window.__ehKbDiagUpd(); }catch(_){}
+  const setKvh = (px)=>{
+    if(px===lastKvh) return;                 // 值没变→跳过, 不 reflow
+    document.documentElement.style.setProperty('--kvh', px + 'px');
+    if(!compensating){ document.documentElement.classList.add('kb-compensating'); compensating=true; }
+    lastKvh=px;
   };
-  window.__ehUnpin=unpin;
-  cin.addEventListener('blur', ()=>{ unpin('blur'); setTimeout(()=>unpin('blur+60'),60); setTimeout(()=>unpin('blur+200'),200); setTimeout(()=>unpin('blur+450'),450); });
-  // document 级 focusout 兑底: cin 的 blur 偶发不触发时, 焦点离开 cin 能被 focusout 冒泡兑住。
-  document.addEventListener('focusout', (e)=>{ if(e.target && e.target.id==='cin'){ setTimeout(()=>unpin('focusout'),60); setTimeout(()=>unpin('focusout+300'),300); } });
-  // ★ overlay 键盘收起真凶兑底: 用户点输入框以外区域(pointerdown/touchend)时, 若 cin 不再聚焦则复位。
-  //   overlay 键盘收起多数伴随这个手势, 不依赖 blur 事件。
-  const outsideCheck=(e)=>{ if(e.target && e.target.id==='cin') return; setTimeout(()=>unpin('outside'),50); setTimeout(()=>unpin('outside+250'),250); };
-  document.addEventListener('pointerdown', outsideCheck, {passive:true});
-  document.addEventListener('touchend', outsideCheck, {passive:true});
-  // ★ 轮询兑底(最可靠): kb-open 但 cin 已不再聚焦 → 键盘已收起但事件都没接住, 强制复位。
-  setInterval(()=>{ if(document.body.classList.contains('kb-open') && !(document.activeElement && document.activeElement.id==='cin')) unpin('poll'); }, 400);
-  // 键盘开着时, 任何把 body 顶起来的滚动都拉回去(iOS 偶发)
-  window.addEventListener('scroll', ()=>{ if(document.body.classList.contains('kb-open') && (window.scrollY||document.documentElement.scrollTop)) window.scrollTo(0,0); }, {passive:true});
+  // CSS 已用 100dvh: iOS系统键盘(只vv缩)和安卓interactive-widget(innerH缩)弹起时 dvh 都会自动收缩、
+  // 收起自动恢复(原生, 不残留黑边)→ 这两种一律清 --kvh 交给 dvh, JS 不插手。
+  // 唯一需要 JS 补偿的只剩【覆盖式第三方IME】: vv/innerH/dvh 全不收缩 → dvh 盖不住键盘 → 用 baseVV-KB_PX 估算。
+  const decideNow = (allowOverlay)=>{
+    if(!cinFocused()){ clearKvh(); return; }
+    const vh = Math.round(vv.height);
+    const innerH = window.innerHeight || baseInner;
+    const vvShrank = baseVV - vh > 60;
+    const innerShrank = baseInner - innerH > 60;
+    if(vvShrank || innerShrank){ clearKvh(); return; }   // 视口收缩了(iOS系统键盘/安卓)→ dvh 已自动贴合, 清补偿走原生
+    // 视口完全没收缩: 弹起过程中(还没跳)按兵不动; 延时门到点仍不缩=覆盖式→才估算补偿
+    if(allowOverlay){ setKvh(Math.max(240, baseVV - KB_PX)); scrollLast(); }
+  };
+  const applyKvh = ()=>{
+    const vh = Math.round(vv.height);
+    const innerH = window.innerHeight || 0;
+    if(!cinFocused()){ if(vh>0){ baseVV = Math.max(vh, innerH); baseInner = Math.max(innerH, vh); } clearKvh(); return; }
+    decideNow(false);   // resize 阶段: 只处理已收缩(iOS/安卓), 覆盖式交延时门
+  };
+  // 延时门: focus 后给浏览器 interactive-widget 反应时间, 到点仍没收缩=覆盖式, 才估算补偿
+  const decideOverlay = ()=>{ decideNow(true); };
+  const schedule = ()=>{ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(applyKvh); };
+  applyKvh();
+  vv.addEventListener('resize', schedule, {passive:true});
+  vv.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('resize', schedule, {passive:true});
+  // focus: 武装返回键 guard + 滚到底; 补偿判定延时(给浏览器先反应)
+  cin.addEventListener('focus', ()=>{ try{ if(window.ehArm) ehArm(); }catch(_){} scrollLast(); setTimeout(decideOverlay,450); setTimeout(decideOverlay,750); });
+  const resetFull = ()=>{ clearKvh(); };
+  window.__ehKbReset = resetFull;   // 供返回键(navConsume 'kbd')收键盘时调用
+  cin.addEventListener('blur', ()=>{ resetFull(); setTimeout(resetFull,300); });
+  // 覆盖式键盘收起无 web 信号(vv/innerH/activeElement 全不变)→靠"触碰输入区外即复位"兜底(用缓存 compensating,
+  //   免 getComputedStyle 强制 reflow)。返回键复位见 navConsume 'kbd'。
+  const maybeReset = (e)=>{
+    if(!compensating) return;                                          // 非补偿态→直接跳过(零开销)
+    const t=e.target; if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;  // 碰输入区→保持
+    try{ cin.blur(); }catch(_){} resetFull();
+  };
+  document.addEventListener('touchstart', maybeReset, {passive:true, capture:true});
+  // (曾试 focusout/window.resize 自动复位, 但在键盘弹起过程中误触发→刚弹就被复位, 键盘弹不上去。已撤除,
+  //  只保留上面的"触碰输入区外即复位": 弹起稳定, 收起后碰一下屏幕即恢复。覆盖式键盘无可靠收起信号, 这是现实折中。)
 })();
 
 // ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
@@ -8651,19 +8959,16 @@ function fillAndLogin(id, pwv){
   },2000);
 })();
 </script>
-<!-- ===== PWA: 注册 Service Worker(离线秒开) ===== -->
+<!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js').then(function (reg) {
-        // 发现新版自动接管,下次进入生效
+      // 新文件名 sw.js + 新缓存名, 让浏览器当成全新 SW 注册(旧 service-worker.js 已删)
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
         reg.addEventListener('updatefound', function () {
-          var nw = reg.installing;
-          if (!nw) return;
+          var nw = reg.installing; if (!nw) return;
           nw.addEventListener('statechange', function () {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              nw.postMessage('SKIP_WAITING');
-            }
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('SKIP_WAITING');
           });
         });
       }).catch(function (e) { console.warn('SW register failed:', e && e.message); });
@@ -8673,6 +8978,46 @@ function fillAndLogin(id, pwv){
       });
     });
   }
+</script>
+
+<!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
+<script>
+(function(){
+  // 版本号常显
+  try{ var vl=document.getElementById('lobbyVer'); if(vl) vl.textContent='回声厅 · v'+(window.__EH_BUILD_VER||'?'); }catch(_){}
+  var btn = document.getElementById('installBtn');
+  if(!btn) return;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches) || window.navigator.standalone===true;
+  // 已装(standalone 打开) → 藏安装按钮
+  if(isStandalone){ btn.style.display='none'; return; }
+  // 统一走 PWA 安装(iOS 分享添加 / 安卓 Chrome 一键装): 无安全警告、独立图标、自动更新。
+  // (放弃 apk 方案: 自签名 apk 在 MIUI 等会被安全扫描拦, 体验差; PWA 才是最顺的。)
+
+  var READY='📲 立即安装 App', IDLE='📲 安装到桌面';
+  function markReady(){ btn.textContent=READY; btn.classList.add('ready'); }
+  // 事件已就绪(head 捕获器早于本脚本接到)→ 立即高亮; 晚到则由回调高亮
+  if(window.__ehDeferredPrompt) markReady();
+  window.__ehOnInstallReady = markReady;
+  window.__ehOnInstalled = function(){ try{ btn.style.display='none'; toast('已添加到桌面 🎉'); }catch(_){} };
+
+  btn.addEventListener('click', function(){
+    var dp = window.__ehDeferredPrompt;
+    if(dp){   // 标准安装(Chrome/小米新版等): 唤起系统原生安装弹窗
+      try{
+        Promise.resolve(dp.prompt()).catch(function(){});
+        dp.userChoice.then(function(r){
+          if(r && r.outcome==='accepted'){ btn.style.display='none'; toast('正在添加到桌面…'); }
+          else toast('已取消安装');
+        }).catch(function(){ toast('安装未完成，请重试'); }).then(function(){ window.__ehDeferredPrompt=null; });
+      }catch(e){ toast('无法调起安装（可能已装过），请查桌面或用菜单添加'); window.__ehDeferredPrompt=null; btn.classList.remove('ready'); btn.textContent=IDLE; }
+      return;
+    }
+    if(isIOS){ try{ toast('点底部「分享」→「添加到主屏幕」即可装成 App'); }catch(_){ alert('分享 → 添加到主屏幕'); } return; }
+    // 其它安卓浏览器: 事件未就绪, 走菜单添加
+    try{ toast('若无弹窗，请点浏览器菜单 →「添加到主屏幕/安装应用」'); }catch(_){ alert('浏览器菜单 → 添加到主屏幕'); }
+  });
+})();
 </script>
 
 <script>
@@ -8699,7 +9044,9 @@ function fillAndLogin(id, pwv){
       }
       el = el.parentElement;
     }
-    return true;   // 没有可滚祖先 → 视为顶部
+    // 没有可滚内层祖先: 大厅"整文档滚动"模式下要看文档本身是否在顶(否则滑到大厅中段下拉会误触发刷新)
+    var docTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    return docTop <= 0;
   }
 
   function reset(){
