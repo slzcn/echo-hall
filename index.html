@@ -3245,7 +3245,7 @@ async function buildBgmMenu(m){
       });
     }
     if(room){
-      html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">灵魂现场生成…</span></div>`);
+      html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">请灵魂制作一首…</span></div>`);
     }
   }
   m.innerHTML=html.join('');
@@ -7265,7 +7265,7 @@ const SLASH_CMDS=[
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
   {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
-  {c:'/bgm',   d:'/bgm 描述 → @灵魂现场生成本地 BGM 🎼'},
+  {c:'/bgm',   d:'/bgm 描述 → 请灵魂制作一首本地 BGM 🎼'},
   {c:'/bgm库', d:'/bgm库 → 查看我的 BGM 曲库'},
 ];
 async function handleSlash(text){
