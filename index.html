@@ -1593,6 +1593,11 @@
        键盘弹起再扣 --kb(=基线−当前vv高)。无 JS(--appvh 未设)才回落 100dvh。 */
     body.hall-on .stage{padding:0;height:calc(var(--appvh,100dvh) - var(--kb,0px));align-items:stretch}
     #hall{width:100%;height:calc(var(--appvh,100dvh) - var(--kb,0px));border-radius:0;border:none}
+    /* ★安卓遮挡兜底(2026-07-28): interactive-widget 压布局视口但部分安卓 CSS 100dvh 不跟键盘同步 →
+       #hall 仍按满屏算高、composer 被键盘盖。键盘弹起时 JS 用实测 innerHeight 钉 --kbvh 覆盖高度贴键盘顶。
+       此刻地址栏被键盘挡住不显隐, innerHeight 稳定不抖。与 kb-compensating(覆盖式IME走--kvh)互斥。 */
+    html.kb-fixed body.hall-on .stage{height:var(--kbvh)}
+    html.kb-fixed #hall{height:var(--kbvh)}
     /* .kb-vv/--kvh 仅用于覆盖式第三方键盘(安卓讯飞等 vv 完全不收缩→--kb≈0 顶不起来): JS 估算写 --kvh 兜底。 */
     html.kb-compensating body.hall-on .stage{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
     html.kb-compensating #hall{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
@@ -1780,7 +1785,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-kb-nojitter';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-kb-occlude';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8941,24 +8946,37 @@ window.addEventListener('beforeunload',()=>{
   var isPWA = document.documentElement.classList.contains('pwa-standalone');
   var baseH = Math.round(vv.height), lastAppvh = -1;
   var baseInner = window.innerHeight || baseH;   // 无键盘布局视口基线(区分安卓interactive-widget vs iOS只缩vv)
+  var lastKbvh = -1;   // 缓存键盘态实测可视高(免无效 reflow)
   function apply(){
     raf = 0;
     if(document.documentElement.classList.contains('kb-compensating')) return;   // 覆盖式键盘交 --kvh
     var inHall = document.body.classList.contains('hall-on');
     var kb;
+    var kbvh = 0;   // >0=键盘态实测可视高覆盖 #hall(安卓dvh不同步兜底); 0=不覆盖, 走 CSS 100dvh/--appvh
     if(!inHall || !cinFocused){
       var h = Math.round(vv.height); if(h>0) baseH = h;   // 无键盘态: 刷新基线(=当下真实可视高)
       var ih = window.innerHeight; if(ih>0) baseInner = ih;
       kb = 0;                                             // --kb 归 0 → 输入框沉底
     } else {
-      // 布局视口(innerHeight)也收缩了 = 浏览器已靠 interactive-widget/dvh 自动让位(安卓Chrome),
-      // 纯 CSS 100dvh 已贴合键盘, JS 不该再扣 --kb(否则双重让位→容器过矮/输入框被推到工具栏后)。
+      // 布局视口(innerHeight)也收缩了 = 浏览器靠 interactive-widget 压缩了布局视口(安卓Chrome)。
       var innerShrunk = (baseInner - (window.innerHeight||baseInner)) > 40;
-      if(innerShrunk){ kb = 0; }
+      if(innerShrunk){
+        // ★安卓遮挡真修(2026-07-28): interactive-widget 压的是布局视口(innerHeight), 但部分安卓浏览器
+        //   CSS 的 100dvh 不跟键盘同步 → #hall 仍按满屏 100dvh 算高 → composer 被键盘盖住(输入框遮挡)。
+        //   对策: 键盘弹起时用【实测 innerHeight】显式钉 #hall 高, 贴键盘顶。此刻地址栏已被键盘挡住不再显隐,
+        //   innerHeight 稳定不抖(抖动只发生在无键盘态地址栏显隐, 那时走上面分支不进这里)→ 治遮挡且不复发抖动。
+        kb = 0; kbvh = window.innerHeight || 0;
+      }
       else { kb = Math.max(0, Math.round(baseH - vv.height - vv.offsetTop)); if(kb<40) kb=0; }   // iOS 只缩 vv, 才补偿
     }
     // --appvh 仅 PWA standalone 用(修 100dvh 偏大不沉底); 浏览器回落纯 100dvh(原生自适应, 免地址栏抖动误伤)。
     if(isPWA && baseH>0 && baseH!==lastAppvh){ lastAppvh=baseH; document.documentElement.style.setProperty('--appvh', baseH + 'px'); }
+    // 键盘态实测高覆盖: 有值→挂 kb-fixed 用 --kbvh; 归零→撤下走原生
+    if(kbvh!==lastKbvh){
+      lastKbvh = kbvh;
+      if(kbvh>0){ document.documentElement.style.setProperty('--kbvh', kbvh + 'px'); document.documentElement.classList.add('kb-fixed'); }
+      else { document.documentElement.style.removeProperty('--kbvh'); document.documentElement.classList.remove('kb-fixed'); }
+    }
     if(kb===lastKb) return;
     lastKb = kb;
     document.documentElement.style.setProperty('--kb', kb + 'px');
