@@ -1245,6 +1245,10 @@
   .msg.fx-soul .av{animation:soulSpeakPulse 1.2s ease-out}
   /* 灵魂发言瞬间: 内辉光猛地亮一下再回落, 纯 inset 全在盒内(不用外扩波纹, 免得跟老光环一样被 content-visibility 裁左侧) */
   @keyframes soulSpeakPulse{0%{box-shadow:inset 0 0 0 2px var(--soul-c,var(--violet)),inset 0 0 15px 1px color-mix(in srgb,var(--soul-c,var(--violet)) 85%,transparent)}55%{box-shadow:inset 0 0 0 1.5px var(--soul-c,var(--violet)),inset 0 0 7px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 45%,transparent)}100%{box-shadow:inset 0 0 0 1.5px transparent,inset 0 0 0 0 transparent}}
+  /* 真人发言脉冲: 对等灵魂 fx-soul 的"我发言了"头像反馈(原则3对称), 但更轻(0.9s, 无外扩, 辉光更淡), 用自身色 --av-c。
+     真人的气泡滑入 fx-in 保留, 这里只补头像层脉冲。 */
+  .msg.fx-say .av{animation:sayPulse .9s ease-out}
+  @keyframes sayPulse{0%{box-shadow:inset 0 0 0 1.5px var(--av-c,var(--cyan)),inset 0 0 10px 0 color-mix(in srgb,var(--av-c,var(--cyan)) 60%,transparent)}60%{box-shadow:inset 0 0 0 1.5px var(--av-c,var(--cyan)),inset 0 0 5px 0 color-mix(in srgb,var(--av-c,var(--cyan)) 30%,transparent)}100%{box-shadow:inset 0 0 0 1.5px var(--av-c,var(--cyan))}}
   .msg.fx-mention{animation:mentionPulse 2s ease-out, msgMentionNudge .55s ease-out}
   @keyframes msgMentionNudge{0%,100%{transform:none}18%{transform:translateX(3px)}36%{transform:translateX(-2px)}54%{transform:translateX(1px)}}
   .ec-pill.fx-echo,.echo-bar .ec-pill.fx-echo{animation:echoPop .5s cubic-bezier(.2,.9,.25,1.25)}
@@ -1773,7 +1777,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-fx-presence';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-say-pulse';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4325,7 +4329,7 @@ async function subscribeMessages(rid){
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空) + 撤掉"正在思考"占位。按 uid 或名字兜底(同名多uid副本)
       if(isSoulUser(m.user_id, m.name)){ m.is_bot=true; removeSoulThinking(m.user_id); }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
-      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
+      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
       if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
@@ -4807,6 +4811,8 @@ function buildMsgEl(m, isHistory){
     </div>`;
   // 呼吸光环要用灵魂主题色驱动阴影 → 写成 CSS 变量供 keyframes 引用
   if(isBot){ el.style.setProperty('--soul-c', avColor); }
+  // 头像色变量: 所有消息都写, 供"发言脉冲"用自身色(真人 fx-say / 灵魂 fx-soul)。
+  el.style.setProperty('--av-c', avColor);
   const txtEl=el.querySelector('.txt');
   // ★空气泡兜底: 若渲染路径任何一环失败导致 .txt 为空(但消息有文本), 强制回填 raw text
   // 保底铁律: 有内容的消息绝不留空框——最差也是 raw 文本, 绝不是纯空白
