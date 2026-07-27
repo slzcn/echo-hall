@@ -631,8 +631,15 @@
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
 
   .skin-menu.bgm-menu .bgm-mode-row{margin:2px 2px 4px}
-  .skin-menu.bgm-menu .bgm-mode-opt{font-size:12.5px;font-weight:600;padding:8px 10px;letter-spacing:.2px}
-  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.42;pointer-events:none}
+  .skin-menu.bgm-menu .bgm-mode-opt{font-size:12.5px;font-weight:600;padding:8px 10px;letter-spacing:.2px;
+    border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 34%,var(--line2));
+    background:color-mix(in srgb,var(--accent,var(--cyan)) 7%,var(--panel-solid));
+    color:var(--ink);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+    transition:background .15s,border-color .15s,box-shadow .15s,transform .08s}
+  .skin-menu.bgm-menu .bgm-mode-opt:hover{border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 15%,var(--panel-solid))}
+  .skin-menu.bgm-menu .bgm-mode-opt:active{transform:scale(.96);background:color-mix(in srgb,var(--accent,var(--cyan)) 23%,var(--panel-solid))}
+  .skin-menu.bgm-menu .bgm-mode-opt.active{border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 18%,var(--panel-solid));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent) inset,0 0 12px -6px var(--accent,var(--cyan))}
+  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.38;cursor:not-allowed;pointer-events:none;filter:saturate(.5)}
   .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
   .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
@@ -8916,9 +8923,25 @@ window.addEventListener('beforeunload',()=>{
     const innerH = window.innerHeight || baseInner;
     const vvShrank = baseVV - vh > 60;
     const innerShrank = baseInner - innerH > 60;
-    if(vvShrank || innerShrank){ clearKvh(); return; }   // 视口收缩了(iOS系统键盘/安卓)→ dvh 已自动贴合, 清补偿走原生
-    // 视口完全没收缩: 弹起过程中(还没跳)按兵不动; 延时门到点仍不缩=覆盖式→才估算补偿
-    if(allowOverlay){ setKvh(Math.max(240, baseVV - KB_PX)); scrollLast(); }
+    if(vvShrank || innerShrank){
+      // Chrome 官方建议用 Visual Viewport 处理键盘，但不同安卓浏览器对 dvh 的同步时机不一致。
+      // 即使布局视口已收缩，也锁定到当下真实可视高度，避免 composer 被 100dvh 留在键盘后面。
+      const visibleH = vvShrank ? vh : Math.round(innerH);
+      setKvh(Math.max(240, visibleH));
+      scrollLast();
+      return;
+    }
+    // 视口完全没收缩：覆盖式第三方输入法才走兜底；优先读取 VirtualKeyboard geometry。
+    if(allowOverlay){
+      let overlayH=0;
+      try{
+        const vk=navigator.virtualKeyboard;
+        const r=vk&&vk.boundingRect;
+        if(r&&r.height>0) overlayH=Math.round(r.height);
+      }catch(_){}
+      setKvh(Math.max(240, baseVV-(overlayH||KB_PX)));
+      scrollLast();
+    }
   };
   const applyKvh = ()=>{
     const vh = Math.round(vv.height);
