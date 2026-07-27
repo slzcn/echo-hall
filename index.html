@@ -391,6 +391,10 @@
     .bg-orb,.mood-aura{animation:none !important}
     .bgm-btn:not(.muted){animation:none !important}
     .msg.soul .av,.pav.soul-av .av-ic{animation:none !important}
+    /* 进场 logo/标题: 保留一次性显影(logoIn/titleReveal), 只关常驻流光/扫光/呼吸 */
+    .logo{animation:logoIn 1s cubic-bezier(.2,.9,.3,1.3) both !important}
+    .title{animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both !important}
+    .title::after{animation:none !important;opacity:0 !important}
     *{scroll-behavior:auto !important}
   }
   /* ============ /EH_PERF_MOBILE ============ */
@@ -402,12 +406,27 @@
     background:linear-gradient(135deg,var(--cyan),var(--magenta),var(--violet));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;pointer-events:none}
-  .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600}
-  /* ③ 大标题: 字重拉满+字距加大更"硬", 双层辉光(青底品红晕)强度由 --fx-title-glow 控 */
-  .title{font-size:40px;font-weight:900;letter-spacing:4px;margin:8px 0 4px;
-    background:linear-gradient(120deg,var(--ink),var(--cyan) 42%,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
+  /* ◢◤ 小标签: 进场时字距从散→收拢并去模糊(logoIn), 之后霓虹微闪呼吸(logoPulse) */
+  .logo{font-size:13px;letter-spacing:8px;color:var(--cyan);text-transform:uppercase;font-weight:600;position:relative;display:inline-block;
+    animation:logoIn 1s cubic-bezier(.2,.9,.3,1.3) both, logoPulse 3.4s ease-in-out 1.1s infinite}
+  @keyframes logoIn{0%{opacity:0;letter-spacing:20px;filter:blur(5px)}100%{opacity:1;letter-spacing:8px;filter:blur(0)}}
+  @keyframes logoPulse{0%,100%{opacity:.88;text-shadow:0 0 6px color-mix(in srgb,var(--cyan) 45%,transparent)}50%{opacity:1;text-shadow:0 0 14px var(--cyan),0 0 26px color-mix(in srgb,var(--cyan) 40%,transparent)}}
+  /* ③ 大标题: 字重拉满+字距加大更"硬", 双层辉光(青底品红晕)强度由 --fx-title-glow 控。
+     酷炫动效: 进场从下方模糊上浮显影(titleReveal), 常驻流光在渐变里来回扫(titleSheen),
+     叠一层沿字形横扫的高光条(titleScan, ::after 复制文字裁成光带)。 */
+  .title{font-size:40px;font-weight:900;letter-spacing:4px;margin:8px 0 4px;position:relative;display:inline-block;
+    background:linear-gradient(110deg,var(--cyan) 0%,#eafcff 16%,var(--magenta) 38%,var(--violet) 56%,var(--cyan) 80%,#eafcff 100%);
+    background-size:230% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
     text-shadow:0 0 calc(28px*var(--fx-title-glow,1)) color-mix(in srgb,var(--cyan) calc(30%*var(--fx-title-glow,1)),transparent),
-                0 0 calc(52px*var(--fx-title-glow,1)) color-mix(in srgb,var(--magenta) calc(20%*var(--fx-title-glow,1)),transparent)}
+                0 0 calc(52px*var(--fx-title-glow,1)) color-mix(in srgb,var(--magenta) calc(20%*var(--fx-title-glow,1)),transparent);
+    animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both, titleSheen 6s ease-in-out 1s infinite}
+  .title::after{content:attr(data-t);position:absolute;left:0;top:0;pointer-events:none;
+    background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.95) 48%,rgba(255,255,255,.95) 52%,transparent 62%);
+    background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:titleScan 4.5s ease-in-out 1.6s infinite}
+  @keyframes titleReveal{0%{opacity:0;transform:translateY(16px) scale(.9);filter:blur(10px)}60%{filter:blur(0)}100%{opacity:1;transform:none;filter:blur(0)}}
+  @keyframes titleSheen{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes titleScan{0%,100%{background-position:120% 50%;opacity:0}12%{opacity:1}30%,100%{opacity:0}50%{background-position:-40% 50%}}
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
@@ -1695,7 +1714,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-bgm6-enterdedup';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-bgm9-logofx';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1790,7 +1809,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <div class="scene on" id="enter">
     <div class="glass enter-card">
       <div class="logo-wrap"><span class="logo">◢◤ Realtime ◢◤</span></div>
-      <div class="title">回声厅</div>
+      <div class="title" data-t="回声厅">回声厅</div>
       <div class="sub-line" id="subLine"></div>
       <div class="identity">
         <div class="id-av" id="idAv">🦊</div>
