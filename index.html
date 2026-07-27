@@ -2186,14 +2186,14 @@ const EH_CONFIG_DEFAULT = {
   // 官方房 BGM(MiniMax music-2.6 生成的真实音频, 存 Supabase Storage/eh-song/bgm/)
   // 官方房按 name 精确绑; public/private 走 _fallback (支持任意用户建的公共/私密房)
   roomBgm: {
-    '闲聊广场':{ name:'8-bit 明亮 chiptune', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3', variants:[{name:'白昼像素',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_daylit.mp3'},{name:'街机霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3'}] },
-    '深夜电台':{ name:'lo-fi 蒸汽波', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
-    '技术黑话':{ name:'极简 techno', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3', variants:[{name:'专注脉冲',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_focus.mp3'},{name:'赛博霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_neon.mp3'}] },
-    '虚空回音':{ name:'空灵 ambient', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3', variants:[{name:'冰川回声',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_glacier.mp3'},{name:'星际微光',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_astral.mp3'}] },
+    '闲聊广场':{ name:'浩浩人流', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3', variants:[{name:'晚风集市',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_daylit.mp3'},{name:'夜市霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3'}] },
+    '深夜电台':{ name:'一个人的午夜塔', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
+    '技术黑话':{ name:'凌晨三点的代码', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3', variants:[{name:'深夜 debug',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_focus.mp3'},{name:'阵雨服务器',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_neon.mp3'}] },
+    '虚空回音':{ name:'一句话碰到月亮', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3', variants:[{name:'海底诗集',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_glacier.mp3'},{name:'行星间的回信',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_astral.mp3'}] },
     _fallback:{
-      public: { name:'温暖夜晚 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3', variants:[{name:'晨光 lounge',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_dawn.mp3'},{name:'暖光 lounge',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_glow.mp3'}] },
-      private:{ name:'温馨 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
-      generated:{ name:'灵魂现场生成', url:'' },
+      public: { name:'饭后的阳台', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3', variants:[{name:'周六早上十点',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_dawn.mp3'},{name:'晴天的窗台',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_glow.mp3'}] },
+      private:{ name:'只有我们两个人', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
+      generated:{ name:'当场召唤', url:'' },
     },
   },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
@@ -3152,17 +3152,29 @@ function initBgmUI(){
   };
   const bind=(btn,menu,other)=>{
     if(!btn) return;
-    let pressT=null; let longPressed=false;
-    btn.onclick=async (e)=>{ e.stopPropagation(); if(longPressed){ longPressed=false; return; } AudioEngine.resume(); await openMenu(menu,other); };
-    // 长按快速静音（保留原有一键开关手感）
-    const start=()=>{ longPressed=false; pressT=setTimeout(()=>{ longPressed=true; setBgm(!bgmOn()); if(menu) menu.classList.remove('on'); syncBgmActive(); }, 550); };
+    let pressT=null; let longPressed=false; const LP_MS=420;
+    // 单击 = 开/关背景音乐；长按 = 弹下拉菜单
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      if(longPressed){ longPressed=false; return; }
+      AudioEngine.resume(); setBgm(!bgmOn());
+      if(menu) menu.classList.remove('on');
+      syncBgmActive();
+    };
+    const start=(ev)=>{
+      longPressed=false;
+      pressT=setTimeout(async ()=>{ longPressed=true; AudioEngine.resume(); await openMenu(menu,other); }, LP_MS);
+    };
     const cancel=()=>{ if(pressT){ clearTimeout(pressT); pressT=null; } };
     btn.addEventListener('touchstart', start, {passive:true});
     btn.addEventListener('touchend', cancel);
     btn.addEventListener('touchmove', cancel, {passive:true});
+    btn.addEventListener('touchcancel', cancel);
     btn.addEventListener('mousedown', start);
     btn.addEventListener('mouseup', cancel);
     btn.addEventListener('mouseleave', cancel);
+    // 桌面端：右键 / 长按菜单也弹出下拉，避免长按误触发系统菜单
+    btn.addEventListener('contextmenu', async (e)=>{ e.preventDefault(); AudioEngine.resume(); await openMenu(menu,other); });
   };
   bind($('#bgmBtnLobby'), menuLobby, menuHall);
   bind($('#bgmBtnHall'), menuHall, menuLobby);
