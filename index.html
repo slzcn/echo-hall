@@ -631,16 +631,17 @@
   .skin-menu.bgm-menu .bgm-sec-title{font-size:10.5px;color:var(--sub);padding:6px 12px 2px;letter-spacing:.4px;opacity:.75}
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
 
-  .skin-menu.bgm-menu .bgm-mode-row{margin:2px 2px 4px}
-  .skin-menu.bgm-menu .bgm-mode-opt{font-size:12.5px;font-weight:600;padding:8px 10px;letter-spacing:.2px;
-    border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 34%,var(--line2));
-    background:color-mix(in srgb,var(--accent,var(--cyan)) 7%,var(--panel-solid));
-    color:var(--ink);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
-    transition:background .15s,border-color .15s,box-shadow .15s,transform .08s}
-  .skin-menu.bgm-menu .bgm-mode-opt:hover{border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 15%,var(--panel-solid))}
-  .skin-menu.bgm-menu .bgm-mode-opt:active{transform:scale(.96);background:color-mix(in srgb,var(--accent,var(--cyan)) 23%,var(--panel-solid))}
-  .skin-menu.bgm-menu .bgm-mode-opt.active{border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 18%,var(--panel-solid));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent) inset,0 0 12px -6px var(--accent,var(--cyan))}
-  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.38;cursor:not-allowed;pointer-events:none;filter:saturate(.5)}
+  /* 顶部分段胶囊：一整块圆角容器，内部两格分隔——克制干净，选中格填充主题色 */
+  .skin-menu.bgm-menu .bgm-mode-row{display:flex;margin:4px 6px 8px;padding:3px;gap:3px;
+    background:var(--card-bg-soft,rgba(255,255,255,.04));border:1px solid var(--line2);border-radius:11px}
+  .skin-menu.bgm-menu .bgm-mode-opt{flex:1;text-align:center;font-size:12.5px;font-weight:600;
+    padding:7px 4px;border-radius:8px;color:var(--sub);cursor:pointer;user-select:none;
+    -webkit-tap-highlight-color:transparent;transition:background .15s,color .15s,transform .08s;
+    border:none;background:transparent}
+  .skin-menu.bgm-menu .bgm-mode-opt:active{transform:scale(.95)}
+  .skin-menu.bgm-menu .bgm-mode-opt.active{color:#fff;
+    background:var(--accent,var(--cyan));box-shadow:0 2px 8px -3px var(--accent,var(--cyan))}
+  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
   .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
   .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
@@ -3211,9 +3212,9 @@ async function buildBgmMenu(m){
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
-    // ④ 灵魂曲目组
-    html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
+    // ④ 灵魂曲目组（无曲则整组不显示，不再留空提示）
     if(mine.length){
+      html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
       const shortTitle=(t)=>{
         let x=String(t||'灵魂曲').trim();
         // 去掉常见前缀「房间名·」/ 「房间名-」
@@ -3240,8 +3241,6 @@ async function buildBgmMenu(m){
         const st=shortTitle(c.title);
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
-    }else{
-      html.push(`<div class="bgm-empty">还没有 · @灵魂 生成一首</div>`);
     }
     if(room){
       html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">灵魂现场生成…</span></div>`);
@@ -3263,8 +3262,8 @@ async function buildBgmMenu(m){
       if(act==='auto'){
         AudioEngine.resume();
         if(!bgmOn()) setBgm(true);
-        pickBgmAuto();           // 切回随机官方曲：清手动记忆 + 重新随机
-        await buildBgmMenu(m);   // 重绘：随机胶囊高亮、手动曲勾去掉
+        pickBgmAuto();               // 切回随机官方曲：清手动记忆 + 重新随机
+        refreshBgmSelState(m);       // 只切高亮，不重绘 DOM（消除跳动）
         syncBgmActive();
         return;
       }
@@ -3280,15 +3279,35 @@ async function buildBgmMenu(m){
       // 再点已选中的曲目 = 回到随机
       if(!isAuto && active===url){
         pickBgmAuto();
-        await buildBgmMenu(m); syncBgmActive();
+        refreshBgmSelState(m); syncBgmActive();
         return;
       }
       const name=(el.textContent||'').replace('✓','').trim();
       if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||name,mine:true});
       else pickBgmManual({url,name});
-      // 选中某曲后重绘：随机胶囊灭高亮、该曲打勾（互斥）
-      await buildBgmMenu(m); syncBgmActive();
+      // 选中某曲：只切高亮（随机胶囊灭、该曲打勾），不重绘 DOM → 无跳动
+      refreshBgmSelState(m); syncBgmActive();
     };
+  });
+}
+// 局部刷新菜单选中态：只切 class，不重建 DOM（避免整体重绘导致的闪烁/高度跳动）
+// isAuto/active 的判定与 buildBgmMenu 完全一致，避免高亮错位
+function refreshBgmSelState(m){
+  if(!m) return;
+  const on=bgmOn();
+  const room=curRoom||null;
+  const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
+  const active=isAuto?'':_bgmActiveUrl();
+  // 顶部两颗胶囊
+  m.querySelectorAll('.bgm-mode-opt').forEach(el=>{
+    const act=el.dataset.action;
+    if(act==='power') el.classList.toggle('active', on);
+    if(act==='auto') el.classList.toggle('active', on&&isAuto);
+  });
+  // 曲目行：命中 active 的打亮，其余取消
+  m.querySelectorAll('.skin-opt[data-url]').forEach(el=>{
+    const u=el.dataset.url||'';
+    el.classList.toggle('active', !isAuto && !!active && u===active);
   });
 }
 function pickBgmManual(row){
