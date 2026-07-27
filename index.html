@@ -245,6 +245,12 @@
   /* ===== 荷尔蒙特效 P0/P1(值由 EH_CONFIG.fx 变量控, 后台可调) ===== */
   /* ② 聊天页活背景: 不再进房关灯。底层两团极缓漂移的青/品红光晕 + 网格轻呼吸, 死场变活场。 */
   body.hall-on .bg-orb{ display:block; opacity:calc(.32 * var(--fx-livebg,.55)*1.8); filter:blur(38px); animation-duration:var(--fx-livebg-speed,26s); }
+  /* ★聊天页(hall-on)日间同样收敛 orb(2026-07-27 修 #8 真凶): 上面 body.hall-on .bg-orb 优先级(0,2,1)
+     高过大厅那条 html[data-mode="day"] .bg-orb(0,2,0), 把日间收敛盖掉了→进聊天页 orb 仍是 .317 的脏色块。
+     这里用 html[data-mode="day"] body.hall-on 双段(0,3,1)压过, 让聊天页日间也退成极淡染色。 */
+  html[data-mode="day"] body.hall-on .bg-orb{ opacity:.1; filter:blur(60px); }
+  html[data-mode="day"] body.hall-on .orb3{ opacity:.07; }
+  html[data-mode="day"] body.hall-on .bg-grid{ opacity:.6; }
   body.hall-on .bg-grid{ opacity:.88; } /* ★ 2026-07-17 P4: gridBreath 实测木20行就吃 52ms，改静态固定亮度。视觉均值(0.7Ω1 → 0.88)不变 */
   @keyframes gridBreath{0%,100%{opacity:.7}50%{opacity:1}} /* 保留 keyframes 定义不删，以防其他地方引用 */
 
@@ -1675,7 +1681,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-kb-browser-split';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-bgm1-hallorb-day';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
