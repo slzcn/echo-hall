@@ -2011,13 +2011,14 @@ const EH_CONFIG_DEFAULT = {
   // 官方房 BGM(MiniMax music-2.6 生成的真实音频, 存 Supabase Storage/eh-song/bgm/)
   // 官方房按 name 精确绑; public/private 走 _fallback (支持任意用户建的公共/私密房)
   roomBgm: {
-    '闲聊广场':{ name:'8-bit 明亮 chiptune', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3' },
+    '闲聊广场':{ name:'8-bit 明亮 chiptune', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3', variants:[{name:'白昼像素',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_daylit.mp3'},{name:'街机霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3'}] },
     '深夜电台':{ name:'lo-fi 蒸汽波', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
-    '技术黑话':{ name:'极简 techno', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3' },
-    '虚空回音':{ name:'空灵 ambient', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3' },
+    '技术黑话':{ name:'极简 techno', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3', variants:[{name:'专注脉冲',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_focus.mp3'},{name:'赛博霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_neon.mp3'}] },
+    '虚空回音':{ name:'空灵 ambient', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3', variants:[{name:'冰川回声',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_glacier.mp3'},{name:'星际微光',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_astral.mp3'}] },
     _fallback:{
-      public: { name:'温暖夜晚 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3' },
+      public: { name:'温暖夜晚 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3', variants:[{name:'晨光 lounge',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_dawn.mp3'},{name:'暖光 lounge',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_glow.mp3'}] },
       private:{ name:'温馨 lounge', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
+      generated:{ name:'灵魂现场生成', url:'' },
     },
   },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
@@ -2794,8 +2795,8 @@ function bgmPool(){
   try{
     const out=[], seen=new Set();
     const push=(c)=>{ if(c&&c.url&&!seen.has(c.url)){ seen.add(c.url); out.push(c); } };
-    Object.keys(ROOM_BGM).forEach(k=>{ if(k==='_fallback') return; push(ROOM_BGM[k]); });
-    if(ROOM_BGM._fallback){ push(ROOM_BGM._fallback.public); push(ROOM_BGM._fallback.private); }
+    Object.keys(ROOM_BGM).forEach(k=>{ if(k==='_fallback') return; push(ROOM_BGM[k]); (ROOM_BGM[k].variants||[]).forEach(push); });
+    if(ROOM_BGM._fallback){ push(ROOM_BGM._fallback.public); (ROOM_BGM._fallback.public.variants||[]).forEach(push); push(ROOM_BGM._fallback.private); (ROOM_BGM._fallback.private.variants||[]).forEach(push); }
     return out;
   }catch(e){ return []; }
 }
@@ -2825,8 +2826,14 @@ function startRoomBGM(room){
     if(!room){ AudioEngine.stop(); return; }
     // 官方房按 name 精确绑, 公共/私密房走 _fallback (支持任意用户建的房间)
     let cfg=null;
-    if(room.kind==='official' && ROOM_BGM[room.name]) cfg=ROOM_BGM[room.name];
-    else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public) cfg=ROOM_BGM._fallback.public;
+    // 用户生成曲默认本地覆盖：同房间重新进入时继续播放，不影响其他人。
+    if(typeof _ehBgmOverride!=='undefined' && _ehBgmOverride && _ehBgmOverride.room_name===room.name && _ehBgmOverride.url) cfg=_ehBgmOverride;
+    else if(room.kind==='official' && ROOM_BGM[room.name]){
+      const base=ROOM_BGM[room.name]; cfg=(Math.random()<0.55 && base.variants&&base.variants.length)?base.variants[Math.floor(Math.random()*base.variants.length)]:base;
+    }
+    else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public){
+      const base=ROOM_BGM._fallback.public; cfg=(Math.random()<0.55 && base.variants&&base.variants.length)?base.variants[Math.floor(Math.random()*base.variants.length)]:base;
+    }
     else if(room.kind==='private' && ROOM_BGM._fallback && ROOM_BGM._fallback.private) cfg=ROOM_BGM._fallback.private;
     if(cfg) AudioEngine.start(cfg); else AudioEngine.stop();
   }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
@@ -3803,6 +3810,19 @@ async function subscribeMessages(rid){
       // 客户端过滤: eh_message_echoes 表无 room_id 列, 用 DOM 判断该消息是否属当前房
       if(!document.querySelector(`.msg[data-mid="${p.new.message_id}"]`)) return;
       applyEchoRealtime(p.new.message_id, p.new.user_id, p.new.emoji);
+    })
+    // 全房间 BGM 广播：当前用户没有本地覆盖时，跟随房间最新曲。
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_room_active_bgm'}, async p=>{
+      if(!curRoom || curRoom.id!==rid || !p.new || p.new.room_name!==curRoom.name || _ehBgmOverride) return;
+      try{
+        const q=await sb.from('eh_user_bgm').select('id,title,url,room_name').eq('id',p.new.bgm_id).maybeSingle();
+        if(q.data && q.data.url) AudioEngine.start({name:'🎼 '+(q.data.title||'全房间新曲'),url:q.data.url});
+      }catch(e){ console.warn('bgm broadcast receive',e); }
+    })
+    .on('broadcast',{event:'bgm.change'}, p=>{
+      const x=p.payload||{};
+      if(!curRoom || curRoom.id!==rid || x.room_name!==curRoom.name || _ehBgmOverride || !x.url) return;
+      try{ AudioEngine.start({name:'🎼 '+(x.title||'全房间新曲'),url:x.url}); }catch(e){ console.warn('bgm broadcast play',e); }
     })
     // 连接指示灯由 realtime 通道真实状态驱动(而非"一批一次性查询有没有 resolve")。
     // SUBSCRIBED=真的连上了; 掉线/出错/超时→回落"连接中",Supabase 会自动重连,重连成功再置亮。
@@ -5401,6 +5421,11 @@ async function send(){
   if(!text || !curRoom) return;
   // 斜杠命令
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
+  // @灵魂生成 BGM：支持自然表达，不和普通灵魂对话抢同一句
+  if(/^@灵魂[\s，,：:！!、]*(生成|来一首|做一首|放一首)?[\s，,：:！!、]*(bgm|背景音乐|音乐)/i.test(text)){
+    const desc=text.replace(/^@灵魂[\s，,：:！!、]*(生成|来一首|做一首|放一首)?[\s，,：:！!、]*(bgm|背景音乐|音乐)/i,'').trim();
+    resetInput(); await sendBgmGen(desc||'按照当前房间气氛创作一首纯器乐背景音乐'); return;
+  }
   let kind='msg';
   if(text.startsWith('/me ')){ kind='act'; text=text.slice(4); }
   // 神曲模式: 走神曲发送(把这句话唱出来), 不落普通文本
@@ -6160,6 +6185,74 @@ document.addEventListener('click',e=>{
   playSong(card.dataset.lyric||'', card.dataset.sid||'', card);
 });
 
+// ============ 灵魂现场 BGM：本地覆盖、曲库、显式广播 ============
+const EH_BGM_FN=SB_URL+'/functions/v1/eh-bgm-gen';
+const LS_BGM_LIBRARY='eh_user_bgm_library_v1';
+let _ehBgmGenerating=false;
+let _ehBgmOverride=null;
+function bgmRoomKind(){ return curRoom&&['official','public','private'].includes(curRoom.kind)?curRoom.kind:'public'; }
+function bgmSaveLocal(row){
+  try{
+    const a=JSON.parse(localStorage.getItem(LS_BGM_LIBRARY)||'[]').filter(x=>x&&x.id!==row.id);
+    a.unshift(row); localStorage.setItem(LS_BGM_LIBRARY,JSON.stringify(a.slice(0,50)));
+  }catch(_){}
+}
+function bgmLocalLibrary(){ try{return JSON.parse(localStorage.getItem(LS_BGM_LIBRARY)||'[]')}catch(_){return []} }
+function bgmPlayLocal(row){
+  if(!row||!row.url) return;
+  _ehBgmOverride=row;
+  try{ AudioEngine.start({name:'🎼 '+(row.title||'灵魂生成'),url:row.url}); }catch(e){ console.warn('bgm play',e); }
+  try{ toast(`🎼 已切换：${row.title||'灵魂现场曲'}（仅你可听）`); }catch(_){}
+}
+function bgmBroadcastPhrase(text){ return /全房间|全房|大家都听|所有人都听|广播|让大家听/i.test(text||''); }
+async function sendBgmGen(desc){
+  if(!curRoom) return;
+  if(!myUid){ try{await ensureAuth();}catch(_){} }
+  if(!myUid){ toast('灵魂还没认出你，请稍后再试'); return; }
+  if(_ehBgmGenerating){ toast('灵魂正在为你作曲，先别催它'); return; }
+  _ehBgmGenerating=true;
+  const room=curRoom;
+  const broadcast=bgmBroadcastPhrase(desc);
+  const clean=String(desc||'当前房间气氛').replace(/让(全房间|大家|所有人)(也)?听|广播/gi,'').trim().slice(0,500);
+  toast('🎼 灵魂开始作曲了，约需一两分钟…');
+  try{
+    const session=await sb.auth.getSession();
+    const token=session&&session.data&&session.data.session&&session.data.session.access_token;
+    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:`${room.name}·${clean.slice(0,24)}`,broadcast};
+    const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
+    const out=await r.json().catch(()=>({}));
+    if(!r.ok||!out.ok){
+      if(out.error==='quota_exceeded') toast(`灵魂今天已经为你做满 ${out.limit||5} 首了，先从曲库里挑一首吧`);
+      else toast('灵魂这次没接住，点一下重试就好');
+      return;
+    }
+    const row={id:out.id,title:out.title||body.title,url:out.url,room_name:room.name,created_at:new Date().toISOString()};
+    bgmSaveLocal(row); bgmPlayLocal(row);
+    if(broadcast){
+      // 直接走 Realtime broadcast 传 URL，避免广播曲依赖其它用户读取触发者的 RLS 曲库行。
+      try{ if(msgChan) await msgChan.send({type:'broadcast',event:'bgm.change',payload:{url:row.url,title:row.title,room_name:room.name,by:myUid}}); }catch(e){ console.warn('bgm broadcast send',e); }
+      toast('🎼 已让全房间听到这首新曲');
+    }
+    try{ ehLog('bgm_generated',{title:row.title,broadcast,room_name:room.name}); }catch(_){}
+  }catch(e){ console.warn('sendBgmGen',e); toast('灵魂暂时走神了，稍后再试'); }
+  finally{ _ehBgmGenerating=false; }
+}
+async function showMyBgmLibrary(){
+  if(!myUid){try{await ensureAuth()}catch(_){} }
+  let rows=[];
+  try{ const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(30); rows=q.data||[]; }catch(_){}
+  const merged=[...rows,...bgmLocalLibrary()].filter((x,i,a)=>x&&x.url&&a.findIndex(y=>String(y.id)===String(x.id))===i);
+  if(!merged.length){toast('你的灵魂曲库还是空的，输入：@灵魂生成 BGM 雨夜');return;}
+  const names=merged.slice(0,8).map((x,i)=>`${i+1}.${x.title||'未命名'}`).join('　');
+  toast('🎼 我的曲库：'+names+'　输入「/bgm切换 曲名」切换');
+  window.__EH_BGM_LIBRARY=merged;
+}
+async function switchMyBgm(title){
+  const all=window.__EH_BGM_LIBRARY||bgmLocalLibrary();
+  const row=all.find(x=>String(x.title||'').includes(title))||all[Number(title)-1];
+  if(!row){await showMyBgmLibrary();return;}
+  bgmPlayLocal(row);
+}
 async function sendSong(lyric, sid){
   if(!curRoom || !myUid) return;
   lyric=String(lyric||'').trim().slice(0,60);
@@ -6466,6 +6559,8 @@ const SLASH_CMDS=[
   {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
   {c:'/echo',  d:'放一串全屏烟花 🎆'},
   {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
+  {c:'/bgm',   d:'/bgm 描述 → @灵魂现场生成本地 BGM 🎼'},
+  {c:'/bgm库', d:'/bgm库 → 查看我的 BGM 曲库'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -6476,6 +6571,17 @@ async function handleSlash(text){
   if(cmd==='/sing'||cmd==='/唱'){
     if(!arg){ toast(EH_CONFIG.text.help_sing); return true; }
     await sendSong(arg, rand(SONG_STYLES).id); return true;
+  }
+  if(cmd==='/bgm'||cmd==='/生成bgm'){
+    if(!arg){ toast('描述一下想听的氛围，例如：雨夜、低频、空灵、纯器乐'); return true; }
+    await sendBgmGen(arg); return true;
+  }
+  if(cmd==='/bgm库'){
+    await showMyBgmLibrary(); return true;
+  }
+  if(cmd==='/bgm切换'){
+    if(!arg){ await showMyBgmLibrary(); return true; }
+    await switchMyBgm(arg); return true;
   }
   if(cmd==='/whisper'){
     const mName=arg.match(/^@?(\S+)\s+(.+)$/);
