@@ -1770,7 +1770,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-bgm13-fix-binding-pavlive';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-bgm14-android-kbd-controls-selflive';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4559,10 +4559,24 @@ function renderTyping(users){
   // 单独 toggle class 不进 sig, 不重建 DOM, 过渡平滑。
   const liveUids=new Set(users.filter(p=>p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
   presenceMap.forEach((el,uid)=>{
-    const on=liveUids.has(uid);
-    if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', on);
-    else el.classList.toggle('pav-live', on);
+    // 自己用本地时间戳判定(即时化, 见 markSelfTyping): 打字时不等 DB 往返, 刷新时也不会误撤本地态。
+    const on = uid===myUid ? (now-_selfTypingAt<3500) : liveUids.has(uid);
+    applyLive(el,on);
   });
+}
+// 头像活跃态开关(灵魂→soul-live 带 ping 环, 真人→pav-live 心跳提亮)
+function applyLive(el,on){
+  if(!el) return;
+  if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', on);
+  else el.classList.toggle('pav-live', on);
+}
+// 自己打字时即时点亮自己头像的活跃态, 不等 typing_at 写库+refreshPresence 拉回(那有 1~2s 延迟)。
+let _selfTypingAt=0, _selfTypingTimer=0;
+function markSelfTyping(){
+  _selfTypingAt=Date.now();
+  const el=presenceMap.get(myUid); if(el) applyLive(el,true);
+  if(_selfTypingTimer) clearTimeout(_selfTypingTimer);
+  _selfTypingTimer=setTimeout(()=>{ if(Date.now()-_selfTypingAt>=3500){ const e=presenceMap.get(myUid); if(e) applyLive(e,false); } }, 3600);
 }
 
 // 神曲谱曲队列条: 汇总 stream 里所有"谱曲中(pending)"神曲, 当有 pending 卡片滚出可视区时,
@@ -8749,6 +8763,9 @@ cin.addEventListener('input',()=>{
   const v=cin.value;
   const now=Date.now();
   if(v.trim() && now-(cin._lastTyping||0)>1500 && curRoom){ cin._lastTyping=now; beat({typing_at:new Date().toISOString()}); }
+  // ★自己头像的活跃态即时化: 不等 DB 往返(写库→下次 refreshPresence 拉回才亮, 有 1~2s 延迟, 打字慢半拍)。
+  //   本地一打字就给自己光墙头像加 live, 3.5s 无续打自动撤(与他人 typing_at 窗口一致)。
+  if(v.trim()){ markSelfTyping(); }
   // 打字流光: 内容变长时在输入框附近溅光点(节流 60ms, 只在字数增加时)
   // ★性能: 触屏设备(移动端)跳过——低端机连续打字时持续创建DOM+WAAPI会和键盘动画抢主线程
   if(!_coarsePointer && v.length>(cin._lastLen||0) && now-(cin._lastSpark||0)>60){
