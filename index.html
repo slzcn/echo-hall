@@ -609,6 +609,12 @@
   .skin-menu.bgm-menu .bgm-sep{height:1px;background:var(--line2);margin:4px 6px;opacity:.55}
   .skin-menu.bgm-menu .bgm-sec-title{font-size:10.5px;color:var(--sub);padding:6px 12px 2px;letter-spacing:.4px;opacity:.75}
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
+
+  .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
+  .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
+  .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
+  .skin-menu.bgm-menu .bgm-flex{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .skin-menu.bgm-menu .bgm-empty{font-size:11.5px;color:var(--sub);padding:2px 12px 4px;opacity:.7;font-style:italic}
   .skin-menu.bgm-menu .bgm-gen-row{color:var(--sub)}
   .skin-menu.bgm-menu .bgm-gen-row:hover{color:var(--ink)}
 
@@ -3016,12 +3022,11 @@ function startRoomBGM(room){
     bgmClearOverrideIfRoomChanged(room);
     if(!bgmOn()) return;
     if(!room){ AudioEngine.stop(); return; }
-    // 官方房按 name 精确绑, 公共/私密房走 _fallback (支持任意用户建的房间)
+    // 恢复上次记忆：manual=钉住那首，auto=随机官方曲
     let cfg=null;
-    // 用户手动选择记忆：进房时优先播放上次手动选的那首（跨会话记住）
     try{
-      const mu=bgmManualUrl(room.name);
-      if(mu){ _ehBgmOverride={ url:mu, name:'手动曲', title:'手动曲', room_name:room.name }; }
+      const mem=bgmModeGet(bgmRoomKey(room));
+      if(mem.mode==='manual' && mem.url){ _ehBgmOverride={ url:mem.url, name:'手动曲', title:'手动曲', room_name:room.name }; }
     }catch(_){}
     // 用户生成曲默认本地覆盖：同房间重新进入时继续播放，不影响其他人。
     if(typeof _ehBgmOverride!=='undefined' && _ehBgmOverride && _ehBgmOverride.room_name===room.name && _ehBgmOverride.url) cfg=_ehBgmOverride;
@@ -3037,9 +3042,18 @@ function startRoomBGM(room){
 }
 // 手动选曲：允许用户从下拉菜单直接挑本房 BGM
 const LS_BGM_MANUAL='eh_bgm_manual_v1';   // { [roomKey]: url }  按房间名维度记住最后一次手动选择
+// 新版记忆：每房间记住模式(auto=随机官方 / manual=钉某首)。auto 时不钉 url，进房重新随机。
+const LS_BGM_MODE='eh_bgm_mode_v1';       // { [roomKey]: {mode:'auto'|'manual', url:''} }
+function bgmModeStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MODE)||'{}')||{}; }catch(_){ return {}; } }
+function bgmModeGet(roomKey){ try{ const m=bgmModeStore()[roomKey]; return (m&&m.mode)?m:{mode:'auto',url:''}; }catch(_){ return {mode:'auto',url:''}; } }
+function bgmModeSave(roomKey,mode,url){ try{ const m=bgmModeStore(); m[roomKey]={mode:mode||'auto',url:(mode==='manual'?(url||''):'')}; localStorage.setItem(LS_BGM_MODE, JSON.stringify(m)); }catch(_){} }
+function bgmModeSaveGlobal(mode,url){ bgmModeSave('__global__', mode, url); }
+function bgmModeGetGlobal(){ return bgmModeGet('__global__'); }
+// roomKey：进房用房间名，大厅用 __lobby__
+function bgmRoomKey(room){ return room? room.name : '__lobby__'; }
 function bgmManualStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MANUAL)||'{}')||{}; }catch(_){ return {}; } }
 function bgmManualSave(roomKey,url){ try{ const m=bgmManualStore(); if(url) m[roomKey]=url; else delete m[roomKey]; localStorage.setItem(LS_BGM_MANUAL, JSON.stringify(m)); }catch(_){} }
-function bgmManualUrl(roomKey){ try{ return bgmManualStore()[roomKey]||''; }catch(_){ return ''; } }
+function bgmManualUrl(roomKey){ try{ return bgmModeGet(roomKey).mode==='manual'? (bgmModeGet(roomKey).url||'') : ''; }catch(_){ return ''; } }
 // 收集给用户看的曲目候选（默认曲、当前房 variants、我的灵魂曲库）
 function bgmCandidatesForRoom(room){
   const out=[]; const seen=new Set();
@@ -3084,10 +3098,11 @@ function _bgmActiveUrl(){
 async function buildBgmMenu(m){
   if(!m) return;
   const room=curRoom||null;
+  const on=bgmOn();
   const active=_bgmActiveUrl();
-  const isAuto=room?!bgmManualUrl(room.name):true;
-  const cands=bgmCandidatesForRoom(room);
-  const mine=await bgmMyLibraryForRoom(room);
+  const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
+  const cands=bgmCandidatesForRoom(room);   // 官方曲目
+  const mine=await bgmMyLibraryForRoom(room); // 灵魂曲目
   const esc=(t)=>String(t||'').replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"})[c]);
   const dotFor=(tag)=>{
     const t=String(tag||'');
@@ -3095,49 +3110,60 @@ async function buildBgmMenu(m){
     if(t==='扩展') return 'var(--violet)';
     if(t==='公开房'||t.indexOf('公')>=0) return 'var(--cyan)';
     if(t==='私密房'||t.indexOf('私')>=0) return 'var(--magenta)';
-    return 'var(--sub)';
+    return 'var(--cyan)';
   };
-  // ── 顶部：自动开关（跟随房间氛围）
-  // ── 分隔线
-  // ── 曲目列表（钉住这首）
   const html=[];
-  html.push(`<div class="skin-opt bgm-auto-row${isAuto?' active':''}" data-action="auto" title="自动跟随房间氛围切换">
-    <span class="dot" style="color:var(--accent,var(--cyan));background:var(--accent,var(--cyan))"></span>
-    <span class="bgm-auto-label">自动跟随氛围</span>
-    <span class="bgm-auto-sw">${isAuto?'开':'关'}</span>
+  // ① 音乐开关
+  html.push(`<div class="skin-opt bgm-power-row${on?' active':''}" data-action="power">
+    <span class="dot" style="color:${on?'var(--green)':'var(--sub)'};background:${on?'var(--green)':'var(--sub)'}"></span>
+    <span class="bgm-flex">背景音乐</span>
+    <span class="bgm-sw">${on?'开':'关'}</span>
   </div>`);
-  html.push(`<div class="bgm-sep"></div>`);
-  html.push(`<div class="bgm-sec-title">选一首钉住</div>`);
-  cands.forEach(c=>{
-    const dc=dotFor(c.tag);
-    const pinned=!isAuto && active===c.url;
-    html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span>${esc(c.name)}<span class="ck" style="color:${dc}">✓</span></div>`);
-  });
-  if(mine.length){
-    html.push(`<div class="bgm-sub-title">我生成的</div>`);
-    mine.forEach(c=>{
-      const pinned=!isAuto && active===c.url;
-      html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span>${esc(c.title||'灵魂曲')}<span class="ck" style="color:var(--amber)">✓</span></div>`);
-    });
-  }
-  if(room){
+  if(on){
     html.push(`<div class="bgm-sep"></div>`);
-    html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span>灵魂现场生成…</div>`);
+    // ② 随机官方（默认项）
+    html.push(`<div class="skin-opt bgm-auto-row${isAuto?' active':''}" data-action="auto" title="随机播放本房间官方曲目">
+      <span class="dot" style="color:var(--accent,var(--cyan));background:var(--accent,var(--cyan))"></span>
+      <span class="bgm-flex">随机官方曲</span>
+      <span class="ck" style="color:var(--accent,var(--cyan))">✓</span>
+    </div>`);
+    // ③ 官方曲目组
+    if(cands.length){
+      html.push(`<div class="bgm-sec-title">官方曲目</div>`);
+      cands.forEach(c=>{
+        const dc=dotFor(c.tag);
+        const pinned=!isAuto && active===c.url;
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
+      });
+    }
+    // ④ 灵魂曲目组
+    html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
+    if(mine.length){
+      mine.forEach(c=>{
+        const pinned=!isAuto && active===c.url;
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:var(--amber);background:var(--amber)"></span><span class="bgm-flex">${esc(c.title||'灵魂曲')}</span><span class="ck" style="color:var(--amber)">✓</span></div>`);
+      });
+    }else{
+      html.push(`<div class="bgm-empty">还没有 · @灵魂 生成一首</div>`);
+    }
+    if(room){
+      html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">灵魂现场生成…</span></div>`);
+    }
   }
   m.innerHTML=html.join('');
   m.querySelectorAll('.skin-opt').forEach(el=>{
     el.onclick=async (e)=>{
       e.stopPropagation();
       const act=el.dataset.action;
-      if(act==='auto'){
-        // 若已是自动，则不动；否则切回自动
-        if(!isAuto){ pickBgmAuto(); }
-        m.classList.remove('on'); syncBgmActive();
+      if(act==='power'){
+        AudioEngine.resume(); setBgm(!bgmOn());
+        await buildBgmMenu(m);   // 重绘：开→展开列表，关→只剩开关
+        syncBgmActive();
         return;
       }
+      if(act==='auto'){ if(!isAuto){ pickBgmAuto(); } m.classList.remove('on'); syncBgmActive(); return; }
       if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
       const url=el.dataset.url; if(!url) return;
-      // 再次点已钉住的曲目 = 回到自动
       if(!isAuto && active===url){ pickBgmAuto(); m.classList.remove('on'); syncBgmActive(); return; }
       const name=(el.textContent||'').replace('✓','').trim();
       if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||name,mine:true});
@@ -3150,18 +3176,20 @@ function pickBgmManual(row){
   if(!row||!row.url) return;
   if(!bgmOn()) setBgm(true);
   AudioEngine.resume();
-  if(curRoom) bgmManualSave(curRoom.name, row.url);
+  const key=bgmRoomKey(curRoom);
+  bgmModeSave(key,'manual',row.url);
   _ehBgmOverride={ url:row.url, name:row.name||'手动曲', title:row.name||'手动曲', room_name:(curRoom&&curRoom.name)||'' };
   try{ AudioEngine.start({name:'🎵 '+(row.name||'手动曲'),url:row.url}); }catch(_){}
-  try{ toast('🎵 已切到：'+(row.name||'手动曲')); }catch(_){}
+  try{ toast('🎵 '+(row.name||'手动曲')); }catch(_){}
 }
 function pickBgmAuto(){
-  if(curRoom) bgmManualSave(curRoom.name, '');
+  const key=bgmRoomKey(curRoom);
+  bgmModeSave(key,'auto','');
   _ehBgmOverride=null;
   if(!bgmOn()){ AudioEngine.stop(); return; }
   AudioEngine.resume();
   if(curRoom) startRoomBGM(curRoom); else startLobbyBGM();
-  try{ toast('🎲 已切回房间默认氛围'); }catch(_){}
+  try{ toast('🎲 随机官方曲'); }catch(_){}
 }
 function initBgmUI(){
   paintBgmBtn(bgmOn());
@@ -3183,32 +3211,15 @@ function initBgmUI(){
   };
   const bind=(btn,menu,other)=>{
     if(!btn) return;
-    let pressT=null; let longPressed=false; const LP_MS=420;
-    // 单击 = 开/关背景音乐；长按 = 弹下拉菜单
-    btn.onclick=(e)=>{
+    // 新交互：单击 = 弹菜单（切换开/关）。所有操作（开关/选曲/生成）都在菜单里。
+    btn.onclick=async (e)=>{
       e.stopPropagation();
-      if(longPressed){ longPressed=false; return; }
-      AudioEngine.resume(); setBgm(!bgmOn());
-      if(menu) menu.classList.remove('on');
-      syncBgmActive();
+      AudioEngine.resume();
+      const wasOpen=menu && menu.classList.contains('on');
+      if(wasOpen){ menu.classList.remove('on'); syncBgmActive(); return; }
+      await openMenu(menu,other);
+      if(menu) menu._openedAt=Date.now();
     };
-    const start=(ev)=>{
-      longPressed=false;
-      pressT=setTimeout(async ()=>{
-        longPressed=true; AudioEngine.resume();
-        await openMenu(menu,other);
-        if(menu){ menu._openedAt=Date.now(); }
-      }, LP_MS);
-    };
-    const cancel=()=>{ if(pressT){ clearTimeout(pressT); pressT=null; } };
-    btn.addEventListener('touchstart', start, {passive:true});
-    btn.addEventListener('touchend', cancel);
-    btn.addEventListener('touchmove', cancel, {passive:true});
-    btn.addEventListener('touchcancel', cancel);
-    btn.addEventListener('mousedown', start);
-    btn.addEventListener('mouseup', cancel);
-    btn.addEventListener('mouseleave', cancel);
-    // 桌面端：右键 / 长按菜单也弹出下拉
     btn.addEventListener('contextmenu', async (e)=>{ e.preventDefault(); AudioEngine.resume(); await openMenu(menu,other); if(menu){ menu._openedAt=Date.now(); } });
   };
   bind($('#bgmBtnLobby'), menuLobby, menuHall);
