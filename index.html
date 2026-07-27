@@ -631,17 +631,11 @@
   .skin-menu.bgm-menu .bgm-sec-title{font-size:10.5px;color:var(--sub);padding:6px 12px 2px;letter-spacing:.4px;opacity:.75}
   .skin-menu.bgm-menu .bgm-sub-title{font-size:10.5px;color:var(--sub);padding:8px 12px 2px;letter-spacing:.4px;opacity:.6}
 
-  /* 顶部分段胶囊：一整块圆角容器，内部两格分隔——克制干净，选中格填充主题色 */
-  .skin-menu.bgm-menu .bgm-mode-row{display:flex;margin:4px 6px 8px;padding:3px;gap:3px;
-    background:var(--card-bg-soft,rgba(255,255,255,.04));border:1px solid var(--line2);border-radius:11px}
-  .skin-menu.bgm-menu .bgm-mode-opt{flex:1;text-align:center;font-size:12.5px;font-weight:600;
-    padding:7px 4px;border-radius:8px;color:var(--sub);cursor:pointer;user-select:none;
-    -webkit-tap-highlight-color:transparent;transition:background .15s,color .15s,transform .08s;
-    border:none;background:transparent}
-  .skin-menu.bgm-menu .bgm-mode-opt:active{transform:scale(.95)}
-  .skin-menu.bgm-menu .bgm-mode-opt.active{color:#fff;
-    background:var(--accent,var(--cyan));box-shadow:0 2px 8px -3px var(--accent,var(--cyan))}
-  .skin-menu.bgm-menu .bgm-mode-opt.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+  /* 顶部「自动 / 关闭」二选一：完全复用通用 .mode-row/.mode-opt（背景风格第一行同款）
+     选中态 = 主题色实心底 + 白字；dimmed = 手动选曲时把「自动」暗化，表示"回自动"入口 */
+  .skin-menu.bgm-menu .mode-row{margin:4px 6px 8px}
+  .skin-menu.bgm-menu .mode-opt.active{background:var(--accent,var(--cyan));color:#fff;font-weight:600}
+  .skin-menu.bgm-menu .mode-opt.dimmed{color:color-mix(in srgb,var(--sub) 65%,transparent)}
   .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
   .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
   .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
@@ -3195,10 +3189,12 @@ async function buildBgmMenu(m){
     return 'var(--cyan)';
   };
   const html=[];
-  // ① 顶部一行：音乐开关 + 随机（借鉴风格菜单的分段胶囊 .mode-row/.mode-opt）
-  html.push(`<div class="mode-row bgm-mode-row">
-    <div class="mode-opt bgm-mode-opt${on?' active':''}" data-action="power" title="打开或关闭背景音乐">${on?'🎵 音乐开':'🔇 音乐关'}</div>
-    <div class="mode-opt bgm-mode-opt${(on&&isAuto)?' active':''}${on?'':' disabled'}" data-action="auto" title="随机播放本房间官方曲目">🎲 随机</div>
+  // ① 顶部一行：「自动 / 关闭」二选一，复用通用 .mode-row/.mode-opt（背景风格第一行同款）
+  //   自动 = 音乐开 + 随机官方曲；关闭 = 停播。手动选曲时「自动」暗化（可点回自动模式）
+  const isManualPicked=on && !isAuto;
+  html.push(`<div class="mode-row">
+    <div class="mode-opt${(on&&isAuto)?' active':(isManualPicked?' dimmed':'')}" data-action="auto" title="随机播放本房间官方曲目">自动</div>
+    <div class="mode-opt${on?'':' active'}" data-action="off" title="关闭背景音乐">关闭</div>
   </div>`);
   if(on){
     // ③ 官方曲目组
@@ -3212,9 +3208,9 @@ async function buildBgmMenu(m){
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
-    // ④ 灵魂曲目组（无曲则整组不显示，不再留空提示）
+    // ④ 灵魂曲目组（标题保留；无曲则只有标题，无提示行）
+    html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
     if(mine.length){
-      html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
       const shortTitle=(t)=>{
         let x=String(t||'灵魂曲').trim();
         // 去掉常见前缀「房间名·」/ 「房间名-」
@@ -3247,23 +3243,25 @@ async function buildBgmMenu(m){
     }
   }
   m.innerHTML=html.join('');
-  // 顶部胶囊（音乐开关 / 随机）——它们是 .mode-opt 不是 .skin-opt，需单独绑定
-  m.querySelectorAll('.bgm-mode-opt').forEach(el=>{
+  // 顶部两颗胶囊：自动 / 关闭 互斥
+  m.querySelectorAll('.mode-row .mode-opt').forEach(el=>{
     el.onclick=async (e)=>{
       e.stopPropagation();
-      if(el.classList.contains('disabled')) return;
       const act=el.dataset.action;
-      if(act==='power'){
-        AudioEngine.resume(); setBgm(!bgmOn());
-        await buildBgmMenu(m);   // 重绘：开→展开列表，关→只剩开关
+      if(act==='auto'){
+        AudioEngine.resume();
+        const wasOff=!bgmOn();
+        if(wasOff) setBgm(true);
+        pickBgmAuto();                       // 清手动记忆 + 重新随机官方曲
+        if(wasOff){ await buildBgmMenu(m); } // 从关闭→自动：需要展开列表（结构变），重绘
+        else { refreshBgmSelState(m); }      // 已开：只切高亮，不重绘 DOM（消除跳动）
         syncBgmActive();
         return;
       }
-      if(act==='auto'){
+      if(act==='off'){
         AudioEngine.resume();
-        if(!bgmOn()) setBgm(true);
-        pickBgmAuto();               // 切回随机官方曲：清手动记忆 + 重新随机
-        refreshBgmSelState(m);       // 只切高亮，不重绘 DOM（消除跳动）
+        setBgm(false);
+        await buildBgmMenu(m);   // 关闭：收起列表（结构变），重绘
         syncBgmActive();
         return;
       }
@@ -3291,20 +3289,25 @@ async function buildBgmMenu(m){
   });
 }
 // 局部刷新菜单选中态：只切 class，不重建 DOM（避免整体重绘导致的闪烁/高度跳动）
-// isAuto/active 的判定与 buildBgmMenu 完全一致，避免高亮错位
 function refreshBgmSelState(m){
   if(!m) return;
   const on=bgmOn();
   const room=curRoom||null;
   const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
   const active=isAuto?'':_bgmActiveUrl();
-  // 顶部两颗胶囊
-  m.querySelectorAll('.bgm-mode-opt').forEach(el=>{
+  const isManualPicked=on && !isAuto;
+  // 顶部：自动 / 关闭 二选一
+  m.querySelectorAll('.mode-row .mode-opt').forEach(el=>{
     const act=el.dataset.action;
-    if(act==='power') el.classList.toggle('active', on);
-    if(act==='auto') el.classList.toggle('active', on&&isAuto);
+    if(act==='auto'){
+      el.classList.toggle('active', on && isAuto);
+      el.classList.toggle('dimmed', isManualPicked);   // 手动选曲时自动暗化
+    }else if(act==='off'){
+      el.classList.toggle('active', !on);
+      el.classList.remove('dimmed');
+    }
   });
-  // 曲目行：命中 active 的打亮，其余取消
+  // 曲目行
   m.querySelectorAll('.skin-opt[data-url]').forEach(el=>{
     const u=el.dataset.url||'';
     el.classList.toggle('active', !isAuto && !!active && u===active);
@@ -6852,6 +6855,26 @@ function bgmClearOverrideIfRoomChanged(next){
   if(_ehBgmOverride && (!next || _ehBgmOverride.room_name!==next.name)) _ehBgmOverride=null;
 }
 function bgmBroadcastPhrase(text){ return /全房间|全房|大家都听|所有人都听|广播|让大家听/i.test(text||''); }
+function bgmGeneratedTitle(desc,room){
+  let t=String(desc||'').replace(/让(全房间|大家|所有人)(也)?听|广播/gi,' ')
+    .replace(/按(照)?当前房间(的)?气氛/gi,' ')
+    .replace(/现场生成|生成一首|创作一首|做一首|来一首/gi,' ')
+    .replace(/纯器乐|无人声|背景音乐|BGM/gi,' ')
+    .replace(/[，。,.!！?？:：;；·\-]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!t){
+    const rn=String((room&&room.name)||'').trim();
+    if(/午夜|深夜|电台/.test(rn)) return '午夜回声';
+    if(/技术|代码/.test(rn)) return '代码微光';
+    if(/虚空|回音/.test(rn)) return '星际回声';
+    if(/私密/.test(rn)||(room&&room.kind==='private')) return '耳边低语';
+    return '此刻回声';
+  }
+  try{
+    const chars=[...new Intl.Segmenter('zh',{granularity:'grapheme'}).segment(t)].map(x=>x.segment);
+    t=chars.slice(0,8).join('');
+  }catch(_){ t=t.slice(0,8); }
+  return t||'此刻回声';
+}
 async function sendBgmGen(desc){
   if(!curRoom) return;
   if(!myUid){ try{await ensureAuth();}catch(_){} }
@@ -6866,7 +6889,7 @@ async function sendBgmGen(desc){
   try{
     const session=await sb.auth.getSession();
     const token=session&&session.data&&session.data.session&&session.data.session.access_token;
-    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:`${clean.slice(0,12)}`,broadcast};
+    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:bgmGeneratedTitle(clean,room),broadcast};
     const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
     const out=await r.json().catch(()=>({}));
     if(!r.ok||!out.ok){
