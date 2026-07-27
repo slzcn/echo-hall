@@ -234,6 +234,7 @@
     .bg-grid, body.hall-on .bg-grid{ animation:none !important; }
     body.priv-heat::before{ animation:none !important; }
     .msg.soul .av, .msg.soul .av::after, .pav.soul-av .av-ic, .pav.soul-av .av-ic::after,
+    .pav.soul-av.soul-live .av-ic, .pav.soul-av.soul-live .av-ic::before, .pav.soul-av.soul-live .av-ic::after,
     .soul-thinking .av, .soul-thinking .av::after{ animation:none !important; }
   }
   @media (max-width: 480px){
@@ -390,7 +391,7 @@
   @media (prefers-reduced-motion:reduce){
     .bg-orb,.mood-aura{animation:none !important}
     .bgm-btn:not(.muted){animation:none !important}
-    .msg.soul .av,.pav.soul-av .av-ic{animation:none !important}
+    .msg.soul .av,.pav.soul-av .av-ic,.pav.soul-av.soul-live .av-ic::before{animation:none !important}
     /* 进场 logo/标题: 保留一次性显影(logoIn/titleReveal), 只关常驻流光/扫光/呼吸 */
     .logo{animation:logoIn 1s cubic-bezier(.2,.9,.3,1.3) both !important}
     .title{animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both !important}
@@ -991,7 +992,23 @@
                0 0 10px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent),
                0 0 18px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent);
     animation:soulHalo 3.8s ease-in-out infinite}
-  .pav.soul-av.soul-live .av-ic::after{animation-duration:1.5s}   /* 活跃→呼吸急促 */
+  /* ===== 活跃态(soul-live: 正在打字/思考, typing_at<3.5s) 视觉质变 =====
+     旧版只把 halo 提速(3.8s→1.5s), 小头像上快慢肉眼分不出=没变化。
+     新增三重叠加, 全是【振幅/形态】级差异, 一眼能看出"它在动":
+       1) 内辉光呼吸提速并加亮(soulHaloLive: opacity .65↔1, 1.4s)
+       2) 头像本体心跳缩放(soulHeartbeat: scale 1↔1.07, 1.4s) — 形态变化
+       3) ::before 外扩 ping 光环(soulPing: 从盒沿向外扩散淡出) — 空间扩张感
+     .presence 竖直有 22px padding, ::before 外扩不被裁。 */
+  .pav.soul-av.soul-live .av-ic::after{animation:soulHaloLive 1.4s ease-in-out infinite}
+  .pav.soul-av.soul-live .av-ic{animation:soulHeartbeat 1.4s ease-in-out infinite}
+  .pav.soul-av.soul-live .av-ic::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent);
+    animation:soulPing 1.4s ease-out infinite}
+  @keyframes soulHaloLive{0%,100%{opacity:.65}50%{opacity:1}}
+  @keyframes soulHeartbeat{0%,100%{transform:scale(1)}45%{transform:scale(1.07)}70%{transform:scale(1.02)}}
+  @keyframes soulPing{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}
+    70%{box-shadow:0 0 0 9px color-mix(in srgb,var(--pav-c,var(--cyan)) 0%,transparent)}
+    100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 0%,transparent)}}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}  /* 保留供 soul-thinking 用 */
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
@@ -1736,7 +1753,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-bgm10-soulglow';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-bgm12-dot-colors-soullive';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
