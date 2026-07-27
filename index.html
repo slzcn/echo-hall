@@ -3215,9 +3215,11 @@ async function buildBgmMenu(m){
     }
   }
   m.innerHTML=html.join('');
-  m.querySelectorAll('.skin-opt').forEach(el=>{
+  // 顶部胶囊（音乐开关 / 随机）——它们是 .mode-opt 不是 .skin-opt，需单独绑定
+  m.querySelectorAll('.bgm-mode-opt').forEach(el=>{
     el.onclick=async (e)=>{
       e.stopPropagation();
+      if(el.classList.contains('disabled')) return;
       const act=el.dataset.action;
       if(act==='power'){
         AudioEngine.resume(); setBgm(!bgmOn());
@@ -3225,14 +3227,34 @@ async function buildBgmMenu(m){
         syncBgmActive();
         return;
       }
-      if(act==='auto'){ if(!isAuto){ pickBgmAuto(); } m.classList.remove('on'); syncBgmActive(); return; }
+      if(act==='auto'){
+        AudioEngine.resume();
+        if(!bgmOn()) setBgm(true);
+        pickBgmAuto();           // 切回随机官方曲：清手动记忆 + 重新随机
+        await buildBgmMenu(m);   // 重绘：随机胶囊高亮、手动曲勾去掉
+        syncBgmActive();
+        return;
+      }
+    };
+  });
+  // 曲目行（官方 / 灵魂 / 生成）
+  m.querySelectorAll('.skin-opt').forEach(el=>{
+    el.onclick=async (e)=>{
+      e.stopPropagation();
+      const act=el.dataset.action;
       if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
       const url=el.dataset.url; if(!url) return;
-      if(!isAuto && active===url){ pickBgmAuto(); m.classList.remove('on'); syncBgmActive(); return; }
+      // 再点已选中的曲目 = 回到随机
+      if(!isAuto && active===url){
+        pickBgmAuto();
+        await buildBgmMenu(m); syncBgmActive();
+        return;
+      }
       const name=(el.textContent||'').replace('✓','').trim();
       if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||name,mine:true});
       else pickBgmManual({url,name});
-      m.classList.remove('on'); syncBgmActive();
+      // 选中某曲后重绘：随机胶囊灭高亮、该曲打勾（互斥）
+      await buildBgmMenu(m); syncBgmActive();
     };
   });
 }
