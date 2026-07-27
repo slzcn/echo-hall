@@ -235,6 +235,7 @@
     body.priv-heat::before{ animation:none !important; }
     .msg.soul .av, .msg.soul .av::after, .pav.soul-av .av-ic, .pav.soul-av .av-ic::after,
     .pav.soul-av.soul-live .av-ic, .pav.soul-av.soul-live .av-ic::before, .pav.soul-av.soul-live .av-ic::after,
+    .pav.pav-live .av-ic, .pav.pav-live .av-ic::after,
     .soul-thinking .av, .soul-thinking .av::after{ animation:none !important; }
   }
   @media (max-width: 480px){
@@ -391,7 +392,7 @@
   @media (prefers-reduced-motion:reduce){
     .bg-orb,.mood-aura{animation:none !important}
     .bgm-btn:not(.muted){animation:none !important}
-    .msg.soul .av,.pav.soul-av .av-ic,.pav.soul-av.soul-live .av-ic::before{animation:none !important}
+    .msg.soul .av,.pav.soul-av .av-ic,.pav.soul-av.soul-live .av-ic::before,.pav.pav-live .av-ic,.pav.pav-live .av-ic::after{animation:none !important}
     /* 进场 logo/标题: 保留一次性显影(logoIn/titleReveal), 只关常驻流光/扫光/呼吸 */
     .logo{animation:logoIn 1s cubic-bezier(.2,.9,.3,1.3) both !important}
     .title{animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both !important}
@@ -1009,6 +1010,14 @@
   @keyframes soulPing{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent)}
     70%{box-shadow:0 0 0 9px color-mix(in srgb,var(--pav-c,var(--cyan)) 0%,transparent)}
     100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 0%,transparent)}}
+  /* ===== 真人活跃态(pav-live: 正在打字, typing_at<3.5s) =====
+     真人静止时头像不动(与灵魂"常驻呼吸=AI标记"区分); 打字时也心跳缩放+描边提亮加内辉光,
+     让"谁在输入"对所有人可见。但【不给】灵魂那种外扩 ping 环+常驻呼吸, 保住灵魂独特身份。 */
+  .pav:not(.soul-av).pav-live .av-ic{animation:soulHeartbeat 1.4s ease-in-out infinite;
+    box-shadow:inset 0 0 0 1.5px var(--pav-c,var(--cyan)),inset 0 0 8px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 45%,transparent),
+               0 0 10px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 35%,transparent)}
+  .pav:not(.soul-av).pav-live .av-ic::after{opacity:.7;inset:-3.5px;animation:pavLiveRing 1.4s ease-in-out infinite}
+  @keyframes pavLiveRing{0%,100%{opacity:.4}50%{opacity:.85}}
   @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}  /* 保留供 soul-thinking 用 */
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
   /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
@@ -1753,7 +1762,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-bgm12-dot-colors-soullive';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-bgm13-fix-binding-pavlive';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4519,10 +4528,15 @@ function renderTyping(users){
     }catch(_){ bar.style.removeProperty('--typing-c'); }
   }
   else bar.classList.remove('on');
-  // 呼吸=活跃度: 正在输入/思考(typing_at 3.5s内)的灵魂 → 头像急促呼吸(soul-live), 否则平稳。
-  // 单独 toggle class 不进 sig, 不重建 DOM, 呼吸加速平滑过渡。
-  const liveUids=new Set(users.filter(p=>soulUidSet.has(p.user_id) && p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
-  presenceMap.forEach((el,uid)=>{ if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', liveUids.has(uid)); });
+  // 活跃度反馈(typing_at 3.5s内=正在输入/思考): 所有人头像都做"心跳+加亮"→ 谁在打字一眼可见。
+  //   灵魂额外带 soul-live(ping 外扩环+内辉光加亮), 真人只 pav-live(心跳+描边提亮), 静止呼吸仍是灵魂专属身份标记。
+  // 单独 toggle class 不进 sig, 不重建 DOM, 过渡平滑。
+  const liveUids=new Set(users.filter(p=>p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
+  presenceMap.forEach((el,uid)=>{
+    const on=liveUids.has(uid);
+    if(el.classList.contains('soul-av')) el.classList.toggle('soul-live', on);
+    else el.classList.toggle('pav-live', on);
+  });
 }
 
 // 神曲谱曲队列条: 汇总 stream 里所有"谱曲中(pending)"神曲, 当有 pending 卡片滚出可视区时,
