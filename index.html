@@ -3026,7 +3026,20 @@ function bgmPool(){
   }catch(e){ return []; }
 }
 // 大厅氛围: 随机连播任意房间 BGM(离房丝滑续播由 backToLobby 调 toChainAfter)
-function startLobbyBGM(){ try{ if(!bgmOn()) return; AudioEngine.chain(bgmPool()); }catch(e){ console.warn('startLobbyBGM',e); } }
+function startLobbyBGM(){
+  try{
+    if(!bgmOn()) return;
+    // 大厅也记住上一次操作：手动选曲时恢复那首；自动模式才随机官方曲目连播。
+    const mem=bgmModeGetGlobal();
+    if(mem.mode==='manual' && mem.url){
+      const row=bgmCandidatesForRoom(null).find(x=>x.url===mem.url);
+      if(row){ AudioEngine.start(row); return; }
+      // 曲库配置变更或资源失效时，清掉失效记忆，回退自动随机。
+      bgmModeSaveGlobal('auto','');
+    }
+    AudioEngine.chain(bgmPool());
+  }catch(e){ console.warn('startLobbyBGM',e); }
+}
 // 首次交互解锁: HTMLAudioElement 受 autoplay 策略限制, 手势后若在大厅且无房则起大厅 BGM。
 // (进房路径由 startRoomBGM 负责; 这里兜底"停在大厅还没响"的冷启动/自动恢复登录进大厅)
 function kickBgmOnGesture(){
@@ -3207,6 +3220,7 @@ function pickBgmManual(row){
   AudioEngine.resume();
   const key=bgmRoomKey(curRoom);
   bgmModeSave(key,'manual',row.url);
+  if(!curRoom) bgmModeSaveGlobal('manual',row.url);
   _ehBgmOverride={ url:row.url, name:row.name||'手动曲', title:row.name||'手动曲', room_name:(curRoom&&curRoom.name)||'' };
   try{ AudioEngine.start({name:'🎵 '+(row.name||'手动曲'),url:row.url}); }catch(_){}
   try{ toast('🎵 '+(row.name||'手动曲')); }catch(_){}
@@ -3214,6 +3228,7 @@ function pickBgmManual(row){
 function pickBgmAuto(){
   const key=bgmRoomKey(curRoom);
   bgmModeSave(key,'auto','');
+  if(!curRoom) bgmModeSaveGlobal('auto','');
   _ehBgmOverride=null;
   if(!bgmOn()){ AudioEngine.stop(); return; }
   AudioEngine.resume();
