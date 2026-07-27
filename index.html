@@ -3289,15 +3289,8 @@ async function buildBgmMenu(m){
       const act=el.dataset.action;
       if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
       const url=el.dataset.url; if(!url) return;
-      // 实时重算 isAuto/active（不用构建时的旧快照，否则第一首/再点已选判断会错位）
-      const curIsAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
-      const curActive=curIsAuto?'':_bgmActiveUrl();
-      // 再点已选中的曲目 = 回到自动
-      if(!curIsAuto && curActive===url){
-        pickBgmAuto();
-        refreshBgmSelState(m); syncBgmActive();
-        return;
-      }
+      // 点歌曲永远进入/保持手动模式；回自动只通过顶部「自动」按钮。
+      // 不再把“再次点已选歌曲”解释为回自动，避免首曲恰好正在播放时看起来点不动、随机重播造成跳动。
       const name=(el.textContent||'').replace('✓','').trim();
       if(el.dataset.mine==='1') pickBgmManual({url,name:el.dataset.title||name,mine:true});
       else pickBgmManual({url,name});
