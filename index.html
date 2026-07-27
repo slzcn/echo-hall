@@ -1675,7 +1675,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-soulpulse-inset';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-kb-browser-split';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8344,7 +8344,13 @@ window.addEventListener('beforeunload',()=>{
   //   innerHeight 与 vv.height 也可能差一截(安全区/状态栏计法不同)→ --kb 被误算成正数→输入框悬空不沉底。
   //   改用"输入框没聚焦时的 vv.height"当基线: 无键盘态 --kb 恒 0(输入框必沉底); 只有聚焦(键盘弹起)
   //   才用 基线 − 当前vv.height 求真实键盘高。基线在无焦点时随 vv 变化(地址栏显隐/转屏)持续刷新。
+  // ★运行时分流(2026-07-27 修安卓浏览器输入框间歇隐藏): --appvh 只在 PWA standalone 生效。
+  //   真凶: --appvh(=JS实测vv高)本为修 iOS PWA "100dvh偏大不沉底"引入, 但原来无条件对所有环境生效。
+  //   安卓浏览器地址栏显隐会让 vv.height 反复抖动 → --appvh 跟着跳 → #hall 高忽大忽小 → composer 被推到
+  //   浏览器工具栏后面, 输入框间歇隐藏。浏览器本有 interactive-widget/dvh 原生自适应, 不该被 JS 覆盖。
+  var isPWA = document.documentElement.classList.contains('pwa-standalone');
   var baseH = Math.round(vv.height), lastAppvh = -1;
+  var baseInner = window.innerHeight || baseH;   // 无键盘布局视口基线(区分安卓interactive-widget vs iOS只缩vv)
   function apply(){
     raf = 0;
     if(document.documentElement.classList.contains('kb-compensating')) return;   // 覆盖式键盘交 --kvh
@@ -8352,13 +8358,17 @@ window.addEventListener('beforeunload',()=>{
     var kb;
     if(!inHall || !cinFocused){
       var h = Math.round(vv.height); if(h>0) baseH = h;   // 无键盘态: 刷新基线(=当下真实可视高)
+      var ih = window.innerHeight; if(ih>0) baseInner = ih;
       kb = 0;                                             // --kb 归 0 → 输入框沉底
     } else {
-      kb = Math.max(0, Math.round(baseH - vv.height - vv.offsetTop));   // 键盘高 = 基线 − 当前可视高(减 offsetTop 抵消 iOS 自动滚动)
-      if(kb<40) kb=0;
+      // 布局视口(innerHeight)也收缩了 = 浏览器已靠 interactive-widget/dvh 自动让位(安卓Chrome),
+      // 纯 CSS 100dvh 已贴合键盘, JS 不该再扣 --kb(否则双重让位→容器过矮/输入框被推到工具栏后)。
+      var innerShrunk = (baseInner - (window.innerHeight||baseInner)) > 40;
+      if(innerShrunk){ kb = 0; }
+      else { kb = Math.max(0, Math.round(baseH - vv.height - vv.offsetTop)); if(kb<40) kb=0; }   // iOS 只缩 vv, 才补偿
     }
-    // --appvh = 无键盘时的真实可视高。容器高用它而非 100dvh(PWA 下 100dvh 偏大→不沉底)。
-    if(baseH>0 && baseH!==lastAppvh){ lastAppvh=baseH; document.documentElement.style.setProperty('--appvh', baseH + 'px'); }
+    // --appvh 仅 PWA standalone 用(修 100dvh 偏大不沉底); 浏览器回落纯 100dvh(原生自适应, 免地址栏抖动误伤)。
+    if(isPWA && baseH>0 && baseH!==lastAppvh){ lastAppvh=baseH; document.documentElement.style.setProperty('--appvh', baseH + 'px'); }
     if(kb===lastKb) return;
     lastKb = kb;
     document.documentElement.style.setProperty('--kb', kb + 'px');
