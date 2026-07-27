@@ -1467,17 +1467,16 @@
          body(height:100%)跟着收缩, .stream(flex:1;min-height:0)吃剩余高并滚动, .composer(flex-shrink:0)贴底=键盘上方。
        统一补偿 — JS 给 <html> 挂 .kb-vv 并用 visualViewport 实测高写 --kvh, 下面让 #hall/stage 用 var(--kvh)。
          这样无论 interactive-widget 生不生效(安卓Chrome/第三方IME/iOS PWA 各异), 都用真实可视高精确收缩。 */
-    /* ★键盘协同 = 行业标准"inset"方案(2026-07-27, 参考 MDN visualViewport / Chrome DevRel / 多个开源聊天库):
-       iOS 不缩 dvh/布局视口, 只缩 visualViewport, 且键盘弹起会自动滚动页面产生 vv.offsetTop 偏移。
-       之前"容器高=vv.height"漏了 offsetTop → 容器顶钉在布局视口顶(被滚到看不见处)→ 输入框跑出屏幕=消失。
-       正解: 键盘高度 --kb = innerHeight − vv.height − vv.offsetTop(公式自带 offsetTop 抵消), 容器高扣掉它;
-       并在 JS focusin 抢先锁滚动让 offsetTop 保持 0。容器 100dvh 打底, 键盘弹起收缩 --kb, 输入框贴键盘顶。 */
-    body.hall-on .stage{padding:0;height:calc(100dvh - var(--kb,0px));align-items:stretch}
-    #hall{width:100%;height:calc(100dvh - var(--kb,0px));border-radius:0;border:none}
-    /* .kb-vv/--kvh 仅用于覆盖式第三方键盘(安卓讯飞等 vv 完全不收缩→--kb≈0 顶不起来): JS 估算写 --kvh 兜底,
-       kb-compensating 时用绝对可视高 --kvh 覆盖上面的 calc。 */
-    html.kb-compensating body.hall-on .stage{height:var(--kvh,calc(100dvh - var(--kb,0px)))}
-    html.kb-compensating #hall{height:var(--kvh,calc(100dvh - var(--kb,0px)))}
+    /* ★键盘协同(2026-07-27 v3, 修 PWA 不沉底): 容器高度直接用 JS 实测的可视高 --appvh, 而非 100dvh。
+       真凶: standalone PWA 下 100dvh 比真实可视高(visualViewport.height)大一截(iOS 把状态栏/安全区算进
+       dvh)→ calc(100dvh−--kb) 即便 --kb=0 也超出屏幕→ #hall 底(输入框)被顶到可视区下方, 露一段空白不沉底。
+       --appvh = 无键盘时的 visualViewport.height(JS 每帧写), 就是"当下真实可视高", PWA/Safari 都准;
+       键盘弹起再扣 --kb(=基线−当前vv高)。无 JS(--appvh 未设)才回落 100dvh。 */
+    body.hall-on .stage{padding:0;height:calc(var(--appvh,100dvh) - var(--kb,0px));align-items:stretch}
+    #hall{width:100%;height:calc(var(--appvh,100dvh) - var(--kb,0px));border-radius:0;border:none}
+    /* .kb-vv/--kvh 仅用于覆盖式第三方键盘(安卓讯飞等 vv 完全不收缩→--kb≈0 顶不起来): JS 估算写 --kvh 兜底。 */
+    html.kb-compensating body.hall-on .stage{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
+    html.kb-compensating #hall{height:var(--kvh,calc(var(--appvh,100dvh) - var(--kb,0px)))}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     /* ★补偿态(PWA 覆盖式键盘, JS 加 kb-compensating): #hall 已收缩到键盘上方, 键盘盖住底部 home 条,
@@ -1657,7 +1656,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-kb-baseline';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-appvh';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8303,19 +8302,21 @@ window.addEventListener('beforeunload',()=>{
   //   innerHeight 与 vv.height 也可能差一截(安全区/状态栏计法不同)→ --kb 被误算成正数→输入框悬空不沉底。
   //   改用"输入框没聚焦时的 vv.height"当基线: 无键盘态 --kb 恒 0(输入框必沉底); 只有聚焦(键盘弹起)
   //   才用 基线 − 当前vv.height 求真实键盘高。基线在无焦点时随 vv 变化(地址栏显隐/转屏)持续刷新。
-  var baseH = Math.round(vv.height);
+  var baseH = Math.round(vv.height), lastAppvh = -1;
   function apply(){
     raf = 0;
     if(document.documentElement.classList.contains('kb-compensating')) return;   // 覆盖式键盘交 --kvh
     var inHall = document.body.classList.contains('hall-on');
     var kb;
     if(!inHall || !cinFocused){
-      var h = Math.round(vv.height); if(h>0) baseH = h;   // 无键盘态: 刷新基线
+      var h = Math.round(vv.height); if(h>0) baseH = h;   // 无键盘态: 刷新基线(=当下真实可视高)
       kb = 0;                                             // --kb 归 0 → 输入框沉底
     } else {
       kb = Math.max(0, Math.round(baseH - vv.height - vv.offsetTop));   // 键盘高 = 基线 − 当前可视高(减 offsetTop 抵消 iOS 自动滚动)
       if(kb<40) kb=0;
     }
+    // --appvh = 无键盘时的真实可视高。容器高用它而非 100dvh(PWA 下 100dvh 偏大→不沉底)。
+    if(baseH>0 && baseH!==lastAppvh){ lastAppvh=baseH; document.documentElement.style.setProperty('--appvh', baseH + 'px'); }
     if(kb===lastKb) return;
     lastKb = kb;
     document.documentElement.style.setProperty('--kb', kb + 'px');
