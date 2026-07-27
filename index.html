@@ -3195,14 +3195,16 @@ function _bgmActiveUrl(){
 // 打开弹层时的分组抽样：list.length<=3 → 全展示；>3 → 随机 3 首，正在播的那首（若在 list 中）强制包含
 function sampleTracks(list, playingUrl, n){
   if(!Array.isArray(list) || list.length<=n) return (list||[]).slice();
+  // 随机挑哪几首：正在播的那首强制包含，其余从剩下里随机补
+  const hasForced = list.some(x=>playingUrl && x && x.url===playingUrl);
   const others=list.filter(x=>!(playingUrl && x && x.url===playingUrl));
-  const forced=list.find(x=>playingUrl && x && x.url===playingUrl);
   const pool=others.slice();
-  // Fisher–Yates 简版
   for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
-  const need=forced?(n-1):n;
-  const picked=pool.slice(0,need);
-  return forced?[forced,...picked]:picked;
+  const need=hasForced?(n-1):n;
+  const chosen=new Set(pool.slice(0,need).map(x=>x&&x.url));
+  if(hasForced){ const f=list.find(x=>playingUrl && x && x.url===playingUrl); if(f) chosen.add(f.url); }
+  // 关键：挑中的这几首，按原始 list 的固定顺序返回（不随机乱序）
+  return list.filter(x=>x && chosen.has(x.url));
 }
 async function buildBgmMenu(m){
   if(!m) return;
@@ -3242,8 +3244,10 @@ async function buildBgmMenu(m){
       m._bgmPickCache.official=officialShown;
       m._bgmPickCache._roomKey=(room&&room.name)||'__lobby__';
     }else if(playing && !officialShown.some(x=>x&&x.url===playing) && cands.some(x=>x&&x.url===playing)){
-      // 播放曲切到未被抽中的官方曲：只替换第一位为它，保持稳定不重抽
-      officialShown=[cands.find(x=>x&&x.url===playing), ...officialShown.slice(0,2)];
+      // 播放曲切到未被抽中的官方曲：加入 3 首集合，但按原 list 固定顺序展示
+      const keep=new Set(officialShown.slice(0,2).map(x=>x&&x.url));
+      keep.add(playing);
+      officialShown=cands.filter(x=>x && keep.has(x.url));
       m._bgmPickCache.official=officialShown;
     }
     if(officialShown.length){
@@ -3263,7 +3267,10 @@ async function buildBgmMenu(m){
       m._bgmPickCache.soul=soulShown;
       m._bgmPickCache._soulLen=mine.length;
     }else if(playing && !soulShown.some(x=>x&&x.url===playing) && mine.some(x=>x&&x.url===playing)){
-      soulShown=[mine.find(x=>x&&x.url===playing), ...soulShown.slice(0,2)];
+      // 播放曲切到未被抽中的灵魂曲：加入 3 首集合，按原 list 固定顺序展示
+      const keep=new Set(soulShown.slice(0,2).map(x=>x&&x.url));
+      keep.add(playing);
+      soulShown=mine.filter(x=>x && keep.has(x.url));
       m._bgmPickCache.soul=soulShown;
     }
     html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
