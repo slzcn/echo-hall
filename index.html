@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-bgm34-pwa-installed-hide';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-bgm35-lobby-soul-all';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3178,10 +3178,16 @@ function bgmCandidatesForRoom(room){
   return out;
 }
 async function bgmMyLibraryForRoom(room){
-  if(!room||!myUid) return [];
+  if(!myUid) return [];
   try{
     const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(50);
     const rows=(q.data||[]).filter(x=>x&&x.url);
+    if(!room){
+      // 【首页大厅 07-28 02:50】无当前房间→聚合展示“我的全部灵魂曲库”（跨房间），方便在大厅直接选播
+      const local=bgmLocalLibrary().filter(x=>x&&x.url);
+      const merged=[...rows,...local].filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i);
+      return merged.slice(0,20);
+    }
     const rn=room.name;
     const here=rows.filter(x=>x.room_name===rn);
     const local=bgmLocalLibrary().filter(x=>x&&x.url&&x.room_name===rn);
