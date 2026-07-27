@@ -2989,6 +2989,8 @@ function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
+    // 换房触发时先清过期 override（同房再进不清，续播用户生成曲）
+    bgmClearOverrideIfRoomChanged(room);
     if(!bgmOn()) return;
     if(!room){ AudioEngine.stop(); return; }
     // 官方房按 name 精确绑, 公共/私密房走 _fallback (支持任意用户建的房间)
@@ -6451,9 +6453,15 @@ function bgmSaveLocal(row){
 function bgmLocalLibrary(){ try{return JSON.parse(localStorage.getItem(LS_BGM_LIBRARY)||'[]')}catch(_){return []} }
 function bgmPlayLocal(row){
   if(!row||!row.url) return;
-  _ehBgmOverride=row;
+  // 只在当前房间生效：override 绑定的 room_name 一定是"当前房"，避免跨房粘曲。
+  const rn=(curRoom&&curRoom.name)||row.room_name||'';
+  _ehBgmOverride={ ...row, room_name:rn };
   try{ AudioEngine.start({name:'🎼 '+(row.title||'灵魂生成'),url:row.url}); }catch(e){ console.warn('bgm play',e); }
   try{ toast(`🎼 已切换：${row.title||'灵魂现场曲'}（仅你可听）`); }catch(_){}
+}
+// 换房时清掉过期 override，避免上一房的曲挡新房的广播/默认曲。
+function bgmClearOverrideIfRoomChanged(next){
+  if(_ehBgmOverride && (!next || _ehBgmOverride.room_name!==next.name)) _ehBgmOverride=null;
 }
 function bgmBroadcastPhrase(text){ return /全房间|全房|大家都听|所有人都听|广播|让大家听/i.test(text||''); }
 async function sendBgmGen(desc){
@@ -6461,6 +6469,7 @@ async function sendBgmGen(desc){
   if(!myUid){ try{await ensureAuth();}catch(_){} }
   if(!myUid){ toast('灵魂还没认出你，请稍后再试'); return; }
   if(_ehBgmGenerating){ toast('灵魂正在为你作曲，先别催它'); return; }
+  const now=Date.now(); if(sendBgmGen._t && now-sendBgmGen._t<4000){ toast('灵魂手还没闲下来，稍等几秒'); return; } sendBgmGen._t=now;
   _ehBgmGenerating=true;
   const room=curRoom;
   const broadcast=bgmBroadcastPhrase(desc);
@@ -6494,12 +6503,18 @@ async function showMyBgmLibrary(){
   try{ const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(30); rows=q.data||[]; }catch(_){}
   const merged=[...rows,...bgmLocalLibrary()].filter((x,i,a)=>x&&x.url&&a.findIndex(y=>String(y.id)===String(x.id))===i);
   if(!merged.length){toast('你的灵魂曲库还是空的，输入：@灵魂生成 BGM 雨夜');return;}
-  const names=merged.slice(0,8).map((x,i)=>`${i+1}.${x.title||'未命名'}`).join('　');
-  toast('🎼 我的曲库：'+names+'　输入「/bgm切换 曲名」切换');
-  window.__EH_BGM_LIBRARY=merged;
+  const rn=curRoom&&curRoom.name;
+  const here=rn?merged.filter(x=>x.room_name===rn):merged;
+  const rest=rn?merged.filter(x=>x.room_name!==rn):[];
+  const list=[...here,...rest].slice(0,8);
+  const names=list.map((x,i)=>`${i+1}.${x.title||'未命名'}${(rn&&x.room_name!==rn)?'（'+x.room_name+'）':''}`).join('　');
+  toast('🎼 我的曲库：'+names+(rn?'　输入「/bgm切换 曲名」':'　（进房后再切）'));
+  window.__EH_BGM_LIBRARY=list;
 }
 async function switchMyBgm(title){
-  const all=window.__EH_BGM_LIBRARY||bgmLocalLibrary();
+  if(!curRoom){ toast('先进一个房间再切曲'); return; }
+  const all=(window.__EH_BGM_LIBRARY||bgmLocalLibrary()).filter(x=>x&&x.room_name===curRoom.name);
+  if(!all.length){ toast('这个房间还没有你的灵魂曲，先「@灵魂生成 BGM …」一首'); return; }
   const row=all.find(x=>String(x.title||'').includes(title))||all[Number(title)-1];
   if(!row){await showMyBgmLibrary();return;}
   bgmPlayLocal(row);
