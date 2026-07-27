@@ -1,1 +1,1 @@
-20260728-bgm35-lobby-soul-all
+20260728-bgm36-lobby-cache-invalidate

@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-bgm35-lobby-soul-all';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-bgm36-lobby-cache-invalidate';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3284,12 +3284,13 @@ async function buildBgmMenu(m){
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
-    // ④ 灵魂曲目组（>3 首时随机抽 3，播放中的那首强制保留；标题保留；无曲则只有标题）
+    // 【灵魂组缓存 07-28 03:08】key 加 _soulRoomKey 防长度巧合复用旧房间抽样（旧实现只看 _soulLen）
     const nSoul=bgmShowN(room,'soul');
     let soulShown=m._bgmPickCache.soul;
-    if(!soulShown || m._bgmPickCache._soulLen!==mine.length || m._bgmPickCache._nSoul!==nSoul){
+    if(!soulShown || m._bgmPickCache._soulRoomKey!==roomKey || m._bgmPickCache._soulLen!==mine.length || m._bgmPickCache._nSoul!==nSoul){
       soulShown=sampleTracks(mine, playing, nSoul);
       m._bgmPickCache.soul=soulShown;
+      m._bgmPickCache._soulRoomKey=roomKey;
       m._bgmPickCache._soulLen=mine.length;
       m._bgmPickCache._nSoul=nSoul;
     }else if(playing && !soulShown.some(x=>x&&x.url===playing) && mine.some(x=>x&&x.url===playing)){
@@ -8376,6 +8377,11 @@ function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('b
 // ============ 返回大厅 ============
 function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
   try{ document.body.classList.remove('priv-heat'); }catch(_){}   // 离房去掉暧昧红氛围
+  // 【房间→首页 BGM 弹层缓存失效 07-28 03:08】roomKey 变了但弹层 DOM 御缓存仍携旧房间数据→
+  //   下次开菜单官方组虽能因 _roomKey!==roomKey 重抽，但灵魂组只看 _soulLen/_nSoul 会长度巧合复用旧抽样
+  //   → 主动清两个弹层缓存，强制下次重新抽
+  try{ var _mLb=document.getElementById('bgmMenu'); if(_mLb) _mLb._bgmPickCache=null; }catch(_){}
+  try{ var _mHall=document.getElementById('bgmMenuHall'); if(_mHall) _mHall._bgmPickCache=null; }catch(_){}
   // 丝滑续播: 不打断当前房 BGM, 只切成大厅随机连播模式——当前曲放完后随机连播任意房间 BGM
   try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){}
   applyTheme(sceneOrDefaultTheme());  // 离房恢复全局主题(未锁主题时叠加深夜/节日场景皮肤)
