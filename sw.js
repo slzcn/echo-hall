@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v53-bgm31-title-left-dot';
+const SW_VERSION = 'eh-sw-v54-bgm31-strong-purge';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -29,7 +29,9 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== SHELL_CACHE && k !== CDN_CACHE).map((k) => caches.delete(k)))
+      // 强制清光所有 eh-shell-* 和 eh-cdn-* 旧缓存，只保留当前版 SHELL_CACHE/CDN_CACHE
+      // 避免旧 SW 缓存的 index.html 被新 SW 听用导致样式不同步（bgm30→bgm31 踩雷）
+      Promise.all(keys.filter((k) => (k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
