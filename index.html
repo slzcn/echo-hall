@@ -3206,6 +3206,7 @@ async function buildBgmMenu(m){
     <div class="mode-opt${on?'':' active'}" data-action="off" title="关闭背景音乐">关闭</div>
   </div>`);
   m.classList.toggle('off-mode', !on);
+  const isLobby=!room;   // 大厅(列表页)：无当前房间概念，不提供「请灵魂制作」
   // 即使关闭，下方列表也展示（只做视觉弱化）；点任一首 = 自动开机+播放
     // ③ 官方曲目组
     if(cands.length){
@@ -3248,7 +3249,8 @@ async function buildBgmMenu(m){
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
-    if(room){
+    // ⑤ 灵魂现场生成（仅房间页；大厅无当前房间，不提供）
+    if(room && !isLobby){
       html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">请灵魂制作一首…</span></div>`);
     }
   m.innerHTML=html.join('');
@@ -3283,8 +3285,11 @@ async function buildBgmMenu(m){
       const act=el.dataset.action;
       if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
       const url=el.dataset.url; if(!url) return;
-      // 再点已选中的曲目 = 回到随机
-      if(!isAuto && active===url){
+      // 实时重算 isAuto/active（不用构建时的旧快照，否则第一首/再点已选判断会错位）
+      const curIsAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
+      const curActive=curIsAuto?'':_bgmActiveUrl();
+      // 再点已选中的曲目 = 回到自动
+      if(!curIsAuto && curActive===url){
         pickBgmAuto();
         refreshBgmSelState(m); syncBgmActive();
         return;
@@ -3301,6 +3306,7 @@ async function buildBgmMenu(m){
 function refreshBgmSelState(m){
   if(!m) return;
   const on=bgmOn();
+  m.classList.toggle('off-mode', !on);
   const room=curRoom||null;
   const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
   const active=isAuto?'':_bgmActiveUrl();
@@ -3390,8 +3396,17 @@ function initBgmUI(){
   document.addEventListener('pointerdown', outside, true);
   // 兜底：滚动/触摸滑动时也关掉
   window.addEventListener('scroll', ()=>{ [menuLobby,menuHall].forEach(m=>{ if(m&&m.classList.contains('on')&&m._openedAt&&Date.now()-m._openedAt>150) m.classList.remove('on'); }); syncBgmActive(); }, {passive:true, capture:true});
-  // 曲目变化时刷新已开菜单（新生成一首后菜单立刻能看到）
-  window.addEventListener('eh:bgm-changed', ()=>{ [menuLobby,menuHall].forEach(m=>{ if(m && m.classList.contains('on')) buildBgmMenu(m); }); });
+  // 曲目变化时刷新已开菜单：
+  //   • reason='library' → 曲库增删（新生成一首），需重建 DOM
+  //   • 其他（切曲/换房）→ 只更新选中态，避免全量重绘导致的跳动
+  window.addEventListener('eh:bgm-changed', (e)=>{
+    const isLib=(e&&e.detail&&e.detail.reason)==='library';
+    [menuLobby,menuHall].forEach(m=>{
+      if(!m||!m.classList.contains('on')) return;
+      if(isLib) buildBgmMenu(m);
+      else refreshBgmSelState(m);
+    });
+  });
 }
 
 
@@ -6934,7 +6949,7 @@ async function sendBgmGen(desc){
       toast('🎼 已让全房间听到这首新曲');
     }
     try{ ehLog('bgm_generated',{title:row.title,broadcast,room_name:room.name}); }catch(_){}
-    try{ window.dispatchEvent(new CustomEvent('eh:bgm-changed')); }catch(_){}
+    try{ window.dispatchEvent(new CustomEvent('eh:bgm-changed',{detail:{reason:'library'}})); }catch(_){}
   }catch(e){ console.warn('sendBgmGen',e); toast('灵魂暂时走神了，稍后再试'); }
   finally{ _ehBgmGenerating=false; }
 }
