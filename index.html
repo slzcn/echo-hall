@@ -3192,6 +3192,18 @@ function _bgmActiveUrl(){
     return bgmMenuCurrentUrl();
   }catch(_){ return ''; }
 }
+// 打开弹层时的分组抽样：list.length<=3 → 全展示；>3 → 随机 3 首，正在播的那首（若在 list 中）强制包含
+function sampleTracks(list, playingUrl, n){
+  if(!Array.isArray(list) || list.length<=n) return (list||[]).slice();
+  const others=list.filter(x=>!(playingUrl && x && x.url===playingUrl));
+  const forced=list.find(x=>playingUrl && x && x.url===playingUrl);
+  const pool=others.slice();
+  // Fisher–Yates 简版
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const need=forced?(n-1):n;
+  const picked=pool.slice(0,need);
+  return forced?[forced,...picked]:picked;
+}
 async function buildBgmMenu(m){
   if(!m) return;
   const room=curRoom||null;
@@ -3221,20 +3233,41 @@ async function buildBgmMenu(m){
   m.classList.toggle('off-mode', !on);
   const isLobby=!room;   // 大厅(列表页)：无当前房间概念，不提供「请灵魂制作」
   // 即使关闭，下方列表也展示（只做视觉弱化）；点任一首 = 自动开机+播放
-    // ③ 官方曲目组
-    if(cands.length){
+    // ③ 官方曲目组（>3 首时随机抽 3，播放中的那首强制保留）
+    // 抽样结果缓存在 m._bgmPickCache，切歌局部刷新不重抽；打开菜单/曲库变化时清缓存
+    if(!m._bgmPickCache) m._bgmPickCache={};
+    let officialShown=m._bgmPickCache.official;
+    if(!officialShown || m._bgmPickCache._roomKey!==((room&&room.name)||'__lobby__')){
+      officialShown=sampleTracks(cands, playing, 3);
+      m._bgmPickCache.official=officialShown;
+      m._bgmPickCache._roomKey=(room&&room.name)||'__lobby__';
+    }else if(playing && !officialShown.some(x=>x&&x.url===playing) && cands.some(x=>x&&x.url===playing)){
+      // 播放曲切到未被抽中的官方曲：只替换第一位为它，保持稳定不重抽
+      officialShown=[cands.find(x=>x&&x.url===playing), ...officialShown.slice(0,2)];
+      m._bgmPickCache.official=officialShown;
+    }
+    if(officialShown.length){
       html.push(`<div class="bgm-sec-title">官方曲目</div>`);
       // 按 index 循环取主题色变量，让相邻曲目点点不同色；主题切换自动跟随
       const OFFICIAL_HUES=['var(--cyan)','var(--violet)','var(--magenta)','var(--green)','var(--amber)'];
-      cands.forEach((c,i)=>{
+      officialShown.forEach((c,i)=>{
         const dc=OFFICIAL_HUES[i%OFFICIAL_HUES.length];
         const pinned=!!playing && playing===c.url;
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
-    // ④ 灵魂曲目组（标题保留；无曲则只有标题，无提示行）
+    // ④ 灵魂曲目组（>3 首时随机抽 3，播放中的那首强制保留；标题保留；无曲则只有标题）
+    let soulShown=m._bgmPickCache.soul;
+    if(!soulShown || m._bgmPickCache._soulLen!==mine.length){
+      soulShown=sampleTracks(mine, playing, 3);
+      m._bgmPickCache.soul=soulShown;
+      m._bgmPickCache._soulLen=mine.length;
+    }else if(playing && !soulShown.some(x=>x&&x.url===playing) && mine.some(x=>x&&x.url===playing)){
+      soulShown=[mine.find(x=>x&&x.url===playing), ...soulShown.slice(0,2)];
+      m._bgmPickCache.soul=soulShown;
+    }
     html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
-    if(mine.length){
+    if(soulShown.length){
       const shortTitle=(t)=>{
         let x=String(t||'灵魂曲').trim();
         // 去掉常见前缀「房间名·」/ 「房间名-」
@@ -3255,7 +3288,7 @@ async function buildBgmMenu(m){
         return x;
       };
       const SOUL_HUES=['var(--amber)','var(--magenta)','var(--violet)','var(--green)','var(--cyan)'];
-      mine.forEach((c,i)=>{
+      soulShown.forEach((c,i)=>{
         const dc=SOUL_HUES[i%SOUL_HUES.length];
         const pinned=!!playing && playing===c.url;
         const st=shortTitle(c.title);
@@ -3368,6 +3401,8 @@ function initBgmUI(){
     // 关别的下拉
     ['#skinMenu','#skinMenuHall'].forEach(sel=>{ const x=$(sel); if(x) x.classList.remove('on'); });
     try{ window.syncSkinActive&&window.syncSkinActive(); }catch(_){}
+    // 每次点开都重新随机抽样：清缓存
+    m._bgmPickCache=null;
     await buildBgmMenu(m);
     m.classList.toggle('on');
     syncBgmActive();
@@ -3410,7 +3445,7 @@ function initBgmUI(){
     const isLib=(e&&e.detail&&e.detail.reason)==='library';
     [menuLobby,menuHall].forEach(m=>{
       if(!m||!m.classList.contains('on')) return;
-      if(isLib) buildBgmMenu(m);
+      if(isLib){ m._bgmPickCache=null; buildBgmMenu(m); }  // 新曲入库：清抽样缓存，重新抽 3 首
       else refreshBgmSelState(m);
     });
   });
