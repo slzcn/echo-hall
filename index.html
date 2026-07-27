@@ -1656,7 +1656,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260727-diag';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260727-enterdedup';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -4778,7 +4778,7 @@ function showTarot(card, luck, streak){
 }
 
 // 进场提示去重: 同一人(uid)2分钟内只提示一次, 避免快速进出/来回切房重复弹进场(甚至同时冒两个)。
-const ENTER_DEDUP_MS = 120000;
+const ENTER_DEDUP_MS = 15 * 60 * 1000;   // ★15分钟: 同一人15分钟内重复进出只提示一次(主人要求, 原2min)
 const _enterSeen = new Map();   // uid → 上次提示时间戳
 function enterDedupOk(uid){
   const now=Date.now(); const last=_enterSeen.get(uid)||0;
@@ -4826,11 +4826,15 @@ function entranceBanner(room){
       }, 1500);   // 等自己入场特效演完再放预览，不盖掉
     }
   }catch(_){}
-  // ★发送端去重: keep-alive 30s 内快速回同一房会再进 entranceBanner, 别重复 insert enter 行/重发世界公告
-  //   (接收端 enterDedupOk 只挡视觉, 挡不住这里的白写 DB + 重复全站公告)。同房 2min 内只广播一次。
+  // ★发送端去重: 快速回同一房会再进 entranceBanner, 别重复 insert enter 行/重发世界公告
+  //   (接收端 enterDedupOk 只挡视觉, 挡不住这里的白写 DB + 重复全站公告)。★同房 15min 内只广播一次(原2min)。
+  //   用 Map 按房记录, 避免只存单房导致 A→B→A 来回切时 A 被重播。
   const _now=Date.now();
-  if(entranceBanner._bc && entranceBanner._bc.rid===room.id && (_now-entranceBanner._bc.at)<120000) return;
-  entranceBanner._bc={ rid:room.id, at:_now };
+  if(!entranceBanner._bc) entranceBanner._bc=new Map();
+  const _lastBc=entranceBanner._bc.get(room.id)||0;
+  if(_now-_lastBc < 15*60*1000) return;
+  entranceBanner._bc.set(room.id, _now);
+  if(entranceBanner._bc.size>50){ for(const [k,v] of entranceBanner._bc){ if(_now-v>15*60*1000) entranceBanner._bc.delete(k); } }
   // 广播给房里其他人(达最低广播档才发; 匿名进出默认不广播防刷屏)。
   // ★enter 是"当场特效", 只需存活到 realtime 把它推给在场的人(几秒)。插入后 8s 自删——
   //   根治它污染历史/大厅预览/灵魂上下文/回声统计(治本, 前端过滤只是治标, 且已删存量24条)。
@@ -8952,11 +8956,5 @@ function fillAndLogin(id, pwv){
   document.addEventListener('touchcancel', function(){ armed=false; pulling=false; dist=0; reset(); }, {passive:true});
 })();
 </script>
-<div id="_kbdiag" style="position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;z-index:2147483647;background:rgba(0,0,0,.8);color:#0f0;font:10px monospace;padding:3px;white-space:pre;pointer-events:none"></div>
-<script>(function(){var d=document.getElementById('_kbdiag');var vv=window.visualViewport;
-var pr=document.createElement('div');pr.style.cssText='position:fixed;top:0;height:100dvh;width:0;visibility:hidden;pointer-events:none';document.body.appendChild(pr);
-function u(){var cs=getComputedStyle(document.documentElement);var comp=document.querySelector('.composer');var cr=comp?comp.getBoundingClientRect():{bottom:0};var st=document.querySelector('.stage');var sr=st?st.getBoundingClientRect():{height:0,bottom:0};
-d.textContent='SA standalone='+(window.navigator.standalone||matchMedia('(display-mode:standalone)').matches)+' innerH='+innerHeight+'\nvv.h='+(vv?Math.round(vv.height):'-')+' vv.top='+(vv?Math.round(vv.offsetTop):'-')+' 100dvh='+pr.offsetHeight+'\n--appvh='+cs.getPropertyValue('--appvh').trim()+' --kb='+cs.getPropertyValue('--kb').trim()+'\nstage.h='+Math.round(sr.height)+' stage.bot='+Math.round(sr.bottom)+' comp.bot='+Math.round(cr.bottom)+' screenGap='+Math.round((vv?vv.height:innerHeight)-cr.bottom);}
-if(vv){vv.addEventListener('resize',u);vv.addEventListener('scroll',u);}setInterval(u,300);u();})();</script>
 </body>
 </html>
