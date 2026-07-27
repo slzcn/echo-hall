@@ -3190,7 +3190,8 @@ async function buildBgmMenu(m){
   if(!m) return;
   const room=curRoom||null;
   const on=bgmOn();
-  const active=_bgmActiveUrl();
+  // 勾表示“当前正在播放”：只看当前播放 URL，不受自动/手动模式影响；关闭时不显示勾。
+  const playing=on?_bgmActiveUrl():'';
   const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
   const cands=bgmCandidatesForRoom(room);   // 官方曲目
   const mine=await bgmMyLibraryForRoom(room); // 灵魂曲目
@@ -3221,7 +3222,7 @@ async function buildBgmMenu(m){
       const OFFICIAL_HUES=['var(--cyan)','var(--violet)','var(--magenta)','var(--green)','var(--amber)'];
       cands.forEach((c,i)=>{
         const dc=OFFICIAL_HUES[i%OFFICIAL_HUES.length];
-        const pinned=!isAuto && active===c.url;
+        const pinned=!!playing && playing===c.url;
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
@@ -3250,7 +3251,7 @@ async function buildBgmMenu(m){
       const SOUL_HUES=['var(--amber)','var(--magenta)','var(--violet)','var(--green)','var(--cyan)'];
       mine.forEach((c,i)=>{
         const dc=SOUL_HUES[i%SOUL_HUES.length];
-        const pinned=!isAuto && active===c.url;
+        const pinned=!!playing && playing===c.url;
         const st=shortTitle(c.title);
         html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
@@ -3308,7 +3309,8 @@ function refreshBgmSelState(m){
   m.classList.toggle('off-mode', !on);
   const room=curRoom||null;
   const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
-  const active=isAuto?'':_bgmActiveUrl();
+  // 自动模式同样显示正在播放的曲目；关闭时不显示勾。
+  const playing=on?_bgmActiveUrl():'';
   const isManualPicked=on && !isAuto;
   // 顶部：自动 / 关闭 二选一
   m.querySelectorAll('.mode-row .mode-opt').forEach(el=>{
@@ -3324,7 +3326,7 @@ function refreshBgmSelState(m){
   // 曲目行
   m.querySelectorAll('.skin-opt[data-url]').forEach(el=>{
     const u=el.dataset.url||'';
-    el.classList.toggle('active', !isAuto && !!active && u===active);
+    el.classList.toggle('active', !!playing && u===playing);
   });
 }
 function pickBgmManual(row){
