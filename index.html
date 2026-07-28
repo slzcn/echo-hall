@@ -702,8 +702,18 @@
   /* EH_PULL_REFRESH_GLOBAL 下拉刷新指示器(fixed, 全局顶部) */
   #pullRefresh{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:center;
     gap:8px;color:var(--cyan,#00E5D4);font-size:12.5px;pointer-events:none;z-index:9999;
-    transform:translateY(-56px);opacity:0;transition:opacity .15s;
+    transform:translateY(-56px);opacity:0;visibility:hidden;transition:opacity .15s,visibility 0s linear .15s;
     padding-top:env(safe-area-inset-top,0px)}
+  /* Keep the off-screen refresh affordance out of the compositor/hit-test entirely.
+     Some desktop WebKit builds can still paint a faint fixed-layer strip while an
+     opacity-0 translated layer is composited. */
+  #pullRefresh.active{visibility:visible;transition-delay:0s}
+  /* Pull-to-refresh is a touch-only gesture. On Mac desktop browsers (hover + fine
+     pointer) the element has no reason to composite at the top of the viewport, and
+     Chromium can flash the empty translated bar during resize / DPR changes. Retire
+     it entirely on desktop so no phantom horizontal strip can appear above the
+     首页 title. */
+  @media (hover:hover) and (pointer:fine){ #pullRefresh{display:none !important} }
   #pullRefresh .pr-spin{width:16px;height:16px;border:2px solid color-mix(in srgb,var(--cyan) 30%,transparent);
     border-top-color:var(--cyan,#00E5D4);border-radius:50%}
   #pullRefresh.spinning .pr-spin{animation:sjSpin .8s linear infinite}
@@ -1783,7 +1793,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-kb-unified';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-kb-android';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -9256,10 +9266,14 @@ window.addEventListener('beforeunload',()=>{
     raf = 0;
     if(!document.body.classList.contains('hall-on')){ setVh(0, false); return; }
     var curVV = vv ? Math.round(vv.height) : (window.innerHeight||baseVV);
-    // 无键盘态: 刷新基线, #hall 用满可视高(--vh = 当下 vv.height), 输入框沉底。
+    // 无键盘态: 只刷新基线, --vh 清空回落 CSS 100dvh。
+    // ★安卓浏览器关键(2026-07-28 修): 无键盘态绝不 JS 手写 #hall 高度。浏览器地址栏显隐会让
+    //   vv.height 反复抖(如 560↔615), 若每帧写 --vh=vv.height 则 #hall 高度跟着抖、composer 跳动
+    //   ("间歇/闪"=vv.height 抖动签名, 见记忆)。PWA 无地址栏故无此问题——这正是"浏览器有/PWA没有"的原因。
+    //   dvh 单位本就为地址栏显隐设计, 浏览器原生平滑处理, 不抖。键盘态才需 --vh 覆盖(dvh 不跟键盘缩)。
     if(!cinFocused()){
-      if(curVV>0) baseVV = curVV;
-      setVh(curVV, false);
+      if(curVV>0) baseVV = curVV;   // 维护基线(供覆盖式IME估算与键盘判定用)
+      setVh(0, false);              // 清 --vh → #hall 走 100dvh, 地址栏抖动交给浏览器原生平滑
       return;
     }
     // 聚焦(键盘弹起)。先尝试 Chromium 精确 geometry(覆盖式也准)。
@@ -9699,9 +9713,11 @@ function fillAndLogin(id, pwv){
           });
         });
       }).catch(function (e) { console.warn('SW register failed:', e && e.message); });
-      var reloaded = false;
+      // SW 更新只接管缓存；页面版本自愈脚本负责唯一一次整页导航。
+      // 若这里也在 controllerchange 时 reload，会和版本自愈的 location.replace
+      // （以及下拉刷新里已经发起的 location.reload）叠加，表现为首页刷新两次。
       navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (reloaded) return; reloaded = true; location.reload();
+        console.info('[EH SW] controller changed; skip implicit reload');
       });
     });
   }
@@ -9801,7 +9817,7 @@ function fillAndLogin(id, pwv){
   }
 
   function reset(){
-    ind.classList.remove('ready');
+    ind.classList.remove('active','ready');
     ind.style.opacity = '0';
     ind.style.transform = 'translateY(-56px)';
     if(txt) txt.textContent = '下拉刷新';
@@ -9830,6 +9846,7 @@ function fillAndLogin(id, pwv){
     if(dy > 0 && Math.abs(dy) > Math.abs(dx) && atTop(e.target)){
       pulling = true;
       dist = Math.min(dy * 0.5, MAX);
+      ind.classList.add('active');
       ind.style.opacity = '1';
       ind.style.transform = 'translateY(' + (dist - 56) + 'px)';
       if(dist >= THRESH){ ind.classList.add('ready'); if(txt) txt.textContent = '松开刷新'; }
