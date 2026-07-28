@@ -43,6 +43,13 @@ function svcKey() {
 function anonKey() {
   return Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SB_ANON_KEY") || "";
 }
+function clampInt(v, def, min, max) {
+  const n = parseInt(String(v ?? ""), 10);
+  if (!Number.isFinite(n) || Number.isNaN(n)) return def;
+  return Math.max(min, Math.min(max, n));
+}
+function pgEq(v) { return encodeURIComponent(String(v || "")); }
+function pgIn(vals) { return vals.map((v)=>encodeURIComponent(String(v))).filter(Boolean).join(","); }
 async function sbGet(pathq) {
   const key = svcKey();
   const r = await fetch(sbRoot() + pathq, {
@@ -210,7 +217,7 @@ async function authRole(req) {
   const u = await r.json().catch(()=>null);
   if (!u?.id) return null;
   // service_role 查该 uid 的角色
-  const rows = await sbGet("eh_accounts?select=username,role&auth_uid=eq." + u.id);
+  const rows = await sbGet("eh_accounts?select=username,role&auth_uid=eq." + pgEq(u.id));
   const acc = Array.isArray(rows) && rows[0];
   if (!acc) return null;
   return {
@@ -326,7 +333,7 @@ Deno.serve(async (req)=>{
         const ins = await sbWrite("eh_souls", "POST", { room_id: roomId, auth_uid: uid, created_by: callerUid, ...fields });
         if (!ins.ok) { // 回滚 auth 身份
           await adminAuth("users/" + uid, "DELETE");
-          await sbWrite("eh_members?user_id=eq." + uid + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+          await sbWrite("eh_members?user_id=eq." + pgEq(uid) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
           return j({ error: "写灵魂配置失败", detail: ins.body }, ins.status);
         }
         // 召唤成功同时补写 presence(last_seen=now), 让灵魂立即出现在光墙(否则要等 worker 下一轮心跳才显示, 房主感知为“召唤了但人没进来”)
@@ -338,16 +345,16 @@ Deno.serve(async (req)=>{
           // 无驻守记录, 但可能有漫游灵魂在场 → 把她请出本房(删 members/presence),
           // 绝不删全局 auth 身份(漫游狼姐在别的房还在用)。
           if (memCur && memCur.user_id) {
-            await sbWrite("eh_members?user_id=eq." + memCur.user_id + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
-            await sbWrite("eh_presence?user_id=eq." + memCur.user_id + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+            await sbWrite("eh_members?user_id=eq." + pgEq(memCur.user_id) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+            await sbWrite("eh_presence?user_id=eq." + pgEq(memCur.user_id) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
             return j({ ok: true, note: "已请离开" });
           }
           return j({ ok: true, note: "本就不在房" });
         }
         await sbWrite("eh_souls?id=eq." + encodeURIComponent(String(cur.id)), "DELETE", undefined, { Prefer: "return=minimal" });
         if (cur.auth_uid) {
-          await sbWrite("eh_members?user_id=eq." + cur.auth_uid + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
-          await sbWrite("eh_presence?user_id=eq." + cur.auth_uid + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+          await sbWrite("eh_members?user_id=eq." + pgEq(cur.auth_uid) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+          await sbWrite("eh_presence?user_id=eq." + pgEq(cur.auth_uid) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
           await adminAuth("users/" + cur.auth_uid, "DELETE");
         }
         return j({ ok: true });
@@ -364,41 +371,6 @@ Deno.serve(async (req)=>{
     role: me.role
   }, 403);
   const isSuper = me.role === "super";
-  // ---- 集中配置中心：统一走 eh_config，写入带白名单与审计 ----
-  const ALLOWED_CONFIG_KEYS = [
-    "themePalettes", "themes", "lobbyDisplay", "roomTheme", "officialFallbackC",
-    "roomKindC", "roomBgm", "text", "identityPool", "tuning", "songStyles",
-    "publicThemePool", "privateThemePool", "roomThemeOverride", "soulColors", "roomNameC",
-    "identityDefaultC", "voidC", "resonanceDefaultC", "fx", "entranceFx", "customTiers",
-    "tierNames", "humanSingStyles", "interactions"
-  ];
-  if (action === "config" && req.method === "GET") {
-    const cfg = await sbGet("eh_config?select=key,value,updated_at&order=key.asc");
-    return j({ config: Array.isArray(cfg) ? cfg : [] });
-  }
-  if (action === "config" && req.method === "POST") {
-    let b = {};
-    try { b = await req.json(); } catch {}
-    const key = String(b?.key || "").trim();
-    if (!ALLOWED_CONFIG_KEYS.includes(key)) return j({ error: "未知配置项: " + key }, 400);
-    const oldRows = await sbGet("eh_config?select=value&key=eq." + encodeURIComponent(key));
-    const prevValue = Array.isArray(oldRows) && oldRows[0] ? oldRows[0].value : null;
-    const up = await sbWrite("eh_config", "POST", { key, value: b?.value ?? null, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
-    if (!up.ok) return j({ error: "保存失败", detail: up.body }, up.status || 500);
-    await sbWrite("eh_logs", "POST", { scope: "admin", tag: "config_update", actor_id: me.uid, actor_name: me.username, payload: { key, prevValue, newValue: b?.value ?? null } }, { Prefer: "return=minimal" });
-    return j({ ok: true });
-  }
-  if (action === "rollback" && req.method === "POST") {
-    let b = {};
-    try { b = await req.json(); } catch {}
-    const key = String(b?.key || "").trim();
-    if (!isSuper) return j({ error: "forbidden" }, 403);
-    if (!ALLOWED_CONFIG_KEYS.includes(key) || b?.value === undefined) return j({ error: "回滚参数无效" }, 400);
-    const up = await sbWrite("eh_config", "POST", { key, value: b.value, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
-    if (!up.ok) return j({ error: "回滚失败", detail: up.body }, up.status || 500);
-    await sbWrite("eh_logs", "POST", { scope: "admin", tag: "config_rollback", actor_id: me.uid, actor_name: me.username, payload: { key, newValue: b.value } }, { Prefer: "return=minimal" });
-    return j({ ok: true });
-  }
   // ---- 管理员管理(仅超管) ----
   if (action === "admins" && req.method === "GET") {
     if (!isSuper) return j({
@@ -428,7 +400,7 @@ Deno.serve(async (req)=>{
     if (!acc) return j({
       error: "该用户名不存在(需对方先在前台注册)"
     }, 404);
-    const res = await sbWrite("eh_accounts?auth_uid=eq." + acc.auth_uid, "PATCH", {
+    const res = await sbWrite("eh_accounts?auth_uid=eq." + pgEq(acc.auth_uid), "PATCH", {
       role: newRole
     }, {
       Prefer: "return=minimal"
@@ -488,27 +460,33 @@ Deno.serve(async (req)=>{
       note: "已转让，你已降为普通管理员"
     });
   }
-  // ---- 概览统计 ----
+  // ---- 概览统计(优化: 并行 4 次请求 + HEAD count=exact 只拿数量不拉数据) ----
   if (action === "stats" && req.method === "GET") {
-    const users = await sbGet("eh_users?select=id&limit=100000");
-    const rooms = await sbGet("eh_rooms?select=id,kind,archived&limit=100000");
-    const msgCount = await fetch(sbRoot() + "eh_messages?select=id", {
-      headers: {
-        apikey: svcKey(),
-        Authorization: "Bearer " + svcKey(),
-        Prefer: "count=exact",
-        Range: "0-0"
-      }
-    });
-    const total = msgCount.headers.get("content-range")?.split("/")?.[1] || "?";
+    async function headCount(table: string): Promise<number|null> {
+      try {
+        const r = await fetch(sbRoot() + table + "?select=id", {
+          method: "HEAD",
+          headers: { apikey: svcKey(), Authorization: "Bearer " + svcKey(), Prefer: "count=exact", Range: "0-0" }
+        });
+        const cr = r.headers.get("content-range") || "";
+        const n = parseInt(cr.split("/")?.[1] || "");
+        return isNaN(n) ? null : n;
+      } catch { return null; }
+    }
+    // 房间要按 kind/archived 分桶,仍需拉小字段 rows(总数仅 12 条,可忽略)
+    const [users, rooms, msgs] = await Promise.all([
+      headCount("eh_users"),
+      sbGet("eh_rooms?select=id,kind,archived&limit=100000"),
+      headCount("eh_messages"),
+    ]);
     const rl = Array.isArray(rooms) ? rooms : [];
     return j({
-      users: Array.isArray(users) ? users.length : 0,
-      rooms_official: rl.filter((r)=>r.kind === "official").length,
-      rooms_public: rl.filter((r)=>r.kind === "public" && !r.archived).length,
-      rooms_public_archived: rl.filter((r)=>r.kind === "public" && r.archived).length,
-      rooms_private: rl.filter((r)=>r.kind === "private").length,
-      messages: total
+      users: users ?? 0,
+      rooms_official: rl.filter((r: any)=>r.kind === "official").length,
+      rooms_public: rl.filter((r: any)=>r.kind === "public" && !r.archived).length,
+      rooms_public_archived: rl.filter((r: any)=>r.kind === "public" && r.archived).length,
+      rooms_private: rl.filter((r: any)=>r.kind === "private").length,
+      messages: msgs ?? 0
     });
   }
   // ---- 房间列表(admin仅公开；super全部) ----
@@ -522,35 +500,32 @@ Deno.serve(async (req)=>{
   // ---- 聊天记录(admin仅公开房；super含私密) ----
   if (action === "messages" && req.method === "GET") {
     const roomId = url.searchParams.get("room_id") || "";
-    const limit = Math.min(parseInt(url.searchParams.get("limit") || "200"), 2000);
+    const userId = url.searchParams.get("user_id") || "";
+    const limit = clampInt(url.searchParams.get("limit"), 200, 1, 2000);
+    const filters: string[] = ["select=*"];
+    if (userId) filters.push("user_id=eq." + pgEq(userId));
     if (roomId) {
       if (!isSuper) {
-        const rk = await sbGet("eh_rooms?select=kind&id=eq." + encodeURIComponent(roomId));
+        const rk = await sbGet("eh_rooms?select=kind&id=eq." + pgEq(roomId));
         const kind = Array.isArray(rk) && rk[0]?.kind;
-        if (kind === "private") return j({
-          error: "无权查看私密房"
-        }, 403);
+        if (kind === "private") return j({ error: "无权查看私密房" }, 403);
       }
-      const msgs = await sbGet("eh_messages?select=*&room_id=eq." + encodeURIComponent(roomId) + "&order=id.desc&limit=" + limit);
-      return j({
-        messages: msgs
-      });
+      filters.push("room_id=eq." + pgEq(roomId));
+      filters.push("order=id.desc");
+      filters.push("limit=" + limit);
+      const msgs = await sbGet("eh_messages?" + filters.join("&"));
+      return j({ messages: msgs });
     }
-    if (isSuper) {
-      const msgs = await sbGet("eh_messages?select=*&order=id.desc&limit=" + limit);
-      return j({
-        messages: msgs
-      });
+    if (!isSuper) {
+      const pubRooms = await sbGet("eh_rooms?select=id&kind=in.(official,public)");
+      const ids = (Array.isArray(pubRooms) ? pubRooms : []).map((r)=>r.id).filter(Boolean);
+      if (!ids.length) return j({ messages: [] });
+      filters.push("room_id=in.(" + pgIn(ids) + ")");
     }
-    const pubRooms = await sbGet("eh_rooms?select=id&kind=in.(official,public)");
-    const ids = (Array.isArray(pubRooms) ? pubRooms : []).map((r)=>r.id);
-    if (!ids.length) return j({
-      messages: []
-    });
-    const msgs = await sbGet("eh_messages?select=*&room_id=in.(" + ids.join(",") + ")&order=id.desc&limit=" + limit);
-    return j({
-      messages: msgs
-    });
+    filters.push("order=id.desc");
+    filters.push("limit=" + limit);
+    const msgs = await sbGet("eh_messages?" + filters.join("&"));
+    return j({ messages: msgs });
   }
   // ============================================================
   //  灵魂居民 Soul —— CRUD(admin 管公开房灵魂; super 管全部)
@@ -620,14 +595,14 @@ Deno.serve(async (req)=>{
       const soul = Array.isArray(up.body) && up.body[0];
       // 灵魂改名/换头像/换色 → 同步 eh_users + eh_members(光墙一致)
       if (soul?.auth_uid) {
-        await sbWrite("eh_users?id=eq." + soul.auth_uid, "PATCH", {
+        await sbWrite("eh_users?id=eq." + pgEq(soul.auth_uid), "PATCH", {
           name,
           emoji,
           color
         }, {
           Prefer: "return=minimal"
         });
-        await sbWrite("eh_members?user_id=eq." + soul.auth_uid + "&room_id=eq." + encodeURIComponent(roomId), "PATCH", {
+        await sbWrite("eh_members?user_id=eq." + pgEq(soul.auth_uid) + "&room_id=eq." + encodeURIComponent(roomId), "PATCH", {
           name,
           emoji,
           color
@@ -731,10 +706,10 @@ Deno.serve(async (req)=>{
     await sbWrite("eh_souls?id=eq." + encodeURIComponent(String(b.id)), "DELETE", undefined, {
       Prefer: "return=minimal"
     });
-    await sbWrite("eh_members?user_id=eq." + row.auth_uid + "&room_id=eq." + encodeURIComponent(row.room_id), "DELETE", undefined, {
+    await sbWrite("eh_members?user_id=eq." + pgEq(row.auth_uid) + "&room_id=eq." + encodeURIComponent(row.room_id), "DELETE", undefined, {
       Prefer: "return=minimal"
     });
-    await sbWrite("eh_presence?user_id=eq." + row.auth_uid + "&room_id=eq." + encodeURIComponent(row.room_id), "DELETE", undefined, {
+    await sbWrite("eh_presence?user_id=eq." + pgEq(row.auth_uid) + "&room_id=eq." + encodeURIComponent(row.room_id), "DELETE", undefined, {
       Prefer: "return=minimal"
     });
     return j({
@@ -836,6 +811,153 @@ Deno.serve(async (req)=>{
       error: "试聊超时：灵魂大脑(本机 worker)可能未启动"
     }, 504);
   }
+
+  // ============================================================
+  //  ★ 后台性能优化补 route (2026-07-16)
+  //    统一分页/搜索/排序: ?page=1&pageSize=50, 返回 { items, total, page, pageSize }
+  //    前台用 total 显示 "第 X/Y 页", pageSize 上限 200 防滥用
+  // ============================================================
+  //
+  // GET /users?page&pageSize&q&filter=all|anon|real&sort=created_at.desc|name.asc
+  //   分页拉用户列表, 返回 total 供前端分页条使用
+  if (action === "users" && req.method === "GET") {
+    const page = clampInt(url.searchParams.get("page"), 1, 1, 1000000);
+    const pageSize = clampInt(url.searchParams.get("pageSize"), 50, 1, 200);
+    const qRaw = (url.searchParams.get("q") || "").trim();
+    // PostgREST or=(...) 语法里逗号/括号/星号有结构含义，搜索词先做窄化，避免打断过滤表达式
+    const q = qRaw.replace(/[(),*]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+    const filterRaw = url.searchParams.get("filter") || "all";
+    const filter = ["all","anon","real"].includes(filterRaw) ? filterRaw : "all";
+    const sort = url.searchParams.get("sort") || "created_at.desc";
+    const offset = (page - 1) * pageSize;
+    const parts: string[] = ["select=id,name,emoji,color,is_anonymous,created_at,last_seen"];
+    if (filter === "anon") parts.push("is_anonymous=eq.true");
+    else if (filter === "real") parts.push("is_anonymous=eq.false");
+    if (q) {
+      // 搜索同时命中"昵称(eh_users.name)"和"用户名(eh_accounts.username)"。
+      // username 在另一张表, 先在 eh_accounts ilike 搜出匹配的 auth_uid, 再用 or=(name.ilike, id.in) 并集查 eh_users。
+      const enc = encodeURIComponent(q);
+      let uidClause = "";
+      try {
+        const accs = await sbGet("eh_accounts?select=auth_uid&username=ilike.*" + enc + "*&limit=200");
+        const uids = Array.isArray(accs) ? accs.map((a: any) => a.auth_uid).filter(Boolean) : [];
+        if (uids.length) uidClause = ",id.in.(" + pgIn(uids) + ")";
+      } catch (_e) { /* eh_accounts 查询失败则只按昵称搜 */ }
+      parts.push("or=(name.ilike.*" + enc + "*" + uidClause + ")");
+    }
+    // sort 白名单
+    const allowSort = new Set(["created_at.desc","created_at.asc","last_seen.desc","last_seen.asc","name.asc","name.desc"]);
+    parts.push("order=" + (allowSort.has(sort) ? sort : "created_at.desc"));
+    parts.push("limit=" + pageSize);
+    parts.push("offset=" + offset);
+    // 用 GET + count=exact 头一次拿数据 + 总数
+    const r = await fetch(sbRoot() + "eh_users?" + parts.join("&"), {
+      headers: { apikey: svcKey(), Authorization: "Bearer " + svcKey(), Prefer: "count=exact", Range: offset + "-" + (offset + pageSize - 1) }
+    });
+    const items = await r.json().catch(()=>[]);
+    const cr = r.headers.get("content-range") || "";
+    const total = parseInt(cr.split("/")?.[1] || "0") || (Array.isArray(items) ? items.length : 0);
+    // P0 易用性: 补全 username(给后台任命/展示用). 仅对本页同时查 eh_accounts, 一轮 IN 查询同时拿到 role
+    if (Array.isArray(items) && items.length) {
+      try {
+        const uids = items.map((u:any)=>u.id).filter(Boolean);
+        if (uids.length) {
+          const accs = await sbGet("eh_accounts?select=auth_uid,username,role&auth_uid=in.(" + pgIn(uids) + ")");
+          const accMap:any = {};
+          if (Array.isArray(accs)) accs.forEach((a:any)=>{ accMap[a.auth_uid] = a; });
+          items.forEach((u:any)=>{ const a=accMap[u.id]; if(a){ u.username = a.username||''; u.role = a.role||'user'; } });
+        }
+      } catch (_e) { /* eh_accounts 查询失败不阻断主数据 */ }
+    }
+    return j({ users: items, total, page, pageSize });
+  }
+
+  // GET /logs?page&pageSize&scope=admin|user&actor=&key=&fromDate=&toDate=
+  //   审计/行为日志分页
+  if (action === "logs" && req.method === "GET") {
+    const page = clampInt(url.searchParams.get("page"), 1, 1, 1000000);
+    const pageSize = clampInt(url.searchParams.get("pageSize"), 50, 1, 200);
+    const scopeRaw = url.searchParams.get("scope") || "";
+    const scope = ["admin","user"].includes(scopeRaw) ? scopeRaw : "";
+    const actor = (url.searchParams.get("actor") || "").trim();
+    const key = (url.searchParams.get("key") || "").trim();
+    const fromDate = url.searchParams.get("fromDate") || "";
+    const toDate = url.searchParams.get("toDate") || "";
+    const offset = (page - 1) * pageSize;
+    const parts: string[] = ["select=*"];
+    if (scope) parts.push("scope=eq." + encodeURIComponent(scope));
+    if (actor) parts.push("actor_name=ilike.*" + encodeURIComponent(actor) + "*");
+    if (key) parts.push("payload->>key=eq." + encodeURIComponent(key));
+    if (fromDate) parts.push("created_at=gte." + encodeURIComponent(fromDate));
+    if (toDate) parts.push("created_at=lte." + encodeURIComponent(toDate));
+    parts.push("order=created_at.desc");
+    parts.push("limit=" + pageSize);
+    parts.push("offset=" + offset);
+    const r = await fetch(sbRoot() + "eh_logs?" + parts.join("&"), {
+      headers: { apikey: svcKey(), Authorization: "Bearer " + svcKey(), Prefer: "count=exact", Range: offset + "-" + (offset + pageSize - 1) }
+    });
+    const items = await r.json().catch(()=>[]);
+    const cr = r.headers.get("content-range") || "";
+    const total = parseInt(cr.split("/")?.[1] || "0") || (Array.isArray(items) ? items.length : 0);
+    return j({ logs: items, total, page, pageSize });
+  }
+
+  // GET /config  拉所有配置 kv; POST /config {key,value} 保存单 key(写前记 prev 到 eh_logs 供回滚)
+  if (action === "config" && req.method === "GET") {
+    const cfg = await sbGet("eh_config?select=key,value,updated_at&order=key.asc");
+    return j({ config: cfg });
+  }
+  if (action === "config" && req.method === "POST") {
+    let b: any = {}; try { b = await req.json(); } catch {}
+    const key = String(b?.key || "").trim();
+    if (!key) return j({ error: "缺少 key" }, 400);
+    // 配置中心白名单：允许新增配置，但禁止任意写入未知表意 key，避免误写污染配置空间。
+    const ALLOWED_CONFIG_KEYS = new Set([
+      "themePalettes", "themes", "roomTheme", "officialFallbackC", "roomKindC", "roomBgm",
+      "text", "identityPool", "tuning", "songStyles", "lobbyDisplay", "publicThemePool",
+      "privateThemePool", "roomThemeOverride", "soulColors", "roomNameC", "identityDefaultC",
+      "voidC", "resonanceDefaultC", "fx", "entranceFx", "customTiers", "tierNames",
+      "humanSingStyles", "interactions"
+    ]);
+    if (!ALLOWED_CONFIG_KEYS.has(key)) return j({ error: "未知配置项: " + key }, 400);
+    // 读旧值供审计
+    const oldRow = await sbGet("eh_config?select=value&key=eq." + encodeURIComponent(key));
+    const prevValue = Array.isArray(oldRow) && oldRow[0] ? oldRow[0].value : null;
+    // upsert
+    const up = await sbWrite("eh_config", "POST", { key, value: b?.value ?? null, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!up.ok) return j({ error: "保存失败", detail: up.body }, up.status || 500);
+    // 记 admin 审计日志
+    await sbWrite("eh_logs", "POST", {
+      scope: "admin", tag: "config.set",
+      actor_id: me.uid, actor_name: me.username,
+      payload: { key, value: b?.value ?? null, prevValue },
+    }, { Prefer: "return=minimal" });
+    return j({ ok: true });
+  }
+
+  // POST /rollback {key,value}  回滚配置到旧值(实为再写一次 config, 记 rollback 日志)
+  if (action === "rollback" && req.method === "POST") {
+    let b: any = {}; try { b = await req.json(); } catch {}
+    const key = String(b?.key || "").trim();
+    if (!key) return j({ error: "缺少 key" }, 400);
+    const ALLOWED_CONFIG_KEYS = new Set([
+      "themePalettes", "themes", "roomTheme", "officialFallbackC", "roomKindC", "roomBgm",
+      "text", "identityPool", "tuning", "songStyles", "lobbyDisplay", "publicThemePool",
+      "privateThemePool", "roomThemeOverride", "soulColors", "roomNameC", "identityDefaultC",
+      "voidC", "resonanceDefaultC", "fx", "entranceFx", "customTiers", "tierNames",
+      "humanSingStyles", "interactions"
+    ]);
+    if (!ALLOWED_CONFIG_KEYS.has(key)) return j({ error: "未知配置项: " + key }, 400);
+    const up = await sbWrite("eh_config", "POST", { key, value: b?.value ?? null, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!up.ok) return j({ error: "回滚失败", detail: up.body }, up.status || 500);
+    await sbWrite("eh_logs", "POST", {
+      scope: "admin", tag: "config.rollback",
+      actor_id: me.uid, actor_name: me.username,
+      payload: { key, value: b?.value ?? null },
+    }, { Prefer: "return=minimal" });
+    return j({ ok: true });
+  }
+
   return j({
     error: "not_found"
   }, 404);
