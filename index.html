@@ -1080,6 +1080,7 @@
   .soul-thinking .tk-dots i:nth-child(3){animation-delay:.36s}
   @keyframes tkDot{0%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
+    touch-action:manipulation;-webkit-user-select:none;user-select:none;
     background:linear-gradient(120deg,var(--accent,var(--cyan)),var(--magenta));transition:.2s;
     box-shadow:0 6px 20px color-mix(in srgb,var(--accent,var(--cyan)) 28%,transparent)}
   .go svg{width:20px;height:20px;color:var(--btn-ink)}
@@ -2006,7 +2007,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <textarea class="cin" id="cin" data-txt-ph="composerPlaceholder" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="hold-talk" id="holdTalk" data-txt="holdToTalk">按住 说话</div>
       </div>
-      <button class="go" id="goBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <button type="button" class="go" id="goBtn" style="display:none" aria-label="发送消息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
       <div class="plus-menu" id="plusMenu">
         <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
@@ -6373,7 +6374,14 @@ async function send(){
   const inp=$('#cin'); let text=inp.value.trim();
   // 眩晕期禁言(被 KO 后 15s 说不出话)——提到最前, 有内容才提示
   if(text && isStunned()){ const left=Math.ceil((_stunnedUntil-Date.now())/1000); toast(`💫 被打晕了，${left>0?left:1}秒后才能说话…`); return; }
-  if(!text || !curRoom) return;
+  if(!text) return;
+  // 房间界面仍在但 curRoom 因前后台恢复/竞态短暂丢失时，旧逻辑直接 return，用户看到的就是“点了没反应”。
+  // 不静默吞点击：给出明确反馈并触发一次前台对齐，状态恢复后可立即重发。
+  if(!curRoom){
+    toast('房间状态正在恢复，请稍后再试');
+    try{ if(typeof foregroundResync==='function') foregroundResync('send-no-room'); }catch(_){}
+    return;
+  }
   // 斜杠命令
   if(text.startsWith('/')){ const handled=await handleSlash(text); if(handled){ resetInput(); return; } }
   // @灵魂生成 BGM：支持自然表达，不和普通灵魂对话抢同一句
@@ -9220,15 +9228,24 @@ cin.addEventListener('keydown',e=>{
   }
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
 });
-$('#goBtn').onclick=send;
-// ★移动端发送键标准做法: pointerdown/mousedown 时 preventDefault, 阻止点发送导致输入框失焦。
-//   否则(尤其 PWA/覆盖式键盘)点发送瞬间 cin blur→键盘收起→composer 位置变化→click 落到原位空处→发不出去。
-//   preventDefault 让焦点留在输入框, 键盘不收、位置不动, click 稳落 goBtn 触发 send。
-(function(){ var go=$('#goBtn'); if(!go) return;
-  var keepFocus=function(e){ e.preventDefault(); };   // 不 blur 输入框
-  go.addEventListener('pointerdown', keepFocus);
-  go.addEventListener('mousedown', keepFocus);
-  go.addEventListener('touchstart', keepFocus, {passive:false});
+// ★移动端发送键：抬手直接发送，不再把成败押在后续合成 click 上。
+// iOS/PWA 中 touchstart.preventDefault()、键盘收起与 composer 位移都可能吞掉 click；旧版因此出现“按钮点了没反应”。
+// pointerup/touchend 直接调用 send；click 保留给键盘/辅助技术/旧浏览器，500ms 锁去重，避免同一次手势双发。
+(function(){
+  var go=$('#goBtn'); if(!go) return;
+  var lastSendAt=0;
+  function fire(e){
+    if(e && e.cancelable) e.preventDefault();
+    var now=Date.now(); if(now-lastSendAt<500) return;
+    lastSendAt=now; send();
+  }
+  function keepFocus(e){ if(e.cancelable) e.preventDefault(); }
+  go.addEventListener('pointerdown',keepFocus);
+  go.addEventListener('pointerup',fire);
+  // Safari 旧版/部分 WebView 没有完整 Pointer Events：保留 touch 兜底；时间锁会吃掉重复事件。
+  go.addEventListener('touchstart',keepFocus,{passive:false});
+  go.addEventListener('touchend',fire,{passive:false});
+  go.addEventListener('click',fire);
 })();
 syncSendBtn();  // 初始：空输入→显示麦克风
 // ＋ 花样菜单：虚空 / 语音 / 神曲。有模式时 ＋变模式图标, 点它=退出; 无模式时=展开菜单
