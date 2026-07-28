@@ -429,15 +429,12 @@
   @keyframes titleReveal{0%{opacity:0;transform:translateY(16px) scale(.9);filter:blur(10px)}60%{filter:blur(0)}100%{opacity:1;transform:none;filter:blur(0)}}
   @keyframes titleSheen{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   @keyframes titleScan{0%,100%{background-position:120% 50%;opacity:0}12%{opacity:1}30%,100%{opacity:0}50%{background-position:-40% 50%}}
-  /* Desktop WebKit/Chromium has a known compositor bug where background-clip:text +
-     linear-gradient + animation occasionally paints the full background rectangle
-     (bypassing the text clip) — showing up as a faint horizontal light bar above
-     the 回声厅 title. Kill both the sheen loop on .title and the scan overlay on
-     .title::after for pointer:fine devices; mobile keeps the effect. */
-  @media (hover:hover) and (pointer:fine){
-    .title{animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both !important}
-    .title::after{display:none !important}
-  }
+  /* ★白条真凶(2026-07-28, 全平台): .title::after 是纯白扫光带(titleScan, rgba(255,255,255,.95)),
+     叠在 background-clip:text 上。WebKit/Chromium 有已知 compositor bug——动画帧里整块背景矩形
+     偶发未被文字裁剪就绘制出来 → 标题上方漏出一条白横条。延迟 1.6s 启动, 故"加载瞬间没有、
+     加载完才出现"。此前只在 pointer:fine(桌面)关掉, 移动端/PWA 白条原样保留=没修到。
+     现全平台关掉这层扫光(它就是白条源头), 保留 .title 的彩色流光 titleSheen(青/品红, 不漏白条)。 */
+  .title::after{display:none !important}
   .sub-line{font-size:12.5px;color:var(--sub);min-height:18px;margin-bottom:26px}
   .cursor{display:inline-block;width:8px;background:var(--cyan);animation:blink 1s steps(1) infinite;margin-left:1px}
   @keyframes blink{50%{opacity:0}}
@@ -1802,7 +1799,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-fg-resync';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-nowhitebar';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
