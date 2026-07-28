@@ -727,6 +727,11 @@
 
   <!-- 📝 文案 & 绑定 -->
   <div class="page" id="p-text">
+    <div class="glass card"><h3>🏠 大厅展示管理
+      <button class="mini-btn" id="lobbyDisplaySaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存展示设置</button> <button class="mini-btn" id="lobbyDisplayResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
+      <p style="color:var(--dim);font-size:12px;margin:-4px 0 14px;line-height:1.7">控制前台大厅显示哪些房间、显示顺序，以及运营看到的卡片标题和描述。隐藏只影响大厅展示，不删除房间；留空使用房间原始名称和主题。</p>
+      <div id="lobbyDisplayTable"></div>
+    </div>
     <div class="glass card"><h3>官方房主题绑定
       <button class="mini-btn" id="bindSaveBtn" style="border-color:var(--cyan);color:var(--cyan)">💾 保存绑定</button> <button class="mini-btn" id="bindResetBtn" style="border-color:var(--dim);color:var(--sub)">↺ 恢复默认</button></h3>
       <div style="font-size:12px;color:var(--dim);margin-bottom:12px">房间进入时自动应用该主题(用户未手动锁定时)</div>
@@ -1749,6 +1754,7 @@ const CFG_DEFAULT = {
     sunset:{"--bg":"#180818","--bg2":"#2c0e26","--panel":"rgba(50,21,34,0.8)","--panel-solid":"#2a131d","--line":"rgba(255,61,146,0.24)","--line2":"rgba(255,61,146,0.38)","--ink":"#FFEAF2","--sub":"#cb86a4","--dim":"#AF6485","--cyan":"#FF3D92","--magenta":"#FF7A3D","--violet":"#C476FF","--amber":"#FFB04D","--green":"#5FE0B0","--accent":"#FF3D92","--grid":"rgba(255,61,146,0.05)","--glow-cyan":"0 0 22px rgba(255,61,146,0.6)","--glow-mag":"0 0 20px rgba(255,122,61,0.55)"},
   },
   themes:[{id:"cyber",name:"赛博夜城",dot:"#00E5D4"},{id:"vapor",name:"迈阿密日落",dot:"#FF4DD8"},{id:"aurora",name:"极光迷幻",dot:"#22FF95"},{id:"mono",name:"暗夜奢华",dot:"#F5D06A"},{id:"klein",name:"克莱因之夜",dot:"#6486FF"},{id:"coral",name:"珊瑚热恋",dot:"#FF8159"},{id:"lagoon",name:"湖水迷情",dot:"#12B0E0"},{id:"dusk",name:"远山暮色",dot:"#8FA6E8"},{id:"rose",name:"莫兰迪玫瑰",dot:"#E29AAE"},{id:"sunset",name:"日暮狂欢",dot:"#FF3D92"}],
+  lobbyDisplay:{official:{},publicVisible:true,privateVisible:true},
   roomTheme:{"闲聊广场":"cyber","深夜电台":"vapor","技术黑话":"klein","虚空回音":"aurora"},
   officialFallbackC:{"闲聊广场":"#00E5D4","深夜电台":"#FF66B0","技术黑话":"#6486FF","虚空回音":"#22FF95"},
   publicThemePool:["coral","lagoon","sunset","cyber","klein"],
@@ -1919,6 +1925,29 @@ function collectBgm(){
   });
   return out;
 }
+
+// ---- 🏠 大厅展示管理 ----
+async function loadLobbyDisplay(){
+  const cfg=await loadConfig();
+  const d=Object.assign({official:{},publicVisible:true,privateVisible:true},cfg.lobbyDisplay||{});
+  if(!roomsCache) await loadRooms();
+  const rooms=roomsCache||[];
+  let h='<div style="overflow-x:auto"><table><thead><tr><th>房间</th><th>大厅显示</th><th>顺序</th><th>卡片标题</th><th>卡片描述</th></tr></thead><tbody>';
+  (rooms.filter(r=>r.kind==='official')).forEach(r=>{
+    const o=(d.official&&d.official[r.name])||{};
+    h+=`<tr data-lobby-room="${esc(r.name)}"><td><b>${esc(r.emoji||'')} ${esc(r.name)}</b></td><td><input type="checkbox" data-lobby="visible" ${o.visible!==false?'checked':''}></td><td><input type="number" data-lobby="order" value="${esc(String(o.order??''))}" placeholder="自动" style="width:70px"></td><td><input data-lobby="title" value="${esc(o.title||'')}" placeholder="默认：${esc(r.name)}" style="width:150px"></td><td><input data-lobby="desc" value="${esc(o.desc||'')}" placeholder="默认：房间描述" style="width:260px"></td></tr>`;
+  });
+  h+='</tbody></table></div><div style="margin-top:12px;display:flex;gap:18px;align-items:center;font-size:12.5px;color:var(--sub)"><label><input type="checkbox" id="lobbyPublicVisible" '+(d.publicVisible!==false?'checked':'')+'> 显示公开房</label><label><input type="checkbox" id="lobbyPrivateVisible" '+(d.privateVisible!==false?'checked':'')+'> 显示我的私密房</label></div>';
+  if(!rooms.filter(r=>r.kind==='official').length) h='<div style="color:var(--dim);padding:12px">暂无官方房，先在房间管理里刷新。</div>'+h;
+  $('#lobbyDisplayTable').innerHTML=h;
+}
+function collectLobbyDisplay(){
+  const d={official:{},publicVisible:!!$('#lobbyPublicVisible')?.checked,privateVisible:!!$('#lobbyPrivateVisible')?.checked};
+  document.querySelectorAll('#lobbyDisplayTable tr[data-lobby-room]').forEach(tr=>{ const name=tr.dataset.lobbyRoom,o={}; tr.querySelectorAll('[data-lobby]').forEach(el=>{ const k=el.dataset.lobby; if(k==='visible') o.visible=el.checked; else if(k==='order'&&el.value.trim()!=='') o.order=Math.max(0,parseInt(el.value,10)||0); else if((k==='title'||k==='desc')&&el.value.trim()) o[k]=el.value.trim(); }); d.official[name]=o; });
+  return d;
+}
+$('#lobbyDisplaySaveBtn')?.addEventListener('click',async()=>{ const v=collectLobbyDisplay(); if(await saveConfigKey('lobbyDisplay',v)){ if(CFG_CACHE) CFG_CACHE.lobbyDisplay=v; loadLobbyDisplay(); } });
+$('#lobbyDisplayResetBtn')?.addEventListener('click',()=>resetConfigKeys(['lobbyDisplay'],loadLobbyDisplay,'大厅展示'));
 
 // ---- 📝 文案 & 绑定 ----
 async function loadTextBind(){
@@ -2341,7 +2370,7 @@ $('#humanSingSave')?.addEventListener('click',async()=>{
 
 // ---- 📋 全站日志 ----
 const AUDIT_KEY_LABEL = {
-  themePalettes:'🎨 主题配色', themes:'🎨 主题元数据', roomTheme:'🏠 官方房主题绑定',
+  themePalettes:'🎨 主题配色', themes:'🎨 主题元数据', lobbyDisplay:'🏠 大厅展示', roomTheme:'🏠 官方房主题绑定',
   officialFallbackC:'🏠 官方房兜底色', publicThemePool:'🏠 公开房主题池', privateThemePool:'🏠 私密房主题池', roomThemeOverride:'🏠 房间主题手动覆盖', roomKindC:'🏠 房间类型强调色', roomBgm:'🎵 BGM',
   text:'📝 文案', identityPool:'🎭 身份池', tuning:'⚙️ 运行参数', songStyles:'🎼 曲风池'
 };
@@ -2938,7 +2967,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=async()=>{
   if(t.dataset.page==='rooms') loadRooms();
   if(t.dataset.page==='users') loadUsersPage();
   if(t.dataset.page==='theme'){ loadTheme(); loadBgm(); }        // 外观 = 主题 + BGM 合并
-  if(t.dataset.page==='text'){ loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
+  if(t.dataset.page==='text'){ loadLobbyDisplay(); loadTextBind(); loadTuning(); }   // 文案参数 = 文案&绑定 + 运行参数 合并
   if(t.dataset.page==='people'){ loadAdmins(); loadTiers(); }    // 人员 = 管理员/超管 + 角色类型(默认+自定义)
   if(t.dataset.page==='songstyles'){ loadSongStyles(); loadInteractionsAdmin(); loadHumanSing(); }  // 玩法 = 曲风+互动+清唱
   if(t.dataset.page==='audit') loadAuditLog();

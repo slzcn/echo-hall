@@ -2268,6 +2268,12 @@ const EH_CONFIG_DEFAULT = {
   themes: [
     { id:"cyber", name:"赛博夜城", dot:"#00E5D4" }, { id:"vapor", name:"迈阿密日落", dot:"#FF4DD8" }, { id:"aurora", name:"极光迷幻", dot:"#22FF95" }, { id:"mono", name:"暗夜奢华", dot:"#F5D06A" }, { id:"klein", name:"克莱因之夜", dot:"#6486FF" }, { id:"coral", name:"珊瑚热恋", dot:"#FF8159" }, { id:"lagoon", name:"湖水迷情", dot:"#12B0E0" }, { id:"dusk", name:"远山暮色", dot:"#8FA6E8" }, { id:"rose", name:"莫兰迪玫瑰", dot:"#E29AAE" }, { id:"sunset", name:"日暮狂欢", dot:"#FF3D92" }
   ],
+  // 大厅展示配置：后台可控制官方房显隐、顺序、卡片标题/描述；未配置时保持默认全展示。
+  lobbyDisplay: {
+    official: {},
+    publicVisible: true,
+    privateVisible: true,
+  },
   // 官方房 → 专属默认主题
   roomTheme: { '闲聊广场':'cyber','深夜电台':'vapor','技术黑话':'klein','虚空回音':'aurora' },
   // 官方房卡片兜底强调色(对应主题夜间 accent)
@@ -2566,7 +2572,7 @@ function _validateConfigMap(map){
     themePalettes:'object', themes:'object', roomTheme:'object',
     officialFallbackC:'object', roomThemeOverride:'object', soulColors:'object',
     roomKindC:'object', identityDefaultC:'string', voidC:'string',
-    resonanceDefaultC:'string', roomBgm:'object', text:'object',
+    resonanceDefaultC:'string', roomBgm:'object', lobbyDisplay:'object', text:'object',
     identityPool:'object', tuning:'object', songStyles:'object',
     fx:'object', entranceFx:'object',
     publicThemePool:'array', privateThemePool:'array', vipUids:'array', vipTreatment:'string', tierNames:'object', customTiers:'array'
@@ -2603,7 +2609,7 @@ function applyConfigMap(rawMap){
   try{
   // 保留引用——ROOM_BGM/ROOM_THEME/THEMES 都指向 EH_CONFIG 子对象，
   // 不能重新赋对象(旧引用会失效),用「清空+拷贝」原地更新
-  ['themePalettes','themes','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','vipTreatment','tierNames','customTiers','text','identityPool','tuning','songStyles'].forEach(k=>{
+  ['themePalettes','themes','lobbyDisplay','roomTheme','officialFallbackC','publicThemePool','privateThemePool','roomThemeOverride','soulColors','roomKindC','roomNameC','identityDefaultC','voidC','resonanceDefaultC','roomBgm','fx','entranceFx','vipUids','vipTreatment','tierNames','customTiers','text','identityPool','tuning','songStyles'].forEach(k=>{
     if(!map[k]) return;
     const dst=EH_CONFIG[k];
     if(Array.isArray(dst)){
@@ -3811,12 +3817,16 @@ async function renderOfficial(soft){
   if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
   const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at'));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试, 不清空也不卡死
-  const { data } = _r;
-  box.innerHTML=(data||[]).map(r=>{
+  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
+  const om=(cfg.official&&typeof cfg.official==='object')?cfg.official:{};
+  const visible=(data||[]).map(r=>({r, o:om[r.name]||{}})).filter(x=>x.o.visible!==false);
+  visible.sort((a,b)=>(Number.isFinite(+a.o.order)?+a.o.order:9999)-(Number.isFinite(+b.o.order)?+b.o.order:9999));
+  box.innerHTML=visible.map(({r,o})=>{
     const c=roomAccentC({...r,kind:'official'});
+    const title=o.title||r.name, desc=o.desc!=null?o.desc:(r.topic||'');
     return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
-      <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
-      <div class="desc">${esc(r.topic||'')}</div>
+      <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(title)}</h3>
+      <div class="desc">${esc(desc)}</div>
       <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
       <div class="preview empty" data-prev>加载中…</div></div>`;
   }).join('');
@@ -3835,6 +3845,8 @@ async function renderPublic(soft){
   const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false}));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
   const { data } = _r;
+  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
+  if(cfg.publicVisible===false){ box.innerHTML=''; empty.style.display='none'; return; }
   if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:${roomAccentC({...r,kind:'public'})}">
@@ -3909,7 +3921,9 @@ async function renderMyRooms(soft){
   const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false}));
   if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
   const { data } = _r;
+  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
   const box=$('#myRooms'); const pe=$('#privEmpty');
+  if(cfg.privateVisible===false){ box.innerHTML=''; if(pe) pe.style.display='none'; return; }
   if(!data || !data.length){ box.innerHTML=''; if(pe) pe.style.display='block'; return; }
   if(pe) pe.style.display='none';
   box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="private">

@@ -364,6 +364,41 @@ Deno.serve(async (req)=>{
     role: me.role
   }, 403);
   const isSuper = me.role === "super";
+  // ---- 集中配置中心：统一走 eh_config，写入带白名单与审计 ----
+  const ALLOWED_CONFIG_KEYS = [
+    "themePalettes", "themes", "lobbyDisplay", "roomTheme", "officialFallbackC",
+    "roomKindC", "roomBgm", "text", "identityPool", "tuning", "songStyles",
+    "publicThemePool", "privateThemePool", "roomThemeOverride", "soulColors", "roomNameC",
+    "identityDefaultC", "voidC", "resonanceDefaultC", "fx", "entranceFx", "customTiers",
+    "tierNames", "humanSingStyles", "interactions"
+  ];
+  if (action === "config" && req.method === "GET") {
+    const cfg = await sbGet("eh_config?select=key,value,updated_at&order=key.asc");
+    return j({ config: Array.isArray(cfg) ? cfg : [] });
+  }
+  if (action === "config" && req.method === "POST") {
+    let b = {};
+    try { b = await req.json(); } catch {}
+    const key = String(b?.key || "").trim();
+    if (!ALLOWED_CONFIG_KEYS.includes(key)) return j({ error: "未知配置项: " + key }, 400);
+    const oldRows = await sbGet("eh_config?select=value&key=eq." + encodeURIComponent(key));
+    const prevValue = Array.isArray(oldRows) && oldRows[0] ? oldRows[0].value : null;
+    const up = await sbWrite("eh_config", "POST", { key, value: b?.value ?? null, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!up.ok) return j({ error: "保存失败", detail: up.body }, up.status || 500);
+    await sbWrite("eh_logs", "POST", { scope: "admin", tag: "config_update", actor_id: me.uid, actor_name: me.username, payload: { key, prevValue, newValue: b?.value ?? null } }, { Prefer: "return=minimal" });
+    return j({ ok: true });
+  }
+  if (action === "rollback" && req.method === "POST") {
+    let b = {};
+    try { b = await req.json(); } catch {}
+    const key = String(b?.key || "").trim();
+    if (!isSuper) return j({ error: "forbidden" }, 403);
+    if (!ALLOWED_CONFIG_KEYS.includes(key) || b?.value === undefined) return j({ error: "回滚参数无效" }, 400);
+    const up = await sbWrite("eh_config", "POST", { key, value: b.value, updated_at: new Date().toISOString() }, { Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!up.ok) return j({ error: "回滚失败", detail: up.body }, up.status || 500);
+    await sbWrite("eh_logs", "POST", { scope: "admin", tag: "config_rollback", actor_id: me.uid, actor_name: me.username, payload: { key, newValue: b.value } }, { Prefer: "return=minimal" });
+    return j({ ok: true });
+  }
   // ---- 管理员管理(仅超管) ----
   if (action === "admins" && req.method === "GET") {
     if (!isSuper) return j({
