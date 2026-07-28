@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-bgm39-restore-install-btn';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-capsule';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1902,8 +1902,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <div class="login-collapse" id="loginCollapse">
         <form class="login-form" id="loginForm" onsubmit="return false">
           <div class="login-row">
-            <input id="loginAccount" name="username" autocomplete="off" data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
-            <input id="loginPassword" type="password" name="password" autocomplete="off" data-txt-ph="loginPwdPh" placeholder="密码">
+            <input id="loginAccount" name="username" autocomplete="username" readonly data-noauto data-txt-ph="loginUserPh" placeholder="用户名 或 邮箱">
+            <input id="loginPassword" type="password" name="password" autocomplete="current-password" readonly data-noauto data-txt-ph="loginPwdPh" placeholder="密码">
           </div>
           <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
           <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
@@ -2049,11 +2049,11 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <h3 data-txt="regTitle">注册账号</h3>
       <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
       <label class="fld"><span data-txt="regUserLabel">用户名</span>
-        <input id="regUser" maxlength="20" data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
+        <input id="regUser" maxlength="20" autocomplete="off" readonly data-noauto data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
       <label class="fld"><span>密码</span>
-        <input id="regPass" type="password" data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
+        <input id="regPass" type="password" autocomplete="new-password" readonly data-noauto data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
       <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
-        <input id="regEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
+        <input id="regEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
       <div class="modal-err" id="regErr"></div>
       <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
@@ -2061,7 +2061,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <h3 data-txt="forgotTitle">找回密码</h3>
       <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
-        <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
+        <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
       <div class="modal-err" id="resetErr"></div>
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
@@ -2075,7 +2075,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
       </div>
       <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
-        <input id="newEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" placeholder="you@example.com"></label>
+        <input id="newEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto placeholder="you@example.com"></label>
       <div class="modal-err" id="emailErr"></div>
       <button class="btn-primary" id="doEmailBtn">保 存</button>
     </div>
@@ -2300,12 +2300,12 @@ const EH_CONFIG_DEFAULT = {
   // 官方房按 name 精确绑; public/private 走 _fallback (支持任意用户建的公共/私密房)
   roomBgm: {
     '闲聊广场':{ name:'浩浩人流', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall.mp3', variants:[{name:'晚风集市',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_daylit.mp3'},{name:'夜市霓虹',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3'}] },
-    '深夜电台':{ name:'一个人的午夜塔', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
+    '深夜电台':{ name:'一个人的午夜塔', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3', variants:[{name:'深夜频率',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio_late.mp3'},{name:'电波未眠',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio_signal.mp3'}] },
     '技术黑话':{ name:'凌晨三点的代码', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech.mp3', variants:[{name:'深夜 debug',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_focus.mp3'},{name:'阵雨服务器',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_neon.mp3'}] },
     '虚空回音':{ name:'一句话碰到月亮', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void.mp3', variants:[{name:'海底诗集',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_glacier.mp3'},{name:'行星间的回信',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/void_astral.mp3'}] },
     _fallback:{
       public: { name:'饭后的阳台', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_night.mp3', variants:[{name:'周六早上十点',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_dawn.mp3'},{name:'晴天的窗台',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/public_glow.mp3'}] },
-      private:{ name:'只有我们两个人', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3' },
+      private:{ name:'只有我们两个人', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_cozy.mp3', variants:[{name:'耳畔低语',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_whisper.mp3'},{name:'暖房时光',url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/private_glow.mp3'}] },
       generated:{ name:'当场召唤', url:'' },
     },
   },
@@ -3174,7 +3174,7 @@ function bgmCandidatesForRoom(room){
     }else if(room.kind==='public' && ROOM_BGM._fallback && ROOM_BGM._fallback.public){
       const base=ROOM_BGM._fallback.public; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
     }else if(room.kind==='private' && ROOM_BGM._fallback && ROOM_BGM._fallback.private){
-      push(ROOM_BGM._fallback.private,'默认');
+      const base=ROOM_BGM._fallback.private; push(base,'默认'); (base.variants||[]).forEach(v=>push(v,'扩展'));
     }
   }else{
     // 大厅：把所有官方房+fallback 都列出来
@@ -7067,6 +7067,61 @@ async function switchMyBgm(title){
   if(!row){await showMyBgmLibrary();return;}
   bgmPlayLocal(row);
 }
+// ============ 时间胶囊 ============
+// /胶囊 7天 内容 → 封存一条消息, open_at 到期后由 worker 让房里灵魂在房间念出来。
+// 呼应"回声厅"命名: 你此刻的声音, 在未来某天回响。
+function parseCapsuleDelay(s){
+  const t=String(s||'').trim();
+  let m;
+  if((m=t.match(/^(\d+)\s*天/))) return {days:+m[1], label:m[1]+'天后'};
+  if((m=t.match(/^(\d+)\s*周/))) return {days:+m[1]*7, label:m[1]+'周后'};
+  if((m=t.match(/^(\d+)\s*个?月/))) return {days:+m[1]*30, label:m[1]+'个月后'};
+  if((m=t.match(/^(\d+)\s*年/))) return {days:+m[1]*365, label:m[1]+'年后'};
+  if((m=t.match(/^(\d+)\s*小时/))) return {hours:+m[1], label:m[1]+'小时后'};
+  if(/^一年后|明年/.test(t)) return {days:365, label:'一年后'};
+  if(/^半年后/.test(t)) return {days:182, label:'半年后'};
+  if(/^一个月后|下个月/.test(t)) return {days:30, label:'一个月后'};
+  if(/^一周后|下周/.test(t)) return {days:7, label:'一周后'};
+  if(/^明天/.test(t)) return {days:1, label:'明天'};
+  if((m=t.match(/^(\d+)$/))) return {days:+m[1], label:m[1]+'天后'};   // 纯数字=天
+  return null;
+}
+async function sealCapsule(arg){
+  if(!myUid){try{await ensureAuth()}catch(_){}}
+  if(!curRoom){ toast('先进一个房间再封存胶囊'); return; }
+  const sp=arg.indexOf(' ');
+  const delayStr=sp<0?arg:arg.slice(0,sp);
+  const content=(sp<0?'':arg.slice(sp+1)).trim();
+  const d=parseCapsuleDelay(delayStr);
+  if(!d){ toast('用法：/胶囊 7天 想对未来说的话（也可 3周/1个月/1年/明年）'); return; }
+  if(!content){ toast('胶囊里得装点话呀：/胶囊 '+delayStr+' 你想说的内容'); return; }
+  if(content.length>300){ toast('胶囊内容太长了（最多300字）'); return; }
+  const ms=(d.hours?d.hours*3600000:0)+(d.days?d.days*86400000:0);
+  if(ms<3600000){ toast('至少封存1小时以上'); return; }
+  if(ms>2*365*86400000){ toast('最多封存2年'); return; }
+  const openAt=new Date(Date.now()+ms).toISOString();
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name||'', emoji:me.emoji||'', color:me.color||'', content, open_at:openAt };
+  try{
+    const { error }=await sb.from('eh_capsules').insert(payload);
+    if(error){ console.warn('capsule',error); toast('封存失败，稍后再试'); return; }
+    try{ burst('🕰️',10); burst('✨',12); }catch(_){}
+    await sendSystemAct(`把一段话封进了时间胶囊 🕰️，将在${d.label}由灵魂念出`);
+    toast('🕰️ 已封存！'+d.label+'，这段话会在这个房间被灵魂念出来');
+  }catch(e){ console.warn('sealCapsule',e); toast('封存失败'); }
+}
+async function showMyCapsules(){
+  if(!myUid){try{await ensureAuth()}catch(_){}}
+  let rows=[];
+  try{ const q=await sb.from('eh_capsules').select('content,open_at,opened').eq('user_id',myUid).order('open_at',{ascending:true}).limit(20); rows=q.data||[]; }catch(_){}
+  if(!rows.length){ toast('你还没有封存过时间胶囊，试试：/胶囊 7天 想对未来说的话'); return; }
+  const pend=rows.filter(r=>!r.opened), done=rows.filter(r=>r.opened);
+  const fmtLeft=(iso)=>{ const ms=new Date(iso)-Date.now(); if(ms<=0) return '待念出'; const dd=Math.floor(ms/86400000); if(dd>=1) return dd+'天后开启'; const hh=Math.ceil(ms/3600000); return hh+'小时后开启'; };
+  const lines=[];
+  pend.forEach(r=>lines.push(`🔒 ${fmtLeft(r.open_at)}：${String(r.content).slice(0,20)}${r.content.length>20?'…':''}`));
+  done.forEach(r=>lines.push(`✅ 已念出：${String(r.content).slice(0,20)}${r.content.length>20?'…':''}`));
+  toast('🕰️ 我的时间胶囊（'+pend.length+'封待启）　'+lines.slice(0,6).join('　'));
+}
+
 async function sendSong(lyric, sid){
   if(!curRoom || !myUid) return;
   lyric=String(lyric||'').trim().slice(0,60);
@@ -7377,6 +7432,8 @@ const SLASH_CMDS=[
   {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
   {c:'/bgm',   d:'/bgm 描述 → 请灵魂制作一首本地 BGM 🎼'},
   {c:'/bgm库', d:'/bgm库 → 查看我的 BGM 曲库'},
+  {c:'/胶囊', d:'/胶囊 7天 想说的话 → 封存进时间胶囊，到期由灵魂在房里念出'},
+  {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -7394,6 +7451,12 @@ async function handleSlash(text){
   }
   if(cmd==='/bgm库'){
     await showMyBgmLibrary(); return true;
+  }
+  if(cmd==='/胶囊'||cmd==='/capsule'){
+    await sealCapsule(arg); return true;
+  }
+  if(cmd==='/胶囊库'||cmd==='/我的胶囊'){
+    await showMyCapsules(); return true;
   }
   if(cmd==='/bgm切换'){
     if(!arg){ await showMyBgmLibrary(); return true; }
@@ -8377,7 +8440,7 @@ async function logoutIdentity(bound){
   closeMe();
   // 清空登录框 + 收起, 退出后不残留账密(改为点击时才拉取)
   const la=$('#loginAccount'), lp=$('#loginPassword'), lc=$('#loginCollapse');
-  if(la) la.value=''; if(lp) lp.value='';
+  if(la){ la.value=''; la.readOnly=true; } if(lp){ lp.value=''; lp.readOnly=true; }  // 退出后清空并重新上锁, 恢复"未交互不调起凭据"初始态
   if(lc){ lc.classList.remove('on'); const sp=$('#loginToggle')?.querySelector('span'); if(sp) sp.textContent='已有账号？点此登录 ▾'; }
   _autoLoginFired=false;
   try{ navigator.credentials && navigator.credentials.preventSilentAccess && navigator.credentials.preventSilentAccess(); }catch(e){}
@@ -8660,7 +8723,7 @@ async function handleResetLink(){
   const mask=document.createElement('div'); mask.className='modal-mask on'; mask.style.zIndex='120';
   mask.innerHTML=`<div class="modal" style="max-width:340px">
     <h2 class="modal-title">设置新密码</h2>
-    <label class="fld"><span>新密码（至少 6 位）</span><input id="rsPw" type="password" autocomplete="new-password" placeholder="新密码"></label>
+    <label class="fld"><span>新密码（至少 6 位）</span><input id="rsPw" type="password" autocomplete="new-password" readonly data-noauto placeholder="新密码"></label>
     <div class="err-line" id="rsErr" style="color:var(--magenta);font-size:12px;min-height:16px"></div>
     <button class="btn-primary" id="rsGo" style="width:100%">确认修改</button>
   </div>`;
@@ -8759,22 +8822,25 @@ async function saveProfile(){
 // ============ 事件绑定 ============
 // 安全绑定: 元素不存在时静默跳过, 避免单个 null 中断整条绑定链(移动端密码管理器偶发改动DOM导致)
 function on(id, ev, fn){ const el=document.getElementById(id); if(el) el.addEventListener(ev, fn); return el; }
+// 防"未交互就被浏览器/密码管理器自动调起存储凭据"(MDN: autocomplete=off 对登录字段无效, 会被故意忽略)。
+// 行业可靠解法 readonly-until-focus: 招引凭据的字段(登录账密/注册/邮箱, 标 [data-noauto])默认 readonly,
+// 浏览器 autofill 扫描会跳过只读字段→首页未弹登录框/改邮箱页都不会被自动填充; 用户真正 pointerdown/focus 时
+// 才摘 readonly 允许输入。委托到 document(捕获阶段)→ 动态创建的重置密码框也覆盖。
+function _unlockNoAuto(el){ if(el && el.hasAttribute && el.hasAttribute('data-noauto') && el.readOnly){ el.readOnly=false; } }
+document.addEventListener('pointerdown', e=>{ _unlockNoAuto(e.target); }, true);
+document.addEventListener('focusin', e=>{ _unlockNoAuto(e.target); }, true);
 on('rerollBtn','click',()=>rollIdentity());
 on('loginToggle','click',()=>{
   const c=$('#loginCollapse'); if(!c) return; const open=c.classList.toggle('on');
   $('#loginToggle').querySelector('span').textContent = open?'已有账号？收起 ▴':'已有账号？点此登录 ▾';
-  // 密码框始终是真正的 type=password + 标准 autocomplete, 浏览器/密码管理器才会记住并自动填充。
-  // (不再用 type=text 骗过 iOS 自填充条——那会连带砸掉记住密码; iOS 聊天输入框的误填充由其独立 form 隔离)
-  // 密码框默认 autocomplete=off(收着时浏览器不弹填充, 免打扰); 点开登录才恢复标准 autocomplete → 填充/记住正常
+  // autocomplete token 恒为 HTML 里的标准值(username/current-password), 浏览器才会记住+自动填充, 不再动态改。
+  // 防误调起靠 readonly: 收着时账密框 readonly, 浏览器 autofill 扫描跳过→首页不弹凭据; 点开=用户手势才解锁。
+  const la=$('#loginAccount'), lp=$('#loginPassword');
   if(open){
-    const la=$('#loginAccount'), lp=$('#loginPassword');
-    if(la) la.setAttribute('autocomplete','username');
-    if(lp) lp.setAttribute('autocomplete','current-password');
+    if(la) la.readOnly=false; if(lp) lp.readOnly=false;
     setTimeout(()=>$('#loginAccount').focus(),200); triggerCredentialLogin();  // 点开=用户手势, 此时才弹系统凭据验证→拉取→自动登录
   } else {
-    const la=$('#loginAccount'), lp=$('#loginPassword');
-    if(la) la.setAttribute('autocomplete','off');
-    if(lp) lp.setAttribute('autocomplete','off');
+    if(la) la.readOnly=true; if(lp) lp.readOnly=true;
   }
 });
 on('loginForm','submit',(e)=>{ e.preventDefault(); doLogin(); });   // form submit(而非裸按钮)→浏览器/密码管理器才认作登录, 触发保存+自动填充
@@ -9425,7 +9491,8 @@ function fillAndLogin(id, pwv){
   if(!$('#enter').classList.contains('on')) return;
   _autoLoginFired=true;
   const c=$('#loginCollapse'); if(c && !c.classList.contains('on')){ c.classList.add('on'); const sp=$('#loginToggle')?.querySelector('span'); if(sp) sp.textContent='已有账号？收起 ▴'; }
-  $('#loginAccount').value=id; $('#loginPassword').value=pwv;
+  const la=$('#loginAccount'), lp=$('#loginPassword');
+  if(la){ la.readOnly=false; la.value=id; } if(lp){ lp.readOnly=false; lp.value=pwv; }  // 解锁再填(readonly 只挡用户手输, 不挡赋值, 但解锁保持状态一致)
   doLogin();
 }
 
