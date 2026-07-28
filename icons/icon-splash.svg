@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    Splash 专用 logo (2026-07-28): 从 icons/icon.svg 派生, 去掉深色圆角底 <rect>,
+    只保留中央青绿同心波纹, 背景透明。让 #pwaSplash 的底色由 CSS 变量控制,
+    日间自动是浅底 + 中央青绿波纹, 夜间自动是深底 + 中央青绿波纹, 不再有大片"卡片黑底"。
+    PWA 主屏图标(manifest.json 里的 icon-512.png)不动, 那个仍需要黑底方图。
+  -->
+  <defs>
+    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5D4"/>
+      <stop offset="100%" stop-color="#34E0B0"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- 回声同心波纹 (纯符号, 无底) -->
+  <g filter="url(#glow)" fill="none" stroke="url(#wave)" stroke-linecap="round">
+    <circle cx="256" cy="256" r="46" stroke="#00E5D4" stroke-width="0" fill="#00E5D4"/>
+    <circle cx="256" cy="256" r="92" stroke-width="14" opacity="0.92"/>
+    <circle cx="256" cy="256" r="140" stroke-width="12" opacity="0.62" stroke-dasharray="330 120" transform="rotate(-30 256 256)"/>
+    <circle cx="256" cy="256" r="188" stroke-width="10" opacity="0.34" stroke-dasharray="420 240" transform="rotate(60 256 256)"/>
+  </g>
+</svg>
