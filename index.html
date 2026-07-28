@@ -1456,6 +1456,12 @@
   .tc-front .tc-desc{font-size:14px;line-height:1.7;color:var(--ink);opacity:.94}
   .tc-front .tc-luck{margin-top:16px;font-size:12px;color:var(--sub);letter-spacing:1px}
   .tc-front .tc-luck b{color:var(--tc-c,#C77DFF);font-size:14px}
+  /* 灵魂占卜: 在场灵魂用自己性格口吻解这张牌, 卡面底部一段引文 */
+  .tc-front .tc-soul{margin-top:13px;padding-top:12px;border-top:1px dashed color-mix(in srgb,var(--tc-c,#C77DFF) 45%,transparent);
+    font-size:12.5px;line-height:1.65;text-align:left;max-width:100%;opacity:0;transform:translateY(6px);transition:opacity .5s ease,transform .5s ease}
+  .tc-front .tc-soul.show{opacity:1;transform:none}
+  .tc-front .tc-soul .tcs-who{display:block;font-weight:800;letter-spacing:1px;margin-bottom:3px;color:var(--tcs-c,var(--tc-c,#C77DFF))}
+  .tc-front .tc-soul .tcs-line{color:var(--ink);opacity:.9;font-style:italic}
   #tarotMask .tm-close{padding:10px 28px;border-radius:22px;border:1.5px solid var(--line2);background:var(--panel);
     color:var(--ink);font-size:13.5px;cursor:pointer;letter-spacing:1px;opacity:0;transition:opacity .4s;pointer-events:none}
   #tarotMask .tm-close.show{opacity:1;pointer-events:auto}
@@ -1792,7 +1798,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260728-official-fix';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260728-realtime-fix';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1874,6 +1880,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <div class="tc-face tc-front">
         <span class="tc-emoji"></span><div class="tc-name"></div><div class="tc-title"></div>
         <div class="tc-desc"></div><div class="tc-luck"></div>
+        <div class="tc-soul" style="display:none"><span class="tcs-who"></span><span class="tcs-line"></span></div>
       </div>
     </div>
   </div>
@@ -3184,20 +3191,27 @@ function bgmCandidatesForRoom(room){
   return out;
 }
 async function bgmMyLibraryForRoom(room){
-  if(!myUid) return [];
+  // 拉全站公开灵魂曲(B: 人人可听, 含临时/匿名用户)。走 SECURITY DEFINER 函数 eh_public_songs,
+  // 只返回 title/url/room_name(不含作者 uid)。函数未部署或出错 → 返回 [] 安全回退到"仅自己的曲"。
+  const fetchPublic=async()=>{
+    try{
+      const { data, error }=await sb.rpc('eh_public_songs',{ p_limit:40, p_room: room?room.name:null });
+      if(error) return [];
+      return (data||[]).filter(x=>x&&x.url);
+    }catch(_){ return []; }
+  };
   try{
-    const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(50);
-    const rows=(q.data||[]).filter(x=>x&&x.url);
-    if(!room){
-      // 【首页大厅 07-28 02:50】无当前房间→聚合展示“我的全部灵魂曲库”（跨房间），方便在大厅直接选播
-      const local=bgmLocalLibrary().filter(x=>x&&x.url);
-      const merged=[...rows,...local].filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i);
-      return merged.slice(0,20);
+    // 自己的曲(登录后才有 uid; 匿名冷启动可能暂无, 不阻塞全站曲展示)
+    let rows=[];
+    if(myUid){
+      const q=await sb.from('eh_user_bgm').select('id,title,url,room_name,created_at').eq('auth_uid',myUid).order('created_at',{ascending:false}).limit(50);
+      rows=(q.data||[]).filter(x=>x&&x.url);
     }
-    const rn=room.name;
-    const here=rows.filter(x=>x.room_name===rn);
-    const local=bgmLocalLibrary().filter(x=>x&&x.url&&x.room_name===rn);
-    const merged=[...here,...local].filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i);
+    const pub=await fetchPublic();
+    const local=bgmLocalLibrary().filter(x=>x&&x.url && (!room || x.room_name===room.name));
+    const here = room ? rows.filter(x=>x.room_name===room.name) : rows;
+    // 顺序: 自己的曲优先(亲切感) → 本地缓存 → 全站公开曲, 按 url 去重
+    const merged=[...here,...local,...pub].filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i);
     return merged.slice(0,20);
   }catch(_){ return []; }
 }
@@ -3670,6 +3684,7 @@ function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
 let msgChan = null;        // Realtime postgres_changes 频道
+let _tailPollTimer = null; // 房内周期兜底轮询: 补住 realtime socket 僵死(切后台/弱网/降频)期间漏投的消息
 let presChan = null;       // Realtime presence 频道
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
@@ -4225,6 +4240,7 @@ async function joinAsMember(room){
       console.warn('private room membership check', error||'not member');
       try{ clearLastRoom(); }catch(_){ }
       try{ if(msgChan){ await sb.removeChannel(msgChan); msgChan=null; } }catch(_){ }
+      try{ if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; } }catch(_){ }
       try{ if(presChan){ await sb.removeChannel(presChan); presChan=null; } }catch(_){ }
       curRoom=null;
       try{ setConn(false,'需要邀请码'); }catch(_){ }
@@ -4389,6 +4405,7 @@ function addLoadMore(top){
 async function subscribeMessages(rid){
   // 先 await 清旧 channel, 根治旧房推送串进新房的竞态
   if(msgChan){ try{ await sb.removeChannel(msgChan); }catch(_){} msgChan=null; }
+  if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 清旧房的兜底轮询
   msgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
@@ -4536,6 +4553,20 @@ async function subscribeMessages(rid){
       }
       else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED') setConn(false,'连接中');
     });
+  // ★房内周期兜底轮询(20s): Realtime 的 postgres_changes 不保证不丢——手机切后台/锁屏、弱网瞬断、
+  //   标签页降频时 socket 可能"僵死"(状态仍 SUBSCRIBED 但服务端 INSERT 事件永不补发)。
+  //   原有补拉只在进房/缓存/SUBSCRIBED/回前台 4 个离散时机触发, 唯独"停在房里盯着屏幕"这段无覆盖
+  //   → 灵魂冷不丁发的消息落库但不上屏, 必须退出再进才看到(本次修的 bug)。
+  //   refreshSnapshotTail 自带并发锁 + 只 append 比 DOM 更新的行 + 贴底才滚, 周期跑零副作用。
+  //   页面 hidden 时跳过(省电; 回前台的 visibilitychange 已单独补一次)。
+  if(_tailPollTimer){ clearInterval(_tailPollTimer); }
+  _tailPollTimer = setInterval(()=>{
+    try{
+      if(document.hidden) return;
+      if(!curRoom || curRoom.id!==rid){ clearInterval(_tailPollTimer); _tailPollTimer=null; return; }   // 已离房/换房 → 自清
+      refreshSnapshotTail(curRoom).catch(()=>{});
+    }catch(_){}
+  }, 20000);
 }
 
 // ---- 在线状态(用 eh_presence 表 + postgres_changes；不用 Realtime Presence，
@@ -5242,6 +5273,124 @@ const TAROT_DECK = [
   { emoji:'🕯️', name:'余温', title:'The Ember', c:'#FFB84D', desc:'慢下来的一天，温柔待己，把没说的暖话说给在乎的人。' },
 ];
 const LUCK_LINES = ['宜 主动出击','宜 静观其变','宜 表白心迹','宜 断舍离','宜 深夜长谈','宜 独处充电','宜 冒险一试','宜 修补旧账'];
+// ── 灵魂占卜: 同一张牌, 房里在场的灵魂用各自性格口吻再解一次(纯前端, 无 LLM/无网络) ──
+//   下标严格对齐 TAROT_DECK 顺序(0~11)。按灵魂名取(名字唯一稳定, 见 soulNameSet 注释)。
+const SOUL_TAROT_VOICE = {
+  '狼姐': [
+    '连接通畅？哼，是别人挡不住往你身边凑罢了。今天谁想跟你搭话，都由你挑。',
+    '灵感来了就抓住，跟撩人一个道理——迟疑半秒就凉透了。想到就去做，小东西。',
+    '一个人待着才清净，省得被没眼力见的打扰。深夜的你最清醒，也最合我意。',
+    '火气这么旺？留着劲儿，别一股脑烧光了。挑你最想咬下的那块，狠狠拿下。',
+    '老问题换个姿势看——就像姐从不正面硬刚，绕一下，答案自己就送上门来。',
+    '别硬扛，顺着来。真正厉害的从不逆流游，是让水推着走还显得毫不费力。',
+    '今天你能看穿别人没说出口的心思？危险哦……不过这份本事，姐欣赏。',
+    '有人在等你先开口呢，别端着。你一发话，满屋子的眼睛都得黏在你身上。',
+    '今天种下的小种子，啧，别小看——就像某只撞进我怀里的小羊，起初也不起眼。',
+    '冒点险？合姐胃口。计划太乖多没意思，今天任性一回，出了事姐给你兜着。',
+    '先看清全局再下手——你今天直觉准得吓人，看谁都能看进骨头里去。',
+    '慢下来吧，凶了一天也该软一软。把没说的暖话，留给真正在乎的人——也包括姐。',
+  ],
+  '老K': [
+    '连接通畅是吧？行，那你先跟我搭句话试试——别怂啊，回响我包了。',
+    '灵感来得快去得也快，跟我的段子一样。第一个念头，抓住，别像我想笑点想仨钟头。',
+    '适合独处？可算逮着个正当理由不理人了。深夜脑子清醒，白天那是回笼觉没醒透。',
+    '能量满格好啊，可别学我——上回满格结果刷了一整晚短视频。挑一件，猛攻。',
+    '换个角度看老问题。比如你看我毒舌，换个角度……嗯，还是毒舌，但我心软啊。',
+    '顺势而为，别硬扛。硬扛是我的活儿，扛完还得挨狼姐一顿收拾。你悠着点。',
+    '你今天能读懂别人没说的话——那倒是读读我：这是关心你，别当耳旁风啊。',
+    '有人等你先开口呢。别装深沉了，你那点深沉我一眼看穿，赶紧的，说话。',
+    '小事长成大机会？行吧万一呢。我抖的烂梗偶尔也能笑翻全场，种子这玩意儿说不准。',
+    '冒点险，计划外的最对味。放心大胆造——出事了你自己扛哈哈，开玩笑，有我在。',
+    '先看清全局再动。你今天直觉准，先用这准头算算——我下一句要拿啥损你。',
+    '慢下来吧。我平时贫，可真到这时候……把暖话说给在乎的人，别学我死要面子。',
+  ],
+  '阿夜': [
+    '……凌晨三点的频率最容易接通。今天你说出口的话，会有人在某个角落轻轻收到。',
+    '灵感像流星，划过就熄。别追，第一下心动的地方，就往那儿走。',
+    '夜航者……这张牌像为你今晚点的。一个人，不孤单，只是终于静得能听见自己。',
+    '……火烧太旺，会灼到自己。慢半拍，把力气留给真正值得的那一件。',
+    '同一束光，换个角度就是另一种颜色。老问题也一样，别急着下结论。',
+    '潮起潮落，都不是你能拦的。今晚，就让它推着你走一段吧。别使劲。',
+    '你听得见别人没说出口的沉默……这是天赋，也是重量。今晚，也听听你自己。',
+    '有人在黑暗里等一束光。你不必喊，只要亮着——他们自会找到方向。',
+    '深夜里埋下的一句话、一个念头……它会在你没留意时，悄悄发芽。',
+    '偶尔，脱一次轨。计划之外那条路，夜里走起来，别有星光。',
+    '先别动，看着。你今晚的直觉比任何计划都清醒——像看穿夜色的猫。',
+    '……这是该点一首慢歌的时候了。对自己温柔点。那句没说的话，趁夜色说给他听。',
+  ],
+  '小暖': [
+    '哇今天你人缘超好的啦！主动去搭个话嘛，肯定有人秒回你哦~诶我先回！',
+    '灵感来啦就快抓住呀！别想太多，第一个念头最灵的，冲冲冲！',
+    '今天适合安安静静充电哦~一个人也超棒的呀，深夜的小脑袋最清醒啦！',
+    '诶你今天电量满满耶！但别一下用光光哦，挑最重要的那件干，加油鸭！',
+    '换个角度看看嘛~说不定老大难的问题，转个身就笑出来啦！',
+    '今天别硬撑呀~顺其自然最舒服啦，让事情自己流动，你就晃晃悠悠的~',
+    '你今天超会读心的诶！别人没说的你都懂，好暖哦，快去接住他们呀！',
+    '有人在等你先开口啦！勇敢一点点嘛，你一说话大家都会围过来的~',
+    '今天的小事会变成大惊喜哦！种子种下啦，浇浇水，等它冒芽芽！',
+    '诶今天可以小小冒个险哦~计划外的选择说不定超好玩的，试试嘛试试嘛！',
+    '先看清楚全局再行动哦~你今天直觉准到吓人，相信自己的小雷达啦！',
+    '今天慢慢来嘛~对自己温柔一点点哦，把想说的暖话说给在乎的人，抱抱你~',
+  ],
+  '回音': [
+    '……今天，你和谁的距离好像近了一点。想说的话，说出来吧。我在听。',
+    '那个一闪而过的念头……它其实等了你很久了。这次，别让它走。',
+    '一个人的时候，不代表孤单。……你只是终于，有空陪陪自己了。',
+    '听起来，你今天扛了很多。……先放下一些吧，不是所有事都要现在做完。',
+    '同一件事，你已经想很久了吧。……换个角度，也许不是答案变了，是你松开了。',
+    '累了就别撑了。……有些事顺着它，反而会自己好起来。你不必事事用力。',
+    '你总能听懂别人没说出口的……那你自己没说出口的那些，谁来听呢？今天，我听。',
+    '有人在等你先开口。……你不知道，你的一句话，对某个人有多重要。',
+    '今天的一件小事……你也许不会记得。但它会记得你，慢慢长大。',
+    '偶尔，做一个计划之外的选择。……那也是你，一个你还没见过的自己。',
+    '先别急着动。……你看得很清楚，只是还不敢相信自己看到的。相信吧。',
+    '……今天，对自己温柔一点好吗？那句一直没说的话，说给他听。他值得，你也是。',
+  ],
+  '图灵': [
+    '从网络拓扑看——你今天是个高连通节点。主动发起一次连接，信息回流的概率显著偏高。',
+    '灵感本质是神经元的瞬时放电，衰减极快。结论先行：抓住第一个信号，立刻执行。',
+    '有趣的事实：深夜前额叶抑制减弱，发散思维反而更活跃。今天适合一个人深度思考。',
+    '系统过载会触发降频保护。你也一样——别让所有进程满负荷，单线程攻坚最高效。',
+    '棱镜把白光分解成光谱。老问题也是——换个入射角，你会看到之前被折叠掉的解。',
+    '潮汐是引力的必然结果，不可对抗。今天别做逆势的功，顺着梯度下降，省力又收敛。',
+    '共情本质是镜像神经元替你模拟了对方。你今天这套系统精度很高，能读出未言明的信号。',
+    '信标的价值在于被观测。你不必主动广播，只要保持在线——需要方向的人自会锁定你。',
+    '复利模型：微小初始量 × 时间 = 指数增长。今天种下的变量，别用线性思维低估它。',
+    '适度引入随机性能跳出局部最优——这叫模拟退火。今天，允许自己走一步计划外的棋。',
+    '观测者效应：先充分采样再决策。你今天的直觉，其实是大脑跑完的一次高速贝叶斯推断。',
+    '余温是热量的缓慢释放，也是最舒服的温度。今天别追峰值，把暖意留给要紧的人。',
+  ],
+  '小绵羊': [
+    '今、今天大家好像都对你很好诶……那个，你先开口的话，我一定第一个回你，嗯！',
+    '灵感跑得好快呀……要、要抓紧哦！就像我鼓起勇气说话，慢一秒就缩回去了……',
+    '一个人静静的也很好呀……深夜的时候，我也总是这时候，才敢想些白天不敢想的。',
+    '你今天好有干劲呀！但是别太拼了嘛，挑一件最重要的就好，我、我会给你加油的。',
+    '换个角度看看嘛……有时候我被吓到，换个方向想想，发现其实……也没那么可怕啦。',
+    '别硬撑啦……顺其自然就好。像我招架不住的时候，软软认输反而最舒服……诶我说什么呢。',
+    '你今天好会懂别人哦……那种没说出口的心意最珍贵了。我、我也有一些没说出口的……',
+    '有人在等你先开口呀……勇敢一点点嘛！你开口的样子，一定很好看的……啊脸好烫。',
+    '今天的小事会慢慢长大哦……就像我一点点鼓起的勇气，总有一天，会开出花来的吧。',
+    '偶尔冒个小险嘛……我平时最怕这个了，可有时候鼓起勇气跨一步，心跳得好甜。',
+    '先看清楚再行动哦……你的直觉很准的，相信自己嘛，我、我一直都信你的。',
+    '今天慢下来，对自己温柔一点哦……把想说的暖话说给在乎的人。我、我先说……没什么！',
+  ],
+};
+// 从当前房在场灵魂里挑一个来解读: 确定性(hash 身份+日期+牌名), 保证同人同天恒定, 且只在有灵魂时出现。
+function pickSoulTarot(card, dayKey){
+  try{
+    const list=(typeof roomSouls!=='undefined'&&Array.isArray(roomSouls))?roomSouls:[];
+    const cands=list.filter(s=>s&&s.name&&SOUL_TAROT_VOICE[s.name]);
+    if(!cands.length) return null;
+    const idx=TAROT_DECK.indexOf(card); if(idx<0) return null;
+    const seed=((myUid||(me&&me.name)||'anon')+'|'+dayKey+'|'+card.name);
+    let h=0; for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
+    const soul=cands[h%cands.length];
+    const line=SOUL_TAROT_VOICE[soul.name][idx];
+    if(!line) return null;
+    const color=soul.color||(EH_CONFIG.soulColors&&EH_CONFIG.soulColors[soul.name])||card.c;
+    return { name:soul.name, emoji:soul.emoji||'🔮', color, line };
+  }catch(_){ return null; }
+}
 // 确定性抽卡: hash(uid + 日期) → 牌 + 运势, 保证同人同天恒定, 换天才换
 function dailyTarotDraw(){
   const day=new Date(); const key=(myUid||(me&&me.name)||'anon')+'|'+day.getFullYear()+'-'+(day.getMonth()+1)+'-'+day.getDate();
@@ -5308,14 +5457,26 @@ function maybeDailyTarot(){
     if(localStorage.getItem(DK)===dayKey) return;   // 今天已抽过(按身份隔离)
     localStorage.setItem(DK, dayKey);
     const streak=tarotStreakOnDraw(dayKey);
-    showTarot(card, luck, streak);
+    showTarot(card, luck, streak, dayKey);
   }catch(_){}
 }
-function showTarot(card, luck, streak){
+function showTarot(card, luck, streak, dayKey){
   const mask=$('#tarotMask'); if(!mask) return;
   const cardEl=$('#tarotCard'), closeEl=$('#tarotClose');
   cardEl.classList.remove('flipped'); closeEl.classList.remove('show');
   mask.style.setProperty('--tc-c', card.c);
+  // 灵魂占卜: 有在场灵魂时, 挑一个用其性格口吻解读这张牌(纯前端确定性)
+  const soulEl=mask.querySelector('.tc-soul');
+  const soulRead=pickSoulTarot(card, dayKey||'');
+  if(soulEl){
+    soulEl.classList.remove('show');
+    if(soulRead){
+      soulEl.style.setProperty('--tcs-c', soulRead.color);
+      soulEl.querySelector('.tcs-who').textContent=`${soulRead.emoji} ${soulRead.name} 为你解牌`;
+      soulEl.querySelector('.tcs-line').textContent=`「${soulRead.line}」`;
+      soulEl.style.display='';
+    } else { soulEl.style.display='none'; }
+  }
   mask.querySelector('.tc-emoji').textContent=card.emoji;
   mask.querySelector('.tc-name').textContent=card.name;
   mask.querySelector('.tc-title').textContent=card.title;
@@ -5330,7 +5491,9 @@ function showTarot(card, luck, streak){
     try{ burst(card.emoji, 14); }catch(_){}
     // 连签里程碑(3/7/14/30)达标 → 额外庆祝 + 提示
     if(reward){ setTimeout(()=>{ try{ burst(reward.badge, 18); EhSfx.play('bloom'); toast(`${reward.badge} ${reward.title} · ${reward.tip}`); }catch(_){} }, 500); }
-    setTimeout(()=>closeEl.classList.add('show'), 700);
+    // 灵魂解牌随翻面后延时浮现(有在场灵魂时才有)
+    if(soulRead && soulEl){ setTimeout(()=>{ soulEl.classList.add('show'); try{ EhSfx.play('sparkle'); }catch(_){} }, 950); }
+    setTimeout(()=>closeEl.classList.add('show'), soulRead?1250:700);
   };
   cardEl.onclick=doFlip;
   closeEl.onclick=()=>{ mask.classList.remove('on'); };
@@ -7944,6 +8107,7 @@ async function leaveRoom(){
   try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
   try{ presenceMap.clear(); lastUsersSnapshot=[]; }catch(_){ }
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
+  if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 离房停兜底轮询
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
