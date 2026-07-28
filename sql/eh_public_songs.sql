@@ -6,7 +6,7 @@
 --       前端在名下曲库为空时回退拉这个, 让人人都能刷到别人做的灵魂曲并点播。
 
 create or replace function public.eh_public_songs(p_limit int default 30, p_room text default null)
-returns table(id uuid, title text, url text, room_name text, created_at timestamptz)
+returns table(id bigint, title text, url text, room_name text, created_at timestamptz)
 language sql
 security definer
 set search_path to 'public'
