@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v82-20260729-structG3';
+const SW_VERSION = 'eh-sw-v83-20260729-structG4';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -14,6 +14,7 @@ const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './js/config.js',
   './js/app.js',
   './js/keyboard.js',
   './js/boot.js',
