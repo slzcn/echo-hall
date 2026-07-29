@@ -1597,18 +1597,34 @@
        模型同 Telegram/WhatsApp/Slack/Discord 移动网页: #hall=可视高, flex column → .stream 内滚,
        .composer 天然贴可视区底(=键盘顶)。iOS系统键盘/PWA/第三方/安卓interactive-widget 弹起 vv 收缩,
        --vh 自动就是真实可视高; 覆盖式IME(vv不缩)由 JS 估算写 --vh 兜底。 */
-    body.hall-on .stage{padding:0;height:var(--vh,100dvh);align-items:stretch}
+    /* ★键盘协同 V8(2026-07-30) - CSS 主导, 按浏览器厂商 2024-2025 官方推荐方案:
+       - 靠 <meta viewport interactive-widget=resizes-content>(Chrome 108+/Safari 17.4+) 自动缩
+         layout viewport, .stage 100dvh 会自动变短到键盘上方
+       - VirtualKeyboard API 启用 overlaysContent=true 后, env(keyboard-inset-height)
+         会给出键盘覆盖高度, composer 直接向上补键盘高度的 padding
+       - iOS PWA WebKit bug #237851 导致 vv.offsetTop=0, 所以不能靠 vv 定位新机
+       - 旧 iOS/没 env 环境由 JS 兵底(监听 vv resize, 把 composer transform 上推) */
+    body.hall-on .stage{padding:0;align-items:stretch;height:100dvh;display:flex}
+    /* fallback: 旧一点的浏览器不支持 dvh 的 -webkit-fill-available */
+    @supports not (height:100dvh){
+      body.hall-on .stage{height:-webkit-fill-available}
+    }
+    /* 旧 JS 会写 --vh 兼容 V7 时代遗留(V8 JS 不再写, 只在 fallback 时写) */
+    body.hall-on .stage[data-kb-jsfallback="1"]{height:var(--vh, 100dvh)}
     /* ★高度真实源唯一化(2026-07-29 vvpin3): #hall 不再独立读 --vh, 只填满 .stage(height:100%)。
        键盘态 .stage 被 pin() 精确钉成可视视口矩形(position:fixed + inline height=vv.height),
        #hall 100% 跟着它走 → 位置与尺寸只有 .stage 一个真相源, --vh 残留/时序竞态再也无法让 #hall 与 .stage 高度打架
        (旧版 #hall 独立读 --vh, 一旦 --vh 卡在 focusin 竞态里的小值 → #hall 缩成 1/3, composer 浮空下方留黑, 即本次症状)。 */
     #hall{width:100%;height:100%;border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
-    .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-    /* 键盘弹起时(html.kb-up)键盘已盖住底部 home 条安全区。VirtualKeyboard.overlaysContent=true 时,
-       env(keyboard-inset-height) 会自动给出键盘覆盖高度; 未启用/不支持时 fallback 0px。
-       用 max() 取「键盘余量」和「8px」的较大值, 保证任何设备都能把输入框抬离键盘边缘。 */
-    html.kb-up .composer{padding-bottom:max(8px, env(keyboard-inset-height, 0px))}
+    /* composer 底部间距:
+       - 无键盘时: env(keyboard-inset-height)=0, 只留 safe-area(home条)
+       - 有键盘时: env(keyboard-inset-height)>0, safe-area 被键盘盖住不需要,
+         padding-bottom 设为 env(keyboard-inset-height)+8 把输入框抬离键盘边缘
+       - CSS max() 取两者较大值自动切换, 不需 JS 加 kb-up class */
+    .composer{padding-bottom:max(calc(14px + env(safe-area-inset-bottom)), calc(env(keyboard-inset-height, 0px) + 8px))}
+    /* V7 遗留兼容: JS fallback 模式(旧 iOS)写 --vh + 者 kb-up, 手动控制输入框位置 */
+    html.kb-up[data-kb-jsfallback="1"] .composer{padding-bottom:8px}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1794,7 +1810,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-kbSimpleV7';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260730-kbCssV8';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }

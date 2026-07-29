@@ -1,90 +1,102 @@
-// ============ 聊天页键盘协同 · 永远跟随 visualViewport (2026-07-29 v7 极简重构) ============
-// 【重构动机】v1-v6 都在做"识别键盘弹起/收起"的判定, 累积了 gap/shrink/vkUp/envUp 四信号 + baseVV
-//   基线 + kbMin 阈值 + 分场景 usableH 计算, 一共 160 行。真机每换一台设备都发现新的信号死角
-//   (vv 不缩 / VK API 不实现 / env 不暴露 / vv 含键盘边缘余量), 反复回归。
+// ============ 聊天页键盘协同 · V8 CSS 主导 (2026-07-30) ============
+// 【为什么推翻 V7】主人 7/30 明确要求"看看网上怎么解决的, 不要自己再猜了"。行业 2024-2025 权威方案:
+//   1) viewport meta 加 interactive-widget=resizes-content (Chrome 108+/Safari 17.4+)
+//      → 浏览器自动把 layout viewport 缩到键盘上方, .stage 100dvh 自动跟随, 不需要 JS pin
+//   2) VirtualKeyboard.overlaysContent = true → 浏览器通过 CSS env(keyboard-inset-height)
+//      暴露键盘覆盖高度, composer padding-bottom 直接吃这个 env, 完全 CSS 驱动
+//   3) iOS PWA WebKit bug #237851: standalone 下 visualViewport.offsetTop 错误报 0
+//      → V7 用 vv.offsetTop 定位 .stage 在 iOS PWA 必然失效, 这正是主人反馈"PWA 不跟随"的根因
+//   4) 正确的键盘高公式是 innerHeight - vv.height - vv.offsetTop (V7 没减 offsetTop)
+//   5) input 字号 ≥16px 防 iOS 聚焦缩放 (EH .cin 已 16px, 满足)
 //
-// 【v7 洞察】不要判"键盘开没开", 因为浏览器早就在 visualViewport 里告诉你可视区在哪。
-//   核心策略: .hall-on 状态下永远把 .stage 用 position:fixed 钉到 vv 当前矩形上。
-//     · 无键盘: vv 满屏 → 贴满屏
-//     · 键盘弹起(vv 缩): vv 变小 → .stage 跟着变小 → composer 贴 .stage 底 = 键盘顶
-//     · 键盘收起(vv 恢复): vv 恢复 → .stage 跟着恢复
-//     · 覆盖式 IME(vv 不缩, 讯飞/搜狗悬浮): 由"点输入区外 blur"兜底 (与 v1-v6 相同)
-//   底部 composer 底距走 CSS env(keyboard-inset-height) + safe-area-inset-bottom, JS 不算冗余。
+// 【V8 分工】
+//   - CSS 主导: .stage:100dvh + composer padding-bottom:max(safe-area, env(keyboard-inset)+8)
+//     这两条完全 CSS 处理常规场景, 支持 Chrome 108+/Safari 17.4+/所有安卓现代浏览器
+//   - JS 只做两件事:
+//     a) 尽早启用 VirtualKeyboard.overlaysContent=true, 让浏览器暴露 env(keyboard-inset-height)
+//     b) 对无 env 支持的旧 iOS (Safari <17.4) 用 visualViewport 兜底: 把 composer transform 上推
+//        `innerHeight - vv.height` 高度; 此路径不用 vv.offsetTop, 避开 PWA bug
+//   - 完全废弃 V7 的 .stage position:fixed pin 逻辑, 因为它依赖 vv.offsetTop 在 iOS PWA 无效
 //
-// 【为什么这次能一次到位】主人真机数据(V6 稳态截图)已证明 vv.height 就是可用区; 之前坏是因为
-//   有"识别→pin"的门槛, 门槛任何一档失败都会漏 pin。v7 无门槛, 无条件 pin, 不存在漏 pin。
-//   vv.height 含键盘边缘余量的问题(V6 症状)由 CSS composer padding-bottom 兜住, 而不是 JS 扣冗余。
-//
-// 诊断: ?kbdebug=1 显示实时 vv 浮层(innerH/vv.h/vv.top/vv.left/kbInset/pinned/cin)。
+// 覆盖式 IME(讯飞/搜狗悬浮, 不缩 vv) 收起由"点输入区外 blur"兜底 (与 V1-V7 一致)。
+// 诊断: ?kbdebug=1 显示实时数据。
 (function(){
   var vv = window.visualViewport;
-  if(!vv){ return; }   // 无 visualViewport(极旧内核): 交给 CSS 100dvh, JS 不介入
-  var raf = 0, pinned = false, stage = null;
 
-  // 尽早启用 VirtualKeyboard overlay 模式, 让浏览器把键盘几何通过 CSS env 暴露给页面
+  // 尽早开启 overlaysContent, 让 env(keyboard-inset-height) 生效 (Chrome 108+, Safari 17.4+)
   try{ if(navigator.virtualKeyboard) navigator.virtualKeyboard.overlaysContent = true; }catch(_){}
 
-  function getStage(){ if(!stage) stage = document.querySelector('.stage'); return stage; }
+  // 特性探测: 浏览器是否支持 env(keyboard-inset-height) - 决定要不要走 JS fallback
+  var supportsKbInset = (function(){
+    try{
+      return CSS.supports('padding-bottom: env(keyboard-inset-height, 0px)');
+    }catch(_){ return false; }
+  })();
+
+  var composer = null, cin = null, hasFallback = false;
+  function getComposer(){ if(!composer) composer = document.querySelector('.composer'); return composer; }
+  function getCin(){ if(!cin) cin = document.getElementById('cin'); return cin; }
   function hallOn(){ return document.body.classList.contains('hall-on'); }
   function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
 
-  function apply(){
+  // JS fallback: 只在无 env 支持时启用
+  // 用 innerHeight - vv.height 算键盘高 (不用 vv.offsetTop 避开 iOS PWA WebKit bug #237851)
+  var raf = 0;
+  function applyFallback(){
     raf = 0;
-    var s = getStage(); if(!s) return;
-    // 只在 hall 场景且 #cin 聚焦时接管布局。非聊天场景 / 非输入态由 CSS 100dvh 自然铺满,
-    // JS 不动 → 避免 pin 副作用污染其它场景。
-    var shouldPin = hallOn() && cinFocused();
-    if(shouldPin) pin(s); else unpin(s);
-    updateDebug();
+    var c = getComposer(); if(!c || !vv) return;
+    if(!hallOn() || !cinFocused()){
+      c.style.transform = '';
+      document.documentElement.classList.remove('kb-up');
+      hasFallback = false;
+      updateDebug(0, false);
+      return;
+    }
+    var kbH = Math.max(0, Math.round(window.innerHeight - vv.height));
+    if(kbH > 40){
+      c.style.transform = 'translateY(-' + kbH + 'px)';
+      c.style.transition = 'transform 180ms ease-out';
+      document.documentElement.classList.add('kb-up');
+      document.documentElement.setAttribute('data-kb-jsfallback','1');
+      hasFallback = true;
+    } else {
+      c.style.transform = '';
+      document.documentElement.classList.remove('kb-up');
+      hasFallback = false;
+    }
+    updateDebug(kbH, true);
   }
-  // ★核心: 无条件把 .stage 钉在 visualViewport 当前矩形。vv 报什么就贴什么。
-  //   #hall 走 CSS height:100% 填满 .stage, flex column → composer 天然贴可视区底=键盘顶。
-  function pin(s){
-    var h = Math.round(vv.height);
-    document.documentElement.style.setProperty('--vh', h + 'px');
-    var st = s.style;
-    st.position = 'fixed';
-    st.left   = Math.round(vv.offsetLeft) + 'px';
-    st.top    = Math.round(vv.offsetTop)  + 'px';
-    st.width  = Math.round(vv.width) + 'px';
-    st.height = h + 'px';
-    if(!pinned){ document.documentElement.classList.add('kb-up'); pinned = true; }
-    try{ scrollStream(); }catch(_){}
-  }
-  function unpin(s){
-    if(!pinned && !s.style.position) return;
-    document.documentElement.style.removeProperty('--vh');
-    var st = s.style;
-    st.position = ''; st.left = ''; st.top = ''; st.width = ''; st.height = '';
-    if(pinned){ document.documentElement.classList.remove('kb-up'); pinned = false; }
-  }
-  function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
+  function schedule(){ if(!raf) raf = requestAnimationFrame(applyFallback); }
 
-  vv.addEventListener('resize', schedule, {passive:true});
-  vv.addEventListener('scroll', schedule, {passive:true});
-  window.addEventListener('orientationchange', function(){ setTimeout(schedule, 300); });
+  if(!supportsKbInset && vv){
+    // 只对无 env 支持的浏览器(旧 iOS Safari <17.4) 启动 JS fallback
+    vv.addEventListener('resize', schedule, {passive:true});
+    vv.addEventListener('scroll', schedule, {passive:true});
+    window.addEventListener('orientationchange', function(){ setTimeout(schedule, 300); });
+    document.addEventListener('focusin', function(e){
+      if(!e.target || e.target.id!=='cin') return;
+      try{ if(window.ehArm) ehArm(); }catch(_){}
+      schedule(); setTimeout(schedule, 150); setTimeout(schedule, 400);
+    }, {capture:true});
+    document.addEventListener('focusout', function(e){
+      if(!e.target || e.target.id!=='cin') return;
+      schedule(); setTimeout(schedule, 300);
+    }, {capture:true});
+  }
 
-  // focusin/focusout 只是触发一次重算 - 不做特殊判定, apply() 里根据 cinFocused() 自己决定 pin/unpin
-  document.addEventListener('focusin', function(e){
-    if(!e.target || e.target.id!=='cin' || !hallOn()) return;
-    try{ if(window.ehArm) ehArm(); }catch(_){}
-    // 键盘弹起动画期间 vv 会多次变化, 让 apply 跟着 resize 事件自然刷新即可; 补两次覆盖 iOS 初次 lag
-    schedule(); setTimeout(schedule, 120); setTimeout(schedule, 400);
-  }, {capture:true});
-  document.addEventListener('focusout', function(e){
-    if(!e.target || e.target.id!=='cin') return;
-    schedule(); setTimeout(schedule, 300);
-  }, {capture:true});
-  // 覆盖式 IME(讯飞/搜狗悬浮, 不缩 vv) 收起无 web 信号 → 键盘态点输入区外主动 blur 复位。
+  // 覆盖式 IME 兜底: 键盘态点输入区外主动 blur (全平台生效, 与 CSS/fallback 无关)
   document.addEventListener('touchstart', function(e){
-    if(!pinned) return;
-    var t=e.target; if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;
-    try{ var c=document.getElementById('cin'); if(c) c.blur(); }catch(_){}
+    var c = getCin(); if(!c || document.activeElement !== c) return;
+    var t = e.target;
+    if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;
+    try{ c.blur(); }catch(_){}
   }, {passive:true, capture:true});
-  window.__ehKbReset  = function(){ schedule(); };
-  window.__ehApplyVVH = schedule;  // 兼容旧调用名 (goScene 进 hall 时调)
 
-  // ---- 诊断浮层: 仅 ?kbdebug=1 显示。极简 - 只显示 vv 原始值 + pinned 状态 ----
+  // 兼容旧调用名(goScene 进 hall 时调)
+  window.__ehKbReset  = function(){ if(!supportsKbInset) schedule(); };
+  window.__ehApplyVVH = window.__ehKbReset;
+
+  // ---- 诊断浮层: ?kbdebug=1 显示实时状态 ----
   var dbg = null;
   var DBG_ON = /[?&]kbdebug=1/.test(location.search);
   var envProbe = null;
@@ -97,29 +109,33 @@
     }
     return Math.round(parseFloat(getComputedStyle(envProbe).height) || 0);
   }
-  function updateDebug(){
+  function updateDebug(fallbackKbH, isFallbackRun){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
-      dbg.style.cssText = 'position:fixed;z-index:99999;left:4px;font:11px/1.35 monospace;'
+      dbg.style.cssText = 'position:fixed;z-index:99999;left:4px;top:4px;font:11px/1.35 monospace;'
         + 'background:rgba(0,0,0,.82);color:#0f0;padding:5px 7px;border-radius:6px;'
         + 'pointer-events:none;white-space:pre;max-width:60vw';
       document.body.appendChild(dbg);
     }
-    dbg.style.top = (Math.round(vv.offsetTop) + 4) + 'px';
-    var vh = getComputedStyle(document.documentElement).getPropertyValue('--vh').trim() || '(空)';
+    var envKb = envKbInset();
+    var vvInfo = vv ? ('vv.h=' + Math.round(vv.height) + '  vv.top=' + Math.round(vv.offsetTop)) : 'vv=null';
     dbg.textContent =
-      'innerH=' + window.innerHeight +
-      '\nvv.h=' + Math.round(vv.height) +
-      '  vv.top=' + Math.round(vv.offsetTop) +
-      '  vv.left=' + Math.round(vv.offsetLeft) +
-      '\nvv.w=' + Math.round(vv.width) +
-      '\nkbInset(env)=' + envKbInset() +
-      '\npinned=' + pinned + '  cin=' + cinFocused() +
-      '\n--vh=' + vh;
+      'V8 CSS-主导' +
+      '\nsupportsEnv=' + supportsKbInset +
+      '\nenvKb=' + envKb + '  (0=CSS无源信号)' +
+      '\ninnerH=' + window.innerHeight +
+      '\n' + vvInfo +
+      '\nkb-up class=' + document.documentElement.classList.contains('kb-up') +
+      '\ncin.focused=' + cinFocused() + '  hallOn=' + hallOn() +
+      (isFallbackRun ? ('\nJS fallback kbH=' + fallbackKbH) : '\nJS fallback: 未启用(有 env 支持)');
   }
-
-  schedule(); setTimeout(schedule, 200); setTimeout(schedule, 600);
+  if(DBG_ON){
+    setTimeout(function(){ updateDebug(0,false); }, 300);
+    if(vv){ vv.addEventListener('resize', function(){ updateDebug(0,false); }); }
+    document.addEventListener('focusin', function(){ setTimeout(function(){ updateDebug(0,false); }, 100); }, {capture:true});
+    document.addEventListener('focusout', function(){ setTimeout(function(){ updateDebug(0,false); }, 100); }, {capture:true});
+  }
 })();
 
 
