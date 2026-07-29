@@ -1,4 +1,4 @@
-// ============ 聊天页键盘协同 · 钉在 visualViewport (2026-07-29 v3 双信号识别) ============
+// ============ 聊天页键盘协同 · 钉在可用视口 (2026-07-29 v4 三信号识别) ============
 // 行业调研结论(2026, MDN/caniuse/Chrome DevRel): iOS 至 26.5 仍无 VirtualKeyboard API、
 // interactive-widget 只安卓生效且不稳定, 全平台唯一可靠信号只有 window.visualViewport。
 //
@@ -10,10 +10,11 @@
 //   ② 部分安卓浏览器 100dvh 键盘弹起时不重算(与规范预期相悖) → 即使 gap≈0, .stage 高度也没跟着缩,
 //      composer 依然被键盘遮住。
 //
-// 【v3 做法】不再区分 iOS/安卓、不再赌 dvh。键盘判定同时看两个信号:
-//   A) gap = innerHeight-vv.height: 覆盖 iOS/安卓覆盖式键盘;
-//   B) shrink = 聚焦前 baseVV-vv.height: 覆盖安卓 resizes-content 两者同缩、gap≈0 的场景。
-//   任一超过屏高 15%(自适应)就把 .stage 用 position:fixed 钉在 visualViewport 矩形上:
+// 【v4 做法】不分平台、不赌 dvh，键盘判定同时看三个信号:
+//   A) gap = innerHeight-vv.height：覆盖 iOS/安卓覆盖式键盘；
+//   B) shrink = 聚焦前 baseVV-vv.height：覆盖安卓 resizes-content 两者同缩、gap≈0；
+//   C) VirtualKeyboard.geometrychange：覆盖安卓 PWA 中 innerHeight/vv 均不变化的场景。
+//   任一信号命中就把 .stage 用 position:fixed 钉在键盘上方的真实可用矩形:
 //   top=vv.offsetTop / left=vv.offsetLeft / width=vv.width / height=vv.height。vv 报什么贴什么,
 //   iOS 二次上滚触发 vv.scroll → 重新钉正; 安卓键盘尺寸变化触发 vv.resize → 尺寸跟着变。
 //   一次解决位置+尺寸+跨平台。#hall 走 CSS height:100% 填满 .stage, flex column: .stream(flex:1)
@@ -27,6 +28,21 @@
   // 聚焦前的可视区基线。安卓 resizes-content 会让 innerHeight 与 vv.height 一起缩、gap≈0，
   // 只能靠焦点前后的 vv.height 落差识别键盘。非输入态持续更新，避免地址栏伸缩污染旧基线。
   var baseVV = Math.round(vv.height);
+  // 安卓 Chrome/PWA 专用第三信号。开启 overlaysContent 后浏览器不替页面猜布局，
+  // geometrychange 直接给键盘真实矩形；我们按键盘顶边精确 pin。
+  var vk = navigator.virtualKeyboard || null;
+  var vkHeight = 0, vkTop = 0;
+  if(vk){
+    try{ vk.overlaysContent = true; }catch(_){}
+    try{
+      vk.addEventListener('geometrychange', function(){
+        var r = vk.boundingRect;
+        vkHeight = r ? Math.round(r.height||0) : 0;
+        vkTop = r ? Math.round(r.top||0) : 0;
+        schedule();
+      });
+    }catch(_){}
+  }
   // 键盘开判定: 阈值 = max(80px, 屏高*0.15)。
   //   iOS/多数场景 gap 是屏高的 30-50%, 稳过。
   //   安卓 gap 常在 100-200px(WebView 定制/PWA/竖屏 720+ 高度): 屏高 800*0.15=120, 阈值 120, 覆盖。
@@ -47,15 +63,19 @@
     var gap = Math.round(window.innerHeight - vv.height);
     var shrink = Math.max(0, baseVV - curVV);
     var thr = kbMin();
-    var kbUp = hallOn() && focused && (gap > thr || shrink > thr);
-    if(kbUp) pin(s); else unpin(s);
-    updateDebug(gap, shrink, thr, kbUp);
+    var vkUp = vkHeight > 40; // geometry 是真实键盘矩形，小阈值只过滤关闭动画残值
+    var kbUp = hallOn() && focused && (gap > thr || shrink > thr || vkUp);
+    // VK overlay 场景 vv 不缩：按键盘顶边算真实可用高；其他场景直接用 vv.height。
+    var usableH = curVV;
+    if(vkUp && vkTop > 0){ usableH = Math.max(180, Math.min(curVV, vkTop - Math.round(vv.offsetTop))); }
+    if(kbUp) pin(s, usableH); else unpin(s);
+    updateDebug(gap, shrink, thr, vkUp, usableH, kbUp);
   }
   // ★核心: 键盘态直接把 .stage 钉在 visualViewport 上(top=offsetTop / 高=vv.height),
   //   vv 给什么贴什么 → 同时消除"iOS 布局视口上滚过头"(位置)和"高度估算污染"(尺寸)两类旧病。
   //   #hall 走既有 CSS height:var(--vh)=vv.height, flex column 使 .composer 天然贴可视区底=键盘顶。
-  function pin(s){
-    var h = Math.round(vv.height);
+  function pin(s, usableH){
+    var h = Math.round(usableH || vv.height);
     document.documentElement.style.setProperty('--vh', h + 'px');
     var st = s.style;
     st.position = 'fixed';
@@ -104,7 +124,7 @@
   // ---- 诊断浮层: 仅 ?kbdebug=1 显示, 不影响其他人。真机念数即可坐实 vv 行为 ----
   var dbg = null;
   var DBG_ON = /[?&]kbdebug=1/.test(location.search);
-  function updateDebug(gap, shrink, thr, kbUp){
+  function updateDebug(gap, shrink, thr, vkUp, usableH, kbUp){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
@@ -122,7 +142,8 @@
       '  vv.left=' + Math.round(vv.offsetLeft) +
       '\ngap=' + gap + '  shrink=' + shrink +
       '\nbaseVV=' + baseVV + '  kbMin=' + thr +
-      '\nkbUp=' + kbUp + '  pinned=' + pinned +
+      '\nvkH=' + vkHeight + '  vkTop=' + vkTop + '  vkUp=' + vkUp +
+      '\nusableH=' + usableH + '  kbUp=' + kbUp + '  pinned=' + pinned +
       '\n--vh=' + vh + '  cin=' + cinFocused();
   }
 
