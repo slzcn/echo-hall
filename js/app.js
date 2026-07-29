@@ -1025,8 +1025,8 @@ function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList
   //   入口/聊天页仍是固定视口(hall 有固定输入框, 不能整页滚)。切走大厅时把文档滚动位置归零, 防残留。
   document.body.classList.toggle('lobby-on', id==='lobby');
   if(id!=='lobby'){ try{ window.scrollTo(0,0); }catch(_){} }
-  // 进聊天页: 立即按真实可视高铺满(输入框沉到底), 见 EH_VVH_FULLSCREEN
-  if(id==='hall'){ try{ window.__ehApplyVVH && window.__ehApplyVVH(); setTimeout(()=>window.__ehApplyVVH&&window.__ehApplyVVH(),250); }catch(_){} }
+  // 进聊天页只做一次布局收尾；键盘控制器本身监听 visualViewport，不再重复补调。
+  if(id==='hall'){ try{ window.__ehApplyVVH?.(); }catch(_){} }
   // 切场景清掉可能残留的全屏遮挡(录音浮层), 防其挡住点击
   const _ro=$('#recOverlay'); if(_ro) _ro.classList.remove('on');
   // 落到大厅 → 大厅氛围随机连播(chain 会保留正在播的曲, 从房间返回时丝滑续播, 不打断)
