@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-structA';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-structB';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -3185,7 +3185,6 @@ function bgmModeGetGlobal(){ return bgmModeGet('__global__'); }
 // roomKey：进房用房间名，大厅用 __lobby__
 function bgmRoomKey(room){ return room? room.name : '__lobby__'; }
 function bgmManualStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MANUAL)||'{}')||{}; }catch(_){ return {}; } }
-function bgmManualSave(roomKey,url){ try{ const m=bgmManualStore(); if(url) m[roomKey]=url; else delete m[roomKey]; localStorage.setItem(LS_BGM_MANUAL, JSON.stringify(m)); }catch(_){} }
 function bgmManualUrl(roomKey){ try{ return bgmModeGet(roomKey).mode==='manual'? (bgmModeGet(roomKey).url||'') : ''; }catch(_){ return ''; } }
 // 收集给用户看的曲目候选（默认曲、当前房 variants、我的灵魂曲库）
 function bgmCandidatesForRoom(room){
@@ -4060,7 +4059,6 @@ function resumeAfterAuth(){
   if(r){ renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间
   else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
 }
-function restoreLastRoom(){ const r=lastRoom(); if(r) enterRoom(r); }
 // 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
 // 判据: 有 last_room + 本地 me.id(曾登录过, 无论正式/临时账号 —— 临时匿名 session 也持久化)。
 // 不解析 supabase 内部存储(其格式在不同版本会 base64/分片, JSON.parse 会失败)。session 若实际失效, 靠兜底回落 enter。
@@ -4836,10 +4834,6 @@ function schedulePresenceRefresh(){
 }
 // typing 独立轻量刷新: 复用最近一次 users 快照, 不查 DB 不重建头像
 let _typingLightTimer=null;
-function scheduleTypingRefresh(){
-  clearTimeout(_typingLightTimer);
-  _typingLightTimer=setTimeout(()=>renderTyping(lastUsersSnapshot),200);
-}
 async function leavePresence(){
   clearInterval(heartbeatTimer); heartbeatTimer=null;
   if(curRoom && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
@@ -5465,7 +5459,6 @@ function scheduleDailyTarot(roomId){
   }catch(_){}
 }
 // 离房时取消待触发的塔罗定时器
-function cancelDailyTarot(){ if(_tarotTimer){ clearTimeout(_tarotTimer); _tarotTimer=null; } }
 function maybeDailyTarot(){
   try{
     const { card, luck, dayKey }=dailyTarotDraw();
@@ -6047,7 +6040,7 @@ let _koTimer = null;            // 眩晕倒计时 timer
 let _counterFrom = null;        // 反击对象 { uid, name } (最近打我的人)
 let _counterTimer = null;
 function isHitIx(ix){ return ix && (ix.category==='hit'); }
-function pairKey(x,y){ return [x,y].sort().join('~'); }   // (保留, 其它处可能引用)
+// (保留, 其它处可能引用)
 // uid → 显示名(取 presence 头像的 atname; 自己→me.name; 取不到→'某人')
 function targetName(uid){
   if(uid===myUid) return (me&&me.name)||'你';
@@ -6353,17 +6346,6 @@ function pickAt(i){
 }
 
 // 显示某灵魂"正在思考…"的占位气泡(乐观提示，真实回应到达后由 removeSoulThinking 撤掉)
-function showSoulThinking(soul){
-  if(!soul) return;
-  removeSoulThinking(soul.auth_uid);
-  const el=document.createElement('div');
-  el.className='soul-thinking'; el.dataset.soul=soul.auth_uid;
-  el.style.setProperty('--soul-c', soulThemeColor(soul.color, safeColor(soul.color), soul));
-  el.innerHTML=`<div class="av">${safeEmoji(soul.emoji)||'✦'}</div>
-    <div class="tk"><span class="tk-label">${esc(soul.name)} 正在思考</span>
-    <span class="tk-dots"><i></i><i></i><i></i></span></div>`;
-  $('#stream').appendChild(el); scrollStream();
-}
 function removeSoulThinking(uid){
   document.querySelectorAll('.soul-thinking'+(uid?`[data-soul="${uid}"]`:'')).forEach(el=>el.remove());
 }
@@ -6430,7 +6412,6 @@ async function send(){
   }
 }
 // 虚空模式开关(统一走 setMode; 保留函数名兼容旧调用)
-function setVoidMode(on){ setMode(on?'void':'none'); }
 // ============ 统一发言模式: none / void / voice / song ============
 // ＋号是唯一入口: 选某模式→＋变该模式图标+输入框切风格; 再点该图标(＋位置)→退出复原。三者互斥。
 let curMode='none';
@@ -6681,7 +6662,6 @@ async function sendVoice(blob, secs, tx){
 }
 // 语音模式(统一走 setMode)
 let voiceMode=false;
-function setVoiceMode(on){ setMode(on?'voice':'none'); }
 // 按住"说话"长条录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
 const holdTalk=$('#holdTalk');
 holdTalk.addEventListener('pointerdown',e=>{
@@ -6857,11 +6837,6 @@ function prefetchSong(url){
   if(!url || _EH_SONG_CACHE.has(url) || _EH_SONG_FETCHING.has(url)) return;
   const ctx=ac(); if(!ctx) return;
   getSongBuffer(ctx, url).catch(()=>{});
-}
-function b64ToArrayBuffer(b64){
-  const bin=atob(b64); const bytes=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-  return bytes.buffer;
 }
 
 // 预取: 不阻塞, 成功存缓存。已有缓存则跳过。pin=true 时铉住不被 LRU 淘汰(预置词用)。
@@ -7496,7 +7471,6 @@ async function generateAndPersistSong(mid, lyric, sid, el){
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
 let songSel=(SONG_STYLES.find(s=>s.id==='acapella')||SONG_STYLES[0]).id;   // 神曲默认用清唱
 let songMode=false;
-function setSongMode(on){ setMode(on?'song':'none'); }
 // 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
 let _cinWasFocused=false;   // 切曲风前输入框是否聚焦(用于切完不改变输入法开/收状态)
 function renderSongStrip(){
@@ -8624,14 +8598,6 @@ async function sendVerifyEmail(){
   }
 }
 // 邮箱首次读到后, 重渲染 meRegSlot(从"读取中"变成真实态)
-function rebindEmailSlot(){
-  if(!$('#meRegSlot')) return;
-  const realEmail=me.email||'';
-  $('#meRegSlot').innerHTML = realEmail
-    ? `<div class="drow"><span class="dk">邮箱</span><span class="dv">${esc(realEmail)}</span></div><button class="dbtn" id="meEmail">✉️ 修改邮箱</button>`
-    : `<button class="dbtn" id="meEmail">✉️ 设置邮箱（找回密码用）</button>`;
-  bindMeEmail();
-}
 // 退出/切换身份：登出 Supabase + 清本地身份 → 回入场页
 async function logoutIdentity(bound){
   if(!await ehConfirm(bound?'确定退出登录？':'确定退出并换一个新身份？', bound?'退出登录':'切换身份')) return;
