@@ -512,7 +512,7 @@
   @keyframes instPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,#00E5D4 50%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
   .ver-line{font-size:10.5px;color:var(--dim);letter-spacing:.5px;font-family:monospace;opacity:.7}
   .lobby-head{text-align:center;position:relative;width:100%;max-width:var(--content-max)}
-  .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px}
+  .lobby-head h2{font-size:24px;font-weight:800;letter-spacing:1px;margin:0}
   .lobby-head p{font-size:12.5px;color:var(--sub);margin-top:6px}
   .lobby-head .you{color:var(--cyan);cursor:pointer;text-decoration:underline dotted}
   .me-btn{position:absolute;top:0;right:0;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
@@ -1624,7 +1624,11 @@
        .composer 天然贴可视区底(=键盘顶)。iOS系统键盘/PWA/第三方/安卓interactive-widget 弹起 vv 收缩,
        --vh 自动就是真实可视高; 覆盖式IME(vv不缩)由 JS 估算写 --vh 兜底。 */
     body.hall-on .stage{padding:0;height:var(--vh,100dvh);align-items:stretch}
-    #hall{width:100%;height:var(--vh,100dvh);border-radius:0;border:none}
+    /* ★高度真实源唯一化(2026-07-29 vvpin3): #hall 不再独立读 --vh, 只填满 .stage(height:100%)。
+       键盘态 .stage 被 pin() 精确钉成可视视口矩形(position:fixed + inline height=vv.height),
+       #hall 100% 跟着它走 → 位置与尺寸只有 .stage 一个真相源, --vh 残留/时序竞态再也无法让 #hall 与 .stage 高度打架
+       (旧版 #hall 独立读 --vh, 一旦 --vh 卡在 focusin 竞态里的小值 → #hall 缩成 1/3, composer 浮空下方留黑, 即本次症状)。 */
+    #hall{width:100%;height:100%;border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
     /* 键盘弹起时(html.kb-up)键盘已盖住底部 home 条安全区, 去掉 composer 的 safe-area 底距, 输入框紧贴键盘顶。 */
@@ -1822,7 +1826,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-kb-vvpin2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-kb-vvpin3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
