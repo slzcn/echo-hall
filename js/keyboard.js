@@ -1,112 +1,92 @@
-// ============ 聊天页键盘协同 · 钉在可用视口 (2026-07-29 v4 三信号识别) ============
-// 行业调研结论(2026, MDN/caniuse/Chrome DevRel): iOS 至 26.5 仍无 VirtualKeyboard API、
-// interactive-widget 只安卓生效且不稳定, 全平台唯一可靠信号只有 window.visualViewport。
+// ============ 聊天页键盘协同 · 永远跟随 visualViewport (2026-07-29 v7 极简重构) ============
+// 【重构动机】v1-v6 都在做"识别键盘弹起/收起"的判定, 累积了 gap/shrink/vkUp/envUp 四信号 + baseVV
+//   基线 + kbMin 阈值 + 分场景 usableH 计算, 一共 160 行。真机每换一台设备都发现新的信号死角
+//   (vv 不缩 / VK API 不实现 / env 不暴露 / vv 含键盘边缘余量), 反复回归。
 //
-// 【v1 为何在安卓坏】v1(2026-07-29) 赌 interactive-widget=resizes-content 会让安卓 innerHeight
-//   和 vv.height 同缩(gap≈0) → 完全不介入, 交给 CSS 100dvh 自愈。真机症状(主人报安卓浏览器+PWA
-//   都坏): #cin 被键盘挡住看不见自己打的字。两条真相打脸:
-//   ① interactive-widget=resizes-content 在安卓 PWA standalone 与国产厂商定制 WebView(华为/小米/vivo)
-//      经常不生效, innerHeight 不缩 → gap 可以有几十到一两百 px, 但被 v1 硬阈值 120 挡在门外。
-//   ② 部分安卓浏览器 100dvh 键盘弹起时不重算(与规范预期相悖) → 即使 gap≈0, .stage 高度也没跟着缩,
-//      composer 依然被键盘遮住。
+// 【v7 洞察】不要判"键盘开没开", 因为浏览器早就在 visualViewport 里告诉你可视区在哪。
+//   核心策略: .hall-on 状态下永远把 .stage 用 position:fixed 钉到 vv 当前矩形上。
+//     · 无键盘: vv 满屏 → 贴满屏
+//     · 键盘弹起(vv 缩): vv 变小 → .stage 跟着变小 → composer 贴 .stage 底 = 键盘顶
+//     · 键盘收起(vv 恢复): vv 恢复 → .stage 跟着恢复
+//     · 覆盖式 IME(vv 不缩, 讯飞/搜狗悬浮): 由"点输入区外 blur"兜底 (与 v1-v6 相同)
+//   底部 composer 底距走 CSS env(keyboard-inset-height) + safe-area-inset-bottom, JS 不算冗余。
 //
-// 【v4 做法】不分平台、不赌 dvh，键盘判定同时看三个信号:
-//   A) gap = innerHeight-vv.height：覆盖 iOS/安卓覆盖式键盘；
-//   B) shrink = 聚焦前 baseVV-vv.height：覆盖安卓 resizes-content 两者同缩、gap≈0；
-//   C) VirtualKeyboard.geometrychange：覆盖安卓 PWA 中 innerHeight/vv 均不变化的场景。
-//   任一信号命中就把 .stage 用 position:fixed 钉在键盘上方的真实可用矩形:
-//   top=vv.offsetTop / left=vv.offsetLeft / width=vv.width / height=vv.height。vv 报什么贴什么,
-//   iOS 二次上滚触发 vv.scroll → 重新钉正; 安卓键盘尺寸变化触发 vv.resize → 尺寸跟着变。
-//   一次解决位置+尺寸+跨平台。#hall 走 CSS height:100% 填满 .stage, flex column: .stream(flex:1)
-//   内滚, .composer 天然贴可视区底=键盘顶。
-// 覆盖式第三方IME(讯飞/搜狗悬浮, 不缩 vv)仍进不了 pin(gap 不够), 收起由"点输入区外 blur"兜底。
-// 诊断: 加 ?kbdebug=1 显示实时 vv 浮层(innerH/vv.h/vv.top/gap/kbMin/kbUp/--vh)。
+// 【为什么这次能一次到位】主人真机数据(V6 稳态截图)已证明 vv.height 就是可用区; 之前坏是因为
+//   有"识别→pin"的门槛, 门槛任何一档失败都会漏 pin。v7 无门槛, 无条件 pin, 不存在漏 pin。
+//   vv.height 含键盘边缘余量的问题(V6 症状)由 CSS composer padding-bottom 兜住, 而不是 JS 扣冗余。
+//
+// 诊断: ?kbdebug=1 显示实时 vv 浮层(innerH/vv.h/vv.top/vv.left/kbInset/pinned/cin)。
 (function(){
   var vv = window.visualViewport;
   if(!vv){ return; }   // 无 visualViewport(极旧内核): 交给 CSS 100dvh, JS 不介入
-  var raf = 0, pinned = false;
-  // 聚焦前的可视区基线。安卓 resizes-content 会让 innerHeight 与 vv.height 一起缩、gap≈0，
-  // 只能靠焦点前后的 vv.height 落差识别键盘。非输入态持续更新，避免地址栏伸缩污染旧基线。
-  var baseVV = Math.round(vv.height);
-  // 安卓 Chrome/PWA 专用第三信号。开启 overlaysContent 后浏览器不替页面猜布局，
-  // geometrychange 直接给键盘真实矩形；我们按键盘顶边精确 pin。
-  var vk = navigator.virtualKeyboard || null;
-  var vkHeight = 0, vkTop = 0;
-  if(vk){
-    try{ vk.overlaysContent = true; }catch(_){}
-    try{
-      vk.addEventListener('geometrychange', function(){
-        var r = vk.boundingRect;
-        vkHeight = r ? Math.round(r.height||0) : 0;
-        vkTop = r ? Math.round(r.top||0) : 0;
-        schedule();
-      });
-    }catch(_){}
-  }
-  // 键盘开判定: 阈值 = max(80px, 屏高*0.15)。
-  //   iOS/多数场景 gap 是屏高的 30-50%, 稳过。
-  //   安卓 gap 常在 100-200px(WebView 定制/PWA/竖屏 720+ 高度): 屏高 800*0.15=120, 阈值 120, 覆盖。
-  //   非键盘场景(浏览器地址栏收缩、旋转过渡)gap 常 <60px, 高于 80 保底避免误判。
-  //   覆盖式悬浮键盘(讯飞/搜狗)不缩 vv, gap≈0, 天然不进 pin(与 v1 一致, 由 blur 兜底)。
-  function kbMin(){ return Math.max(80, Math.round(window.innerHeight * 0.15)); }
-  function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
-  function hallOn(){ return document.body.classList.contains('hall-on'); }
-  var stage = null;
+  var raf = 0, pinned = false, stage = null;
+
+  // 尽早启用 VirtualKeyboard overlay 模式, 让浏览器把键盘几何通过 CSS env 暴露给页面
+  try{ if(navigator.virtualKeyboard) navigator.virtualKeyboard.overlaysContent = true; }catch(_){}
+
   function getStage(){ if(!stage) stage = document.querySelector('.stage'); return stage; }
+  function hallOn(){ return document.body.classList.contains('hall-on'); }
+  function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
+
   function apply(){
     raf = 0;
     var s = getStage(); if(!s) return;
-    var focused = cinFocused();
-    var curVV = Math.round(vv.height);
-    // 只有未聚焦且未 pin 时刷新基线；键盘态绝不能把小高度写回基线。
-    if(!focused && !pinned) baseVV = curVV;
-    var gap = Math.round(window.innerHeight - vv.height);
-    var shrink = Math.max(0, baseVV - curVV);
-    var thr = kbMin();
-    var vkUp = vkHeight > 40; // geometry 是真实键盘矩形，小阈值只过滤关闭动画残值
-    var envKb = envKbInset();  // CSS 键盘 inset 兜底(第四信号)
-    var envUp = envKb > 40;
-    var kbUp = hallOn() && focused && (gap > thr || shrink > thr || vkUp || envUp);
-    // 可用高度: 优先 VK 顶边, 其次 env inset(innerH-envKb), 再次 vv.height。
-    var usableH = curVV;
-    if(vkUp && vkTop > 0){ usableH = Math.max(180, Math.min(curVV, vkTop - Math.round(vv.offsetTop))); }
-    else if(envUp){ usableH = Math.max(180, window.innerHeight - envKb); }
-    else if(kbUp){
-      // 仅 vv 信号场景(安卓浏览器/iOS): 部分安卓浏览器 vv.height 仍含一小截被键盘边缘/
-      //   底部系统条占用的区域, 钉满 vv.height 会让贴底 composer 被键盘盖住一点。
-      //   扣一个小安全冗余（屏高 2%，上限 24px）把 .stage 抬离键盘边缘。
-      var pad = Math.min(24, Math.round(curVV * 0.02));
-      usableH = Math.max(180, curVV - pad);
-    }
-    if(kbUp) pin(s, usableH); else unpin(s);
-    updateDebug(gap, shrink, thr, vkUp, envKb, usableH, kbUp);
+    // 只在 hall 场景且 #cin 聚焦时接管布局。非聊天场景 / 非输入态由 CSS 100dvh 自然铺满,
+    // JS 不动 → 避免 pin 副作用污染其它场景。
+    var shouldPin = hallOn() && cinFocused();
+    if(shouldPin) pin(s); else unpin(s);
+    updateDebug();
   }
-  // ★核心: 键盘态直接把 .stage 钉在 visualViewport 上(top=offsetTop / 高=vv.height),
-  //   vv 给什么贴什么 → 同时消除"iOS 布局视口上滚过头"(位置)和"高度估算污染"(尺寸)两类旧病。
-  //   #hall 走既有 CSS height:var(--vh)=vv.height, flex column 使 .composer 天然贴可视区底=键盘顶。
-  function pin(s, usableH){
-    var h = Math.round(usableH || vv.height);
+  // ★核心: 无条件把 .stage 钉在 visualViewport 当前矩形。vv 报什么就贴什么。
+  //   #hall 走 CSS height:100% 填满 .stage, flex column → composer 天然贴可视区底=键盘顶。
+  function pin(s){
+    var h = Math.round(vv.height);
     document.documentElement.style.setProperty('--vh', h + 'px');
     var st = s.style;
     st.position = 'fixed';
     st.left   = Math.round(vv.offsetLeft) + 'px';
     st.top    = Math.round(vv.offsetTop)  + 'px';
     st.width  = Math.round(vv.width) + 'px';
-    st.height = h + 'px';   // 显式兜住高, 不依赖 CSS var(--vh) 生效时序(fixed 不设 height 会塌成内容高)
+    st.height = h + 'px';
     if(!pinned){ document.documentElement.classList.add('kb-up'); pinned = true; }
     try{ scrollStream(); }catch(_){}
   }
   function unpin(s){
     if(!pinned && !s.style.position) return;
-    document.documentElement.style.removeProperty('--vh');   // 回落 CSS 100dvh
+    document.documentElement.style.removeProperty('--vh');
     var st = s.style;
     st.position = ''; st.left = ''; st.top = ''; st.width = ''; st.height = '';
     if(pinned){ document.documentElement.classList.remove('kb-up'); pinned = false; }
   }
   function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
-  // 第四信号: CSS env(keyboard-inset-height)。overlaysContent=true 后, 即便 JS 的
-  //   VirtualKeyboard.boundingRect 在某些国产 WebView 不报(vkH=0), 浏览器仍可能只通过
-  //   CSS 环境变量暴露键盘位置。用一个探针元素读实时值。
+
+  vv.addEventListener('resize', schedule, {passive:true});
+  vv.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('orientationchange', function(){ setTimeout(schedule, 300); });
+
+  // focusin/focusout 只是触发一次重算 - 不做特殊判定, apply() 里根据 cinFocused() 自己决定 pin/unpin
+  document.addEventListener('focusin', function(e){
+    if(!e.target || e.target.id!=='cin' || !hallOn()) return;
+    try{ if(window.ehArm) ehArm(); }catch(_){}
+    // 键盘弹起动画期间 vv 会多次变化, 让 apply 跟着 resize 事件自然刷新即可; 补两次覆盖 iOS 初次 lag
+    schedule(); setTimeout(schedule, 120); setTimeout(schedule, 400);
+  }, {capture:true});
+  document.addEventListener('focusout', function(e){
+    if(!e.target || e.target.id!=='cin') return;
+    schedule(); setTimeout(schedule, 300);
+  }, {capture:true});
+  // 覆盖式 IME(讯飞/搜狗悬浮, 不缩 vv) 收起无 web 信号 → 键盘态点输入区外主动 blur 复位。
+  document.addEventListener('touchstart', function(e){
+    if(!pinned) return;
+    var t=e.target; if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;
+    try{ var c=document.getElementById('cin'); if(c) c.blur(); }catch(_){}
+  }, {passive:true, capture:true});
+  window.__ehKbReset  = function(){ schedule(); };
+  window.__ehApplyVVH = schedule;  // 兼容旧调用名 (goScene 进 hall 时调)
+
+  // ---- 诊断浮层: 仅 ?kbdebug=1 显示。极简 - 只显示 vv 原始值 + pinned 状态 ----
+  var dbg = null;
+  var DBG_ON = /[?&]kbdebug=1/.test(location.search);
   var envProbe = null;
   function envKbInset(){
     if(!envProbe){
@@ -115,40 +95,9 @@
         + 'height:env(keyboard-inset-height, 0px);pointer-events:none';
       (document.body||document.documentElement).appendChild(envProbe);
     }
-    var h = parseFloat(getComputedStyle(envProbe).height) || 0;
-    return Math.round(h);
+    return Math.round(parseFloat(getComputedStyle(envProbe).height) || 0);
   }
-  vv.addEventListener('resize', schedule, {passive:true});
-  vv.addEventListener('scroll', schedule, {passive:true});   // iOS 键盘动画后二次上滚 → vv.scroll 触发, 重新钉正
-  window.addEventListener('orientationchange', function(){
-    // 旋转后旧方向基线作废；等 viewport 稳定再重建。
-    setTimeout(function(){ if(!cinFocused()){ baseVV=Math.round(vv.height); } schedule(); },300);
-  });
-  document.addEventListener('focusin', function(e){
-    var t=e.target; if(!t || t.id!=='cin') return;
-    if(!hallOn()) return;
-    // focusin 通常早于键盘 resize：此刻立即锁住键盘前基线，安卓两者同缩后仍可判定。
-    baseVV = Math.max(baseVV, Math.round(vv.height));
-    try{ if(window.ehArm) ehArm(); }catch(_){}
-    schedule(); setTimeout(schedule,80); setTimeout(schedule,180); setTimeout(schedule,350); setTimeout(schedule,650);
-  }, {capture:true});
-  document.addEventListener('focusout', function(e){
-    var t=e.target; if(!t || t.id!=='cin') return;
-    schedule(); setTimeout(schedule,60); setTimeout(schedule,300);
-  }, {capture:true});
-  // 覆盖式IME(讯飞/搜狗悬浮, 不缩 vv)收起无 web 信号 → 键盘态点输入区外主动 blur 复位。
-  document.addEventListener('touchstart', function(e){
-    if(!pinned) return;
-    var t=e.target; if(t && (t.id==='cin' || (t.closest && t.closest('.composer')))) return;
-    try{ var c=document.getElementById('cin'); if(c) c.blur(); }catch(_){}
-  }, {passive:true, capture:true});
-  window.__ehKbReset  = function(){ schedule(); };
-  window.__ehApplyVVH = schedule;   // 兼容旧调用名(goScene 进 hall 时调)
-
-  // ---- 诊断浮层: 仅 ?kbdebug=1 显示, 不影响其他人。真机念数即可坐实 vv 行为 ----
-  var dbg = null;
-  var DBG_ON = /[?&]kbdebug=1/.test(location.search);
-  function updateDebug(gap, shrink, thr, vkUp, envKb, usableH, kbUp){
+  function updateDebug(){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
@@ -157,22 +106,20 @@
         + 'pointer-events:none;white-space:pre;max-width:60vw';
       document.body.appendChild(dbg);
     }
-    dbg.style.top = (Math.round(vv.offsetTop) + 4) + 'px';   // 跟随可视视口顶, 键盘态也看得见
+    dbg.style.top = (Math.round(vv.offsetTop) + 4) + 'px';
     var vh = getComputedStyle(document.documentElement).getPropertyValue('--vh').trim() || '(空)';
     dbg.textContent =
       'innerH=' + window.innerHeight +
       '\nvv.h=' + Math.round(vv.height) +
       '  vv.top=' + Math.round(vv.offsetTop) +
       '  vv.left=' + Math.round(vv.offsetLeft) +
-      '\ngap=' + gap + '  shrink=' + shrink +
-      '\nbaseVV=' + baseVV + '  kbMin=' + thr +
-      '\nvkH=' + vkHeight + '  vkTop=' + vkTop + '  vkUp=' + vkUp +
-      '\nenvKb=' + envKb + '  usableH=' + usableH +
-      '\nkbUp=' + kbUp + '  pinned=' + pinned +
-      '\n--vh=' + vh + '  cin=' + cinFocused();
+      '\nvv.w=' + Math.round(vv.width) +
+      '\nkbInset(env)=' + envKbInset() +
+      '\npinned=' + pinned + '  cin=' + cinFocused() +
+      '\n--vh=' + vh;
   }
 
-  schedule(); setTimeout(schedule,200); setTimeout(schedule,600);
+  schedule(); setTimeout(schedule, 200); setTimeout(schedule, 600);
 })();
 
 
