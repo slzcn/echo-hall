@@ -188,11 +188,17 @@
       color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%)}
   /* 上下边缘 vignette: fixed 覆盖全屏, 顶部用 --bg 实色→透明缓出, 中间完全透明不挡内容。
      z-index 压在内容(scene z2)之下、装饰层(orb/grid z0)之上, 只吃掉边缘发光不影响可读性与交互。
-     2026-07-29 CDP 单变量证伪: 旧顶部长实色带(0→透明拉到 230px)会在"回声厅"标题后叠出一块偏白
-     色块。改为顶端只留 8px 实色贴合系统条、40px 内快速淡出到全透明——去掉标题背后的色块, 同时
-     夜间不会露出 HTML 浅青氛围光形成的顶部亮带。底部不动。详见
-     docs/triage/2026-07-29-lobby-top-horizontal-seam.md。 */
+     2026-07-29 CDP 桌面宽屏复现: 顶部任何实色带都会在浅色日间的"回声厅"标题后叠出偏白横带。
+     终解=日间/夜间拆开: 日间顶部全透明(浅底自带贴合、无黑边、无白带), 夜间才用 8px 实色淡出
+     贴合深色系统条。底部不动。详见 docs/triage/2026-07-29-lobby-top-horizontal-seam.md。 */
+  /* 日间：顶部完全透明（浅色底本身贴合系统条，无需实色）→ 标题背后不会叠出偏白色块。
+     夜间：单独保留 8px 实色快速淡出，贴合深色系统条、不露 html 浅青氛围光形成的顶部亮带。 */
   #edgeFade{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom,
+      transparent 0,
+      transparent calc(100% - 90px),
+      var(--bg) 100%)}
+  html:has(body.deep-night) #edgeFade{
     background:linear-gradient(to bottom,
       var(--bg) 0,
       color-mix(in srgb, var(--bg) 60%, transparent) 8px,
@@ -1825,7 +1831,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-bg-seam2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-bg-seam3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
