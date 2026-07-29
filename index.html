@@ -463,11 +463,6 @@
   .vbadge.ok{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}
   .vbadge.no{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber)}
   .opt-email:hover{color:var(--cyan)}
-  .opt-email-box{max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s ease;margin-bottom:0}
-  .opt-email-box.on{max-height:70px;margin-bottom:16px}
-  .opt-email-box input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line2);background:var(--input-bg);box-shadow:var(--input-shadow);
-    color:var(--ink);font-family:inherit;font-size:16px;outline:none;transition:.18s}
-  .opt-email-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 10%,transparent)}
   .btn-primary{width:100%;padding:14px;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;
     letter-spacing:2px;cursor:pointer;color:var(--btn-ink);position:relative;overflow:hidden;
     background:linear-gradient(120deg,var(--cyan),var(--magenta));transition:.2s;box-shadow:0 8px 30px color-mix(in srgb,var(--cyan) 25%,transparent)}
@@ -639,11 +634,6 @@
      text-align 是继承属性，不受 position:absolute 影响；→ 无 text-align 定义的子元素（.bgm-sec-title、.bgm-empty等）全部继承居中。
      直接在容器级 .skin-menu.bgm-menu 上 text-align:left 一次性截断继承（.mode-opt 自己写 center 不受影响）*/
   .skin-menu.bgm-menu{max-height:52vh;overflow-y:auto;overscroll-behavior:contain;text-align:left}
-  .skin-menu.bgm-menu .bgm-auto-row{border-radius:9px;padding:9px 12px;background:transparent;font-weight:500}
-  .skin-menu.bgm-menu .bgm-auto-row.active{background:color-mix(in srgb, var(--accent,var(--cyan)) 14%, transparent);color:var(--ink)}
-  
-  .skin-menu.bgm-menu .bgm-auto-row .bgm-auto-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
-  .skin-menu.bgm-menu .bgm-auto-row.active .bgm-auto-sw{background:color-mix(in srgb,var(--accent,var(--cyan)) 22%,transparent);color:var(--accent,var(--cyan))}
   
   /* 分组标题：【定稿 07-28 02:37】左对齐（容器级已截断继承，只需写 padding）
      text-align 默认从容器 .skin-menu.bgm-menu 继承 left；padding-left:12px 与曲目行圆点左缘对齐 */
@@ -661,9 +651,6 @@
   .skin-menu.bgm-menu.off-mode .bgm-sec-title,
   .skin-menu.bgm-menu.off-mode .skin-opt{opacity:.55}
   .skin-menu.bgm-menu.off-mode .skin-opt:hover{opacity:1}
-  .skin-menu.bgm-menu .bgm-power-row{padding:9px 12px;background:transparent;font-weight:600}
-  .skin-menu.bgm-menu .bgm-power-row .bgm-sw{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);color:var(--sub);letter-spacing:.4px}
-  .skin-menu.bgm-menu .bgm-power-row.active .bgm-sw{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
   .skin-menu.bgm-menu .bgm-flex{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   
   .skin-menu.bgm-menu .bgm-gen-row{color:var(--sub)}
@@ -909,19 +896,6 @@
   .typing-bar .d i{width:5px;height:5px;border-radius:50%;background:var(--typing-c,var(--accent,var(--cyan)));animation:bounce 1.2s infinite}
   .typing-bar .d i:nth-child(2){animation-delay:.15s}.typing-bar .d i:nth-child(3){animation-delay:.3s}
   @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
-  /* 神曲谱曲队列条: 悬浮在消息流顶部中央, 仅当有歌在谱且滚出视野时显示 */
-  .song-queue-bar{position:absolute;left:50%;top:8px;transform:translateX(-50%) translateY(-6px);z-index:8;
-    display:none;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;cursor:pointer;
-    background:color-mix(in srgb,var(--panel-solid,#12141f) 88%,transparent);backdrop-filter:blur(8px);
-    border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 35%,transparent);
-    box-shadow:0 4px 16px -6px rgba(0,0,0,.55);font-size:11.5px;color:var(--ink,#e8ecf5);
-    opacity:0;transition:opacity .22s,transform .22s;white-space:nowrap}
-  .song-queue-bar.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
-  .song-queue-bar:hover{border-color:color-mix(in srgb,var(--accent,var(--cyan)) 60%,transparent)}
-  .sqb-dots{display:inline-flex;gap:3px;align-items:center}
-  .sqb-dots i{width:6px;height:6px;border-radius:50%;animation:sqbBob 1s ease-in-out infinite}
-  .sqb-dots i:nth-child(2){animation-delay:.16s}.sqb-dots i:nth-child(3){animation-delay:.32s}
-  @keyframes sqbBob{0%,100%{transform:translateY(1px);opacity:.6}50%{transform:translateY(-3px);opacity:1}}
   
 
   /* 回复预览条 */
@@ -1740,12 +1714,6 @@
   .summon-item.busy{opacity:.5;pointer-events:none}
   .summon-item.busy{opacity:.5;pointer-events:none}
   
-  .wolf-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 0;padding:10px 12px;border-radius:10px;cursor:pointer;
-    background:var(--card-bg-soft,rgba(10,12,24,.4));border:1px solid var(--line2);
-    font-size:13px;color:var(--ink);user-select:none;transition:.15s}
-  .wolf-toggle:hover{border-color:var(--line2)}
-  .wolf-toggle i{display:inline;font-style:normal;font-size:11px;color:var(--sub);margin-left:4px}
-  .wolf-toggle input{width:18px;height:18px;accent-color:var(--accent,var(--cyan));flex-shrink:0;cursor:pointer}
   /* 名场面(回声墙) */
   .wall-modal{max-width:440px}
   /* 列表高度: 用 dvh(移动端地址栏收缩不跳变) + clamp 保底, 让它在超小屏/横屏都不溢出;
@@ -1828,7 +1796,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-clean1';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-clean2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
