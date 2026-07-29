@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v80-20260729-structG1';
+const SW_VERSION = 'eh-sw-v81-20260729-structG2';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -14,6 +14,7 @@ const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './js/app.js',
   './js/ambient-fx.js',
   './js/debug-overlay.js',
   './js/sw-register.js',
@@ -64,7 +65,7 @@ self.addEventListener('fetch', (e) => {
 
   // ★ manifest / 图标 / SW自身: 一律 network-first, 绝不返回可能过期的缓存
   //   (Chrome 检查可安装性时抓 manifest, 若 SW 给回旧缓存版本会导致'装了不出图标'/判不可安装)
-  const isPwaCore = /manifest\.json$|\.webmanifest$|\/icons\/|icon-\d+\.png$|sw\.js$/.test(url.pathname);
+  const isPwaCore = req.destination === 'script' || /manifest\.json$|\.webmanifest$|\/icons\/|icon-\d+\.png$|sw\.js$/.test(url.pathname);
   if (isPwaCore) {
     e.respondWith(fetch(req).catch(() => caches.match(req)));
     return;

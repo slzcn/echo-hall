@@ -147,9 +147,8 @@ baselines = {
 warned = 0
 for (fname, idname), base in baselines.items():
     p = pathlib.Path(fname)
-    if not p.exists():
-        continue
-    src = p.read_text(encoding='utf-8', errors='replace')
+    sources = [p, *sorted(pathlib.Path('js').glob('*.js'))] if fname == 'index.html' else [p]
+    src = '\n'.join(x.read_text(encoding='utf-8', errors='replace') for x in sources if x.exists())
     hits = len(re.findall(r'''id=['"]''' + re.escape(idname) + r'''['"]''', src))
     if hits > base:
         print(f'  ✗ #{idname} 在 {fname} 出现 {hits} 次（基线 {base}）— 又新增了重复 ID 生成点')
@@ -174,7 +173,8 @@ baselines = {
     r'\baddEventListener\s*\(': ('addEventListener', 95, 10),
     r'\.style\.\w+\s*=': ('element.style=', 131, 15),
 }
-src = pathlib.Path('index.html').read_text(encoding='utf-8', errors='replace')
+sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]
+src = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in sources if p.exists())
 warned = 0
 for pat, (name, base, allow) in baselines.items():
     hits = len(re.findall(pat, src))
