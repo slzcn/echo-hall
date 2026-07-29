@@ -126,7 +126,10 @@
 - [ ] D：精简纯样式 ID 与可事件委托的按钮 ID；
 - [ ] E：逐模板拍平动态 DOM 无意义嵌套；
 - [ ] F：按容器重整 z-index，消除冲突段；
-- [ ] G：按依赖边界逐模块拆出内联脚本。
+- [x] G1：拆出 5 个天然独立尾部增强脚本；
+- [x] G2：主业务脚本整体迁入 `js/app.js`，`index.html` 从 9617 行降至 2235 行；
+- [x] G3：键盘协同与启动逻辑拆成 `js/keyboard.js` / `js/boot.js`，保持经典脚本执行顺序；
+- [ ] G4+：后续再按依赖边界从 `app.js` 中拆 BGM、消息渲染、房间、账号等高耦合模块。
 
 ## 7. 验证底线
 
@@ -139,3 +142,23 @@
 - 大厅、入房、消息发送、BGM、互动／KO、漂流瓶、塔罗、抽屉场景；
 - BUILD_VER、`ver.txt`、SW_VERSION 同步；
 - 原子提交并推送后验证线上版本。
+
+## 8. 当前脚本文件结构（阶段 G3 后）
+
+`index.html` 只保留页面骨架、首屏预绘与脚本入口，业务代码已物理拆出：
+
+| 文件 | 行数 | 职责 |
+|---|---:|---|
+| `index.html` | 约 2236 | 页面骨架、首屏内联脚本、CSS、外链入口 |
+| `js/app.js` | 约 7038 | 主业务定义：配置、房间、消息、BGM、账号、互动等 |
+| `js/keyboard.js` | 约 221 | 聊天页 visualViewport 与弹窗键盘协同 |
+| `js/boot.js` | 约 119 | 启动、auth 回跳、Credential API |
+| `js/ambient-fx.js` | 约 89 | 酷炫氛围特效 |
+| `js/debug-overlay.js` | 约 42 | `?debug=1` 诊断浮层 |
+| `js/sw-register.js` | 约 19 | Service Worker 注册 |
+| `js/pwa-install.js` | 约 60 | PWA 安装按钮与版本号显示 |
+| `js/pull-refresh.js` | 约 91 | PWA 全局下拉刷新 |
+
+加载顺序保持经典脚本语义：`app.js → keyboard.js → boot.js → ambient/debug/sw/pwa/pull-refresh`。
+
+约束：当前仍是经典脚本，不是 ES module；不要把主脚本直接改 `type=module`，否则会破坏 Supabase fallback、全局函数绑定和后续增强脚本的调试 hook。
