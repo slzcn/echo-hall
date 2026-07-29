@@ -36,6 +36,7 @@
   var composer = null, cin = null, hasFallback = false;
   function getComposer(){ if(!composer) composer = document.querySelector('.composer'); return composer; }
   function getCin(){ if(!cin) cin = document.getElementById('cin'); return cin; }
+  function getStage(){ return document.querySelector('.stage'); }
   function hallOn(){ return document.body.classList.contains('hall-on'); }
   function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
 
@@ -92,9 +93,40 @@
     try{ c.blur(); }catch(_){}
   }, {passive:true, capture:true});
 
+  // ★ __ehApplyVVH: goScene('hall') 时调用, 作为“进入 hall 布局收尾”钩子
+  //   V8 下 CSS 主导, 平时不需要 JS 参与, 但场景切换的那一刷必须:
+  //     1) 清掉 V7 时代可能残留的 --vh / .stage 内联样式 (升级路径会卡旧值)
+  //     2) 强制读一次 .stage.offsetHeight 触发 reflow, 让 100dvh 在 hall-on 新 class 下重新算
+  //     3) 旧 iOS 无 env 支持时还要跑 fallback (schedule)
+  //   这只钩子修复了“从首页进房间时显示不全、刷新就好”的 bug: 现代浏览器下
+  //   __ehApplyVVH 不能因为支持 env 就完全空转。
+  function ehApplyVVH(){
+    try{
+      var s = getStage() || document.querySelector('.stage');
+      if(s){
+        // 清残留内联样式 (V7 代码会写 position/left/top/width/height)
+        var st = s.style;
+        if(st.position || st.height || st.width || st.top || st.left){
+          st.position=''; st.left=''; st.top=''; st.width=''; st.height='';
+        }
+        // 强制 reflow: 读取 offsetHeight 让浏览器当场重算布局
+        void s.offsetHeight;
+      }
+      // 清 V7 遗留的 --vh / kb-up class / data-kb-jsfallback
+      document.documentElement.style.removeProperty('--vh');
+      if(supportsKbInset){
+        document.documentElement.classList.remove('kb-up');
+        document.documentElement.removeAttribute('data-kb-jsfallback');
+      }
+      // 旧 iOS fallback 路径仍需 schedule (无 env 支持时)
+      if(!supportsKbInset) schedule();
+      // 完成后滞后滑到底 (代替 V7 pin 里的 scrollStream)
+      setTimeout(function(){ try{ window.scrollStream && window.scrollStream(); }catch(_){} }, 60);
+    }catch(_){}
+  }
   // 兼容旧调用名(goScene 进 hall 时调)
-  window.__ehKbReset  = function(){ if(!supportsKbInset) schedule(); };
-  window.__ehApplyVVH = window.__ehKbReset;
+  window.__ehKbReset  = ehApplyVVH;
+  window.__ehApplyVVH = ehApplyVVH;
 
   // ---- 诊断浮层: ?kbdebug=1 显示实时状态 ----
   var dbg = null;
