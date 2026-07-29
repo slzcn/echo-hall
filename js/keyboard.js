@@ -64,12 +64,15 @@
     var shrink = Math.max(0, baseVV - curVV);
     var thr = kbMin();
     var vkUp = vkHeight > 40; // geometry 是真实键盘矩形，小阈值只过滤关闭动画残值
-    var kbUp = hallOn() && focused && (gap > thr || shrink > thr || vkUp);
-    // VK overlay 场景 vv 不缩：按键盘顶边算真实可用高；其他场景直接用 vv.height。
+    var envKb = envKbInset();  // CSS 键盘 inset 兜底(第四信号)
+    var envUp = envKb > 40;
+    var kbUp = hallOn() && focused && (gap > thr || shrink > thr || vkUp || envUp);
+    // 可用高度: 优先 VK 顶边, 其次 env inset(innerH-envKb), 再次 vv.height。
     var usableH = curVV;
     if(vkUp && vkTop > 0){ usableH = Math.max(180, Math.min(curVV, vkTop - Math.round(vv.offsetTop))); }
+    else if(envUp){ usableH = Math.max(180, window.innerHeight - envKb); }
     if(kbUp) pin(s, usableH); else unpin(s);
-    updateDebug(gap, shrink, thr, vkUp, usableH, kbUp);
+    updateDebug(gap, shrink, thr, vkUp, envKb, usableH, kbUp);
   }
   // ★核心: 键盘态直接把 .stage 钉在 visualViewport 上(top=offsetTop / 高=vv.height),
   //   vv 给什么贴什么 → 同时消除"iOS 布局视口上滚过头"(位置)和"高度估算污染"(尺寸)两类旧病。
@@ -94,6 +97,20 @@
     if(pinned){ document.documentElement.classList.remove('kb-up'); pinned = false; }
   }
   function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
+  // 第四信号: CSS env(keyboard-inset-height)。overlaysContent=true 后, 即便 JS 的
+  //   VirtualKeyboard.boundingRect 在某些国产 WebView 不报(vkH=0), 浏览器仍可能只通过
+  //   CSS 环境变量暴露键盘位置。用一个探针元素读实时值。
+  var envProbe = null;
+  function envKbInset(){
+    if(!envProbe){
+      envProbe = document.createElement('div');
+      envProbe.style.cssText = 'position:fixed;bottom:0;left:-9999px;width:0;'
+        + 'height:env(keyboard-inset-height, 0px);pointer-events:none';
+      (document.body||document.documentElement).appendChild(envProbe);
+    }
+    var h = parseFloat(getComputedStyle(envProbe).height) || 0;
+    return Math.round(h);
+  }
   vv.addEventListener('resize', schedule, {passive:true});
   vv.addEventListener('scroll', schedule, {passive:true});   // iOS 键盘动画后二次上滚 → vv.scroll 触发, 重新钉正
   window.addEventListener('orientationchange', function(){
@@ -124,7 +141,7 @@
   // ---- 诊断浮层: 仅 ?kbdebug=1 显示, 不影响其他人。真机念数即可坐实 vv 行为 ----
   var dbg = null;
   var DBG_ON = /[?&]kbdebug=1/.test(location.search);
-  function updateDebug(gap, shrink, thr, vkUp, usableH, kbUp){
+  function updateDebug(gap, shrink, thr, vkUp, envKb, usableH, kbUp){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
@@ -143,7 +160,8 @@
       '\ngap=' + gap + '  shrink=' + shrink +
       '\nbaseVV=' + baseVV + '  kbMin=' + thr +
       '\nvkH=' + vkHeight + '  vkTop=' + vkTop + '  vkUp=' + vkUp +
-      '\nusableH=' + usableH + '  kbUp=' + kbUp + '  pinned=' + pinned +
+      '\nenvKb=' + envKb + '  usableH=' + usableH +
+      '\nkbUp=' + kbUp + '  pinned=' + pinned +
       '\n--vh=' + vh + '  cin=' + cinFocused();
   }
 
