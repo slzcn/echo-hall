@@ -1704,8 +1704,7 @@
   .summon-item:hover .si-nm{color:var(--ink)}
   .summon-item.on .si-nm{color:var(--ink)}
   .summon-item .si-emoji{font-size:22px;line-height:1;flex:none}
-  .summon-item .si-body{flex:1;min-width:0;display:block}
-  .summon-item .si-nm{font-weight:500;font-size:13px;color:var(--ink);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .summon-item .si-nm{flex:1;min-width:0;font-weight:500;font-size:13px;color:var(--ink);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .summon-item .si-check{flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.15s}
   .summon-item.on .si-check{background:var(--accent);border-color:var(--accent);color:#fff}
   .summon-item.busy{opacity:.5;pointer-events:none}
@@ -1792,7 +1791,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-structB';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-structE1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -8168,13 +8167,13 @@ async function openGear(){
            <div class="summon-grid" id="gSummonGrid">${EH_SUMMONABLES_FALLBACK.map(x=>`
              <div class="summon-item" data-key="${x.key}" data-name="${esc(x.name)}" data-orig="0">
                <span class="si-emoji">${x.emoji}</span>
-               <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb)}</div></div>
+               <div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb)}</div>
                <span class="si-check">✓</span>
              </div>`).join('')}</div>
          </div>`
       : '';
     const editExtra = topicField + summonPanel;
-    overview = `<div class="dsec"><div class="dcard room-overview">
+    overview = `<div class="dsec dcard room-overview">
       <div class="ro-hero">
         <div class="ro-ic ro-ic-edit" id="gRoomEmojiBtn" style="--room-c:${roomAccentC(curRoom)}" title="点击换图标">${roomEmoji}</div>
         <div class="ro-meta"><input class="ro-nm-edit" id="gRoomName" maxlength="40" value="${esc(curRoom.name)}" placeholder="房间名"><div class="ro-kind">${kindLabel} · ${(members||[]).length} 人</div></div>
@@ -8185,13 +8184,12 @@ async function openGear(){
     </div></div>`;
   } else {
     // 只读: 展示
-    overview = `<div class="dsec"><div class="dcard room-overview">
+    overview = `<div class="dsec dcard room-overview">
       <div class="ro-hero"><div class="ro-ic" style="--room-c:${roomAccentC(curRoom)}">${roomEmoji}</div>
         <div class="ro-meta"><div class="ro-nm">${esc(curRoom.name)}</div><div class="ro-kind">${kindLabel} · ${(members||[]).length} 人</div></div></div>
       ${noticeText?`<div class="ro-notice">📢 ${noticeText}</div>`:''}
     </div></div>`;
   }
-  const ownerEdit = '';   // 已合并进概览卡, 不再有独立编辑区
   // 成员列表: 最多显示 20 个, 超出折叠"还有 N 人"
   const allM=(members||[]); const MAX_SHOW=20;
   const showM=allM.slice(0, MAX_SHOW); const moreN=allM.length-showM.length;
@@ -8210,7 +8208,6 @@ async function openGear(){
   }).join('') + (moreN>0?`<div class="mitem-more">…还有 ${moreN} 人</div>`:'');
   body.innerHTML=`
     ${overview}
-    ${ownerEdit}
     <div class="dsec"><div class="dl">成员 (${allM.length})</div>
       <div class="member-list">${memberRows}</div></div>
     ${(isOwner && !isOfficial)?`<div class="dsec"><div class="dl">危险操作</div>
@@ -8267,7 +8264,7 @@ async function openGear(){
         <div class="summon-item ${on?'on':''}" data-key="${x.key}" data-name="${esc(x.name)}" data-orig="${on?'1':'0'}">
 
           <span class="si-emoji">${x.emoji}</span>
-          <div class="si-body"><div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb||'')}</div></div>
+          <div class="si-nm">叫${esc(x.name)}来陪你 ${esc(x.blurb||'')}</div>
           <span class="si-check">✓</span>
         </div>`; }).join('');
       grid.querySelectorAll('.summon-item').forEach(it=>{
