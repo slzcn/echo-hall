@@ -1,29 +1,33 @@
-// ============ 聊天页键盘协同 · 钉在 visualViewport (2026-07-29 重写) ============
+// ============ 聊天页键盘协同 · 钉在 visualViewport (2026-07-29 v2 全平台统一) ============
 // 行业调研结论(2026, MDN/caniuse/Chrome DevRel): iOS 至 26.5 仍无 VirtualKeyboard API、
-// interactive-widget 只安卓生效, 全平台唯一可靠信号只有 window.visualViewport。
+// interactive-widget 只安卓生效且不稳定, 全平台唯一可靠信号只有 window.visualViewport。
 //
-// 【上一版为何还坏】上一版(2026-07-28)只写 --vh 高度 + 多分支估算(baseVV/KB_PX=300)。
-//   真机症状(主人真机图, Safari+PWA 都坏): 弹键盘时 composer 被甩到屏幕最顶、header+消息流全消失、
-//   中间大片空白、键盘在底。两个病因叠加:
-//   ① 位置: iOS 弹键盘会把布局视口整体上滚(vv.offsetTop>0), 且在键盘动画结束后"再滚一次",
-//      上一版靠 focusin 里 scrollTo(0,0) 抵消 → 管不住二次滚动 → 页面被顶飞。
-//   ② 尺寸: baseVV 基线在 focusin 竞态里可能被写成键盘态小值 → #hall 缩成 240px 钉在顶。
+// 【v1 为何在安卓坏】v1(2026-07-29) 赌 interactive-widget=resizes-content 会让安卓 innerHeight
+//   和 vv.height 同缩(gap≈0) → 完全不介入, 交给 CSS 100dvh 自愈。真机症状(主人报安卓浏览器+PWA
+//   都坏): #cin 被键盘挡住看不见自己打的字。两条真相打脸:
+//   ① interactive-widget=resizes-content 在安卓 PWA standalone 与国产厂商定制 WebView(华为/小米/vivo)
+//      经常不生效, innerHeight 不缩 → gap 可以有几十到一两百 px, 但被 v1 硬阈值 120 挡在门外。
+//   ② 部分安卓浏览器 100dvh 键盘弹起时不重算(与规范预期相悖) → 即使 gap≈0, .stage 高度也没跟着缩,
+//      composer 依然被键盘遮住。
 //
-// 【本版做法】不估算、不 scrollTo, 键盘态直接把 .stage 用 position:fixed 钉在 visualViewport 上:
-//   top=vv.offsetTop / left=vv.offsetLeft / width=vv.width, 高度 --vh=vv.height。vv 报什么就贴什么,
-//   iOS 二次上滚会触发 vv.scroll → 重新钉正 → 位置永远跟着可视视口, 尺寸永远=可视高。一次解决位置+尺寸。
-//   #hall 走既有 CSS height:var(--vh), flex column: .stream(flex:1)内滚, .composer 天然贴可视区底=键盘顶。
-// 键盘开判定: gap = innerHeight − vv.height > 120(iOS/PWA innerHeight 不随键盘缩, 差值可靠;
-//   安卓 interactive-widget=resizes-content 两者同缩 gap≈0 → 不 pin, 交给 CSS dvh, 其已是内容区高)。
-// 覆盖式第三方IME(讯飞/搜狗悬浮, 不缩 vv)不进 pin(gap≈0), 收起由"点输入区外 blur"兜底。
-// 诊断: 加 ?kbdebug=1 显示实时 vv 浮层(innerH/vv.h/vv.top/gap/kbUp/--vh)。JS 未跑/无 vv 时 CSS 回落 100dvh。
+// 【v2 做法】不再区分 iOS/安卓、不再赌 dvh, 统一策略: 只要 gap 超过屏高 15%(自适应, 覆盖
+//   安卓的低 gap 场景), 就把 .stage 用 position:fixed 钉在 visualViewport 矩形上:
+//   top=vv.offsetTop / left=vv.offsetLeft / width=vv.width / height=vv.height。vv 报什么贴什么,
+//   iOS 二次上滚触发 vv.scroll → 重新钉正; 安卓键盘尺寸变化触发 vv.resize → 尺寸跟着变。
+//   一次解决位置+尺寸+跨平台。#hall 走 CSS height:100% 填满 .stage, flex column: .stream(flex:1)
+//   内滚, .composer 天然贴可视区底=键盘顶。
+// 覆盖式第三方IME(讯飞/搜狗悬浮, 不缩 vv)仍进不了 pin(gap 不够), 收起由"点输入区外 blur"兜底。
+// 诊断: 加 ?kbdebug=1 显示实时 vv 浮层(innerH/vv.h/vv.top/gap/kbMin/kbUp/--vh)。
 (function(){
   var vv = window.visualViewport;
   if(!vv){ return; }   // 无 visualViewport(极旧内核): 交给 CSS 100dvh, JS 不介入
   var raf = 0, pinned = false;
-  // 键盘开判定: iOS(含PWA)布局视口 window.innerHeight 不随键盘收缩, 只有 vv.height 缩 → 差值可靠。
-  // 安卓 interactive-widget=resizes-content 两者同缩(差≈0)→ 不 pin, 交给 CSS dvh(其已缩到内容区)。
-  var KB_MIN = 120;
+  // 键盘开判定: 阈值 = max(80px, 屏高*0.15)。
+  //   iOS/多数场景 gap 是屏高的 30-50%, 稳过。
+  //   安卓 gap 常在 100-200px(WebView 定制/PWA/竖屏 720+ 高度): 屏高 800*0.15=120, 阈值 120, 覆盖。
+  //   非键盘场景(浏览器地址栏收缩、旋转过渡)gap 常 <60px, 高于 80 保底避免误判。
+  //   覆盖式悬浮键盘(讯飞/搜狗)不缩 vv, gap≈0, 天然不进 pin(与 v1 一致, 由 blur 兜底)。
+  function kbMin(){ return Math.max(80, Math.round(window.innerHeight * 0.15)); }
   function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
   function hallOn(){ return document.body.classList.contains('hall-on'); }
   var stage = null;
@@ -32,9 +36,10 @@
     raf = 0;
     var s = getStage(); if(!s) return;
     var gap = Math.round(window.innerHeight - vv.height);
-    var kbUp = hallOn() && cinFocused() && gap > KB_MIN;
+    var thr = kbMin();
+    var kbUp = hallOn() && cinFocused() && gap > thr;
     if(kbUp) pin(s); else unpin(s);
-    updateDebug(gap, kbUp);
+    updateDebug(gap, thr, kbUp);
   }
   // ★核心: 键盘态直接把 .stage 钉在 visualViewport 上(top=offsetTop / 高=vv.height),
   //   vv 给什么贴什么 → 同时消除"iOS 布局视口上滚过头"(位置)和"高度估算污染"(尺寸)两类旧病。
@@ -84,7 +89,7 @@
   // ---- 诊断浮层: 仅 ?kbdebug=1 显示, 不影响其他人。真机念数即可坐实 vv 行为 ----
   var dbg = null;
   var DBG_ON = /[?&]kbdebug=1/.test(location.search);
-  function updateDebug(gap, kbUp){
+  function updateDebug(gap, thr, kbUp){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
@@ -100,7 +105,8 @@
       '\nvv.h=' + Math.round(vv.height) +
       '  vv.top=' + Math.round(vv.offsetTop) +
       '  vv.left=' + Math.round(vv.offsetLeft) +
-      '\ngap=' + gap + '  kbUp=' + kbUp + '  pinned=' + pinned +
+      '\ngap=' + gap + '  kbMin=' + thr +
+      '\nkbUp=' + kbUp + '  pinned=' + pinned +
       '\n--vh=' + vh + '  cin=' + cinFocused();
   }
 
