@@ -1,4 +1,4 @@
-// ============ 聊天页键盘协同 · 钉在 visualViewport (2026-07-29 v2 全平台统一) ============
+// ============ 聊天页键盘协同 · 钉在 visualViewport (2026-07-29 v3 双信号识别) ============
 // 行业调研结论(2026, MDN/caniuse/Chrome DevRel): iOS 至 26.5 仍无 VirtualKeyboard API、
 // interactive-widget 只安卓生效且不稳定, 全平台唯一可靠信号只有 window.visualViewport。
 //
@@ -10,8 +10,10 @@
 //   ② 部分安卓浏览器 100dvh 键盘弹起时不重算(与规范预期相悖) → 即使 gap≈0, .stage 高度也没跟着缩,
 //      composer 依然被键盘遮住。
 //
-// 【v2 做法】不再区分 iOS/安卓、不再赌 dvh, 统一策略: 只要 gap 超过屏高 15%(自适应, 覆盖
-//   安卓的低 gap 场景), 就把 .stage 用 position:fixed 钉在 visualViewport 矩形上:
+// 【v3 做法】不再区分 iOS/安卓、不再赌 dvh。键盘判定同时看两个信号:
+//   A) gap = innerHeight-vv.height: 覆盖 iOS/安卓覆盖式键盘;
+//   B) shrink = 聚焦前 baseVV-vv.height: 覆盖安卓 resizes-content 两者同缩、gap≈0 的场景。
+//   任一超过屏高 15%(自适应)就把 .stage 用 position:fixed 钉在 visualViewport 矩形上:
 //   top=vv.offsetTop / left=vv.offsetLeft / width=vv.width / height=vv.height。vv 报什么贴什么,
 //   iOS 二次上滚触发 vv.scroll → 重新钉正; 安卓键盘尺寸变化触发 vv.resize → 尺寸跟着变。
 //   一次解决位置+尺寸+跨平台。#hall 走 CSS height:100% 填满 .stage, flex column: .stream(flex:1)
@@ -22,6 +24,9 @@
   var vv = window.visualViewport;
   if(!vv){ return; }   // 无 visualViewport(极旧内核): 交给 CSS 100dvh, JS 不介入
   var raf = 0, pinned = false;
+  // 聚焦前的可视区基线。安卓 resizes-content 会让 innerHeight 与 vv.height 一起缩、gap≈0，
+  // 只能靠焦点前后的 vv.height 落差识别键盘。非输入态持续更新，避免地址栏伸缩污染旧基线。
+  var baseVV = Math.round(vv.height);
   // 键盘开判定: 阈值 = max(80px, 屏高*0.15)。
   //   iOS/多数场景 gap 是屏高的 30-50%, 稳过。
   //   安卓 gap 常在 100-200px(WebView 定制/PWA/竖屏 720+ 高度): 屏高 800*0.15=120, 阈值 120, 覆盖。
@@ -35,11 +40,16 @@
   function apply(){
     raf = 0;
     var s = getStage(); if(!s) return;
+    var focused = cinFocused();
+    var curVV = Math.round(vv.height);
+    // 只有未聚焦且未 pin 时刷新基线；键盘态绝不能把小高度写回基线。
+    if(!focused && !pinned) baseVV = curVV;
     var gap = Math.round(window.innerHeight - vv.height);
+    var shrink = Math.max(0, baseVV - curVV);
     var thr = kbMin();
-    var kbUp = hallOn() && cinFocused() && gap > thr;
+    var kbUp = hallOn() && focused && (gap > thr || shrink > thr);
     if(kbUp) pin(s); else unpin(s);
-    updateDebug(gap, thr, kbUp);
+    updateDebug(gap, shrink, thr, kbUp);
   }
   // ★核心: 键盘态直接把 .stage 钉在 visualViewport 上(top=offsetTop / 高=vv.height),
   //   vv 给什么贴什么 → 同时消除"iOS 布局视口上滚过头"(位置)和"高度估算污染"(尺寸)两类旧病。
@@ -66,12 +76,17 @@
   function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
   vv.addEventListener('resize', schedule, {passive:true});
   vv.addEventListener('scroll', schedule, {passive:true});   // iOS 键盘动画后二次上滚 → vv.scroll 触发, 重新钉正
-  window.addEventListener('orientationchange', function(){ setTimeout(schedule,300); });
+  window.addEventListener('orientationchange', function(){
+    // 旋转后旧方向基线作废；等 viewport 稳定再重建。
+    setTimeout(function(){ if(!cinFocused()){ baseVV=Math.round(vv.height); } schedule(); },300);
+  });
   document.addEventListener('focusin', function(e){
     var t=e.target; if(!t || t.id!=='cin') return;
     if(!hallOn()) return;
+    // focusin 通常早于键盘 resize：此刻立即锁住键盘前基线，安卓两者同缩后仍可判定。
+    baseVV = Math.max(baseVV, Math.round(vv.height));
     try{ if(window.ehArm) ehArm(); }catch(_){}
-    schedule(); setTimeout(schedule,150); setTimeout(schedule,350); setTimeout(schedule,650);
+    schedule(); setTimeout(schedule,80); setTimeout(schedule,180); setTimeout(schedule,350); setTimeout(schedule,650);
   }, {capture:true});
   document.addEventListener('focusout', function(e){
     var t=e.target; if(!t || t.id!=='cin') return;
@@ -89,7 +104,7 @@
   // ---- 诊断浮层: 仅 ?kbdebug=1 显示, 不影响其他人。真机念数即可坐实 vv 行为 ----
   var dbg = null;
   var DBG_ON = /[?&]kbdebug=1/.test(location.search);
-  function updateDebug(gap, thr, kbUp){
+  function updateDebug(gap, shrink, thr, kbUp){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
@@ -105,7 +120,8 @@
       '\nvv.h=' + Math.round(vv.height) +
       '  vv.top=' + Math.round(vv.offsetTop) +
       '  vv.left=' + Math.round(vv.offsetLeft) +
-      '\ngap=' + gap + '  kbMin=' + thr +
+      '\ngap=' + gap + '  shrink=' + shrink +
+      '\nbaseVV=' + baseVV + '  kbMin=' + thr +
       '\nkbUp=' + kbUp + '  pinned=' + pinned +
       '\n--vh=' + vh + '  cin=' + cinFocused();
   }
