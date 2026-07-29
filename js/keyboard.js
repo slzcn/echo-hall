@@ -71,6 +71,13 @@
     var usableH = curVV;
     if(vkUp && vkTop > 0){ usableH = Math.max(180, Math.min(curVV, vkTop - Math.round(vv.offsetTop))); }
     else if(envUp){ usableH = Math.max(180, window.innerHeight - envKb); }
+    else if(kbUp){
+      // 仅 vv 信号场景(安卓浏览器/iOS): 部分安卓浏览器 vv.height 仍含一小截被键盘边缘/
+      //   底部系统条占用的区域, 钉满 vv.height 会让贴底 composer 被键盘盖住一点。
+      //   扣一个小安全冗余（屏高 2%，上限 24px）把 .stage 抬离键盘边缘。
+      var pad = Math.min(24, Math.round(curVV * 0.02));
+      usableH = Math.max(180, curVV - pad);
+    }
     if(kbUp) pin(s, usableH); else unpin(s);
     updateDebug(gap, shrink, thr, vkUp, envKb, usableH, kbUp);
   }
