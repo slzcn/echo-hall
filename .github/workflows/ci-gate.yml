@@ -1,8 +1,7 @@
 name: CI Gate
 
-# Echo 最小 CI 门禁：语法检查 + 版本号一致 + 危险 API 密度监控
+# Echo 最小 CI 门禁：语法检查 + 版本号一致 + 危险 API 密度监控 + 诊断单强制检查
 # 与 deploy-pages.yml 独立运行；deploy 依然按原样发 Pages，本 workflow 只做失败即报警。
-# 短期目标：让「commit 前必过一遍」变成硬约束；长期可加 Playwright 视觉回归。
 
 on:
   push:
@@ -21,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # 让 scripts/ci-check.sh §6 能对比 HEAD~1
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,3 +38,55 @@ jobs:
         run: |
           chmod +x scripts/ci-check.sh
           bash scripts/ci-check.sh
+
+  triage-required:
+    # 只在 PR 上跑；push 到 main（直推）不强制要诊断单以免堵住基础设施类改动
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check triage doc presence
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -e
+          # 白名单 label 直接豁免
+          if echo "$LABELS" | grep -qE '"(no-triage|infra|docs|content|chore|dependencies)"'; then
+            echo "✓ PR 已打豁免 label，跳过诊断单检查"
+            exit 0
+          fi
+
+          # 检出本次 PR 是否触碰业务代码
+          CHANGED="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "changed files:"
+          echo "$CHANGED"
+
+          # 业务代码定义：index.html / admin.html / edge-functions/ / masters/
+          BIZ_CHANGED=$(echo "$CHANGED" | grep -E '^(index\.html|admin\.html|edge-functions/|masters/)' || true)
+          if [ -z "$BIZ_CHANGED" ]; then
+            echo "✓ 本 PR 未触碰业务代码，跳过诊断单检查"
+            exit 0
+          fi
+
+          # 触碰业务代码 → 必须新增 docs/triage/*.md
+          NEW_TRIAGE=$(echo "$CHANGED" | grep -E '^docs/triage/.+\.md$' || true)
+          if [ -n "$NEW_TRIAGE" ]; then
+            echo "✓ 找到新增诊断单："
+            echo "$NEW_TRIAGE"
+            exit 0
+          fi
+
+          echo ""
+          echo "❌ 本 PR 触碰了业务代码但未新增 docs/triage/*.md 诊断单。"
+          echo ""
+          echo "解决方案二选一："
+          echo "  1. 复制 docs/bug-triage-template.md 到 docs/triage/YYYY-MM-DD-<slug>.md 填完再推"
+          echo "  2. 如果是纯基础设施/文档/内容/依赖类改动，给 PR 打 label:"
+          echo "       no-triage / infra / docs / content / chore / dependencies"
+          exit 1
