@@ -128,7 +128,16 @@ function applyConfigMap(rawMap){
   try{ checkCachePurge(); }catch(_){}
   // OPTD 修偶发: 远程配置(含 songStyles 曲风池)到达后, 若正在神曲模式, 补一次曲风条重渲染+重绑拖动。
   // 根治「首次进神曲模式时曲风池尚未从后台加载完 → 曲风条内容/拖动绑定时机错位 → 偶发拖不动」。
-  try{ if(typeof songMode!=='undefined' && songMode && typeof renderSongStrip==='function'){ renderSongStrip(); } }catch(_){}
+  // ★TDZ 陷阱(2026-07-29 拆分单体后坐实): songMode 是 app.js 里靠后声明的 let, 而缓存命中时
+  //   applyConfigMap 会在 app.js 顶层执行到该 let 声明之前被同步调用(loadRemoteConfig 在 app.js:1021,
+  //   songMode 在 app.js:4811)→ 此刻 songMode 处于暂时性死区, 对它做 `typeof` 不会返回 'undefined' 而是
+  //   直接抛 ReferenceError(JS TDZ 语义, 非普通未声明变量)。原 `typeof songMode!=='undefined'` 守卫因此
+  //   每次缓存命中启动都白抛一次(被下面 catch 吞掉, 页面不崩但噪音+这次补刷被跳过)。
+  //   改用局部 try 安全读取: TDZ/未声明一律降级为 false, 不抛错(曲风条另有 SONG_STYLES 空池 300ms 重试兜底)。
+  try{
+    var _songMode=false; try{ _songMode=songMode; }catch(_){ _songMode=false; }
+    if(_songMode && typeof renderSongStrip==='function'){ renderSongStrip(); }
+  }catch(_){}
   }catch(e){ try{ console.warn('[EH cfg] applyConfigMap threw, some fields kept default', e&&e.message); }catch(_){} try{ _ehDbg('[cfg] applyConfigMap throw', e&&e.message||String(e)); }catch(_){} }
 }
 // 启动立即注入一次完整主题变量(此时 document.head 已就绪,script 在 body 末尾)
