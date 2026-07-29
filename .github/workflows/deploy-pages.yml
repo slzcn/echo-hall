@@ -34,6 +34,7 @@ jobs:
           done
           [ -d icons ] && cp -R icons _site/icons || true
           [ -d masters ] && cp -R masters _site/masters || true
+          [ -d js ] && cp -R js _site/js || true
       # enablement:true 让 configure-pages 首次运行时自动开启 Pages(build type=Actions)，
       # 不声明 environment，避免在 Pages 尚未启用时 job 无法调度
       - name: Setup Pages

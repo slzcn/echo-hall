@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v79-20260729-structDF';
+const SW_VERSION = 'eh-sw-v80-20260729-structG1';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -14,6 +14,11 @@ const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './js/ambient-fx.js',
+  './js/debug-overlay.js',
+  './js/sw-register.js',
+  './js/pwa-install.js',
+  './js/pull-refresh.js',
 ];
 
 const NETWORK_ONLY_HOSTS = ['supabase.co', 'supabase.in'];

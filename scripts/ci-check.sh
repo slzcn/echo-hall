@@ -77,10 +77,19 @@ PY
     fi
   done < "$TMP/manifest.txt"
 
+  while IFS= read -r js; do
+    [ -z "$js" ] && continue
+    if ! node --check "$js" 2>/tmp/echo-ci-node.err; then
+      BAD=$((BAD+1))
+      echo "  外部脚本语法错误：$js"
+      sed 's/^/    /' /tmp/echo-ci-node.err
+    fi
+  done < <(find js -type f -name '*.js' 2>/dev/null | sort)
+
   if [ "$BAD" -eq 0 ]; then
-    pass "所有内联 <script> 语法检查通过"
+    pass "所有内联与本地外部 JavaScript 语法检查通过"
   else
-    fail "$BAD 个内联 <script> 语法错误"
+    fail "$BAD 个 JavaScript 语法错误"
   fi
 fi
 
