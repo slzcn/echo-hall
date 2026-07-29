@@ -1,0 +1,41 @@
+name: CI Gate
+
+# Echo 最小 CI 门禁：语法检查 + 版本号一致 + 危险 API 密度监控
+# 与 deploy-pages.yml 独立运行；deploy 依然按原样发 Pages，本 workflow 只做失败即报警。
+# 短期目标：让「commit 前必过一遍」变成硬约束；长期可加 Playwright 视觉回归。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # 让 scripts/ci-check.sh §6 能对比 HEAD~1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run ci-check.sh
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          chmod +x scripts/ci-check.sh
+          bash scripts/ci-check.sh
