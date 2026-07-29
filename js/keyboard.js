@@ -1,83 +1,103 @@
-// ============ 聊天页键盘协同 · V8 CSS 主导 (2026-07-30) ============
-// 【为什么推翻 V7】主人 7/30 明确要求"看看网上怎么解决的, 不要自己再猜了"。行业 2024-2025 权威方案:
-//   1) viewport meta 加 interactive-widget=resizes-content (Chrome 108+/Safari 17.4+)
-//      → 浏览器自动把 layout viewport 缩到键盘上方, .stage 100dvh 自动跟随, 不需要 JS pin
-//   2) VirtualKeyboard.overlaysContent = true → 浏览器通过 CSS env(keyboard-inset-height)
-//      暴露键盘覆盖高度, composer padding-bottom 直接吃这个 env, 完全 CSS 驱动
-//   3) iOS PWA WebKit bug #237851: standalone 下 visualViewport.offsetTop 错误报 0
-//      → V7 用 vv.offsetTop 定位 .stage 在 iOS PWA 必然失效, 这正是主人反馈"PWA 不跟随"的根因
-//   4) 正确的键盘高公式是 innerHeight - vv.height - vv.offsetTop (V7 没减 offsetTop)
-//   5) input 字号 ≥16px 防 iOS 聚焦缩放 (EH .cin 已 16px, 满足)
+// ============ 聊天页键盘协同 · V9 权威方案 (2026-07-30) ============
+// 【为什么推翻 V8】权威调研发现 V8 建立在多个错误假设上:
+// 1. Safari/iOS 至今未实现 interactive-widget=resizes-content (WebKit bug #259770 追踪中)
+//    → V8 注释写"Safari 17.4+ 支持"是错的
+// 2. CSS.supports('env(keyboard-inset-height)') 在 iOS Safari 会返回 true
+//    但实际 env(keyboard-inset-height) 永远是 0 (MDN: env() 语法合法即通过 supports)
+//    → V8 的 iOS fallback 从未启动!
+// 3. overlaysContent=true 和 interactive-widget=resizes-content 语义互斥
+//    (前者禁止缩 viewport 由应用自己避让, 后者要求浏览器缩 viewport)
+// 4. iOS fallback 键盘高公式应是 layoutHeight - (vv.offsetTop + vv.height)
+//    V8 少减了 offsetTop, 会推得过高
+// 5. overlaysContent=true 是全局设置, 破坏弹窗 isKbOpen 逻辑
 //
-// 【V8 分工】
-//   - CSS 主导: .stage:100dvh + composer padding-bottom:max(safe-area, env(keyboard-inset)+8)
-//     这两条完全 CSS 处理常规场景, 支持 Chrome 108+/Safari 17.4+/所有安卓现代浏览器
-//   - JS 只做两件事:
-//     a) 尽早启用 VirtualKeyboard.overlaysContent=true, 让浏览器暴露 env(keyboard-inset-height)
-//     b) 对无 env 支持的旧 iOS (Safari <17.4) 用 visualViewport 兜底: 把 composer transform 上推
-//        `innerHeight - vv.height` 高度; 此路径不用 vv.offsetTop, 避开 PWA bug
-//   - 完全废弃 V7 的 .stage position:fixed pin 逻辑, 因为它依赖 vv.offsetTop 在 iOS PWA 无效
+// 【V9 分层策略】
+//  A. Android Chrome (有 navigator.virtualKeyboard):
+//     启用 overlaysContent=true, CSS env(keyboard-inset-height) 驱动 composer
+//     .stage 保持 100dvh, VirtualKeyboard 通过 boundingRect 精确报告键盘位置
+//  B. iOS Safari/PWA + 无 VirtualKeyboard API 环境:
+//     禁用 interactive-widget=resizes-content 的错误期望
+//     用 VisualViewport 作为唯一真源, 写 --vh 让 .stage 走真实可视高度
+//     公式: kbH = innerHeight - (vv.offsetTop + vv.height)  ← 减 offsetTop!
+//  C. 覆盖式 IME (讯飞/搜狗浮动): vv 不变时 blur 兜底
 //
-// 覆盖式 IME(讯飞/搜狗悬浮, 不缩 vv) 收起由"点输入区外 blur"兜底 (与 V1-V7 一致)。
-// 诊断: ?kbdebug=1 显示实时数据。
+// 【关键决策】
+// - 不再用 CSS.supports 判断 env 可用性, 直接用 navigator.virtualKeyboard 特性存在性
+// - iOS 永远走 vv fallback (即使 CSS.supports 返回 true 也不信)
+// - .stage 是唯一高度源 (写 --vh + data-kb-jsfallback), 不再单独 transform composer
 (function(){
   var vv = window.visualViewport;
 
-  // 尽早开启 overlaysContent, 让 env(keyboard-inset-height) 生效 (Chrome 108+, Safari 17.4+)
-  try{ if(navigator.virtualKeyboard) navigator.virtualKeyboard.overlaysContent = true; }catch(_){}
+  // 平台分层探测: 只有 navigator.virtualKeyboard 存在时才走 CSS env 模式
+  // iOS Safari/PWA 从未实现 VirtualKeyboard API, 一律走 vv fallback
+  var hasVKAPI = !!(navigator.virtualKeyboard);
+  var useVKMode = hasVKAPI;  // 仅 Android Chromium 系走 VK 模式
+  var useVVFallback = !useVKMode && !!vv;  // 其他平台一律 vv fallback (含 iOS 全部)
 
-  // 特性探测: 浏览器是否支持 env(keyboard-inset-height) - 决定要不要走 JS fallback
-  var supportsKbInset = (function(){
-    try{
-      return CSS.supports('padding-bottom: env(keyboard-inset-height, 0px)');
-    }catch(_){ return false; }
-  })();
+  // Android: 启用 overlaysContent 让 env(keyboard-inset-height) 生效
+  // iOS: 不启用 (即使能开也无效, 反而增加复杂度)
+  if(useVKMode){
+    try{ navigator.virtualKeyboard.overlaysContent = true; }catch(_){}
+  }
 
-  var composer = null, cin = null, hasFallback = false;
+  var composer = null, cin = null, stage = null;
   function getComposer(){ if(!composer) composer = document.querySelector('.composer'); return composer; }
   function getCin(){ if(!cin) cin = document.getElementById('cin'); return cin; }
-  function getStage(){ return document.querySelector('.stage'); }
+  function getStage(){ if(!stage) stage = document.querySelector('.stage'); return stage; }
   function hallOn(){ return document.body.classList.contains('hall-on'); }
   function cinFocused(){ return document.activeElement && document.activeElement.id==='cin'; }
 
-  // JS fallback: 只在无 env 支持时启用
-  // 用 innerHeight - vv.height 算键盘高 (不用 vv.offsetTop 避开 iOS PWA WebKit bug #237851)
+  // VV fallback: 写 --vh 让 .stage 走真高度, 用 html[data-kb-jsfallback] 选择器
   var raf = 0;
   function applyFallback(){
     raf = 0;
-    var c = getComposer(); if(!c || !vv) return;
+    if(!vv) return;
+    var s = getStage(); if(!s) return;
+
     if(!hallOn() || !cinFocused()){
-      c.style.transform = '';
+      // 无键盘态: 清 fallback 变量
+      document.documentElement.removeAttribute('data-kb-jsfallback');
+      document.documentElement.style.removeProperty('--vh');
       document.documentElement.classList.remove('kb-up');
-      hasFallback = false;
-      updateDebug(0, false);
+      updateDebug();
       return;
     }
-    var kbH = Math.max(0, Math.round(window.innerHeight - vv.height));
-    if(kbH > 40){
-      c.style.transform = 'translateY(-' + kbH + 'px)';
-      c.style.transition = 'transform 180ms ease-out';
-      document.documentElement.classList.add('kb-up');
-      document.documentElement.setAttribute('data-kb-jsfallback','1');
-      hasFallback = true;
-    } else {
-      c.style.transform = '';
-      document.documentElement.classList.remove('kb-up');
-      hasFallback = false;
-    }
-    updateDebug(kbH, true);
-  }
-  function schedule(){ if(!raf) raf = requestAnimationFrame(applyFallback); }
 
-  if(!supportsKbInset && vv){
-    // 只对无 env 支持的浏览器(旧 iOS Safari <17.4) 启动 JS fallback
+    // 正确公式: 底部遮挡 = layoutHeight - (vv.offsetTop + vv.height)
+    // 双 rAF 后 offsetTop 应稳定 (WebKit bug #237851 是瞬时错误)
+    var visibleBottom = Math.round(vv.offsetTop + vv.height);
+    var kbH = Math.max(0, window.innerHeight - visibleBottom);
+
+    if(kbH > 40){
+      // 键盘弹起: .stage 高度 = 可视高 (visibleBottom - 顶部预留)
+      // --vh 存的是可用高度, CSS 用 height:var(--vh) 直接吃
+      document.documentElement.style.setProperty('--vh', visibleBottom + 'px');
+      document.documentElement.setAttribute('data-kb-jsfallback','1');
+      document.documentElement.classList.add('kb-up');
+    } else {
+      // 键盘收起
+      document.documentElement.removeAttribute('data-kb-jsfallback');
+      document.documentElement.style.removeProperty('--vh');
+      document.documentElement.classList.remove('kb-up');
+    }
+    updateDebug();
+  }
+  function schedule(){
+    if(!raf) raf = requestAnimationFrame(function(){
+      // double-rAF: 让 WebKit vv.offsetTop 稳定后再读
+      requestAnimationFrame(applyFallback);
+      raf = 0;
+    });
+  }
+
+  if(useVVFallback){
     vv.addEventListener('resize', schedule, {passive:true});
     vv.addEventListener('scroll', schedule, {passive:true});
     window.addEventListener('orientationchange', function(){ setTimeout(schedule, 300); });
     document.addEventListener('focusin', function(e){
       if(!e.target || e.target.id!=='cin') return;
-      try{ if(window.ehArm) ehArm(); }catch(_){}
-      schedule(); setTimeout(schedule, 150); setTimeout(schedule, 400);
+      // 多次纠正 (iOS 键盘弹起 lag ~300ms, offsetTop 稳定需 double-rAF)
+      schedule(); setTimeout(schedule, 150); setTimeout(schedule, 400); setTimeout(schedule, 900);
     }, {capture:true});
     document.addEventListener('focusout', function(e){
       if(!e.target || e.target.id!=='cin') return;
@@ -85,7 +105,14 @@
     }, {capture:true});
   }
 
-  // 覆盖式 IME 兜底: 键盘态点输入区外主动 blur (全平台生效, 与 CSS/fallback 无关)
+  // Android VK 模式: 监听 geometrychange 让诊断浮层可见
+  if(useVKMode){
+    try{
+      navigator.virtualKeyboard.addEventListener('geometrychange', function(){ updateDebug(); });
+    }catch(_){}
+  }
+
+  // 覆盖式 IME 兜底: 键盘态点输入区外主动 blur (全平台生效)
   document.addEventListener('touchstart', function(e){
     var c = getCin(); if(!c || document.activeElement !== c) return;
     var t = e.target;
@@ -93,38 +120,39 @@
     try{ c.blur(); }catch(_){}
   }, {passive:true, capture:true});
 
-  // ★ __ehApplyVVH: goScene('hall') 时调用, 作为“进入 hall 布局收尾”钩子
-  //   V8 下 CSS 主导, 平时不需要 JS 参与, 但场景切换的那一刷必须:
-  //     1) 清掉 V7 时代可能残留的 --vh / .stage 内联样式 (升级路径会卡旧值)
-  //     2) 强制读一次 .stage.offsetHeight 触发 reflow, 让 100dvh 在 hall-on 新 class 下重新算
-  //     3) 旧 iOS 无 env 支持时还要跑 fallback (schedule)
-  //   这只钩子修复了“从首页进房间时显示不全、刷新就好”的 bug: 现代浏览器下
-  //   __ehApplyVVH 不能因为支持 env 就完全空转。
+  // ★ __ehApplyVVH: goScene('hall') 时调用, 场景切换布局收尾钩子
+  //   V9 修复: 除清 V7 遗留内联样式外, 必须清 弹窗补丁(下半段) 写在 .stage 的
+  //   transform/transition/data-kb-offset, 否则从登录/弹窗进 hall 会残留上移
+  //   (这正是主人反馈"从首页进来显示不全"的直接真凶之一)
   function ehApplyVVH(){
     try{
       var s = getStage() || document.querySelector('.stage');
       if(s){
-        // 清残留内联样式 (V7 代码会写 position/left/top/width/height)
         var st = s.style;
+        // 清 V7 遗留 (position:fixed 定位 rect)
         if(st.position || st.height || st.width || st.top || st.left){
           st.position=''; st.left=''; st.top=''; st.width=''; st.height='';
         }
-        // 强制 reflow: 读取 offsetHeight 让浏览器当场重算布局
+        // 清弹窗补丁遗留 (transform 上移 - P1 真凶!)
+        if(st.transform || st.transition){
+          st.transform=''; st.transition='';
+        }
+        if(s.hasAttribute('data-kb-offset')){
+          s.removeAttribute('data-kb-offset');
+        }
+        // 强制 reflow
         void s.offsetHeight;
       }
-      // 清 V7 遗留的 --vh / kb-up class / data-kb-jsfallback
+      // 清 fallback 遗留
       document.documentElement.style.removeProperty('--vh');
-      if(supportsKbInset){
-        document.documentElement.classList.remove('kb-up');
-        document.documentElement.removeAttribute('data-kb-jsfallback');
-      }
-      // 旧 iOS fallback 路径仍需 schedule (无 env 支持时)
-      if(!supportsKbInset) schedule();
-      // 完成后滞后滑到底 (代替 V7 pin 里的 scrollStream)
+      document.documentElement.classList.remove('kb-up');
+      document.documentElement.removeAttribute('data-kb-jsfallback');
+      // 若在 iOS 且当前 cin 已 focused, 重新算一次
+      if(useVVFallback) schedule();
+      // 完成后滚到底
       setTimeout(function(){ try{ window.scrollStream && window.scrollStream(); }catch(_){} }, 60);
     }catch(_){}
   }
-  // 兼容旧调用名(goScene 进 hall 时调)
   window.__ehKbReset  = ehApplyVVH;
   window.__ehApplyVVH = ehApplyVVH;
 
@@ -141,47 +169,75 @@
     }
     return Math.round(parseFloat(getComputedStyle(envProbe).height) || 0);
   }
-  function updateDebug(fallbackKbH, isFallbackRun){
+  function updateDebug(){
     if(!DBG_ON) return;
     if(!dbg){
       dbg = document.createElement('div');
       dbg.style.cssText = 'position:fixed;z-index:99999;left:4px;top:4px;font:11px/1.35 monospace;'
         + 'background:rgba(0,0,0,.82);color:#0f0;padding:5px 7px;border-radius:6px;'
-        + 'pointer-events:none;white-space:pre;max-width:60vw';
+        + 'pointer-events:none;white-space:pre;max-width:70vw';
       document.body.appendChild(dbg);
     }
     var envKb = envKbInset();
-    var vvInfo = vv ? ('vv.h=' + Math.round(vv.height) + '  vv.top=' + Math.round(vv.offsetTop)) : 'vv=null';
+    var vvInfo = vv ? ('vv.h=' + Math.round(vv.height) + '  vv.top=' + Math.round(vv.offsetTop) + '  vv.w=' + Math.round(vv.width)) : 'vv=null';
+    var vkInfo = 'VK-API=' + hasVKAPI;
+    if(hasVKAPI){
+      try{
+        var r = navigator.virtualKeyboard.boundingRect;
+        vkInfo += '  overlay=' + navigator.virtualKeyboard.overlaysContent + '  kbRect.h=' + (r?Math.round(r.height):'?');
+      }catch(_){}
+    }
     dbg.textContent =
-      'V8 CSS-主导' +
-      '\nsupportsEnv=' + supportsKbInset +
-      '\nenvKb=' + envKb + '  (0=CSS无源信号)' +
+      'V9 权威方案 (' + (useVKMode ? 'Android/VK' : (useVVFallback ? 'iOS/VV-fallback' : 'unknown')) + ')' +
+      '\n' + vkInfo +
+      '\nenvKb=' + envKb + '  (0=CSS无源)' +
       '\ninnerH=' + window.innerHeight +
       '\n' + vvInfo +
-      '\nkb-up class=' + document.documentElement.classList.contains('kb-up') +
+      '\nkbH=' + (vv ? Math.max(0, window.innerHeight - Math.round(vv.offsetTop + vv.height)) : '?') +
       '\ncin.focused=' + cinFocused() + '  hallOn=' + hallOn() +
-      (isFallbackRun ? ('\nJS fallback kbH=' + fallbackKbH) : '\nJS fallback: 未启用(有 env 支持)');
+      '\nkb-up=' + document.documentElement.classList.contains('kb-up') +
+      '  fallbackAttr=' + (document.documentElement.getAttribute('data-kb-jsfallback')||'-') +
+      '\n--vh=' + (document.documentElement.style.getPropertyValue('--vh')||'-');
   }
   if(DBG_ON){
-    setTimeout(function(){ updateDebug(0,false); }, 300);
-    if(vv){ vv.addEventListener('resize', function(){ updateDebug(0,false); }); }
-    document.addEventListener('focusin', function(){ setTimeout(function(){ updateDebug(0,false); }, 100); }, {capture:true});
-    document.addEventListener('focusout', function(){ setTimeout(function(){ updateDebug(0,false); }, 100); }, {capture:true});
+    setTimeout(updateDebug, 300);
+    if(vv){ vv.addEventListener('resize', updateDebug); }
+    document.addEventListener('focusin', function(){ setTimeout(updateDebug, 100); }, {capture:true});
+    document.addEventListener('focusout', function(){ setTimeout(updateDebug, 100); }, {capture:true});
   }
 })();
 
 
 // ============ 弹窗输入框通用键盘跟随 EH_KEYBOARD_UNIVERSAL_PATCH ============
-// 覆盖: 登录/注册/邀请码/建房/找回密码/改邮箱/个人资料 等所有弹窗输入框
-// 已在 #cin 单独处理的场景不受影响(#cin 走 hall 保护,不进 modal 分支)
+// V9 修改: isKbOpen 兼容 VirtualKeyboard API (overlaysContent 下 vv 不变)
 (function(){
-  const KB_THRESH = 120;  // 可视区比 window 矮 >120px 判为键盘开
-  const SAFE_PAD  = 20;   // 输入框底部距键盘顶至少 20px
+  const KB_THRESH = 120;
+  const SAFE_PAD  = 20;
   let activeInput = null;
 
   function isKbOpen(){
+    // 优先用 VirtualKeyboard API 的 boundingRect (Android overlay 模式下 vv 不变)
+    if(navigator.virtualKeyboard){
+      try{
+        var r = navigator.virtualKeyboard.boundingRect;
+        if(r && r.height > 40) return true;
+      }catch(_){}
+    }
+    // fallback: vv.height 缩了 >120px
     const vv = window.visualViewport;
     return vv ? (window.innerHeight - vv.height > KB_THRESH) : false;
+  }
+  function kbTopY(){
+    // 键盘顶端 Y 坐标 (从 window 顶算)
+    if(navigator.virtualKeyboard){
+      try{
+        var r = navigator.virtualKeyboard.boundingRect;
+        if(r && r.height > 40) return r.y;  // 键盘 y 就是键盘顶
+      }catch(_){}
+    }
+    const vv = window.visualViewport;
+    if(vv) return vv.offsetTop + vv.height;
+    return window.innerHeight;
   }
   function isTextInput(el){
     if(!el) return false;
@@ -192,20 +248,15 @@
   }
   function ensureVisible(el){
     if(!el || !document.body.contains(el)) return;
-    const vv = window.visualViewport;
     const r = el.getBoundingClientRect();
-    const kbTop = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
-    // 已完全在可视区(留 SAFE_PAD 余量)则不动
+    const kbTop = kbTopY();
     if(r.bottom <= kbTop - SAFE_PAD && r.top >= 8) return;
-    // 先重要: 弹窗本身需要先被压缩到可视区高, 不然算 modal.scrollTo 也没滚动空间
-    // EH 的 .modal max-height:90dvh, dvh 不响应键盘, 需手工改成 kbTop 上方的可用高
     const modalHost = el.closest('.modal');
     if(modalHost){
       const hostTop = modalHost.getBoundingClientRect().top;
       const availH = Math.max(200, kbTop - Math.max(0,hostTop) - 8);
       modalHost.style.maxHeight = availH + 'px';
     }
-    // 找真实的可滚动祖先(EH 的弹窗真实容器是 #modal.glass, 不是 .modal)
     let scrollable = null;
     let p = el.parentElement;
     while(p && p !== document.body){
@@ -216,7 +267,6 @@
       p = p.parentElement;
     }
     if(scrollable){
-      // 有自己的滚动容器(弹窗场景): 在容器内滚,不动 body
       let y = 0, node = el;
       while(node && node !== scrollable){ y += node.offsetTop; node = node.offsetParent; }
       const visibleH = Math.min(scrollable.clientHeight, kbTop - scrollable.getBoundingClientRect().top);
@@ -224,13 +274,10 @@
       try{ scrollable.scrollTo({top:target, behavior:'smooth'}); }
       catch(_){ scrollable.scrollTop = target; }
     } else {
-      // 无独立滚动容器(如 loginCollapse 在 enter 场景内): 没有滚动容器, 直接把输入框手动 translate 上推
-      // 默认的 scrollIntoView 在 enter 场景里无效(所有层都 overflow:visible/hidden)
       const need = r.bottom - (kbTop - SAFE_PAD);
       if(need > 0){
         const stage = el.closest('.stage') || document.body;
         if(stage){
-          // 上推 stage 一个距离, 把输入框露出可视区
           const cur = parseFloat(stage.getAttribute('data-kb-offset')||'0');
           const total = cur + need + 8;
           stage.style.transition = 'transform 0.25s';
@@ -240,45 +287,41 @@
       }
     }
   }
-
-  // 失焦时恢复 modal 的 max-height + stage transform
   function restoreModalHeight(){
-    document.querySelectorAll('.modal[style*="max-height"]').forEach(m=>{
-      m.style.maxHeight = '';
-    });
+    document.querySelectorAll('.modal[style*="max-height"]').forEach(m=>{ m.style.maxHeight=''; });
     document.querySelectorAll('[data-kb-offset]').forEach(s=>{
       s.style.transform = '';
+      s.style.transition = '';
       s.removeAttribute('data-kb-offset');
     });
   }
-
-  // focus 时记录目标输入框,并在键盘弹起过程多次纠正(iOS 键盘弹起有 lag)
   document.addEventListener('focusin', (e)=>{
     const el = e.target;
     if(!isTextInput(el)) return;
-    // #cin 已由 hall 保护接管,这里不重复
     if(el.id === 'cin') return;
     activeInput = el;
     const tick = ()=>{ if(activeInput===el && isKbOpen()) ensureVisible(el); };
-    // iOS 键盘弹起 ~300ms 内可视区才真正变化,多次纠正抹平 lag
     setTimeout(tick, 80);
     setTimeout(tick, 250);
     setTimeout(tick, 500);
     setTimeout(tick, 900);
   }, {passive:true});
-
   document.addEventListener('focusout', (e)=>{
     if(e.target === activeInput){
       activeInput = null;
-      // 输入完成后延时恢复 modal 高度(给键盘收回时间)
       setTimeout(restoreModalHeight, 300);
     }
   }, {passive:true});
-
-  // visualViewport resize(键盘弹/收) 时,还有 active 输入框就再纠一次
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', ()=>{
       if(activeInput && isKbOpen()) ensureVisible(activeInput);
     });
+  }
+  if(navigator.virtualKeyboard){
+    try{
+      navigator.virtualKeyboard.addEventListener('geometrychange', ()=>{
+        if(activeInput && isKbOpen()) ensureVisible(activeInput);
+      });
+    }catch(_){}
   }
 })();

@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v93-20260730-kbFixSceneV8_1';
+const SW_VERSION = 'eh-sw-v94-20260730-kbAuthorityV9';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 
@@ -88,7 +88,23 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 其余同源静态: stale-while-revalidate
+  // ★同源 JS 改 network-first (2026-07-30 P0 修): 避免"新 index + 旧 keyboard.js"混版本
+  //   SWR 会先返回缓存旧文件, 后台再更新 -> 用户第一次访问总跑旧代码, 只有刷新才拿新的
+  //   -> 这正是主人反馈"改了代码但没变化"的机制根因
+  if (req.destination === 'script'){
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.status === 200){
+          const clone = res.clone();
+          caches.open(SHELL_CACHE).then((cache) => cache.put(req, clone)).catch(()=>{});
+        }
+        return res;
+      }).catch(() => caches.open(SHELL_CACHE).then((cache) => cache.match(req)))
+    );
+    return;
+  }
+
+  // 其余同源静态(CSS/图片/字体等): stale-while-revalidate
   e.respondWith(
     caches.open(SHELL_CACHE).then((cache) =>
       cache.match(req).then((cached) => {
