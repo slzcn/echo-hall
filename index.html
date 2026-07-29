@@ -188,16 +188,15 @@
       color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%)}
   /* 上下边缘 vignette: fixed 覆盖全屏, 顶部用 --bg 实色→透明缓出, 中间完全透明不挡内容。
      z-index 压在内容(scene z2)之下、装饰层(orb/grid z0)之上, 只吃掉边缘发光不影响可读性与交互。
-     2026-07-29 CDP 单变量证伪: 旧顶部渐变在 120px 直接结束, 透明度斜率骤停；叠在 grid/orb 上会
-     形成一条全宽水平明暗接缝。改为多段缓出并拉长低透明尾巴, 保留顶端实色贴合系统条, 同时避免
-     在固定像素处突然收口。底部不动。详见 docs/triage/2026-07-29-lobby-top-horizontal-seam.md。 */
+     2026-07-29 CDP 单变量证伪: 旧顶部长实色带(0→透明拉到 230px)会在"回声厅"标题后叠出一块偏白
+     色块。改为顶端只留 8px 实色贴合系统条、40px 内快速淡出到全透明——去掉标题背后的色块, 同时
+     夜间不会露出 HTML 浅青氛围光形成的顶部亮带。底部不动。详见
+     docs/triage/2026-07-29-lobby-top-horizontal-seam.md。 */
   #edgeFade{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(to bottom,
       var(--bg) 0,
-      color-mix(in srgb, var(--bg) 82%, transparent) 38px,
-      color-mix(in srgb, var(--bg) 46%, transparent) 90px,
-      color-mix(in srgb, var(--bg) 16%, transparent) 156px,
-      transparent 230px,
+      color-mix(in srgb, var(--bg) 60%, transparent) 8px,
+      transparent 40px,
       transparent calc(100% - 90px),
       var(--bg) 100%)}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
@@ -1826,7 +1825,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-bg-seam1';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-bg-seam2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
