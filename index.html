@@ -1792,7 +1792,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-clean5';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-structA';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1823,24 +1823,46 @@ try{var _m=localStorage.getItem('eh_mode')||'auto';var _h=new Date().getHours();
 <script>/* 首帧无黑边: data-theme/data-mode 定好后, 立即用生效的 --bg 覆盖 theme-color(原硬编码 #070a12) + 钉 html/body 底色。
    避免大 JS 加载前, 浏览器状态栏/工具栏带与页面(尤其日间浅色)割裂成上下黑边。首帧CSS已在head解析, --bg此刻可读。 */
 try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();if(_bg){var _mc=document.querySelector('meta[name="theme-color"]');if(_mc)_mc.content=_bg;document.documentElement.style.backgroundColor=_bg;}}catch(e){}</script>
+<!-- 进场全屏光幕(高阶档) -->
+<!-- 灵魂心情联动: 底部情绪雾 -->
+<!-- 互动: 全屏对角光带扫过 -->
+<!-- 互动: 命中大字 -->
+<!-- 连击对战: 反击浮钮 -->
+<!-- 挨打时格挡免伤 -->
+<!-- 世界频道: 全站流光公告 -->
+
+
+<!-- 背景装饰层(z<10) -->
+<div id="fx-bg">
 <div class="bg-grid"></div>
-<div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+<div class="bg-orb orb3"></div>
 <div id="edgeFade"></div>
 <div id="particles"></div>
-<div id="entStage"></div><!-- 进场全屏光幕(高阶档) -->
 <div id="warp"></div>
 <div id="soundwave"></div>
 <div class="mood-aura" id="moodAura"></div>
-<div id="moodTintLayer"></div><!-- 灵魂心情联动: 底部情绪雾 -->
+<div id="moodTintLayer"></div>
 <div class="night-badge" id="nightBadge">· 夜 航 中 ·</div>
 <div id="resonance"></div>
+</div>
+
+<!-- 互动特效层(z 50-70) -->
+<div id="fx-ix">
+<div id="entStage"></div>
 <div id="ixFlash"></div>
-<div id="ixSweep"></div><!-- 互动: 全屏对角光带扫过 -->
-<div id="ixWord"></div><!-- 互动: 命中大字 -->
-<div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div><!-- 连击对战: 反击浮钮 -->
-<div id="guardBtn"><span class="gb-ic">🛡️</span><span class="gb-txt">格挡</span></div><!-- 挨打时格挡免伤 -->
+<div id="ixSweep"></div>
+<div id="ixWord"></div>
+<div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div>
+<div id="guardBtn"><span class="gb-ic">🛡️</span><span class="gb-txt">格挡</span></div>
 <div id="koStun"><!-- 被KO眩晕: 大字倒计时 --><div class="ks-stars">💫</div><div class="ks-title">被 打 晕 了</div><div class="ks-num" id="koStunNum"></div><div class="ks-tip">眩晕中 · 暂时还不了手（还能说话、送暖）</div></div>
-<div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div><!-- 世界频道: 全站流光公告 -->
+<div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div>
+<div class="act-ring" id="actRing"></div>
+</div>
+
+<!-- 弹窗/抽屉层(z>=80) -->
+<div id="fx-modal">
 <div id="bottleMask"><!-- 漂流瓶: 捞到/回信 -->
   <div class="bt-box">
     <div class="bt-title">🍾 捞到一个漂流瓶</div>
@@ -1881,6 +1903,122 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <button class="tm-close" id="tarotClose">收下今日签</button>
 </div>
 <div id="toast"></div>
+<div class="rec-overlay" id="recOverlay">
+  <div class="rec-panel" id="recPanel">
+    <div class="rec-wave" id="recWave"></div>
+    <div class="rec-time" id="recTime">0:00</div>
+    <div class="rec-caption" id="recCaption"></div>
+    <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
+  </div>
+</div>
+<div class="modal-mask" id="modalMask">
+  <div class="glass modal" id="modal">
+    <div class="modal-x" id="modalX">✕</div>
+    <div class="modal-body" id="mCreate">
+      <h3 data-txt="createRoomTitle">创建房间</h3>
+      <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
+      <div class="seg" id="kindSeg">
+        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
+        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
+      </div>
+      <label class="fld"><span data-txt="roomNameLabel">房间名</span>
+        <input id="roomNameIn" maxlength="40" data-txt-ph="roomNamePh" placeholder="比如：午夜同好会"></label>
+      <label class="fld"><span data-txt="roomIconLabel">图标</span>
+        <div class="emoji-pick" id="roomEmojiPick"></div></label>
+      <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
+    </div>
+    <div class="modal-body" id="mCreated" style="display:none">
+      <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
+      <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
+      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
+      <p class="modal-sub" id="wolfHintCreated" style="display:none;font-size:11.5px;opacity:.8">想让狼姐来陪聊？进房后点顶部房间头像 → 房间设置开启 🐺</p>
+      <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
+    </div>
+    <div class="modal-body" id="mJoin" style="display:none">
+      <h3 data-txt="joinRoomTitle">用邀请码加入</h3>
+      <p class="modal-sub" data-txt="joinRoomSub">输入朋友给你的邀请码：</p>
+      <label class="fld"><span data-txt="inviteCodeLabel">邀请码</span>
+        <input id="codeIn" maxlength="12" data-txt-ph="inviteCodePh" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
+      <div class="modal-err" id="joinErr"></div>
+      <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
+    </div>
+    <div class="modal-body" id="mReg" style="display:none">
+      <h3 data-txt="regTitle">注册账号</h3>
+      <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
+      <label class="fld"><span data-txt="regUserLabel">用户名</span>
+        <input id="regUser" maxlength="20" autocomplete="off" readonly data-noauto data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
+      <label class="fld"><span>密码</span>
+        <input id="regPass" type="password" autocomplete="new-password" readonly data-noauto data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
+      <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
+        <input id="regEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
+      <div class="modal-err" id="regErr"></div>
+      <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
+    </div>
+    <div class="modal-body" id="mReset" style="display:none">
+      <h3 data-txt="forgotTitle">找回密码</h3>
+      <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
+      <label class="fld"><span>邮箱</span>
+        <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
+      <div class="modal-err" id="resetErr"></div>
+      <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
+    </div>
+    <div class="modal-body" id="mEmail" style="display:none">
+      <h3 data-txt="emailSetTitle">邮箱设置</h3>
+      <p class="modal-sub" data-txt="emailSetSub">用于找回密码。绑定用户名/密码登录不受影响。</p>
+      <label class="fld" id="curEmailRow"><span><span data-txt="emailCurLabel">当前邮箱</span> <span id="emailVerifyBadge"></span></span>
+        <input id="curEmail" type="email" disabled style="opacity:.6"></label>
+      <div id="verifyRow" style="display:none;margin:-6px 0 14px">
+        <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
+        <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
+      </div>
+      <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
+        <input id="newEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto placeholder="you@example.com"></label>
+      <div class="modal-err" id="emailErr"></div>
+      <button class="btn-primary" id="doEmailBtn">保 存</button>
+    </div>
+    <div class="modal-body" id="mProfile" style="display:none">
+      <h3 data-txt="editProfileTitle">编辑形象</h3>
+      <p class="modal-sub" data-txt="editProfileSub">自定义你的昵称和头像（用户名登录不受影响）。</p>
+      <label class="fld"><span data-txt="nickLabel">昵称</span>
+        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" data-txt-ph="nickPh" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
+      <label class="fld"><span data-txt="avatarLabel">头像</span>
+        <div class="emoji-pick" id="profEmojiPick"></div></label>
+      <label class="fld"><span data-txt="themeColorLabel">主题色</span>
+        <div class="color-pick" id="profColorPick"></div></label>
+      <div class="modal-err" id="profErr"></div>
+      <button class="btn-primary" id="doProfBtn">保 存</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="confirmMask">
+  <div class="glass confirm-box">
+    <div class="confirm-title" id="confirmTitle" data-txt="confirmTitle">确认操作</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="cf-cancel" id="confirmNo" data-txt="cancelBtn">取消</button>
+      <button class="cf-ok" id="confirmYes" data-txt="okBtn">确定</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="wallMask">
+  <div class="glass modal wall-modal">
+    <div class="modal-x" id="wallX">✕</div>
+    <h2 class="modal-title">✨ 名场面</h2>
+    <p class="modal-sub">这个房间里被大家共鸣最多的消息</p>
+    <div id="wallList" class="wall-list"></div>
+  </div>
+</div>
+<div class="drawer-mask" id="meMask"></div>
+<div class="drawer" id="meDrawer">
+  <div class="drawer-h"><h3>个人空间</h3><span class="dx" id="meDx">✕</span></div>
+  <div class="drawer-body" id="meBody"></div>
+</div>
+<div class="drawer-mask" id="gearMask"></div>
+<div class="drawer" id="gearDrawer">
+  <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx">✕</span></div>
+  <div class="drawer-body" id="gearBody"></div>
+</div>
+</div>
 
 <div class="stage">
 
@@ -2002,134 +2140,18 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </div>
 
 <!-- 长按互动环 -->
-<div class="act-ring" id="actRing"></div>
 
 <!-- 语音录制浮层(按住说话) -->
-<div class="rec-overlay" id="recOverlay">
-  <div class="rec-panel" id="recPanel">
-    <div class="rec-wave" id="recWave"></div>
-    <div class="rec-time" id="recTime">0:00</div>
-    <div class="rec-caption" id="recCaption"></div>
-    <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
-  </div>
-</div>
 
 <!-- ===== 弹窗：建房 / 入房 / 绑定 ===== -->
-<div class="modal-mask" id="modalMask">
-  <div class="glass modal" id="modal">
-    <div class="modal-x" id="modalX">✕</div>
-    <div class="modal-body" id="mCreate">
-      <h3 data-txt="createRoomTitle">创建房间</h3>
-      <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
-      <div class="seg" id="kindSeg">
-        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
-        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
-      </div>
-      <label class="fld"><span data-txt="roomNameLabel">房间名</span>
-        <input id="roomNameIn" maxlength="40" data-txt-ph="roomNamePh" placeholder="比如：午夜同好会"></label>
-      <label class="fld"><span data-txt="roomIconLabel">图标</span>
-        <div class="emoji-pick" id="roomEmojiPick"></div></label>
-      <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
-    </div>
-    <div class="modal-body" id="mCreated" style="display:none">
-      <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
-      <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
-      <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
-      <p class="modal-sub" id="wolfHintCreated" style="display:none;font-size:11.5px;opacity:.8">想让狼姐来陪聊？进房后点顶部房间头像 → 房间设置开启 🐺</p>
-      <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
-    </div>
-    <div class="modal-body" id="mJoin" style="display:none">
-      <h3 data-txt="joinRoomTitle">用邀请码加入</h3>
-      <p class="modal-sub" data-txt="joinRoomSub">输入朋友给你的邀请码：</p>
-      <label class="fld"><span data-txt="inviteCodeLabel">邀请码</span>
-        <input id="codeIn" maxlength="12" data-txt-ph="inviteCodePh" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
-      <div class="modal-err" id="joinErr"></div>
-      <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
-    </div>
-    <div class="modal-body" id="mReg" style="display:none">
-      <h3 data-txt="regTitle">注册账号</h3>
-      <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
-      <label class="fld"><span data-txt="regUserLabel">用户名</span>
-        <input id="regUser" maxlength="20" autocomplete="off" readonly data-noauto data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
-      <label class="fld"><span>密码</span>
-        <input id="regPass" type="password" autocomplete="new-password" readonly data-noauto data-txt-ph="regPwdPh" placeholder="至少 6 位"></label>
-      <label class="fld" style="margin-bottom:8px"><span data-txt="regEmailLabel">邮箱（选填）</span>
-        <input id="regEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="regEmailPh" placeholder="用于找回密码，建议填写"></label>
-      <div class="modal-err" id="regErr"></div>
-      <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
-    </div>
-    <div class="modal-body" id="mReset" style="display:none">
-      <h3 data-txt="forgotTitle">找回密码</h3>
-      <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
-      <label class="fld"><span>邮箱</span>
-        <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
-      <div class="modal-err" id="resetErr"></div>
-      <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
-    </div>
-    <div class="modal-body" id="mEmail" style="display:none">
-      <h3 data-txt="emailSetTitle">邮箱设置</h3>
-      <p class="modal-sub" data-txt="emailSetSub">用于找回密码。绑定用户名/密码登录不受影响。</p>
-      <label class="fld" id="curEmailRow"><span><span data-txt="emailCurLabel">当前邮箱</span> <span id="emailVerifyBadge"></span></span>
-        <input id="curEmail" type="email" disabled style="opacity:.6"></label>
-      <div id="verifyRow" style="display:none;margin:-6px 0 14px">
-        <button class="dbtn" id="sendVerifyBtn" style="width:100%">✉️ 发送验证邮件</button>
-        <div id="verifyHint" style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6"></div>
-      </div>
-      <label class="fld"><span id="newEmailLabel" data-txt="emailNewLabel">新邮箱</span>
-        <input id="newEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto placeholder="you@example.com"></label>
-      <div class="modal-err" id="emailErr"></div>
-      <button class="btn-primary" id="doEmailBtn">保 存</button>
-    </div>
-    <div class="modal-body" id="mProfile" style="display:none">
-      <h3 data-txt="editProfileTitle">编辑形象</h3>
-      <p class="modal-sub" data-txt="editProfileSub">自定义你的昵称和头像（用户名登录不受影响）。</p>
-      <label class="fld"><span data-txt="nickLabel">昵称</span>
-        <div style="display:flex;gap:8px"><input id="profName" maxlength="24" data-txt-ph="nickPh" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
-      <label class="fld"><span data-txt="avatarLabel">头像</span>
-        <div class="emoji-pick" id="profEmojiPick"></div></label>
-      <label class="fld"><span data-txt="themeColorLabel">主题色</span>
-        <div class="color-pick" id="profColorPick"></div></label>
-      <div class="modal-err" id="profErr"></div>
-      <button class="btn-primary" id="doProfBtn">保 存</button>
-    </div>
-  </div>
-</div>
 
 <!-- ===== 通用确认弹层(替代原生 confirm) ===== -->
-<div class="modal-mask" id="confirmMask">
-  <div class="glass confirm-box">
-    <div class="confirm-title" id="confirmTitle" data-txt="confirmTitle">确认操作</div>
-    <div class="confirm-msg" id="confirmMsg"></div>
-    <div class="confirm-btns">
-      <button class="cf-cancel" id="confirmNo" data-txt="cancelBtn">取消</button>
-      <button class="cf-ok" id="confirmYes" data-txt="okBtn">确定</button>
-    </div>
-  </div>
-</div>
 
 <!-- ===== 名场面(回声墙): 本房高共鸣消息 ===== -->
-<div class="modal-mask" id="wallMask">
-  <div class="glass modal wall-modal">
-    <div class="modal-x" id="wallX">✕</div>
-    <h2 class="modal-title">✨ 名场面</h2>
-    <p class="modal-sub">这个房间里被大家共鸣最多的消息</p>
-    <div id="wallList" class="wall-list"></div>
-  </div>
-</div>
 
 <!-- ===== 抽屉：个人空间 ===== -->
-<div class="drawer-mask" id="meMask"></div>
-<div class="drawer" id="meDrawer">
-  <div class="drawer-h"><h3>个人空间</h3><span class="dx" id="meDx">✕</span></div>
-  <div class="drawer-body" id="meBody"></div>
-</div>
 
 <!-- ===== 抽屉：房主设置 ===== -->
-<div class="drawer-mask" id="gearMask"></div>
-<div class="drawer" id="gearDrawer">
-  <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx">✕</span></div>
-  <div class="drawer-body" id="gearBody"></div>
-</div>
 
 <script>
 // ⚡ 首帧防闪: 在阻塞的 supabase 库脚本之前同步决定初始场景。
