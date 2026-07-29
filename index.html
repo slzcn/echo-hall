@@ -186,18 +186,18 @@
     background-repeat:no-repeat}
   html:has(body.deep-night){background-image:radial-gradient(ellipse 130% 46% at 50% 100%,
       color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%)}
-  /* 上下边缘 vignette: fixed 覆盖全屏, 上/下各约 90px 用 --bg 实色→透明渐隐, 中间完全透明不挡内容。
+  /* 上下边缘 vignette: fixed 覆盖全屏, 顶部用 --bg 实色→透明缓出, 中间完全透明不挡内容。
      z-index 压在内容(scene z2)之下、装饰层(orb/grid z0)之上, 只吃掉边缘发光不影响可读性与交互。
-     ★白条真凶(2026-07-28, headless 对比确认): 顶部原是 [--bg 0 → transparent 90px] 的陡渐变,
-       渐变结束的 90px 那条线叠在 orb 辉光上 → 亮度突变=一条水平接缝("白条"); orb 有浮动动画,
-       飘到顶部才与该线对齐显形, 故"加载完才出现"、白天浅色 --bg 更明显。
-     修法: 顶部渐变多加中间色标(--bg→70%不透明的--bg→透明), 把硬转折摊成长而柔的缓入,
-       亮度连续无突变 → 接缝消失。仍在最顶端保留实色贴合系统条(消除黑边的原目的不变)。底部不动。 */
+     2026-07-29 CDP 单变量证伪: 旧顶部渐变在 120px 直接结束, 透明度斜率骤停；叠在 grid/orb 上会
+     形成一条全宽水平明暗接缝。改为多段缓出并拉长低透明尾巴, 保留顶端实色贴合系统条, 同时避免
+     在固定像素处突然收口。底部不动。详见 docs/triage/2026-07-29-lobby-top-horizontal-seam.md。 */
   #edgeFade{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(to bottom,
       var(--bg) 0,
-      color-mix(in srgb, var(--bg) 70%, transparent) 46px,
-      transparent 120px,
+      color-mix(in srgb, var(--bg) 82%, transparent) 38px,
+      color-mix(in srgb, var(--bg) 46%, transparent) 90px,
+      color-mix(in srgb, var(--bg) 16%, transparent) 156px,
+      transparent 230px,
       transparent calc(100% - 90px),
       var(--bg) 100%)}
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
@@ -1826,7 +1826,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260729-kb-vvpin3';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260729-bg-seam1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
