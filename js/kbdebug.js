@@ -2,7 +2,11 @@
  * 比较 svh/dvh/lvh 与实际布局，区分浏览器底部工具栏遮挡和输入法遮挡。
  */
 (function () {
-  if (!/[?&]kbdebug=1(&|$)/.test(location.search)) return;
+  const queryEnabled = /[?&]kbdebug=1(&|$)/.test(location.search);
+  const androidPwa = /Android/i.test(navigator.userAgent) &&
+    matchMedia('(display-mode: standalone)').matches;
+  // 临时真机探针：安卓 standalone PWA 自动显示；其他平台仍仅 ?kbdebug=1 启用。
+  if (!queryEnabled && !androidPwa) return;
 
   const box = document.createElement('div');
   box.id = '__ehkbdbg';
