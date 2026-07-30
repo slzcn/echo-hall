@@ -204,12 +204,34 @@
     });
   }
 
+  // ★V54：记录最近用户真实交互时间戳（用于区分后台恢复的引擎 focus vs 用户主动 focus）。
+  let lastUserTouchTs = 0;
   document.addEventListener('touchstart', event => {
+    lastUserTouchTs = Date.now();
     const input = chatInput();
     if (!input || document.activeElement !== input) return;
     if (event.target === input || event.target.closest?.('.composer')) return;
     input.blur();
   }, { passive: true, capture: true });
+
+  // ★V54：后台恢复误弹起修复。小米浏览器/PWA 进程冻结恢复时，引擎会自动把 focus
+  //   还原到进后台前的 #cin（引擎级 focus 快照恢复，早于任何 JS 事件）→ 触发 focusin → 误估算键盘高 → 输入框误弹上。
+  //   用户主动点击会伴随 touchstart（上面记了时间戳）；回前台后短窗口内若 #cin 被 focus 但无伴随交互 → 引擎恢复 → 主动 blur。
+  function guardBackgroundRefocus() {
+    setTimeout(() => {
+      if (!inHall()) return;
+      if (document.activeElement !== chatInput()) return;
+      if (Date.now() - lastUserTouchTs > 500) {
+        try { chatInput().blur(); } catch (_) {}
+        chatFocused = false;
+        estimatedKbH = 0;
+        if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
+        settleChatLayout();
+      }
+    }, 300);
+  }
+  // 复用 app.js 已有的 visibilitychange/pageshow/focus 多源入口（不新增监听器，过 CI 门禁）。
+  window.__ehKbGuardBg = guardBackgroundRefocus;
 
   window.__ehApplyVVH = settleChatLayout;
   window.__ehKbReset = function () {

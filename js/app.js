@@ -4714,12 +4714,14 @@ function foregroundResync(){
 document.addEventListener('visibilitychange', ()=>{
   // 隐藏时暂停装饰动画省电, 显示时恢复
   try{ document.body.classList.toggle('page-hidden', document.hidden); }catch(_){}
-  if(document.hidden || !curRoom) return;
+  if(document.hidden) return;
+  try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){}   // ★V54: 回前台挡引擎恢复的 #cin focus 误弹起
+  if(!curRoom) return;
   foregroundResync();
 });
 // pageshow(含 bfcache 恢复, persisted=true 时 visibilitychange 可能不发) + window focus: 多源兜底
-window.addEventListener('pageshow', ()=>{ foregroundResync(); });
-window.addEventListener('focus', ()=>{ foregroundResync(); });
+window.addEventListener('pageshow', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){} foregroundResync(); });
+window.addEventListener('focus', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){} foregroundResync(); });
 // 音频域加固批B: 清唱兜底(worker 未回写时 120s 明确降级)
 const _EH_ACAPELLA_TIMERS = new Map();   // mid → timeoutId, 供 worker 回写时清理
 function _ehAcapellaTimeoutMark(mid){
