@@ -190,7 +190,11 @@
   window.addEventListener('orientationchange', () => setTimeout(settleChatLayout, 250), { passive: true });
 
   if (virtualKeyboard) {
-    try { virtualKeyboard.overlaysContent = true; } catch (_) {}
+    // ★V53（主人思路：参考弹起信号解弹回）：overlaysContent=true 把键盘设成“覆盖式”（悬浮盖内容、viewport 不缩）
+    //   → vv/win 信号全哑 → 被迫用 0.38 估算 + 弹回时三信号命中不了。这是自己亲手造的难题链。
+    //   改回 false（系统默认占位式）：键盘顶起 viewport → vv.resize 有信号 → 弹起/弹回交给系统自动处理，不再依赖估算。
+    //   估算整套作为兵底保留（万一某设备 false 下仍哑）。
+    try { virtualKeyboard.overlaysContent = false; } catch (_) {}
     virtualKeyboard.addEventListener('geometrychange', event => {
       // ★V30：真信号回来了 → 撤销估算。
       vkGeomHits++;
