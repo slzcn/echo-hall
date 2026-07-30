@@ -163,6 +163,33 @@
       });
     }
   }, { passive: true });
+  // ★V29 无信号探测：focusin 后连续 20 帧记录 innerH/vv.height/clientH 原始值，
+  //   确认 MiuiBrowser 是否彻底不 resize（释 innerH 也不变）。
+  var poll = [];
+  function pollLine(tag) {
+    var ih = window.innerHeight;
+    var ch = document.documentElement.clientHeight;
+    var vh = vv ? vv.height : null;
+    poll.push(tag + ': innerH=' + Math.round(ih) + ' clientH=' + Math.round(ch) + ' vv=' + (vh == null ? '?' : Math.round(vh)));
+    if (poll.length > 22) poll.shift();
+    var p = document.getElementById('__ehkbpoll');
+    if (!p && document.body) {
+      p = document.createElement('div');
+      p.id = '__ehkbpoll';
+      p.style.cssText = 'position:fixed;right:6px;top:6px;z-index:2147483647;background:rgba(0,20,40,.92);color:#7fd;font:10px/1.35 monospace;padding:6px 8px;border:1px solid #7fd;border-radius:6px;pointer-events:none;white-space:pre;max-width:60vw';
+      document.body.appendChild(p);
+    }
+    if (p) p.textContent = 'focusin 无信号探测:\n' + poll.join('\n');
+  }
+  document.addEventListener('focusin', function (e) {
+    if (e.target && e.target.id === 'cin') {
+      poll = [];
+      pollLine('t0');
+      [50, 100, 150, 200, 300, 400, 500, 700, 900, 1200, 1500, 2000].forEach(function (ms) {
+        setTimeout(function () { pollLine('t' + ms); }, ms);
+      });
+    }
+  }, { passive: true });
   document.addEventListener('focusin', () => setTimeout(snapshot, 50), { passive: true });
   document.addEventListener('focusout', () => setTimeout(snapshot, 250), { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(snapshot, 300), { passive: true });
