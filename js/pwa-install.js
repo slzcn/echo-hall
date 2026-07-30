@@ -36,9 +36,11 @@
 
   var READY='📲 立即安装 App', IDLE='📲 安装到桌面';
   function markReady(){ btn.textContent=READY; btn.classList.add('ready'); }
-  // 事件已就绪(head 捕获器早于本脚本接到)→ 立即高亮; 晚到则由回调高亮
-  if(window.__ehDeferredPrompt) markReady();
+  // ★修复时序坑: head 捕获器 fire 时 __ehOnInstallReady 可能还未定义(短路), 者然 __ehDeferredPrompt 已存但按钮拿不到高亮通知。
+  //   三重兵判双保险: 1脚本启动时直接查 __ehDeferredPrompt/__ehInstallReadyFlag; 2回调式 markReady; 3延迟 1.5s 重校。
+  if(window.__ehDeferredPrompt || window.__ehInstallReadyFlag) markReady();
   window.__ehOnInstallReady = markReady;
+  setTimeout(function(){ if((window.__ehDeferredPrompt || window.__ehInstallReadyFlag) && !btn.classList.contains('ready')) markReady(); }, 1500);
   window.__ehOnInstalled = function(){ try{ btn.style.display='none'; toast('已添加到桌面 🎉'); }catch(_){} };
 
   btn.addEventListener('click', function(){
