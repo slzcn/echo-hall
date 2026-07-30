@@ -585,8 +585,10 @@
   .rm .rm-badge{font-size:9px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--violet) 15%,transparent);color:var(--violet)}
   .rm .rm-arr{color:var(--dim)}
 
-  /* ============ 场景3：聊天厅 ============ */
-  #hall{flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
+  /* 聊天厅脱离通用场景容器，直接固定在视口上。
+     输入框只经过 #hall 这一层 flex 布局，不再让 .stage 与 #hall 同时争夺高度。 */
+  body.hall-on > .stage{display:none}
+  #hall{position:fixed;inset:0;z-index:2;flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
   .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
@@ -1587,20 +1589,13 @@
   .member-list .mitem:hover{transform:none;box-shadow:none;border-color:var(--line)}
   .mitem-more{padding:8px 12px;font-size:12px;color:var(--dim);text-align:center}
 
-  /* 移动端聊天页只有一个高度源：默认 100dvh，输入框聚焦时由 keyboard.js
-     将 .stage 临时设为 visualViewport.height。#hall 只负责填满父容器。 */
+  /* 聊天页不再复用 .stage：#hall 自己就是唯一视口容器，keyboard.js 只写这一层。 */
   @media(max-width:1366px){
     .title{font-size:30px}
-    /* ★布局底边只认 visualViewport.height：工具栏展开、收起、输入法弹起都跟随当前真实可视边界。
-       keyboard.js 进房间后持续写入 .stage 高度；以下单位只作为脚本尚未接管时的首屏回退。 */
-    body.hall-on .stage{padding:0;align-items:stretch;height:100dvh;display:flex}
-    @supports not (height:100dvh){
-      body.hall-on .stage{height:100svh}
+    #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;margin:0;border-radius:0;border:none;align-items:stretch}
+    @supports not (height:100svh){
+      #hall{height:-webkit-fill-available}
     }
-    @supports not (height:100dvh) and not (height:100svh){
-      body.hall-on .stage{height:-webkit-fill-available}
-    }
-    #hall{width:100%;height:100%;border-radius:0;border:none}
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
     /* 输入框外框距当前可视底边严格 5px；安全区不再叠加到业务间距。 */
     .composer{padding-bottom:15px}
@@ -1795,7 +1790,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260730-kbVisualRestoreV21';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260730-kbHallSimpleV22';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2085,7 +2080,9 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     </div>
   </div>
 
-  <!-- ===== 场景3：聊天厅 ===== -->
+</div>
+
+  <!-- ===== 场景3：聊天厅：独立于通用 stage，避免双层高度链 ===== -->
   <div class="scene" id="hall">
     <div class="hall-top">
       <div class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
@@ -2139,8 +2136,6 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <div class="at-menu" id="atMenu"></div>
     </form>
   </div>
-
-</div>
 
 <!-- 长按互动环 -->
 
@@ -2222,22 +2217,22 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260730-kbVisualRestoreV21"></script>
-<script src="./js/config-runtime.js?v=20260730-kbVisualRestoreV21"></script>
-<script src="./js/app.js?v=20260730-kbVisualRestoreV21"></script>
-<script src="./js/keyboard.js?v=20260730-kbVisualRestoreV21"></script>
-<script src="./js/boot.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/config.js?v=20260730-kbHallSimpleV22"></script>
+<script src="./js/config-runtime.js?v=20260730-kbHallSimpleV22"></script>
+<script src="./js/app.js?v=20260730-kbHallSimpleV22"></script>
+<script src="./js/keyboard.js?v=20260730-kbHallSimpleV22"></script>
+<script src="./js/boot.js?v=20260730-kbHallSimpleV22"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/ambient-fx.js?v=20260730-kbHallSimpleV22"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
-<script src="./js/debug-overlay.js?v=20260730-kbVisualRestoreV21"></script>
-<script src="./js/kbdebug.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/debug-overlay.js?v=20260730-kbHallSimpleV22"></script>
+<script src="./js/kbdebug.js?v=20260730-kbHallSimpleV22"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/sw-register.js?v=20260730-kbHallSimpleV22"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/pwa-install.js?v=20260730-kbHallSimpleV22"></script>
 
-<script src="./js/pull-refresh.js?v=20260730-kbVisualRestoreV21"></script>
+<script src="./js/pull-refresh.js?v=20260730-kbHallSimpleV22"></script>
 </body>
 </html>

@@ -1,67 +1,48 @@
-/* Echo Hall 键盘布局：一个控制器，一个高度源。
- * 进入聊天室后，.stage 始终跟随 visualViewport.height；聊天框聚焦只触发一次即时重算。
- * 其他输入框只滚动到可见位置，不改页面布局。
+/* Echo Hall 聊天键盘：#hall 是唯一视口容器。
+ * VisualViewport 负责 iOS/浏览器；VirtualKeyboard geometry 负责安卓覆盖式 IME/PWA。
  */
 (function () {
   const viewport = window.visualViewport;
+  const virtualKeyboard = navigator.virtualKeyboard;
   let frame = 0;
+  let chatFocused = false;
+  let keyboardRect = null;
   let popupInput = null;
-  let kbActive = false; // 聊天输入框聚焦=键盘意图激活
 
-  const stage = () => document.querySelector('.stage');
+  const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
   const inHall = () => document.body.classList.contains('hall-on');
 
-  function clearLegacyLayout() {
-    const el = stage();
-    if (el) {
-      el.style.height = '';
-      el.style.position = '';
-      el.style.inset = '';
-      el.style.top = '';
-      el.style.left = '';
-      el.style.width = '';
-      el.style.transform = '';
-      el.style.transition = '';
-      el.removeAttribute('data-kb-offset');
-    }
-    document.documentElement.style.removeProperty('--vh');
-    document.documentElement.classList.remove('kb-up');
-    document.documentElement.removeAttribute('data-kb-jsfallback');
+  function visibleHeight() {
+    const top = viewport ? viewport.offsetTop : 0;
+    let bottom = viewport ? top + viewport.height : window.innerHeight;
+    if (keyboardRect && keyboardRect.height > 0) bottom = Math.min(bottom, keyboardRect.top);
+    return Math.max(1, Math.round(bottom - top));
   }
 
-  function updateChatLayout() {
+  function applyLayout() {
     frame = 0;
-    const el = stage();
-    if (!el || !inHall() || !viewport) {
-      if (el) el.style.height = '';
+    const el = hall();
+    if (!el) return;
+    if (!inHall() || !chatFocused) {
+      el.style.height = '';
       return;
     }
-    // 键盘激活时取两个 viewport 的较小值：Android PWA 走 resizes-content
-    // 时 innerHeight 会先缩小；iOS 则通常由 visualViewport.height 反映键盘。
-    // 两者只保留一个共同高度源，避免某一侧停在键盘弹起前的大值。
-    if (kbActive) {
-      const h = Math.min(window.innerHeight, viewport.height);
-      el.style.height = `${Math.round(h)}px`;
-    } else {
-      // 失焦立即释放 inline 高度，避免二次聚焦继承键盘期间的小高度。
-      el.style.height = '';
-    }
+    el.style.height = `${visibleHeight()}px`;
   }
 
-  function syncChatLayout() {
+  function scheduleLayout() {
+    if (!frame) frame = requestAnimationFrame(applyLayout);
+  }
+
+  function syncLayout() {
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
-    updateChatLayout();
+    applyLayout();
   }
 
-  function resetIOSScroll() {
-    // iOS 聚焦输入框后可能异步把文档向上滚；聊天页本身不应滚动文档。
-    if (window.scrollY !== 0) window.scrollTo(0, 0);
-  }
-
-  function scheduleChatLayout() {
-    if (!frame) frame = requestAnimationFrame(updateChatLayout);
+  function resetDocumentScroll() {
+    if (inHall() && window.scrollY !== 0) window.scrollTo(0, 0);
   }
 
   function isTextInput(el) {
@@ -76,17 +57,16 @@
     requestAnimationFrame(() => input.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   }
 
+  function settleChatLayout() {
+    syncLayout();
+    resetDocumentScroll();
+  }
+
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
-      kbActive = true;
-      // 必须在系统键盘调整 viewport 之前同步把 stage 接管到当前较小高度，
-      // 避免 iOS 先滚动整页、Android PWA 先沿用旧高度。
-      syncChatLayout();
-      resetIOSScroll();
-      [100, 250, 450, 700, 1000, 1500].forEach(ms => setTimeout(() => {
-        syncChatLayout();
-        resetIOSScroll();
-      }, ms));
+      chatFocused = true;
+      settleChatLayout();
+      [100, 250, 450, 700, 1000].forEach(ms => setTimeout(settleChatLayout, ms));
       return;
     }
     if (isTextInput(event.target)) {
@@ -97,29 +77,32 @@
 
   document.addEventListener('focusout', event => {
     if (event.target === chatInput()) {
-      kbActive = false;
-      syncChatLayout();
-      resetIOSScroll();
-      [100, 300, 600].forEach(ms => setTimeout(() => {
-        syncChatLayout();
-        resetIOSScroll();
-      }, ms));
+      chatFocused = false;
+      keyboardRect = null;
+      settleChatLayout();
+      [100, 300, 600].forEach(ms => setTimeout(settleChatLayout, ms));
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
   if (viewport) {
-    viewport.addEventListener('resize', () => {
-      scheduleChatLayout();
-      revealPopupInput();
+    viewport.addEventListener('resize', scheduleLayout, { passive: true });
+    viewport.addEventListener('scroll', () => {
+      scheduleLayout();
+      resetDocumentScroll();
     }, { passive: true });
   }
 
-  window.addEventListener('resize', () => {
-    scheduleChatLayout();
-  }, { passive: true });
+  window.addEventListener('resize', scheduleLayout, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(settleChatLayout, 250), { passive: true });
 
-  window.addEventListener('orientationchange', () => setTimeout(scheduleChatLayout, 250), { passive: true });
+  if (virtualKeyboard) {
+    try { virtualKeyboard.overlaysContent = true; } catch (_) {}
+    virtualKeyboard.addEventListener('geometrychange', event => {
+      keyboardRect = event.target.boundingRect;
+      settleChatLayout();
+    });
+  }
 
   document.addEventListener('touchstart', event => {
     const input = chatInput();
@@ -128,12 +111,16 @@
     input.blur();
   }, { passive: true, capture: true });
 
-  window.__ehApplyVVH = function () {
-    clearLegacyLayout();
-    scheduleChatLayout();
-    requestAnimationFrame(() => window.scrollStream?.());
+  window.__ehApplyVVH = settleChatLayout;
+  window.__ehKbReset = function () {
+    chatFocused = false;
+    keyboardRect = null;
+    const el = hall();
+    if (el) el.style.height = '';
+    document.documentElement.style.removeProperty('--vh');
+    document.documentElement.classList.remove('kb-up');
+    document.documentElement.removeAttribute('data-kb-jsfallback');
   };
-  window.__ehKbReset = clearLegacyLayout;
 
-  clearLegacyLayout();
+  window.__ehKbReset();
 })();
