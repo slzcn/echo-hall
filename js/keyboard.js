@@ -111,6 +111,12 @@
 
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
+      // ★V55：消除后台恢复“闪一下”。V54 是“先弹起(focusin→估算)再 300ms 后 blur 拉回”，一弹一收就是闪。
+      //   改为源头拦截：刚回前台的短窗口内，若 focusin 无伴随用户交互（引擎恢复）→ 立即 blur、不启动估算定时器 → 根本不弹起、不闪。
+      if (justForegrounded && (Date.now() - lastUserTouchTs > 500)) {
+        try { event.target.blur(); } catch (_) {}
+        return;
+      }
       chatFocused = true;
       resetDocumentScroll();
       // ★V40：退回 V38 估算兼容。V39 不干预方向错误（浏览器并未自动避让）。
@@ -206,6 +212,9 @@
 
   // ★V54：记录最近用户真实交互时间戳（用于区分后台恢复的引擎 focus vs 用户主动 focus）。
   let lastUserTouchTs = 0;
+  // ★V55：刚回前台的短窗口标记。回前台后 700ms 内视为“可能有引擎 focus 快照恢复”，focusin 源头拦截用。
+  let justForegrounded = false;
+  let justFgTimer = 0;
   document.addEventListener('touchstart', event => {
     lastUserTouchTs = Date.now();
     const input = chatInput();
@@ -217,7 +226,12 @@
   // ★V54：后台恢复误弹起修复。小米浏览器/PWA 进程冻结恢复时，引擎会自动把 focus
   //   还原到进后台前的 #cin（引擎级 focus 快照恢复，早于任何 JS 事件）→ 触发 focusin → 误估算键盘高 → 输入框误弹上。
   //   用户主动点击会伴随 touchstart（上面记了时间戳）；回前台后短窗口内若 #cin 被 focus 但无伴随交互 → 引擎恢复 → 主动 blur。
+  // ★V55：源头拦截已在 focusin 处理（justForegrounded 窗口内引擎 focus 直接 blur 不弹）。
+  //   guardBackgroundRefocus 保留作兜底：万一 focusin 拦截漏了（例如 focus 早于窗口标记设立），300ms 后再收一次。
   function guardBackgroundRefocus() {
+    justForegrounded = true;
+    if (justFgTimer) clearTimeout(justFgTimer);
+    justFgTimer = setTimeout(() => { justForegrounded = false; justFgTimer = 0; }, 700);
     setTimeout(() => {
       if (!inHall()) return;
       if (document.activeElement !== chatInput()) return;
