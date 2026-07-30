@@ -4,7 +4,7 @@
   "description": "实时回声聊天空间——匿名身份、灵魂对话、神曲共鸣。",
   "lang": "zh-CN",
   "dir": "ltr",
-  "id": "https://slzcn.github.io/echo-hall/",
+  "id": "/echo-hall/?pwa=20260731-v58",
   "start_url": "https://slzcn.github.io/echo-hall/",
   "scope": "https://slzcn.github.io/echo-hall/",
   "display": "standalone",
