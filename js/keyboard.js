@@ -110,7 +110,7 @@
           if (realKbH) {
             estimatedKbH = realKbH;
           } else {
-            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.35);
+            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.36);
           }
           settleChatLayout();
         }
