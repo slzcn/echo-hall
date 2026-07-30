@@ -92,7 +92,7 @@
           || (vkGeomHits > signalBaseline.vkHits)
           || (Math.abs(window.innerHeight - signalBaseline.winH) > 1);
         if (!changed) {
-          estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.32);
+          estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.25);
           settleChatLayout();
         }
       }, 250);
