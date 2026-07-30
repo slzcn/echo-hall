@@ -16,10 +16,10 @@
   const box = document.createElement('div');
   box.id = '__ehkbdbg';
   box.style.cssText = [
-    'position:fixed', 'left:6px', 'top:6px', 'z-index:2147483647',
-    'background:rgba(255,0,80,.92)', 'color:#fff', 'font:11px/1.45 monospace',
-    'padding:7px 9px', 'border:2px solid #fff', 'border-radius:6px',
-    'pointer-events:none', 'white-space:pre', 'max-width:82vw',
+    'position:fixed', 'right:6px', 'bottom:6px', 'z-index:2147483647',
+    'background:rgba(255,0,80,.92)', 'color:#fff', 'font:10px/1.35 monospace',
+    'padding:5px 7px', 'border:2px solid #fff', 'border-radius:6px',
+    'pointer-events:none', 'white-space:pre', 'max-width:60vw',
     'box-shadow:0 0 12px rgba(255,0,80,.6)'
   ].join(';');
 
@@ -100,6 +100,9 @@
     const streamScrollGap = stream ? (stream.scrollHeight - stream.scrollTop - stream.clientHeight) : null;
     const focused = document.activeElement === cin;
 
+    const directVk = directVkRect();
+    const inset = keyboardInsetRect();
+
     const lines = [
       'kbdebug v3 · ' + (focused ? '聊天框已聚焦' : '未聚焦'),
       'innerH        = ' + px(window.innerHeight),
@@ -132,6 +135,8 @@
       'VK.overlaysContent = ' + (vk ? String(vk.overlaysContent) : 'n/a'),
       'VK.geometrychange 次数 = ' + vkGeomHits,
       'VK.boundingRect = ' + (vkRect ? (px(vkRect.x)+','+px(vkRect.y)+' '+px(vkRect.width)+'x'+px(vkRect.height)) : '(无)'),
+      '★VK直读 rect  = ' + (directVk ? (px(directVk.x)+','+px(directVk.y)+' '+px(directVk.width)+'x'+px(directVk.height)) : '(无)'),
+      '★envKb inset  = ' + (inset ? ('top='+px(inset.top)+' h='+px(inset.height)) : '(无)'),
       'vv.resize 次数 = ' + vvResizeHits,
       'window.resize 次数 = ' + winResizeHits,
       'ver           = ' + (window.__EH_BUILD_VER || '?')

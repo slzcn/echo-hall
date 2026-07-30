@@ -76,16 +76,40 @@
     if (event.target === chatInput()) {
       chatFocused = true;
       resetDocumentScroll();
-      // ★V39：三信号全哑环境不再估算缩 #hall。
-      // 根因：小米浏览器 PWA 全屏态弹键盘时，浏览器已把整页视觉上推避键盘（框底 790→589）。
-      // JS 再估算缩 hall 高 = 两个位移叠加，反而造成 composer 错位/遮挡（V30-V38 一路调系数没修好的根因）。
-      // 保留 signalBaseline/noSignalTimer 目前仅侜诊断用（不写 estimatedKbH）。
+      // ★V40：退回 V38 估算兼容。V39 不干预方向错误（浏览器并未自动避让）。
+      // ★同时：如果 VK.boundingRect 或 env(keyboard-inset-height) 给了真值，优先使用真值（待 V40 看能不能拿到）。
       signalBaseline = {
         vvH: viewport ? viewport.height : window.innerHeight,
         vkHits: vkGeomHits,
         winH: window.innerHeight,
       };
       if (noSignalTimer) clearTimeout(noSignalTimer);
+      noSignalTimer = setTimeout(() => {
+        if (!chatFocused || estimatedKbH > 0) return;
+        const curVv = viewport ? viewport.height : window.innerHeight;
+        const changed = (Math.abs(curVv - signalBaseline.vvH) > 1)
+          || (vkGeomHits > signalBaseline.vkHits)
+          || (Math.abs(window.innerHeight - signalBaseline.winH) > 1);
+        if (!changed) {
+          // ★V40：优先直读 VirtualKeyboard.boundingRect，拿不到再看 env(keyboard-inset-height)，都拿不到才落到 0.33 估算。
+          let realKbH = 0;
+          try {
+            const r = virtualKeyboard && virtualKeyboard.boundingRect;
+            if (r && r.height > 0) realKbH = Math.round(r.height);
+          } catch (_) {}
+          if (!realKbH) {
+            // 探 env(keyboard-inset-height)
+            const probe = document.createElement('div');
+            probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;height:env(keyboard-inset-height,0px)';
+            document.body.appendChild(probe);
+            const h = probe.getBoundingClientRect().height;
+            probe.remove();
+            if (h > 0) realKbH = Math.round(h);
+          }
+          estimatedKbH = realKbH || Math.round((viewport ? viewport.height : window.innerHeight) * 0.33);
+          settleChatLayout();
+        }
+      }, 250);
       return;
     }
     if (isTextInput(event.target)) {
