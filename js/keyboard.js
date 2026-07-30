@@ -1,5 +1,5 @@
 /* Echo Hall 键盘布局：一个控制器，一个高度源。
- * 聊天框聚焦时，.stage 跟随 visualViewport.height；失焦时恢复 CSS。
+ * 进入聊天室后，.stage 始终跟随 visualViewport.height；聊天框聚焦只触发一次即时重算。
  * 其他输入框只滚动到可见位置，不改页面布局。
  */
 (function () {
