@@ -8,6 +8,11 @@
   let chatFocused = false;
   let keyboardRect = null;
   let popupInput = null;
+  // ★V30：三信号全哑 WebView（小米浏览器等）兜底。focusin 后 250ms 内若 vv/VK/window 均无变化，启用估算键盘高。
+  let estimatedKbH = 0;                   // 当前估算键盘高（0=未启用）
+  let noSignalTimer = 0;                  // focusin 后判定无信号的定时器
+  let signalBaseline = null;              // focusin 瞬间的 vv.height / VK 计数基线
+  let vkGeomHits = 0;
 
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
@@ -17,6 +22,8 @@
     const top = viewport ? viewport.offsetTop : 0;
     let bottom = viewport ? top + viewport.height : window.innerHeight;
     if (keyboardRect && keyboardRect.height > 0) bottom = Math.min(bottom, keyboardRect.top);
+    // ★V30：无信号 WebView 兜底——从可视底扊掋估算键盘高。
+    if (estimatedKbH > 0) bottom -= estimatedKbH;
     return Math.max(1, Math.round(bottom - top));
   }
 
@@ -71,6 +78,24 @@
       resetDocumentScroll();
       // 不在这里写 #hall 高度：键盘弹起后 visualViewport.resize / VirtualKeyboard.geometrychange 会一次写到位，
       // 避免先写 innerHeight 再写 vv.height 造成的两帧跳变。
+      // ★V30：启动无信号判定。记录 focusin 瞬间基线，250ms 后若 vv/VK/window 都没变 → 启用估算。
+      signalBaseline = {
+        vvH: viewport ? viewport.height : window.innerHeight,
+        vkHits: vkGeomHits,
+        winH: window.innerHeight,
+      };
+      if (noSignalTimer) clearTimeout(noSignalTimer);
+      noSignalTimer = setTimeout(() => {
+        if (!chatFocused || estimatedKbH > 0) return;
+        const curVv = viewport ? viewport.height : window.innerHeight;
+        const changed = (Math.abs(curVv - signalBaseline.vvH) > 1)
+          || (vkGeomHits > signalBaseline.vkHits)
+          || (Math.abs(window.innerHeight - signalBaseline.winH) > 1);
+        if (!changed) {
+          estimatedKbH = Math.round(window.screen.height * 0.42);
+          settleChatLayout();
+        }
+      }, 250);
       return;
     }
     if (isTextInput(event.target)) {
@@ -83,13 +108,20 @@
     if (event.target === chatInput()) {
       chatFocused = false;
       keyboardRect = null;
+      // ★V30：失焦清零估算键盘高 + 取消待定定时器。
+      estimatedKbH = 0;
+      if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
       settleChatLayout();
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
   if (viewport) {
-    viewport.addEventListener('resize', scheduleLayout, { passive: true });
+    viewport.addEventListener('resize', () => {
+      // ★V30：真信号回来了 → 撤销估算，切回真值主链。
+      if (estimatedKbH > 0) estimatedKbH = 0;
+      scheduleLayout();
+    }, { passive: true });
     viewport.addEventListener('scroll', () => {
       scheduleLayout();
       resetDocumentScroll();
@@ -102,6 +134,9 @@
   if (virtualKeyboard) {
     try { virtualKeyboard.overlaysContent = true; } catch (_) {}
     virtualKeyboard.addEventListener('geometrychange', event => {
+      // ★V30：真信号回来了 → 撤销估算。
+      vkGeomHits++;
+      if (estimatedKbH > 0) estimatedKbH = 0;
       keyboardRect = event.target.boundingRect;
       settleChatLayout();
     });
@@ -118,6 +153,8 @@
   window.__ehKbReset = function () {
     chatFocused = false;
     keyboardRect = null;
+    estimatedKbH = 0;
+    if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
     const el = hall();
     if (el) el.style.height = '';
     document.documentElement.style.removeProperty('--vh');

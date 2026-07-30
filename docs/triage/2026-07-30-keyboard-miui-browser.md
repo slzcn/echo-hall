@@ -40,7 +40,20 @@ iOS / 安卓 Chrome 都遵守标准信号（V23/V24 已修好）；MiuiBrowser �
 
 ⚠️ 这是**下策**（估算高度，不同输入法/机型有误差），但对完全不给信号的 WebView 是唯一可行路。优先尝试：先在 focusin 后延迟读一次 `visualViewport` / `clientHeight`，万一 MiuiBrowser 是"延迟才更新"，能拿到真值就用真值；拿不到才落到估算。
 
-## 待验证的关键疑点
+## V29 时序探测实锤
+**V29 focusin 时序探测 13 帧（t0/t50/t100/t150/t200/t300/t400/t500/t700/t900/t1200/t1500/t2000）全部 `innerH=805 clientH=805 vv=805`**——两秒内无任何量变化。
+
+→ MiuiBrowser 彻底不 resize，兜底只能走**估算键盘高度**下策（屏高 42%），没有真值可读。
+
+## V30 兜底方案设计
+- **只对三信号全哑的环境生效**，不碰 iOS/Chrome 主链
+- 检测条件：focusin 后延迟 250ms，若 `vv.height` 与聚焦前一致、`VK.geometrychange` 未触发 → 判定无信号 WebView → 启用估算
+- 估算键盘高 = `Math.round(window.screen.height * 0.42)`（安卓中文输入法常见值）
+- `#hall` 高度 = `vv.height - 估算键盘高`；composer 靠 `#hall` 缩短自然上移
+- 失焦复位（估算键盘高清零）
+- 若聚焦后 500ms 内 `vv.resize` 或 `VK.geometrychange` 任一触发 → 立即撤销估算、切回真值主链
+
+## 待验证的关键疑点（保留历史结论）
 截图是**键盘已弹起后**的稳定态采样，6 帧全 805。需要确认：**是不是 MiuiBrowser 压根不 resize（那 innerH 永远 805）**，还是**采样时机没抓到变化帧**。→ 兜底方案里加 innerH 时序日志，focusin 后连续记录 innerH，看它到底变不变。
 
 ## 决策
