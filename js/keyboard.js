@@ -25,10 +25,11 @@
     const el = hall();
     if (!el) return;
     if (!inHall() || !chatFocused) {
-      el.style.height = '';
+      if (el.style.height) el.style.height = '';
       return;
     }
-    el.style.height = `${visibleHeight()}px`;
+    const next = `${visibleHeight()}px`;
+    if (el.style.height !== next) el.style.height = next;
   }
 
   function scheduleLayout() {
@@ -65,8 +66,9 @@
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
       chatFocused = true;
-      settleChatLayout();
-      [100, 250, 450, 700, 1000].forEach(ms => setTimeout(settleChatLayout, ms));
+      resetDocumentScroll();
+      // 不在这里写 #hall 高度：键盘弹起后 visualViewport.resize / VirtualKeyboard.geometrychange 会一次写到位，
+      // 避免先写 innerHeight 再写 vv.height 造成的两帧跳变。
       return;
     }
     if (isTextInput(event.target)) {
@@ -80,27 +82,26 @@
       chatFocused = false;
       keyboardRect = null;
       settleChatLayout();
-      [100, 300, 600].forEach(ms => setTimeout(settleChatLayout, ms));
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
   if (viewport) {
-    viewport.addEventListener('resize', scheduleLayout, { passive: true });
+    viewport.addEventListener('resize', () => { if (chatFocused) scheduleLayout(); }, { passive: true });
     viewport.addEventListener('scroll', () => {
-      scheduleLayout();
+      if (chatFocused) scheduleLayout();
       resetDocumentScroll();
     }, { passive: true });
   }
 
-  window.addEventListener('resize', scheduleLayout, { passive: true });
-  window.addEventListener('orientationchange', () => setTimeout(settleChatLayout, 250), { passive: true });
+  window.addEventListener('resize', () => { if (chatFocused) scheduleLayout(); }, { passive: true });
+  window.addEventListener('orientationchange', () => { if (chatFocused) setTimeout(settleChatLayout, 250); }, { passive: true });
 
   if (virtualKeyboard) {
     try { virtualKeyboard.overlaysContent = true; } catch (_) {}
     virtualKeyboard.addEventListener('geometrychange', event => {
       keyboardRect = event.target.boundingRect;
-      settleChatLayout();
+      if (chatFocused) settleChatLayout();
     });
   }
 
