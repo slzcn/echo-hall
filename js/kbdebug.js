@@ -21,8 +21,26 @@
   if (!mount()) document.addEventListener('DOMContentLoaded', mount);
 
   const vv = window.visualViewport;
+  const vk = navigator.virtualKeyboard || null;
   const px = v => (v == null || Number.isNaN(v) ? '?' : Math.round(v));
   const probes = {};
+  let vkGeomHits = 0;
+  let vkRect = null;
+  let vvResizeHits = 0;
+  let winResizeHits = 0;
+
+  if (vk) {
+    try { vk.overlaysContent = true; } catch (_) {}
+    vk.addEventListener('geometrychange', ev => {
+      vkGeomHits++;
+      vkRect = ev.target.boundingRect;
+      snapshot();
+    });
+  }
+  if (vv) {
+    vv.addEventListener('resize', () => { vvResizeHits++; }, { passive: true });
+  }
+  window.addEventListener('resize', () => { winResizeHits++; }, { passive: true });
 
   function mountProbes() {
     if (!document.body || probes.svh) return;
@@ -80,6 +98,14 @@
       '★遮挡量      = ' + (overlap == null ? '?' : (px(overlap) + (overlap > 1 ? ' ← 被键盘盖住' : ' ok'))),
       '★stream↔composer= ' + (streamToComposer == null ? '?' : px(streamToComposer)),
       '★最新消息↔composer= ' + (lastMsgToComposer == null ? '?' : px(lastMsgToComposer)),
+      '--- PWA/API 信号 ---',
+      'standalone    = ' + (matchMedia('(display-mode:standalone)').matches ? '✓ PWA' : '✗ 浏览器'),
+      'VirtualKeyboard API = ' + (vk ? '✓ 已挂载' : '✗ 未挂载(无法用 geometrychange)'),
+      'VK.overlaysContent = ' + (vk ? String(vk.overlaysContent) : 'n/a'),
+      'VK.geometrychange 次数 = ' + vkGeomHits,
+      'VK.boundingRect = ' + (vkRect ? (px(vkRect.x)+','+px(vkRect.y)+' '+px(vkRect.width)+'x'+px(vkRect.height)) : '(无)'),
+      'vv.resize 次数 = ' + vvResizeHits,
+      'window.resize 次数 = ' + winResizeHits,
       'ver           = ' + (window.__EH_BUILD_VER || '?')
     ];
     box.textContent = lines.join('\n');
