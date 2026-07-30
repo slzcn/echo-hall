@@ -72,6 +72,43 @@
     resetDocumentScroll();
   }
 
+  // ★V45：小米 PWA 三信号全哑时，键盘收起同样无信号。启动轮询 fallback：
+  // 在沉入估算态后，每 300ms 重探 VK.boundingRect / env(keyboard-inset-height) / window.innerHeight。
+  // 任一信号变化到“键盘已收”情形（真值=0 或 innerH 回升）→ 清零 estimatedKbH + 重经布局。
+  let collapseTimer = 0;
+  let collapseBaseInnerH = 0;
+  function startKbCollapseWatch() {
+    if (collapseTimer) return;
+    collapseBaseInnerH = window.innerHeight;
+    collapseTimer = setInterval(() => {
+      if (!chatFocused || estimatedKbH === 0) {
+        clearInterval(collapseTimer); collapseTimer = 0; return;
+      }
+      // 信号 1：#cin 不再是活动元素（用户点了别处，focusout 可能未触发但 activeElement 变了）
+      if (document.activeElement !== chatInput()) {
+        chatFocused = false;
+        estimatedKbH = 0;
+        clearInterval(collapseTimer); collapseTimer = 0;
+        settleChatLayout();
+        return;
+      }
+      // 信号 2：window.innerHeight 回升（部分 WebView 收键盘时会变大）
+      if (window.innerHeight > collapseBaseInnerH + 50) {
+        estimatedKbH = 0;
+        clearInterval(collapseTimer); collapseTimer = 0;
+        settleChatLayout();
+        return;
+      }
+      // 信号 3：VK.boundingRect 当前为真值（开始 0 后变非 0 又变 0——三信号全哑时很少命中，作为上限兵入共同处理）
+      try {
+        const r = virtualKeyboard && virtualKeyboard.boundingRect;
+        if (r && r.height === 0 && vkGeomHits > (signalBaseline?.vkHits || 0)) {
+          // 曾有 geometrychange 峙峰 rect 但现在回 0 → 真实收起。但走不到这里、上面 vv/vk 监听已处理。
+        }
+      } catch (_) {}
+    }, 300);
+  }
+
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
       chatFocused = true;
@@ -112,6 +149,8 @@
           } else {
             estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.37);
           }
+          // ★V45：估算启用后启动轮询，检测“键盘收起”信号（小米 PWA 上收键盘不一定触发 focusout，也不一定发 vv.resize）。
+          startKbCollapseWatch();
           settleChatLayout();
         }
       }, 250);
