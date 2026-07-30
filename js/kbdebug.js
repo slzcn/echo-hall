@@ -1,6 +1,5 @@
-/* Echo Hall 键盘遮挡诊断浮层 v2（?kbdebug=1）。
- * 追加：stream 与 composer 的间距、最新消息底到 composer 的间距，
- * 定位「距离不合适」到底是 stream 布满未顶到 composer，还是消息未贴 stream 底。
+/* Echo Hall 浏览器工具栏／键盘遮挡诊断浮层 v3（?kbdebug=1）。
+ * 比较 svh/dvh/lvh 与实际布局，区分浏览器底部工具栏遮挡和输入法遮挡。
  */
 (function () {
   if (!/[?&]kbdebug=1(&|$)/.test(location.search)) return;
@@ -23,8 +22,25 @@
 
   const vv = window.visualViewport;
   const px = v => (v == null || Number.isNaN(v) ? '?' : Math.round(v));
+  const probes = {};
+
+  function mountProbes() {
+    if (!document.body || probes.svh) return;
+    ['svh', 'dvh', 'lvh'].forEach(unit => {
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;visibility:hidden;height:100${unit};pointer-events:none`;
+      document.body.appendChild(el);
+      probes[unit] = el;
+    });
+  }
+
+  function viewportUnit(unit) {
+    const probe = probes[unit];
+    return probe ? probe.getBoundingClientRect().height : null;
+  }
 
   function snapshot() {
+    mountProbes();
     const stage = document.querySelector('.stage');
     const hall = document.getElementById('hall');
     const stream = document.getElementById('stream') || document.querySelector('.stream');
@@ -43,8 +59,12 @@
     const focused = document.activeElement === cin;
 
     const lines = [
-      'kbdebug v2 · ' + (focused ? '聊天框已聚焦' : '未聚焦'),
+      'kbdebug v3 · ' + (focused ? '聊天框已聚焦' : '未聚焦'),
       'innerH        = ' + px(window.innerHeight),
+      'clientH       = ' + px(document.documentElement.clientHeight),
+      '100svh        = ' + px(viewportUnit('svh')),
+      '100dvh        = ' + px(viewportUnit('dvh')),
+      '100lvh        = ' + px(viewportUnit('lvh')),
       'vv.height     = ' + px(vv && vv.height),
       'vv.offsetTop  = ' + px(vv && vv.offsetTop),
       '键盘顶边      = ' + px(kbTop),
