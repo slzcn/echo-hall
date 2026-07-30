@@ -44,6 +44,15 @@
     if (!frame) frame = requestAnimationFrame(updateChatLayout);
   }
 
+  // iOS/WebKit 首次聚焦时 visualViewport.height 有一段延迟才更新到真实键盘高度，
+  // 只算一次会拿到旧的全屏高 → composer 掉到屏幕底被键盘盖住。补几次延迟重采样兜住这段空档。
+  let settleTimers = [];
+  function settleChatLayout() {
+    settleTimers.forEach(clearTimeout);
+    settleTimers = [100, 300, 550].map(ms => setTimeout(scheduleChatLayout, ms));
+    scheduleChatLayout();
+  }
+
   function isTextInput(el) {
     if (!el) return false;
     if (el.tagName === 'TEXTAREA') return true;
@@ -58,7 +67,7 @@
 
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
-      scheduleChatLayout();
+      settleChatLayout();
       return;
     }
     if (isTextInput(event.target)) {
