@@ -161,37 +161,69 @@
       [100, 250, 450, 700, 1000].forEach(function (ms) {
         setTimeout(function () { traceLine('t' + ms); }, ms);
       });
+      schedulePoll('弹出');
     }
   }, { passive: true });
-  // ★V29 无信号探测：focusin 后连续 20 帧记录 innerH/vv.height/clientH 原始值，
-  //   确认 MiuiBrowser 是否彻底不 resize（释 innerH 也不变）。
+  // ★V33 全量信号对比：focusin(弹出)→focusout(弹回) 全程逐帧穷举所有可能变化的量，
+  //   找出 PWA 里到底哪个信号还会动（浏览器 vs PWA 各截一次对比）。
   var poll = [];
+  function allMetrics() {
+    var de = document.documentElement;
+    var se = document.scrollingElement || de;
+    var deRect = de.getBoundingClientRect();
+    return {
+      innerH: window.innerHeight,
+      outerH: window.outerHeight,
+      clientH: de.clientHeight,
+      deRectH: Math.round(deRect.height),
+      scrollTop: Math.round(se.scrollTop),
+      scrollH: se.scrollHeight,
+      bodyH: Math.round(document.body.getBoundingClientRect().height),
+      vvH: vv ? Math.round(vv.height) : null,
+      vvTop: vv ? Math.round(vv.offsetTop) : null,
+      vvPageTop: vv ? Math.round(vv.pageTop) : null,
+      vvScale: vv ? +vv.scale.toFixed(2) : null,
+      svh: Math.round(viewportUnit('svh') || 0),
+      dvh: Math.round(viewportUnit('dvh') || 0),
+      lvh: Math.round(viewportUnit('lvh') || 0),
+      screenH: window.screen.height,
+      screenAvailH: window.screen.availHeight,
+      vkH: vkRect ? Math.round(vkRect.height) : 0,
+    };
+  }
+  var baseM = null;
   function pollLine(tag) {
-    var ih = window.innerHeight;
-    var ch = document.documentElement.clientHeight;
-    var vh = vv ? vv.height : null;
-    poll.push(tag + ': innerH=' + Math.round(ih) + ' clientH=' + Math.round(ch) + ' vv=' + (vh == null ? '?' : Math.round(vh)));
-    if (poll.length > 22) poll.shift();
+    var m = allMetrics();
+    if (!baseM) baseM = m;
+    // 只显示相对基线有变化的量（★标记），一眼看出弹键盘时谁动了
+    var keys = Object.keys(m);
+    var parts = keys.map(function (k) {
+      var changed = m[k] !== baseM[k];
+      return (changed ? '★' : '') + k + '=' + m[k];
+    });
+    poll.push(tag + ' ' + parts.filter(function (s) { return s.indexOf('★') === 0; }).join(' ') || (tag + ' (无变化)'));
+    if (poll.length > 16) poll.shift();
     var p = document.getElementById('__ehkbpoll');
     if (!p && document.body) {
       p = document.createElement('div');
       p.id = '__ehkbpoll';
-      p.style.cssText = 'position:fixed;right:6px;top:6px;z-index:2147483647;background:rgba(0,20,40,.92);color:#7fd;font:10px/1.35 monospace;padding:6px 8px;border:1px solid #7fd;border-radius:6px;pointer-events:none;white-space:pre;max-width:60vw';
+      p.style.cssText = 'position:fixed;right:6px;top:6px;z-index:2147483647;background:rgba(0,20,40,.94);color:#7fd;font:9px/1.3 monospace;padding:6px 8px;border:1px solid #7fd;border-radius:6px;pointer-events:none;white-space:pre;max-width:66vw';
       document.body.appendChild(p);
     }
-    if (p) p.textContent = 'focusin 无信号探测:\n' + poll.join('\n');
+    if (p) p.textContent = '全量信号(★=相对基线变了):\n基线innerH=' + baseM.innerH + '\n' + poll.join('\n');
   }
-  document.addEventListener('focusin', function (e) {
-    if (e.target && e.target.id === 'cin') {
-      poll = [];
-      pollLine('t0');
-      [50, 100, 150, 200, 300, 400, 500, 700, 900, 1200, 1500, 2000].forEach(function (ms) {
-        setTimeout(function () { pollLine('t' + ms); }, ms);
-      });
-    }
-  }, { passive: true });
+  function schedulePoll(phase) {
+    baseM = null; poll = [];
+    pollLine(phase + 't0');
+    [80, 160, 260, 400, 600, 900, 1400].forEach(function (ms) {
+      setTimeout(function () { pollLine(phase + 't' + ms); }, ms);
+    });
+  }
   document.addEventListener('focusin', () => setTimeout(snapshot, 50), { passive: true });
-  document.addEventListener('focusout', () => setTimeout(snapshot, 250), { passive: true });
+  document.addEventListener('focusout', function (e) {
+    if (e.target && e.target.id === 'cin') { schedulePoll('弹回'); }
+    setTimeout(snapshot, 250);
+  }, { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(snapshot, 300), { passive: true });
   setInterval(snapshot, 300);
   snapshot();
