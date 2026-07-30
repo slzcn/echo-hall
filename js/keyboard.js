@@ -8,53 +8,28 @@
   let chatFocused = false;
   let keyboardRect = null;
   let popupInput = null;
-  // ★V35：小米浏览器桌面 PWA 全屏态 —— vv/innerH/clientH 全部不变（三信号真哑），
-  // 但浏览器把 composer/`.cin-wrap` 视觉上推了，真值信号在 rect.bottom 上。
-  // V33 金矿截图实锤：框底 790 → 589（位移 201 = 键盘高真值）。
+  // ★V34：弹键盘时 vv.height/innerH 真的会变（V33 全量信号对比实锤），
+  // 只是 resize 事件不派发。方法：focusin 后启动轮询直接读真值，不靠事件、不估算。
   let pollRaf = 0;
   let pollStopAt = 0;
-  let pollBaselineBottom = 0;
-  let pollBaselineVv = 0;
-  let inferredKbH = 0;                   // 从 composer 位移推导出的键盘高真值
-  function composerBottom() {
-    const wrap = document.querySelector('.composer .cin-wrap');
-    if (!wrap) return null;
-    return Math.round(wrap.getBoundingClientRect().bottom);
-  }
+  let pollLastVv = 0;
   function pollViewport() {
     pollRaf = 0;
     if (!chatFocused || Date.now() > pollStopAt) return;
     const curVv = viewport ? viewport.height : window.innerHeight;
-    const curBottom = composerBottom();
-    let needLayout = false;
-    // 分支 1：vv.height 变了（iOS / 安卓 Chrome / 小米浏览器地址栏未隐藏态）
-    if (Math.abs(curVv - pollBaselineVv) > 1) {
-      pollBaselineVv = curVv;
-      inferredKbH = 0;
-      needLayout = true;
+    if (Math.abs(curVv - pollLastVv) > 1) {
+      pollLastVv = curVv;
+      syncLayout();
     }
-    // 分支 2：vv 不变但 composer 上推了（小米 PWA 全屏态）——位移就是键盘高。
-    if (curBottom != null && pollBaselineBottom > 0) {
-      const displaced = pollBaselineBottom - curBottom;
-      if (displaced > 20 && Math.abs(displaced - inferredKbH) > 2) {
-        inferredKbH = displaced;
-        needLayout = true;
-      }
-    }
-    if (needLayout) syncLayout();
     pollRaf = requestAnimationFrame(pollViewport);
   }
   function startPoll() {
-    pollBaselineVv = viewport ? viewport.height : window.innerHeight;
-    // 基线底取 focusin 瞬间值。若 composer 位移与基线差 > 20px 就当作键盘高真值。
-    pollBaselineBottom = composerBottom() || 0;
+    pollLastVv = viewport ? viewport.height : window.innerHeight;
     pollStopAt = Date.now() + 2000;
-    inferredKbH = 0;
     if (!pollRaf) pollRaf = requestAnimationFrame(pollViewport);
   }
   function stopPoll() {
     if (pollRaf) { cancelAnimationFrame(pollRaf); pollRaf = 0; }
-    inferredKbH = 0;
   }
 
 
@@ -66,8 +41,6 @@
     const top = viewport ? viewport.offsetTop : 0;
     let bottom = viewport ? top + viewport.height : window.innerHeight;
     if (keyboardRect && keyboardRect.height > 0) bottom = Math.min(bottom, keyboardRect.top);
-    // ★V35：从 composer 视觉位移推导出的键盘高——真值信号，不是估算。
-    if (inferredKbH > 0) bottom -= inferredKbH;
     return Math.max(1, Math.round(bottom - top));
   }
 
