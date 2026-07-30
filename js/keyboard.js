@@ -8,11 +8,30 @@
   let chatFocused = false;
   let keyboardRect = null;
   let popupInput = null;
-  // ★V30：三信号全哑 WebView（小米浏览器等）兜底。focusin 后 250ms 内若 vv/VK/window 均无变化，启用估算键盘高。
-  let estimatedKbH = 0;                   // 当前估算键盘高（0=未启用）
-  let noSignalTimer = 0;                  // focusin 后判定无信号的定时器
-  let signalBaseline = null;              // focusin 瞬间的 vv.height / VK 计数基线
-  let vkGeomHits = 0;
+  // ★V34：弹键盘时 vv.height/innerH 真的会变（V33 全量信号对比实锤），
+  // 只是 resize 事件不派发。方法：focusin 后启动轮询直接读真值，不靠事件、不估算。
+  let pollRaf = 0;
+  let pollStopAt = 0;
+  let pollLastVv = 0;
+  function pollViewport() {
+    pollRaf = 0;
+    if (!chatFocused || Date.now() > pollStopAt) return;
+    const curVv = viewport ? viewport.height : window.innerHeight;
+    if (Math.abs(curVv - pollLastVv) > 1) {
+      pollLastVv = curVv;
+      syncLayout();
+    }
+    pollRaf = requestAnimationFrame(pollViewport);
+  }
+  function startPoll() {
+    pollLastVv = viewport ? viewport.height : window.innerHeight;
+    pollStopAt = Date.now() + 2000;
+    if (!pollRaf) pollRaf = requestAnimationFrame(pollViewport);
+  }
+  function stopPoll() {
+    if (pollRaf) { cancelAnimationFrame(pollRaf); pollRaf = 0; }
+  }
+
 
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
@@ -22,8 +41,6 @@
     const top = viewport ? viewport.offsetTop : 0;
     let bottom = viewport ? top + viewport.height : window.innerHeight;
     if (keyboardRect && keyboardRect.height > 0) bottom = Math.min(bottom, keyboardRect.top);
-    // ★V30：无信号 WebView 兜底——从可视底扊掋估算键盘高。
-    if (estimatedKbH > 0) bottom -= estimatedKbH;
     return Math.max(1, Math.round(bottom - top));
   }
 
@@ -76,26 +93,8 @@
     if (event.target === chatInput()) {
       chatFocused = true;
       resetDocumentScroll();
-      // 不在这里写 #hall 高度：键盘弹起后 visualViewport.resize / VirtualKeyboard.geometrychange 会一次写到位，
-      // 避免先写 innerHeight 再写 vv.height 造成的两帧跳变。
-      // ★V30：启动无信号判定。记录 focusin 瞬间基线，250ms 后若 vv/VK/window 都没变 → 启用估算。
-      signalBaseline = {
-        vvH: viewport ? viewport.height : window.innerHeight,
-        vkHits: vkGeomHits,
-        winH: window.innerHeight,
-      };
-      if (noSignalTimer) clearTimeout(noSignalTimer);
-      noSignalTimer = setTimeout(() => {
-        if (!chatFocused || estimatedKbH > 0) return;
-        const curVv = viewport ? viewport.height : window.innerHeight;
-        const changed = (Math.abs(curVv - signalBaseline.vvH) > 1)
-          || (vkGeomHits > signalBaseline.vkHits)
-          || (Math.abs(window.innerHeight - signalBaseline.winH) > 1);
-        if (!changed) {
-          estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.25);
-          settleChatLayout();
-        }
-      }, 250);
+      // ★V34：启动 rAF 轮询 vv.height/innerH 真值，不靠 resize 事件。
+      startPoll();
       return;
     }
     if (isTextInput(event.target)) {
@@ -108,20 +107,14 @@
     if (event.target === chatInput()) {
       chatFocused = false;
       keyboardRect = null;
-      // ★V30：失焦清零估算键盘高 + 取消待定定时器。
-      estimatedKbH = 0;
-      if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
+      stopPoll();
       settleChatLayout();
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
   if (viewport) {
-    viewport.addEventListener('resize', () => {
-      // ★V30：真信号回来了 → 撤销估算，切回真值主链。
-      if (estimatedKbH > 0) estimatedKbH = 0;
-      scheduleLayout();
-    }, { passive: true });
+    viewport.addEventListener('resize', scheduleLayout, { passive: true });
     viewport.addEventListener('scroll', () => {
       scheduleLayout();
       resetDocumentScroll();
@@ -134,9 +127,6 @@
   if (virtualKeyboard) {
     try { virtualKeyboard.overlaysContent = true; } catch (_) {}
     virtualKeyboard.addEventListener('geometrychange', event => {
-      // ★V30：真信号回来了 → 撤销估算。
-      vkGeomHits++;
-      if (estimatedKbH > 0) estimatedKbH = 0;
       keyboardRect = event.target.boundingRect;
       settleChatLayout();
     });
@@ -153,8 +143,7 @@
   window.__ehKbReset = function () {
     chatFocused = false;
     keyboardRect = null;
-    estimatedKbH = 0;
-    if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
+    stopPoll();
     const el = hall();
     if (el) el.style.height = '';
     document.documentElement.style.removeProperty('--vh');
