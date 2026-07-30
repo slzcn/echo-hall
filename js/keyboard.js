@@ -147,7 +147,7 @@
           if (realKbH) {
             estimatedKbH = realKbH;
           } else {
-            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.37);
+            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.38);
           }
           // ★V45：估算启用后启动轮询，检测“键盘收起”信号（小米 PWA 上收键盘不一定触发 focusout，也不一定发 vv.resize）。
           startKbCollapseWatch();
