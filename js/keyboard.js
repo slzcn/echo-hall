@@ -24,10 +24,12 @@
     frame = 0;
     const el = hall();
     if (!el) return;
-    if (!inHall() || !chatFocused) {
+    if (!inHall()) {
       if (el.style.height) el.style.height = '';
       return;
     }
+    // 不再区分聊天聚焦/未聚焦：#hall 高度始终跟随真实可视区。
+    // 避免未聚焦时 CSS 100svh 与 visualViewport.height 差距造成的首次进 hall 底部留白。
     const next = `${visibleHeight()}px`;
     if (el.style.height !== next) el.style.height = next;
   }
@@ -87,21 +89,21 @@
   }, { passive: true });
 
   if (viewport) {
-    viewport.addEventListener('resize', () => { if (chatFocused) scheduleLayout(); }, { passive: true });
+    viewport.addEventListener('resize', scheduleLayout, { passive: true });
     viewport.addEventListener('scroll', () => {
-      if (chatFocused) scheduleLayout();
+      scheduleLayout();
       resetDocumentScroll();
     }, { passive: true });
   }
 
-  window.addEventListener('resize', () => { if (chatFocused) scheduleLayout(); }, { passive: true });
-  window.addEventListener('orientationchange', () => { if (chatFocused) setTimeout(settleChatLayout, 250); }, { passive: true });
+  window.addEventListener('resize', scheduleLayout, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(settleChatLayout, 250), { passive: true });
 
   if (virtualKeyboard) {
     try { virtualKeyboard.overlaysContent = true; } catch (_) {}
     virtualKeyboard.addEventListener('geometrychange', event => {
       keyboardRect = event.target.boundingRect;
-      if (chatFocused) settleChatLayout();
+      settleChatLayout();
     });
   }
 
