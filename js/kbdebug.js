@@ -3,8 +3,17 @@
  */
 (function () {
   const queryEnabled = /[?&]kbdebug=1(&|$)/.test(location.search);
-  const androidPwa = /Android/i.test(navigator.userAgent) &&
-    matchMedia('(display-mode: standalone)').matches;
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  // matchMedia standalone 在部分安卓 PWA 上不可靠，三重兑底：
+  //   (1) matchMedia (display-mode: standalone)
+  //   (2) navigator.standalone（iOS 主用、旧安卓 WebView 有时也有）
+  //   (3) referrer android-app://（从PWA 启动器进入时）
+  const standalone = matchMedia('(display-mode: standalone)').matches
+    || matchMedia('(display-mode: fullscreen)').matches
+    || matchMedia('(display-mode: minimal-ui)').matches
+    || !!navigator.standalone
+    || /android-app:\/\//.test(document.referrer);
+  const androidPwa = isAndroid && standalone;
   // 临时真机探针：安卓 standalone PWA 自动显示；其他平台仍仅 ?kbdebug=1 启用。
   if (!queryEnabled && !androidPwa) return;
 
@@ -12,9 +21,10 @@
   box.id = '__ehkbdbg';
   box.style.cssText = [
     'position:fixed', 'left:6px', 'top:6px', 'z-index:2147483647',
-    'background:rgba(0,0,0,.86)', 'color:#0ff', 'font:11px/1.45 monospace',
-    'padding:7px 9px', 'border:1px solid #0ff', 'border-radius:6px',
-    'pointer-events:none', 'white-space:pre', 'max-width:82vw'
+    'background:rgba(255,0,80,.92)', 'color:#fff', 'font:11px/1.45 monospace',
+    'padding:7px 9px', 'border:2px solid #fff', 'border-radius:6px',
+    'pointer-events:none', 'white-space:pre', 'max-width:82vw',
+    'box-shadow:0 0 12px rgba(255,0,80,.6)'
   ].join(';');
 
   function mount() {
