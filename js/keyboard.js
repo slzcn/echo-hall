@@ -113,8 +113,6 @@
     if (event.target === chatInput()) {
       chatFocused = true;
       resetDocumentScroll();
-      // ★V40：退回 V38 估算兼容。V39 不干预方向错误（浏览器并未自动避让）。
-      // ★同时：如果 VK.boundingRect 或 env(keyboard-inset-height) 给了真值，优先使用真值（待 V40 看能不能拿到）。
       signalBaseline = {
         vvH: viewport ? viewport.height : window.innerHeight,
         vkHits: vkGeomHits,
@@ -174,6 +172,25 @@
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
+  // ★V47：小米 PWA 收键盘无任何 JS 事件且三信号全哑，轮询命中不了。
+  // 主人实测：收键盘后“点一下屏幕”才跳回——说明用户交互事件是唯一可靠触发。
+  // 所以估算态下全局监听 touchend/pointerup：只要用户碰了屏幕（且不是在 composer 内），
+  // 就视为可能收键盘 → 主动 blur #cin + 清零 estimatedKbH + 重排，composer 弹回底部。
+  function onUserTapWhileEstimating(event) {
+    if (estimatedKbH === 0) return;
+    const t = event.target;
+    // 点 composer 内部（输入框/发送键）不算收键盘，保持当前布局
+    if (t && (t === chatInput() || t.closest?.('.composer'))) return;
+    // 点了 composer 外 → 收键盘：主动失焦 + 清零 + 重排
+    const cin = chatInput();
+    if (cin && document.activeElement === cin) cin.blur();
+    chatFocused = false;
+    estimatedKbH = 0;
+    if (collapseTimer) { clearInterval(collapseTimer); collapseTimer = 0; }
+    settleChatLayout();
+  }
+  document.addEventListener('pointerup', onUserTapWhileEstimating, { passive: true, capture: true });
+
   if (viewport) {
     viewport.addEventListener('resize', () => {
       // ★V30：真信号回来了 → 撤销估算，切回真值主链。
@@ -200,12 +217,7 @@
     });
   }
 
-  document.addEventListener('touchstart', event => {
-    const input = chatInput();
-    if (!input || document.activeElement !== input) return;
-    if (event.target === input || event.target.closest?.('.composer')) return;
-    input.blur();
-  }, { passive: true, capture: true });
+  // ★V47：原 touchstart blur 逻辑已合并进上面 pointerup(onUserTapWhileEstimating)，不再单独监听。
 
   window.__ehApplyVVH = settleChatLayout;
   window.__ehKbReset = function () {
