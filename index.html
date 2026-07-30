@@ -1591,8 +1591,15 @@
      将 .stage 临时设为 visualViewport.height。#hall 只负责填满父容器。 */
   @media(max-width:1366px){
     .title{font-size:30px}
-    body.hall-on .stage{padding:0;align-items:stretch;height:100dvh;display:flex}
-    @supports not (height:100dvh){
+    /* ★高度源用 svh 不用 dvh (2026-07-30 修遮挡真因)：
+       dvh=dynamic 按"工具栏收起后"的大高度算 (729)，从首页进入时工具栏展开，
+       stage 用 729 → composer 掉到工具栏后面被盖 25px。svh=small 恒按"工具栏显示"安全高 (705)，
+       输入框永不被底部工具栏盖住。键盘弹起时仍由 keyboard.js 写 vv.height 覆盖。 */
+    body.hall-on .stage{padding:0;align-items:stretch;height:100svh;display:flex}
+    @supports not (height:100svh){
+      body.hall-on .stage{height:100dvh}
+    }
+    @supports not (height:100svh) and not (height:100dvh){
       body.hall-on .stage{height:-webkit-fill-available}
     }
     #hall{width:100%;height:100%;border-radius:0;border:none}
@@ -1789,7 +1796,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260730-vhProbeV12';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260730-svhFixV13';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2216,22 +2223,22 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260730-vhProbeV12"></script>
-<script src="./js/config-runtime.js?v=20260730-vhProbeV12"></script>
-<script src="./js/app.js?v=20260730-vhProbeV12"></script>
-<script src="./js/keyboard.js?v=20260730-vhProbeV12"></script>
-<script src="./js/boot.js?v=20260730-vhProbeV12"></script>
+<script src="./js/config.js?v=20260730-svhFixV13"></script>
+<script src="./js/config-runtime.js?v=20260730-svhFixV13"></script>
+<script src="./js/app.js?v=20260730-svhFixV13"></script>
+<script src="./js/keyboard.js?v=20260730-svhFixV13"></script>
+<script src="./js/boot.js?v=20260730-svhFixV13"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260730-vhProbeV12"></script>
+<script src="./js/ambient-fx.js?v=20260730-svhFixV13"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
-<script src="./js/debug-overlay.js?v=20260730-vhProbeV12"></script>
-<script src="./js/kbdebug.js?v=20260730-vhProbeV12"></script>
+<script src="./js/debug-overlay.js?v=20260730-svhFixV13"></script>
+<script src="./js/kbdebug.js?v=20260730-svhFixV13"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260730-vhProbeV12"></script>
+<script src="./js/sw-register.js?v=20260730-svhFixV13"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260730-vhProbeV12"></script>
+<script src="./js/pwa-install.js?v=20260730-svhFixV13"></script>
 
-<script src="./js/pull-refresh.js?v=20260730-vhProbeV12"></script>
+<script src="./js/pull-refresh.js?v=20260730-svhFixV13"></script>
 </body>
 </html>
