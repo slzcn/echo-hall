@@ -109,9 +109,12 @@
     frame = 0;
     if (!vv) return;
     if (kbActive) {
+      // ★ iOS 键盘弹起时 layout viewport 被上推，vv.offsetTop 变正；
+      //   position:fixed;top:0 相对 layout 定位会飘走，用 top=vv.offsetTop 拉回真实可视区顶。
+      stage.style.top = Math.round(vv.offsetTop) + 'px';
       stage.style.height = Math.round(vv.height) + 'px';
     } else {
-      // 未聚焦：释放高度，回 CSS 满屏（避免卡在键盘小高）
+      stage.style.top = '';
       stage.style.height = '';
     }
   }
@@ -166,12 +169,16 @@
     var kbTop = vv ? Math.round(vv.offsetTop + vv.height) : window.innerHeight;
     var gap = kbTop - Math.round(wr.bottom);
     var focused = document.activeElement === cin;
+    var standalone = matchMedia('(display-mode: standalone)').matches;
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
     dbg.textContent = [
-      'demo · ' + (focused?'聚焦':'未聚焦'),
+      'demo · ' + (focused?'聚焦':'未聚焦') + (standalone?' PWA':' 浏览器') + (isIOS?' iOS':' 安卓'),
       'innerH   = ' + px(window.innerHeight),
       'vv.h     = ' + px(vv && vv.height),
       'vv.top   = ' + px(vv && vv.offsetTop),
+      'scrollY  = ' + px(window.scrollY),
       '键盘顶   = ' + kbTop,
+      'stageTop = ' + (stage.style.top||'(空)'),
       'stageH   = ' + px(parseFloat(getComputedStyle(stage).height)),
       '框底     = ' + px(wr.bottom),
       '★距键盘 = ' + gap + (Math.abs(gap-15)<=2?' ✓':' ✗需15')
@@ -183,7 +190,7 @@
     var wr = wrap.getBoundingClientRect();
     var kbTop = vv ? Math.round(vv.offsetTop + vv.height) : window.innerHeight;
     var gap = kbTop - Math.round(wr.bottom);
-    traceLines.push(tag + ' vv=' + px(vv&&vv.height) + ' stage=' + px(parseFloat(getComputedStyle(stage).height)) + ' 框底=' + px(wr.bottom) + ' 距键盘=' + gap);
+    traceLines.push(tag + ' vvT=' + px(vv&&vv.offsetTop) + ' vv=' + px(vv&&vv.height) + ' sTop=' + (stage.style.top||'0') + ' 框底=' + px(wr.bottom) + ' 距=' + gap);
     if (traceLines.length > 7) traceLines.shift();
     trace.textContent = '聚焦采样(应=15):\n' + traceLines.join('\n');
   }
