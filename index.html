@@ -217,7 +217,7 @@
      原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
      lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
      #lobby 交还外层滚动。入口/聊天页(hall)不受影响, 仍固定视口。 */
-  body.lobby-on, html:has(body.lobby-on){height:auto;min-height:100%;overflow:visible;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  body.lobby-on, html.lobby-on, html:has(body.lobby-on){height:auto;min-height:100%;overflow:visible;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
   body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
   /* ==== 背景 ==== */
@@ -1790,7 +1790,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260730-kbRevertV48';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260730-lobbyScrollV49';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2217,24 +2217,24 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260730-kbRevertV48"></script>
-<script src="./js/config-runtime.js?v=20260730-kbRevertV48"></script>
-<script src="./js/app.js?v=20260730-kbRevertV48"></script>
-<script src="./js/keyboard.js?v=20260730-kbRevertV48"></script>
-<script src="./js/boot.js?v=20260730-kbRevertV48"></script>
+<script src="./js/config.js?v=20260730-lobbyScrollV49"></script>
+<script src="./js/config-runtime.js?v=20260730-lobbyScrollV49"></script>
+<script src="./js/app.js?v=20260730-lobbyScrollV49"></script>
+<script src="./js/keyboard.js?v=20260730-lobbyScrollV49"></script>
+<script src="./js/boot.js?v=20260730-lobbyScrollV49"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260730-kbRevertV48"></script>
+<script src="./js/ambient-fx.js?v=20260730-lobbyScrollV49"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
-<script src="./js/debug-overlay.js?v=20260730-kbRevertV48"></script>
-<script src="./js/kbdebug.js?v=20260730-kbRevertV48"></script>
+<script src="./js/debug-overlay.js?v=20260730-lobbyScrollV49"></script>
+<script src="./js/kbdebug.js?v=20260730-lobbyScrollV49"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260730-kbRevertV48"></script>
+<script src="./js/sw-register.js?v=20260730-lobbyScrollV49"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260730-kbRevertV48"></script>
+<script src="./js/pwa-install.js?v=20260730-lobbyScrollV49"></script>
 
-<script src="./js/pull-refresh.js?v=20260730-kbRevertV48"></script>
+<script src="./js/pull-refresh.js?v=20260730-lobbyScrollV49"></script>
 </body>
 </html>

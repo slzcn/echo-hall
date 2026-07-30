@@ -1024,6 +1024,8 @@ function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList
   // ★lobby-on: 大厅改"整文档滚动"(而非内层容器滚), 让移动浏览器下滑时自动收起顶/底地址栏→真沉浸无黑边。
   //   入口/聊天页仍是固定视口(hall 有固定输入框, 不能整页滚)。切走大厅时把文档滚动位置归零, 防残留。
   document.body.classList.toggle('lobby-on', id==='lobby');
+  // ★V49: 同步给 <html> 加/删 lobby-on，避免依赖 :has() 选择器（小米 MiuiBrowser 内核不支持 :has() → 大厅首页滑不动）。
+  document.documentElement.classList.toggle('lobby-on', id==='lobby');
   if(id!=='lobby'){ try{ window.scrollTo(0,0); }catch(_){} }
   // 进聊天页只做一次布局收尾；键盘控制器本身监听 visualViewport，不再重复补调。
   if(id==='hall'){ try{ window.__ehApplyVVH?.(); }catch(_){} }
