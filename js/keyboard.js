@@ -6,6 +6,7 @@
   const viewport = window.visualViewport;
   let frame = 0;
   let popupInput = null;
+  let kbActive = false; // 聊天输入框聚焦=键盘意图激活
 
   const stage = () => document.querySelector('.stage');
   const chatInput = () => document.getElementById('cin');
@@ -32,14 +33,18 @@
   function updateChatLayout() {
     frame = 0;
     const el = stage();
-    // 进入房间就让 .stage 恒等于 visualViewport.height(当前真实可视区高):
-    // 工具栏展开=小、收起=大、键盘弹起=更小, vv.height 永远精确 -> composer 永远贴真实底边。
-    // 底边 5px 间距由 .composer 的 padding-bottom 控制, 不再依赖 CSS 静态 svh/dvh。
     if (!el || !inHall() || !viewport) {
       if (el) el.style.height = '';
       return;
     }
-    el.style.height = `${Math.round(viewport.height)}px`;
+    // ★失焦（键盘收回）时清空 inline height 退回 CSS 满高，
+    //   避免安卓 PWA 下 vv.resize 不可靠导致 stage 卡在小高度，
+    //   二次聚焦时输入框被顶到顶部。只在聚焦（键盘激活）时才钉 vv.height。
+    if (kbActive) {
+      el.style.height = `${Math.round(viewport.height)}px`;
+    } else {
+      el.style.height = '';
+    }
   }
 
   function scheduleChatLayout() {
@@ -60,7 +65,10 @@
 
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
+      kbActive = true;
       scheduleChatLayout();
+      // 兜底：vv.resize 在安卓 PWA 可能延迟/不触发，多帧采样保证 stage 跟上
+      [100, 250, 450, 700, 1000, 1500].forEach(ms => setTimeout(scheduleChatLayout, ms));
       return;
     }
     if (isTextInput(event.target)) {
@@ -70,7 +78,12 @@
   }, { passive: true });
 
   document.addEventListener('focusout', event => {
-    if (event.target === chatInput()) setTimeout(scheduleChatLayout, 200);
+    if (event.target === chatInput()) {
+      kbActive = false;
+      scheduleChatLayout(); // 立即释放高度
+      // 兜底：键盘收回动画期间不断确保回满高
+      [100, 300, 600].forEach(ms => setTimeout(scheduleChatLayout, ms));
+    }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
 
