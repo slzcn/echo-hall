@@ -60,11 +60,25 @@
       document.body.appendChild(el);
       probes[unit] = el;
     });
+    // ★V36：VirtualKeyboard 事件可能不派发，补测 CSS keyboard-inset 环境变量真值。
+    const kbInset = document.createElement('div');
+    kbInset.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;height:env(keyboard-inset-height,0px);width:env(keyboard-inset-width,0px);top:env(keyboard-inset-top,0px);left:env(keyboard-inset-left,0px)';
+    document.body.appendChild(kbInset);
+    probes.kbInset = kbInset;
   }
 
   function viewportUnit(unit) {
     const probe = probes[unit];
     return probe ? probe.getBoundingClientRect().height : null;
+  }
+
+  function directVkRect() {
+    try { return vk && vk.boundingRect ? vk.boundingRect : null; } catch (_) { return null; }
+  }
+
+  function keyboardInsetRect() {
+    const probe = probes.kbInset;
+    return probe ? probe.getBoundingClientRect() : null;
   }
 
   function snapshot() {
@@ -168,9 +182,12 @@
   //   找出 PWA 里到底哪个信号还会动（浏览器 vs PWA 各截一次对比）。
   var poll = [];
   function allMetrics() {
+    mountProbes();
     var de = document.documentElement;
     var se = document.scrollingElement || de;
     var deRect = de.getBoundingClientRect();
+    var directVk = directVkRect();
+    var inset = keyboardInsetRect();
     return {
       innerH: window.innerHeight,
       outerH: window.outerHeight,
@@ -188,7 +205,11 @@
       lvh: Math.round(viewportUnit('lvh') || 0),
       screenH: window.screen.height,
       screenAvailH: window.screen.availHeight,
-      vkH: vkRect ? Math.round(vkRect.height) : 0,
+      vkEventH: vkRect ? Math.round(vkRect.height) : 0,
+      vkDirectY: directVk ? Math.round(directVk.y) : -1,
+      vkDirectH: directVk ? Math.round(directVk.height) : 0,
+      envKbTop: inset ? Math.round(inset.top) : -1,
+      envKbH: inset ? Math.round(inset.height) : 0,
     };
   }
   var baseM = null;
