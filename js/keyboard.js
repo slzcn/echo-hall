@@ -32,8 +32,10 @@
   function updateChatLayout() {
     frame = 0;
     const el = stage();
-    const input = chatInput();
-    if (!el || !inHall() || document.activeElement !== input || !viewport) {
+    // 进入房间就让 .stage 恒等于 visualViewport.height(当前真实可视区高):
+    // 工具栏展开=小、收起=大、键盘弹起=更小, vv.height 永远精确 -> composer 永远贴真实底边。
+    // 底边 5px 间距由 .composer 的 padding-bottom 控制, 不再依赖 CSS 静态 svh/dvh。
+    if (!el || !inHall() || !viewport) {
       if (el) el.style.height = '';
       return;
     }
