@@ -4,18 +4,14 @@
 (function () {
   const queryEnabled = /[?&]kbdebug=1(&|$)/.test(location.search);
   const isAndroid = /Android/i.test(navigator.userAgent);
-  // matchMedia standalone 在部分安卓 PWA 上不可靠，三重兑底：
-  //   (1) matchMedia (display-mode: standalone)
-  //   (2) navigator.standalone（iOS 主用、旧安卓 WebView 有时也有）
-  //   (3) referrer android-app://（从PWA 启动器进入时）
+  // 临时（V28）：安卓 PWA 三重 standalone 检测全 false，先无条件挂浮层仅限安卓，
+  // 让浮层自己报告 display-mode / UA 真实值，拿到后再收敛条件。
   const standalone = matchMedia('(display-mode: standalone)').matches
     || matchMedia('(display-mode: fullscreen)').matches
     || matchMedia('(display-mode: minimal-ui)').matches
     || !!navigator.standalone
     || /android-app:\/\//.test(document.referrer);
-  const androidPwa = isAndroid && standalone;
-  // 临时真机探针：安卓 standalone PWA 自动显示；其他平台仍仅 ?kbdebug=1 启用。
-  if (!queryEnabled && !androidPwa) return;
+  if (!queryEnabled && !isAndroid) return;
 
   const box = document.createElement('div');
   box.id = '__ehkbdbg';
@@ -113,7 +109,11 @@
       '★stream↔composer= ' + (streamToComposer == null ? '?' : px(streamToComposer)),
       '★最新消息↔composer= ' + (lastMsgToComposer == null ? '?' : px(lastMsgToComposer)),
       '--- PWA/API 信号 ---',
-      'standalone    = ' + (matchMedia('(display-mode:standalone)').matches ? '✓ PWA' : '✗ 浏览器'),
+      'display-mode  = ' + (['standalone','fullscreen','minimal-ui','browser'].find(m => matchMedia('(display-mode: '+m+')').matches) || '?'),
+      'nav.standalone= ' + String(!!navigator.standalone),
+      'referrer      = ' + (document.referrer.slice(0,40) || '(空)'),
+      'UA snippet    = ' + navigator.userAgent.match(/(Chrome|SamsungBrowser|MiuiBrowser|HuaweiBrowser|EdgA|Firefox|UCBrowser|OPR)\/[\d.]+/g)?.join(' ') || 'other',
+      'standalone 组合= ' + (standalone ? '✓' : '✗'),
       'VirtualKeyboard API = ' + (vk ? '✓ 已挂载' : '✗ 未挂载(无法用 geometrychange)'),
       'VK.overlaysContent = ' + (vk ? String(vk.overlaysContent) : 'n/a'),
       'VK.geometrychange 次数 = ' + vkGeomHits,
