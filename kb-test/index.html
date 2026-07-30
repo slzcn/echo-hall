@@ -100,12 +100,20 @@
   var cin = document.getElementById('cin');
   var wrap = document.querySelector('.cin-wrap');
   var frame = 0;
+  var kbActive = false; // 聊天输入框聚焦=键盘意图激活
 
-  // ★核心：stage 高度 = 当前 visualViewport.height（唯一动态源）
+  // ★核心：只在键盘意图激活时才把 stage 钉到 vv.height；
+  //   失焦（键盘收回）时清空 inline 高度，退回 CSS 满高 100svh。
+  //   这样二次聚焦总从满高开始，不会卡在键盘弹起时的小高度。
   function apply(){
     frame = 0;
     if (!vv) return;
-    stage.style.height = Math.round(vv.height) + 'px';
+    if (kbActive) {
+      stage.style.height = Math.round(vv.height) + 'px';
+    } else {
+      // 未聚焦：释放高度，回 CSS 满屏（避免卡在键盘小高）
+      stage.style.height = '';
+    }
   }
   function schedule(){
     if (!frame) frame = requestAnimationFrame(apply);
@@ -119,11 +127,15 @@
   // focusin 即时刷新一次（键盘弹起前）+ 兜底：如果 vv.resize 迟迟不来，重复采样
   document.addEventListener('focusin', function(e){
     if (e.target !== cin) return;
+    kbActive = true;
     schedule();
     [100,250,450,700,1000,1500].forEach(function(ms){ setTimeout(schedule, ms); });
   });
   document.addEventListener('focusout', function(e){
     if (e.target !== cin) return;
+    kbActive = false;
+    schedule(); // 立即释放高度
+    // 兜底：键盘收回动画期间 vv 陆续变化，多次重采（仅确保最终回满高）
     [100,300,600].forEach(function(ms){ setTimeout(schedule, ms); });
   });
 
