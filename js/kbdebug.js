@@ -92,6 +92,37 @@
     vv.addEventListener('resize', snapshot, { passive: true });
     vv.addEventListener('scroll', snapshot, { passive: true });
   }
+  // ★聚焦后多帧采样：抓键盘弹起前/中/后 vv.height 与 stage 高度，暴露“点击后不跟随”到底哪一环断。
+  var trace = [];
+  function traceLine(tag) {
+    var stage = document.querySelector('.stage');
+    var wrap = document.querySelector('.composer .cin-wrap');
+    var kbTop = vv ? Math.round(vv.offsetTop + vv.height) : window.innerHeight;
+    var wb = wrap ? Math.round(wrap.getBoundingClientRect().bottom) : null;
+    trace.push(tag + ': vv=' + (vv ? Math.round(vv.height) : '?') +
+      ' stageH=' + (stage ? Math.round(parseFloat(getComputedStyle(stage).height)) : '?') +
+      ' 框底=' + (wb == null ? '?' : wb) +
+      ' 键盘顶=' + kbTop +
+      ' 距键盘=' + (wb == null ? '?' : (kbTop - wb)));
+    if (trace.length > 6) trace.shift();
+    var t = document.getElementById('__ehkbtrace');
+    if (!t && document.body) {
+      t = document.createElement('div');
+      t.id = '__ehkbtrace';
+      t.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:2147483647;background:rgba(20,0,0,.9);color:#fd6;font:10px/1.4 monospace;padding:6px 8px;border:1px solid #fd6;border-radius:6px;pointer-events:none;white-space:pre;max-width:88vw';
+      document.body.appendChild(t);
+    }
+    if (t) t.textContent = '聚焦采样(距键盘应=15):\n' + trace.join('\n');
+  }
+  document.addEventListener('focusin', function (e) {
+    if (e.target && e.target.id === 'cin') {
+      trace = [];
+      traceLine('t0聚焦');
+      [100, 250, 450, 700, 1000].forEach(function (ms) {
+        setTimeout(function () { traceLine('t' + ms); }, ms);
+      });
+    }
+  }, { passive: true });
   document.addEventListener('focusin', () => setTimeout(snapshot, 50), { passive: true });
   document.addEventListener('focusout', () => setTimeout(snapshot, 250), { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(snapshot, 300), { passive: true });
