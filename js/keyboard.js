@@ -37,14 +37,27 @@
       if (el) el.style.height = '';
       return;
     }
-    // ★失焦（键盘收回）时清空 inline height 退回 CSS 满高，
-    //   避免安卓 PWA 下 vv.resize 不可靠导致 stage 卡在小高度，
-    //   二次聚焦时输入框被顶到顶部。只在聚焦（键盘激活）时才钉 vv.height。
+    // 键盘激活时取两个 viewport 的较小值：Android PWA 走 resizes-content
+    // 时 innerHeight 会先缩小；iOS 则通常由 visualViewport.height 反映键盘。
+    // 两者只保留一个共同高度源，避免某一侧停在键盘弹起前的大值。
     if (kbActive) {
-      el.style.height = `${Math.round(viewport.height)}px`;
+      const h = Math.min(window.innerHeight, viewport.height);
+      el.style.height = `${Math.round(h)}px`;
     } else {
+      // 失焦立即释放 inline 高度，避免二次聚焦继承键盘期间的小高度。
       el.style.height = '';
     }
+  }
+
+  function syncChatLayout() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    updateChatLayout();
+  }
+
+  function resetIOSScroll() {
+    // iOS 聚焦输入框后可能异步把文档向上滚；聊天页本身不应滚动文档。
+    if (window.scrollY !== 0) window.scrollTo(0, 0);
   }
 
   function scheduleChatLayout() {
@@ -66,9 +79,14 @@
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
       kbActive = true;
-      scheduleChatLayout();
-      // 兜底：vv.resize 在安卓 PWA 可能延迟/不触发，多帧采样保证 stage 跟上
-      [100, 250, 450, 700, 1000, 1500].forEach(ms => setTimeout(scheduleChatLayout, ms));
+      // 必须在系统键盘调整 viewport 之前同步把 stage 接管到当前较小高度，
+      // 避免 iOS 先滚动整页、Android PWA 先沿用旧高度。
+      syncChatLayout();
+      resetIOSScroll();
+      [100, 250, 450, 700, 1000, 1500].forEach(ms => setTimeout(() => {
+        syncChatLayout();
+        resetIOSScroll();
+      }, ms));
       return;
     }
     if (isTextInput(event.target)) {
@@ -80,9 +98,12 @@
   document.addEventListener('focusout', event => {
     if (event.target === chatInput()) {
       kbActive = false;
-      scheduleChatLayout(); // 立即释放高度
-      // 兜底：键盘收回动画期间不断确保回满高
-      [100, 300, 600].forEach(ms => setTimeout(scheduleChatLayout, ms));
+      syncChatLayout();
+      resetIOSScroll();
+      [100, 300, 600].forEach(ms => setTimeout(() => {
+        syncChatLayout();
+        resetIOSScroll();
+      }, ms));
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
@@ -93,6 +114,10 @@
       revealPopupInput();
     }, { passive: true });
   }
+
+  window.addEventListener('resize', () => {
+    scheduleChatLayout();
+  }, { passive: true });
 
   window.addEventListener('orientationchange', () => setTimeout(scheduleChatLayout, 250), { passive: true });
 
