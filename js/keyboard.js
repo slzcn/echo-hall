@@ -106,7 +106,12 @@
             probe.remove();
             if (h > 0) realKbH = Math.round(h);
           }
-          estimatedKbH = realKbH || Math.round((viewport ? viewport.height : window.innerHeight) * 0.33);
+          // ★V41：估算结果再上调 25px（主人真机反馈 V40 composer 仍偏低 25px）。真值路径不加（真值准确不需补偿）。
+          if (realKbH) {
+            estimatedKbH = realKbH;
+          } else {
+            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.33) + 25;
+          }
           settleChatLayout();
         }
       }, 250);
