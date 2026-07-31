@@ -17,6 +17,9 @@
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
   const inHall = () => document.body.classList.contains('hall-on');
+  // 软键盘控制器只服务以触屏为主的设备。PC 聚焦输入框不会弹 IME，
+  // “视口无变化”是正常现象，不能误判为小米 WebView 键盘信号丢失。
+  const usesSoftKeyboardLayout = () => window.matchMedia('(hover:none) and (pointer:coarse)').matches;
 
   function visibleHeight() {
     const top = viewport ? viewport.offsetTop : 0;
@@ -31,6 +34,11 @@
     frame = 0;
     const el = hall();
     if (!el) return;
+    // PC 恢复纯 CSS 桌面布局（92dvh，最大 900px），禁止写入 VisualViewport 全高。
+    if (!usesSoftKeyboardLayout()) {
+      if (el.style.height) el.style.height = '';
+      return;
+    }
     if (!inHall()) {
       if (el.style.height) el.style.height = '';
       return;
@@ -111,6 +119,8 @@
 
   document.addEventListener('focusin', event => {
     if (event.target === chatInput()) {
+      // PC 没有软键盘，不启动无信号估算；输入框由桌面 CSS 原位管理。
+      if (!usesSoftKeyboardLayout()) return;
       // ★V55：消除后台恢复“闪一下”。V54 是“先弹起(focusin→估算)再 300ms 后 blur 拉回”，一弹一收就是闪。
       //   改为源头拦截：刚回前台的短窗口内，若 focusin 无伴随用户交互（引擎恢复）→ 立即 blur、不启动估算定时器 → 根本不弹起、不闪。
       if (justForegrounded && (Date.now() - lastUserTouchTs > 500)) {
@@ -170,6 +180,7 @@
 
   document.addEventListener('focusout', event => {
     if (event.target === chatInput()) {
+      if (!usesSoftKeyboardLayout()) return;
       chatFocused = false;
       keyboardRect = null;
       // ★V30：失焦清零估算键盘高 + 取消待定定时器。
@@ -229,6 +240,7 @@
   // ★V55：源头拦截已在 focusin 处理（justForegrounded 窗口内引擎 focus 直接 blur 不弹）。
   //   guardBackgroundRefocus 保留作兜底：万一 focusin 拦截漏了（例如 focus 早于窗口标记设立），300ms 后再收一次。
   function guardBackgroundRefocus() {
+    if (!usesSoftKeyboardLayout()) return;
     justForegrounded = true;
     if (justFgTimer) clearTimeout(justFgTimer);
     justFgTimer = setTimeout(() => { justForegrounded = false; justFgTimer = 0; }, 700);
