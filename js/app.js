@@ -600,15 +600,24 @@ function sampleTracks(list, playingUrl, n){
   // 关键：挑中的这几首，按原始 list 的固定顺序返回（不随机乱序）
   return list.filter(x=>x && chosen.has(x.url));
 }
-async function buildBgmMenu(m){
+// 灵魂曲目按房间缓存: 打开菜单先用缓存【同步】渲染(官方曲秒出), 网络回来再补。
+//   { [roomKey]: {list:[], at:ts, loading:bool} } —— roomKey 见 bgmRoomKey。
+const _bgmSoulCache={};
+function _bgmSoulKey(room){ return (room&&room.name)||'__lobby__'; }
+// buildBgmMenu 现为【同步】渲染: 灵魂曲只取缓存, 不再 await 网络(那是弹层慢的根因)。
+// 网络刷新由 refreshBgmSoulLib 后台做, 回来重渲染。soulOverride 供刷新回调直接传新列表。
+function buildBgmMenu(m, soulOverride){
   if(!m) return;
   const room=curRoom||null;
   const on=bgmOn();
   // 勾表示“当前正在播放”：只看当前播放 URL，不受自动/手动模式影响；关闭时不显示勾。
   const playing=on?_bgmActiveUrl():'';
   const isAuto=room?!bgmManualUrl(room.name):(bgmModeGetGlobal().mode!=='manual');
-  const cands=bgmCandidatesForRoom(room);   // 官方曲目
-  const mine=await bgmMyLibraryForRoom(room); // 灵魂曲目
+  const cands=bgmCandidatesForRoom(room);   // 官方曲目(纯本地 config, 瞬时)
+  const _sk=_bgmSoulKey(room);
+  const _sc=_bgmSoulCache[_sk];
+  const mine=Array.isArray(soulOverride)?soulOverride:((_sc&&_sc.list)||[]); // 灵魂曲目(缓存, 同步)
+  const soulLoading=!soulOverride && (!_sc || _sc.loading) && !(_sc&&_sc.list&&_sc.list.length);
   const esc=(t)=>String(t||'').replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"})[c]);
   const dotFor=(tag)=>{
     const t=String(tag||'');
@@ -674,6 +683,10 @@ async function buildBgmMenu(m){
       m._bgmPickCache.soul=soulShown;
     }
     html.push(`<div class="bgm-sec-title">灵魂曲目</div>`);
+    if(!soulShown.length && soulLoading){
+      // 缓存还没有 + 正在后台拉 → 占位, 别让"灵魂曲目"标题下空一块
+      html.push(`<div class="skin-opt bgm-loading" aria-busy="true"><span class="dot" style="color:var(--violet);background:var(--violet)"></span><span class="bgm-flex">载入中…</span></div>`);
+    }
     if(soulShown.length){
       const shortTitle=(t)=>{
         let x=String(t||'灵魂曲').trim();
@@ -717,7 +730,7 @@ async function buildBgmMenu(m){
         const wasOff=!bgmOn();
         if(wasOff) setBgm(true);
         pickBgmAuto();                       // 清手动记忆 + 重新随机官方曲
-        if(wasOff){ await buildBgmMenu(m); } // 从关闭→自动：需要展开列表（结构变），重绘
+        if(wasOff){ buildBgmMenu(m); } // 从关闭→自动：需要展开列表（结构变），重绘(灵魂曲走缓存, 同步)
         else { refreshBgmSelState(m); }      // 已开：只切高亮，不重绘 DOM（消除跳动）
         syncBgmActive();
         return;
@@ -725,7 +738,7 @@ async function buildBgmMenu(m){
       if(act==='off'){
         AudioEngine.resume();
         setBgm(false);
-        await buildBgmMenu(m);   // 关闭：收起列表（结构变），重绘
+        buildBgmMenu(m);   // 关闭：收起列表（结构变），重绘(灵魂曲走缓存, 同步)
         syncBgmActive();
         return;
       }
@@ -747,6 +760,24 @@ async function buildBgmMenu(m){
       refreshBgmSelState(m); syncBgmActive();
     };
   });
+}
+// 后台拉灵魂曲库, 回来存缓存 + 若菜单还开着则只重渲染(不阻塞打开)。
+//   force=true 忽略缓存新鲜度强拉(曲库增删时用)。默认 8s 内的缓存视为新鲜, 不重复打网络。
+async function refreshBgmSoulLib(m, force){
+  const room=curRoom||null;
+  const key=_bgmSoulKey(room);
+  const cached=_bgmSoulCache[key];
+  const fresh = cached && cached.at && !cached.loading && (Date.now()-cached.at < 8000);
+  if(fresh && !force){ return; }
+  _bgmSoulCache[key]={ list:(cached&&cached.list)||[], at:(cached&&cached.at)||0, loading:true };
+  let list=[];
+  try{ list=await bgmMyLibraryForRoom(room); }catch(_){ list=[]; }
+  _bgmSoulCache[key]={ list:list||[], at:Date.now(), loading:false };
+  // 拉回来时若房间已切走, 或菜单已关, 就只更新缓存不动 DOM
+  if(!m || !m.classList.contains('on')) return;
+  if(_bgmSoulKey(curRoom||null)!==key) return;
+  m._bgmPickCache=null;                 // 灵魂曲变了, 清抽样缓存重抽
+  buildBgmMenu(m, list||[]);
 }
 // 局部刷新菜单选中态：只切 class，不重建 DOM（避免整体重绘导致的闪烁/高度跳动）
 function refreshBgmSelState(m){
@@ -810,9 +841,10 @@ function initBgmUI(){
     try{ window.syncSkinActive&&window.syncSkinActive(); }catch(_){}
     // 每次点开都重新随机抽样：清缓存
     m._bgmPickCache=null;
-    await buildBgmMenu(m);
+    buildBgmMenu(m);          // 同步渲染: 官方曲(本地)立即出, 灵魂曲用缓存/占位 → 弹层秒开
     m.classList.toggle('on');
     syncBgmActive();
+    refreshBgmSoulLib(m);     // 后台拉灵魂曲库, 回来补渲染(不阻塞弹层)
   };
   const bind=(btn,menu,other)=>{
     if(!btn) return;
@@ -852,7 +884,7 @@ function initBgmUI(){
     const isLib=(e&&e.detail&&e.detail.reason)==='library';
     [menuLobby,menuHall].forEach(m=>{
       if(!m||!m.classList.contains('on')) return;
-      if(isLib){ m._bgmPickCache=null; buildBgmMenu(m); }  // 新曲入库：清抽样缓存，重新抽 3 首
+      if(isLib){ m._bgmPickCache=null; buildBgmMenu(m); refreshBgmSoulLib(m, true); }  // 新曲入库：先用旧缓存重抽, 再强拉最新灵魂曲库补渲染
       else refreshBgmSelState(m);
     });
   });
