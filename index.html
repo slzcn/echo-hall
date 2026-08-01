@@ -41,6 +41,7 @@
   :root{
     --bg:#070a12; --bg2:#0d1524; --panel:rgba(21,50,48,0.8); --panel-solid:#132a29; --line:rgba(0,229,212,0.24); --line2:rgba(0,229,212,0.38); --ink:#EAF6FF; --sub:#86cbc6; --dim:#498d88; --cyan:#00E5D4; --magenta:#FF2D8E; --violet:#9C85FF; --amber:#FFC24D; --green:#34E0B0; --accent:#00E5D4; --grid:rgba(0,229,212,0.05); --glow-cyan:0 0 22px rgba(0,229,212,0.6); --glow-mag:0 0 20px rgba(255,45,142,0.55);
     --content-max:860px; --card-max:420px;  /* 全站统一: 内容页宽度 / 卡片宽度 */
+    --hall-px:18px;  /* 聊天室四个纵向区(顶栏/在场/消息流/输入区)统一的左右内边距; 小屏在媒体查询里降到 14 */
     /* 语义化组件变量(夜间基线) —— 日间模式在 html[data-mode="day"] 统一覆盖 */
     --input-bg:rgba(10,12,24,.6); --input-shadow:none;
     --card-bg:rgba(10,12,24,.5); --card-bg-soft:rgba(10,12,24,.4);
@@ -594,7 +595,9 @@
      输入框只经过 #hall 这一层 flex 布局，不再让 .stage 与 #hall 同时争夺高度。 */
   body.hall-on > .stage{display:none}
   #hall{position:fixed;inset:0;z-index:2;flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
-  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
+  .hall-top{display:flex;align-items:center;gap:12px;padding:14px 0;
+    padding-left:max(var(--hall-px),env(safe-area-inset-left));padding-right:max(var(--hall-px),env(safe-area-inset-right));
+    border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
   .back{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--sub);
     border:1px solid var(--line);transition:.15s;flex-shrink:0}
   .back:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan))}
@@ -664,7 +667,9 @@
   /* ★上下 padding 22px: 灵魂头像呼吸光环(box-shadow 0 0 16px 2px + inset -3px + 呼吸 scale 1.08)峰值向外约 ~21px。
      .presence 有 overflow-x:auto → 浏览器把 overflow-y 也算成 auto(会纵向裁剪), 原 10px padding 只留 9px 余量,
      光环顶/底被切一条(主人反馈"光晕不完整")。提到 22px 让呼吸峰值仍留余量不裁。 */
-  .presence{display:flex;gap:12px;padding:22px 18px;overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;touch-action:pan-x;overscroll-behavior-x:contain}
+  .presence{display:flex;gap:12px;padding:22px 0;
+    padding-left:max(var(--hall-px),env(safe-area-inset-left));padding-right:max(var(--hall-px),env(safe-area-inset-right));
+    overflow-x:auto;border-bottom:1px solid var(--line);flex-shrink:0;touch-action:pan-x;overscroll-behavior-x:contain}
   .presence::-webkit-scrollbar{height:0}
   /* 每个成员 = 头像 + 名字, 竖排一列 */
   .pav{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;position:relative;
@@ -729,7 +734,11 @@
   /* 左右 padding 24px: 灵魂头像呼吸光环(box-shadow外发光)在呼吸放大峰值时向外约 ~15px, 加头像 scale 占用,
      容器 overflow-y:auto 会把 overflow-x 也算成裁剪 → padding 不足时贴左沿的头像光环被切一条(主人反馈"光晕不完整")。
      24px + 光晕收敛到13px, webkit实测峰值不裁。 */
-  .stream{flex:1;min-height:0;overflow-y:auto;padding:16px 24px 26px;display:flex;flex-direction:column;gap:2px;
+  /* 左右 24 是光环刚需(比通用 --hall-px:18 大 6): 见上方注释, 灵魂头像外发光需 24 才不被 overflow 裁;
+     safe-area 内建进本定义(横屏刘海取更大者), 不再靠 body.hall-on #stream 事后覆盖。 */
+  .stream{flex:1;min-height:0;overflow-y:auto;padding:16px 0 26px;
+    padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right));
+    display:flex;flex-direction:column;gap:2px;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:auto}
   .stream::-webkit-scrollbar{width:5px}
   .stream::-webkit-scrollbar-track{background:transparent}
@@ -925,7 +934,9 @@
   .composer.bottle-mode .cin::placeholder{color:#12B0E0;opacity:.6}
   .composer.bottle-mode .plus-btn.mode-on{border-color:#12B0E0;background:color-mix(in srgb,#12B0E0 16%,transparent);box-shadow:0 0 12px -3px #12B0E0}
 
-  .composer{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative;max-width:100%}
+  .composer{display:flex;gap:8px;padding:14px 0;
+    padding-left:max(var(--hall-px),env(safe-area-inset-left));padding-right:max(var(--hall-px),env(safe-area-inset-right));
+    border-top:1px solid var(--line);flex-shrink:0;align-items:flex-end;position:relative;max-width:100%}
   .cin-wrap{flex:1;min-width:0;display:flex;align-items:flex-end;min-height:46px;background:var(--input-bg);box-shadow:var(--input-shadow);border:1px solid var(--line);border-radius:12px;padding:2px 14px 2px 4px;transition:.2s}
   .cin-wrap:focus-within{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .cin{flex:1;min-width:0;border:none;outline:none;background:none;color:var(--ink);font-family:inherit;font-size:16px;resize:none;box-sizing:border-box;
@@ -1578,7 +1589,8 @@
   /* 聊天页不再复用 .stage：#hall 自己就是唯一视口容器，keyboard.js 只写这一层。 */
   @media(max-width:1366px){
     .title{font-size:30px}
-    #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;margin:0;border-radius:0;border:none;align-items:stretch}
+    /* 小屏四区左右边距统一收到 14(变量继承给 hall-top/presence/stream/composer, stream 仍取 max(24) 保光环) */
+    #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;margin:0;border-radius:0;border:none;align-items:stretch;--hall-px:14px}
     @supports not (height:100svh){
       #hall{height:-webkit-fill-available}
     }
@@ -1589,7 +1601,7 @@
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
     .cin-emoji{width:36px;height:36px;font-size:19px}
-    .composer{gap:5px;padding-left:8px;padding-right:8px}
+    .composer{gap:5px}
     .song-lyric{max-width:150px}
     .enter-card{padding:32px 22px}
     .modal{padding:24px 20px}
@@ -1706,20 +1718,9 @@
   .wall-item .wi-pill{font-size:11.5px;padding:1px 8px;border-radius:8px;background:color-mix(in srgb,var(--accent,var(--cyan)) 12%,transparent);color:var(--accent,var(--cyan));white-space:nowrap}
   .wall-empty{text-align:center;color:var(--dim);font-size:13px;padding:30px 0;line-height:1.7}
 
-  /* ★横屏刘海安全区 (2026-07-30 V9 P1 修): 补 left/right safe-area, 之前只有 top/bottom */
-  /* ★2026-08-01 边距回归修: 这三条用 id/class 覆盖各自基础 padding 的左右值, 保底值必须
-     == 基础 padding 的左右值, 否则竖屏(safe-area=0)时 max() 取到不同保底 → 篡改基础边距。
-     曾误写 #stream 保底 0(基础 .stream 是 24px)→ 聊天内容贴边。
-     注意 composer 基础值分断点: 桌面 16(.composer 928), ≤1366px 小屏收窄到 8(1592),
-     故覆盖也须分断点跟随, 否则会把手机输入区从设计的 8 顶成 16。
-     现各自对齐基础值: hall-top 18 / composer 桌面16·小屏8 / stream 24。 */
-  body.hall-on .hall-top{ padding-left:max(18px, env(safe-area-inset-left)); padding-right:max(18px, env(safe-area-inset-right)); }
-  body.hall-on .composer{ padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); }
-  body.hall-on #stream{ padding-left:max(24px, env(safe-area-inset-left)); padding-right:max(24px, env(safe-area-inset-right)); }
-  /* ≤1366px 小屏: composer 设计左右边距是 8(见 1592), 覆盖保底随之降到 8, 竖屏保 8, 横屏刘海仍取更大的 safe-area */
-  @media(max-width:1366px){
-    body.hall-on .composer{ padding-left:max(8px, env(safe-area-inset-left)); padding-right:max(8px, env(safe-area-inset-right)); }
-  }
+  /* 横屏刘海安全区: 已内建进 .hall-top/.presence/.stream/.composer 各自定义的
+     padding-left/right:max(var(--hall-px)|24px, env(safe-area-inset-*)) —— 不再需要 body.hall-on
+     事后覆盖(那套曾因保底值与基础 padding 不一致反复篡改边距, 现由统一变量 --hall-px 根治)。 */
 </style>
 </head>
 <body>
@@ -1786,7 +1787,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260801-composerPaddingBreakpointV66';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260801-hallPaddingUnifyV67';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2213,24 +2214,24 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260801-composerPaddingBreakpointV66"></script>
-<script src="./js/config-runtime.js?v=20260801-composerPaddingBreakpointV66"></script>
-<script src="./js/app.js?v=20260801-composerPaddingBreakpointV66"></script>
-<script src="./js/keyboard.js?v=20260801-composerPaddingBreakpointV66"></script>
-<script src="./js/boot.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/config.js?v=20260801-hallPaddingUnifyV67"></script>
+<script src="./js/config-runtime.js?v=20260801-hallPaddingUnifyV67"></script>
+<script src="./js/app.js?v=20260801-hallPaddingUnifyV67"></script>
+<script src="./js/keyboard.js?v=20260801-hallPaddingUnifyV67"></script>
+<script src="./js/boot.js?v=20260801-hallPaddingUnifyV67"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/ambient-fx.js?v=20260801-hallPaddingUnifyV67"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
-<script src="./js/debug-overlay.js?v=20260801-composerPaddingBreakpointV66"></script>
-<script src="./js/kbdebug.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/debug-overlay.js?v=20260801-hallPaddingUnifyV67"></script>
+<script src="./js/kbdebug.js?v=20260801-hallPaddingUnifyV67"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/sw-register.js?v=20260801-hallPaddingUnifyV67"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/pwa-install.js?v=20260801-hallPaddingUnifyV67"></script>
 
-<script src="./js/pull-refresh.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/pull-refresh.js?v=20260801-hallPaddingUnifyV67"></script>
 </body>
 </html>
