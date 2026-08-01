@@ -1708,12 +1708,18 @@
 
   /* ★横屏刘海安全区 (2026-07-30 V9 P1 修): 补 left/right safe-area, 之前只有 top/bottom */
   /* ★2026-08-01 边距回归修: 这三条用 id/class 覆盖各自基础 padding 的左右值, 保底值必须
-     ≥ 基础 padding 的左右值, 否则竖屏(safe-area=0)时 max() 取到更小的保底 → 把基础边距吃掉。
-     曾误写 #stream 保底 0(基础 .stream 是 24px)→ 聊天内容贴边; .composer 保底 12(基础 16)也偏窄。
-     现各自对齐基础值: hall-top 18 / composer 16 / stream 24。 */
+     == 基础 padding 的左右值, 否则竖屏(safe-area=0)时 max() 取到不同保底 → 篡改基础边距。
+     曾误写 #stream 保底 0(基础 .stream 是 24px)→ 聊天内容贴边。
+     注意 composer 基础值分断点: 桌面 16(.composer 928), ≤1366px 小屏收窄到 8(1592),
+     故覆盖也须分断点跟随, 否则会把手机输入区从设计的 8 顶成 16。
+     现各自对齐基础值: hall-top 18 / composer 桌面16·小屏8 / stream 24。 */
   body.hall-on .hall-top{ padding-left:max(18px, env(safe-area-inset-left)); padding-right:max(18px, env(safe-area-inset-right)); }
   body.hall-on .composer{ padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); }
   body.hall-on #stream{ padding-left:max(24px, env(safe-area-inset-left)); padding-right:max(24px, env(safe-area-inset-right)); }
+  /* ≤1366px 小屏: composer 设计左右边距是 8(见 1592), 覆盖保底随之降到 8, 竖屏保 8, 横屏刘海仍取更大的 safe-area */
+  @media(max-width:1366px){
+    body.hall-on .composer{ padding-left:max(8px, env(safe-area-inset-left)); padding-right:max(8px, env(safe-area-inset-right)); }
+  }
 </style>
 </head>
 <body>
@@ -1780,7 +1786,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260801-dropSoulThinkingV65';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260801-composerPaddingBreakpointV66';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2207,24 +2213,24 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260801-dropSoulThinkingV65"></script>
-<script src="./js/config-runtime.js?v=20260801-dropSoulThinkingV65"></script>
-<script src="./js/app.js?v=20260801-dropSoulThinkingV65"></script>
-<script src="./js/keyboard.js?v=20260801-dropSoulThinkingV65"></script>
-<script src="./js/boot.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/config.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/config-runtime.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/app.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/keyboard.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/boot.js?v=20260801-composerPaddingBreakpointV66"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/ambient-fx.js?v=20260801-composerPaddingBreakpointV66"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
-<script src="./js/debug-overlay.js?v=20260801-dropSoulThinkingV65"></script>
-<script src="./js/kbdebug.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/debug-overlay.js?v=20260801-composerPaddingBreakpointV66"></script>
+<script src="./js/kbdebug.js?v=20260801-composerPaddingBreakpointV66"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/sw-register.js?v=20260801-composerPaddingBreakpointV66"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/pwa-install.js?v=20260801-composerPaddingBreakpointV66"></script>
 
-<script src="./js/pull-refresh.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/pull-refresh.js?v=20260801-composerPaddingBreakpointV66"></script>
 </body>
 </html>
