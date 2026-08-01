@@ -2068,6 +2068,17 @@ function renderTyping(users){
     const on = uid===myUid ? (now-_selfTypingAt<3500) : liveUids.has(uid);
     applyLive(el,on);
   });
+  // 灵魂"正在思考"流内气泡: 正在输入的灵魂 → 插占位气泡(showSoulThinking 幂等);
+  //   停止输入(或真实回应已到, buildMsgEl 路径也会 removeSoulThinking)→ 撤掉残留气泡。
+  //   注: 气泡最终由「回应到达」时的 removeSoulThinking(1803) 撤下是主路径, 这里兜"只思考没下文"的超时清理。
+  try{
+    const thinkingSouls=typersP.filter(p=>soulUidSet.has(p.user_id)||(soulNameSet&&soulNameSet.has(p.name)));
+    const thinkingUids=new Set(thinkingSouls.map(p=>p.user_id));
+    thinkingSouls.forEach(p=>showSoulThinking(p));
+    document.querySelectorAll('#stream .soul-thinking[data-soul]').forEach(el=>{
+      if(!thinkingUids.has(el.dataset.soul)) el.remove();
+    });
+  }catch(_){}
 }
 // 头像活跃态开关(灵魂→soul-live 带 ping 环, 真人→pav-live 心跳提亮)
 function applyLive(el,on){
@@ -3685,7 +3696,30 @@ function pickAt(i){
   hideAt(); syncSendBtn();
 }
 
-// 显示某灵魂"正在思考…"的占位气泡(乐观提示，真实回应到达后由 removeSoulThinking 撤掉)
+// 显示某灵魂"正在思考…"的占位气泡(乐观提示，真实回应到达后由 removeSoulThinking 撤掉)。
+// 头像结构与 buildMsgEl 的灵魂头像一致(soul-c 底色 + emoji + AI 角标 + 狼姐蝴蝶结),
+// 气泡本体样式走 CSS 里的 .soul-thinking/.tk/.tk-dots(跳动粒子)。soul 传 presence 行对象。
+function showSoulThinking(soul){
+  const st=$('#stream'); if(!st||!soul||!soul.user_id) return;
+  // 已有该灵魂的思考气泡 → 不重复插(renderTyping 每次刷新都会调, 幂等)
+  if(st.querySelector(`.soul-thinking[data-soul="${soul.user_id}"]`)) return;
+  const latest=soulLatestBy(soul.user_id, soul.name)||soul;   // 拿最新 emoji/color
+  const c=soulThemeColor(latest.color||'', safeColor(latest.color), latest);
+  const ic=avEmoji(safeEmoji(latest.emoji)||'👤');
+  const soulDot=`<span class="soul-dot" title="灵魂居民 · AI">AI</span>`;
+  const avBow=isWolfSoul(latest)?`<span class="av-bow">🎀</span>`:'';
+  const div=document.createElement('div');
+  div.className='soul-thinking';
+  div.dataset.soul=soul.user_id;
+  div.style.setProperty('--soul-c', c);
+  div.innerHTML=`<div class="av" style="background:${c}22;color:${c};box-shadow:inset 0 0 0 1.5px ${c}">${ic}${soulDot}${avBow}</div>`+
+    `<div class="tk"><span class="tk-label">${esc(latest.name||'')} 正在思考</span>`+
+    `<span class="tk-dots"><i></i><i></i><i></i></span></div>`;
+  // 只有已贴底才随气泡滚动, 避免打断正在往上翻历史的用户
+  let near=true; try{ near=(st.scrollHeight-st.scrollTop-st.clientHeight)<120; }catch(_){}
+  st.appendChild(div);
+  if(near){ try{ scrollStream(true); }catch(_){} }
+}
 function removeSoulThinking(uid){
   document.querySelectorAll('.soul-thinking'+(uid?`[data-soul="${uid}"]`:'')).forEach(el=>el.remove());
 }
