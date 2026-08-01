@@ -6,9 +6,19 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v155-20260801-hallPaddingUnifyV67';
+const SW_VERSION = 'eh-sw-v156-20260801-bgmAudioCacheV68';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
+// BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
+// 一天升好几次版本号不该把几 MB 的曲子冲掉。放过一次即长期驻留, 秒开。
+const AUDIO_CACHE = 'eh-audio-v1';
+// 命中即缓存的音频路径(Supabase Storage 的官方/灵魂 BGM 与神曲)。这些是 supabase.co 域,
+// 本会被下面的 NETWORK_ONLY_HOSTS 判成 network-only(每次全量重下 3~7MB = 点开慢的根因),
+// 故在 network-only 之前先拦成 cache-first。仅拦音频对象, 不碰 rest/realtime/auth 等 API。
+function isBgmAudio(url) {
+  return /supabase\.(co|in)$/.test(url.hostname)
+    && /\/storage\/v1\/object\/public\/eh-song\/.*\.mp3$/.test(url.pathname);
+}
 
 // 不 precache manifest/图标: 让它们始终走网络最新, 避免 SW 缓存旧 manifest 导致 Chrome 判不可安装
 const SHELL_ASSETS = [
@@ -50,6 +60,13 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // ★BGM 音频: 先于 network-only 拦截, 走【持久】cache-first(见 AUDIO_CACHE 注释)。
+  //   音频常带 Range 请求(Supabase 回 206), 而缓存里存的是完整 200 —— 需自己按 Range 切片。
+  if (isBgmAudio(url)) {
+    e.respondWith(serveAudio(req));
+    return;
+  }
 
   if (NETWORK_ONLY_HOSTS.some((h) => url.hostname.endsWith(h))) return;
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
@@ -114,5 +131,56 @@ self.addEventListener('fetch', (e) => {
     )
   );
 });
+
+// BGM 音频取用: 缓存优先, 缓存里始终存【完整 200】; 命中后若请求带 Range 则手工切片回 206。
+//   miss 时抓一份【不带 Range 的完整体】存缓存, 再据本次请求是否 Range 决定返回整体还是切片。
+//   任何网络失败都静默降级(BGM 非必需), 不 throw 以免打断 audio 元素。
+async function serveAudio(req) {
+  const cache = await caches.open(AUDIO_CACHE);
+  const rangeHeader = req.headers.get('range');
+  // 用不带 Range/无 query 的规范 URL 做 key, 保证同一首只存一份完整体
+  const keyReq = new Request(new URL(req.url).origin + new URL(req.url).pathname);
+
+  let full = await cache.match(keyReq);
+  if (!full) {
+    try {
+      const res = await fetch(keyReq);           // 主动请求完整体(不透传 Range)
+      if (res && res.status === 200) {
+        cache.put(keyReq, res.clone()).catch(() => {});
+        full = res;
+      } else {
+        return fetch(req);                        // 拿不到完整体, 直接透传原请求
+      }
+    } catch (_) {
+      return fetch(req).catch(() => new Response('', { status: 504 }));
+    }
+  }
+  if (!rangeHeader) return full;                  // 无 Range: 直接给完整 200
+
+  // 有 Range: 从完整体切片, 手工构造 206
+  try {
+    const buf = await full.clone().arrayBuffer();
+    const total = buf.byteLength;
+    const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+    let start = m && m[1] ? parseInt(m[1], 10) : 0;
+    let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    if (isNaN(start) || start < 0) start = 0;
+    if (isNaN(end) || end >= total) end = total - 1;
+    if (start > end) { start = 0; end = total - 1; }
+    const slice = buf.slice(start, end + 1);
+    return new Response(slice, {
+      status: 206,
+      statusText: 'Partial Content',
+      headers: {
+        'Content-Type': full.headers.get('Content-Type') || 'audio/mpeg',
+        'Content-Range': `bytes ${start}-${end}/${total}`,
+        'Content-Length': String(end - start + 1),
+        'Accept-Ranges': 'bytes',
+      },
+    });
+  } catch (_) {
+    return full;                                  // 切片失败退回完整体
+  }
+}
 
 self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
