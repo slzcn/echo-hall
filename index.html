@@ -255,8 +255,8 @@
     body.priv-heat::before{ animation:none !important; }
     .msg.soul .av, .msg.soul .av::after, .pav.soul-av .av-ic, .pav.soul-av .av-ic::after,
     .pav.soul-av.soul-live .av-ic, .pav.soul-av.soul-live .av-ic::before, .pav.soul-av.soul-live .av-ic::after,
-    .pav.pav-live .av-ic, .pav.pav-live .av-ic::after, .pav:not(.soul-av) .av-ic::after,
-    .soul-thinking .av, .soul-thinking .av::after{ animation:none !important; }
+    .pav.pav-live .av-ic, .pav.pav-live .av-ic::after,
+    .pav:not(.soul-av) .av-ic::after{ animation:none !important; }
   }
   @media (max-width: 480px){
     .orb3{ display:none; } /* 手机上只保留 2 个背景光斑 */
@@ -1039,26 +1039,7 @@
                0 0 10px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 35%,transparent)}
   .pav:not(.soul-av).pav-live .av-ic::after{opacity:.7;inset:-3.5px;animation:pavLiveRing 1.4s ease-in-out infinite}
   @keyframes pavLiveRing{0%,100%{opacity:.4}50%{opacity:.85}}
-  @keyframes soulBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}  /* 保留供 soul-thinking 用 */
   .msg.soul .nm{text-shadow:0 0 10px color-mix(in srgb,var(--soul-c,var(--violet)) 40%,transparent)}
-  /* 灵魂正在思考…：一条带头像光环 + 粒子的占位气泡(与 .msg 同布局，插在 #stream) */
-  .soul-thinking{display:flex;gap:11px;padding:5px 0;align-items:flex-start;animation:slidein .32s cubic-bezier(.2,.8,.3,1)}
-  .soul-thinking .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:16px;margin-top:2px;
-    position:relative;animation:soulBreathe 2s ease-in-out infinite;
-    background:color-mix(in srgb,var(--soul-c,var(--violet)) 14%,transparent);color:var(--soul-c,var(--violet));
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent)}
-  .soul-thinking .av::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 90%,transparent),
-               inset 0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent);
-    animation:soulHalo 2s ease-in-out infinite}
-  .soul-thinking .tk{display:flex;align-items:center;gap:8px;margin-top:9px}
-  .soul-thinking .tk-label{font-size:12px;color:var(--soul-c,var(--violet));opacity:.85}
-  .soul-thinking .tk-dots{display:inline-flex;gap:3px}
-  .soul-thinking .tk-dots i{width:5px;height:5px;border-radius:50%;background:var(--soul-c,var(--violet));display:inline-block;
-    animation:tkDot 1.2s ease-in-out infinite;box-shadow:0 0 6px color-mix(in srgb,var(--soul-c,var(--violet)) 70%,transparent)}
-  .soul-thinking .tk-dots i:nth-child(2){animation-delay:.18s}
-  .soul-thinking .tk-dots i:nth-child(3){animation-delay:.36s}
-  @keyframes tkDot{0%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
   .go{width:46px;height:46px;border:none;border-radius:12px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
     touch-action:manipulation;-webkit-user-select:none;user-select:none;
     background:linear-gradient(120deg,var(--accent,var(--cyan)),var(--magenta));transition:.2s;
@@ -1688,7 +1669,7 @@
     /* 优化批A: 常驻装饰动画全部关掉,一次性功能动画(slidein/popin/msgSendPop)保留 */
     .bg-orb,.msg.soul .av,.msg.soul .av::after,.pav.soul-av .av-ic,.pav.soul-av .av-ic::after,
     .mention-jump.on,.bgm-btn:not(.muted),.song-jump.on,.song-jump.gen,.song-jump.gen .sj-god,.song-jump.gen .sj-ring,
-    .song-jump .sj-god,.mood-aura.on,.soul-thinking .av,
+    .song-jump .sj-god,.mood-aura.on,
     .ch .live .pulse,.cnt-led.live,.install-btn.ready{animation:none!important}
   }
   /* 房间设置里"叫狼姐陪聊"开关(仅私密房) */
@@ -1799,7 +1780,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260801-streamPaddingFixV64';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260801-dropSoulThinkingV65';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2226,24 +2207,24 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260801-streamPaddingFixV64"></script>
-<script src="./js/config-runtime.js?v=20260801-streamPaddingFixV64"></script>
-<script src="./js/app.js?v=20260801-streamPaddingFixV64"></script>
-<script src="./js/keyboard.js?v=20260801-streamPaddingFixV64"></script>
-<script src="./js/boot.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/config.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/config-runtime.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/app.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/keyboard.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/boot.js?v=20260801-dropSoulThinkingV65"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script src="./js/ambient-fx.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/ambient-fx.js?v=20260801-dropSoulThinkingV65"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
-<script src="./js/debug-overlay.js?v=20260801-streamPaddingFixV64"></script>
-<script src="./js/kbdebug.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/debug-overlay.js?v=20260801-dropSoulThinkingV65"></script>
+<script src="./js/kbdebug.js?v=20260801-dropSoulThinkingV65"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script src="./js/sw-register.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/sw-register.js?v=20260801-dropSoulThinkingV65"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script src="./js/pwa-install.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/pwa-install.js?v=20260801-dropSoulThinkingV65"></script>
 
-<script src="./js/pull-refresh.js?v=20260801-streamPaddingFixV64"></script>
+<script src="./js/pull-refresh.js?v=20260801-dropSoulThinkingV65"></script>
 </body>
 </html>
