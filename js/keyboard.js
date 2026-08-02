@@ -46,7 +46,22 @@
     // 不再区分聊天聚焦/未聚焦：#hall 高度始终跟随真实可视区。
     // 避免未聚焦时 CSS 100svh 与 visualViewport.height 差距造成的首次进 hall 底部留白。
     const next = `${visibleHeight()}px`;
-    if (el.style.height !== next) el.style.height = next;
+    if (el.style.height !== next) {
+      // ★键盘弹起/收回改变 #hall 高度 → #stream 这个滚动容器随之变矮/变高。
+      //   若用户本来贴在底部(在看最新消息, 含灵魂刚发的那条), 改高度前先记住"在底", 改完后重新贴底,
+      //   否则底部内容会被键盘挤出视口(弹起)或下方留白(收回)——即"输入法弹起收回没考虑到新内容"。
+      let wasAtBottom = false;
+      try { wasAtBottom = (typeof window.nearBottom === 'function') ? window.nearBottom() : false; } catch (_) {}
+      el.style.height = next;
+      if (wasAtBottom) {
+        try {
+          if (typeof window.scrollStream === 'function') {
+            // 等本帧高度落定再滚, 拿到新的 scrollHeight
+            requestAnimationFrame(() => { try { window.scrollStream(); } catch (_) {} });
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   function scheduleLayout() {
