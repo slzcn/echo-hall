@@ -1604,7 +1604,7 @@ async function refreshSnapshotTail(room){
       //   DOM 里 data-mid 存在但 .txt 是空框。这类不能跳过, 要用真实 data 原地重建修复空框。
       try{
         const kind=exist.dataset.kind||'msg';
-        if(kind==='voice'||kind==='song'||kind==='proj'||kind==='interact'||kind==='act') return;   // 特效/互动/act消息不判空(无.txt, 内容非纯文本)
+        if(kind==='voice'||kind==='song'||kind==='proj'||kind==='interact'||kind==='act'||kind==='game') return;   // 特效/互动/act/游戏消息不判空(无.txt, 内容非纯文本)
         const t=exist.querySelector('.txt');
         const hasTxt = t && t.textContent.trim();
         if(!hasTxt && (m.text||'').trim()){
@@ -2247,6 +2247,48 @@ function fmtTime(ts){
   return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${hm}`;                          // 跨年: 年/月/日 时分
 }
 
+// 🐢 海龟汤游戏卡片: text = "game|<事件>|<字段…>"。三种事件:
+//   soup    汤面卡:   game|soup|<标题>|<汤面>|<难度>
+//   verdict 判定条:   game|verdict|<yes|no|na|close|win>|<点评>
+//   reveal  揭晓卡:   game|reveal|<汤底>|<轮数>|<solved|gaveup|timeout>
+function buildGameEl(m){
+  const p=String(m.text||'').split('|');
+  const ev=p[1];
+  const host=esc(m.name||'主持');
+  const hostColor=safeColor(m.color, '#00E5D4');
+  if(ev==='soup'){
+    const title=esc(p[2]||'无题之汤'), surface=esc(p[3]||''), diff=esc(p[4]||'适中');
+    const el=document.createElement('div'); el.className='game-card soup-card';
+    el.style.setProperty('--gc', hostColor);
+    el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🐢</span><span class="gc-kind">海龟汤 · ${diff}</span><span class="gc-host">${host} 出题</span></div>`
+      +`<div class="gc-title">${title}</div>`
+      +`<div class="gc-surface">${surface}</div>`
+      +`<div class="gc-tip">提问只能问「是 / 否」类问题 · 猜中汤底即通关 · 发 <b>/提示</b> 求线索 · <b>/揭晓</b> 看答案</div>`;
+    return el;
+  }
+  if(ev==='verdict'){
+    const v=p[2]||'na'; const note=esc(p.slice(3).join('|')||'');
+    const MAP={ yes:{t:'是',c:'#22FF95',i:'✓'}, no:{t:'否',c:'#FF5D6C',i:'✗'}, na:{t:'无关',c:'#8FA6E8',i:'∼'}, close:{t:'接近了',c:'#F5D06A',i:'🔥'}, win:{t:'通关！',c:'#FFB020',i:'🎉'} };
+    const d=MAP[v]||MAP.na;
+    const el=document.createElement('div'); el.className='game-verdict gv-'+v;
+    el.style.setProperty('--gc', d.c);
+    el.innerHTML=`<span class="gv-badge">${d.i} ${d.t}</span>`+(note?`<span class="gv-note">${note}</span>`:'')+`<span class="gv-host">— ${host}</span>`;
+    return el;
+  }
+  if(ev==='reveal'){
+    const bottom=esc(p[2]||''); const turns=esc(p[3]||'?');
+    const how=p[4]||'solved';
+    const HOW={ solved:{t:'🎉 真相大白',c:'#FFB020'}, gaveup:{t:'🐢 揭晓汤底',c:'#8FA6E8'}, timeout:{t:'⏳ 时间到 · 揭晓',c:'#B57EDC'} };
+    const h=HOW[how]||HOW.solved;
+    const el=document.createElement('div'); el.className='game-card reveal-card';
+    el.style.setProperty('--gc', h.c);
+    el.innerHTML=`<div class="gc-head"><span class="gc-kind">${h.t}</span><span class="gc-host">共 ${turns} 问 · ${host}</span></div>`
+      +`<div class="gc-bottom-label">汤底</div><div class="gc-bottom">${bottom}</div>`
+      +`<div class="gc-tip">想再来一局? 发 <b>/海龟汤</b> 开新的一锅 🍲</div>`;
+    return el;
+  }
+  return null;
+}
 function buildMsgEl(m, isHistory){
   // 进场广播 enter: 只是"当场"特效, 不留气泡/不进历史(text 存的是档位, 非聊天内容)。历史里遇到直接跳过。
   if(m.kind==='enter') return null;
@@ -2295,6 +2337,12 @@ function buildMsgEl(m, isHistory){
     const el=document.createElement('div'); el.className='ixmsg';
     if(m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='interact'; }   // ★去重键: 无 mid 会在刷新/补拉时被反复 append(实测互动消息刷新后重复多条)
     el.innerHTML=`<span class="ix-em">${safeEmoji(ix&&ix.emoji)||'✨'}</span> ${esc(txt)}`;
+    return el;
+  }
+  // 🐢 海龟汤游戏消息: text = "game|事件|字段…"(worker 端 turtleMsg 编码)。三种事件各自成卡。
+  if(m.kind==='game'){
+    const el=buildGameEl(m);
+    if(el && m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='game'; }   // ★去重键
     return el;
   }
   const el=document.createElement('div');
@@ -4190,6 +4238,13 @@ function msgPreview(m){
     case 'voice': return '🎤 语音消息';
     case 'enter': return '✦ 有人进入了房间';   // enter 广播: 预览别露原始档位字符串(reg/super)
     case 'song':  return '🎵 '+parseSong(m.text).lyric;
+    case 'game': {   // text = game|事件|字段… → 预览别露原始编码
+      const p=String(m.text||'').split('|');
+      if(p[1]==='soup')   return '🐢 海龟汤《'+(p[2]||'')+'》开局';
+      if(p[1]==='verdict')return '🐢 主持判定';
+      if(p[1]==='reveal') return '🐢 揭晓汤底';
+      return '🐢 海龟汤';
+    }
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
       const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);
       const txt=parts.slice(2).join('|').trim();
