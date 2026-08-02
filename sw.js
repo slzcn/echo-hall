@@ -6,12 +6,21 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v163-20260802-turtleCardFlexFix';
+const SW_VERSION = 'eh-sw-v164-20260803-libCacheAndHeaderFix';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
 // 一天升好几次版本号不该把几 MB 的曲子冲掉。放过一次即长期驻留, 秒开。
 const AUDIO_CACHE = 'eh-audio-v1';
+// ★第三方库持久缓存【故意不带 SW_VERSION】: supabase-js 版本锁死在 URL 里(@2.45.4), 内容永不变。
+//   若跟着 CDN_CACHE 走 SW_VERSION, 每次升版本号(改 bug 常有)都会连它一起删 → 用户下次刷新在弱网
+//   重下 120KB UMD 库 = "刷新等很久"的真凶(实测 Slow3G 下库就绪要 14s)。放进独立持久缓存, 下一次
+//   即长期驻留, 之后任何版本升级都秒取。仅拦第三方 lib CDN, 不碰其他跨域资源。
+const LIB_CACHE = 'eh-lib-v1';
+function isVendorLib(url) {
+  return (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'unpkg.com' || url.hostname === 'cdnjs.cloudflare.com')
+    && /@supabase\/supabase-js@[\d.]+\//.test(url.pathname);
+}
 // 命中即缓存的音频路径(Supabase Storage 的官方/灵魂 BGM 与神曲)。这些是 supabase.co 域,
 // 本会被下面的 NETWORK_ONLY_HOSTS 判成 network-only(每次全量重下 3~7MB = 点开慢的根因),
 // 故在 network-only 之前先拦成 cache-first。仅拦音频对象, 不碰 rest/realtime/auth 等 API。
@@ -65,6 +74,20 @@ self.addEventListener('fetch', (e) => {
   //   音频常带 Range 请求(Supabase 回 206), 而缓存里存的是完整 200 —— 需自己按 Range 切片。
   if (isBgmAudio(url)) {
     e.respondWith(serveAudio(req));
+    return;
+  }
+
+  // ★第三方 lib CDN(supabase-js): 持久 cache-first, 命中秒返, miss 时下载并存入不失效的 LIB_CACHE。
+  //   放在跨域 CDN 通用分支之前, 让它走独立持久缓存(不随 SW_VERSION 清)。
+  if (isVendorLib(url)) {
+    e.respondWith(
+      caches.open(LIB_CACHE).then((cache) =>
+        cache.match(req).then((hit) => hit || fetch(req).then((res) => {
+          if (res && res.status === 200) cache.put(req, res.clone());
+          return res;
+        }))
+      )
+    );
     return;
   }
 
