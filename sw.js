@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v164-20260803-libCacheAndHeaderFix';
+const SW_VERSION = 'eh-sw-v165-20260803-libCacheOpaqueFix';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -83,7 +83,9 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       caches.open(LIB_CACHE).then((cache) =>
         cache.match(req).then((hit) => hit || fetch(req).then((res) => {
-          if (res && res.status === 200) cache.put(req, res.clone());
+          // ★<script defer src> 无 crossorigin → no-cors 请求 → 响应是 opaque(status=0, type='opaque')。
+          //   只认 status===200 会漏存 opaque(这正是首版 LIB_CACHE 一直空的原因)。opaque 可缓存也可回放执行。
+          if (res && (res.status === 200 || res.type === 'opaque')) cache.put(req, res.clone());
           return res;
         }))
       )
