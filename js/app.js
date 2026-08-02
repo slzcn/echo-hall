@@ -2257,7 +2257,10 @@ function buildGameEl(m){
   const host=esc(m.name||'主持');
   const hostColor=safeColor(m.color, '#00E5D4');
   if(ev==='soup'){
-    const title=esc(p[2]||'无题之汤'), surface=esc(p[3]||''), diff=esc(p[4]||'适中');
+    // 兜底: 汤面是易含 | 的自由文本, 若被切成多段(p.length>5), 末段=难度, 中间全部并回汤面。
+    const title=esc(p[2]||'无题之汤');
+    const surface=esc(p.length>5 ? p.slice(3,-1).join('|') : (p[3]||''));
+    const diff=esc((p.length>=5 ? p[p.length-1] : '') || '适中');
     const el=document.createElement('div'); el.className='game-card soup-card';
     el.style.setProperty('--gc', hostColor);
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🐢</span><span class="gc-kind">海龟汤 · ${diff}</span><span class="gc-host">${host} 出题</span></div>`
@@ -2276,8 +2279,10 @@ function buildGameEl(m){
     return el;
   }
   if(ev==='reveal'){
-    const bottom=esc(p[2]||''); const turns=esc(p[3]||'?');
-    const how=p[4]||'solved';
+    // 兜底: 汤底是易含 | 的自由文本, 末两段固定是「轮数 + how枚举」, 中间全部并回汤底。
+    const bottom=esc(p.length>5 ? p.slice(2,-2).join('|') : (p[2]||''));
+    const turns=esc((p.length>=5 ? p[p.length-2] : p[3]) || '?');
+    const how=(p.length>=5 ? p[p.length-1] : p[4])||'solved';
     const HOW={ solved:{t:'🎉 真相大白',c:'#FFB020'}, gaveup:{t:'🐢 揭晓汤底',c:'#8FA6E8'}, timeout:{t:'⏳ 时间到 · 揭晓',c:'#B57EDC'} };
     const h=HOW[how]||HOW.solved;
     const el=document.createElement('div'); el.className='game-card reveal-card';
