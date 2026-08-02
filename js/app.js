@@ -1833,6 +1833,8 @@ async function subscribeMessages(rid){
       }
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空)。按 uid 或名字兜底(同名多uid副本)
       if(isSoulUser(m.user_id, m.name)){ m.is_bot=true; }
+      // 内容已到达 → 本地立刻抹掉该人"正在输入"并即时刷新 typing bar, 不等 presence 通道(否则会有空档)。
+      if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
       const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
@@ -2069,7 +2071,10 @@ function renderPresenceAvatars(users){
 
 function renderTyping(users){
   const now=Date.now();
-  const typersP=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500);
+  // ★消除"正在输入撤下 → 空档 → 气泡才出现"的逆序间隙: typing(presence通道)与气泡(msg通道)是两条
+  //   独立 realtime 通道, 到达时序不定。收到某人消息时会把其 uid 记入 _typingSuppress(见 msg 处理器),
+  //   这里直接把"刚发过言的人"从正在输入里剔除 → 内容一出现, 其"正在输入"同帧消失, 零空档。
+  const typersP=users.filter(p=>p.user_id!==myUid && p.typing_at && now-new Date(p.typing_at).getTime()<3500 && !(now-(_typingSuppress.get(p.user_id)||0)<4000));
   const typers=typersP.map(p=>p.name);
   const bar=$('#typingBar');
   if(typers.length){
@@ -2094,7 +2099,7 @@ function renderTyping(users){
   // 活跃度反馈(typing_at 3.5s内=正在输入/思考): 所有人头像都做"心跳+加亮"→ 谁在打字一眼可见。
   //   灵魂额外带 soul-live(ping 外扩环+内辉光加亮), 真人只 pav-live(心跳+描边提亮), 静止呼吸仍是灵魂专属身份标记。
   // 单独 toggle class 不进 sig, 不重建 DOM, 过渡平滑。
-  const liveUids=new Set(users.filter(p=>p.typing_at && now-new Date(p.typing_at).getTime()<3500).map(p=>p.user_id));
+  const liveUids=new Set(users.filter(p=>p.typing_at && now-new Date(p.typing_at).getTime()<3500 && !(now-(_typingSuppress.get(p.user_id)||0)<4000)).map(p=>p.user_id));
   presenceMap.forEach((el,uid)=>{
     // 自己用本地时间戳判定(即时化, 见 markSelfTyping): 打字时不等 DB 往返, 刷新时也不会误撤本地态。
     const on = uid===myUid ? (now-_selfTypingAt<3500) : liveUids.has(uid);
@@ -2109,6 +2114,8 @@ function applyLive(el,on){
 }
 // 自己打字时即时点亮自己头像的活跃态, 不等 typing_at 写库+refreshPresence 拉回(那有 1~2s 延迟)。
 let _selfTypingAt=0, _selfTypingTimer=0;
+// 别人消息一到达就本地抑制其"正在输入"(uid→抑制起始时刻), 消除双通道逆序造成的"撤下→空档→气泡"间隙。
+const _typingSuppress=new Map();
 function markSelfTyping(){
   _selfTypingAt=Date.now();
   const el=presenceMap.get(myUid); if(el) applyLive(el,true);
