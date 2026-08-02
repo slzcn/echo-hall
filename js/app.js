@@ -4155,7 +4155,10 @@ async function sendVoice(blob, secs, tx){
 let voiceMode=false;
 // 按住"说话"长条录音，松手发送，上滑取消(桌面鼠标 / 移动触摸统一走 Pointer Events)
 const holdTalk=$('#holdTalk');
-holdTalk.addEventListener('pointerdown',e=>{
+// ★null-safe: #holdTalk 只在 hall 场景 DOM 里。弱网下 SW 命中旧壳/半更新可能让它缺失,
+//   裸 .addEventListener 会抛 TypeError 中断整条顶层绑定链 → 连入口的 enterBtn 都绑不上
+//   (表现为"入口页点哪都没反应")。故这里及后续 holdTalk 引用全部容错。
+if(holdTalk) holdTalk.addEventListener('pointerdown',e=>{
   e.preventDefault();
   if(recorder || recActive) return;
   recActive=true; recStartY=e.clientY;
@@ -4168,7 +4171,7 @@ function micRelease(){
   if(!recActive) return;
   recActive=false;
   recWanted=true;                 // 松手即发(除非已标记取消)
-  holdTalk.textContent='按住 说话';
+  if(holdTalk) holdTalk.textContent='按住 说话';
   if(recorder) stopRec();         // 授权仍在进行(recorder 未就绪)时，startRec 会因 recActive=false 自行放弃
   else { clearInterval(recTimer); recTimer=null; stopWave(); hideRecUI(); }
 }
@@ -6679,6 +6682,7 @@ $('#rpX').onclick=()=>clearReply();
 // 输入框
 const cin=$('#cin');
 let _inputRaf=0;
+if(cin){
 cin.addEventListener('input',()=>{
   // 高度/按钮/斜杠菜单用 rAF 合并, 避免每字符触发 layout thrash
   if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
@@ -6721,6 +6725,7 @@ cin.addEventListener('keydown',e=>{
   }
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
 });
+} // if(cin) — #cin 缺失(弱网旧壳)时跳过绑定, 不中断后续
 // ★移动端发送键：抬手直接发送，不再把成败押在后续合成 click 上。
 // iOS/PWA 中 touchstart.preventDefault()、键盘收起与 composer 位移都可能吞掉 click；旧版因此出现“按钮点了没反应”。
 // pointerup/touchend 直接调用 send；click 保留给键盘/辅助技术/旧浏览器，500ms 锁去重，避免同一次手势双发。
