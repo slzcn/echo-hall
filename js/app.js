@@ -1588,10 +1588,16 @@ async function refreshSnapshotTail(room){
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
+      if(isSoulUser(m.user_id, m.name)) m.is_bot=true;
       const exist=stream.querySelector(`[data-mid="${m.id}"]`);
       if(!exist){
         // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
-        if(m.id>domMaxMid){ const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; } }
+        if(m.id>domMaxMid){
+          // ★灵魂文字消息(msg/act)走渲染队列一条条节奏吐出, 不在此同步批量 append(否则又"一口气冒几条")。
+          //   队列自带 pending 去重, 已排队/已渲染的不会重复。其余(真人/song/voice/proj/interact)仍即时 append。
+          if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
+          const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; }
+        }
         return;
       }
       // ★ keep-alive 快照修复铁律: 快照可能是"渲染未完成态"截下来的(分批渲染没跑完/打字机中断),
@@ -1833,6 +1839,9 @@ async function subscribeMessages(rid){
       }
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空)。按 uid 或名字兜底(同名多uid副本)
       if(isSoulUser(m.user_id, m.name)){ m.is_bot=true; }
+      // ★灵魂文字消息(msg/act)改走渲染队列: 无论 realtime 逐条到还是补拉批量灌, 都由 flusher 一条条节奏吐出,
+      //   避免"一口气冒好几条"。入队后本条不再走下面的同步 append(队列内做完全部副作用)。
+      if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
       // 内容已到达 → 本地立刻抹掉该人"正在输入"并即时刷新 typing bar, 不等 presence 通道(否则会有空档)。
       if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
@@ -3601,7 +3610,68 @@ function typewriterInto(el, fullText){
   };
   el._twTimer=setTimeout(tick, per);
 }
-// 被 @ 强提醒：收到别人消息里 @了我 → toast + 消息卡脉冲高亮 + 震动
+
+// ═══ 灵魂消息"一条条打出来"节奏队列 ═══════════════════════════════════════════
+//   问题: 灵魂连发的多条消息, 无论来自 realtime 逐条 INSERT 还是 20s 兜底轮询批量补拉,
+//   一旦到达时机被压到一起(realtime 通道降频/切后台回来/弱网 → 补拉一次性灌), 就会
+//   "一口气冒好几条", 失去真人一条条敲的节奏。
+//   解法: 所有灵魂文字消息(msg/act)进 DOM 前先入此队列, 由单一 flusher 按"正在输入 + 打字机 + 条间停顿"
+//   一条条吐出。渲染节奏从此只由前端队列决定, 不再受消息到达时序影响。
+//   只管灵魂 msg/act 文字; song/voice/proj/interact/真人消息仍走原同步路径(它们本就不该排队)。
+const _soulQ = [];                        // 待逐条显示的灵魂消息 [{m}]
+const _soulQPending = new Set();          // 已入队但尚未进 DOM 的 mid — 两条渲染路径共用此集合去重
+let _soulQFlushing = false;
+function _soulMsgDelay(text){
+  // 条间停顿: 按内容长度给"读+敲"的时间感, 短句快、长句封顶。与 worker 端节拍呼应。
+  const n = (text||'').length;
+  return 450 + Math.min(n * 34, 1400);
+}
+// 该 mid 是否"已在视野内"(DOM 已渲染 或 正排在队列里)——两条路径入队前都要问一次, 防重复渲染。
+function _soulMsgKnown(mid){
+  if(mid==null) return false;
+  if(_soulQPending.has(mid)) return true;
+  return !!document.querySelector(`[data-mid="${mid}"]`);
+}
+function enqueueSoulMsg(m){
+  if(!m || m.id==null || _soulMsgKnown(m.id)) return;
+  _soulQPending.add(m.id);
+  _soulQ.push(m);
+  if(!_soulQFlushing) _flushSoulQ();
+}
+async function _flushSoulQ(){
+  if(_soulQFlushing) return;
+  _soulQFlushing = true;
+  try{
+    while(_soulQ.length){
+      const m = _soulQ.shift();
+      _soulQPending.delete(m.id);
+      // 出队时重新判断是否贴底(用户可能中途翻了历史), 并再查一次 DOM 防重复(另一路径抢先渲染过)
+      if(document.querySelector(`[data-mid="${m.id}"]`)) continue;
+      const wasNear = nearBottom();
+      // 内容即将上屏 → 此刻才抹掉该灵魂"正在输入"(在队列等待期间保留输入态, 让"打字→冒泡"更像真人)
+      if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
+      const el = buildMsgEl(m);
+      if(el){
+        $('#stream').appendChild(el);
+        if(wasNear) scrollStream(true); else bumpUnread();
+        ehFx(el, 'fx-soul', 1200);
+        try{ EhSfx.play('soul'); }catch(_){}
+        // 普通文字走逐字打字机; 纯 emoji / act 不打字
+        const useTw = m.kind==='msg' && !isEmojiOnly(m.text);
+        if(useTw) typewriterInto(el, m.text);
+        try{ maybeResonate(m); }catch(_){}
+        if(isEmojiOnly(m.text)) try{ burst(m.text); }catch(_){}
+        try{ notifyIfMentioned(m, el); }catch(_){}
+        try{ trackChatHeat(m); }catch(_){}
+        try{ persistRoomSnap(); }catch(_){}
+        // 打字机时长 + 条间停顿, 再放下一条(打字机自身约 0.4~1.8s, 这里再补一段自然停顿)
+        const twMs = useTw ? Math.min((m.text||'').length * 30, 1600) : 0;
+        await new Promise(r=>setTimeout(r, twMs + _soulMsgDelay(m.text)));
+      }
+    }
+  } finally { _soulQFlushing = false; }
+}
+
 function notifyIfMentioned(m, el){
   if(!m || m.user_id===myUid || !me || !me.name) return;
   const t=String(m.text||'');
