@@ -4519,25 +4519,54 @@ function bgmClearOverrideIfRoomChanged(next){
   if(_ehBgmOverride && (!next || _ehBgmOverride.room_name!==next.name)) _ehBgmOverride=null;
 }
 function bgmBroadcastPhrase(text){ return /全房间|全房|大家都听|所有人都听|广播|让大家听/i.test(text||''); }
+// 灵魂曲目命名: 策展式(网易云歌单风), 与官方曲名同调性。
+//   优先按用户描述里的意象命中一组诗化曲名; 命不中且描述本身是干净短句(≤8字)才直接用它;
+//   否则按房间/通用意象兜底。【绝不】把长描述截成残句(旧实现"适合加班到凌晨还"的尬断根因)。
+const BGM_TITLE_MOODS = [
+  [/雨|下雨|阴天|潮湿|梅雨/, ['雨落下来的时候','听雨到天亮','窗外一直在下','潮湿的心事']],
+  [/夜|深夜|午夜|凌晨|失眠|睡不着|熬夜/, ['没人知道我还醒着','凌晨三点的城市','午夜还亮着的窗','失眠者的电台']],
+  [/加班|工作|代码|编程|bug|debug|程序|技术/i, ['改到天亮','与光标独处','键盘不肯睡','写完这一行就走']],
+  [/悲|难过|伤心|哭|眼泪|失恋|心碎|想念|思念/, ['说不出口的那句','眼泪教会我的事','留在昨天的人','把想念调成静音']],
+  [/治愈|平静|放松|舒缓|安静|温柔|舒服/, ['慢慢呼吸','把世界调小一点','软下来的午后','什么都不用想']],
+  [/激昂|燃|热血|振奋|动感|嗨|力量|冲/, ['把音量开到最大','向前冲的理由','心跳追上节拍','不回头的路']],
+  [/宇宙|星|太空|银河|星际|虚空|回音|科幻/, ['把秘密扔进宇宙','星尘落进耳朵','银河那头的回声','漂在无重力里']],
+  [/孤独|一个人|独处|寂寞|安静的夜/, ['一个人也很好','关上门以后','空房间的回声','独自亮着的灯']],
+  [/爱|喜欢|心动|恋|温暖的人|想见/, ['心动的证据','靠近一点点','为你留的座','说晚安之前']],
+  [/回忆|过去|旧|怀念|从前|少年|青春/, ['翻旧照片的下午','那年夏天的风','回不去的操场','旧磁带里的我们']],
+  [/海|大海|海边|浪|沙滩/, ['浪把话带走了','面朝海的下午','咸咸的风','退潮以后']],
+  [/森林|山|自然|树|风|草原|旷野/, ['风穿过树林','山那边的安静','躺进一片绿','旷野无人']],
+  [/咖啡|下午茶|慵懒|午后|阳光/, ['第二杯咖啡','阳光晒过的沙发','慵懒午后','不赶时间的下午']],
+  [/旅行|路上|远方|出发|流浪/, ['去往远方的车票','路一直在前面','背包和风','不问来处']],
+  [/梦|梦境|做梦|入睡/, ['落进梦里','半梦半醒','梦的边缘','睡前最后一个念头']],
+];
 function bgmGeneratedTitle(desc,room){
-  let t=String(desc||'').replace(/让(全房间|大家|所有人)(也)?听|广播/gi,' ')
+  const pick=(arr)=>{ try{ return arr[Math.floor(Math.random()*arr.length)]; }catch(_){ return arr[0]; } };
+  const raw=String(desc||'');
+  // 命中意象直接给策展名(优先级最高, 长描述也能得体命名而非被截断)
+  for(const [re,names] of BGM_TITLE_MOODS){ if(re.test(raw)) return pick(names); }
+  // 去掉指令性套话与填充词("一首/来点/生成"这类不该进曲名)
+  let t=raw.replace(/让(全房间|大家|所有人)(也)?听|广播/gi,' ')
     .replace(/按(照)?当前房间(的)?气氛/gi,' ')
-    .replace(/现场生成|生成一首|创作一首|做一首|来一首/gi,' ')
-    .replace(/纯器乐|无人声|背景音乐|BGM/gi,' ')
-    .replace(/[，。,.!！?？:：;；·\-]+/g,' ').replace(/\s+/g,' ').trim();
-  if(!t){
-    const rn=String((room&&room.name)||'').trim();
-    if(/午夜|深夜|电台/.test(rn)) return '午夜回声';
-    if(/技术|代码/.test(rn)) return '代码微光';
-    if(/虚空|回音/.test(rn)) return '星际回声';
-    if(/私密/.test(rn)||(room&&room.kind==='private')) return '耳边低语';
-    return '此刻回声';
-  }
+    .replace(/(现场|帮我|给我|想要|想|要|来)?(生成|创作|做|来|写|整|搞|放|点)(一)?(首|曲|段|点|个)?/gi,' ')
+    .replace(/纯器乐|无人声|背景音乐|轻音乐|音乐|曲子|歌曲|旋律|BGM|歌/gi,' ')
+    .replace(/(的|吧|呀|啊|嘛|哦|呢)$/,'')
+    .replace(/[，。,.!！?？:：;；·\-—、~～]+/g,' ').replace(/\s+/g,' ').trim();
+  // 纯量词/填充残留("一首""一曲""一个")不成曲名, 判空走兜底(线上"一首"脏数据即此)
+  if(/^(一|来|个)?(首|曲|段|点|个|下|把)?$/.test(t)) t='';
+  // 描述本身已是干净短句(≤8字)才直接用; 否则一律走兜底, 不做残句截断
+  let clean='';
   try{
     const chars=[...new Intl.Segmenter('zh',{granularity:'grapheme'}).segment(t)].map(x=>x.segment);
-    t=chars.slice(0,8).join('');
-  }catch(_){ t=t.slice(0,8); }
-  return t||'此刻回声';
+    if(chars.length&&chars.length<=8) clean=chars.join('');
+  }catch(_){ if(t&&t.length<=8) clean=t; }
+  if(clean) return clean;
+  // 兜底: 按房间意象给策展名(带轻微变体避免千篇一律)
+  const rn=String((room&&room.name)||'').trim();
+  if(/午夜|深夜|电台/.test(rn)) return pick(['午夜回声','凌晨的电台','没人的深夜频率']);
+  if(/技术|代码/.test(rn)) return pick(['代码微光','改到天亮','屏幕前的深夜']);
+  if(/虚空|回音/.test(rn)) return pick(['星际回声','把秘密扔进宇宙','银河那头']);
+  if(/私密/.test(rn)||(room&&room.kind==='private')) return pick(['耳边低语','关上门以后','只说给你听']);
+  return pick(['此刻回声','说不清的心情','留给自己的一首','当下这一刻']);
 }
 async function sendBgmGen(desc){
   if(!curRoom) return;
