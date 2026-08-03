@@ -4947,8 +4947,8 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='生成中'; }catch(_){}
-    try{ toast('生成中,由后台生成…'); }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){}
+    try{ toast('谱曲中,由后台生成…'); }catch(_){}
     // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
     try{
       const key=String(mid);
