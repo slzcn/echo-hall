@@ -208,28 +208,14 @@
       transparent 40px,
       transparent calc(100% - 90px),
       var(--bg) 100%)}
-  /* ★独立 PWA(standalone)关掉 .edge-fade: 它是浏览器系统条融合专用 hack, standalone 无系统条不需要。
-     (注: 它是 fixed 元素, 真机诊断证实 fixed;bottom:0 都够不到底部 home indicator 安全区, 故无论如何
-      也盖不住那条黑; 这里透明化只为不让底部实色带压在内容上。) */
-  html.pwa-standalone .edge-fade{ background:transparent !important; }
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
-     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
+     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
+     ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
     background:transparent;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
-  /* ★home indicator 黑带真凶(2026-08-03 真机诊断+顶底对称分析定论):
-     顶部 62px 状态栏区【没黑边】——因 html{background:--bg} 盒子锚在物理屏顶 y=0, black-translucent
-     状态栏是半透明浮层, html 背景自然铺满顶部安全区。
-     底部 34px home indicator 区【露黑】——真凶是 html,body{height:100%}: iOS 独立态下 100% 取【小视口
-     (不含底部安全区)】, 于是 html 盒子底边停在 home indicator 上方那 34px 【在盒子之外】, html 背景
-     根本没画到 → 露 webview 黑。诊断条 fixed;bottom:0 够不到 / v179 给 body 铺色也没用, 都因盒子本身
-     就没延伸到物理屏底(body 同为 height:100% 小视口)。
-     正解(与顶部对称): standalone 下 html 高度改用【大视口 100lvh(含安全区)】, 让 html 背景像盖住顶部
-     一样铺到物理屏底那 34px。仅独立态改, 浏览器标签页不动。--bg 随主题, syncThemeColor 已同步 htmlBg。 */
-  html.pwa-standalone{ min-height:100lvh; background-color:var(--bg); }
-  html.pwa-standalone body{ min-height:100lvh; }
   /* ★大厅"整文档滚动"模式(2026-07-26): 移动浏览器只有【根文档滚动】时才自动收起顶/底地址栏→真全屏沉浸。
      原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
      lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
@@ -240,14 +226,6 @@
   body.lobby-on{height:100%;min-height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
   body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
-  /* ★独立 PWA(standalone)退回"内层 #lobby 滚"——整页滚动 hack 纯为让【移动浏览器】自动收地址栏(见上注释),
-     PWA 没有地址栏可收, 这套 body 当滚动容器反而在 iOS 上让 position:fixed 背景(bg-orb/bg-grid)脱锚、跟着
-     文档滚: 滚到底部青色氛围光滚出视口 → 底部只剩无光纯 --bg = 主人看到的"底部黑边"(滚到顶有光、滚到底变黑
-     的真凶)。standalone 下 body/html 固定视口、#lobby 自己滚, fixed 背景重新钉死视口, 底部氛围光恒在位。 */
-  html.pwa-standalone.lobby-on, html.pwa-standalone:has(body.lobby-on){height:100%;overflow:hidden}
-  html.pwa-standalone body.lobby-on{height:100%;min-height:0;overflow:hidden}
-  html.pwa-standalone body.lobby-on .stage{height:100svh;min-height:0;display:flex}
-  html.pwa-standalone body.lobby-on #lobby{height:100%;min-height:0;overflow-y:auto}
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -524,12 +502,11 @@
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
   /* ============ 场景2：大厅 ============ */
-  /* 四边都叠加 safe-area: iOS 独立 PWA(black-translucent 状态栏)下内容渲染到刘海/状态栏/home indicator 之下 ——
+  /* padding-top 叠加 safe-area: iOS 独立 PWA(black-translucent 状态栏)下顶栏三按钮会被状态栏/灵动岛遮住 ——
      根因是移动端 .stage{padding:0} 抹掉了安全区, 而 .lobby-tools 是 absolute 钉在 .lobby-head(位于 #lobby 内边距顶),
-     #lobby 原来只有平的 24px 不含 env() → 顶栏按钮顶进刘海。补 top 那次漏了 bottom → 底部页脚/内容沉进 home indicator
-     区 = 主人看到的"底部黑边"(黑边在大厅页, 不在聊天房)。四边补齐, 桌面 inset=0 padding 仍精确 24px, 无回归。 */
+     #lobby 原来只有平的 24px 不含 env() → 按钮顶进刘海区。左右也带上, 防横屏刘海。桌面 inset=0 不受影响。 */
   #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;
-    padding:calc(24px + env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
+    padding:calc(24px + env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 24px max(20px,env(safe-area-inset-left));
     overflow-y:auto;overflow-x:hidden}
   #lobby .sec-label{margin-top:10px}
   /* 大厅底部页脚: 安装按钮 + 版本号 */
@@ -1650,9 +1627,8 @@
       #hall{height:-webkit-fill-available}
     }
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
-    /* 键盘收起(静止态): 底部叠加 env(safe-area-inset-bottom) 让输入框避开 home indicator, 否则 #hall=100svh/visualViewport 全屏高时输入框沉进安全区 = 底部"黑边"。
-       键盘弹起时 iOS 会把 safe-area-inset-bottom 归 0(键盘盖住 home indicator 区), 于是这里退回纯 15px = 距键盘顶 5px 的原意, 两态自洽。 */
-    .composer{padding-bottom:calc(15px + env(safe-area-inset-bottom))}
+    /* 输入框外框距当前可视底边严格 5px；安全区不再叠加到业务间距。 */
+    .composer{padding-bottom:15px}
     .channels{grid-template-columns:1fr}
     .emoji-tray{right:14px;left:14px;grid-template-columns:repeat(8,1fr)}
     .plus-btn{width:46px;height:46px;font-size:23px}
@@ -1827,12 +1803,7 @@
   <script>
     /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
     (function(){try{
-      /* ★standalone 判据必须多重兜底: iOS 老式 apple-mobile-web-app PWA 与小米系实测 display-mode:standalone
-         media query 会不可靠报 false(见 js/pwa-install.js 同款注释)。这里给 <html> 挂 pwa-standalone class,
-         下游 CSS(edge-fade / lobby 滚动)一律用 html.pwa-standalone 选择器, 绝不直接写 @media(display-mode:standalone)
-         —— 那条纯 CSS media query 吃这个 quirk, 是之前几版 standalone 修法在真机全成死代码的根因。 */
-      var mm = function(m){ return window.matchMedia && matchMedia(m).matches; };
-      var standalone = mm('(display-mode:standalone)') || mm('(display-mode:fullscreen)') || mm('(display-mode:minimal-ui)')
+      var standalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
         || window.navigator.standalone === true
         || document.referrer.indexOf('android-app://') === 0;
       if(standalone){
@@ -1848,7 +1819,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-htmlLvhFillBottom';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-revertBlackEdgeKeepKbd';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
