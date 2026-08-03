@@ -1,1 +1,1 @@
-20260803-fastPullReload
+20260803-navSWR

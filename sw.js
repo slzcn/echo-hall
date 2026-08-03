@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v182-20260803-fastPullReload';
+const SW_VERSION = 'eh-sw-v183-20260803-navSWR';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -144,15 +144,30 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 导航/入口: network-first
+  // ★ver.txt: network-first —— 版本自愈命脉(31B, 必须拿最新, 不慢)。绝不先返缓存, 否则永远发现不了新版。
+  if (url.pathname.endsWith('ver.txt')) {
+    e.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
+
+  // ★导航文档(index.html / navigate): stale-while-revalidate(2026-08-03 下拉刷新提速)。
+  //   旧策略 network-first: reload 后死等 fetch(index.html) 从 GitHub Pages 返回才换页 —— 国内访问 Pages
+  //   慢/不稳时, 下拉刷新"刷新中"就一直卡着(每次都重下整份 ~196KB HTML)。改 SWR: 缓存壳秒返, 页面立即
+  //   换新、"刷新中"立即消失; 后台拉最新写缓存。壳只是容器, 聊天/房间数据运行时从 Supabase 实时拉、不靠它;
+  //   真有新版由页面内 BUILD_VER 比对 ver.txt(仍 network-first)自愈再 reload 一次, 那次已被本次后台 fetch
+  //   暖好缓存 → 秒拿新壳。稳态(无新版)下拉刷新即秒切, 不再等 Pages。
   const isNav = req.mode === 'navigate' || req.destination === 'document' ||
-    url.pathname.endsWith('/') || url.pathname.endsWith('index.html') || url.pathname.endsWith('ver.txt');
+    url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
   if (isNav) {
     e.respondWith(
-      fetch(req).then((res) => {
-        if (res && res.status === 200) { const copy = res.clone(); caches.open(SHELL_CACHE).then((c) => c.put(req, copy)); }
-        return res;
-      }).catch(() => caches.open(SHELL_CACHE).then((cache) => cache.match(req).then((c) => c || cache.match('./index.html'))))
+      caches.open(SHELL_CACHE).then(async (cache) => {
+        const cached = (await cache.match(req)) || (await cache.match('./index.html'));
+        const fresh = fetch(req).then((res) => {
+          if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
+          return res;
+        }).catch(() => cached);
+        return cached || fresh;   // 有缓存: 秒返 + 后台更新; 无缓存(首访): 等网络
+      })
     );
     return;
   }
