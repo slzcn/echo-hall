@@ -3337,7 +3337,8 @@ function renderAtMenu(){
     ${c.isSoul?`<span class="ai-tag" style="--ec:${safeColor(c.color)};background:color-mix(in srgb,${safeColor(c.color)} 16%,transparent)">✦AI</span>`:''}
   </div>`).join('');
   menu.classList.add('on');
-  menu.querySelectorAll('.at-item').forEach(el=>el.onclick=()=>pickAt(+el.dataset.i));
+  // 同 slash-item: pointerdown+preventDefault, 键盘弹起时首触即选中, 不被 blur 吞掉第一下(pickAt 会 refocus)。
+  menu.querySelectorAll('.at-item').forEach(el=>el.onpointerdown=ev=>{ ev.preventDefault(); pickAt(+el.dataset.i); });
 }
 function hideAt(){ _atActive=false; $('#atMenu').classList.remove('on'); }
 // 点在线光墙的头像 → 往输入框插入 @该用户(快捷@)
@@ -5217,7 +5218,10 @@ function renderSlashMenu(filter){
   if(!_slashList.length){ hideSlash(); return; }
   if(_slashSel>=_slashList.length) _slashSel=0;
   menu.innerHTML=_slashList.map((c,i)=>`<div class="slash-item ${i===_slashSel?'sel':''}" data-i="${i}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
-  menu.querySelectorAll('.slash-item').forEach(el=>el.onclick=()=>pickSlash(+el.dataset.i));
+  // ★用 pointerdown+preventDefault 而非 click: 输入框聚焦(键盘弹起)时, 点菜单项的第一下会先 blur 输入框
+  //   → iOS 收键盘 → composer/菜单整体下移, 这一下的 click 落空, 得点第二次才中(主人反馈"命令要点两次")。
+  //   preventDefault 挡掉焦点转移, 键盘不收、布局不动, 首触即触发。pickSlash 会自己 refocus #cin。
+  menu.querySelectorAll('.slash-item').forEach(el=>el.onpointerdown=ev=>{ ev.preventDefault(); pickSlash(+el.dataset.i); });
   menu.classList.add('on'); _slashActive=true;
 }
 function pickSlash(i){
