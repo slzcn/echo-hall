@@ -208,20 +208,6 @@
       transparent 40px,
       transparent calc(100% - 90px),
       var(--bg) 100%)}
-  /* ★独立 PWA(standalone)关掉 .edge-fade: 它是【浏览器系统条融合】专用 hack —— 把上/下边缘各 ~90px 强制压成
-     纯 --bg, 好跟浏览器顶/底黑色系统条无缝衔接。但独立 PWA 没有浏览器系统条, html 自身深色底(含底部氛围光)
-     已铺满整屏(含 home indicator 安全区), 此时那条固定的底部纯黑带反而盖在内容/安全区上 = 主人看到的"底部黑边"。
-     standalone 下直接透明化, 让 html 背景自然铺到底。 */
-  html.pwa-standalone .edge-fade{ background:transparent !important; }
-  /* ★home indicator 那条黑带真凶(主人指的"C"): iOS PWA 下 html 自身背景色【不画进】底部
-     env(safe-area-inset-bottom) 那条 safe-area, 露出 webview 默认纯黑 = 底部黑带。前几版全在改
-     home indicator 上方的内容间距(把内容往上推), 从没碰过这条黑带本身, 方向错。
-     正解: 一条 fixed 钉在屏底、高度=inset-bottom 的填充条, 显式 painting --bg 把那 34px 盖住
-     (fixed+显式背景在 viewport-fit=cover 下会画进 safe-area)。仅 standalone 启用; 非刘海机 inset=0 自动无。 */
-  .safe-fill-bottom{ display:none; }
-  html.pwa-standalone .safe-fill-bottom{
-    display:block;position:fixed;left:0;right:0;bottom:0;z-index:0;pointer-events:none;
-    height:env(safe-area-inset-bottom,0px);background:var(--bg); }
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
      禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
      ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
@@ -240,14 +226,6 @@
   body.lobby-on{height:100%;min-height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
   body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
-  /* ★独立 PWA(standalone)退回"内层 #lobby 滚"——整页滚动 hack 纯为让【移动浏览器】自动收地址栏(见上注释),
-     PWA 没有地址栏可收, 这套 body 当滚动容器反而在 iOS 上让 position:fixed 背景(bg-orb/bg-grid)脱锚、跟着
-     文档滚: 滚到底部青色氛围光滚出视口 → 底部只剩无光纯 --bg = 主人看到的"底部黑边"(滚到顶有光、滚到底变黑
-     的真凶)。standalone 下 body/html 固定视口、#lobby 自己滚, fixed 背景重新钉死视口, 底部氛围光恒在位。 */
-  html.pwa-standalone.lobby-on, html.pwa-standalone:has(body.lobby-on){height:100%;overflow:hidden}
-  html.pwa-standalone body.lobby-on{height:100%;min-height:0;overflow:hidden}
-  html.pwa-standalone body.lobby-on .stage{height:100svh;min-height:0;display:flex}
-  html.pwa-standalone body.lobby-on #lobby{height:100%;min-height:0;overflow-y:auto}
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -524,13 +502,7 @@
   .btn-primary:disabled{opacity:.5;cursor:wait}
 
   /* ============ 场景2：大厅 ============ */
-  /* 四边都叠加 safe-area: iOS 独立 PWA(black-translucent 状态栏)下内容渲染到刘海/状态栏/home indicator 之下 ——
-     根因是移动端 .stage{padding:0} 抹掉了安全区, 而 .lobby-tools 是 absolute 钉在 .lobby-head(位于 #lobby 内边距顶),
-     #lobby 原来只有平的 24px 不含 env() → 顶栏按钮顶进刘海。补 top 那次漏了 bottom → 底部页脚/内容沉进 home indicator
-     区 = 主人看到的"底部黑边"(黑边在大厅页, 不在聊天房)。四边补齐, 桌面 inset=0 padding 仍精确 24px, 无回归。 */
-  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;
-    padding:calc(24px + env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
-    overflow-y:auto;overflow-x:hidden}
+  #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:24px 20px;overflow-y:auto;overflow-x:hidden}
   #lobby .sec-label{margin-top:10px}
   /* 大厅底部页脚: 安装按钮 + 版本号 */
   .lobby-footer{width:100%;max-width:var(--content-max);margin-top:14px;padding-top:16px;border-top:1px solid var(--line);
@@ -1827,12 +1799,7 @@
   <script>
     /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
     (function(){try{
-      /* ★standalone 判据必须多重兜底: iOS 老式 apple-mobile-web-app PWA 与小米系实测 display-mode:standalone
-         media query 会不可靠报 false(见 js/pwa-install.js 同款注释)。这里给 <html> 挂 pwa-standalone class,
-         下游 CSS(edge-fade / lobby 滚动)一律用 html.pwa-standalone 选择器, 绝不直接写 @media(display-mode:standalone)
-         —— 那条纯 CSS media query 吃这个 quirk, 是之前几版 standalone 修法在真机全成死代码的根因。 */
-      var mm = function(m){ return window.matchMedia && matchMedia(m).matches; };
-      var standalone = mm('(display-mode:standalone)') || mm('(display-mode:fullscreen)') || mm('(display-mode:minimal-ui)')
+      var standalone = (window.matchMedia && matchMedia('(display-mode:standalone)').matches)
         || window.navigator.standalone === true
         || document.referrer.indexOf('android-app://') === 0;
       if(standalone){
@@ -1848,7 +1815,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-homeIndicatorFill';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-lobbyRevertToBaseline';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1890,7 +1857,6 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 
 <!-- 背景装饰层(z<10) -->
 <div id="fx-bg">
-<div class="safe-fill-bottom"></div>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div>
 <div class="bg-orb orb2"></div>
