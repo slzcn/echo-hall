@@ -1809,9 +1809,13 @@
       if(standalone){
         document.documentElement.classList.add('pwa-standalone');
         var hide=function(){ var s=document.getElementById('pwaSplash'); if(!s) return; s.classList.add('ps-hide'); setTimeout(function(){ try{ s.remove(); }catch(_){}} , 600); };
-        // 1.4s 后淡出(动画放两轮涟漪); 兜底 window.load 也触发, 谁先到算谁
-        setTimeout(hide, 1400);
-        window.addEventListener('load', function(){ setTimeout(hide, 900); });
+        /* ★下拉刷新(reload)不是冷启动, 不该重放 1.4s 开屏仪式 —— pull-refresh.js 在 reload 前打了
+           sessionStorage 标记。读到就走极短路径: 尽快淡出, 只等 window.load(拿新壳)即隐, 体感"秒刷"。
+           真·冷启动(无标记)保留完整涟漪仪式感。 */
+        var isPull=false; try{ isPull = sessionStorage.getItem('eh_pull_reload')==='1'; if(isPull) sessionStorage.removeItem('eh_pull_reload'); }catch(_){}
+        // 下拉刷新: 尽快淡出(仪式跳过); 冷启动: 放两轮涟漪(1.4s)。兜底 setTimeout 与 load 谁先到算谁。
+        setTimeout(hide, isPull ? 500 : 1400);
+        window.addEventListener('load', function(){ setTimeout(hide, isPull ? 60 : 900); });
       }
     }catch(_){}})();
   </script>
@@ -1819,7 +1823,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-revertBlackEdgeKeepKbd';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-fastPullReload';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2264,6 +2268,6 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
 <script src="./js/pwa-install.js?v=20260802-entryFreezeFix"></script>
 
-<script src="./js/pull-refresh.js?v=20260802-entryFreezeFix"></script>
+<script src="./js/pull-refresh.js?v=20260803-fastPullReload"></script>
 </body>
 </html>

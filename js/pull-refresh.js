@@ -73,6 +73,9 @@
       ind.classList.remove('ready');
       ind.style.transform = 'translateY(0px)';
       if(txt) txt.textContent = '刷新中…';
+      /* ★打标记: 下拉刷新是 reload 而非冷启动, 让开屏脚本(index.html)读到后跳过 1.4s 仪式动画, 直接秒隐。 */
+      try{ sessionStorage.setItem('eh_pull_reload','1'); }catch(_){}
+      /* 350→120ms: 只留一点动画收尾就刷, 不再白等大半秒。 */
       setTimeout(function(){
         try{
           if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
@@ -82,7 +85,7 @@
             }, function(){ location.reload(); });
           } else { location.reload(); }
         }catch(_){ location.reload(); }
-      }, 350);
+      }, 120);
     } else { reset(); }
     armed = false; pulling = false; dist = 0;
   }, {passive:true});
