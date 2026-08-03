@@ -231,6 +231,16 @@
   body.lobby-on{height:100%;min-height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   body.lobby-on .stage{height:auto;min-height:100dvh;display:block}
   body.lobby-on #lobby{height:auto;min-height:100dvh;overflow:visible}
+  /* ★独立 PWA(standalone)退回"内层 #lobby 滚"——整页滚动 hack 纯为让【移动浏览器】自动收地址栏(见上注释),
+     PWA 没有地址栏可收, 这套 body 当滚动容器反而在 iOS 上让 position:fixed 背景(bg-orb/bg-grid)脱锚、跟着
+     文档滚: 滚到底部青色氛围光滚出视口 → 底部只剩无光纯 --bg = 主人看到的"底部黑边"(滚到顶有光、滚到底变黑
+     的真凶)。standalone 下 body/html 固定视口、#lobby 自己滚, fixed 背景重新钉死视口, 底部氛围光恒在位。 */
+  @media (display-mode:standalone){
+    html.lobby-on, html:has(body.lobby-on){height:100%;overflow:hidden}
+    body.lobby-on{height:100%;min-height:0;overflow:hidden}
+    body.lobby-on .stage{height:100svh;min-height:0;display:flex}
+    body.lobby-on #lobby{height:100%;min-height:0;overflow-y:auto}
+  }
   /* ==== 背景 ==== */
   .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
@@ -1826,7 +1836,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-lobbyBottomSafeArea';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-lobbyFixedBgDetach';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
