@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v176-20260803-edgeFadeBottomRestore';
+const SW_VERSION = 'eh-sw-v177-20260803-jsPersistCache';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -21,6 +21,34 @@ function isVendorLib(url) {
   return (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'unpkg.com' || url.hostname === 'cdnjs.cloudflare.com')
     && /@supabase\/supabase-js@[\d.]+\//.test(url.pathname);
 }
+// ★本地 js/*.js 带 ?v= 指纹的持久缓存【故意不带 SW_VERSION】: 引用 URL 里的 ?v= 指纹随内容变,
+//   URL 即内容标识。此前同源 script 走 network-first(见旧注释), 每次刷新全量重下 app.js(167KB gzip)
+//   +其余 = "刷新慢"的结构性根因。有了指纹, 换版时 URL 必变 → cache-first 绝不会混版本:
+//   命中秒返, 指纹一变即 miss 下载一次并清同名旧版。仅拦 /js/*.js?v=, 不碰 sw.js/config 无指纹场景。
+const JS_CACHE = 'eh-js-v1';
+function isVersionedJs(url) {
+  return url.origin === self.location.origin
+    && /\/js\/[\w-]+\.js$/.test(url.pathname)
+    && /[?&]v=/.test(url.search);
+}
+// 命中即返, miss 下载存入, 并顺手删掉【同一 pathname 的旧指纹】条目(避免缓存无限膨胀)
+async function serveVersionedJs(req, url) {
+  const cache = await caches.open(JS_CACHE);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  let res;
+  try { res = await fetch(req); }
+  catch (e) { const any = await cache.match(url.pathname, { ignoreSearch: true }); if (any) return any; throw e; }
+  if (res && res.status === 200) {
+    cache.put(req, res.clone()).catch(() => {});
+    // 清掉同 pathname 的旧指纹版本(只保留本次这条)
+    cache.keys().then((keys) => keys.forEach((k) => {
+      const ku = new URL(k.url);
+      if (ku.pathname === url.pathname && ku.search !== url.search) cache.delete(k);
+    })).catch(() => {});
+  }
+  return res;
+}
 // 命中即缓存的音频路径(Supabase Storage 的官方/灵魂 BGM 与神曲)。这些是 supabase.co 域,
 // 本会被下面的 NETWORK_ONLY_HOSTS 判成 network-only(每次全量重下 3~7MB = 点开慢的根因),
 // 故在 network-only 之前先拦成 cache-first。仅拦音频对象, 不碰 rest/realtime/auth 等 API。
@@ -30,19 +58,11 @@ function isBgmAudio(url) {
 }
 
 // 不 precache manifest/图标: 让它们始终走网络最新, 避免 SW 缓存旧 manifest 导致 Chrome 判不可安装
+// ★不再 precache /js/*.js: 页面引用全带 ?v= 指纹, 实际请求走 JS_CACHE(cache-first, 见 isVersionedJs);
+//   这里 precache 的是【无指纹】URL, 页面从不请求 = install 时白下一份 app.js(167KB)。只留导航入口壳。
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './js/config.js',
-  './js/config-runtime.js',
-  './js/app.js',
-  './js/keyboard.js',
-  './js/boot.js',
-  './js/ambient-fx.js',
-  './js/debug-overlay.js',
-  './js/sw-register.js',
-  './js/pwa-install.js',
-  './js/pull-refresh.js',
 ];
 
 const NETWORK_ONLY_HOSTS = ['supabase.co', 'supabase.in'];
@@ -90,6 +110,13 @@ self.addEventListener('fetch', (e) => {
         }))
       )
     );
+    return;
+  }
+
+  // ★本地带指纹 js: 持久 cache-first(见 JS_CACHE 注释)。放在 isPwaCore(script→network-first)之前,
+  //   让带 ?v= 的 /js/*.js 命中秒返, 不再每次刷新全量重下。指纹保证换版必拉新, 不会混版本。
+  if (isVersionedJs(url)) {
+    e.respondWith(serveVersionedJs(req, url));
     return;
   }
 
