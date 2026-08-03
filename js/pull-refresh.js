@@ -66,6 +66,64 @@
     }
   }, {passive:true});
 
+  /* 硬刷新: 整页 reload(拿新壳)。打 sessionStorage 标记让开屏脚本跳过 1.4s 仪式, 松手动画收尾 120ms 后刷。 */
+  function hardReload(){
+    try{ sessionStorage.setItem('eh_pull_reload','1'); }catch(_){}
+    setTimeout(function(){
+      try{
+        if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
+          navigator.serviceWorker.getRegistration().then(function(reg){
+            if(reg && reg.waiting){ reg.waiting.postMessage('SKIP_WAITING'); }
+            location.reload();
+          }, function(){ location.reload(); });
+        } else { location.reload(); }
+      }catch(_){ location.reload(); }
+    }, 120);
+  }
+
+  /* 下拉刷新主流程(2026-08-03 软刷新):
+     1. 先 check 版本 —— 拉 ver.txt(2.5s 超时) 比对页面内 BUILD_VER。不一致=有新代码 → 必须硬 reload 拿新壳。
+     2. 版本一致(常态) → 调 app.js 暴露的 EH_SOFT_REFRESH 软刷新(只重拉数据, 不重建应用), 近乎瞬时。
+     3. 软刷新不可用(函数缺失/返回 ok:false/抛错) → 兜底硬 reload, 保证下拉永远有效。
+     这样既拿到"不 reload 的秒刷", 又不牺牲版本自愈(有新版仍会整页换新)。 */
+  function doRefresh(){
+    var soft = window.EH_SOFT_REFRESH;
+    if(typeof soft !== 'function'){ hardReload(); return; }   // app.js 还没就绪 → 硬刷兜底
+    var settled = false;
+    // 版本 check: 有新版硬 reload; 无新版或 check 失败(不该因网络抖动就退化成硬刷)→ 软刷新
+    var ver = fetchVer();
+    ver.then(function(latest){
+      if(settled) return;
+      var cur = window.__EH_BUILD_VER || '';
+      if(latest && cur && latest !== cur){ settled = true; hardReload(); return; }   // 有新代码 → 拿新壳
+      runSoft();
+    }, function(){ if(!settled) runSoft(); });   // check 失败也软刷(内容重拉本就走网络, 失败会自己兜底)
+
+    function runSoft(){
+      if(settled) return; settled = true;
+      // 软刷极快(可能几十 ms), 给指示器一个最短可见时长(400ms), 让"刷新中→完成"有反馈, 不至于闪一下像没触发
+      var t0 = Date.now();
+      Promise.resolve().then(function(){ return soft(); }).then(function(res){
+        if(res && res.ok){
+          var wait = Math.max(0, 400 - (Date.now() - t0));
+          setTimeout(reset, wait);       // 软刷成功: 收起指示器, 页面已就地更新
+        } else { hardReload(); }         // 入口态/未知场景 → 硬刷兜底
+      }).catch(function(){ hardReload(); });
+    }
+  }
+
+  /* 轻量拉 ver.txt(no-store, 2.5s 超时)。超时/失败返回 null → 上层按"无新版"软刷。 */
+  function fetchVer(){
+    return new Promise(function(resolve, reject){
+      var done = false;
+      var to = setTimeout(function(){ if(!done){ done = true; reject(new Error('ver timeout')); } }, 2500);
+      fetch('ver.txt?_=' + Date.now(), { cache:'no-store' }).then(function(r){
+        return r.ok ? r.text() : null;
+      }).then(function(t){ if(done) return; done = true; clearTimeout(to); resolve((t||'').trim()); },
+        function(e){ if(done) return; done = true; clearTimeout(to); reject(e); });
+    });
+  }
+
   document.addEventListener('touchend', function(){
     if(!armed){ return; }
     if(pulling && dist >= THRESH){
@@ -73,19 +131,7 @@
       ind.classList.remove('ready');
       ind.style.transform = 'translateY(0px)';
       if(txt) txt.textContent = '刷新中…';
-      /* ★打标记: 下拉刷新是 reload 而非冷启动, 让开屏脚本(index.html)读到后跳过 1.4s 仪式动画, 直接秒隐。 */
-      try{ sessionStorage.setItem('eh_pull_reload','1'); }catch(_){}
-      /* 350→120ms: 只留一点动画收尾就刷, 不再白等大半秒。 */
-      setTimeout(function(){
-        try{
-          if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
-            navigator.serviceWorker.getRegistration().then(function(reg){
-              if(reg && reg.waiting){ reg.waiting.postMessage('SKIP_WAITING'); }
-              location.reload();
-            }, function(){ location.reload(); });
-          } else { location.reload(); }
-        }catch(_){ location.reload(); }
-      }, 120);
+      doRefresh();
     } else { reset(); }
     armed = false; pulling = false; dist = 0;
   }, {passive:true});

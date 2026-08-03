@@ -6800,3 +6800,35 @@ window.addEventListener('beforeunload',()=>{
   // 尽力删除自己的在线行(用 sendBeacon 式的同步兜底：直接 fire-and-forget)
   if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
 });
+
+// ★下拉刷新的"软刷新"入口(2026-08-03): pull-refresh.js 是独立 script, 拿不到本文件作用域内的
+//   curRoom/refreshSnapshotTail/renderLobby 等符号, 故在此封装成全局函数暴露。软刷新 = 不 location.reload
+//   (整页推倒重来: 重解析 442KB app.js + supabase 重连 + Realtime 重订阅), 只调已有的幂等零件重拉数据:
+//     · 房间内: refreshSnapshotTail(补空窗消息, 自带并发锁/防串房/DOM去重) + refreshPresence(刷在场)
+//               + resyncMsgOwnership(校正左右归属)。这套正是进房收尾/回前台静默刷新复用的同一批, 已验证。
+//     · 大厅:   renderLobby(true) —— soft=true 不清骨架, 原地更新房间列表。
+//   返回 Promise, 让 pull-refresh.js 知道刷完(收起"刷新中")。版本自愈由 pull-refresh 侧先 check ver.txt 负责,
+//   有新版才真 reload 拿新壳; 无新版才软刷新 → 拿不到新代码的顾虑由版本 check 兜住, 逻辑自洽。
+window.EH_SOFT_REFRESH = async function(){
+  try{
+    const inRoom = $('#hall') && $('#hall').classList.contains('on') && curRoom;
+    if(inRoom){
+      const _r = curRoom;
+      await Promise.all([
+        refreshSnapshotTail(_r).catch(e=>console.warn('[softRefresh] snapTail', e)),
+        refreshPresence().catch(e=>console.warn('[softRefresh] presence', e)),
+      ]);
+      try{ resyncMsgOwnership(); }catch(_){}
+      return { ok:true, scope:'room' };
+    }
+    if($('#lobby') && $('#lobby').classList.contains('on')){
+      await renderLobby(true).catch(e=>console.warn('[softRefresh] lobby', e));
+      return { ok:true, scope:'lobby' };
+    }
+    // 既不在房也不在大厅(入口/加载中等) → 交回 pull-refresh 让它走硬 reload 兜底
+    return { ok:false, scope:'other' };
+  }catch(e){
+    console.warn('[softRefresh] fail', e);
+    return { ok:false, scope:'error' };
+  }
+};

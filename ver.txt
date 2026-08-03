@@ -1,1 +1,1 @@
-20260803-navSWR
+20260803-softPullRefresh
