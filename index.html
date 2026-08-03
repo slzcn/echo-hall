@@ -213,6 +213,15 @@
      已铺满整屏(含 home indicator 安全区), 此时那条固定的底部纯黑带反而盖在内容/安全区上 = 主人看到的"底部黑边"。
      standalone 下直接透明化, 让 html 背景自然铺到底。 */
   html.pwa-standalone .edge-fade{ background:transparent !important; }
+  /* ★home indicator 那条黑带真凶(主人指的"C"): iOS PWA 下 html 自身背景色【不画进】底部
+     env(safe-area-inset-bottom) 那条 safe-area, 露出 webview 默认纯黑 = 底部黑带。前几版全在改
+     home indicator 上方的内容间距(把内容往上推), 从没碰过这条黑带本身, 方向错。
+     正解: 一条 fixed 钉在屏底、高度=inset-bottom 的填充条, 显式 painting --bg 把那 34px 盖住
+     (fixed+显式背景在 viewport-fit=cover 下会画进 safe-area)。仅 standalone 启用; 非刘海机 inset=0 自动无。 */
+  .safe-fill-bottom{ display:none; }
+  html.pwa-standalone .safe-fill-bottom{
+    display:block;position:fixed;left:0;right:0;bottom:0;z-index:0;pointer-events:none;
+    height:env(safe-area-inset-bottom,0px);background:var(--bg); }
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
      禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
      ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
@@ -1839,7 +1848,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-standaloneCssDeadCode';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-homeIndicatorFill';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1881,6 +1890,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 
 <!-- 背景装饰层(z<10) -->
 <div id="fx-bg">
+<div class="safe-fill-bottom"></div>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div>
 <div class="bg-orb orb2"></div>
