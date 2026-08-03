@@ -208,35 +208,24 @@
       transparent 40px,
       transparent calc(100% - 90px),
       var(--bg) 100%)}
-  /* ★独立 PWA(standalone)保留 .edge-fade 底部实色带(2026-08-03 复盘修正):
-     这条 fixed + viewport-fit=cover 的元素, 其底部 90px 实色 --bg 会【画进 home indicator 的
-     env(safe-area-inset-bottom) 安全区】(fixed 元素的实色背景在 cover 下铺满整屏含安全区) ——
-     这正是 2026-07-26 真机验证过、能盖住底部系统条/安全区黑的老防线(见 commit 28dc2d7)。
-     曾误判它是黑边元凶在 standalone 下整体透明化(b694c8e), 反而撤掉了唯一盖住 home indicator
-     的实色层, 之后连改五版都在别处打转。这里恢复: standalone 无浏览器系统条, 顶部不需实色带
-     (交给 env(safe-area-inset-top)), 故只保留底部带压回纯 --bg, 让 home indicator 那条不再露黑。 */
-  html.pwa-standalone .edge-fade{
-    background:linear-gradient(to bottom,
-      transparent 0,
-      transparent calc(100% - 90px),
-      var(--bg) 100%) !important; }
-  /* ★home indicator 那条黑带真凶(主人指的"C"): iOS PWA 下 html 自身背景色【不画进】底部
-     env(safe-area-inset-bottom) 那条 safe-area, 露出 webview 默认纯黑 = 底部黑带。前几版全在改
-     home indicator 上方的内容间距(把内容往上推), 从没碰过这条黑带本身, 方向错。
-     正解: 一条 fixed 钉在屏底、高度=inset-bottom 的填充条, 显式 painting --bg 把那 34px 盖住
-     (fixed+显式背景在 viewport-fit=cover 下会画进 safe-area)。仅 standalone 启用; 非刘海机 inset=0 自动无。 */
-  .safe-fill-bottom{ display:none; }
-  html.pwa-standalone .safe-fill-bottom{
-    display:block;position:fixed;left:0;right:0;bottom:0;z-index:0;pointer-events:none;
-    height:env(safe-area-inset-bottom,0px);background:var(--bg); }
+  /* ★独立 PWA(standalone)关掉 .edge-fade: 它是浏览器系统条融合专用 hack, standalone 无系统条不需要。
+     (注: 它是 fixed 元素, 真机诊断证实 fixed;bottom:0 都够不到底部 home indicator 安全区, 故无论如何
+      也盖不住那条黑; 这里透明化只为不让底部实色带压在内容上。) */
+  html.pwa-standalone .edge-fade{ background:transparent !important; }
   /* 不用 position:fixed 钉 body —— 那会和 iOS 键盘冲突(键盘弹起整屏被顶出视口→空白)。
-     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。
-     ★body 背景透明: 让 html 那一层氛围光透上来铺满整屏(含安全区), 消除底部硬缝。 */
+     禁横滑靠 touch-action:pan-y + overflow-x:hidden 即可。 */
   body{
     font-family:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
     background:transparent;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
+  /* ★home indicator 黑带真凶(2026-08-03 真机诊断定论): 诊断条实测——① fixed;bottom:0 的高 z-index
+     元素都盖不到那 34px 安全区(证明它在 fixed 可达范围之外, .safe-fill-bottom/edge-fade 等一切 fixed
+     方案注定无效, 已全删); ② 唯一能给安全区上色的机制是【根背景由 UA 向安全区传播】, 而本壳该传播取的是
+     body 背景 —— 但 2026-07-26(28dc2d7)为透氛围光把 body 设成了 transparent → 安全区穿到 webview 默认黑。
+     修法: standalone 下给 body 铺实色 --bg(只在独立态, 浏览器标签页不动, 保留 body 透明透光)。
+     代价: standalone 下丢失底部氛围光透色(orb 仍在 body 之上正常渲染, 只是 html 那层底部渐晕被盖), 可接受。 */
+  html.pwa-standalone body{ background:var(--bg); }
   /* ★大厅"整文档滚动"模式(2026-07-26): 移动浏览器只有【根文档滚动】时才自动收起顶/底地址栏→真全屏沉浸。
      原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
      lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
@@ -1855,7 +1844,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-blackEdgeDiag';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-bodyBgSafeArea';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -1897,7 +1886,6 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 
 <!-- 背景装饰层(z<10) -->
 <div id="fx-bg">
-<div class="safe-fill-bottom"></div>
 <div class="bg-grid"></div>
 <div class="bg-orb orb1"></div>
 <div class="bg-orb orb2"></div>
@@ -2302,37 +2290,5 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script src="./js/pwa-install.js?v=20260802-entryFreezeFix"></script>
 
 <script src="./js/pull-refresh.js?v=20260802-entryFreezeFix"></script>
-<!-- ★临时黑边诊断条(2026-08-03): 定死屏幕最底, 打印真机 safe-area / standalone 判据, 定位后即删 -->
-<div id="__blackDiag" style="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#e5008a;color:#fff;font:11px/1.4 monospace;padding:6px 8px;pointer-events:none;white-space:pre-wrap;word-break:break-all;box-shadow:0 -2px 8px rgba(0,0,0,.5)">diag…</div>
-<script>
-(function(){
-  function px(v){ var d=document.createElement('div'); d.style.cssText='position:fixed;bottom:0;height:'+v+';'; document.body.appendChild(d); var h=d.getBoundingClientRect().height; d.remove(); return h; }
-  function run(){
-    var el=document.getElementById('__blackDiag'); if(!el) return;
-    var cs=getComputedStyle(document.documentElement);
-    var sab=cs.getPropertyValue('--fake')||''; // placeholder
-    var insetBottom=px('env(safe-area-inset-bottom,0px)');
-    var insetTop=px('env(safe-area-inset-top,0px)');
-    var hasClass=document.documentElement.classList.contains('pwa-standalone');
-    var mmS=matchMedia('(display-mode:standalone)').matches;
-    var mmF=matchMedia('(display-mode:fullscreen)').matches;
-    var nav=('standalone' in navigator)?navigator.standalone:'n/a';
-    var ef=document.querySelector('.edge-fade');
-    var efBg=ef?getComputedStyle(ef).backgroundImage.slice(0,30):'no-el';
-    var sf=document.querySelector('.safe-fill-bottom');
-    var sfDisp=sf?getComputedStyle(sf).display:'no-el';
-    var sfH=sf?getComputedStyle(sf).height:'-';
-    el.textContent=
-      'inset底='+insetBottom.toFixed(1)+' 顶='+insetTop.toFixed(1)+'\n'+
-      'pwa-standalone类='+hasClass+' mmStandalone='+mmS+' mmFull='+mmF+' navStandalone='+nav+'\n'+
-      'innerH='+window.innerHeight+' screenH='+screen.height+' dpr='+window.devicePixelRatio+'\n'+
-      'edgeFade.bgImg='+efBg+'\n'+
-      'safeFill.display='+sfDisp+' h='+sfH+'\n'+
-      'bodyBg='+getComputedStyle(document.body).backgroundColor+' htmlBg='+getComputedStyle(document.documentElement).backgroundColor+'\n'+
-      'ver='+(window.__EH_BUILD_VER||'?');
-  }
-  var t=setInterval(function(){ if(document.body){ clearInterval(t); setTimeout(run,300); } },50);
-})();
-</script>
 </body>
 </html>
