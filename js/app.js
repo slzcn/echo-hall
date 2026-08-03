@@ -1618,6 +1618,25 @@ async function refreshSnapshotTail(room){
   finally{ _snapTailBusy=false; }
 }
 
+// 下拉刷新用: 真正"重刷聊天记录"——清空消息流 + 重置分页游标 + 全量重拉重渲(同进房首屏),
+// 拿到编辑/撤回/被删等所有最新态, 而不是像 refreshSnapshotTail 只 append 增量新消息。
+// ★与"进房"区别: 不动 realtime 订阅/BGM/进场动效/成员角色查询——那些是进房专属副作用,
+//   下拉不该重放(重挂订阅会瞬断重连、重演进场横幅会闪)。这里只重建消息流本身。
+async function reloadRoomMessages(room){
+  if(!room || !curRoom || curRoom.id!==room.id) return false;
+  const stream=$('#stream'); if(!stream) return false;
+  // 复用进房 no-snapshot 分支的清空动作: 清 DOM + 重置分页游标 + 清各种"未读跳转"队列(会由重渲重建)
+  stream.innerHTML=''; oldestId=null; echoState={};
+  // 下拉=要最新: 清掉该房的预取缓存, 逼 loadHistory 现拉(否则可能命中 60s 内的旧缓存 → 刷了个滞后数据)
+  try{ if(prefetchCache && prefetchCache[room.id]) delete prefetchCache[room.id]; }catch(_){}
+  _mentionQueue=[]; try{ updateMentionJump(); }catch(_){}
+  _songReadyQueue=[]; _songGenQueue=[]; _songGenIdx=0; try{ updateSongJump(); }catch(_){}
+  await loadHistory(true);   // 全量重拉最近一屏并渲染(带超时兜底), 分批 idle 补更早的
+  // 拉取期间可能已切房: loadHistory 内部有防串房, 这里再确认一次落底
+  if(curRoom && curRoom.id===room.id){ try{ ensureBottom(); }catch(_){} }
+  return true;
+}
+
 async function joinAsMember(room){
   if(!room) return false;
   // 私密房准入只做成员资格校验: 邀请码加入已由 eh_join_by_code RPC 代插成员。
@@ -6832,8 +6851,10 @@ window.EH_SOFT_REFRESH = async function(){
     const inRoom = $('#hall') && $('#hall').classList.contains('on') && curRoom;
     if(inRoom){
       const _r = curRoom;
+      // ★下拉是"给我最新聊天记录"的明确手势 → 真正重载消息流(清空重拉重渲, 拿编辑/撤回/删除等全部最新态),
+      //   不是只 append 增量(那样漏刷已有消息的状态变化)。presence 同步刷。不断 realtime、不重挂 BGM、不重演进场。
       await Promise.all([
-        refreshSnapshotTail(_r).catch(e=>console.warn('[softRefresh] snapTail', e)),
+        reloadRoomMessages(_r).catch(e=>console.warn('[softRefresh] reload', e)),
         refreshPresence().catch(e=>console.warn('[softRefresh] presence', e)),
       ]);
       try{ resyncMsgOwnership(); }catch(_){}
