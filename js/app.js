@@ -4460,9 +4460,9 @@ function playSongAI(el, onEnd){
   a.preload='auto';
   a.src=url.split('#')[0];
   const chEls = el ? [...el.querySelectorAll('.sl-ch')] : [];
-  // 起播: 能定位到 chorus 段就跳过去, 否则从头
-  const startAt=(chE>chS)?chS:0;
-  const endAt=(chE>chS)?chE:0;   // 0=播到自然结束
+  // 起播: 能定位到 chorus 段就跳过去, 否则从头。用 let——拿到真实 duration 后要按实际时长夹紧(见 doSeek)。
+  let startAt=(chE>chS)?chS:0;
+  let endAt=(chE>chS)?chE:0;   // 0=播到自然结束
   let started=false;
   const beginMarquee=(dur)=>{
     if(!chEls.length||!curSong) return;
@@ -4474,6 +4474,16 @@ function playSongAI(el, onEnd){
     if(curSong&&curSong.token!==myToken) return;
     if(started) return; started=true;
     el.classList.remove('loading');
+    // ★按真实 mp3 时长夹紧 chorus 段(修"最后一首歌点开只响两三秒就停"):
+    //   后端返回的 chorus 时间来自母版结构(母版~55s), 但实际生成的 cover 可能更短(如 49s),
+    //   导致 chE 越界到整首之外 → 从 chS 起播只剩两三秒音频就 onended。这里用真实 duration 校正:
+    //   ①chE 不许超整首; ②若夹紧后窗口过短(<8s)则把起播点前移, 保证至少 8s(或整首若更短)的高潮。
+    const dur=a.duration;
+    if(isFinite(dur) && dur>0 && endAt>startAt){
+      if(endAt>dur) endAt=dur;
+      const MIN_WIN=8;
+      if(endAt-startAt < MIN_WIN) startAt=Math.max(0, endAt-MIN_WIN);
+    }
     try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
   };
   a.onloadedmetadata=doSeek;
@@ -4975,6 +4985,14 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     }catch(_){}
     // 兜底: 没有 chorus 时用全歌
     if(chE<=chS){ chS=0; chE=res.cover_duration||0; }
+    // ★治本: 按 cover 真实时长夹紧 chorus, 别把越界值存进库(修"最后一首歌只响两三秒")。
+    //   后端 structure 的时间戳源自母版(母版~55s), 实际生成的 cover 常更短 → chE 越界。
+    //   有 cover_duration 就以它为准: chE 封顶到整首, 夹后窗口 <8s 则起播点前移保底 8s。
+    const _cd = Number(res.cover_duration)||0;
+    if(_cd>0 && chE>chS){
+      if(chE>_cd) chE=_cd;
+      if(chE-chS < 8) chS=Math.max(0, chE-8);
+    }
     // b64 → Blob → 上传 eh-song 桶
     const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
@@ -6822,7 +6840,11 @@ window.EH_SOFT_REFRESH = async function(){
       return { ok:true, scope:'room' };
     }
     if($('#lobby') && $('#lobby').classList.contains('on')){
-      await renderLobby(true).catch(e=>console.warn('[softRefresh] lobby', e));
+      // ★下拉刷新是"给我最新"的明确手势 → 大厅走全量重查(renderLobby(false)), 真的重拉房间列表。
+      //   不能用 soft=true: 那条路径(见 renderOfficial/renderPublic 的 `if(soft&&box.children.length)`)
+      //   卡片已在时只刷在线数/预览、直接 return, 不重新查 eh_rooms → 新建的房/删掉的房下拉不出来。
+      //   区别于"返回大厅"的 soft 刷新(避免闪烁): 那是被动回来, 这是用户主动要最新。
+      await renderLobby(false).catch(e=>console.warn('[softRefresh] lobby', e));
       return { ok:true, scope:'lobby' };
     }
     // 既不在房也不在大厅(入口/加载中等) → 交回 pull-refresh 让它走硬 reload 兜底
