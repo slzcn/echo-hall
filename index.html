@@ -219,13 +219,17 @@
     background:transparent;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;
     position:relative;width:100%;max-width:100%;overflow:hidden;overflow-x:hidden;touch-action:pan-y;
   }
-  /* ★home indicator 黑带真凶(2026-08-03 真机诊断定论): 诊断条实测——① fixed;bottom:0 的高 z-index
-     元素都盖不到那 34px 安全区(证明它在 fixed 可达范围之外, .safe-fill-bottom/edge-fade 等一切 fixed
-     方案注定无效, 已全删); ② 唯一能给安全区上色的机制是【根背景由 UA 向安全区传播】, 而本壳该传播取的是
-     body 背景 —— 但 2026-07-26(28dc2d7)为透氛围光把 body 设成了 transparent → 安全区穿到 webview 默认黑。
-     修法: standalone 下给 body 铺实色 --bg(只在独立态, 浏览器标签页不动, 保留 body 透明透光)。
-     代价: standalone 下丢失底部氛围光透色(orb 仍在 body 之上正常渲染, 只是 html 那层底部渐晕被盖), 可接受。 */
-  html.pwa-standalone body{ background:var(--bg); }
+  /* ★home indicator 黑带真凶(2026-08-03 真机诊断+顶底对称分析定论):
+     顶部 62px 状态栏区【没黑边】——因 html{background:--bg} 盒子锚在物理屏顶 y=0, black-translucent
+     状态栏是半透明浮层, html 背景自然铺满顶部安全区。
+     底部 34px home indicator 区【露黑】——真凶是 html,body{height:100%}: iOS 独立态下 100% 取【小视口
+     (不含底部安全区)】, 于是 html 盒子底边停在 home indicator 上方那 34px 【在盒子之外】, html 背景
+     根本没画到 → 露 webview 黑。诊断条 fixed;bottom:0 够不到 / v179 给 body 铺色也没用, 都因盒子本身
+     就没延伸到物理屏底(body 同为 height:100% 小视口)。
+     正解(与顶部对称): standalone 下 html 高度改用【大视口 100lvh(含安全区)】, 让 html 背景像盖住顶部
+     一样铺到物理屏底那 34px。仅独立态改, 浏览器标签页不动。--bg 随主题, syncThemeColor 已同步 htmlBg。 */
+  html.pwa-standalone{ min-height:100lvh; background-color:var(--bg); }
+  html.pwa-standalone body{ min-height:100lvh; }
   /* ★大厅"整文档滚动"模式(2026-07-26): 移动浏览器只有【根文档滚动】时才自动收起顶/底地址栏→真全屏沉浸。
      原来 html/body 锁死 height:100%+overflow:hidden、只让内层 #lobby 滚 → 文档不动 → 地址栏永不收 → 上下"黑边"。
      lobby-on 时: 解开 html/body 让文档自己滚(min-height 撑满、内容超出即整页滚), stage 不再锁死一屏高,
@@ -1844,7 +1848,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260803-bodyBgSafeArea';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260803-htmlLvhFillBottom';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
