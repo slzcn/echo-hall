@@ -1657,7 +1657,29 @@ async function refreshSnapshotTail(room){
       //   DOM 里 data-mid 存在但 .txt 是空框。这类不能跳过, 要用真实 data 原地重建修复空框。
       try{
         const kind=exist.dataset.kind||'msg';
-        if(kind==='voice'||kind==='song'||kind==='proj'||kind==='interact'||kind==='act'||kind==='game') return;   // 特效/互动/act/游戏消息不判空(无.txt, 内容非纯文本)
+        // ★神曲"归队"兜底(修"清唱成功了但前端一直谱曲中"): song 卡是原地 PATCH 更新(同 mid,
+        //   text 从无 url→有 url), 不是新增行, 靠 realtime UPDATE 归队。但 UPDATE 事件会丢(锁屏/
+        //   切后台/弱网瞬断, 见本文件 2063 注释), 一丢就永远卡"谱曲中"直到退出重进。此处对已就绪
+        //   却仍 pending 的歌卡原地重建, 让 20s 兜底轮询能救回——不能像其他 kind 那样无脑 return。
+        if(kind==='song'){
+          const card=exist.querySelector('.song-card');
+          if(card && card.classList.contains('pending') && parseSong(m.text).ready){
+            const fresh=buildMsgEl(m, true);
+            if(fresh){
+              exist.replaceWith(fresh);
+              const nc=fresh.querySelector('.song-card');
+              if(nc && !nc.classList.contains('pending')){
+                nc.classList.add('arrived');
+                try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){}
+                setTimeout(()=>{ try{ nc.classList.remove('arrived'); }catch(_){} }, 3400);
+                try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
+                try{ updateSongQueueBar(); }catch(_){}
+              }
+            }
+          }
+          return;
+        }
+        if(kind==='voice'||kind==='proj'||kind==='interact'||kind==='act'||kind==='game') return;   // 特效/互动/act/游戏消息不判空(无.txt, 内容非纯文本)
         const t=exist.querySelector('.txt');
         const hasTxt = t && t.textContent.trim();
         if(!hasTxt && (m.text||'').trim()){
@@ -4395,7 +4417,8 @@ function songHtml(text){
   const pendCls = pending ? ' pending' : '';
   // 谱曲中: 跳动音符♪(音乐语义, 非"加载"转圈); 就绪: 播放三角
   const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
-  const btnTip = pending ? 'AI 谱曲中 · 约 40 秒' : '播放';
+  // 清唱(acapella)走内网 TTS, 实测 5~15s; MiniMax 翻唱 ~40s。文案按曲风给贴合的预期, 别让清唱也报"40 秒"显得慢。
+  const btnTip = pending ? (sid==='acapella' ? '清唱谱曲中 · 约 10 秒' : 'AI 谱曲中 · 约 40 秒') : '播放';
   // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
   const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
   // 就绪的歌: 挂一个隐藏 <audio preload=auto> 预热浏览器缓存, 点播放时音频已缓存→秒播(不再点后干等下载)
@@ -4851,7 +4874,8 @@ document.addEventListener('click',e=>{
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
       card.classList.remove('failed','timeout');
-      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
+      const _aca = (card.dataset.sid||'')==='acapella';
+      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip', _aca ? '清唱谱曲中 · 约 10 秒' : 'AI 谱曲中 · 约 40 秒');
       const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中';
       if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计 120s 超时
       toast('神曲重新生成中…');
@@ -5179,11 +5203,13 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(sid==='acapella'){
     try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){}
     try{ toast('谱曲中,由后台生成…'); }catch(_){}
-    // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
+    // 45s 兜底: 清唱合成实测 5~15s(worker 3s 扫 + TTS 合成 + 回写), 45s 足够覆盖 worker 排队/慢网。
+    //   原 120s 太长, 让人干等两分钟。worker 若仍未回写 → 明确降级"清唱服务暂不可用", 允许手动重试。
+    //   注: UPDATE 事件丢失已由 20s 兜底轮询救回(见 refreshSnapshotTail song 分支), 此 timer 只兜"worker 真挂了"。
     try{
       const key=String(mid);
       if(_EH_ACAPELLA_TIMERS.has(key)) clearTimeout(_EH_ACAPELLA_TIMERS.get(key));
-      const tid=setTimeout(()=>_ehAcapellaTimeoutMark(key), 120000);
+      const tid=setTimeout(()=>_ehAcapellaTimeoutMark(key), 45000);
       _EH_ACAPELLA_TIMERS.set(key, tid);
     }catch(_){}
     return;
