@@ -4870,19 +4870,36 @@ document.addEventListener('click',e=>{
     }
   }catch(_){}
   if(card.classList.contains('pending') || card.classList.contains('failed') || card.classList.contains('timeout')){
-    // pending(生成中断) / failed(失败) / timeout(超时) 卡片被点 → 补触发一次生成
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
-    if(mid && !_EH_SONG_GENERATING.has(String(mid))){
+    // ★点 pending/failed/timeout 卡: 不要无脑立即重生成(主人要求"进程还正常就别重来")。
+    //   ①明确失败态(failed/timeout) → 允许立即重生成。
+    //   ②纯 pending → 先探测真相(可能已成功但 UPDATE 丢了); 若确在正常窗口内生成 → 只提示别打断。
+    const failedState = card.classList.contains('failed') || card.classList.contains('timeout');
+    // 本端正在生成(内存态, 刷新会丢): MiniMax 看 _EH_SONG_GENERATING; 清唱看 45s 兜底 timer 是否还在
+    const genning = mid && (_EH_SONG_GENERATING.has(String(mid)) || _EH_ACAPELLA_TIMERS.has(String(mid)));
+    const ts = parseInt((bubble&&bubble.dataset.songTs)||'0',10);
+    const age = ts ? (Date.now()-ts) : Infinity;   // 无时间戳(刷新后)当作"已过窗口",允许重试
+    const doRegen = ()=>{
+      if(!mid) return;
       card.classList.remove('failed','timeout');
       const _aca = (card.dataset.sid||'')==='acapella';
       const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip', _aca ? '清唱谱曲中 · 约 10 秒' : 'AI 谱曲中 · 约 40 秒');
       const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中';
-      if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计 120s 超时
+      if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计超时
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
-    } else {
-      toast('神曲生成中…');
-    }
+    };
+    if(genning){ toast('正在生成中,请稍候…'); return; }       // 本端确在生成 → 绝不打断
+    if(failedState){ doRegen(); return; }                      // 明确失败 → 立即重生成
+    // 纯 pending: 先探测是否其实已成功(UPDATE 事件可能丢了), 成功则原地救回;
+    //   仍未成功且还在正常窗口(未超时)→ 不重来只提示; 已超窗口 → 允许重生成。
+    (async()=>{
+      let healed=false;
+      try{ healed = mid ? await probeSongReady(String(mid), bubble) : false; }catch(_){}
+      if(healed) return;   // 已救回成可播卡, 不再生成
+      if(age < SONG_TIMEOUT_MS){ toast('正在生成中,请稍候…'); return; }
+      doRegen();
+    })();
     return;
   }
   if(curSong && curSong.el===card){ stopSong(); return; }
@@ -5124,6 +5141,48 @@ async function sendSong(lyric, sid){
 // 生成 + 上传 + 回写 消息 text 字段(附带兜底: 谁触发到"未完成"卡片就由谁重生成一次)
 const _EH_SONG_GENERATING=new Set();   // 记录正在生成的 mid, 防重复触发
 // 扫已卡住的 pending 神曲(自己发的，上传了但 patch fail 的) → 存储桶中已有 mp3 则直接补回写, 不重调 MiniMax(省额度+快)
+// 点 pending 卡时的"真相探测": 查该消息最新 text 是否其实已就绪(realtime UPDATE 可能丢了),
+//   是→原地重建成可播卡并自动播放, 返回 true(调用方据此不再重新生成)。
+//   否→再 HEAD 探测存储桶(worker 传了桶但 PATCH 没落的边缘情况), 命中则补 PATCH 回写。
+//   全落空返回 false(真没生成好, 交给调用方按超时判定是否重生成)。不烧任何生成额度。
+async function probeSongReady(mid, bubble){
+  if(!mid) return false;
+  try{
+    // ① 查库最新 text
+    const { data:row }=await sb.from('eh_messages').select('id,text,name,user_id,anon,kind,created_at,reply_to,streaming,deleted_at').eq('id',mid).maybeSingle();
+    if(!row) return false;
+    const applyFresh=(m)=>{
+      const exist=bubble || document.querySelector(`.msg[data-mid="${mid}"]`);
+      if(!exist) return false;
+      if(isSoulUser(m.user_id, m.name)) m.is_bot=true;
+      const fresh=buildMsgEl(m, true);
+      if(!fresh) return false;
+      exist.replaceWith(fresh);
+      const nc=fresh.querySelector('.song-card');
+      if(nc && !nc.classList.contains('pending')){
+        nc.classList.add('arrived');
+        try{ const tid=_EH_ACAPELLA_TIMERS.get(String(mid)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(mid)); } }catch(_){}
+        setTimeout(()=>{ try{ nc.classList.remove('arrived'); }catch(_){} }, 3400);
+        try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
+        try{ updateSongQueueBar(); }catch(_){}
+        try{ playSong(nc.dataset.lyric||'', nc.dataset.sid||'', nc); }catch(_){}   // 点了就想听→直接放
+      }
+      return true;
+    };
+    if(parseSong(row.text).ready){ toast('已谱好, 帮你补上了'); return applyFresh(row); }
+    // ② 库里还没 url, 但桶里可能已有 mp3(worker 传桶成功但 PATCH 丢): HEAD 探测后补 PATCH
+    const path=`songs/${curRoom&&curRoom.id}/${mid}.mp3`;
+    const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
+    let ok=false;
+    try{ const r=await fetch(pub.publicUrl,{method:'HEAD'}); ok=r.ok; }catch(_){ ok=false; }
+    if(!ok) return false;
+    const parts=(row.text||'').split('|'); const sid=parts[0]||'dj'; const lyric=parts.slice(1).join('|');
+    const newText=encodeSong(sid, lyric, pub.publicUrl+'?t='+Date.now(), 0, 0);
+    const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
+    if(upd.error || !upd.data || !upd.data.length) return false;
+    toast('已谱好, 帮你补上了'); return applyFresh({...row, text:newText});
+  }catch(_){ return false; }
+}
 async function resumeStuckPendingSongs(){
   if(!curRoom || !curRoom.id || !myUid) return;
   try{
