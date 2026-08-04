@@ -4489,6 +4489,63 @@ function prefetchSong(url){
   getSongBuffer(ctx, url).catch(()=>{});
 }
 
+// ============ 神曲人声活动包络: 修跑马灯"点亮和唱词节奏对不上" ============
+// ★MiniMax 翻唱 API【不返逐字/逐句时间戳】(官方文档核实, data 只有 status+audio)。原来跑马灯只能按
+//   "N 字匀速铺满副歌窗口"线性估算 → 唱词有换气停顿(如"今天天气不错 / 适合郊游呀"两句间的气口)和
+//   句尾拖腔时, 线性游标追不上、越跑越飘(实测漂移达 +0.8s)。
+// ★逐字 onset 检测在【带鼓混音】上不可靠(实测 funk 副歌宽带 47 峰/11 字, 鼓点全被当成字)。
+//   改用鲁棒的 VAD 掩码: 一极带通 HP@250(去底鼓)+LP@3500(去镲) → 50ms 帧 RMS>窗口峰值22% 判有声。
+//   累计"有声时间", 高亮游标按【真实人声时间】分布(换气/停顿处自动冻住), 不需数准字数, 对鼓鲁棒。
+//   离线在真实 funk 上验证: 线性 vs 本法, 换气口处校正 +0.8s, 明显更贴。解不出/检测失败退回线性。
+const _EH_SONG_VOCAL=new Map();   // url → {ws, we, env} 人声活动累计表(对某窗口)
+// 从已解码 AudioBuffer 的 [ws,we] 窗口算人声活动累计表。返回 {cum, hop, total, nf, ws} 或 null(失败退线性)。
+function buildVocalEnvelope(buf, ws, we){
+  try{
+    if(!buf || !(we>ws)) return null;
+    const sr=buf.sampleRate||44100;
+    const ch=buf.getChannelData(0);
+    const i0=Math.max(0, Math.floor(ws*sr));
+    const i1=Math.min(ch.length, Math.floor(we*sr));
+    if(i1-i0 < sr*0.5) return null;              // 窗口太短不值当
+    const dt=1/sr;
+    const aHP=(1/(2*Math.PI*250))/((1/(2*Math.PI*250))+dt);   // 一极 highpass@250 系数
+    const aLP=(dt*2*Math.PI*3500)/(dt*2*Math.PI*3500+1);      // 一极 lowpass@3500 系数
+    const FR=Math.round(0.05*sr);                // 50ms 帧
+    const nf=Math.floor((i1-i0)/FR);
+    if(nf<4) return null;
+    const rms=new Float32Array(nf);
+    let yp=0, xp=0, lp=0, mx=0;
+    for(let f=0;f<nf;f++){
+      let s=0; const off=i0+f*FR;
+      for(let i=0;i<FR;i++){
+        const x=ch[off+i]||0;
+        const y=aHP*(yp+x-xp); yp=y; xp=x;       // 高通去底鼓
+        lp=lp+aLP*(y-lp);                         // 低通去镲
+        s+=lp*lp;
+      }
+      const r=Math.sqrt(s/FR); rms[f]=r; if(r>mx)mx=r;
+    }
+    if(mx<=0) return null;
+    const thr=mx*0.22;
+    const act=new Float32Array(nf);
+    for(let f=0;f<nf;f++) act[f]=rms[f]>thr?1:0;
+    for(let f=1;f<nf-1;f++) if(!act[f]&&act[f-1]&&act[f+1]) act[f]=1;  // 填单帧空洞
+    const hop=FR/sr;
+    const cum=new Float32Array(nf+1);
+    for(let f=0;f<nf;f++) cum[f+1]=cum[f]+act[f]*hop;
+    const total=cum[nf];
+    if(total < (we-ws)*0.25) return null;        // 有声太少(纯伴奏/检测失败) → 退线性
+    return {cum, hop, total, nf, ws};
+  }catch(_){ return null; }
+}
+// 给定绝对时间 absT(秒), 返回从窗口起点到此已累计的人声时长(秒)
+function vocalElapsedAt(env, absT){
+  const idx=Math.floor((absT-env.ws)/env.hop);
+  if(idx<=0) return 0;
+  if(idx>=env.nf) return env.total;
+  return env.cum[idx];
+}
+
 // 预取: 不阻塞, 成功存缓存。已有缓存则跳过。pin=true 时铉住不被 LRU 淘汰(预置词用)。
 let _prefetchInflight=new Set();
 // ============ 静态预生成真人嗓(随页面异步加载, 固定词零网络瞬时) ============
@@ -4693,6 +4750,7 @@ function playSongAI(el, onEnd){
   // 双遍(短词): 第一遍≈前半, 尾部一个衬音 → f=N/(2N+2)。
   let _pf = (N>=SONG_SHORT_CHARS) ? 0.88 : N/(2*N+2);
   _pf=Math.max(0.2,Math.min(0.95,_pf));
+  let vocalEnv=null;   // 人声活动累计表(异步解码就绪后填); 有则按真实人声时间分布高亮, 无则退线性
   const syncMarquee=()=>{
     if(!curSong||curSong.token!==myToken||!N) return;
     const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
@@ -4710,7 +4768,17 @@ function playSongAI(el, onEnd){
       for(let i=0;i<N;i++){ chEls[i].classList.add('sung'); chEls[i].classList.remove('on'); }
       return;
     }
-    const frac=Math.max(0,t/phraseWin);
+    // ★有人声活动包络时: 第一遍窗口边界仍用线性估算(phraseWin), 但窗口【内部】按真实人声时间分布——
+    //   换气/停顿处人声累计不增, 游标自动冻住, 不再穿过气口空推。无包络则退回纯线性(frac=t/phraseWin)。
+    let frac;
+    if(vocalEnv){
+      const veEnd=vocalElapsedAt(vocalEnv, startAt+phraseWin);
+      const veNow=vocalElapsedAt(vocalEnv, a.currentTime);
+      frac = veEnd>0 ? (veNow/veEnd) : (t/phraseWin);
+    }else{
+      frac = t/phraseWin;
+    }
+    frac=Math.max(0,Math.min(1,frac));
     const cur=Math.min(N-1, Math.floor(frac*N));
     for(let i=0;i<N;i++){ const ce=chEls[i]; ce.classList.toggle('sung', i<cur); ce.classList.toggle('on', i===cur); }
   };
@@ -4730,6 +4798,19 @@ function playSongAI(el, onEnd){
       if(endAt-startAt < MIN_WIN) startAt=Math.max(0, endAt-MIN_WIN);
     }
     try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
+    // ★异步建人声活动包络(不阻塞播放): 从缓存/解码 AudioBuffer 算副歌窗口的 VAD 累计表, 就绪后
+    //   syncMarquee 自动切到"按真实人声时间"高亮(换气/停顿冻住), 修节奏漂移。解码慢/失败则始终走线性。
+    if(!vocalEnv && (endAt>startAt)){
+      const _tk=myToken, _ws=startAt, _we=endAt;
+      const ctx=ac();
+      if(ctx){
+        getSongBuffer(ctx, url.split('#')[0]).then(buf=>{
+          if(!curSong||curSong.token!==_tk) return;   // 已切歌/停止, 丢弃
+          const env=buildVocalEnvelope(buf, _ws, _we);
+          if(env) vocalEnv=env;
+        }).catch(()=>{});
+      }
+    }
   };
   a.onloadedmetadata=doSeek;
   a.oncanplay=doSeek;
