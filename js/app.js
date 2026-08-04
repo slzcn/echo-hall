@@ -4541,10 +4541,19 @@ function playSongAI(el, onEnd){
   let startAt=(chE>chS)?chS:0;
   let endAt=(chE>chS)?chE:0;   // 0=播到自然结束
   let started=false;
-  const beginMarquee=(dur)=>{
-    if(!chEls.length||!curSong) return;
-    const per=(dur>0?dur:20)/chEls.length;
-    chEls.forEach((ce,i)=>{ curSong.timeouts.push(setTimeout(()=>{ ce.classList.add('on','sung'); const p=chEls[i-1]; if(p) p.classList.remove('on'); }, Math.max(0,i*per*1000))); });
+  // ★字幕点亮改为【跟真实播放进度走】(闭环), 不再用 setTimeout 开环匀速铺(修"点亮节奏和歌曲对不上"):
+  //   旧法在 onplaying 那一刻按 dur/字数 定死每字时刻 → 移动端一缓冲/卡顿, 音频停了定时器还在跑,
+  //   越跑越飘; 且起播 seek 有延迟, 定时器却从 onplaying 起算 → 一开始就错位。
+  //   现按 currentTime 在 [startAt,endAt] 窗口内的占比推进高亮: 音频停它就停, seek/卡顿自动纠偏。
+  //   注: 无法做到逐字精确(后端把词唱了两遍+加"哦耶/嗨起来"伴唱, 卡片只显一遍, 且翻唱无对齐时间戳),
+  //   这里保证的是"高亮位置忠实反映播放进度", 不再漂移。
+  const syncMarquee=()=>{
+    if(!curSong||curSong.token!==myToken||!chEls.length) return;
+    const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
+    if(!(win>0)) return;
+    const frac=Math.max(0,Math.min(1,(a.currentTime-startAt)/win));
+    const cur=Math.min(chEls.length-1, Math.floor(frac*chEls.length));
+    for(let i=0;i<chEls.length;i++){ const ce=chEls[i]; ce.classList.toggle('sung', i<cur); ce.classList.toggle('on', i===cur); }
   };
   // loadedmetadata 比 canplay 更早触发(拿到 duration 即可 seek 到 chorus), 不死等 canplay
   const doSeek=()=>{
@@ -4569,11 +4578,14 @@ function playSongAI(el, onEnd){
     if(!curSong||curSong.token!==myToken) return;
     el.classList.remove('loading');
     el.classList.add('playing'); el.querySelectorAll('.sl-ch').forEach(x=>x.classList.remove('on','sung'));
-    const dur=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
-    beginMarquee(dur);
+    syncMarquee();   // 立即对齐一次(后续由 ontimeupdate 持续跟进度推进)
   };
-  // 到 chorus 段末尾自动停(播高潮段而非整首)
-  a.ontimeupdate=()=>{ if(endAt>startAt && a.currentTime>=endAt){ if(curSong&&curSong.token===myToken) stopSong(); } };
+  // timeupdate: ①字幕高亮跟真实进度走(闭环, 修点亮漂移) ②到 chorus 段末尾自动停(播高潮段而非整首)
+  a.ontimeupdate=()=>{
+    if(!curSong||curSong.token!==myToken) return;
+    if(endAt>startAt && a.currentTime>=endAt){ stopSong(); return; }
+    syncMarquee();
+  };
   a.onended=()=>{ if(curSong&&curSong.token===myToken) stopSong(); };
   a.onerror=()=>{ el.classList.remove('loading'); if(curSong&&curSong.token===myToken){ stopSong(); toast('神曲播放失败，请重试'); } };   // ★ 仅当仍是本次播放才报错; 主动停止(src='')触发的 error 不弹
   curSong={ audioEl:a, oscs:[], timeouts:[], el, onEnd:onEnd||null, _ai:true, token:myToken };
