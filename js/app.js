@@ -2341,6 +2341,14 @@ function buildGameEl(m){
   return null;
 }
 function buildMsgEl(m, isHistory){
+  // ★"旧记录一条一条翻"修复: .msg 基础样式带持久 animation:slidein, 且 .msg 是 content-visibility:auto。
+  //   历史气泡离屏时被跳过渲染, 用户上滑翻旧记录时每条"首次渲染"→重放 slidein 入场动画, 表现为一条条蹦。
+  //   历史应即时呈现: 给 isHistory 元素打 no-anim 关掉入场动画; 实时新消息自带 fx-send/fx-in/fx-soul, 不受影响。
+  const el = _buildMsgElRaw(m, isHistory);
+  if(el && isHistory && el.classList) el.classList.add('no-anim');
+  return el;
+}
+function _buildMsgElRaw(m, isHistory){
   // 进场广播 enter: 只是"当场"特效, 不留气泡/不进历史(text 存的是档位, 非聊天内容)。历史里遇到直接跳过。
   if(m.kind==='enter') return null;
   // ★撤回消息(A方案: 用 deleted_at 时间戳判定, 服务端 RPC 严格权限): 渲染占位气泡
