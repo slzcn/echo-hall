@@ -1381,6 +1381,53 @@ function persistRoomSnap(){
   if(window.requestIdleCallback) requestIdleCallback(doWrite, { timeout:2000 });
   else setTimeout(doWrite, 0);
 }
+// ============ 刷新停留原位 (scroll anchor) ============
+// 需求: "在哪刷新, 就停留在什么位置, 只刷新数据, 不改变停留位置"。默认刷新会跳回最新(底部),
+// 这里记录"翻历史时停留的锚点消息", 刷新后精准还原到那条; 想回最新用现成的 #toLatestBtn 一键到底。
+// 锚点用【顶部第一条可见消息的 mid + 它距视口顶的像素偏移】: 重渲染后高度会变, 靠 mid 定位比纯像素稳。
+// 存 sessionStorage(仅当前标签页, 刷新存活/关页即弃) 且【按房间 id 分键】。贴底时清锚点 → 在底部刷新仍留底部。
+let _restoreScrollPending=false;   // 仅"刷新自动进房"(resumeAfterAuth)时置真, 大厅点房进入不还原(那是新导航该到底)
+let _suppressAutoBottom=false;     // 本轮进房抑制"自动贴底"(loadHistory 首屏/ensureBottom), 交给 restoreScrollAnchor 定位
+function _scrollAnchorKey(rid){ return 'eh_scroll_'+rid; }
+function recordScrollAnchor(){
+  const s=$('#stream'); if(!s || !curRoom) return;
+  const rid=curRoom.id; if(!rid) return;
+  try{
+    if(nearBottom()){ sessionStorage.removeItem(_scrollAnchorKey(rid)); return; }  // 贴底=不记锚点(刷新留底部)
+    const top=s.getBoundingClientRect().top;
+    let anchor=null;
+    // 顶部第一条"下沿还在视口内"的消息即为锚点
+    const msgs=s.querySelectorAll('.msg[data-mid]');
+    for(const m of msgs){ const r=m.getBoundingClientRect(); if(r.bottom>top+4){ anchor={mid:m.dataset.mid, off:Math.round(r.top-top)}; break; } }
+    if(anchor) sessionStorage.setItem(_scrollAnchorKey(rid), JSON.stringify(anchor));
+  }catch(_){}
+}
+// 刷新进房后还原到锚点消息。锚点消息可能还在 idle 分批渲染中未落 DOM → 有限重试等它出现;
+// 出现后再多校几帧(图片/字体/神曲卡异步撑高会漂移)。返回是否走了还原(false=无锚点, 调用方回退贴底)。
+function restoreScrollAnchor(rid){
+  let a=null;
+  try{ const raw=sessionStorage.getItem(_scrollAnchorKey(rid)); a=raw&&JSON.parse(raw); }catch(_){}
+  if(!a || !a.mid) return false;
+  const s=$('#stream'); if(!s) return false;
+  let tries=0, locked=0;
+  const kick=()=>{
+    if(!curRoom || curRoom.id!==rid) return;   // 已切房, 停止
+    const el=s.querySelector(`.msg[data-mid="${a.mid}"]`);
+    if(el){
+      const top=s.getBoundingClientRect().top;
+      s.scrollTop += (el.getBoundingClientRect().top - top) - (a.off||0);
+      try{ updateToLatest(); }catch(_){}   // 还原到非底部 → 浮出"回到最新"按钮
+      // 锁定后再校几帧防漂移(drainRest 往顶插入已保位, 这里多兜一手异步撑高)
+      if(locked<6){ locked++; setTimeout(kick, 130); }
+      return;
+    }
+    if(tries<50){ tries++; setTimeout(kick, 130); return; }   // 目标还没分批渲染出来, 最多等 ~6.5s
+    // 等超时仍没出现(锚点比本次加载范围更早/已被裁剪) → 退回贴底, 不把用户困在顶部
+    try{ const st=$('#stream'); if(st){ st.scrollTop=st.scrollHeight; hideToLatest(); } }catch(_){}
+  };
+  requestAnimationFrame(kick);
+  return true;
+}
 // 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
 function prefetchSouls(rid){
   const hit=soulsCache[rid];
@@ -1428,7 +1475,7 @@ function clearLastRoom(){ try{ localStorage.removeItem('eh_last_room'); }catch(e
 // 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
 function resumeAfterAuth(){
   const r=lastRoom();
-  if(r){ renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间
+  if(r){ _restoreScrollPending=true; renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间; 刷新进房要还原停留位置
   else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
 }
 // 刷新时同步预绘上次所在房间的骨架(切到 hall 场景), 避免先闪 enter/lobby 再跳回房间。
@@ -1470,6 +1517,7 @@ async function enterRoom(room){
   $('#hallNameTxt').innerHTML=esc(room.name);
   clearReply();
   if(snapHit){
+    _restoreScrollPending=false;   // keep-alive 秒回房不走还原(快照已含位置), 顺手清一次性标记防泄漏到下轮
     // 秒还原已渲染消息 + 滚动位置状态。★先剔除快照里烘焙进去的旧进场横幅(否则回房会看到上次的横幅残留)
     let _snapHtml = roomSnap.html;
     try{ const _d=document.createElement('div'); _d.innerHTML=_snapHtml; _d.querySelectorAll('.entry-banner,.sysmsg').forEach(e=>e.remove()); _snapHtml=_d.innerHTML; }catch(_){}
@@ -1494,6 +1542,10 @@ async function enterRoom(room){
     return;
   }
   // ---- 无快照: 原全量流程 ----
+  // 刷新进房(resumeAfterAuth 置真)且该房存过锚点 → 本轮抑制自动贴底, 首屏渲染后还原到停留位置。
+  // 一次性: 用完即清, 之后大厅点房/切房都是正常贴底。
+  const _wantRestore = _restoreScrollPending; _restoreScrollPending=false;
+  _suppressAutoBottom = _wantRestore;
   $('#stream').innerHTML=''; oldestId=null; echoState={};
   _mentionQueue=[]; updateMentionJump();   // 切房清空@我提醒
   _songReadyQueue=[]; _songGenQueue=[]; _songGenIdx=0; updateSongJump();   // 切房清空神曲谱好+谱曲中提醒
@@ -1522,7 +1574,8 @@ async function enterRoom(room){
   // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
   setTimeout(()=>{ try{ fishMyBottleReplies(); }catch(_){} }, 2600);
   setTimeout(()=>{ try{ if(secureRand()<0.5) fishBottleFromDB(); }catch(_){} }, 4200);
-  ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
+  if(_suppressAutoBottom){ _suppressAutoBottom=false; }   // 还原停留位置时不贴底(loadHistory 首屏已交给 restoreScrollAnchor)
+  else ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
@@ -1757,7 +1810,11 @@ async function loadHistory(first){
     const rest = rows.length > FIRST_PAINT_N ? rows.slice(0, rows.length - FIRST_PAINT_N) : [];
     const frag=document.createDocumentFragment();
     head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
-    stream.appendChild(frag); scrollStream();
+    stream.appendChild(frag);
+    // 刷新停留原位: 本轮要还原就【别贴底】, 交给 restoreScrollAnchor 定位到锚点(锚点可能在后续 idle 批里才落 DOM, 内含重试)
+    let _restored=false;
+    if(_suppressAutoBottom){ try{ _restored=restoreScrollAnchor(_enterRid); }catch(_){} }
+    if(!_restored) scrollStream();
     // 兜底回补左右归属: 正式账号 session 恢复慢, 历史可能在 myUid 就绪前渲染→自己的消息判成别人靠左。
     // 无论时序如何, 首屏渲染完再回补一次(渲染时/回补时至少一次拿到真 myUid)。
     try{ resyncMsgOwnership(); }catch(e){}
@@ -3200,7 +3257,7 @@ function bumpUnread(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()
   const attach=()=>{
     const s=$('#stream'), b=$('#toLatestBtn'); if(!s||!b) return false;
     if(s._tlBound) return true; s._tlBound=true;
-    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); }); };
+    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); recordScrollAnchor(); }); };
     s.addEventListener('scroll', kick, {passive:true});
     // ★偶发不显示的根因: 翻历史时消息到达打字机/图片加载/神曲卡/特效会"事后撑高" stream,
     //   离底距离变大却不触发 scroll → updateToLatest 不跑 → 按钮该现不现。用 MutationObserver
@@ -4553,13 +4610,18 @@ function playSongAI(el, onEnd){
   //   旧法一: setTimeout 开环匀速铺 → 音频卡顿定时器照跑, 越跑越飘。
   //   旧法二(v189): 按 currentTime 在整个副歌窗口匀速推进 → 但显示词只是副歌里【第一遍】的唱词,
   //     其后还有"哦耶"+伴唱+重复一遍(见后端 wrapLyric 模板), 把 N 个字摊到整窗 → 每字太慢, 高亮爬在声音后面。
-  //   现在: 利用【已知的演唱结构】—— 副歌开头必是显示词(锚点), 它只占副歌窗口的前一段。
-  //     按音节数估算第一遍唱词占比 f=N/(2N+8)(词+哦耶+(哦耶)+词+嗨起来+(嗨起来)), 只在 [startAt, startAt+phraseWin]
-  //     内推进高亮; 每字时长再夹到 [0.28s,0.65s] 的真实演唱区间(防副歌窗口误判过长/过短时点得太慢/太快)。
-  //     第一遍唱完即整句点亮保持(其后是伴唱与重复段, 不再移动)。
+  //   现在: 利用【已知的演唱结构】—— 副歌开头必是显示词(锚点), 它占副歌窗口的前一段。
+  //     ★后端已改"严格贴词、少加料"(见 eh-sing-cover wrapLyric): 长词(≥SHORT_CHARS 字)【只唱一遍】+尾部
+  //       一个极轻衬音 → 唱词几乎占满整窗, _pf≈1; 短词(<SHORT_CHARS)【唱两遍】撑满 → 第一遍约占前半, _pf≈0.5。
+  //       两处阈值必须同步(后端 SHORT_CHARS=8)。每字时长再夹到 [0.28s,0.65s] 的真实演唱区间防误判。
+  //     第一遍唱完即整句点亮保持(其后是衬音/重复段, 不再移动)。
   //   仍无法逐字帧级精确(翻唱 API 不返对齐时间戳), 但第一遍的点亮节奏已贴合实际演唱, 且音频停/卡顿自动纠偏。
+  const SONG_SHORT_CHARS=8;   // 与后端 wrapLyric 的 SHORT_CHARS 同步: <8 字唱两遍, 否则单遍
   const N=chEls.length;
-  let _pf=N/(2*N+8); _pf=Math.max(0.2,Math.min(0.55,_pf));   // 第一遍唱词占副歌窗口的估算比例
+  // 单遍(长词): 唱词≈占满副歌, 只留很小尾部给收尾衬音 → _pf≈0.88。
+  // 双遍(短词): 第一遍≈前半, 尾部一个衬音 → f=N/(2N+2)。
+  let _pf = (N>=SONG_SHORT_CHARS) ? 0.88 : N/(2*N+2);
+  _pf=Math.max(0.2,Math.min(0.95,_pf));
   const syncMarquee=()=>{
     if(!curSong||curSong.token!==myToken||!N) return;
     const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
