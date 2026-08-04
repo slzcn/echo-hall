@@ -5157,10 +5157,13 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     // ★带 featureId/masterDuration(若 manifest 已预存): Edge 跳过下载母版+preprocess, 每首快 2~5s。
     const _payload={ masterUrl, lyric, prompt:st.coverPrompt||'', sid };
     if(master.featureId){ _payload.featureId=master.featureId; _payload.masterDuration=Number(master.duration)||0; }
+    // ★服务端直传桶: 带 roomId+mid → Edge 生成后自己传桶回 songUrl, 省"2MB base64 回传+atob+浏览器再传"整段(~9s)。
+    //   path 与前端旧逻辑一致(songs/<roomId>/<mid>.mp3), 服务端上传失败会自动退回 base64(见下)。
+    _payload.roomId = startRoomId || 'unknown'; _payload.mid = String(mid);
     const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_payload),signal:_ac.signal});
     if(!resp.ok) throw new Error('cover HTTP '+resp.status);
     const res=await resp.json();
-    if(!res.ok || !res.coverMp3_b64) throw new Error('cover no audio');
+    if(!res.ok || (!res.coverMp3_b64 && !res.songUrl)) throw new Error('cover no audio');
     // 解析 chorus 段(structure 是 JSON 字符串)
     let chS=0, chE=0;
     try{
@@ -5180,17 +5183,23 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       if(chE>_cd) chE=_cd;
       if(chE-chS < 8) chS=Math.max(0, chE-8);
     }
-    // b64 → Blob → 上传 eh-song 桶
-    const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-    const blob=new Blob([bytes],{type:'audio/mpeg'});
-    // 固定 path(用初始房间id + mid, 不带 ts) → 重试时会覆盖同文件, 不产生垃圾
-    const path=`songs/${startRoomId||'unknown'}/${mid}.mp3`;
-    const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:true});
-    if(up.error) throw new Error('upload '+up.error.message);
-    const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
-    // 加 cache-bust 参数防上传后 CDN 拿到旧缓存(覆写同名文件尤需)
-    const songUrl=pub.publicUrl + '?t=' + Date.now();
+    // ★优先用服务端直传回的 songUrl(省 base64 解码+浏览器再上传整段); 没有则退回老路自己传。
+    let songUrl;
+    if(res.songUrl){
+      songUrl=res.songUrl;
+    } else {
+      // b64 → Blob → 上传 eh-song 桶(服务端未直传时的兜底路径)
+      const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      const blob=new Blob([bytes],{type:'audio/mpeg'});
+      // 固定 path(用初始房间id + mid, 不带 ts) → 重试时会覆盖同文件, 不产生垃圾
+      const path=`songs/${startRoomId||'unknown'}/${mid}.mp3`;
+      const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:true});
+      if(up.error) throw new Error('upload '+up.error.message);
+      const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
+      // 加 cache-bust 参数防上传后 CDN 拿到旧缓存(覆写同名文件尤需)
+      songUrl=pub.publicUrl + '?t=' + Date.now();
+    }
     // 回写消息 text 字段 → 带 .select() 看影响行数, RLS 静默拒/0 行会报错而不是假成功
     const newText=encodeSong(sid, lyric, songUrl, chS, chE);
     const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
