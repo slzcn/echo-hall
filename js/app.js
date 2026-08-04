@@ -2167,7 +2167,6 @@ function updateSongQueueBar(){
     const age=nowMs-ts;
     const mid=msg.dataset.mid; const mine=(msg.dataset.uid===myUid);
     if(c.classList.contains('timeout')) return;   // 已是手动超时态, 不重复处理
-    updateSongProgress(c, age);   // #10: 诚实进度爬升 + 母版曲风倒计时
     if(age > SONG_TIMEOUT_MS){
       // 自己发的 + 还没自动重试 → 自动补一次(去重靠 _EH_SONG_GENERATING)
       if(mine && !msg.dataset.autoRetried && mid && !_EH_SONG_GENERATING.has(String(mid))){
@@ -2190,35 +2189,9 @@ function updateSongQueueBar(){
   if(_songGenIdx >= _songGenQueue.length) _songGenIdx=0;
   _sqbTarget = pend.length ? (pend[pend.length-1].closest('.msg')||pend[pend.length-1]) : null;
   if(!pend.length){ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } updateSongJump(); return; }
-  // 有 pending 就保活轮询: 让超时判定 + 进度倒计时持续跑(1s 让倒计时平滑)
-  if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 1000); }
+  // 有 pending 就保活轮询: 让超时判定持续跑
+  if(!_sqbTimer){ _sqbTimer=setInterval(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 2500); }
   updateSongJump();
-}
-// #10 谱曲进度: 诚实按 已耗时/ETA 爬升(渐近封顶 92%, 只有真"归队"才由 arrived 流程补满/换播放态)。
-//   母版曲风(data-eta>0): 文案 "谱曲中 · 约 N 秒"倒计时, 到点后转"即将完成"。
-//   清唱(eta=0): 无硬承诺, 只 "真人嗓音合成中" + 缓慢爬升(worker 排队时长不可控)。
-function updateSongProgress(card, ageMs){
-  try{
-    const cm=card.querySelector('.song-composing'); if(!cm) return;
-    if(card.classList.contains('timeout')||card.classList.contains('failed')) return;
-    const eta=parseInt(cm.dataset.eta||'0',10);
-    const label=cm.dataset.label||'谱曲中';
-    const sec=Math.floor(ageMs/1000);
-    const bar=card.querySelector('.song-prog>i');
-    if(eta>0){
-      // 母版翻唱: 有稳定 ETA。进度按 age/eta 爬到 92% 封顶; 文案带倒计时。
-      const frac=Math.min(0.92, ageMs/(eta*1000));
-      if(bar) bar.style.width=Math.round(frac*100)+'%';
-      const left=eta-sec;
-      cm.textContent = left>0 ? (label+' · 约 '+left+' 秒') : (label+' · 即将完成');
-    }else{
-      // 清唱: 无 ETA。用饱和曲线慢爬(0→~85% over ~90s), 表达"在推进"但不谎报即将好。
-      const frac=Math.min(0.85, 1-Math.exp(-ageMs/45000));
-      if(bar) bar.style.width=Math.round(frac*100)+'%';
-      // 文案分档: 前 8s 显"排队中", 之后"真人嗓音合成中"
-      cm.textContent = sec<8 ? '排队中' : label;
-    }
-  }catch(_){}
 }
 let _sqbTimer=null;
 let _songGenCount=0;   // 当前 pending(生成中)神曲数, 驱动"神"按钮生成中态
@@ -4331,16 +4304,9 @@ function songHtml(text){
   const pendCls = pending ? ' pending' : '';
   // 谱曲中: 跳动音符♪(音乐语义, 非"加载"转圈); 就绪: 播放三角
   const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
-  // ★两条不同管道, 文案/时长各表: 清唱走内网真人嗓音 TTS(worker 补生成), 其余走 MiniMax 母版翻唱。
-  //   清唱不给"约N秒"硬承诺(worker 排队时长不可控), 只说"合成中"; 母版曲风有稳定 ETA 可倒计时。
-  const isAca = sid==='acapella';
-  const composeLabel = isAca ? '真人嗓音合成中' : '谱曲中';
-  const etaSec = isAca ? 0 : 38;   // 0 = 不倒计时(只走进度爬升+文案)
-  const btnTip = pending ? (isAca ? '真人嗓音合成中' : 'AI 谱曲中 · 约 38 秒') : '播放';
-  // 曲风标签色 = 曲风自己的颜色。生成中显示管道文案 + 细进度条(诚实爬升, 不到 100% 不谎报完成)。
-  const metaExtra = pending
-    ? `<span class="song-composing" data-eta="${etaSec}" data-label="${esc(composeLabel)}">${esc(composeLabel)}</span><span class="song-prog"><i></i></span>`
-    : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
+  const btnTip = pending ? 'AI 谱曲中 · 约 40 秒' : '播放';
+  // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
+  const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
   // 就绪的歌: 挂一个隐藏 <audio preload=auto> 预热浏览器缓存, 点播放时音频已缓存→秒播(不再点后干等下载)
   const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
@@ -4775,12 +4741,8 @@ document.addEventListener('click',e=>{
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     if(mid && !_EH_SONG_GENERATING.has(String(mid))){
       card.classList.remove('failed','timeout');
-      // 重试: 按管道恢复文案/ETA + 进度归零, 由 updateSongProgress 重新接管爬升。
-      const isAca=(card.dataset.sid||'')==='acapella';
-      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip', isAca?'真人嗓音合成中':'AI 谱曲中 · 约 38 秒');
-      const cm=card.querySelector('.song-composing');
-      if(cm){ cm.dataset.eta=isAca?'0':'38'; cm.dataset.label=isAca?'真人嗓音合成中':'谱曲中'; cm.textContent=isAca?'排队中':'谱曲中'; }
-      const pb=card.querySelector('.song-prog>i'); if(pb) pb.style.width='0';
+      const b=card.querySelector('.song-play'); if(b) b.setAttribute('data-tip','AI 谱曲中 · 约 40 秒');
+      const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中';
       if(bubble) bubble.dataset.songTs=String(Date.now());   // 重置计时, 重试后重新计 120s 超时
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
@@ -5105,9 +5067,8 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    // 清唱走内网真人嗓音 TTS(worker 补生成), 文案与母版翻唱区分开; 进度爬升由 updateSongProgress 接管。
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm){ cm.dataset.eta='0'; cm.dataset.label='真人嗓音合成中'; cm.textContent='排队中'; } }catch(_){}
-    try{ toast('真人嗓音合成中,由后台生成…'); }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){}
+    try{ toast('谱曲中,由后台生成…'); }catch(_){}
     // 120s 兜底: worker 若未回写 → 明确降级为"清唱服务暂不可用", 允许手动重试
     try{
       const key=String(mid);
