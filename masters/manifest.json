@@ -1,5 +1,5 @@
 {
-  "version": "20260711b",
+  "version": "20260711b-feat",
   "items": [
     {
       "id": "dj_1",
@@ -7,8 +7,9 @@
       "styleName": "蹦迪DJ",
       "url": "masters/dj_1.mp3",
       "prompt": "EDM, Electronic Dance, Energetic, Heavy Bass, Club, 洗脑抖音神曲, 快节奏",
-      "introEnd": 16.0,
-      "duration": 49.865
+      "introEnd": 16,
+      "duration": 49.865,
+      "featureId": "6ad86df732bb219db6b066a917b40ee9"
     },
     {
       "id": "dj_2",
@@ -17,7 +18,8 @@
       "url": "masters/dj_2.mp3",
       "prompt": "Future Bass, Synth, Drop, Energetic, 未来贝斯, 炸场",
       "introEnd": 14.118312780000002,
-      "duration": 42.783
+      "duration": 42.783,
+      "featureId": "399bb614def893ba4846914dd6fdd14c"
     },
     {
       "id": "dj_3",
@@ -26,7 +28,8 @@
       "url": "masters/dj_3.mp3",
       "prompt": "Big Room House, Festival, Powerful Kick, 电音节, 大鼓点",
       "introEnd": 15.60868584,
-      "duration": 47.299
+      "duration": 47.299,
+      "featureId": "13a89be4b89559f7f551c6d059246b49"
     },
     {
       "id": "dj_4",
@@ -34,8 +37,9 @@
       "styleName": "蹦迪DJ",
       "url": "masters/dj_4.mp3",
       "prompt": "Chinese EDM, Guzheng Synth Fusion, Energetic, 国风电子, 炸场",
-      "introEnd": 16.0,
-      "duration": 50.666
+      "introEnd": 16,
+      "duration": 50.666,
+      "featureId": "2c5b46cb79e4f035c853e6ed167ba00d"
     },
     {
       "id": "dj_5",
@@ -44,7 +48,8 @@
       "url": "masters/dj_5.mp3",
       "prompt": "Progressive House, Melodic, Uplifting, 旋律电子, 律动",
       "introEnd": 15.92668308,
-      "duration": 48.263
+      "duration": 48.263,
+      "featureId": "ac7f4a3af86a03ab7aa1743749059be2"
     },
     {
       "id": "funk_1",
@@ -52,8 +57,9 @@
       "styleName": "Funk",
       "url": "masters/funk_1.mp3",
       "prompt": "Funk, Groovy, Disco, Upbeat, Electronic, 复古电子, 律动",
-      "introEnd": 16.0,
-      "duration": 66.99
+      "introEnd": 16,
+      "duration": 66.99,
+      "featureId": "1095a232910b42fbf6c24e553125f4aa"
     },
     {
       "id": "funk_2",
@@ -61,8 +67,9 @@
       "styleName": "Funk",
       "url": "masters/funk_2.mp3",
       "prompt": "Disco Funk, 70s, Wah Guitar, Dancefloor, 迪斯科放克, 舞池",
-      "introEnd": 16.0,
-      "duration": 51.862
+      "introEnd": 16,
+      "duration": 51.862,
+      "featureId": "03767ea209da121fa45280c62268ac82"
     },
     {
       "id": "funk_3",
@@ -70,8 +77,9 @@
       "styleName": "Funk",
       "url": "masters/funk_3.mp3",
       "prompt": "Electro Funk, Synth Bass, Retro, 电子放克, 复古",
-      "introEnd": 16.0,
-      "duration": 56.552
+      "introEnd": 16,
+      "duration": 56.552,
+      "featureId": "7dae88c2dad6427d5800e134ac37b599"
     },
     {
       "id": "funk_4",
@@ -79,8 +87,9 @@
       "styleName": "Funk",
       "url": "masters/funk_4.mp3",
       "prompt": "Nu Disco, Modern, Groovy Bass, 新迪斯科, 现代律动",
-      "introEnd": 16.0,
-      "duration": 49.818
+      "introEnd": 16,
+      "duration": 49.818,
+      "featureId": "d14fe940459254ae0c65b470f267ade7"
     },
     {
       "id": "funk_5",
@@ -88,8 +97,9 @@
       "styleName": "Funk",
       "url": "masters/funk_5.mp3",
       "prompt": "Chiptune Funk, 8bit Synth, Playful, 芯片放克, 俏皮电玩",
-      "introEnd": 16.0,
-      "duration": 49.342
+      "introEnd": 16,
+      "duration": 49.342,
+      "featureId": "3e2bac350e6b66297a28af8db26b4cbe"
     },
     {
       "id": "gufeng_1",
@@ -97,8 +107,9 @@
       "styleName": "古风",
       "url": "masters/gufeng_1.mp3",
       "prompt": "Guofeng, Chinese Traditional, Guzheng, Bamboo Flute, 婉转优美",
-      "introEnd": 16.0,
-      "duration": 52.14
+      "introEnd": 16,
+      "duration": 52.14,
+      "featureId": "f4ed6986335148f4d6f9cbd9517d76f9"
     },
     {
       "id": "gufeng_2",
@@ -106,8 +117,9 @@
       "styleName": "古风",
       "url": "masters/gufeng_2.mp3",
       "prompt": "Guofeng Pop, Erhu, Modern Beat, 古风流行, 现代节奏",
-      "introEnd": 16.0,
-      "duration": 50.178
+      "introEnd": 16,
+      "duration": 50.178,
+      "featureId": "a95a50cc2faf26b085d1ce28c8beec7b"
     },
     {
       "id": "gufeng_3",
@@ -115,8 +127,9 @@
       "styleName": "古风",
       "url": "masters/gufeng_3.mp3",
       "prompt": "Ancient Chinese, Pipa, Ethereal, 古典, 空灵悠远",
-      "introEnd": 16.0,
-      "duration": 71.726
+      "introEnd": 16,
+      "duration": 71.726,
+      "featureId": "5892a63b3623ee45391830ab2427a076"
     },
     {
       "id": "gufeng_4",
@@ -124,8 +137,9 @@
       "styleName": "古风",
       "url": "masters/gufeng_4.mp3",
       "prompt": "Guofeng Electronic, Guzheng Synth, Epic, 古风电子, 大气",
-      "introEnd": 16.0,
-      "duration": 60.987
+      "introEnd": 16,
+      "duration": 60.987,
+      "featureId": "3b3ea258a6dae1bba57a52288696f7b8"
     },
     {
       "id": "gufeng_5",
@@ -133,8 +147,9 @@
       "styleName": "古风",
       "url": "masters/gufeng_5.mp3",
       "prompt": "Xianxia, Bamboo Flute, Serene, 仙侠古风, 幽远",
-      "introEnd": 16.0,
-      "duration": 58.828
+      "introEnd": 16,
+      "duration": 58.828,
+      "featureId": "203054c75c3b741e121d5ba2931de24f"
     },
     {
       "id": "jazz_1",
@@ -142,8 +157,9 @@
       "styleName": "爵士",
       "url": "masters/jazz_1.mp3",
       "prompt": "Jazz, Smooth, Lounge, Saxophone, 慵懒深夜酒吧, 轻松",
-      "introEnd": 16.0,
-      "duration": 55.438
+      "introEnd": 16,
+      "duration": 55.438,
+      "featureId": "3918122b7f12fbfded0efc449519aebe"
     },
     {
       "id": "jazz_2",
@@ -151,8 +167,9 @@
       "styleName": "爵士",
       "url": "masters/jazz_2.mp3",
       "prompt": "Bossa Nova, Relaxed, Guitar, Warm, 巴萨诺瓦, 温暖",
-      "introEnd": 16.0,
-      "duration": 48.785
+      "introEnd": 16,
+      "duration": 48.785,
+      "featureId": "ec5af928f86f27c28265e5d36a85fceb"
     },
     {
       "id": "jazz_3",
@@ -160,8 +177,9 @@
       "styleName": "爵士",
       "url": "masters/jazz_3.mp3",
       "prompt": "Swing Jazz, Upbeat, Piano, Brass, 摇摆爵士, 欢快",
-      "introEnd": 16.0,
-      "duration": 49.667
+      "introEnd": 16,
+      "duration": 49.667,
+      "featureId": "4993847bcec2de4c98162d6c9255543b"
     },
     {
       "id": "jazz_4",
@@ -170,7 +188,8 @@
       "url": "masters/jazz_4.mp3",
       "prompt": "Jazz Funk, Groovy, Electric Piano, 爵士放克, 律动",
       "introEnd": 14.80411416,
-      "duration": 44.861
+      "duration": 44.861,
+      "featureId": "598e2881cc58645a95257e86253e6aa8"
     },
     {
       "id": "jazz_5",
@@ -179,7 +198,8 @@
       "url": "masters/jazz_5.mp3",
       "prompt": "Cafe Jazz, Cozy, Soft Piano, 咖啡馆爵士, 惬意",
       "introEnd": 12.716059950000002,
-      "duration": 38.534
+      "duration": 38.534,
+      "featureId": "723229b9dbeebdf1d367d2dfdbb587be"
     },
     {
       "id": "kid_1",
@@ -187,8 +207,9 @@
       "styleName": "卡通",
       "url": "masters/kid_1.mp3",
       "prompt": "Kids Song, Cartoon, Cheerful, Playful, Cute Vocal, 欢快童声",
-      "introEnd": 16.0,
-      "duration": 48.948
+      "introEnd": 16,
+      "duration": 48.948,
+      "featureId": "323572cdccb7fd0efe91ac584e6e2428"
     },
     {
       "id": "kid_2",
@@ -197,7 +218,8 @@
       "url": "masters/kid_2.mp3",
       "prompt": "Nursery Rhyme, Piano, Choir, Warm, 幼儿园儿歌, 温暖",
       "introEnd": 14.106819210000001,
-      "duration": 42.748
+      "duration": 42.748,
+      "featureId": "60ed8d3450cb66bf68f52f48a42f2c5f"
     },
     {
       "id": "kid_3",
@@ -206,7 +228,8 @@
       "url": "masters/kid_3.mp3",
       "prompt": "Cartoon Theme, Xylophone Bells, Bouncy, 卡通片头, 跳跃",
       "introEnd": 15.2025687,
-      "duration": 46.068
+      "duration": 46.068,
+      "featureId": "58ec8f78e74202dd15b108c0b4a6fb95"
     },
     {
       "id": "kid_4",
@@ -215,7 +238,8 @@
       "url": "masters/kid_4.mp3",
       "prompt": "Children Pop, Guitar, Sunny, Simple Melody, 童谣, 阳光",
       "introEnd": 10.47092244,
-      "duration": 31.73
+      "duration": 31.73,
+      "featureId": "d3d24bcdb03fcaa6fe8568de678bc5b7"
     },
     {
       "id": "kid_5",
@@ -224,7 +248,8 @@
       "url": "masters/kid_5.mp3",
       "prompt": "Playful Kids, Ukulele, Happy, 俏皮儿歌, 快乐",
       "introEnd": 8.64722727,
-      "duration": 26.204
+      "duration": 26.204,
+      "featureId": "9b1889550f0c5338f6b79e021e56ebf0"
     },
     {
       "id": "rnb_1",
@@ -233,7 +258,8 @@
       "styleName": "冰霞柔情R&B",
       "prompt": "R&B, Soul, Smooth, Sensual, Slow Jam, 午夜情调, 慢节奏, 柔情",
       "duration": 109.587,
-      "introEnd": 8.0
+      "introEnd": 8,
+      "featureId": "19edfa2347be5466e9d5929aa5ee0965"
     },
     {
       "id": "rnb_2",
@@ -242,7 +268,8 @@
       "styleName": "冰霞柔情R&B",
       "prompt": "Contemporary R&B, Warm Vocal, Silky, Modern, 都市 R&B, 丝滑",
       "duration": 67.199,
-      "introEnd": 8.0
+      "introEnd": 8,
+      "featureId": "cadb5d0998f5390b558ca1529710b994"
     },
     {
       "id": "rnb_3",
@@ -251,7 +278,8 @@
       "styleName": "冰霞柔情R&B",
       "prompt": "Neo-Soul, Groove, Chill, Retro, 新灵魂, 慵懒律动",
       "duration": 45.058,
-      "introEnd": 8.0
+      "introEnd": 8,
+      "featureId": "dd90ec732f0a57b463c3e9beda494509"
     },
     {
       "id": "rnb_4",
@@ -260,7 +288,8 @@
       "styleName": "冰霞柔情R&B",
       "prompt": "R&B Ballad, Piano, Emotional, Late Night, R&B 情歌, 夜深情浓",
       "duration": 112.315,
-      "introEnd": 8.0
+      "introEnd": 8,
+      "featureId": "07ac3b57a5fba6ed46800e88814b0108"
     },
     {
       "id": "rnb_5",
@@ -269,7 +298,8 @@
       "styleName": "冰霞柔情R&B",
       "prompt": "Chill R&B, Electronic, Ambient, Dreamy, 冷 R&B, 梦幻迷离",
       "duration": 54.753,
-      "introEnd": 8.0
+      "introEnd": 8,
+      "featureId": "daf09494451a7dc68dd05f6240efb861"
     }
   ]
 }

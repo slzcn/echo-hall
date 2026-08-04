@@ -1187,6 +1187,12 @@
   .song-composing{color:var(--sc-txt,var(--sc,var(--magenta)));font-size:11px;font-weight:600;letter-spacing:.3px;margin-left:2px;opacity:.9}
   .song-composing::after{content:'';animation:composeDots 1.4s steps(1,end) infinite}
   @keyframes composeDots{0%{content:''}25%{content:'·'}50%{content:'··'}75%{content:'···'}100%{content:''}}
+  /* 谱曲进度细条: JS 按已耗时/ETA 诚实爬升(渐近 <100%, 只有真"归队"才满), 曲风色。给用户"在推进"的确定感, 替代纯转圈。 */
+  .song-prog{display:inline-block;width:46px;height:3px;margin-left:6px;border-radius:2px;vertical-align:middle;
+    background:color-mix(in srgb,var(--sc,var(--magenta)) 18%,transparent);overflow:hidden}
+  .song-prog>i{display:block;height:100%;width:0;border-radius:2px;background:var(--sc,var(--magenta));
+    transition:width .9s linear;box-shadow:0 0 6px -1px var(--sc,var(--magenta))}
+  .song-card.timeout .song-prog,.song-card.failed .song-prog{display:none}
   .song-card.failed{opacity:.85}
   .song-card.failed .song-play{cursor:pointer;border-color:var(--magenta);color:var(--magenta)}
   .song-card.failed .song-play::before{content:'↻';font-size:14px}
@@ -1827,7 +1833,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260804-songFirstPassAlign';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260804-songSpeedWait';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2256,7 +2262,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260804-songFirstPassAlign"></script>
+<script src="./js/app.js?v=20260804-songSpeedWait"></script>
 <script src="./js/keyboard.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
