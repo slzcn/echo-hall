@@ -1852,20 +1852,54 @@ async function loadHistory(first){
     // 扫我自己发的卡住的 pending 神曲: 如果存储桶里已有 mp3 → 直接补 patch, 不重新调 MiniMax
     try{ resumeStuckPendingSongs().catch(()=>{}); }catch(_){}
   } else {
+    // ★加载更早: 用"锚元素定位"而非"像素差"恢复滚动位置。
+    //   旧法 scrollTop=scrollHeight-prevH 在 content-visibility:auto(离屏气泡按估算高占位)下会飘 → 插入后视觉跳动/卡顿感。
+    //   改: 记住插入前的第一条真实消息元素, 插完把它重新滚回原来那个屏内偏移, 逐帧稳到位, 不受估算高影响。
+    // 拉到空(超时/无更早) → 别动按钮: 有 canLoadMore 说明可能还有(超时), 留给 doLoadMore 复位可重试;
+    //   无 canLoadMore 说明真到底了, 移除按钮。不再"先 remove 后发现没内容"把按钮弄丢。
+    if(!rows.length){ if(moreBtn && !canLoadMore) moreBtn.remove(); return; }
+    const anchorEl = stream.querySelector('.msg[data-mid]');
+    const anchorTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
     const frag=document.createDocumentFragment();
     rows.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
-    const prevH=stream.scrollHeight;
     if(moreBtn) moreBtn.remove();
     stream.insertBefore(frag, stream.firstChild);
     if(canLoadMore) addLoadMore(true);
-    stream.scrollTop = stream.scrollHeight - prevH;
+    // 锚定回位: 新内容插在顶部, 把锚元素拉回它插入前的屏内位置(多帧兜异步撑高)
+    if(anchorEl){
+      const fix=()=>{ const cur=anchorEl.getBoundingClientRect().top; const d=cur-anchorTop; if(Math.abs(d)>1) stream.scrollTop += d; };
+      fix(); requestAnimationFrame(fix); setTimeout(fix,60); setTimeout(fix,180);
+    }
     fetchEchoes(rows.map(m=>m.id));
+  }
+}
+// 加载更早: 点击态收敛(防连点重复拉 + 消解"卡住感")。
+//   旧问题: onclick 直接 loadHistory(false) 无任何反馈, 15s 超时里按钮纹丝不动 → "点了没反应/卡住";
+//   且连点会并发多次共用同一 oldestId → 同页重复插入(样式错乱)。
+let _loadingMore=false;
+async function doLoadMore(btn){
+  if(_loadingMore) return;
+  _loadingMore=true;
+  const old=btn.textContent;
+  btn.classList.add('loading'); btn.disabled=true; btn.textContent='加载中…';
+  try{
+    await loadHistory(false);
+  }catch(e){
+    console.warn('load more', e);
+    // 失败: 按钮不消失, 复位可重试(loadHistory 内部拉不到会自己决定还留不留按钮; 这里兜异常路径)
+    const again=$('#loadMoreBtn');
+    if(again){ again.classList.remove('loading'); again.disabled=false; again.textContent='↑ 重试加载'; }
+    else { const s=$('#stream'); if(s){ addLoadMore(true); } }
+  }finally{
+    _loadingMore=false;
+    const b2=$('#loadMoreBtn');   // loadHistory 成功会 remove 旧按钮并按 canLoadMore 重建, 这里只复位仍存在的那个
+    if(b2 && b2.disabled){ b2.classList.remove('loading'); b2.disabled=false; b2.textContent=old; }
   }
 }
 function addLoadMore(top){
   const stream=$('#stream');
   const b=document.createElement('button'); b.className='load-more'; b.id='loadMoreBtn'; b.textContent='↑ 加载更早的消息';
-  b.onclick=()=>loadHistory(false);
+  b.onclick=()=>doLoadMore(b);
   stream.insertBefore(b, stream.firstChild);
 }
 
@@ -4527,12 +4561,26 @@ if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCac
 let _masterPreview=null;   // { audioEl, mid, token }
 let _masterPreviewToken=0;
 // 从【已加载】的 manifest 同步挑一首该曲风母版(不 await, 供发送手势链同步取)。未加载/无母版返回 null。
+// ★母版选取按"时长反比"加权(2026-08-04 提速): 实测 MiniMax 生成耗时 ∝ 母版时长
+//   (母版50s→生成41s, 母版110s→生成66s)。均匀随机会抽到长母版拖慢一截。
+//   权重取 1/max(dur,20)^3: 短母版概率显著更高, 但长母版仍有机会 → 保多样性不"永远同一首"。
+//   实测 exp=3 是甜点: rnb 曲风 E[母版] 77.8s→55.5s(两首110s+母版各压到~3%仍非零), 其余曲风本就无长母版故变化小。
+//   同曲风、无质量损失, 只是偏向更紧凑的母版, 把慢曲风最坏情况从 ~70s 压到 ~55s。
+function pickMasterWeighted(pool){
+  if(!pool || !pool.length) return null;
+  if(pool.length===1) return pool[0];
+  const w=pool.map(m=>{ const d=Math.max(20, Number(m.duration)||50); return 1/Math.pow(d,3); });
+  const total=w.reduce((a,b)=>a+b,0);
+  let r=secureRand()*total;
+  for(let i=0;i<pool.length;i++){ r-=w[i]; if(r<=0) return pool[i]; }
+  return pool[pool.length-1];
+}
 function pickMasterSync(sid){
   try{
     const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
     const pool=items.filter(x=>x.sid===sid);
     if(!pool.length) return null;
-    const m=pool[Math.floor(secureRand()*pool.length)];
+    const m=pickMasterWeighted(pool)||pool[0];
     return { url:new URL(m.url, location.href).href, introEnd:Number(m.introEnd)||0 };
   }catch(_){ return null; }
 }
@@ -5149,7 +5197,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
     // 挑一首同曲风母版当参考(整个对象: 可能带预存 featureId/duration 供 Edge 跳过 preprocess 加速)
     let master=null;
-    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pool[Math.floor(Math.random()*pool.length)]; }catch(_){}
+    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pickMasterWeighted(pool)||pool[0]; }catch(_){}
     if(!master){ throw new Error('no master for sid '+sid); }
     const masterUrl=new URL(master.url, location.href).href;
     // 调 Edge Function 生成(37s 左右, 前端 80s 硬超时)。
