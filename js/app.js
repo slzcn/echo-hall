@@ -4800,7 +4800,12 @@ function playSongAI(el, onEnd){
     try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
     // ★异步建人声活动包络(不阻塞播放): 从缓存/解码 AudioBuffer 算副歌窗口的 VAD 累计表, 就绪后
     //   syncMarquee 自动切到"按真实人声时间"高亮(换气/停顿冻住), 修节奏漂移。解码慢/失败则始终走线性。
-    if(!vocalEnv && (endAt>startAt)){
+    // ★门槛 chS>0(母版给了【真实副歌定位】)才启用 VAD-warp。实测教训: 当 chS=0(母版没定位、
+    //   退化成"整首窗口")时, 窗口里混着前奏/间奏/多段人声, VAD 分不清哪段是显示的那句唱词 → 反而
+    //   比线性更飘(真实数据: 7232 rnb 前奏垫音污染致 +3.1s、7140 整首全程有声致 -1.95s)。有真实
+    //   副歌段(chS>0, 如 7220/7099/7090)时 VAD-warp 精准跟停顿(shift 0.7~1.1s 合理)。库里多数歌
+    //   是 chS=0, 一律走线性(与旧行为一致, 不回归); 只有拿到副歌定位的才吃这个精修。
+    if(!vocalEnv && chS>0 && (endAt>startAt)){
       const _tk=myToken, _ws=startAt, _we=endAt;
       const ctx=ac();
       if(ctx){
