@@ -3965,6 +3965,8 @@ function setMode(mode){
   // 神曲: 显示曲风细色条
   const strip=$('#songStrip');
   if(strip){ strip.classList.toggle('on', songMode); if(songMode) renderSongStrip(); }
+  // ★方向2: 进神曲模式即预热母版 manifest —— 让发送时 pickMasterSync 能同步拿到母版立即预览前奏(不 await)。
+  if(songMode){ try{ loadMasterManifest(); }catch(_){} }
   // 占位文案 + 神曲模式跟随当前曲风色
   const cin=$('#cin');
   if(songMode){ const st=SONG_STYLES.find(s=>s.id===songSel)||SONG_STYLES[0]; cin.placeholder=`输入要唱的话… ${st.emoji}${st.name}`; composer.style.setProperty('--song-c', safeColor(st.color)); }
@@ -4428,6 +4430,7 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
 let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el,onEnd,token}
 let _songToken=0;   // 一次性播放令牌: 每次 play 递增, 回调比对 curSong.token 判定"是不是我这首歌"(ctx是全局单例, 拿它当身份形同虚设)
 function stopSong(){
+  try{ if(typeof stopMasterPreview==='function') stopMasterPreview(); }catch(_){}   // 播真歌/停止时连带停母版前奏预览
   if(!curSong) return;
   AudioEngine.duck(false);   // 恢复官方房 BGM 音量
   const s=curSong; curSong=null;
@@ -4450,6 +4453,61 @@ function pickZhVoice(){
   return _voiceCache;
 }
 if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=()=>{ _voiceCache=null; pickZhVoice(); }; pickZhVoice(); }catch(e){} }
+
+// ============ 谱曲期母版前奏预览(方向2: 0延迟真乐器, 消解40s干等) ============
+// 点谱曲那一刻立即播【选中曲风母版的纯器乐前奏段(intro)】, loop 到翻唱生成完成/失败/切房即停。
+// · 只播 intro(manifest 每首存 introEnd): 纯器乐无人声 → 不暴露"别人的词", 也不抢真歌的听感。
+// · 用 <audio>(与 playSongAI 同款可靠路径, 不碰 Web Audio 手势静音坑); 在用户点发送的同步手势链里 play()。
+// · 独立于真歌播放(curSong): 播真歌/切房/生成结束都会 stopMasterPreview。轻音量, 只为"有动静"不喧宾。
+let _masterPreview=null;   // { audioEl, mid, token }
+let _masterPreviewToken=0;
+// 从【已加载】的 manifest 同步挑一首该曲风母版(不 await, 供发送手势链同步取)。未加载/无母版返回 null。
+function pickMasterSync(sid){
+  try{
+    const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
+    const pool=items.filter(x=>x.sid===sid);
+    if(!pool.length) return null;
+    const m=pool[Math.floor(secureRand()*pool.length)];
+    return { url:new URL(m.url, location.href).href, introEnd:Number(m.introEnd)||0 };
+  }catch(_){ return null; }
+}
+function stopMasterPreview(mid){
+  if(!_masterPreview) return;
+  if(mid && _masterPreview.mid!==String(mid)) return;   // 指定 mid 时只停那一首的预览(防停错)
+  const p=_masterPreview; _masterPreview=null;
+  try{ const a=p.audioEl; if(a){ a.onended=null; a.ontimeupdate=null; a.pause(); a.src=''; a.load&&a.load(); } }catch(_){}
+  try{ AudioEngine.duck(false); }catch(_){}
+  // 卡片去掉"预览中"高亮
+  try{ const card=document.querySelector(`.msg[data-mid="${p.mid}"] .song-card`); if(card) card.classList.remove('previewing'); }catch(_){}
+}
+// 点谱曲后调: 立即播该曲风某首母版的 intro 段, loop 直到 stopMasterPreview。masterUrl/introEnd 由调用方从 manifest 取。
+function startMasterPreview(mid, masterUrl, introEnd){
+  try{
+    if(!masterUrl) return;
+    stopMasterPreview();           // 同一时刻只预览一首
+    stopVoice(); stopSong();       // 预览与真歌/语音互斥
+    const myToken=++_masterPreviewToken;
+    const a=new Audio();
+    a.preload='auto';
+    a.src=String(masterUrl).split('#')[0];
+    a.volume=0.85;
+    const loopTo=(isFinite(introEnd)&&introEnd>1)?introEnd:0;   // 有 introEnd 就 loop 前奏段, 否则整首 loop
+    if(loopTo>0){
+      a.ontimeupdate=()=>{ if(_masterPreview&&_masterPreview.token===myToken && a.currentTime>=loopTo){ try{ a.currentTime=0; }catch(_){} } };
+    } else {
+      a.loop=true;
+    }
+    _masterPreview={ audioEl:a, mid:String(mid), token:myToken };
+    try{ AudioEngine.duck(true); }catch(_){}
+    try{ const card=document.querySelector(`.msg[data-mid="${mid}"] .song-card`); if(card) card.classList.add('previewing'); }catch(_){}
+    // play() 必须在点击同步链里(sendSong 由发送手势触发) → 不受移动端 autoplay 静音限制
+    a.play().then(()=>{}).catch(err=>{
+      // 被拦/被打断: 静默收场, 别打扰(预览是锦上添花, 失败不该报错)
+      if(_masterPreview&&_masterPreview.token===myToken) stopMasterPreview();
+    });
+  }catch(_){}
+}
+
 // 神曲播放 dispatcher: 根据 singMode 分发到 legacy(本地合成)/ai(拉URL播高潮)
 async function playSong(lyric, sid, el, onEnd){
   const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
@@ -4872,15 +4930,24 @@ async function sendSong(lyric, sid){
   // AI 模式: 消息立即发出(pending 态) → 后台异步生成 → 上传 → PATCH text 回写 → realtime 广播归队
   // ★先 insert 拿真实 id 再 buildMsgEl append, 彻底消灭"realtime 广播快于本地回填 dataset.mid 导致重复渲染"竞态
   //   (代价: 50-200ms 后才上屏, 换 100% 无重复; 且 realtime handler 也会 append 但会被 data-mid 去重挡住)
+  // ★方向2 母版前奏预览: 立即播该曲风母版 intro(0延迟真乐器), 消解 40s 干等。
+  //   必须在 insert(await) 之前的【同步手势链】里 play() —— 否则脱离用户手势, iOS/移动端 autoplay 静音。
+  //   此刻还没 mid, 先用占位 'pending' 启动, insert 拿到真 id 后把预览 mid 更新过去(见下)。
+  //   acapella 走内网 TTS worker、无母版, 不预览。
+  if(sid!=='acapella'){ const _mp=pickMasterSync(sid); if(_mp){ startMasterPreview('pending', _mp.url, _mp.introEnd); } }
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:encodeSong(sid,lyric), kind:'song' };
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
-  if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); return; }
+  if(error){ console.warn('song send',error); toast(EH_CONFIG.text.err_singSend); try{ stopMasterPreview('pending'); }catch(_){} return; }
+  // 预览 mid: 占位 → 真 id(让后续按 mid 停预览/挂卡片高亮能对上)
+  try{ if(_masterPreview && _masterPreview.mid==='pending') _masterPreview.mid=String(row.id); }catch(_){}
   // 若 realtime 已经先把它 append 进 DOM(理论上不太可能, insert 返回和广播基本同时), 则跳过本地 append
   let el=document.querySelector(`.msg[data-mid="${row.id}"]`);
   if(!el){
     const optimistic={ ...payload, id:row.id, created_at:new Date().toISOString() };
     el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
   }
+  // 卡片上屏后挂"预览中"高亮(此时卡片必在 DOM; 在 insert 后立即挂会因卡片尚未 append 而落空)
+  try{ if(_masterPreview && _masterPreview.mid===String(row.id) && el){ const card=el.querySelector('.song-card'); if(card) card.classList.add('previewing'); } }catch(_){}
   try{ updateSongQueueBar(); }catch(e){}   // 自己发的 pending 歌进队列条监视
   // 后台生成(不 await, 让用户可以继续聊天/其他操作)。mid 统一 String, 与点击补触发(String(mid))同键防重复生成
   generateAndPersistSong(String(row.id), lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
@@ -5041,6 +5108,9 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   }finally{
     clearTimeout(_to);
     _EH_SONG_GENERATING.delete(mid);
+    // ★方向2: 生成结束(成功归队 / 失败 / 超时)即停母版前奏预览 —— 否则会一直循环到用户手动点播才停。
+    //   只停 mid 匹配的那条(用户可能已切去别的曲、或又发了新歌启了新预览)。
+    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(mid); }catch(_){}
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
