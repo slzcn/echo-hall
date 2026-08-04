@@ -4541,19 +4541,33 @@ function playSongAI(el, onEnd){
   let startAt=(chE>chS)?chS:0;
   let endAt=(chE>chS)?chE:0;   // 0=播到自然结束
   let started=false;
-  // ★字幕点亮改为【跟真实播放进度走】(闭环), 不再用 setTimeout 开环匀速铺(修"点亮节奏和歌曲对不上"):
-  //   旧法在 onplaying 那一刻按 dur/字数 定死每字时刻 → 移动端一缓冲/卡顿, 音频停了定时器还在跑,
-  //   越跑越飘; 且起播 seek 有延迟, 定时器却从 onplaying 起算 → 一开始就错位。
-  //   现按 currentTime 在 [startAt,endAt] 窗口内的占比推进高亮: 音频停它就停, seek/卡顿自动纠偏。
-  //   注: 无法做到逐字精确(后端把词唱了两遍+加"哦耶/嗨起来"伴唱, 卡片只显一遍, 且翻唱无对齐时间戳),
-  //   这里保证的是"高亮位置忠实反映播放进度", 不再漂移。
+  // ★字幕点亮【跟真实播放进度走】(闭环) + 第一遍唱词精准对齐(修"点亮节奏和歌曲对不上"):
+  //   旧法一: setTimeout 开环匀速铺 → 音频卡顿定时器照跑, 越跑越飘。
+  //   旧法二(v189): 按 currentTime 在整个副歌窗口匀速推进 → 但显示词只是副歌里【第一遍】的唱词,
+  //     其后还有"哦耶"+伴唱+重复一遍(见后端 wrapLyric 模板), 把 N 个字摊到整窗 → 每字太慢, 高亮爬在声音后面。
+  //   现在: 利用【已知的演唱结构】—— 副歌开头必是显示词(锚点), 它只占副歌窗口的前一段。
+  //     按音节数估算第一遍唱词占比 f=N/(2N+8)(词+哦耶+(哦耶)+词+嗨起来+(嗨起来)), 只在 [startAt, startAt+phraseWin]
+  //     内推进高亮; 每字时长再夹到 [0.28s,0.65s] 的真实演唱区间(防副歌窗口误判过长/过短时点得太慢/太快)。
+  //     第一遍唱完即整句点亮保持(其后是伴唱与重复段, 不再移动)。
+  //   仍无法逐字帧级精确(翻唱 API 不返对齐时间戳), 但第一遍的点亮节奏已贴合实际演唱, 且音频停/卡顿自动纠偏。
+  const N=chEls.length;
+  let _pf=N/(2*N+8); _pf=Math.max(0.2,Math.min(0.55,_pf));   // 第一遍唱词占副歌窗口的估算比例
   const syncMarquee=()=>{
-    if(!curSong||curSong.token!==myToken||!chEls.length) return;
+    if(!curSong||curSong.token!==myToken||!N) return;
     const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
     if(!(win>0)) return;
-    const frac=Math.max(0,Math.min(1,(a.currentTime-startAt)/win));
-    const cur=Math.min(chEls.length-1, Math.floor(frac*chEls.length));
-    for(let i=0;i<chEls.length;i++){ const ce=chEls[i]; ce.classList.toggle('sung', i<cur); ce.classList.toggle('on', i===cur); }
+    let phraseWin=win*_pf;
+    phraseWin=Math.min(phraseWin, N*0.65);   // 每字≤0.65s: 防窗口过长(全歌兜底)时点得太慢
+    phraseWin=Math.max(phraseWin, N*0.28);   // 每字≥0.28s: 防窗口极短时点得太快
+    phraseWin=Math.min(phraseWin, win);      // 不超过窗口本身
+    const t=a.currentTime-startAt;
+    if(t>=phraseWin){                          // 第一遍唱完: 整句保持点亮(其后伴唱/重复段, 不再移动)
+      for(let i=0;i<N;i++){ chEls[i].classList.add('sung'); chEls[i].classList.remove('on'); }
+      return;
+    }
+    const frac=Math.max(0,t/phraseWin);
+    const cur=Math.min(N-1, Math.floor(frac*N));
+    for(let i=0;i<N;i++){ const ce=chEls[i]; ce.classList.toggle('sung', i<cur); ce.classList.toggle('on', i===cur); }
   };
   // loadedmetadata 比 canplay 更早触发(拿到 duration 即可 seek 到 chorus), 不死等 canplay
   const doSeek=()=>{
