@@ -4698,7 +4698,11 @@ function playSongAI(el, onEnd){
     const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
     if(!(win>0)) return;
     let phraseWin=win*_pf;
-    phraseWin=Math.min(phraseWin, N*0.65);   // 每字≤0.65s: 防窗口过长(全歌兜底)时点得太慢
+    // 每字上限 1.5s(修 funk/jazz 等慢曲风高亮快2x): MiniMax cover 把字拖长唱, 实测副歌
+    //   每字达 1.36~1.4s(funk 11字/15s窗、12字/16.8s窗)。旧上限 0.65s 只按语速最快的
+    //   acapella(TTS≈0.31s/字)定, 慢曲风被硬勒到半程就扫完、剩下大半歌字全灭 = "点亮和唱词对不上"。
+    //   放宽到 1.5s 覆盖真实慢曲风; acapella 仍受下限 0.28s 约束不变, 不回归。
+    phraseWin=Math.min(phraseWin, N*1.5);    // 每字≤1.5s: 防窗口过长(全歌兜底)时点得太慢
     phraseWin=Math.max(phraseWin, N*0.28);   // 每字≥0.28s: 防窗口极短时点得太快
     phraseWin=Math.min(phraseWin, win);      // 不超过窗口本身
     const t=a.currentTime-startAt;
