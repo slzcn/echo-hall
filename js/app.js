@@ -1836,7 +1836,11 @@ async function loadHistory(first){
     // 刷新停留原位: 本轮要还原就【别贴底】, 交给 restoreScrollAnchor 定位到锚点(锚点可能在后续 idle 批里才落 DOM, 内含重试)
     let _restored=false;
     if(_suppressAutoBottom){ try{ _restored=restoreScrollAnchor(_enterRid); }catch(_){} }
-    if(!_restored) scrollStream();
+    // ★真凶(修"进房不是最新记录"): 上次在底部刷新 → 无锚点 → _restored=false, 但 _suppressAutoBottom 仍为真,
+    //   会让 enterRoom 末尾【跳过 ensureBottom】。而首屏这次 scrollStream 只贴一次, 之后图片/字体/神曲卡/
+    //   idle 补渲染继续撑高 stream → 停在半中间, 看着"不是最新"。这里: 没真正还原就把抑制清掉,
+    //   让 enterRoom 末尾照常 ensureBottom(多帧反复贴底直到高度稳), 真正落到最后一条。
+    if(!_restored){ _suppressAutoBottom=false; scrollStream(); }
     // 兜底回补左右归属: 正式账号 session 恢复慢, 历史可能在 myUid 就绪前渲染→自己的消息判成别人靠左。
     // 无论时序如何, 首屏渲染完再回补一次(渲染时/回补时至少一次拿到真 myUid)。
     try{ resyncMsgOwnership(); }catch(e){}
