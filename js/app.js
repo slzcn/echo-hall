@@ -4549,6 +4549,55 @@ function vocalElapsedAt(env, absT){
   if(idx>=env.nf) return env.total;
   return env.cum[idx];
 }
+// ★清唱(acapella)逐字对齐: 从整首解码 buffer 算【人声真实起止 + 尾部长音起点】, 直接给出每字点亮时刻表。
+//   清唱是 worker TTS 干唱显示词一遍(无伴奏/无前奏/无重复/无衬词), 整首 mp3 就是这句词 → 用 VAD 掩码的
+//   首末有声帧当唱词起止, 比"匀速铺 0.97*时长"准得多。实测(5 首真人清唱 vs whisper 逐字真值):
+//     平均误差 0.51s → 0.23s, 崩掉的两首(拖长音/尾巴长)0.51/1.44s → 0.21/0.51s, 脆快句 7/11→11/11。
+//   关键: 尾部长音(finalRun>1.5s)时, 最后一个字应落在【长音起点】而非长音末尾(否则整句被拖后 ~1s);
+//     无长尾则按 k/N 摊到整段(最后一字自然落在末尾前一个音节)。返回 {onset:[N], firstT, lastT} 或 null。
+function buildAcapellaOnsets(buf, N){
+  try{
+    if(!buf || !(N>0)) return null;
+    const sr=buf.sampleRate||44100;
+    const ch=buf.getChannelData(0);
+    const dt=1/sr;
+    const aHP=(1/(2*Math.PI*250))/((1/(2*Math.PI*250))+dt);   // HP@250 去底鼓/隆隆
+    const aLP=(dt*2*Math.PI*3500)/(dt*2*Math.PI*3500+1);      // LP@3500 去齿音毛刺
+    const FR=Math.round(0.05*sr);                             // 50ms 帧(与 buildVocalEnvelope 同)
+    const nf=Math.floor(ch.length/FR);
+    if(nf<4) return null;
+    const rms=new Float32Array(nf); let yp=0,xp=0,lp=0,mx=0;
+    for(let f=0;f<nf;f++){
+      let s=0; const off=f*FR;
+      for(let i=0;i<FR;i++){ const x=ch[off+i]||0; const y=aHP*(yp+x-xp); yp=y; xp=x; lp=lp+aLP*(y-lp); s+=lp*lp; }
+      const r=Math.sqrt(s/FR); rms[f]=r; if(r>mx)mx=r;
+    }
+    if(mx<=0) return null;
+    const thr=mx*0.22;
+    const act=new Uint8Array(nf);
+    for(let f=0;f<nf;f++) act[f]=rms[f]>thr?1:0;
+    for(let f=1;f<nf-1;f++) if(!act[f]&&act[f-1]&&act[f+1]) act[f]=1;   // 填单帧空洞
+    const hop=FR/sr;
+    let first=-1,last=-1;
+    for(let f=0;f<nf;f++) if(act[f]){ if(first<0)first=f; last=f; }
+    if(first<0) return null;
+    const firstT=first*hop, lastT=(last+1)*hop;
+    if(lastT-firstT < 0.5) return null;                        // 有声太少, 退线性
+    // 尾部连续有声段的起点(允许 ≤2 帧小空隙): 长音起点
+    let lr=last;
+    while(lr>first){ if(act[lr-1]) lr--; else if(lr-2>=first && act[lr-2]) lr-=2; else break; }
+    const lastRunStartT=lr*hop;
+    const finalRun=lastT-lastRunStartT;
+    const onset=new Array(N);
+    if(finalRun>1.5 && lastRunStartT>firstT+0.3){
+      const endT=lastRunStartT;                                // 长尾: 末字落长音起点, 0..N-1 摊到 [firstT,endT]
+      for(let k=0;k<N;k++) onset[k]=firstT+(endT-firstT)*(k/(N-1||1));
+    }else{
+      for(let k=0;k<N;k++) onset[k]=firstT+(lastT-firstT)*(k/N);  // 脆快: k/N, 末字自然落末尾前一音节
+    }
+    return {onset, firstT, lastT};
+  }catch(_){ return null; }
+}
 
 // 预取: 不阻塞, 成功存缓存。已有缓存则跳过。pin=true 时铉住不被 LRU 淘汰(预置词用)。
 let _prefetchInflight=new Set();
@@ -4728,6 +4777,11 @@ function playSongAI(el, onEnd){
   if(!url){ toast('神曲地址缺失'); return; }
   const chS=parseFloat(el.dataset.cs||'0')||0;
   const chE=parseFloat(el.dataset.ce||'0')||0;
+  const sid=(el.dataset.sid||'').toLowerCase();
+  // ★人声对齐(清唱逐字时刻表 / 翻唱 VAD-warp)只在【无鼓/弱鼓】曲风可信: 鼓点/镲的 4~8kHz 能量会被当成字
+  //   (实测 funk 副歌 47峰/11字全乱, 见 buildVocalEnvelope 注)。有鼓曲风(funk/dj/kid)不在此集 → 永远走
+  //   匀速线性, 不硬上逐字。清唱(acapella)另有专属逐字表分支(buildAcapellaOnsets), jazz/gufeng/rnb 走 warp。
+  const VOCAL_WARP_STYLES=new Set(['jazz','gufeng','rnb']);
   try{ AudioEngine.duck(true); }catch(_){}
   el.classList.add('loading');
   const a=new Audio();
@@ -4750,13 +4804,25 @@ function playSongAI(el, onEnd){
   //   仍无法逐字帧级精确(翻唱 API 不返对齐时间戳), 但第一遍的点亮节奏已贴合实际演唱, 且音频停/卡顿自动纠偏。
   const SONG_SHORT_CHARS=8;   // 与后端 wrapLyric 的 SHORT_CHARS 同步: <8 字唱两遍, 否则单遍
   const N=chEls.length;
-  // 单遍(长词): 唱词≈占满副歌, 只留很小尾部给收尾衬音 → _pf≈0.88。
-  // 双遍(短词): 第一遍≈前半, 尾部一个衬音 → f=N/(2N+2)。
+  // _pf = "显示词在播放窗口里占的比例"(第一遍唱完的位置), 用于翻唱(MiniMax cover)的匀速/warp 高亮:
+  //   后端 wrapLyric 长词唱一遍+轻衬音(_pf≈0.88)、短词唱两遍撑满副歌(_pf≈N/(2N+2))。
+  //   ★清唱(acapella)不走这套: 它有 acaOnset【逐字点亮时刻表】(见 buildAcapellaOnsets), 直接按绝对时刻点。
   let _pf = (N>=SONG_SHORT_CHARS) ? 0.88 : N/(2*N+2);
   _pf=Math.max(0.2,Math.min(0.95,_pf));
-  let vocalEnv=null;   // 人声活动累计表(异步解码就绪后填); 有则按真实人声时间分布高亮, 无则退线性
+  let vocalEnv=null;    // 翻唱: 人声活动累计表(异步解码就绪后填); 有则按真实人声时间分布高亮, 无则退线性
+  let acaOnset=null;    // 清唱: {onset:[N],firstT,lastT} 逐字点亮时刻表(绝对秒, startAt=0)。就绪后 syncMarquee 直接用
   const syncMarquee=()=>{
     if(!curSong||curSong.token!==myToken||!N) return;
+    // ★清唱有逐字时刻表: 到某字的 onset 时刻即点亮它(before=sung, at=on)。播放停/卡顿天然自纠(跟 currentTime)。
+    if(acaOnset){
+      const tc=a.currentTime;
+      let cur=-1;
+      for(let i=0;i<N;i++) if(tc>=acaOnset.onset[i]) cur=i;
+      if(cur<0){ for(let i=0;i<N;i++) chEls[i].classList.remove('sung','on'); return; }
+      for(let i=0;i<N;i++){ const ce=chEls[i]; ce.classList.toggle('sung', i<cur); ce.classList.toggle('on', i===cur); }
+      if(cur>=N-1){ chEls[N-1].classList.add('sung'); }   // 末字唱到即整句点亮保持
+      return;
+    }
     const win=(endAt>startAt)?(endAt-startAt):((a.duration||0)-startAt);
     if(!(win>0)) return;
     let phraseWin=win*_pf;
@@ -4802,14 +4868,25 @@ function playSongAI(el, onEnd){
       if(endAt-startAt < MIN_WIN) startAt=Math.max(0, endAt-MIN_WIN);
     }
     try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
-    // ★异步建人声活动包络(不阻塞播放): 从缓存/解码 AudioBuffer 算副歌窗口的 VAD 累计表, 就绪后
-    //   syncMarquee 自动切到"按真实人声时间"高亮(换气/停顿冻住), 修节奏漂移。解码慢/失败则始终走线性。
-    // ★门槛 chS>0(母版给了【真实副歌定位】)才启用 VAD-warp。实测教训: 当 chS=0(母版没定位、
-    //   退化成"整首窗口")时, 窗口里混着前奏/间奏/多段人声, VAD 分不清哪段是显示的那句唱词 → 反而
-    //   比线性更飘(真实数据: 7232 rnb 前奏垫音污染致 +3.1s、7140 整首全程有声致 -1.95s)。有真实
-    //   副歌段(chS>0, 如 7220/7099/7090)时 VAD-warp 精准跟停顿(shift 0.7~1.1s 合理)。库里多数歌
-    //   是 chS=0, 一律走线性(与旧行为一致, 不回归); 只有拿到副歌定位的才吃这个精修。
-    if(!vocalEnv && chS>0 && (endAt>startAt)){
+    // ★异步解码 AudioBuffer 建对齐表(不阻塞播放), 就绪后 syncMarquee 自动切到精准高亮。解码慢/失败则退线性。
+    //   分两条路(都只在无鼓曲风 VOCAL_WARP_STYLES 上启用——有鼓的 funk/dj/kid 鼓点会被当成字, 见 buildVocalEnvelope):
+    //   ①清唱(acapella): 整首=一遍干净人声, 用 buildAcapellaOnsets 直接算【逐字点亮时刻表】。
+    //     实测 5 首真人清唱 vs whisper 逐字真值: 平均误差 0.51s→0.23s(匀速兜底 vs 本法), 崩掉的拖长音句尤其明显。
+    //   ②翻唱(jazz/gufeng/rnb): 必须 chS>0(母版给了真实副歌定位)才用 VAD 累计表 warp 内部分布。chS=0 时
+    //     窗口混前奏/间奏/多段人声, VAD 分不清哪段是显示词 → 反比线性飘(真实教训: 7232 rnb +3.1s、7140 -1.95s)。
+    if(sid==='acapella'){
+      if(!acaOnset){
+        const _tk=myToken;
+        const ctx=ac();
+        if(ctx){
+          getSongBuffer(ctx, url.split('#')[0]).then(buf=>{
+            if(!curSong||curSong.token!==_tk) return;   // 已切歌/停止, 丢弃
+            const ao=buildAcapellaOnsets(buf, N);
+            if(ao) acaOnset=ao;
+          }).catch(()=>{});
+        }
+      }
+    }else if(!vocalEnv && VOCAL_WARP_STYLES.has(sid) && chS>0 && (endAt>startAt)){
       const _tk=myToken, _ws=startAt, _we=endAt;
       const ctx=ac();
       if(ctx){
@@ -5396,9 +5473,10 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     try{
       const struct=typeof res.structure==='string' ? JSON.parse(res.structure) : (res.structure||{});
       const segs=struct.segments||[];
+      // ★只认真正的 chorus 段; 找不到退【全曲】(chS=0), 别退 segs[last]=outro——
+      //   outro 常是纯尾奏/衬音、不含显示词, 高亮会对到没唱那句词的音频上(worker 端同此修)。
       const chorus=segs.find(x=>String(x.label).toLowerCase().includes('chorus'));
       if(chorus){ chS=chorus.start||0; chE=chorus.end||0; }
-      else if(segs.length){ const last=segs[segs.length-1]; chS=last.start||0; chE=last.end||0; }
     }catch(_){}
     // 兜底: 没有 chorus 时用全歌
     if(chE<=chS){ chS=0; chE=res.cover_duration||0; }
