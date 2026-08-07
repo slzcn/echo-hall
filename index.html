@@ -1644,6 +1644,12 @@
     background:var(--magenta,#FF2D8E);color:#fff;font-size:9px;font-weight:800;
     align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,#12141f)}
   .dm-btn.has-unread .dm-dot,.me-avatar.has-unread .dm-dot{display:inline-flex}
+  /* 未读时头像角标脉冲呼吸, 更醒目(否则小数字容易漏看); 头像本体也轻微发光提示 */
+  .me-avatar.has-unread .dm-dot{animation:dm-dot-pulse 1.6s ease-in-out infinite}
+  .me-avatar.has-unread{animation:dm-av-glow 1.6s ease-in-out infinite}
+  @keyframes dm-dot-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 2px var(--panel-solid,#12141f),0 0 0 0 color-mix(in srgb,var(--magenta,#FF2D8E) 60%,transparent)}
+    50%{transform:scale(1.12);box-shadow:0 0 0 2px var(--panel-solid,#12141f),0 0 0 5px color-mix(in srgb,var(--magenta,#FF2D8E) 0%,transparent)}}
+  @keyframes dm-av-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--magenta,#FF2D8E) 55%,transparent))}}
   /* 个人空间里的私信入口按钮(整行, 带未读徽标靠右) */
   .me-dm-entry{display:flex;align-items:center;gap:10px;width:100%;justify-content:flex-start;position:relative}
   .me-dm-entry .mde-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
@@ -1663,13 +1669,14 @@
   .dm-composer{flex-shrink:0;display:flex;gap:8px;align-items:center;padding:12px 0 max(14px,env(safe-area-inset-bottom));
     border-top:1px solid var(--line)}
   .dm-composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);
-    border-radius:12px;padding:11px 14px;font-size:15px;font-family:inherit;outline:none;transition:.2s}
+    border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;outline:none;transition:.2s}
   .dm-composer input:focus{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .dm-send{flex-shrink:0;border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 45%,transparent);
     background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent);color:var(--accent,var(--cyan));
     border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s}
   .dm-send:hover{background:color-mix(in srgb,var(--accent,var(--cyan)) 24%,transparent)}
   .dm-send:active{transform:scale(.95)}
+  .dm-send.is-disabled,.dm-send:disabled{opacity:.4;pointer-events:none;filter:grayscale(.5)}
   /* 收件箱会话列表项 */
   .dm-thread{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
     background:var(--card-bg);cursor:pointer;margin-bottom:8px;transition:.15s}
@@ -1888,7 +1895,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260807-dmsoul';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260807-dmux';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2333,10 +2340,10 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260807-dmsoul"></script>
+<script src="./js/app.js?v=20260807-dmux"></script>
 <script src="./js/keyboard.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260807-dmsoul"></script>
+<script src="./js/dm.js?v=20260807-dmux"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->

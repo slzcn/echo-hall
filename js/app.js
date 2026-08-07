@@ -3571,7 +3571,7 @@ function openPeerMenu(anchorEl, name, uid){
   });
   // 私信入口(灵魂不开放私信——AI 不在私信闭环里); 放菜单顶部
   if(!isTargetSoul && window.EhDM){
-    items.unshift(`<div class="pm-row" data-act="dm">✉️ <span>发私信</span></div>`);
+    items.unshift(`<div class="pm-row" data-act="dm">✉️ <span>私信</span></div>`);
   }
   const menu=document.createElement('div'); menu.className='peer-menu'; menu.id='peerMenu';
   menu.innerHTML=`<div class="pm-hd">对 ${esc(name)}</div>`+items.join('');

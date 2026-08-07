@@ -166,7 +166,8 @@
     if(!curThread || !myUid) return;
     const inp=$('#dmChatInput'); const text=(inp.value||'').trim();
     if(!text) return;
-    inp.value='';
+    inp.value=''; syncSendState();
+    try{ inp.focus(); }catch(e){}                       // 保持聚焦: 键盘不收, 连发更顺
     const stream=$('#dmChatStream');
     const div=document.createElement('div'); div.className='dm-msg me';   // 乐观渲染
     div.innerHTML=`${esc(text)}<span class="dm-t">刚刚</span>`;
@@ -237,7 +238,28 @@
     $('#dmChatBack')&&($('#dmChatBack').onclick=()=>{ closeChat(); openInbox(); });
     $('#dmChatMask')&&($('#dmChatMask').onclick=closeChat);
     $('#dmChatSend')&&($('#dmChatSend').onclick=sendChat);
-    $('#dmChatInput')&&$('#dmChatInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendChat(); } });
+    const inp=$('#dmChatInput');
+    if(inp){
+      // ★输入法协同: 中文拼音候选期(compositionstart→end)按空格/回车是"选字/确认", 不是发送。
+      //   用 isComposing + 自维护 _composing 双保险(部分安卓 IME 不给 isComposing), 候选期回车一律不发。
+      let _composing=false;
+      inp.addEventListener('compositionstart',()=>{ _composing=true; });
+      inp.addEventListener('compositionend',()=>{ _composing=false; syncSendState(); });
+      inp.addEventListener('keydown',e=>{
+        if(e.key==='Enter' && !e.shiftKey){
+          if(_composing || e.isComposing || e.keyCode===229){ return; }  // 229=IME 合成中的通用 keyCode
+          e.preventDefault(); sendChat();
+        }
+      });
+      inp.addEventListener('input', syncSendState);
+      syncSendState();
+    }
+  }
+  // 空文本时禁用发送按钮(灰态), 有内容才亮; compositionend/input 时刷新
+  function syncSendState(){
+    const inp=$('#dmChatInput'), btn=$('#dmChatSend'); if(!inp||!btn) return;
+    const empty=!(inp.value||'').trim();
+    btn.disabled=empty; btn.classList.toggle('is-disabled', empty);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 
