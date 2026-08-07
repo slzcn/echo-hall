@@ -46,12 +46,16 @@
   }
 
   // ---- 未读红点 ----
+  // 入口已收进个人空间: 红点跟到个人空间入口头像(#meBtn/#meBtnHall)的角标 + 面板内私信行的徽标。
   function paintUnread(){
-    ['#dmBtnLobby','#dmBtnHall'].forEach(sel=>{
-      const b=$(sel); if(!b) return;
-      b.classList.toggle('has-unread', _totalUnread>0);
-      const dot=b.querySelector('.dm-dot'); if(dot) dot.textContent = _totalUnread>9?'9+':String(_totalUnread);
+    const txt = _totalUnread>9?'9+':String(_totalUnread);
+    [['#meBtn','#dmDotMe'],['#meBtnHall','#dmDotMeHall']].forEach(([btn,dot])=>{
+      const b=$(btn); if(b) b.classList.toggle('has-unread', _totalUnread>0);
+      const d=$(dot); if(d) d.textContent=txt;
     });
+    const entry=$('#meDmEntry'), badge=$('#meDmBadge');   // 个人空间面板内的私信行(打开时才在)
+    if(entry) entry.classList.toggle('has-unread', _totalUnread>0);
+    if(badge) badge.textContent=txt;
   }
   async function refreshUnread(){
     if(!sb || !myUid) return;
@@ -221,8 +225,7 @@
 
   // ---- 绑定 ----
   function bind(){
-    $('#dmBtnLobby')&&($('#dmBtnLobby').onclick=openInbox);
-    $('#dmBtnHall')&&($('#dmBtnHall').onclick=openInbox);
+    // 私信入口现在收在个人空间面板内(#meDmEntry, openMe 渲染时由 app.js 绑定); 这里只绑会话窗/收件箱自身控件。
     $('#dmInboxDx')&&($('#dmInboxDx').onclick=closeInbox);
     $('#dmInboxMask')&&($('#dmInboxMask').onclick=closeInbox);
     $('#dmChatDx')&&($('#dmChatDx').onclick=closeChat);

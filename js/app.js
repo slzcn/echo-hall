@@ -6543,6 +6543,7 @@ async function openMe(){
         ${isBound?'<button class="dbtn" id="meEmail">✉️ 邮箱</button>':'<button class="dbtn" id="meReg">✨ 注册</button>'}
       </div>
     </div>
+    <div class="dsec"><button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button></div>
     <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
     <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
@@ -6626,6 +6627,8 @@ function bindMeActions(isBound){
     rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast(EH_CONFIG.text.ok_profileUpdated); closeMe();
   };
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
+  const dmE=$('#meDmEntry'); if(dmE) dmE.onclick=()=>{ closeMe(); if(window.EhDM) window.EhDM.openInbox(); };
+  if(window.EhDM) window.EhDM.refreshUnread();   // 面板刚渲染, 立即把未读数喷到私信行徽标
   bindMeReg(); bindMeEmail();
 }
 function bindMeReg(){ const b=$('#meReg'); if(b) b.onclick=()=>{ closeMe(); openModal('mReg'); }; }
