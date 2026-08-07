@@ -3567,6 +3567,10 @@ function openPeerMenu(anchorEl, name, uid){
     if(isTargetSoul && ix.can_target_soul===false) return;
     items.push(`<div class="pm-row" data-ix="${esc(ix.id)}">${safeEmoji(ix.emoji)||'✨'} <span>${esc(ix.name)}</span></div>`);
   });
+  // 私信入口(灵魂不开放私信——AI 不在私信闭环里); 放菜单顶部
+  if(!isTargetSoul && window.EhDM){
+    items.unshift(`<div class="pm-row" data-act="dm">✉️ <span>发私信</span></div>`);
+  }
   const menu=document.createElement('div'); menu.className='peer-menu'; menu.id='peerMenu';
   menu.innerHTML=`<div class="pm-hd">对 ${esc(name)}</div>`+items.join('');
   document.body.appendChild(menu);
@@ -3579,6 +3583,14 @@ function openPeerMenu(anchorEl, name, uid){
     menu.style.left=Math.max(8,x)+'px'; menu.style.top=Math.max(8,y)+'px'; menu.classList.add('on'); });
   menu.querySelectorAll('.pm-row').forEach(row=>row.onclick=(e)=>{ e.stopPropagation();
     if(row.dataset.act==='at'){ insertAtName(name); hidePeerMenu(); return; }
+    if(row.dataset.act==='dm'){ hidePeerMenu();
+      // 从光墙头像取对方 emoji/色, 让会话/列表有据可依
+      const pav=document.querySelector(`#presence .pav[data-uid="${uid}"]`);
+      let em='', col='';
+      if(pav){ col=pav.style.getPropertyValue('--pav-c')||''; const ic=pav.querySelector('.av-ic'); em=(ic?ic.textContent:'').replace('AI','').trim(); }
+      window.EhDM.open(uid, name, em, col);
+      return;
+    }
     const ix=_interactions.find(i=>i.id===row.dataset.ix); if(ix) sendInteraction(ix, uid, name);
     hidePeerMenu();
   });

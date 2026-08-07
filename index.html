@@ -1637,6 +1637,46 @@
   .member-list .mitem:hover{transform:none;box-shadow:none;border-color:var(--line)}
   .mitem-more{padding:8px 12px;font-size:12px;color:var(--dim);text-align:center}
 
+  /* ============ 私信 (DM) ============ */
+  /* 头部✉️按钮 + 未读红点(仿 .mj-dot) */
+  .dm-btn{position:relative}
+  .dm-dot{display:none;position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;
+    background:var(--magenta,#FF2D8E);color:#fff;font-size:9px;font-weight:800;
+    align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,#12141f)}
+  .dm-btn.has-unread .dm-dot{display:inline-flex}
+  /* 会话窗: 抽屉复用 .drawer/.drawer-mask, 内部改成 消息流 + 底部输入 的竖向布局 */
+  #dmChatDrawer{padding-bottom:0}
+  .dm-back{cursor:pointer;color:var(--dim);font-size:26px;line-height:1;margin-right:4px;transition:color .15s}
+  .dm-back:hover{color:var(--accent,var(--cyan))}
+  .dm-stream{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px 12px}
+  .dm-msg{max-width:78%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}
+  .dm-msg.them{align-self:flex-start;background:var(--card-bg);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .dm-msg.me{align-self:flex-end;background:color-mix(in srgb,var(--accent,var(--cyan)) 18%,var(--panel-solid));
+    border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 40%,transparent);border-bottom-right-radius:5px}
+  .dm-msg .dm-t{display:block;font-size:10px;color:var(--dim);margin-top:3px;text-align:right}
+  .dm-composer{flex-shrink:0;display:flex;gap:8px;align-items:center;padding:12px 0 max(14px,env(safe-area-inset-bottom));
+    border-top:1px solid var(--line)}
+  .dm-composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);
+    border-radius:12px;padding:11px 14px;font-size:15px;font-family:inherit;outline:none;transition:.2s}
+  .dm-composer input:focus{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
+  .dm-send{flex-shrink:0;border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 45%,transparent);
+    background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent);color:var(--accent,var(--cyan));
+    border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s}
+  .dm-send:hover{background:color-mix(in srgb,var(--accent,var(--cyan)) 24%,transparent)}
+  .dm-send:active{transform:scale(.95)}
+  /* 收件箱会话列表项 */
+  .dm-thread{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
+    background:var(--card-bg);cursor:pointer;margin-bottom:8px;transition:.15s}
+  .dm-thread:hover{border-color:var(--accent,var(--cyan));transform:translateY(-1px)}
+  .dm-thread .dt-av{width:40px;height:40px;flex-shrink:0;border-radius:12px;display:grid;place-items:center;font-size:21px;
+    background:color-mix(in srgb,var(--dt-c,var(--cyan)) 12%,transparent);box-shadow:inset 0 0 0 1.5px var(--dt-c,var(--cyan))}
+  .dm-thread .dt-mid{flex:1;min-width:0}
+  .dm-thread .dt-nm{font-size:14px;font-weight:700;color:var(--dt-c,var(--ink));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dm-thread .dt-last{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .dm-thread .dt-badge{flex-shrink:0;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--magenta,#FF2D8E);
+    color:#fff;font-size:10px;font-weight:800;display:none;align-items:center;justify-content:center;line-height:1}
+  .dm-thread.unread .dt-badge{display:inline-flex}
+
   /* 聊天页不再复用 .stage：#hall 自己就是唯一视口容器，keyboard.js 只写这一层。 */
   @media(max-width:1366px){
     .title{font-size:30px}
@@ -1842,7 +1882,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260807-lyricTint';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260807-dm';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2068,6 +2108,22 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx">✕</span></div>
   <div class="drawer-body" id="gearBody"></div>
 </div>
+<!-- 私信收件箱: 所有会话线列表 -->
+<div class="drawer-mask" id="dmInboxMask"></div>
+<div class="drawer" id="dmInboxDrawer">
+  <div class="drawer-h"><h3>私信</h3><span class="dx" id="dmInboxDx">✕</span></div>
+  <div class="drawer-body" id="dmInboxBody"></div>
+</div>
+<!-- 私信会话窗: 与某人的 1v1 对话 -->
+<div class="drawer-mask" id="dmChatMask"></div>
+<div class="drawer" id="dmChatDrawer">
+  <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dx" id="dmChatDx">✕</span></div>
+  <div class="dm-stream" id="dmChatStream"></div>
+  <div class="dm-composer">
+    <input id="dmChatInput" maxlength="500" placeholder="发条私信…" autocomplete="off">
+    <button id="dmChatSend" class="dm-send">发送</button>
+  </div>
+</div>
 </div>
 
 <div class="stage">
@@ -2107,6 +2163,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     <div class="lobby-head">
       <h2>回声厅</h2>
       <div class="hall-tools lobby-tools">
+        <div class="tool-btn dm-btn" id="dmBtnLobby" title="私信">✉️<span class="dm-dot" id="dmDotLobby"></span></div>
         <div class="tool-btn bgm-btn" id="bgmBtnLobby" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
         <div class="tool-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊</div>
@@ -2147,6 +2204,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       </div>
       <div class="hall-tools">
         <div class="tool-btn" id="wallBtn" title="名场面 · 本房高共鸣消息">✨</div>
+        <div class="tool-btn dm-btn" id="dmBtnHall" title="私信">✉️<span class="dm-dot" id="dmDotHall"></span></div>
         <div class="tool-btn bgm-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
         <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊</div>
@@ -2269,11 +2327,12 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script src="./js/config.js?v=20260802-entryFreezeFix"></script>
+<script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260806-acaAlign"></script>
+<script src="./js/app.js?v=20260807-dm"></script>
 <script src="./js/keyboard.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
+<script src="./js/dm.js?v=20260807-dm"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
