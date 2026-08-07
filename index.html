@@ -1206,10 +1206,10 @@
   .song-card.failed .song-eq i{animation:none;opacity:.3;background:var(--magenta)}
   /* 谱曲超时(pending 超 2 分钟仍没好): 琥珀色↻可点重试, 盖住音符跳动 */
   .song-card.timeout{opacity:.85}
-  .song-card.timeout .song-play{cursor:pointer;border-color:var(--amber,#F7C873);color:var(--amber,#F7C873)}
+  .song-card.timeout .song-play{cursor:pointer;border-color:var(--amber,#FFC24D);color:var(--amber,#FFC24D)}
   .song-card.timeout .song-note{display:none}
   .song-card.timeout .song-play::before{content:'↻';font-size:14px}
-  .song-card.timeout .song-composing{color:var(--amber,#F7C873)}
+  .song-card.timeout .song-composing{color:var(--amber,#FFC24D)}
   .song-card.timeout .song-composing::after{content:'' !important;animation:none}
   .song-pre{display:none!important;width:0;height:0}   /* 预加载用隐藏 audio, 不占布局 */
   /* loading: 不用 transparent-border 拼转圈环(某些安卓 webview 会渲成黑色扇形/圆盘)。
@@ -1840,7 +1840,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260806-acaAlign';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260807-songPalette';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
