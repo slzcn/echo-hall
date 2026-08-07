@@ -3560,7 +3560,9 @@ const isSoulUid=(uid)=>soulUidSet && soulUidSet.has(uid);
 // 点头像弹出「对TA」小菜单: @TA + 各互动
 function openPeerMenu(anchorEl, name, uid){
   hidePeerMenu();
-  const isTargetSoul=isSoulUid(uid);
+  // ★用 isSoulUser(uid,name) 而非 isSoulUid(uid): 漫游进房的灵魂只写 presence、不入 eh_room_souls,
+  //   soulUidSet 里没它 → isSoulUid 会判成真人 → "发私信"入口漏出 + 互动误放行。按名字/花名册兜底根治。
+  const isTargetSoul=isSoulUser(uid, name);
   // 长按菜单只保留互动(送花/抱一下/打一拳/扔炸弹); @TA 仍由"点头像"触发, 不在此菜单
   const items=[];
   _interactions.forEach(ix=>{

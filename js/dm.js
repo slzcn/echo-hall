@@ -88,7 +88,9 @@
   }
   function renderInbox(list){
     const body=$('#dmInboxBody'); if(!body) return;
-    if(!list || !list.length){ body.innerHTML='<div class="empty-hint">还没有私信。长按某人头像即可发起私信 ✉️</div>'; return; }
+    // 灵魂线不进列表(AI 不在私信闭环; 可能是拦截上线前误建的历史线)
+    list=(list||[]).filter(t=>!isSoulTarget(t.other_uid, t.other_name));
+    if(!list.length){ body.innerHTML='<div class="empty-hint">还没有私信。长按某人头像即可发起私信 ✉️</div>'; return; }
     body.innerHTML=list.map(t=>{
       const c=safeColor(t.other_color);
       const preview=t.last_text ? (t.last_from===myUid?'我: ':'')+t.last_text : '（暂无消息）';
@@ -104,10 +106,13 @@
   }
 
   // ---- 会话窗 ----
+  // 灵魂(AI)暂不在私信闭环里(那端没人接), 任何入口打开跟灵魂的会话都拦掉——含收件箱里的历史灵魂线。
+  function isSoulTarget(uid, name){ try{ return typeof isSoulUser==='function' && isSoulUser(uid, name); }catch(e){ return false; } }
   async function openChat(otherUid, otherName, otherEmoji, otherColor){
     try{ await awaitSb(); }catch(e){}
     if(!myUid){ toast('身份加载中，请稍后再试'); return; }
     if(otherUid===myUid){ toast('不能给自己发私信'); return; }
+    if(isSoulTarget(otherUid, otherName)){ toast('灵魂暂不支持私信哦'); return; }
     $('#dmChatTitle').textContent=otherName||'私信';
     $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     $('#dmChatMask').classList.add('on'); $('#dmChatDrawer').classList.add('on');
