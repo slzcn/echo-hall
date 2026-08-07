@@ -15,6 +15,32 @@
   let _tailPoll = null;          // 会话窗兜底轮询
   let _lastMsgId = 0;            // 已渲染的最大消息 id(兜底轮询/实时去重)
 
+  // ---- 键盘协同: 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它。
+  //   iOS Safari 无 VirtualKeyboard API、走 visualViewport, fixed 锚 layout viewport(不随键盘缩)
+  //   → bottom:0 落键盘背后, 输入框被盖住。按验证过的方案把抽屉钉到 visualViewport:
+  //   top=vv.offsetTop + height=vv.height(去掉 bottom:0), 让 .dm-stream(flex:1)被挤扁而 composer 常驻可视底。
+  //   Android 占位式键盘(overlaysContent=false)本就顶起 viewport, 此时 top≈0/height≈innerHeight → 本绑定近似空操作, 不回归。
+  const _vv = window.visualViewport;
+  const _softKb = () => { try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return false; } };
+  function fitChatViewport(){
+    const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
+    if(!_vv || !_softKb()) return;                 // 桌面/无 vv: 留默认 top:0/bottom:0 全高
+    d.style.top=_vv.offsetTop+'px';
+    d.style.height=_vv.height+'px';
+    d.style.bottom='auto';                          // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
+    scrollBottom();                                 // 键盘挤扁 stream 后重新贴底, 别把最新消息顶出可视区
+  }
+  function bindChatViewport(){
+    if(!_vv) return;
+    _vv.addEventListener('resize', fitChatViewport);
+    _vv.addEventListener('scroll', fitChatViewport);
+    fitChatViewport();
+  }
+  function unbindChatViewport(){
+    if(_vv){ _vv.removeEventListener('resize', fitChatViewport); _vv.removeEventListener('scroll', fitChatViewport); }
+    const d=$('#dmChatDrawer'); if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; }
+  }
+
   function fmtTime(iso){
     try{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; }
   }
@@ -82,6 +108,7 @@
     $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     $('#dmChatMask').classList.add('on'); $('#dmChatDrawer').classList.add('on');
     try{ ehArm(); }catch(e){}
+    bindChatViewport();
     _lastMsgId=0;
     try{
       const {data:thread,error}=await sb.rpc('eh_dm_get_or_create',{p_other:otherUid});
@@ -98,6 +125,8 @@
   }
   function closeChat(){
     try{ if($('#dmChatMask').classList.contains('on')) EhSfx.play('back'); }catch(e){}
+    unbindChatViewport();
+    const inp=$('#dmChatInput'); if(inp){ try{ inp.blur(); }catch(e){} }   // 收键盘, 免关窗后 vv 仍缩着
     $('#dmChatMask').classList.remove('on'); $('#dmChatDrawer').classList.remove('on');
     curThread=null; stopTailPoll();
     refreshUnread();
