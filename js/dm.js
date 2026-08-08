@@ -108,15 +108,13 @@
   // ---- 会话窗 ----
   // 灵魂(AI)暂不在私信闭环里(那端没人接), 任何入口打开跟灵魂的会话都拦掉——含收件箱里的历史灵魂线。
   function isSoulTarget(uid, name){ try{ return typeof isSoulUser==='function' && isSoulUser(uid, name); }catch(e){ return false; } }
-  // origin: 'inbox'(从收件箱点进来) | 'direct'(长按头像直接进来)。返回时据此"回到来处":
-  //   inbox → 退回收件箱; direct → 直接关闭(回大厅/房间)。避免"直接进的会话按返回却弹出没来过的收件箱"。
-  let _chatOrigin='direct';
-  async function openChat(otherUid, otherName, otherEmoji, otherColor, origin){
+  // 层级固定两级: 收件箱(列表) → 会话(单聊)。会话返回【一定回列表】(不论从列表点进还是长按头像直接进),
+  //   列表返回则回"调出私信的上一页"(大厅/房间/个人空间)。见 backChat/closeInbox。
+  async function openChat(otherUid, otherName, otherEmoji, otherColor){
     try{ await awaitSb(); }catch(e){}
     if(!myUid){ toast('身份加载中，请稍后再试'); return; }
     if(otherUid===myUid){ toast('不能给自己发私信'); return; }
     if(isSoulTarget(otherUid, otherName)){ toast('灵魂暂不支持私信哦'); return; }
-    _chatOrigin = (origin==='inbox') ? 'inbox' : 'direct';
     $('#dmChatTitle').textContent=otherName||'私信';
     $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     $('#dmChatMask').classList.add('on'); $('#dmChatDrawer').classList.add('on');
@@ -231,8 +229,9 @@
   }
 
   // ---- 对外入口: 供 app.js 长按菜单/返回键接管调用 ----
-  //   backChat: 会话窗返回(= ‹) —— 回到来处: 收件箱来的退回收件箱, 直接来的直接关闭。
-  function backChat(){ const wasInbox=(_chatOrigin==='inbox'); closeChat(); if(wasInbox) openInbox(); }
+  //   backChat: 会话窗返回(= ‹) —— 【一定回列表】。不论从列表点进还是长按头像直接进, 层级都是 列表→会话,
+  //   返回退一级到列表; 再从列表返回才回大厅/房间(见 closeInbox)。
+  function backChat(){ closeChat(); openInbox(); }
   window.EhDM = { open: openChat, openInbox, closeInbox, closeChat, backChat, refreshUnread, subscribe: subscribeDm };
 
   // ---- 绑定 ----
