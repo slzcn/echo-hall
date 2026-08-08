@@ -101,18 +101,22 @@
       </div>`;
     }).join('');
     body.querySelectorAll('.dm-thread').forEach(el=>el.onclick=()=>{
-      openChat(el.dataset.uid, el.dataset.nm, el.dataset.em, el.dataset.c);
+      openChat(el.dataset.uid, el.dataset.nm, el.dataset.em, el.dataset.c, 'inbox');
     });
   }
 
   // ---- 会话窗 ----
   // 灵魂(AI)暂不在私信闭环里(那端没人接), 任何入口打开跟灵魂的会话都拦掉——含收件箱里的历史灵魂线。
   function isSoulTarget(uid, name){ try{ return typeof isSoulUser==='function' && isSoulUser(uid, name); }catch(e){ return false; } }
-  async function openChat(otherUid, otherName, otherEmoji, otherColor){
+  // origin: 'inbox'(从收件箱点进来) | 'direct'(长按头像直接进来)。返回时据此"回到来处":
+  //   inbox → 退回收件箱; direct → 直接关闭(回大厅/房间)。避免"直接进的会话按返回却弹出没来过的收件箱"。
+  let _chatOrigin='direct';
+  async function openChat(otherUid, otherName, otherEmoji, otherColor, origin){
     try{ await awaitSb(); }catch(e){}
     if(!myUid){ toast('身份加载中，请稍后再试'); return; }
     if(otherUid===myUid){ toast('不能给自己发私信'); return; }
     if(isSoulTarget(otherUid, otherName)){ toast('灵魂暂不支持私信哦'); return; }
+    _chatOrigin = (origin==='inbox') ? 'inbox' : 'direct';
     $('#dmChatTitle').textContent=otherName||'私信';
     $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     $('#dmChatMask').classList.add('on'); $('#dmChatDrawer').classList.add('on');
@@ -227,18 +231,19 @@
   }
 
   // ---- 对外入口: 供 app.js 长按菜单/返回键接管调用 ----
-  //   backChat: 会话窗返回(= ‹, 回收件箱); closeInbox/closeChat: 供 navConsume 关层。
-  function backChat(){ closeChat(); openInbox(); }
+  //   backChat: 会话窗返回(= ‹) —— 回到来处: 收件箱来的退回收件箱, 直接来的直接关闭。
+  function backChat(){ const wasInbox=(_chatOrigin==='inbox'); closeChat(); if(wasInbox) openInbox(); }
   window.EhDM = { open: openChat, openInbox, closeInbox, closeChat, backChat, refreshUnread, subscribe: subscribeDm };
 
   // ---- 绑定 ----
   function bind(){
     // 私信入口现在收在个人空间面板内(#meDmEntry, openMe 渲染时由 app.js 绑定); 这里只绑会话窗/收件箱自身控件。
+    // 收件箱(顶层): ✕ / 点遮罩 = 关闭私信。
     $('#dmInboxDx')&&($('#dmInboxDx').onclick=closeInbox);
     $('#dmInboxMask')&&($('#dmInboxMask').onclick=closeInbox);
-    $('#dmChatDx')&&($('#dmChatDx').onclick=closeChat);
-    $('#dmChatBack')&&($('#dmChatBack').onclick=()=>{ closeChat(); openInbox(); });
-    $('#dmChatMask')&&($('#dmChatMask').onclick=closeChat);
+    // 会话窗: 只有 ‹ 返回(回到来处), 点遮罩同义; 已去掉右上 ✕。
+    $('#dmChatBack')&&($('#dmChatBack').onclick=backChat);
+    $('#dmChatMask')&&($('#dmChatMask').onclick=backChat);
     $('#dmChatSend')&&($('#dmChatSend').onclick=sendChat);
     const inp=$('#dmChatInput');
     if(inp){

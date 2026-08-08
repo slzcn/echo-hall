@@ -1660,6 +1660,8 @@
   #dmChatDrawer{padding-bottom:0}
   .dm-back{cursor:pointer;color:var(--dim);font-size:26px;line-height:1;margin-right:4px;transition:color .15s}
   .dm-back:hover{color:var(--accent,var(--cyan))}
+  /* 会话窗头部只留左侧 ‹ 返回(去掉右上 ✕, 消除"两个键分不清"); 右侧等宽占位让标题真正居中 */
+  .dm-back-spacer{width:30px;flex-shrink:0}
   .dm-stream{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px 12px}
   .dm-msg{max-width:78%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}
   .dm-msg.them{align-self:flex-start;background:var(--card-bg);border:1px solid var(--line);border-bottom-left-radius:5px}
@@ -1895,7 +1897,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260807-dmnav';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260807-dmback';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2130,7 +2132,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <!-- 私信会话窗: 与某人的 1v1 对话 -->
 <div class="drawer-mask" id="dmChatMask"></div>
 <div class="drawer" id="dmChatDrawer">
-  <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dx" id="dmChatDx">✕</span></div>
+  <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dm-back-spacer" aria-hidden="true"></span></div>
   <div class="dm-stream" id="dmChatStream"></div>
   <div class="dm-composer">
     <input id="dmChatInput" maxlength="500" placeholder="发条私信…" autocomplete="off">
@@ -2340,10 +2342,10 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260807-dmnav"></script>
+<script src="./js/app.js?v=20260807-dmback"></script>
 <script src="./js/keyboard.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260807-dmnav"></script>
+<script src="./js/dm.js?v=20260807-dmback"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
