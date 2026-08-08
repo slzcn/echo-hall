@@ -226,8 +226,10 @@
       .subscribe();
   }
 
-  // ---- 对外入口: 供 app.js 长按菜单调用 ----
-  window.EhDM = { open: openChat, openInbox, refreshUnread, subscribe: subscribeDm };
+  // ---- 对外入口: 供 app.js 长按菜单/返回键接管调用 ----
+  //   backChat: 会话窗返回(= ‹, 回收件箱); closeInbox/closeChat: 供 navConsume 关层。
+  function backChat(){ closeChat(); openInbox(); }
+  window.EhDM = { open: openChat, openInbox, closeInbox, closeChat, backChat, refreshUnread, subscribe: subscribeDm };
 
   // ---- 绑定 ----
   function bind(){

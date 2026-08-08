@@ -6731,6 +6731,10 @@ function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({
 function navTopLayer(){
   // 键盘开着(输入框聚焦)时, 返回键第一优先收键盘 + 输入框失焦 + 复位, 符合安卓习惯(先收键盘再退层)
   if(document.activeElement && document.activeElement.id==='cin') return 'kbd';
+  // 私信: 会话窗输入框聚焦 → 先收键盘; 再是会话窗 → 退回收件箱; 再是收件箱 → 关。放在最上层(它们是覆盖全屏的独立抽屉)
+  if(document.activeElement && document.activeElement.id==='dmChatInput') return 'dmkbd';
+  if($('#dmChatMask')?.classList.contains('on')) return 'dmchat';
+  if($('#dmInboxMask')?.classList.contains('on')) return 'dminbox';
   if($('#recOverlay')?.classList.contains('on')) return 'rec';
   if($('#wallMask')?.classList.contains('on')) return 'wall';
   if($('#modalMask')?.classList.contains('on')) return 'modal';
@@ -6746,6 +6750,9 @@ function navTopLayer(){
 function navConsume(layer){
   switch(layer){
     case 'kbd': try{ var _c=$('#cin'); if(_c) _c.blur(); if(window.__ehKbReset) window.__ehKbReset(); }catch(_){} break;
+    case 'dmkbd': try{ var _d=$('#dmChatInput'); if(_d) _d.blur(); }catch(_){} break;
+    case 'dmchat': try{ if(window.EhDM) EhDM.backChat(); }catch(_){} break;   // 会话窗返回 = 回收件箱(与 ‹ 一致)
+    case 'dminbox': try{ if(window.EhDM) EhDM.closeInbox(); }catch(_){} break;
     case 'rec': if(recActive){ recCanceled=true; setRecCancel(true); micRelease(); } break;
     case 'wall': $('#wallMask')?.classList.remove('on'); break;
     case 'modal': closeModal(); break;
