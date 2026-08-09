@@ -139,7 +139,8 @@
       await loadMessages();
       await markRead();
       startTailPoll();
-      const inp=$('#dmChatInput'); if(inp){ try{ inp.focus(); }catch(e){} }
+      // 不再自动 focus 输入框: 打开即聚焦会触发 :focus-within 让 composer margin 从 15px→0 闪一下
+      //   (且 iOS 程序化 focus 多半弹不出键盘, 纯闪无收益)。让用户主动点输入框才聚焦。
     }catch(e){
       console.warn('openChat',e);
       $('#dmChatStream').innerHTML='<div class="empty-hint">打开会话失败：'+esc(String(e.message||e))+'</div>';
