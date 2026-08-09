@@ -22,22 +22,33 @@
   //   Android 占位式键盘(overlaysContent=false)本就顶起 viewport, 此时 top≈0/height≈innerHeight → 本绑定近似空操作, 不回归。
   const _vv = window.visualViewport;
   const _softKb = () => { try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return false; } };
+  //   ★收敛到 keyboard.js(#hall)那套【真机验证过】的机制, 别再自造轮子:
+  //   1. iOS 聚焦 fixed 容器内的输入框会把整个【文档】滚上去 → fixed 定位漂移、composer 被顶到键盘后。
+  //      keyboard.js 用 resetDocumentScroll 强制 window.scrollTo(0,0) 消掉它 —— 之前我漏了这步(真因)。
+  //   2. 保持 top:0(不再写 offsetTop, 文档已归零→offsetTop 失去意义), 只压 height=vv.height。
   function fitChatViewport(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
     if(!_vv || !_softKb()) return;                 // 桌面/无 vv: 留默认 top:0/bottom:0 全高
-    d.style.top=_vv.offsetTop+'px';
+    if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
+    d.style.top='0px';
     d.style.height=_vv.height+'px';
     d.style.bottom='auto';                          // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
     scrollBottom();                                 // 键盘挤扁 stream 后重新贴底, 别把最新消息顶出可视区
+  }
+  function onChatFocus(){                            // 聚焦瞬间键盘还没起, vv.resize 才是真正时机; 但先滚回顶挡住文档漂移
+    if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }
+    setTimeout(fitChatViewport, 60);                // 等键盘动画抬起后再定一次(部分机型 resize 只发一次且早)
   }
   function bindChatViewport(){
     if(!_vv) return;
     _vv.addEventListener('resize', fitChatViewport);
     _vv.addEventListener('scroll', fitChatViewport);
+    const inp=$('#dmChatInput'); if(inp) inp.addEventListener('focus', onChatFocus);
     fitChatViewport();
   }
   function unbindChatViewport(){
     if(_vv){ _vv.removeEventListener('resize', fitChatViewport); _vv.removeEventListener('scroll', fitChatViewport); }
+    const inp=$('#dmChatInput'); if(inp) inp.removeEventListener('focus', onChatFocus);
     const d=$('#dmChatDrawer'); if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; }
   }
 
