@@ -45,13 +45,28 @@
   //   1. iOS 聚焦 fixed 容器内的输入框会把整个【文档】滚上去 → fixed 定位漂移、composer 被顶到键盘后。
   //      keyboard.js 用 resetDocumentScroll 强制 window.scrollTo(0,0) 消掉它 —— 之前我漏了这步(真因)。
   //   2. 保持 top:0(不再写 offsetTop, 文档已归零→offsetTop 失去意义), 只压 height=vv.height。
+  let _vvBase=0;                                     // 开窗(键盘未起)时的 vv.height 基线, 用于判"键盘是否真起来了"
+  // ★键盘是否真的弹起 —— 用【视口收缩】判定, 不再靠 matchMedia('(hover:none)and(pointer:coarse)')。
+  //   真机(某些安卓 WebView/PWA)那条媒体查询会误报 false → _softKb 一假, 依赖它的 :focus-within 收 padding
+  //   也随之失效 → composer 底残留 10px 呼吸位, 看着就是"输入框浮在键盘上方 ~15px"。改用视口收缩这个
+  //   跨 iOS/安卓都靠谱的信号: iOS 只缩 vv.height, 安卓占位式键盘 vv/innerH 一起缩, 两者相对基线都会掉一大截;
+  //   桌面聚焦不弹键盘、视口不缩 → 永远判 false → 不收 padding、不跳。
+  function _kbUp(){ return !!(_vv && _vvBase && (_vvBase - _vv.height > 120)); }
+  // 键盘起 → composer 贴键盘(去掉 10px 呼吸位); 键盘落 → 恢复默认呼吸位。单一机制, 不再靠媒体查询门禁。
+  function syncComposerPad(){
+    const c=document.querySelector('.dm-composer'); if(!c) return;
+    c.style.paddingBottom = _kbUp() ? '0px' : '';
+  }
   function fitChatViewport(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
-    if(!_vv || !_softKb()) return;                 // 桌面/无 vv: 留默认 top:0/bottom:0 全高
-    if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
-    d.style.top='0px';
-    d.style.height=_vv.height+'px';
-    d.style.bottom='auto';                          // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
+    if(!_vv){ return; }
+    if(_softKb()){                                  // iOS: fixed 锚 layout viewport 不随键盘缩, 必须手动钉到 vv
+      if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
+      d.style.top='0px';
+      d.style.height=_vv.height+'px';
+      d.style.bottom='auto';                        // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
+    }
+    syncComposerPad();                              // 键盘态一变就同步 composer 呼吸位(不受 _softKb 误报影响)
     scrollBottom();                                 // 键盘挤扁 stream 后重新贴底, 别把最新消息顶出可视区
   }
   function onChatFocus(){                            // 聚焦瞬间键盘还没起, vv.resize 才是真正时机; 但先滚回顶挡住文档漂移
@@ -60,6 +75,7 @@
   }
   function bindChatViewport(){
     if(!_vv) return;
+    _vvBase=_vv.height;                             // 开窗即记基线(此刻键盘未起)
     _vv.addEventListener('resize', fitChatViewport);
     _vv.addEventListener('scroll', fitChatViewport);
     const inp=$('#dmChatInput'); if(inp) inp.addEventListener('focus', onChatFocus);
@@ -69,6 +85,8 @@
     if(_vv){ _vv.removeEventListener('resize', fitChatViewport); _vv.removeEventListener('scroll', fitChatViewport); }
     const inp=$('#dmChatInput'); if(inp) inp.removeEventListener('focus', onChatFocus);
     const d=$('#dmChatDrawer'); if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; }
+    const c=document.querySelector('.dm-composer'); if(c) c.style.paddingBottom='';   // 复位呼吸位
+    _vvBase=0;
   }
 
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
