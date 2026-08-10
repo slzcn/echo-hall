@@ -6542,10 +6542,12 @@ async function openMe(){
       <div class="mh-sub">${subLine}</div>
       <div class="me-btns">
         <button class="dbtn" id="meReroll">${isBound?'✎ 编辑资料':'↻ 换个身份'}</button>
-        ${isBound?'<button class="dbtn" id="meEmail">✉️ 邮箱</button>':'<button class="dbtn" id="meReg">✨ 注册</button>'}
+        ${isBound
+          ? '<button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button>'
+          : '<button class="dbtn" id="meReg">✨ 注册</button>'}
       </div>
     </div>
-    <div class="dsec"><button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button></div>
+    ${isBound?'':'<div class="dsec"><button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button></div>'}
     <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
     <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
@@ -6631,19 +6633,9 @@ function bindMeActions(isBound){
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
   const dmE=$('#meDmEntry'); if(dmE) dmE.onclick=()=>{ closeMe(); if(window.EhDM) window.EhDM.openInbox(); };
   if(window.EhDM) window.EhDM.refreshUnread();   // 面板刚渲染, 立即把未读数喷到私信行徽标
-  bindMeReg(); bindMeEmail();
+  bindMeReg();
 }
 function bindMeReg(){ const b=$('#meReg'); if(b) b.onclick=()=>{ closeMe(); openModal('mReg'); }; }
-function bindMeEmail(){
-  const b=$('#meEmail'); if(!b) return;
-  b.onclick=()=>{ const realEmail=me.email||''; closeMe(); openModal('mEmail'); setTimeout(()=>{
-    const has=!!realEmail;
-    $('#curEmailRow').style.display = has?'block':'none';
-    if(has) $('#curEmail').value=realEmail;
-    $('#newEmailLabel').textContent = has?'新邮箱':'邮箱';
-    renderEmailVerifyUI();
-  },50); };
-}
 // 邮箱验证状态 UI: 徽章 + 发送验证按钮(有邮箱且未验证时显示)
 function renderEmailVerifyUI(){
   const has=!!(me.email);
@@ -6779,7 +6771,7 @@ const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨'
 let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
 function openModal(which){
   $('#modalMask').classList.add('on'); ehArm();
-  ['mCreate','mCreated','mJoin','mReg','mReset','mEmail','mProfile'].forEach(id=>$('#'+id).style.display=(id===which?'block':'none'));
+  ['mCreate','mCreated','mJoin','mReg','mReset','mProfile'].forEach(id=>{ const el=$('#'+id); if(el) el.style.display=(id===which?'block':'none'); });
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
     $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o.dataset.kind==='public'));
@@ -6789,7 +6781,6 @@ function openModal(which){
   if(which==='mJoin'){ $('#codeIn').value=''; $('#joinErr').textContent=''; setTimeout(()=>$('#codeIn').focus(),50); }
   if(which==='mReg'){ $('#regUser').value='';$('#regPass').value='';$('#regEmail').value='';$('#regErr').textContent=''; setTimeout(()=>$('#regUser').focus(),50); }
   if(which==='mReset'){ $('#resetEmail').value='';$('#resetErr').textContent=''; setTimeout(()=>$('#resetEmail').focus(),50); }
-  if(which==='mEmail'){ $('#newEmail').value='';$('#emailErr').textContent=''; setTimeout(()=>$('#newEmail').focus(),50); }
   if(which==='mProfile'){ $('#profErr').textContent=''; }
 }
 function renderEmojiPick(){
@@ -7015,21 +7006,8 @@ function openLoginWith(username){
   // 用户名已填好 → 直接聚焦密码框, 让用户输新密码
   setTimeout(()=>{ try{ (username? (lp||la) : la).focus(); }catch(_){} }, 250);
 }
-// 修改邮箱: 更新 eh_accounts.email(真邮箱, 找回密码用)。不动 auth 登录邮箱(u_hex@eh.local)。
-async function changeEmail(){
-  const email=$('#newEmail').value.trim();
-  if(!/^\S+@\S+\.\S+$/.test(email)){ $('#emailErr').textContent='邮箱格式不对'; return; }
-  const btn=$('#doEmailBtn'); btn.disabled=true; btn.textContent='保存中…'; $('#emailErr').textContent='';
-  const { data:{ session } }=await sb.auth.getSession();
-  if(!session){ btn.disabled=false; btn.textContent='发 送 确 认 邮 件'; $('#emailErr').textContent='请先登录'; return; }
-  const r=await fetch(EH_AUTH_FN+'/update-email',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({email}) });
-  const j=await r.json().catch(()=>({}));
-  btn.disabled=false; btn.textContent='发 送 确 认 邮 件';
-  if(!r.ok || !j.ok){ $('#emailErr').textContent=friendlyErr(j.error,'保存失败'); return; }
-  me.email=email; me.emailVerified=false; saveIdentity();  // 换邮箱→需重新验证
-  toast(EH_CONFIG.text.ok_emailUpdated); closeModal();
-}
-// 正式账号编辑形象: 自定义昵称+头像+颜色(不随机、不动用户名、保留registered)
+// (修改邮箱已并入 saveProfile: 编辑资料里填了新邮箱框, 保存时一并走 eh-auth /update-email)
+// 正式账号编辑资料: 昵称+头像+颜色+邮箱(不随机、不动用户名、保留registered)
 let _profEmoji, _profColor;
 function openProfileEditor(){
   openModal('mProfile');
@@ -7045,11 +7023,28 @@ function openProfileEditor(){
   const cols=COLORS.includes(_profColor)?COLORS:[_profColor,...COLORS];
   $('#profColorPick').innerHTML=cols.map(c=>`<i class="${c===_profColor?'on':''}" data-c="${c}" style="background:${c}"></i>`).join('');
   $('#profColorPick').querySelectorAll('i').forEach(el=>el.onclick=()=>{ _profColor=el.dataset.c; $('#profColorPick').querySelectorAll('i').forEach(x=>x.classList.remove('on')); el.classList.add('on'); });
+  // 邮箱区(并入编辑资料): 仅正式账号显示; 已有邮箱→显示当前+验证态, 新邮箱框留空(填了才改)
+  const sec=$('#profEmailSec');
+  if(sec){
+    const isBound=!!(me && me.registered);
+    sec.style.display = isBound ? 'block' : 'none';
+    if(isBound){
+      const realEmail=me.email||''; const has=!!realEmail;
+      $('#profCurEmailRow').style.display = has?'block':'none';
+      if(has) $('#curEmail').value=realEmail;
+      $('#newEmailLabel').textContent = has?'更换邮箱':'邮箱';
+      $('#newEmail').value=''; $('#emailErr').textContent='';
+      renderEmailVerifyUI();
+    }
+  }
 }
 async function saveProfile(){
   const name=$('#profName').value.trim();
   if(name.length<1){ $('#profErr').textContent='昵称不能为空'; return; }
   if(name.length>24){ $('#profErr').textContent='昵称最多 24 字'; return; }
+  // 邮箱并入编辑资料: 若填了新邮箱框, 先校验格式(错的话不保存, 免昵称改了邮箱没改的割裂)
+  const emailInput=$('#newEmail'); const newEmail=(emailInput && emailInput.value||'').trim();
+  if(newEmail && !/^\S+@\S+\.\S+$/.test(newEmail)){ $('#emailErr').textContent='邮箱格式不对'; return; }
   const btn=$('#doProfBtn'); btn.disabled=true; btn.textContent='保存中…';
   // 关键: 只更新昵称/头像/颜色, 保留 id 和 registered 标记(不动用户名/登录)
   // 先存旧值, DB 写失败(如昵称撞名)时回滚这次乐观更新, 免得本地显示了但库里没改
@@ -7074,6 +7069,19 @@ async function saveProfile(){
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
   const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
+  // 邮箱并入: 填了新邮箱才提交(update-email 走 eh-auth, 换邮箱需重新验证)。邮箱失败不回滚昵称(各自独立), 但保留弹窗让用户看错误
+  if(newEmail && newEmail!==(me.email||'')){
+    const btn2=$('#doProfBtn'); btn2.disabled=true; btn2.textContent='保存邮箱中…';
+    try{
+      const { data:{ session } }=await sb.auth.getSession();
+      if(!session){ $('#emailErr').textContent='请先登录'; btn2.disabled=false; btn2.textContent='保 存'; return; }
+      const r=await fetch(EH_AUTH_FN+'/update-email',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({email:newEmail}) });
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok || !j.ok){ $('#emailErr').textContent=friendlyErr(j.error,'邮箱保存失败'); btn2.disabled=false; btn2.textContent='保 存'; return; }
+      me.email=newEmail; me.emailVerified=false; saveIdentity();   // 换邮箱→需重新验证
+    }catch(e){ $('#emailErr').textContent='邮箱保存失败'; btn2.disabled=false; btn2.textContent='保 存'; return; }
+    btn2.disabled=false; btn2.textContent='保 存';
+  }
   toast(EH_CONFIG.text.ok_profileUpdated); closeModal();
 }
 
@@ -7121,7 +7129,6 @@ on('toReg','click',()=>openModal('mReg'));
 on('toReset','click',(e)=>{ e.stopPropagation(); openModal('mReset'); });
 on('doRegBtn','click',()=>doRegister());
 on('doResetBtn','click',()=>doReset());
-on('doEmailBtn','click',()=>changeEmail());
 on('sendVerifyBtn','click',()=>sendVerifyEmail());
 on('doProfBtn','click',()=>saveProfile());
 on('enterBtn','click',async()=>{
