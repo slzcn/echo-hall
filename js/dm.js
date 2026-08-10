@@ -52,8 +52,21 @@
     const d=$('#dmChatDrawer'); if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; }
   }
 
+  // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
+  //   优先复用 app.js 的全局 fmtTime(经典 <script> 同作用域), 保证两处逻辑永远同源;
+  //   万一取不到再本地兜底(同样带日期, 别退回"只有时分"漏了历史私信的日期)。
   function fmtTime(iso){
-    try{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; }
+    try{ if(typeof window!=='undefined' && typeof window.fmtTime==='function') return window.fmtTime(iso); }catch(e){}
+    try{
+      const d=iso?new Date(iso):new Date(); const now=new Date();
+      const hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      const dayStart=t=>new Date(t.getFullYear(),t.getMonth(),t.getDate()).getTime();
+      const diffDays=Math.round((dayStart(now)-dayStart(d))/86400000);
+      if(diffDays<=0) return hm;
+      if(diffDays===1) return '昨天 '+hm;
+      if(d.getFullYear()===now.getFullYear()) return (d.getMonth()+1)+'/'+d.getDate()+' '+hm;
+      return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+' '+hm;
+    }catch(e){ return ''; }
   }
 
   // ---- 未读红点 ----
