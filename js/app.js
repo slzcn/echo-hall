@@ -698,6 +698,9 @@ function buildBgmMenu(m, soulOverride){
           if(x.startsWith(rn)) x=x.slice(rn.length);
         }
         x=x.replace(/^[·\-\s]+/,'').trim();
+        // 兜底: 历史脏数据/旧本地缓存里的纯量词残句("一首""一曲""一个")不成曲名 → 归空走"灵魂曲"
+        //   (库里已批量清洗过, 这里挡住可能残留在用户 localStorage 的旧标题, 免再露"一首")
+        if(/^(一|来|个)?(首|曲|段|点|个|下|把)?$/.test(x)) x='';
         if(!x) x='灵魂曲';
         // 中文按字符截断到 10
         try{
