@@ -6545,12 +6545,10 @@ async function openMe(){
       <div class="mh-sub">${subLine}</div>
       <div class="me-btns">
         <button class="dbtn" id="meReroll">${isBound?'✏️ 编辑资料':'🎲 换个身份'}</button>
-        ${isBound
-          ? '<button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button>'
-          : '<button class="dbtn" id="meReg">✨ 注册</button>'}
+        ${isBound ? '' : '<button class="dbtn" id="meReg">✨ 注册</button>'}
       </div>
     </div>
-    ${isBound?'':'<div class="dsec"><button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button></div>'}
+    <div class="dsec"><button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button></div>
     <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
     <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
