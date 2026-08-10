@@ -155,3 +155,39 @@ as $$
   order by t.last_msg_at desc nulls last
 $$;
 grant execute on function public.eh_dm_inbox() to public;
+
+-- ---- RPC: 打开会话一次拿齐(取或建线 + 最近N条消息), 单次往返替代 get_or_create+select 两跳 ----
+-- 参考聊天室 eh_public_recent 的做法: 前端一个 RPC 就能瞬开会话窗。
+-- ★不在此 RPC 里 mark_read: 保持"只读"语义, 这样 hover/按下【预取】它不会误标已读;
+--   真正打开后前端再单独 fire-and-forget 调 eh_dm_mark_read(不阻塞首屏)。
+create or replace function public.eh_dm_open(p_other uuid, p_limit int default 200)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+declare
+  v_me uuid := auth.uid();
+  v_a uuid; v_b uuid; v_id uuid;
+  v_msgs jsonb;
+begin
+  if v_me is null then raise exception 'not authenticated'; end if;
+  if p_other is null or p_other = v_me then raise exception 'invalid target'; end if;
+  if not exists (select 1 from public.eh_users u where u.id = p_other) then
+    raise exception 'target not found';
+  end if;
+  if v_me < p_other then v_a := v_me; v_b := p_other; else v_a := p_other; v_b := v_me; end if;
+  insert into public.eh_dm_threads(user_a, user_b) values (v_a, v_b)
+    on conflict (user_a, user_b) do nothing;
+  select id into v_id from public.eh_dm_threads where user_a = v_a and user_b = v_b;
+  -- 取最新 N 条(id desc limit), 再按 id 升序聚合成正序数组(与前端渲染顺序一致)
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.id), '[]'::jsonb) into v_msgs
+    from (select id, from_uid, text, created_at
+          from public.eh_dm_messages
+          where thread_id = v_id
+          order by id desc
+          limit greatest(1, least(coalesce(p_limit, 200), 500))) x;
+  return jsonb_build_object('thread_id', v_id, 'messages', v_msgs);
+end;
+$$;
+grant execute on function public.eh_dm_open(uuid, int) to public;

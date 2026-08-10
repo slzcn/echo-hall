@@ -1,10 +1,13 @@
 /* ============ 私信系统 (DM) — 前端 ============
    脱离房间的持久 1v1 会话。后端: eh_dm_threads / eh_dm_messages + RPC
-   (eh_dm_get_or_create / eh_dm_mark_read / eh_dm_inbox)。
+   (eh_dm_open[取线+最近消息一跳] / eh_dm_mark_read / eh_dm_inbox)。
    实时: 订阅 eh_dm_messages INSERT, 靠 RLS 只投递"我参与的线"的行。
    依赖 app.js 的全局(经典 <script> 共享词法作用域, 本文件在 app.js 之后加载):
      sb, me, myUid, esc, toast, awaitSb, safeColor, safeEmoji, ehArm, EhSfx。
-   方案B: 匿名也能收发(在场即可发起), 正式账号享持久化。 */
+   方案B: 匿名也能收发(在场即可发起), 正式账号享持久化。
+   ★性能(对齐聊天室 loadHistory 那套): 1) 收件箱缓存→秒显旧列表, 后台刷新覆盖(不再冷"加载中");
+     2) 会话打开走单跳 eh_dm_open(取线+最近消息), 替代原 get_or_create+select+mark_read 三次串行往返;
+     3) hover/按下会话行时预取该会话(prefetch), 点开命中缓存瞬开。 */
 (function(){
   'use strict';
   const $ = s => document.querySelector(s);
@@ -14,6 +17,22 @@
   let _totalUnread = 0;
   let _tailPoll = null;          // 会话窗兜底轮询
   let _lastMsgId = 0;            // 已渲染的最大消息 id(兜底轮询/实时去重)
+
+  // ---- 缓存(对齐聊天室 prefetchCache/快照): 让打开瞬时, 网络回来再覆盖 ----
+  const DM_PREFETCH_TTL = 60000;   // 预取有效期 60s(同房间 prefetchTtlMs)
+  let _inboxCache = null;          // { at, list } —— 上次收件箱结果, 打开先秒显
+  const _chatPrefetch = {};        // otherUid → { at, p:Promise<{thread_id,messages}> } 会话预取
+  function _dmOpenReq(otherUid){   // 单跳 RPC: 取线+最近消息(不 mark_read, 供预取安全复用)
+    return sb.rpc('eh_dm_open',{ p_other:otherUid, p_limit:200 }).then(({data,error})=>{ if(error) throw error; return data; });
+  }
+  function prefetchChat(otherUid){
+    if(!sb || !myUid || !otherUid || otherUid===myUid) return;
+    try{ if(isSoulTarget(otherUid)) return; }catch(_){}
+    const hit=_chatPrefetch[otherUid];
+    if(hit && Date.now()-hit.at < DM_PREFETCH_TTL) return;   // 命中未过期, 不重复打
+    const p=_dmOpenReq(otherUid).catch(()=>null);            // 预取失败静默, openChat 会现拉兜底
+    _chatPrefetch[otherUid]={ at:Date.now(), p };
+  }
 
   // ---- 键盘协同: 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它。
   //   iOS Safari 无 VirtualKeyboard API、走 visualViewport, fixed 锚 layout viewport(不随键盘缩)
@@ -93,18 +112,24 @@
   }
 
   // ---- 收件箱(会话列表) ----
+  //   对齐聊天室: 有缓存先秒显旧列表, 再后台刷新覆盖 → 不再每次冷"加载中"。
   async function openInbox(){
     try{ await awaitSb(); }catch(e){}
     if(!myUid){ toast('身份加载中，请稍后再试'); return; }
     $('#dmInboxMask').classList.add('on'); $('#dmInboxDrawer').classList.add('on');
     try{ ehArm(); }catch(e){}
-    $('#dmInboxBody').innerHTML='<div class="empty-hint">加载中…</div>';
+    // 有缓存(哪怕稍旧)先立即渲染, 用户秒见列表; 无缓存才显加载态
+    if(_inboxCache && Array.isArray(_inboxCache.list)){ renderInbox(_inboxCache.list); }
+    else { $('#dmInboxBody').innerHTML='<div class="empty-hint">加载中…</div>'; }
     try{
       const {data,error}=await sb.rpc('eh_dm_inbox');
       if(error) throw error;
+      _inboxCache={ at:Date.now(), list:data||[] };
       renderInbox(data);
       _totalUnread=(data||[]).reduce((s,t)=>s+(t.unread||0),0); paintUnread();
-    }catch(e){ $('#dmInboxBody').innerHTML='<div class="empty-hint">加载失败，稍后重试</div>'; }
+    }catch(e){
+      if(!_inboxCache) $('#dmInboxBody').innerHTML='<div class="empty-hint">加载失败，稍后重试</div>';  // 有缓存则保留旧列表, 不覆盖成报错
+    }
   }
   function closeInbox(){
     try{ if($('#dmInboxMask').classList.contains('on')) EhSfx.play('back'); }catch(e){}
@@ -124,8 +149,13 @@
         <span class="dt-badge">${t.unread>9?'9+':t.unread}</span>
       </div>`;
     }).join('');
-    body.querySelectorAll('.dm-thread').forEach(el=>el.onclick=()=>{
-      openChat(el.dataset.uid, el.dataset.nm, el.dataset.em, el.dataset.c, 'inbox');
+    body.querySelectorAll('.dm-thread').forEach(el=>{
+      const uid=el.dataset.uid;
+      // hover(桌面)/按下(移动)即预取该会话, 点开命中缓存瞬开(同聊天室房间卡)
+      const pf=()=>prefetchChat(uid);
+      el.addEventListener('pointerenter', pf);
+      el.addEventListener('touchstart', pf, {passive:true});
+      el.onclick=()=>{ openChat(uid, el.dataset.nm, el.dataset.em, el.dataset.c); };
     });
   }
 
@@ -140,19 +170,26 @@
     if(otherUid===myUid){ toast('不能给自己发私信'); return; }
     if(isSoulTarget(otherUid, otherName)){ toast('灵魂暂不支持私信哦'); return; }
     $('#dmChatTitle').textContent=otherName||'私信';
-    $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     $('#dmChatMask').classList.add('on'); $('#dmChatDrawer').classList.add('on');
     try{ ehArm(); }catch(e){}
     bindChatViewport();
     _lastMsgId=0;
+    // 命中预取(hover/按下时已开始拉)→ 复用其 promise 瞬开; 否则现拉。都走单跳 eh_dm_open。
+    const hit=_chatPrefetch[otherUid];
+    let req;
+    if(hit && Date.now()-hit.at < DM_PREFETCH_TTL){ req=hit.p.then(d=>d||_dmOpenReq(otherUid)); }
+    else { req=_dmOpenReq(otherUid); }
+    delete _chatPrefetch[otherUid];
+    // 无缓存首帧才显"加载中"(命中缓存的话 req 已 resolve, 下面 await 立即返回, 不闪加载态)
+    $('#dmChatStream').innerHTML='<div class="empty-hint">加载中…</div>';
     try{
-      const {data:thread,error}=await sb.rpc('eh_dm_get_or_create',{p_other:otherUid});
-      if(error) throw error;
-      curThread={ id:thread.id, otherUid, otherName, otherEmoji, otherColor };
-      await loadMessages();
-      await markRead();
+      const res=await req;
+      if(!res || !res.thread_id) throw new Error('bad response');
+      curThread={ id:res.thread_id, otherUid, otherName, otherEmoji, otherColor };
+      renderMessages(res.messages||[]);
+      markRead();                 // fire-and-forget: 标已读不阻塞首屏(RPC 里没做, 这里补)
       startTailPoll();
-      // 不再自动 focus 输入框: 打开即聚焦会触发 :focus-within 让 composer margin 从 15px→0 闪一下
+      // 不再自动 focus 输入框: 打开即聚焦会触发 :focus-within 让 composer padding 变化闪一下
       //   (且 iOS 程序化 focus 多半弹不出键盘, 纯闪无收益)。让用户主动点输入框才聚焦。
     }catch(e){
       console.warn('openChat',e);
@@ -167,13 +204,11 @@
     curThread=null; stopTailPoll();
     refreshUnread();
   }
-  async function loadMessages(){
-    if(!curThread) return;
-    const {data,error}=await sb.from('eh_dm_messages').select('id,from_uid,text,created_at')
-      .eq('thread_id',curThread.id).order('id',{ascending:true}).limit(200);
-    if(error){ $('#dmChatStream').innerHTML='<div class="empty-hint">消息加载失败</div>'; return; }
-    const stream=$('#dmChatStream'); stream.innerHTML='';
-    (data||[]).forEach(m=>appendMsg(m));
+  // 把一批消息行渲染进会话流(供 openChat 首屏用; eh_dm_open 已按 id 升序返回)
+  function renderMessages(rows){
+    const stream=$('#dmChatStream'); if(!stream) return;
+    stream.innerHTML='';
+    (rows||[]).forEach(m=>appendMsg(m));
     scrollBottom();
   }
   function appendMsg(m){
