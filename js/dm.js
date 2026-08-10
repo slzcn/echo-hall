@@ -118,6 +118,17 @@
     if(entry) entry.classList.toggle('has-unread', _totalUnread>0);
     if(badge) badge.textContent=txt;
   }
+  // 新私信【到达瞬间】的一次性弹跳提示: 给个人空间头像挂 .dm-arrive, 动画结束即摘, 保证下条可重放。
+  //   稳态只有柔和的 has-unread 呼吸, 容易被无视 —— 到达那一下让它当场炸一圈光环 + 轻抖。
+  function pingUnread(){
+    ['#meBtn','#meBtnHall'].forEach(sel=>{
+      const b=$(sel); if(!b) return;
+      b.classList.remove('dm-arrive');       // 先摘, 强制重排以便同名动画能重新触发
+      void b.offsetWidth;                     // reflow: 让浏览器认下"移除→再加"是一次新动画
+      b.classList.add('dm-arrive');
+      b.addEventListener('animationend', ()=>b.classList.remove('dm-arrive'), {once:true});
+    });
+  }
   async function refreshUnread(){
     if(!sb || !myUid) return;
     try{
@@ -298,7 +309,7 @@
         if(curThread && m.thread_id===curThread.id){
           appendMsg(m); scrollBottom(); markRead();
         } else {
-          _totalUnread++; paintUnread();
+          _totalUnread++; paintUnread(); pingUnread();
           if($('#dmInboxMask')?.classList.contains('on')) refreshUnread();
           try{ EhSfx.play('pop'); }catch(e){}
         }
