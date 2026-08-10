@@ -103,6 +103,16 @@
     const directVk = directVkRect();
     const inset = keyboardInsetRect();
 
+    // ★私信会话窗几何(独立 fixed 抽屉, 不同于聊天室 #hall): 定位/高度算错时 composer 会浮在键盘上方留大缝
+    const dmDrawer = document.getElementById('dmChatDrawer');
+    const dmComposer = document.querySelector('.dm-composer');
+    const dmInput = document.getElementById('dmChatInput');
+    const dmOn = dmDrawer && dmDrawer.classList.contains('on');
+    const dRect = dmDrawer ? dmDrawer.getBoundingClientRect() : null;
+    const dcRect = dmComposer ? dmComposer.getBoundingClientRect() : null;
+    const dmFocused = document.activeElement === dmInput;
+    const dmComposerToKb = dcRect ? (kbTop - dcRect.bottom) : null;  // >0 = composer 底与键盘顶之间的空缝
+
     const lines = [
       'kbdebug v3 · ' + (focused ? '聊天框已聚焦' : '未聚焦'),
       'innerH        = ' + px(window.innerHeight),
@@ -139,6 +149,14 @@
       '★envKb inset  = ' + (inset ? ('top='+px(inset.top)+' h='+px(inset.height)) : '(无)'),
       'vv.resize 次数 = ' + vvResizeHits,
       'window.resize 次数 = ' + winResizeHits,
+      '--- 私信会话窗 ---',
+      'DM抽屉开     = ' + (dmOn ? '✓' : '✗') + (dmFocused ? ' 输入框聚焦' : ''),
+      'DM抽屉top    = ' + (dRect ? px(dRect.top) : '无'),
+      'DM抽屉底     = ' + (dRect ? px(dRect.bottom) : '无'),
+      'DM抽屉高     = ' + (dRect ? px(dRect.height) : '无'),
+      'DM抽屉内联h  = ' + (dmDrawer ? (dmDrawer.style.height || '(空)') : '无'),
+      'DMcomposer底 = ' + (dcRect ? px(dcRect.bottom) : '无'),
+      '★DMcomposer↔键盘 = ' + (dmComposerToKb == null ? '?' : (px(dmComposerToKb) + (dmComposerToKb > 2 ? ' ← 上方留缝' : (dmComposerToKb < -2 ? ' ← 被键盘盖' : ' ok')))),
       'ver           = ' + (window.__EH_BUILD_VER || '?')
     ];
     box.textContent = lines.join('\n');
