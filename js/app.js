@@ -97,6 +97,15 @@ const _coarsePointer = !!(window.matchMedia && matchMedia('(hover:none)').matche
 const ADJ = EH_CONFIG.identityPool.adjectives;
 const ANI = EH_CONFIG.identityPool.animals;
 const EMO = ['🦦','🦊','🐦‍⬛','🪼','🐺','🐋','🦉','🦇','🐙','🦌','🐧','🐈‍⬛','🐬','🐯','🦔','🦋'];
+// 头像入口(#meBtn/#meBtnHall)里除了 emoji 还挂着私信未读角标 <span.dm-dot> ——
+//   直接 el.textContent=emoji 会连子节点一起清掉(角标 span 就此消失, 未读数永远显示不出来)。
+//   用它只改 emoji 文字节点、保留 .dm-dot 等子元素。
+function setAvatarEmoji(el, emoji){
+  if(!el) return;
+  const first=el.firstChild;
+  if(first && first.nodeType===3){ first.nodeValue=emoji; }   // 已有文字节点: 原地改, 不动后面的角标
+  else { el.insertBefore(document.createTextNode(emoji), el.firstChild); }  // 没有则补一个在最前
+}
 // 手动选头像用全量(正式账号自由表达, 与名字无关); 随机生成只用上面 16 个对齐词表
 const EMO_ALL = ['🦊','🐺','🐋','🦉','🪼','🐙','🦌','🐝','🐆','🦔','🐬','🦇','🦋','🦭','🐈‍⬛','🦅','👑','🐼','🐱','🦁','🐯','🐰','🐸','🐵','🦄','🐲','🦖','🦦','🦩','🦚'];
 // 真人随机身份色: 与新十主题 accent 对齐(cyber/vapor/aurora/mono/klein/coral/lagoon/dusk/rose/sunset)
@@ -134,8 +143,8 @@ function paintIdentity(){
   av.style.boxShadow=`0 0 24px ${safeColor(me.color)}55, inset 0 0 0 1.5px ${safeColor(me.color)}`; av.style.color=me.color;
   av.style.transform='scale(1.12) rotate(-6deg)'; setTimeout(()=>av.style.transform='scale(1) rotate(0)',60);
   $('#idName').textContent=me.name; $('#idName').style.color=me.color;
-  const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
-  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
+  const mb=$('#meBtn'); if(mb){ setAvatarEmoji(mb, me.emoji); mb.style.color=me.color; }
+  const mbh=$('#meBtnHall'); if(mbh){ setAvatarEmoji(mbh, me.emoji); mbh.style.color=me.color; }
   // 正式账号 vs 临时身份: 更新标签 + 主按钮文案 + 换一个按钮(临时才可换)
   // ★ 多重判据: registered 字段可能因旧版本或异常保存而缺失,
   //   同时看 username/email(正式账号特有字段)作为兼容判据, 避免“已登录却显示临时身份”。
@@ -7069,8 +7078,8 @@ async function saveProfile(){
   }
   // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
-  const mb=$('#meBtn'); if(mb){ mb.textContent=me.emoji; mb.style.color=me.color; }
-  const mbh=$('#meBtnHall'); if(mbh){ mbh.textContent=me.emoji; mbh.style.color=me.color; }
+  const mb=$('#meBtn'); if(mb){ setAvatarEmoji(mb, me.emoji); mb.style.color=me.color; }
+  const mbh=$('#meBtnHall'); if(mbh){ setAvatarEmoji(mbh, me.emoji); mbh.style.color=me.color; }
   // 邮箱并入: 填了新邮箱才提交(update-email 走 eh-auth, 换邮箱需重新验证)。邮箱失败不回滚昵称(各自独立), 但保留弹窗让用户看错误
   if(newEmail && newEmail!==(me.email||'')){
     const btn2=$('#doProfBtn'); btn2.disabled=true; btn2.textContent='保存邮箱中…';
