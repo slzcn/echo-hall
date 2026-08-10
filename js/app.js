@@ -6634,7 +6634,9 @@ function bindMeActions(isBound){
     rollIdentity(); sb.from('eh_users').update({name:me.name,emoji:me.emoji,color:me.color}).eq('id',myUid); toast(EH_CONFIG.text.ok_profileUpdated); closeMe();
   };
   $('#meLogout').onclick=()=>logoutIdentity(isBound);
-  const dmE=$('#meDmEntry'); if(dmE) dmE.onclick=()=>{ closeMe(); if(window.EhDM) window.EhDM.openInbox(); };
+  // 私信从个人空间进: 不关个人空间, 让收件箱【盖在它上面】(收件箱抽屉不透明+DOM 在后→完全遮住)。
+  //   这样收件箱返回(✕/back)只退收件箱一层→露出个人空间(=真正的"上一页"), 而非直接掉回大厅。
+  const dmE=$('#meDmEntry'); if(dmE) dmE.onclick=()=>{ if(window.EhDM) window.EhDM.openInbox(); };
   if(window.EhDM) window.EhDM.refreshUnread();   // 面板刚渲染, 立即把未读数喷到私信行徽标
   bindMeReg();
 }
