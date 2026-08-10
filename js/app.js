@@ -6544,7 +6544,7 @@ async function openMe(){
       <div class="mh-name" style="color:${c}">${esc(me.name)}</div>
       <div class="mh-sub">${subLine}</div>
       <div class="me-btns">
-        <button class="dbtn" id="meReroll">${isBound?'✎ 编辑资料':'↻ 换个身份'}</button>
+        <button class="dbtn" id="meReroll">${isBound?'✏️ 编辑资料':'🎲 换个身份'}</button>
         ${isBound
           ? '<button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button>'
           : '<button class="dbtn" id="meReg">✨ 注册</button>'}

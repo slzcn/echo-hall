@@ -1651,7 +1651,7 @@
     50%{transform:scale(1.12);box-shadow:0 0 0 2px var(--panel-solid,#12141f),0 0 0 5px color-mix(in srgb,var(--magenta,#FF2D8E) 0%,transparent)}}
   @keyframes dm-av-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--magenta,#FF2D8E) 55%,transparent))}}
   /* 个人空间里的私信入口按钮(整行, 带未读徽标靠右) */
-  .me-dm-entry{display:flex;align-items:center;gap:10px;width:100%;justify-content:flex-start;position:relative}
+  .me-dm-entry{display:flex;align-items:center;gap:8px;width:100%;justify-content:center;position:relative}
   .me-dm-entry .mde-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
     background:var(--magenta,#FF2D8E);color:#fff;font-size:10px;font-weight:800;display:none;
     align-items:center;justify-content:center;line-height:1}
@@ -1907,7 +1907,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260810-dmspeed';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260810-dmicon';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2350,7 +2350,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260810-dmback"></script>
+<script src="./js/app.js?v=20260810-dmicon"></script>
 <script src="./js/keyboard.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/dm.js?v=20260810-dmspeed"></script>
