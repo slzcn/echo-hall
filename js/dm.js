@@ -39,15 +39,12 @@
   //   键盘落再复位到 CSS 默认(top:0/bottom:0)。数学已由真机 Chrome(CDP)实测验证正确, 关键是取到真实键盘高。
   const _vv = window.visualViewport;
   const _vk = navigator.virtualKeyboard || null;
-  //   ★为什么 DM 要自己管键盘几何(而不是只借 keyboard.js 的 __ehKbVisibleH):
-  //   真机 Chrome 实测(CDP)证明 __ehKbVisibleH 的钉抽屉数学没错, 但它在 DM 场景【永远不缩小】——
-  //   它靠三信号缩高, DM 一个都吃不到: (1)vv.height 收缩→安卓覆盖式键盘不缩;
-  //   (2)VK geometrychange 的 keyboardRect→只在 overlaysContent=true 才发, 而 keyboard.js 特意设 false;
-  //   (3)estimatedKbH 估算→只在聊天室 #cin 聚焦时启用, DM 输入框聚焦从不触发。
-  //   ∴ DM 开窗期间【临时把 overlaysContent 切 true(覆盖式)】, 让 VK.boundingRect 给出真实键盘高;
-  //   DM 抽屉是手动定尺寸的 fixed 容器, 覆盖式对它零副作用; 关窗还原 false(不动 #hall 那套占位式)。
-  let _kbEst=0;                                      // DM 自己的估算兜底(三信号全哑机型), 单位 px, 0=未启用
-  // 当前键盘高度(px): 优先 VK.boundingRect(真值), 再 vv 收缩量, 都拿不到才用 _kbEst 估算。
+  //   ★键盘几何【照抄聊天室已验证能用的那套】: 保持占位式(overlaysContent 不动=keyboard.js 设的 false),
+  //   让键盘顶起 → viewport 收缩 → vv.height 变小, 这是主人真机上聊天室能正常避让的信号(已由聊天室截图佐证)。
+  //   之前曾把 DM 改成 overlaysContent=true(覆盖式)去赌 VK.boundingRect, 结果关掉了 vv 收缩这个唯一能用的信号,
+  //   真机反而更糟 → 已撤销。VK.boundingRect 若设备恰好上报则作真值加分, 否则退回 vv 收缩, 再退回 0.38 估算。
+  let _kbEst=0;                                      // DM 自己的估算兜底(vv 也不缩的机型), 单位 px, 0=未启用
+  // 当前键盘高度(px): 优先 VK.boundingRect(真值, 有才用), 再 vv 收缩量(占位式主路径), 都拿不到才用 _kbEst 估算。
   function _kbHeight(){
     try{ const r=_vk&&_vk.boundingRect; if(r&&r.height>0) return Math.round(r.height); }catch(e){}
     if(_vv&&_baseVvH&&(_baseVvH-_vv.height>60)) return Math.round(_baseVvH-_vv.height);   // 占位式/iOS: vv 收缩即键盘高
@@ -71,7 +68,7 @@
     if(_kbUp()){
       if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
       d.style.top='0px';
-      d.style.height=_visH()+'px';                  // 钉成"键盘上方可视高"(不是 vv.height, 覆盖式下二者不同)
+      d.style.height=_visH()+'px';                  // 钉成"键盘上方可视高" = 基线高 - 键盘高
       d.style.bottom='auto';                        // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
     } else {                                        // 键盘落: 复位到 CSS 默认(top:0/bottom:0), 别让钉死的 height 残留
       _resetDrawerBox(d);
@@ -97,18 +94,15 @@
     _baseH=window.innerHeight;                       // 开窗即记基线(此刻键盘未起)
     _baseVvH=_vv?_vv.height:window.innerHeight;
     _kbEst=0;
-    // ★DM 开窗期间切覆盖式: 让 VK 发 geometrychange + boundingRect 给真实键盘高(见上方长注释)。
-    if(_vk){ try{ _vk.overlaysContent=true; }catch(e){} }
-    if(_vv){ _vv.addEventListener('resize', fitChatViewport); }   // 占位式/iOS 键盘起落走 vv.resize; 覆盖式走下面 VK
-    if(_vk){ try{ _vk.addEventListener('geometrychange', fitChatViewport); }catch(e){} }
+    // ★不动 overlaysContent(保持 keyboard.js 的占位式 false): 让键盘顶起 viewport → vv 收缩, 走聊天室已验证的信号。
+    if(_vv){ _vv.addEventListener('resize', fitChatViewport); }   // 占位式键盘起落 → vv.resize, 聊天室已验证的主信号
+    if(_vk){ try{ _vk.addEventListener('geometrychange', fitChatViewport); }catch(e){} }   // 有 VK 真值则加分, 无则无害
     const inp=$('#dmChatInput'); if(inp){ inp.addEventListener('focus', onChatFocus); inp.addEventListener('blur', onChatBlur); }
     fitChatViewport();
   }
   function unbindChatViewport(){
     if(_vv){ _vv.removeEventListener('resize', fitChatViewport); }
     if(_vk){ try{ _vk.removeEventListener('geometrychange', fitChatViewport); }catch(e){} }
-    // 还原占位式, 把键盘模式交回 keyboard.js(#hall 那套依赖 false)。
-    if(_vk){ try{ _vk.overlaysContent=false; }catch(e){} }
     const inp=$('#dmChatInput'); if(inp){ inp.removeEventListener('focus', onChatFocus); inp.removeEventListener('blur', onChatBlur); }
     _resetDrawerBox($('#dmChatDrawer'));
     const c=document.querySelector('.dm-composer'); if(c) c.style.paddingBottom='';   // 复位呼吸位
