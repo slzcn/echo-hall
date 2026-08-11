@@ -40,7 +40,10 @@
   let winResizeHits = 0;
 
   if (vk) {
-    try { vk.overlaysContent = true; } catch (_) {}
+    // ★不要在这里改 overlaysContent。诊断浮层曾强设 true(覆盖式), 因本文件在所有安卓机无条件运行
+    //   且加载在 keyboard.js 之后, 把 keyboard.js 特意设的 false(占位式)覆盖掉 → 覆盖式下 vv 不缩 →
+    //   DM 抽屉(只读 vv)判不出键盘弹起 → 输入框被键盘遮。诊断只读几何(geometrychange/boundingRect),
+    //   键盘模式一律交给 keyboard.js 定。
     vk.addEventListener('geometrychange', ev => {
       vkGeomHits++;
       vkRect = ev.target.boundingRect;

@@ -275,6 +275,10 @@
   window.__ehKbGuardBg = guardBackgroundRefocus;
 
   window.__ehApplyVVH = settleChatLayout;
+  // 供 DM 抽屉(独立 fixed 容器, 不是 #hall)复用同一套键盘几何: vv + VirtualKeyboard.boundingRect + 估算兜底。
+  //   DM 只读 vv.height 在【覆盖式键盘(overlaysContent=true)】下失效(vv 不缩), 必须走这个统一口子:
+  //   visibleHeight() 会在有 VK.boundingRect 时把键盘高扣掉 → 覆盖式/占位式两种模式都返回真实可视高。
+  window.__ehKbVisibleH = function () { try { return visibleHeight(); } catch (_) { return (viewport ? viewport.height : window.innerHeight); } };
   window.__ehKbReset = function () {
     chatFocused = false;
     keyboardRect = null;

@@ -34,67 +34,60 @@
     _chatPrefetch[otherUid]={ at:Date.now(), p };
   }
 
-  // ---- 键盘协同: 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它。
-  //   iOS Safari 无 VirtualKeyboard API、走 visualViewport, fixed 锚 layout viewport(不随键盘缩)
-  //   → bottom:0 落键盘背后, 输入框被盖住。按验证过的方案把抽屉钉到 visualViewport:
-  //   top=vv.offsetTop + height=vv.height(去掉 bottom:0), 让 .dm-stream(flex:1)被挤扁而 composer 常驻可视底。
-  //   Android 占位式键盘(overlaysContent=false)本就顶起 viewport, 此时 top≈0/height≈innerHeight → 本绑定近似空操作, 不回归。
+  // ---- 键盘协同: 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它, 但【键盘几何复用它】。
+  //   之前 DM 自造轮子只读 vv.height —— 在【覆盖式键盘(overlaysContent=true)】下 vv 根本不缩 → 判不出
+  //   键盘弹起 → 抽屉不被钉 → composer 落 bottom:0 到键盘背后 = "输入框被遮"(安卓 PWA 真机反复复现的坑)。
+  //   ★收敛到聊天室那套【真机验证过】的键盘几何: keyboard.js 暴露 window.__ehKbVisibleH(),
+  //   内部 = vv + VirtualKeyboard.boundingRect + 估算兜底, 覆盖式/占位式两种模式都返回真实"键盘上方可视高"。
+  //   DM 只需: 抽屉高度钉成这个可视高 → .dm-stream(flex:1)被挤扁、composer 常驻可视底; 键盘落再复位。
+  //   (另: kbdebug.js 曾在所有安卓机把 overlaysContent 强设回 true 覆盖 keyboard.js 的 false, 已一并修掉。)
   const _vv = window.visualViewport;
-  //   ★收敛到 keyboard.js(#hall)那套【真机验证过】的机制, 别再自造轮子:
-  //   1. iOS 聚焦 fixed 容器内的输入框会把整个【文档】滚上去 → fixed 定位漂移、composer 被顶到键盘后。
-  //      keyboard.js 用 resetDocumentScroll 强制 window.scrollTo(0,0) 消掉它 —— 之前我漏了这步(真因)。
-  //   2. 保持 top:0(不再写 offsetTop, 文档已归零→offsetTop 失去意义), 只压 height=vv.height。
-  let _vvBase=0;                                     // 开窗(键盘未起)时的 vv.height 基线, 用于判"键盘是否真起来了"
-  // ★键盘是否真的弹起 —— 用【视口收缩】判定, 不再靠 matchMedia('(hover:none)and(pointer:coarse)')。
-  //   真机(某些安卓 WebView/PWA)那条媒体查询会误报 false → _softKb 一假, 依赖它的 :focus-within 收 padding
-  //   也随之失效 → composer 底残留 10px 呼吸位, 看着就是"输入框浮在键盘上方 ~15px"。改用视口收缩这个
-  //   跨 iOS/安卓都靠谱的信号: iOS 只缩 vv.height, 安卓占位式键盘 vv/innerH 一起缩, 两者相对基线都会掉一大截;
-  //   桌面聚焦不弹键盘、视口不缩 → 永远判 false → 不收 padding、不跳。
-  function _kbUp(){ return !!(_vv && _vvBase && (_vvBase - _vv.height > 120)); }
+  // 当前"键盘上方可视高": 优先用 keyboard.js 的统一口子(含 VK.boundingRect/估算), 取不到再退回 vv.height。
+  function _visH(){ try{ if(typeof window.__ehKbVisibleH==='function') return window.__ehKbVisibleH(); }catch(e){} return _vv?_vv.height:window.innerHeight; }
+  let _baseH=0;                                      // 开窗(键盘未起)时的可视高基线, 用于判"键盘是否真起来了"
+  // ★键盘是否真的弹起 —— 用【可视高收缩】判定(跨 iOS/安卓覆盖式&占位式都靠谱), 不靠媒体查询、不只看 vv。
+  function _kbUp(){ return !!(_baseH && (_baseH - _visH() > 120)); }
   // 复位抽屉的定位盒到 CSS 默认(top:0/bottom:0, 撤掉 JS 钉死的 height) —— 键盘落 & 关窗共用一处
   function _resetDrawerBox(d){ if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; } }
-  // 键盘起 → composer 贴键盘(去掉 10px 呼吸位); 键盘落 → 恢复默认呼吸位。单一机制, 不再靠媒体查询门禁。
+  // 键盘起 → composer 贴键盘(去掉 10px 呼吸位); 键盘落 → 恢复默认呼吸位。
   function syncComposerPad(){
     const c=document.querySelector('.dm-composer'); if(!c) return;
     c.style.paddingBottom = _kbUp() ? '0px' : '';
   }
   function fitChatViewport(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
-    if(!_vv){ return; }
-    // ★钉抽屉的门禁改用 _kbUp()(视口收缩), 不再用 _softKb()。之前只有 iOS 走这条:
-    //   _softKb() 在部分【安卓 PWA/WebView】误报 false(同 syncComposerPad 早已踩到的坑),
-    //   → 抽屉不被钉到 vv → composer 留在 bottom:0、落在覆盖式键盘背后 = "输入框被遮"。
-    //   两平台统一按"键盘真起来了"来钉: iOS 只缩 vv、安卓覆盖式键盘也缩 vv, 都命中;
-    //   安卓占位式键盘(resizes-content 生效)会连 layout viewport 一起缩, 此时钉 height=vv.height 与其一致, 无副作用。
     if(_kbUp()){
       if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
       d.style.top='0px';
-      d.style.height=_vv.height+'px';
+      d.style.height=_visH()+'px';                  // 钉成"键盘上方可视高"(不是 vv.height, 覆盖式下二者不同)
       d.style.bottom='auto';                        // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
     } else {                                        // 键盘落: 复位到 CSS 默认(top:0/bottom:0), 别让钉死的 height 残留
       _resetDrawerBox(d);
     }
-    syncComposerPad();                              // 键盘态一变就同步 composer 呼吸位(不受 _softKb 误报影响)
+    syncComposerPad();
     scrollBottom();                                 // 键盘挤扁 stream 后重新贴底, 别把最新消息顶出可视区
   }
-  function onChatFocus(){                            // 聚焦瞬间键盘还没起, vv.resize 才是真正时机; 但先滚回顶挡住文档漂移
+  function onChatFocus(){                            // 聚焦瞬间键盘还没起, resize/geometrychange 才是真正时机; 先滚回顶挡文档漂移
     if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }
-    setTimeout(fitChatViewport, 60);                // 等键盘动画抬起后再定一次(部分机型 resize 只发一次且早)
+    setTimeout(fitChatViewport, 60);                // 等键盘动画抬起后再定一次(部分机型信号只发一次且早)
+    setTimeout(fitChatViewport, 300);               // 覆盖式键盘/慢机型再补一帧(估算值落定后)
   }
+  const _vk = navigator.virtualKeyboard || null;
   function bindChatViewport(){
-    if(!_vv) return;
-    _vvBase=_vv.height;                             // 开窗即记基线(此刻键盘未起)
-    _vv.addEventListener('resize', fitChatViewport);
-    _vv.addEventListener('scroll', fitChatViewport);
+    _baseH=_visH();                                 // 开窗即记基线(此刻键盘未起)
+    if(_vv){ _vv.addEventListener('resize', fitChatViewport); _vv.addEventListener('scroll', fitChatViewport); }
+    // 覆盖式键盘(overlaysContent=true)下 vv 不发 resize, 只发 VK geometrychange → 必须一并听, 否则判不出弹起。
+    if(_vk){ try{ _vk.addEventListener('geometrychange', fitChatViewport); }catch(e){} }
     const inp=$('#dmChatInput'); if(inp) inp.addEventListener('focus', onChatFocus);
     fitChatViewport();
   }
   function unbindChatViewport(){
     if(_vv){ _vv.removeEventListener('resize', fitChatViewport); _vv.removeEventListener('scroll', fitChatViewport); }
+    if(_vk){ try{ _vk.removeEventListener('geometrychange', fitChatViewport); }catch(e){} }
     const inp=$('#dmChatInput'); if(inp) inp.removeEventListener('focus', onChatFocus);
     _resetDrawerBox($('#dmChatDrawer'));
     const c=document.querySelector('.dm-composer'); if(c) c.style.paddingBottom='';   // 复位呼吸位
-    _vvBase=0;
+    _baseH=0;
   }
 
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
