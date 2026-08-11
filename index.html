@@ -1674,7 +1674,11 @@
     align-items:center;justify-content:center;line-height:1}
   .me-dm-entry.has-unread .mde-badge{display:inline-flex}
   /* 会话窗: 抽屉复用 .drawer/.drawer-mask, 内部改成 消息流 + 底部输入 的竖向布局 */
-  #dmChatDrawer{padding-bottom:0}
+  /* ★键盘避让(极简): 高度锁成 dm.js 喂进来的 --dm-vh(=visualViewport.height, 键盘上方可视高)。
+     键盘起→vv 收缩→抽屉变矮→作为列底的 composer 落在键盘顶沿, 不被遮; 键盘落→vv 复原→抽屉复位。
+     未拿到 --dm-vh 前(JS 未跑/桌面)回退到 100dvh, 与 .drawer 的 top/bottom 定位等效。
+     用 height + bottom:auto 覆盖 .drawer 的 top:0/bottom:0(否则上下双约束会忽略 height)。 */
+  #dmChatDrawer{padding-bottom:0;height:var(--dm-vh,100dvh);bottom:auto}
   .dm-back{cursor:pointer;color:var(--dim);font-size:26px;line-height:1;margin-right:4px;transition:color .15s}
   .dm-back:hover{color:var(--accent,var(--cyan))}
   /* 会话窗头部只留左侧 ‹ 返回(去掉右上 ✕, 消除"两个键分不清"); 右侧等宽占位让标题真正居中 */
@@ -1688,11 +1692,9 @@
   .dm-msg.me{align-self:flex-end;background:color-mix(in srgb,var(--accent,var(--cyan)) 18%,var(--panel-solid));
     border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 40%,transparent);border-bottom-right-radius:5px}
   .dm-msg .dm-t{display:block;font-size:10px;color:var(--dim);margin-top:3px;text-align:right}
-  /* 底部间距: 键盘未起留 10px 呼吸位(见下图确认的留白); 键盘弹起时由 dm.js syncComposerPad()
-     依【视口收缩】把 padding-bottom 收到 0, 让输入框贴键盘顶(去掉那道 ~15px 缝)。
-     ★不再用 @media(hover:none)and(pointer:coarse) + :focus-within 收 padding —— 那条媒体查询在部分
-       安卓 WebView/PWA 误报 false → 收缩规则整段失效 → 键盘上方残留 ~15px 缝。改由 JS 单一机制驱动
-       (视口收缩信号跨 iOS/安卓可靠, 桌面聚焦不弹键盘=视口不缩→永不收 padding, 不跳)。 */
+  /* 底部间距: 抽屉高度已锁成键盘上方可视高(--dm-vh), composer 作为列底自然贴键盘顶,
+     这里只留固定的 10px 呼吸位即可, 不再需要 JS 依视口收缩动态收 padding。
+     safe-area 交给抽屉外层 .drawer 的 padding-bottom 兜底(键盘遮住时 iOS 会把 inset 归 0, 不会双留白)。 */
   .dm-composer{flex-shrink:0;display:flex;gap:8px;align-items:center;padding:12px 0 10px;
     border-top:1px solid var(--line)}
   .dm-composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);
@@ -1922,7 +1924,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260811-dmkbvv';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260811-dmvh';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2368,7 +2370,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script src="./js/app.js?v=20260810-dmdotfix"></script>
 <script src="./js/keyboard.js?v=20260811-dmkbvv"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260811-dmkbvv"></script>
+<script src="./js/dm.js?v=20260811-dmvh"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
