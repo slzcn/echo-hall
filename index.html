@@ -1652,6 +1652,11 @@
     background:var(--magenta,#FF2D8E);color:#fff;font-size:9px;font-weight:800;
     align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--panel-solid,#12141f)}
   .dm-btn.has-unread .dm-dot,.me-avatar.has-unread .dm-dot{display:inline-flex}
+  /* 顶栏(大厅/聊天室)头像角标收进 icon 内右上角, 不向上探出顶边: 真机实测(安卓 PWA)顶栏紧贴
+     #hall(overflow:hidden)顶边, env(safe-area-inset-top)不可靠→顶部空间不足, top:-4px 探出的那截
+     被 overflow 从顶部裁平(只露一条粉弧, 数字看不见=反复报的"私信数被遮挡")。收进内侧后不依赖任何
+     顶部空间即完整可见; 特异性(0,2,0)>基线(0,1,0)覆盖生效, 只作用于顶栏两个头像, 不动其他 .dm-dot。 */
+  .hall-tools .dm-dot{top:2px;right:2px}
   /* 有角标后不再让整个头像发光(太吵), 只让角标本身轻微呼吸 */
   .me-avatar.has-unread .dm-dot{animation:dm-dot-pulse 1.8s ease-in-out infinite}
   @keyframes dm-dot-pulse{0%,100%{transform:scale(1);box-shadow:0 0 3px 0 color-mix(in srgb,var(--magenta,#FF2D8E) 60%,transparent),0 0 0 2px var(--panel-solid,#12141f)}
@@ -1930,7 +1935,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260811-maskfade';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260811-dotinset';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
