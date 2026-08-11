@@ -40,7 +40,6 @@
   //   top=vv.offsetTop + height=vv.height(去掉 bottom:0), 让 .dm-stream(flex:1)被挤扁而 composer 常驻可视底。
   //   Android 占位式键盘(overlaysContent=false)本就顶起 viewport, 此时 top≈0/height≈innerHeight → 本绑定近似空操作, 不回归。
   const _vv = window.visualViewport;
-  const _softKb = () => { try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return false; } };
   //   ★收敛到 keyboard.js(#hall)那套【真机验证过】的机制, 别再自造轮子:
   //   1. iOS 聚焦 fixed 容器内的输入框会把整个【文档】滚上去 → fixed 定位漂移、composer 被顶到键盘后。
   //      keyboard.js 用 resetDocumentScroll 强制 window.scrollTo(0,0) 消掉它 —— 之前我漏了这步(真因)。
@@ -52,6 +51,8 @@
   //   跨 iOS/安卓都靠谱的信号: iOS 只缩 vv.height, 安卓占位式键盘 vv/innerH 一起缩, 两者相对基线都会掉一大截;
   //   桌面聚焦不弹键盘、视口不缩 → 永远判 false → 不收 padding、不跳。
   function _kbUp(){ return !!(_vv && _vvBase && (_vvBase - _vv.height > 120)); }
+  // 复位抽屉的定位盒到 CSS 默认(top:0/bottom:0, 撤掉 JS 钉死的 height) —— 键盘落 & 关窗共用一处
+  function _resetDrawerBox(d){ if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; } }
   // 键盘起 → composer 贴键盘(去掉 10px 呼吸位); 键盘落 → 恢复默认呼吸位。单一机制, 不再靠媒体查询门禁。
   function syncComposerPad(){
     const c=document.querySelector('.dm-composer'); if(!c) return;
@@ -60,11 +61,18 @@
   function fitChatViewport(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
     if(!_vv){ return; }
-    if(_softKb()){                                  // iOS: fixed 锚 layout viewport 不随键盘缩, 必须手动钉到 vv
+    // ★钉抽屉的门禁改用 _kbUp()(视口收缩), 不再用 _softKb()。之前只有 iOS 走这条:
+    //   _softKb() 在部分【安卓 PWA/WebView】误报 false(同 syncComposerPad 早已踩到的坑),
+    //   → 抽屉不被钉到 vv → composer 留在 bottom:0、落在覆盖式键盘背后 = "输入框被遮"。
+    //   两平台统一按"键盘真起来了"来钉: iOS 只缩 vv、安卓覆盖式键盘也缩 vv, 都命中;
+    //   安卓占位式键盘(resizes-content 生效)会连 layout viewport 一起缩, 此时钉 height=vv.height 与其一致, 无副作用。
+    if(_kbUp()){
       if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // ★关键: 文档滚回顶, 免 fixed 漂移
       d.style.top='0px';
       d.style.height=_vv.height+'px';
       d.style.bottom='auto';                        // 必须放开 bottom, 否则 top+bottom+height 过约束会忽略 height
+    } else {                                        // 键盘落: 复位到 CSS 默认(top:0/bottom:0), 别让钉死的 height 残留
+      _resetDrawerBox(d);
     }
     syncComposerPad();                              // 键盘态一变就同步 composer 呼吸位(不受 _softKb 误报影响)
     scrollBottom();                                 // 键盘挤扁 stream 后重新贴底, 别把最新消息顶出可视区
@@ -84,7 +92,7 @@
   function unbindChatViewport(){
     if(_vv){ _vv.removeEventListener('resize', fitChatViewport); _vv.removeEventListener('scroll', fitChatViewport); }
     const inp=$('#dmChatInput'); if(inp) inp.removeEventListener('focus', onChatFocus);
-    const d=$('#dmChatDrawer'); if(d){ d.style.top=''; d.style.height=''; d.style.bottom=''; }
+    _resetDrawerBox($('#dmChatDrawer'));
     const c=document.querySelector('.dm-composer'); if(c) c.style.paddingBottom='';   // 复位呼吸位
     _vvBase=0;
   }
