@@ -1554,8 +1554,11 @@
   .modal-err{color:var(--magenta);font-size:12.5px;min-height:18px;margin-bottom:10px}
 
   /* 抽屉(个人空间/房主设置) */
-  .drawer-mask{position:fixed;inset:0;z-index:82;background:var(--mask);backdrop-filter:blur(3px);display:none}
-  .drawer-mask.on{display:block}
+  /* 遮罩改 opacity+pointer-events(弃 display 硬切): display:block→none 对带 backdrop-filter 的层
+     在安卓 WebView 有一帧合成残留, 模糊层会多盖角标一两帧。关闭走基线(无 opacity 过渡)→ 移除 .on 同帧透明,
+     与抽屉一起瞬间隐形让开右上角角标; pointer-events 关闭时 none 免隐形遮罩继续吞点击。打开 .on 再渐显。 */
+  .drawer-mask{position:fixed;inset:0;z-index:82;background:var(--mask);backdrop-filter:blur(3px);opacity:0;pointer-events:none}
+  .drawer-mask.on{opacity:1;pointer-events:auto;transition:opacity .22s ease}
   .drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,90vw);background:var(--panel-solid);border-left:1px solid var(--line2);
     z-index:83;transform:translateX(100%);opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.2,.9,.3,1.1);display:flex;flex-direction:column;
     padding:max(20px,env(safe-area-inset-top)) 22px max(20px,env(safe-area-inset-bottom))}
@@ -1927,7 +1930,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260811-dmclose';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260811-maskfade';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
