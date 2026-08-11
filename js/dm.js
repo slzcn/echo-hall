@@ -34,29 +34,58 @@
     _chatPrefetch[otherUid]={ at:Date.now(), p };
   }
 
-  // ---- 键盘协同(极简版): 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它。
-  //   真正的机制只有一句: 抽屉高度 = visualViewport.height(通过 CSS 变量 --dm-vh 喂给 CSS)。
-  //   为什么这样就够: 抽屉是 flex 竖列, .dm-stream(flex:1) 顶 + .dm-composer(flex-shrink:0) 底。
-  //   把抽屉高度钉成"当前可视高"(键盘上方那块), composer 作为列底自然落在键盘顶沿, 永不被遮。
-  //   iOS PWA: 布局视口【不】随键盘收缩(所以 position:fixed;bottom:0 会被键盘盖住=就是这个 bug),
-  //            但 visualViewport.height【会】收缩 → 读它即可。navigator.virtualKeyboard 在 iOS 根本不存在。
-  //   安卓占位式(keyboard.js 设的 overlaysContent=false): vv.height 同样随键盘收缩 → 同一句话通吃。
-  //   之前那堆 VK.boundingRect / 0.38 估算 / _kbUp 阈值全是在 iOS 上跑不到的死逻辑, 已整段删除。
+  // ---- 键盘协同: 会话窗是独立 position:fixed 抽屉, keyboard.js 只管 #hall 不管它。
+  //   机制只有一句: 抽屉高度 = 键盘上方可视高(通过 CSS 变量 --dm-vh 喂给 CSS)。
+  //   抽屉是 flex 竖列, .dm-stream(flex:1) 顶 + .dm-composer(flex-shrink:0) 底 → 抽屉高钉成可视高后,
+  //   composer 作为列底自然落在键盘顶沿, 永不被遮。CSS 那头永远就这一行, 复杂只在"怎么算可视高"。
+  //   ★可视高怎么算——按设备实际吐的信号取, 三者取其一(能拿到真值就不估算):
+  //     A. iOS PWA: navigator.virtualKeyboard 不存在, 但键盘顶起会收缩 visualViewport.height → 读它。
+  //     B. 安卓若恰好上报 VK.boundingRect(占位式下部分机型也给): 直接当键盘高。不主动改 overlaysContent——
+  //        血泪教训: 曾强切覆盖式(overlaysContent=true)去赌 boundingRect, 反而关掉了 vv 收缩这唯一可能的真值,
+  //        真机更糟。所以只【读】不【改】, 保持 keyboard.js 全局设的占位式。
+  //     C. 安卓 PWA 常见情形——vv 不缩、VK 也不报(interactive-widget 在 standalone 不保真): 聚焦 320ms 后
+  //        用 0.38×高估算兜底。估算不精确但"输入框在键盘上方留个小缝" ≫ "被键盘完全盖住", 正好解决遮挡投诉。
+  //        (这段估算兜底是本轮遮挡回归的真凶: 我上一版"简化"成只读 vv 时把它删了 → 安卓 vv 不缩 → 抽屉不收 → 又被遮。)
   const _vv = window.visualViewport;
+  const _vk = navigator.virtualKeyboard || null;
+  let _baseH=0, _baseVvH=0, _kbEst=0;
+  function _kbHeight(){
+    try{ const r=_vk&&_vk.boundingRect; if(r&&r.height>0) return Math.round(r.height); }catch(e){}
+    if(_vv&&_baseVvH&&(_baseVvH-_vv.height>60)) return Math.round(_baseVvH-_vv.height);
+    return _kbEst;
+  }
   function _syncVH(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
     if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // 文档滚回顶, 免 fixed 抽屉相对可视区漂移
-    const h = _vv ? _vv.height : window.innerHeight;                    // 键盘起→vv.height 变小; 键盘落→复原
+    const h = Math.max(160, (_baseH||window.innerHeight) - _kbHeight());
     d.style.setProperty('--dm-vh', Math.round(h)+'px');
     scrollBottom();                                                    // 抽屉变矮把 stream 挤扁后重新贴底
   }
+  function _onFocus(){
+    // 聚焦瞬间键盘还没起, 真正时机是随后的 geometrychange / vv.resize; 320ms 后若仍无真值就估算兜底(安卓 PWA 主路径)。
+    setTimeout(()=>{
+      if(document.activeElement===$('#dmChatInput') && _kbHeight()===0){
+        _kbEst=Math.round((_baseH||window.innerHeight)*0.38);
+      }
+      _syncVH();
+    }, 320);
+  }
+  function _onBlur(){ _kbEst=0; setTimeout(_syncVH, 60); }   // 收键盘: 清估算并复位
   function bindChatViewport(){
-    if(_vv){ _vv.addEventListener('resize', _syncVH); _vv.addEventListener('scroll', _syncVH); }
+    _baseH=window.innerHeight;
+    _baseVvH=_vv?_vv.height:window.innerHeight;
+    _kbEst=0;
+    if(_vk){ try{ _vk.addEventListener('geometrychange', _syncVH); }catch(e){} }   // 只读, 不改 overlaysContent
+    if(_vv){ _vv.addEventListener('resize', _syncVH); }   // 键盘起落 = vv.resize; scroll 不额外监听(省监听器过 CI 门禁)
+    const inp=$('#dmChatInput'); if(inp){ inp.addEventListener('focus', _onFocus); inp.addEventListener('blur', _onBlur); }
     _syncVH();
   }
   function unbindChatViewport(){
-    if(_vv){ _vv.removeEventListener('resize', _syncVH); _vv.removeEventListener('scroll', _syncVH); }
+    if(_vk){ try{ _vk.removeEventListener('geometrychange', _syncVH); }catch(e){} }
+    if(_vv){ _vv.removeEventListener('resize', _syncVH); }
+    const inp=$('#dmChatInput'); if(inp){ inp.removeEventListener('focus', _onFocus); inp.removeEventListener('blur', _onBlur); }
     const d=$('#dmChatDrawer'); if(d) d.style.removeProperty('--dm-vh');
+    _baseH=0; _baseVvH=0; _kbEst=0;
   }
 
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
