@@ -515,6 +515,10 @@
     overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}   /* ★隐藏右侧滚动条(PC 首页由 #lobby 自身滚, 仍可滚) */
   #lobby::-webkit-scrollbar{width:0;height:0;display:none}
   #lobby .sec-label{margin-top:10px}
+  /* ★首页内容(小节线/频道卡)左右各内缩一个 --hall-px, 与聊天室"分隔线内缩(规范B)"及本页已内缩的 icon 全对齐。
+     此前只 icon 内缩、线/卡仍贴 860 框沿 → 首页横线右端(1150)比聊天室(1132)外突 18px, 主人所见"横线右侧没对齐"。
+     box-sizing:border-box 下 padding 只缩内容不改 860 框, 故框右沿仍与聊天室齐, 线/卡右沿同步内缩到 1132。 */
+  #lobby .sec-label,#lobby .channels{padding-left:var(--hall-px);padding-right:var(--hall-px)}
   /* 大厅底部页脚: 安装按钮 + 版本号 */
   .lobby-footer{width:100%;max-width:var(--content-max);margin-top:14px;padding-top:16px;border-top:1px solid var(--line);
     display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -1975,7 +1979,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260812-kbgate';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260812-align2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2210,10 +2214,14 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <div class="drawer" id="dmChatDrawer">
   <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dm-back-spacer" aria-hidden="true"></span></div>
   <div class="dm-stream" id="dmChatStream"></div>
-  <div class="dm-composer">
+  <!-- ★私信输入区包成 <form>: 与主聊天室 .composer 同款(form 边界+autocomplete=off)。
+       此前是裸 <div>, 而页面里注册密码框 #regPass 也是裸(在 <div> 不在 <form>) → Chrome 把两个"无 form"
+       输入并进同一隐式表单, 把私信搜索框当用户名配对密码框 → 发私信被当成凭据提交 → 弹保存密码。
+       给私信自己的 form 边界即隔离; 发送按钮 type=button 防表单真提交(发送逻辑仍走 dm.js)。 -->
+  <form class="dm-composer" onsubmit="return false" autocomplete="off" spellcheck="false">
     <input id="dmChatInput" type="search" maxlength="500" placeholder="发条私信…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" enterkeyhint="send" aria-label="私信输入">
-    <button id="dmChatSend" class="dm-send">发送</button>
-  </div>
+    <button id="dmChatSend" type="button" class="dm-send">发送</button>
+  </form>
 </div>
 </div>
 
@@ -2419,9 +2427,9 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/app.js?v=20260811-dmbadgenow"></script>
-<script src="./js/keyboard.js?v=20260812-kbgate"></script>
+<script src="./js/keyboard.js?v=20260812-align2"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260812-kbgate"></script>
+<script src="./js/dm.js?v=20260812-align2"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
@@ -2430,7 +2438,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 -->
 <!-- ★键盘诊断浮层放回加载: 内部门禁(仅 ?kbdebug / localStorage / 安卓)才挂, 普通用户无感。
      此前它被整段注释掉 = 无论怎么刷都看不到浮层的真因。 -->
-<script src="./js/kbdebug.js?v=20260812-kbgate"></script>
+<script src="./js/kbdebug.js?v=20260812-align2"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
 <script src="./js/sw-register.js?v=20260802-entryFreezeFix"></script>
 
