@@ -512,7 +512,8 @@
      落在 y=16, 与聊天室 hall-icon 的 top=16 齐平 → 切换页面 icon 不纵向跳。 */
   #lobby{flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;
     padding:calc(16px + env(safe-area-inset-top)) max(var(--hall-px),env(safe-area-inset-right)) 24px max(var(--hall-px),env(safe-area-inset-left));
-    overflow-y:auto;overflow-x:hidden}
+    overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}   /* ★隐藏右侧滚动条(PC 首页由 #lobby 自身滚, 仍可滚) */
+  #lobby::-webkit-scrollbar{width:0;height:0;display:none}
   #lobby .sec-label{margin-top:10px}
   /* 大厅底部页脚: 安装按钮 + 版本号 */
   .lobby-footer{width:100%;max-width:var(--content-max);margin-top:14px;padding-top:16px;border-top:1px solid var(--line);
@@ -1962,7 +1963,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260812-kbdbg4';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260812-pcfix2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2198,7 +2199,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dm-back-spacer" aria-hidden="true"></span></div>
   <div class="dm-stream" id="dmChatStream"></div>
   <div class="dm-composer">
-    <input id="dmChatInput" type="text" maxlength="500" placeholder="发条私信…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="eh-dm-msg" data-lpignore="true" data-1p-ignore data-form-type="other">
+    <input id="dmChatInput" type="text" maxlength="500" placeholder="发条私信…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly data-noauto data-lpignore="true" data-1p-ignore data-form-type="other">
     <button id="dmChatSend" class="dm-send">发送</button>
   </div>
 </div>
@@ -2406,15 +2407,15 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/app.js?v=20260811-dmbadgenow"></script>
-<script src="./js/keyboard.js?v=20260812-kbdbg4"></script>
+<script src="./js/keyboard.js?v=20260812-pcfix2"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260812-kbdbg4"></script>
+<script src="./js/dm.js?v=20260812-pcfix2"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
 <script src="./js/debug-overlay.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/kbdebug.js?v=20260812-kbdbg4"></script>
+<script src="./js/kbdebug.js?v=20260812-pcfix2"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
 <script src="./js/sw-register.js?v=20260802-entryFreezeFix"></script>
