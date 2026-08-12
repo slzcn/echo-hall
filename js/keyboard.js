@@ -22,12 +22,21 @@
   const usesSoftKeyboardLayout = () => window.matchMedia('(hover:none) and (pointer:coarse)').matches;
 
   function visibleHeight() {
-    const top = viewport ? viewport.offsetTop : 0;
-    let bottom = viewport ? top + viewport.height : window.innerHeight;
-    if (keyboardRect && keyboardRect.height > 0) bottom = Math.min(bottom, keyboardRect.top);
-    // ★V30：无信号 WebView 兜底——从可视底扊掋估算键盘高。
-    if (estimatedKbH > 0) bottom -= estimatedKbH;
-    return Math.max(1, Math.round(bottom - top));
+    // ★V56（对齐私信稳定方案 dm.js._kbHeightRaw）：键盘上方可视高 = min(innerHeight, visualViewport.height)。
+    //   安卓 interactive-widget=resizes-content 靠收缩 innerHeight 避让, iOS 靠 vv.height 收缩 → 取更紧者两平台通吃。
+    //   【为何弃用旧 vv.offsetTop+vv.height - keyboardRect.top】小米浏览器实测(innerH=400/vv=401 却 hall=369):
+    //   旧式减的是【缓存的】keyboardRect.top; 键盘动画中途上报过一次"键盘高≈32"的 geometrychange, 而 MIUI
+    //   focusout 常不触发 → 这个陈旧 keyboardRect 没被清 → #hall 被永久卡在 369, composer 浮在距底 32px 半空。
+    //   改为: 主用 min(innerH,vv.h)(私信同款), VK.boundingRect 每次【实时读】不缓存(覆盖式键盘 vv/innerH 不缩时才用),
+    //   天然免疫陈旧值。
+    let vis = window.innerHeight;
+    if (viewport && viewport.height) vis = Math.min(vis, viewport.height);
+    const full = viewport ? Math.max(window.innerHeight, viewport.height) : window.innerHeight;
+    let vkH = 0;
+    try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkH = Math.round(r.height); } catch (_) {}
+    if (vkH > 0) vis = Math.min(vis, full - vkH);            // 覆盖式键盘: vv/innerH 不缩, 从全高扣实时键盘高
+    if (estimatedKbH > 0) vis = Math.min(vis, full - estimatedKbH);  // 三信号全哑 WebView 估算兜底
+    return Math.max(1, Math.round(vis));
   }
 
   function applyLayout() {
