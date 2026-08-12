@@ -11,13 +11,15 @@
   const qOff = /[?&](kbdebug=0|nokbdebug)(&|$)/.test(location.search);
   if (qOff) { try { localStorage.removeItem('eh_kbdebug'); } catch (_) {} return; }
   if (qOn) { try { localStorage.setItem('eh_kbdebug', '1'); } catch (_) {} persisted = true; }
-  const isAndroid = /Android/i.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches
     || matchMedia('(display-mode: fullscreen)').matches
     || matchMedia('(display-mode: minimal-ui)').matches
     || !!navigator.standalone
     || /android-app:\/\//.test(document.referrer);
-  if (!qOn && !persisted && !isAndroid) return;
+  // ★门禁 v5: 只在【显式 ?kbdebug 或持久开关】时显示。此前为让折叠屏(UA 可能不含 Android)也能调而
+  //   无条件对所有安卓机放行 → 线上每个安卓真人都被红色诊断框糊脸。诊断已取到真相, 收回无条件放行:
+  //   主人调试仍用 ?kbdebug(带一次即写 localStorage 持久, PWA 图标进也留着), ?nokbdebug 关。
+  if (!qOn && !persisted) return;
 
   const box = document.createElement('div');
   box.id = '__ehkbdbg';
