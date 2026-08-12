@@ -320,7 +320,10 @@
   //   backChat: 会话窗返回(= ‹) —— 【一定回列表】。不论从列表点进还是长按头像直接进, 层级都是 列表→会话,
   //   返回退一级到列表; 再从列表返回才回大厅/房间(见 closeInbox)。
   function backChat(){ closeChat(); openInbox(); }
-  window.EhDM = { open: openChat, openInbox, closeInbox, closeChat, backChat, refreshUnread, subscribe: subscribeDm };
+  // paintNow: 用【已知的】_totalUnread 立刻把角标/面板徽标画上, 不发网络请求。
+  //   给 openMe 用: 个人空间面板是 innerHTML 现渲染出 #meDmBadge 空 span, 而未读数房间列表/聊天室
+  //   早已算好存在 _totalUnread 里 —— 渲染后立即 paintNow() 即秒显, 不必空等下一次 refreshUnread。
+  window.EhDM = { open: openChat, openInbox, closeInbox, closeChat, backChat, refreshUnread, subscribe: subscribeDm, paintNow: paintUnread };
 
   // ---- 绑定 ----
   function bind(){

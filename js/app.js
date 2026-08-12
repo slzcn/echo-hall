@@ -6566,6 +6566,9 @@ async function openMe(){
   $('#meMask').classList.add('on'); $('#meDrawer').classList.add('on'); ehArm();
   $('#meBtn')&&$('#meBtn').classList.add('active'); $('#meBtnHall')&&$('#meBtnHall').classList.add('active');
   bindMeActions(isBound);
+  // 私信徽标: 面板刚由 innerHTML 现渲染出空 #meDmBadge, 未读数(房间列表/聊天室早算好)已在 dm.js 的
+  //   _totalUnread 里 —— 立即用已知值画上, 不空等下一次 refreshUnread(否则"进个人空间才慢慢读出来")。
+  try{ window.EhDM && EhDM.paintNow && EhDM.paintNow(); }catch(e){}
   // ↻ 按钮点击 → 强制刷新对应区域(用户主动)
   $('#meMsgsRefresh')&&($('#meMsgsRefresh').onclick=()=>refreshMeData('msgs',isBound,acctKnown));
   $('#meRoomsRefresh')&&($('#meRoomsRefresh').onclick=()=>refreshMeData('rooms',isBound,acctKnown));
