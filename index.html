@@ -616,7 +616,9 @@
   /* ★桌面态顶部锚定(不再垂直居中): #hall 原 margin:auto 垂直居中 → 顶部留白随窗口高变 → 右上 icon 竖向位置漂移,
      与首页(贴视口顶, icon top 恒定)切换时 icon 上下跳。改 top 固定锚定 → icon 竖向恒定, 与首页对齐(实测两页 icon top 齐平)。
      水平仍 margin:0 auto 居中。移动端媒体查询另有 #hall 覆盖(left:0;top:0;全屏), 不受影响。 */
-  #hall{position:fixed;top:12px;left:0;right:0;bottom:auto;z-index:2;flex-direction:column;width:min(var(--content-max),96vw);max-height:min(92vh,900px);max-height:min(92dvh,900px);height:calc(100dvh - 24px);margin:0 auto;overflow:hidden;padding:0}
+  /* ★宽度与首页同一夹取: 首页内容外框 = min(--content-max, 视口 - 2×--hall-px)(#lobby padding 决定);
+     #hall 原用 96vw, 在 ~861px 窄窗与首页差 3px(96vw=826 vs 833) → 同一卡片两页宽度不一致。改用同式严格对齐。 */
+  #hall{position:fixed;top:12px;left:0;right:0;bottom:auto;z-index:2;flex-direction:column;width:min(var(--content-max),calc(100vw - 2*var(--hall-px)));max-height:min(92vh,900px);max-height:min(92dvh,900px);height:calc(100dvh - 24px);margin:0 auto;overflow:hidden;padding:0}
   /* ★分隔线内缩(全站规范B): 线不再贴屏幕边, 而是与本区文字内容同走 --hall-px 左右留白。
      用 absolute ::after 画内缩线(替代满宽 border-bottom), 两端 = max(--hall-px,safe)与内容左右沿齐平。 */
   .hall-top{display:flex;align-items:center;gap:12px;padding:14px 0;
@@ -1779,18 +1781,30 @@
     /* ★max-height:none 关键: 桌面基础规则那份 max-height:min(92dvh,900px) 会继承到移动端, 把满屏 #hall 顶到
        92dvh(实测 786→723, 差 63px) → 输入框浮在距底 63px(安卓 pwa 尤其明显, ×dpr≈165px 空档); 且键盘弹起时
        keyboard.js 写的 inline height 也被这份 92dvh 上限截断 → 输入框既不贴底、又被键盘遮。移动端 #hall 就该占满
-       可视区(height:100svh + 键盘态由 keyboard.js 接管), 必须清掉桌面 max-height 上限。 */
-    #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;max-height:none;margin:0;border-radius:0;border:none;align-items:stretch;--hall-px:14px}
-    @supports not (height:100svh){
-      #hall{height:-webkit-fill-available}
+       可视区(height:100svh + 键盘态由 keyboard.js 接管), 必须清掉桌面 max-height 上限。
+       ★但 max-width:1366 也命中【PC 窗口收窄到 861~1366】(1366 本就是笔记本宽度): 那里 #hall 若满宽贴边,
+       而首页(#lobby)仍是 860 居中卡片 → 同一 PC 窗口下"首页居中卡片、聊天室却贴屏满宽"的突兀断层
+       (设计本意见上方 616-619: 桌面态 #hall = 居中卡片, 满屏是"移动端"专属)。故满宽这套下沉到【手机宽度 ≤640】,
+       PC 收窄到 861~1366 回落到 base 的居中卡片(与首页一致); 手机(≤430)仍满屏 + 键盘协同不变。
+       ★用宽度而非 (pointer:coarse) 门控: 实测安卓模拟器上 pointer 报 fine(不可靠), 宽度判定在真机/模拟器都稳。 */
+    #hall{--hall-px:14px}
+    @media (max-width:640px){
+      #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;max-height:none;margin:0;border-radius:0;border:none;align-items:stretch}
+      @supports not (height:100svh){
+        #hall{height:-webkit-fill-available}
+      }
+      /* ★手机端首页内容"单次内缩"修正(规范B 本意, 见上方 518): 手机上 #lobby 自身 padding(max(--hall-px,safe))
+         已给内容一次内缩; 而 sec-label/channels/priv-actions/my-rooms/empty-hint 又各自加了一份 --hall-px padding
+         → 双重内缩 28px, 内容右沿被顶到比聊天室(单次内缩=398)左 14px 的 384。PC 上 #lobby 居中框窄于视口, 那份 padding
+         失效故只单缩=正确; 唯手机泄漏成双缩。此处清掉 section 自带 padding, 回到"#lobby padding 一次内缩", 与聊天室
+         (.hall-top/.stream 等 max(--hall-px,safe))同沿, safe-area 也一并跟随。 */
+      #lobby .sec-label,#lobby .channels,#lobby .priv-actions,#lobby .my-rooms,#lobby .empty-hint{padding-left:0;padding-right:0}
+      /* 手机端 lobby-head 与内容同占 #lobby 内缩区(左右各一个 --hall-px/safe), icon 贴其右沿(right:0) → 与频道卡/房间行
+         右沿(398)、聊天室顶栏 icon(398)三者严格对齐, 切页也不横移。★用宽度门控而非旧的 (pointer:coarse):
+         实测安卓模拟器 pointer 报 fine → 旧门控在真机(coarse)才 right:0、在 PC/模拟器失效 → 设备相关的假对齐。 */
+      .lobby-tools{right:0}
     }
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
-    /* ★icon 归零仅限【触屏移动端】: 那里 #hall 满宽(left:0), lobby-head 已被 #lobby padding 内缩一个 --hall-px,
-       lobby-tools 再 right:--hall-px 就双重内缩 → 比聊天室 icon 多缩 14px; 故触屏归零, icon 贴 lobby-head 右沿=聊天室 icon 位。
-       ★但 max-width:1366 也命中【PC 窗口收窄到 888~1366】: 那里首页仍是 860 居中框, 若 right:0 则 icon 贴框沿, 比下方
-       内缩了 --hall-px 的内容(频道卡/房间行)右沿多突出 14px —— 主人所见"右上角 icon 和下方内容没对齐"。故加 hover:none 限定,
-       PC 各宽度都保持 base 的 right:var(--hall-px), icon 右沿与内容右沿严格对齐。 */
-    @media (hover:none) and (pointer:coarse){ .lobby-tools{right:0} }
     /* 输入框外框距当前可视底边严格 5px；安全区不再叠加到业务间距。 */
     .composer{padding-bottom:15px}
     .channels{grid-template-columns:1fr}
@@ -1987,7 +2001,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260813-hallfullh';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260813-alignspec';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
