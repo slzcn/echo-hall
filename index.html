@@ -538,7 +538,9 @@
   .me-btn.me-avatar,.tool-btn.me-avatar{border:1px solid var(--line);background:var(--panel);font-size:18px}
   .me-btn.me-avatar:hover,.tool-btn.me-avatar:hover{border-color:var(--accent,var(--cyan));box-shadow:0 0 12px -3px var(--accent,var(--cyan));transform:translateY(-1px)}
   /* 大厅头部工具栏: 与聊天页 .hall-tools 完全同款(🎵/🎨/🦊 三个 .tool-btn), 绝对定位到标题右侧 */
-  .lobby-tools{position:absolute;top:0;right:0}
+  /* ★icon 切页不横移: 聊天室 .hall-tools 在 .hall-top(padding-right:--hall-px)内, icon 右沿=#hall 右沿-hall-px。
+     首页 .lobby-head 无此 padding, 故 lobby-tools 也内缩一个 --hall-px 使两页 icon 右沿对齐(实测 DELTA 18→0)。 */
+  .lobby-tools{position:absolute;top:0;right:var(--hall-px)}
   .skin-menu{position:absolute;top:48px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px var(--shadow-lg);min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
@@ -605,7 +607,10 @@
   /* 聊天厅脱离通用场景容器，直接固定在视口上。
      输入框只经过 #hall 这一层 flex 布局，不再让 .stage 与 #hall 同时争夺高度。 */
   body.hall-on > .stage{display:none}
-  #hall{position:fixed;inset:0;z-index:2;flex-direction:column;width:min(var(--content-max),96vw);height:min(92vh,900px);height:min(92dvh,900px);margin:auto;overflow:hidden;padding:0}
+  /* ★桌面态顶部锚定(不再垂直居中): #hall 原 margin:auto 垂直居中 → 顶部留白随窗口高变 → 右上 icon 竖向位置漂移,
+     与首页(贴视口顶, icon top 恒定)切换时 icon 上下跳。改 top 固定锚定 → icon 竖向恒定, 与首页对齐(实测两页 icon top 齐平)。
+     水平仍 margin:0 auto 居中。移动端媒体查询另有 #hall 覆盖(left:0;top:0;全屏), 不受影响。 */
+  #hall{position:fixed;top:12px;left:0;right:0;bottom:auto;z-index:2;flex-direction:column;width:min(var(--content-max),96vw);max-height:min(92vh,900px);max-height:min(92dvh,900px);height:calc(100dvh - 24px);margin:0 auto;overflow:hidden;padding:0}
   /* ★分隔线内缩(全站规范B): 线不再贴屏幕边, 而是与本区文字内容同走 --hall-px 左右留白。
      用 absolute ::after 画内缩线(替代满宽 border-bottom), 两端 = max(--hall-px,safe)与内容左右沿齐平。 */
   .hall-top{display:flex;align-items:center;gap:12px;padding:14px 0;
@@ -1734,7 +1739,10 @@
   .dm-composer{flex-shrink:0;display:flex;gap:8px;align-items:center;padding:12px 0 10px;
     border-top:1px solid var(--line)}
   .dm-composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);
-    border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;outline:none;transition:.2s}
+    border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;outline:none;transition:.2s;-webkit-appearance:none;appearance:none}
+  /* type=search 自带的清除叉/放大镜(仅为规避密码管理器把它当凭据框而用 search 语义, 视觉上仍是普通输入框): 一律去掉 */
+  .dm-composer input::-webkit-search-decoration,.dm-composer input::-webkit-search-cancel-button,
+  .dm-composer input::-webkit-search-results-button,.dm-composer input::-webkit-search-results-decoration{display:none;-webkit-appearance:none}
   .dm-composer input:focus{border-color:var(--accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,var(--cyan)) 10%,transparent)}
   .dm-send{flex-shrink:0;border:1px solid color-mix(in srgb,var(--accent,var(--cyan)) 45%,transparent);
     background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent);color:var(--accent,var(--cyan));
@@ -1963,7 +1971,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260812-pcfix2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260812-pcfix3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2199,7 +2207,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <div class="drawer-h"><span class="dm-back" id="dmChatBack">‹</span><h3 id="dmChatTitle">私信</h3><span class="dm-back-spacer" aria-hidden="true"></span></div>
   <div class="dm-stream" id="dmChatStream"></div>
   <div class="dm-composer">
-    <input id="dmChatInput" type="text" maxlength="500" placeholder="发条私信…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly data-noauto data-lpignore="true" data-1p-ignore data-form-type="other">
+    <input id="dmChatInput" type="search" maxlength="500" placeholder="发条私信…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" enterkeyhint="send" aria-label="私信输入">
     <button id="dmChatSend" class="dm-send">发送</button>
   </div>
 </div>
@@ -2407,15 +2415,15 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/app.js?v=20260811-dmbadgenow"></script>
-<script src="./js/keyboard.js?v=20260812-pcfix2"></script>
+<script src="./js/keyboard.js?v=20260812-pcfix3"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/dm.js?v=20260812-pcfix2"></script>
+<script src="./js/dm.js?v=20260812-pcfix3"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- 诊断浮层已下线（V44 主人验收干净效果），需调试时取消注释
 <script src="./js/debug-overlay.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/kbdebug.js?v=20260812-pcfix2"></script>
+<script src="./js/kbdebug.js?v=20260812-pcfix3"></script>
 -->
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
 <script src="./js/sw-register.js?v=20260802-entryFreezeFix"></script>
