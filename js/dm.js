@@ -38,33 +38,42 @@
   //   机制只有一句: 抽屉高度 = 键盘上方可视高(通过 CSS 变量 --dm-vh 喂给 CSS)。
   //   抽屉是 flex 竖列, .dm-stream(flex:1) 顶 + .dm-composer(flex-shrink:0) 底 → 抽屉高钉成可视高后,
   //   composer 作为列底自然落在键盘顶沿, 永不被遮。CSS 那头永远就这一行, 复杂只在"怎么算可视高"。
-  //   ★可视高怎么算——按设备实际吐的信号取, 三者取其一(能拿到真值就不估算):
-  //     A. iOS PWA: navigator.virtualKeyboard 不存在, 但键盘顶起会收缩 visualViewport.height → 读它。
-  //     B. 安卓若恰好上报 VK.boundingRect(占位式下部分机型也给): 直接当键盘高。不主动改 overlaysContent——
-  //        血泪教训: 曾强切覆盖式(overlaysContent=true)去赌 boundingRect, 反而关掉了 vv 收缩这唯一可能的真值,
-  //        真机更糟。所以只【读】不【改】, 保持 keyboard.js 全局设的占位式。
-  //     C. 安卓 PWA 常见情形——vv 不缩、VK 也不报(interactive-widget 在 standalone 不保真): 聚焦 320ms 后
-  //        用 0.38×高估算兜底。估算不精确但"输入框在键盘上方留个小缝" ≫ "被键盘完全盖住", 正好解决遮挡投诉。
-  //        (这段估算兜底是本轮遮挡回归的真凶: 我上一版"简化"成只读 vv 时把它删了 → 安卓 vv 不缩 → 抽屉不收 → 又被遮。)
+  //   ★可视高怎么算——直接读设备真实收缩后的视口(不做减法估算, 能拿到真值就不估算):
+  //     核心: 键盘上方可视高 = min(window.innerHeight, visualViewport.height)。两平台各吃一条, 取更小者通吃——
+  //     · 安卓浏览器/Chrome(viewport meta 有 interactive-widget=resizes-content): 键盘顶起会收缩【layout viewport】
+  //       → window.innerHeight 直接缩成键盘上方可视高。这就是主人说的"安卓浏览器怎么拿高度"——读 innerHeight。
+  //       (旧版只读 vv 收缩量+0.38估算, 从不读 innerHeight → 折叠屏 vv 缩不足/估算偏小 → 抽屉偏高被键盘盖。)
+  //     · iOS PWA: navigator.virtualKeyboard 不存在, layout viewport 不缩, 但 visualViewport.height 会缩 → 读它。
+  //     · 覆盖式键盘(某些安卓上 innerHeight/vv 都不缩)但上报 VK.boundingRect: 从全高扣键盘高。只【读】不【改】
+  //       overlaysContent(血泪教训: 强切覆盖式会关掉 vv 收缩这唯一真值, 真机更糟)。
+  //     · 三信号全哑(极少数 standalone WebView): 聚焦 320ms 后 0.38×高估算兜底, 保证"留缝" ≫ "被盖住"。
   const _vv = window.visualViewport;
   const _vk = navigator.virtualKeyboard || null;
-  let _baseH=0, _baseVvH=0, _kbEst=0;
-  function _kbHeight(){
+  let _baseH=0, _kbEst=0;
+  // 从设备真信号测到的键盘高(0=没测到, 三信号全哑)。可视高 = min(innerHeight, vv.height), 键盘高 = 全高 - 可视高。
+  function _kbHeightRaw(){
     try{ const r=_vk&&_vk.boundingRect; if(r&&r.height>0) return Math.round(r.height); }catch(e){}
-    if(_vv&&_baseVvH&&(_baseVvH-_vv.height>60)) return Math.round(_baseVvH-_vv.height);
-    return _kbEst;
+    const full=_baseH||window.innerHeight;
+    let vis=window.innerHeight;
+    if(_vv&&_vv.height) vis=Math.min(vis,_vv.height);   // 安卓靠 innerHeight 缩, iOS 靠 vv 缩, 取更紧者
+    if(full-vis>60) return Math.round(full-vis);
+    return 0;
   }
   function _syncVH(){
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
     if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // 文档滚回顶, 免 fixed 抽屉相对可视区漂移
-    const h = Math.max(160, (_baseH||window.innerHeight) - _kbHeight());
+    let kb=_kbHeightRaw();
+    // 无键盘态(kb=0 且没在估算): 当前 innerHeight 即真全高 → 校准 _baseH, 通吃折叠屏展开/折叠、工具栏增减。
+    if(kb===0 && _kbEst===0) _baseH=window.innerHeight;
+    if(kb===0 && _kbEst>0) kb=_kbEst;                                  // 真信号哑 → 用估算兜底
+    const h = Math.max(160, (_baseH||window.innerHeight) - kb);
     d.style.setProperty('--dm-vh', Math.round(h)+'px');
     scrollBottom();                                                    // 抽屉变矮把 stream 挤扁后重新贴底
   }
   function _onFocus(){
-    // 聚焦瞬间键盘还没起, 真正时机是随后的 geometrychange / vv.resize; 320ms 后若仍无真值就估算兜底(安卓 PWA 主路径)。
+    // 聚焦瞬间键盘还没起, 真正时机是随后的 geometrychange / vv.resize / window.resize; 320ms 后若仍无真值就估算兜底。
     setTimeout(()=>{
-      if(document.activeElement===$('#dmChatInput') && _kbHeight()===0){
+      if(document.activeElement===$('#dmChatInput') && _kbHeightRaw()===0){
         _kbEst=Math.round((_baseH||window.innerHeight)*0.38);
       }
       _syncVH();
@@ -73,19 +82,22 @@
   function _onBlur(){ _kbEst=0; setTimeout(_syncVH, 60); }   // 收键盘: 清估算并复位
   function bindChatViewport(){
     _baseH=window.innerHeight;
-    _baseVvH=_vv?_vv.height:window.innerHeight;
     _kbEst=0;
     if(_vk){ try{ _vk.addEventListener('geometrychange', _syncVH); }catch(e){} }   // 只读, 不改 overlaysContent
-    if(_vv){ _vv.addEventListener('resize', _syncVH); }   // 键盘起落 = vv.resize; scroll 不额外监听(省监听器过 CI 门禁)
+    if(_vv){ _vv.addEventListener('resize', _syncVH); }   // iOS/浏览器键盘起落信号
+    // ★window.resize: 安卓 interactive-widget=resizes-content 下键盘起落收缩 layout viewport 的主信号(折叠屏关键)。
+    //   部分安卓 PWA 只发 window.resize 不发 vv.resize, 不监听它折叠屏抽屉就不跟着收 → 输入框被盖。
+    window.addEventListener('resize', _syncVH);
     const inp=$('#dmChatInput'); if(inp){ inp.addEventListener('focus', _onFocus); inp.addEventListener('blur', _onBlur); }
     _syncVH();
   }
   function unbindChatViewport(){
     if(_vk){ try{ _vk.removeEventListener('geometrychange', _syncVH); }catch(e){} }
     if(_vv){ _vv.removeEventListener('resize', _syncVH); }
+    window.removeEventListener('resize', _syncVH);
     const inp=$('#dmChatInput'); if(inp){ inp.removeEventListener('focus', _onFocus); inp.removeEventListener('blur', _onBlur); }
     const d=$('#dmChatDrawer'); if(d) d.style.removeProperty('--dm-vh');
-    _baseH=0; _baseVvH=0; _kbEst=0;
+    _baseH=0; _kbEst=0;
   }
 
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
