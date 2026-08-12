@@ -53,6 +53,38 @@
   // ★PC(非触屏)不跑键盘避让: 桌面聚焦输入框【不】弹软键盘, 视口不该收缩。旧版无条件跑 → PC 上聚焦后
   //   320ms 估算兜底把抽屉压到 0.38h="弹起", 输入框凭空跳上来。桌面就该原位不动 → 门禁掉整套逻辑。
   function _isSoftKb(){ try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return true; } }
+  // ★键盘调试 HUD(仅 URL 带 ?kbdebug 时激活): 真机上把所有视口信号打屏, 供截图一击定位"高度不够"差在哪个信号。
+  //   纯只读, 250ms 轮询刷新(含键盘弹起动画的中间态), 不新增事件监听、不改任何布局逻辑。
+  const _KBDEBUG=(function(){ try{ return /[?&]kbdebug/.test(location.search); }catch(e){ return false; } })();
+  let _hudEl=null, _hudTimer=null;
+  function _hudPaint(){
+    if(!_hudEl) return;
+    const d=$('#dmChatDrawer');
+    const comp=d?d.querySelector('.dm-composer'):null;
+    const cr=comp?comp.getBoundingClientRect():null;
+    const vk=navigator.virtualKeyboard||null;
+    const r=vk&&vk.boundingRect;
+    const dmvh=d?getComputedStyle(d).getPropertyValue('--dm-vh').trim():'';
+    _hudEl.textContent=[
+      'iH='+window.innerHeight,
+      'vv.h='+(_vv?Math.round(_vv.height):'-')+' oTop='+(_vv?Math.round(_vv.offsetTop):'-')+' pTop='+(_vv?Math.round(_vv.pageTop):'-'),
+      'VK='+(vk?('y ov='+vk.overlaysContent+' rH='+(r?Math.round(r.height):0)):'n'),
+      'base='+_baseH+' est='+_kbEst+' kbRaw='+_kbHeightRaw(),
+      'dmvh='+dmvh+' compBot='+(cr?Math.round(cr.bottom):'-'),
+      'gap(iH-compBot)='+(cr?Math.round(window.innerHeight-cr.bottom):'-'),
+    ].join('\n');
+  }
+  function _hudStart(){
+    if(!_KBDEBUG) return;
+    if(!_hudEl){
+      _hudEl=document.createElement('div');
+      _hudEl.style.cssText='position:fixed;left:4px;top:4px;z-index:99999;background:rgba(0,0,0,.82);color:#0f0;font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;white-space:pre;pointer-events:none;max-width:78vw';
+      document.body.appendChild(_hudEl);
+    }
+    if(!_hudTimer) _hudTimer=setInterval(_hudPaint, 250);
+    _hudPaint();
+  }
+  function _hudStop(){ if(_hudTimer){ clearInterval(_hudTimer); _hudTimer=null; } }
   // 从设备真信号测到的键盘高(0=没测到, 三信号全哑)。可视高 = min(innerHeight, vv.height), 键盘高 = 全高 - 可视高。
   function _kbHeightRaw(){
     try{ const r=_vk&&_vk.boundingRect; if(r&&r.height>0) return Math.round(r.height); }catch(e){}
@@ -94,6 +126,7 @@
     window.addEventListener('resize', _syncVH);
     const inp=$('#dmChatInput'); if(inp){ inp.addEventListener('focus', _onFocus); inp.addEventListener('blur', _onBlur); }
     _syncVH();
+    _hudStart();
   }
   function unbindChatViewport(){
     if(_vk){ try{ _vk.removeEventListener('geometrychange', _syncVH); }catch(e){} }
@@ -102,6 +135,7 @@
     const inp=$('#dmChatInput'); if(inp){ inp.removeEventListener('focus', _onFocus); inp.removeEventListener('blur', _onBlur); }
     const d=$('#dmChatDrawer'); if(d) d.style.removeProperty('--dm-vh');
     _baseH=0; _kbEst=0;
+    _hudStop();
   }
 
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
