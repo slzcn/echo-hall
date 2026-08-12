@@ -13,6 +13,11 @@
   let noSignalTimer = 0;                  // focusin 后判定无信号的定时器
   let signalBaseline = null;              // focusin 瞬间的 vv.height / VK 计数基线
   let vkGeomHits = 0;
+  // ★V57：键盘落下时的全屏可视高【持久基线】。visibleHeight() 里扣键盘高(vkH/估算)时的"分母"必须用它,
+  //   而不是 max(当前innerH, 当前vv.h)——后者在 resizes-content 设备(安卓折叠屏)上键盘弹起会随 innerH
+  //   一起缩到 180, 于是 full-估算 = 180-68 = 112(把已经缩掉的键盘又扣一遍 → 双减)。用落键盘时的稳定全高
+  //   做分母: 折叠屏 min(180, 457-174)=180 估算天然失效(min 取已缩的真值), 覆盖式(vv/innerH 不缩)才真正扣高。
+  let baseFullH = 0;
 
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
@@ -31,7 +36,10 @@
     //   天然免疫陈旧值。
     let vis = window.innerHeight;
     if (viewport && viewport.height) vis = Math.min(vis, viewport.height);
-    const full = viewport ? Math.max(window.innerHeight, viewport.height) : window.innerHeight;
+    // ★V57：扣键盘高的"全屏分母"用【落键盘时的持久基线 baseFullH】, 不用 max(当前innerH, 当前vv.h)。
+    //   后者在 resizes-content 设备上键盘弹起会随 innerH 一起缩 → full-估算 把已缩的键盘再扣一遍(双减 → 112)。
+    //   baseFullH 恒为键盘落下时的全高: 折叠屏 min(180, 457-174)=180 → 估算天然让位给已缩真值; 覆盖式才真扣。
+    const full = Math.max(baseFullH || 0, window.innerHeight, viewport ? viewport.height : 0);
     let vkH = 0;
     try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkH = Math.round(r.height); } catch (_) {}
     if (vkH > 0) vis = Math.min(vis, full - vkH);            // 覆盖式键盘: vv/innerH 不缩, 从全高扣实时键盘高
@@ -51,6 +59,13 @@
     if (!inHall()) {
       if (el.style.height) el.style.height = '';
       return;
+    }
+    // ★V57：键盘确定落下时(未聚焦且无估算/无覆盖式键盘几何), 当前 innerH 即真全高 → 刷新持久基线。
+    //   进 hall、收键盘、转屏后都会走到这里把 baseFullH 校到当前朝向的全高, 避免陈旧竖屏高污染横屏。
+    if (!chatFocused && estimatedKbH === 0) {
+      let vkDown = true;
+      try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkDown = false; } catch (_) {}
+      if (vkDown) baseFullH = Math.max(window.innerHeight, viewport ? viewport.height : 0);
     }
     // 不再区分聊天聚焦/未聚焦：#hall 高度始终跟随真实可视区。
     // 避免未聚焦时 CSS 100svh 与 visualViewport.height 差距造成的首次进 hall 底部留白。
@@ -151,6 +166,9 @@
         try { event.target.blur(); } catch (_) {}
         return;
       }
+      // ★V57：focusin 此刻键盘尚未弹起(viewport 仍全高), 记下持久全屏基线, 供 visibleHeight() 扣键盘高做分母。
+      //   比取当前(可能已缩)的 innerH 稳: 是键盘落下态的真全高。
+      baseFullH = Math.max(baseFullH, window.innerHeight, viewport ? viewport.height : 0);
       chatFocused = true;
       resetDocumentScroll();
       // ★V40：退回 V38 估算兼容。V39 不干预方向错误（浏览器并未自动避让）。
@@ -228,7 +246,7 @@
   }
 
   window.addEventListener('resize', scheduleLayout, { passive: true });
-  window.addEventListener('orientationchange', () => setTimeout(settleChatLayout, 250), { passive: true });
+  window.addEventListener('orientationchange', () => { baseFullH = 0; setTimeout(settleChatLayout, 250); }, { passive: true });
 
   if (virtualKeyboard) {
     // ★V53（主人思路：参考弹起信号解弹回）：overlaysContent=true 把键盘设成“覆盖式”（悬浮盖内容、viewport 不缩）
