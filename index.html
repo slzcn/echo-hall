@@ -1657,8 +1657,9 @@
      角标原在右上角探出顶边(top:-4px)那截被裁→只剩粉弧; 收到 top:2px 仍切数字一半(顶部裁切线仍够得到)。
      逐像素赌顶部余量不稳。改锚右下角且用正偏移(bottom:1px/right:1px, 不用负值探出): 15×15 角标整个包在
      36×36 icon 内, 四边都不出界→无论状态栏/safe-area/#hall overflow 怎样都碰不到它, 与环境完全解耦。
-     特异性(0,2,0)>基线, 只作用顶栏两个头像, 不动私信入口/其他 .dm-dot。 */
-  .hall-tools .dm-dot{top:auto;bottom:1px;right:1px}
+     特异性(0,2,0)>基线, 只作用顶栏两个头像, 不动私信入口/其他 .dm-dot。
+     右上角版: 仍用正偏移(top:1px, 不用 -4px 探出上缘), 角标整个包在 icon 内不出界→状态栏够不到, 完整可见。 */
+  .hall-tools .dm-dot{top:1px;right:1px;bottom:auto}
   /* 有角标后不再让整个头像发光(太吵), 只让角标本身轻微呼吸 */
   .me-avatar.has-unread .dm-dot{animation:dm-dot-pulse 1.8s ease-in-out infinite}
   @keyframes dm-dot-pulse{0%,100%{transform:scale(1);box-shadow:0 0 3px 0 color-mix(in srgb,var(--magenta,#FF2D8E) 60%,transparent),0 0 0 2px var(--panel-solid,#12141f)}
@@ -1937,7 +1938,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260811-dotinset2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260811-dotinset3';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
