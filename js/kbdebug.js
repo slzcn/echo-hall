@@ -2,21 +2,28 @@
  * 比较 svh/dvh/lvh 与实际布局，区分浏览器底部工具栏遮挡和输入法遮挡。
  */
 (function () {
-  const queryEnabled = /[?&]kbdebug=1(&|$)/.test(location.search);
+  // ★门禁 v4: 支持裸 ?kbdebug(不强求 =1); 且带过一次即写 localStorage 持久开关 ——
+  //   从 PWA 图标进(start_url 不带 query)、或折叠屏/鸿蒙 UA 不含 "Android" 时, 仍能显示。
+  //   带 ?kbdebug=0 或 ?nokbdebug 显式关闭并清持久位。
+  let persisted = false;
+  try { persisted = localStorage.getItem('eh_kbdebug') === '1'; } catch (_) {}
+  const qOn = /[?&]kbdebug(=1)?(&|$)/.test(location.search);
+  const qOff = /[?&](kbdebug=0|nokbdebug)(&|$)/.test(location.search);
+  if (qOff) { try { localStorage.removeItem('eh_kbdebug'); } catch (_) {} return; }
+  if (qOn) { try { localStorage.setItem('eh_kbdebug', '1'); } catch (_) {} persisted = true; }
   const isAndroid = /Android/i.test(navigator.userAgent);
-  // 临时（V28）：安卓 PWA 三重 standalone 检测全 false，先无条件挂浮层仅限安卓，
-  // 让浮层自己报告 display-mode / UA 真实值，拿到后再收敛条件。
   const standalone = matchMedia('(display-mode: standalone)').matches
     || matchMedia('(display-mode: fullscreen)').matches
     || matchMedia('(display-mode: minimal-ui)').matches
     || !!navigator.standalone
     || /android-app:\/\//.test(document.referrer);
-  if (!queryEnabled && !isAndroid) return;
+  if (!qOn && !persisted && !isAndroid) return;
 
   const box = document.createElement('div');
   box.id = '__ehkbdbg';
   box.style.cssText = [
-    'position:fixed', 'right:6px', 'bottom:6px', 'z-index:2147483647',
+    // 主浮层挪到【顶部】: 弹键盘时键盘盖住屏幕下半, 底部浮层会被遮 → 这正是"浮层没出来"的错觉根因之一。
+    'position:fixed', 'right:6px', 'top:calc(6px + env(safe-area-inset-top))', 'z-index:2147483647',
     'background:rgba(255,0,80,.92)', 'color:#fff', 'font:10px/1.35 monospace',
     'padding:5px 7px', 'border:2px solid #fff', 'border-radius:6px',
     'pointer-events:none', 'white-space:pre', 'max-width:60vw',
@@ -195,7 +202,7 @@
     if (!t && document.body) {
       t = document.createElement('div');
       t.id = '__ehkbtrace';
-      t.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:2147483647;background:rgba(20,0,0,.9);color:#fd6;font:10px/1.4 monospace;padding:6px 8px;border:1px solid #fd6;border-radius:6px;pointer-events:none;white-space:pre;max-width:88vw';
+      t.style.cssText = 'position:fixed;left:6px;top:calc(40vh + env(safe-area-inset-top));z-index:2147483647;background:rgba(20,0,0,.9);color:#fd6;font:10px/1.4 monospace;padding:6px 8px;border:1px solid #fd6;border-radius:6px;pointer-events:none;white-space:pre;max-width:88vw';
       document.body.appendChild(t);
     }
     if (t) t.textContent = '聚焦采样(距键盘应=15):\n' + trace.join('\n');
@@ -260,7 +267,7 @@
     if (!p && document.body) {
       p = document.createElement('div');
       p.id = '__ehkbpoll';
-      p.style.cssText = 'position:fixed;right:6px;top:6px;z-index:2147483647;background:rgba(0,20,40,.94);color:#7fd;font:9px/1.3 monospace;padding:6px 8px;border:1px solid #7fd;border-radius:6px;pointer-events:none;white-space:pre;max-width:66vw';
+      p.style.cssText = 'position:fixed;left:6px;top:calc(6px + env(safe-area-inset-top));z-index:2147483647;background:rgba(0,20,40,.94);color:#7fd;font:9px/1.3 monospace;padding:6px 8px;border:1px solid #7fd;border-radius:6px;pointer-events:none;white-space:pre;max-width:60vw';
       document.body.appendChild(p);
     }
     if (p) p.textContent = '全量信号(★=相对基线变了):\n基线innerH=' + baseM.innerH + '\n' + poll.join('\n');
