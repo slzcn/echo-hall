@@ -50,6 +50,9 @@
   const _vv = window.visualViewport;
   const _vk = navigator.virtualKeyboard || null;
   let _baseH=0, _kbEst=0;
+  // ★PC(非触屏)不跑键盘避让: 桌面聚焦输入框【不】弹软键盘, 视口不该收缩。旧版无条件跑 → PC 上聚焦后
+  //   320ms 估算兜底把抽屉压到 0.38h="弹起", 输入框凭空跳上来。桌面就该原位不动 → 门禁掉整套逻辑。
+  function _isSoftKb(){ try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return true; } }
   // 从设备真信号测到的键盘高(0=没测到, 三信号全哑)。可视高 = min(innerHeight, vv.height), 键盘高 = 全高 - 可视高。
   function _kbHeightRaw(){
     try{ const r=_vk&&_vk.boundingRect; if(r&&r.height>0) return Math.round(r.height); }catch(e){}
@@ -81,6 +84,7 @@
   }
   function _onBlur(){ _kbEst=0; setTimeout(_syncVH, 60); }   // 收键盘: 清估算并复位
   function bindChatViewport(){
+    if(!_isSoftKb()) return;   // ★PC 不跑键盘避让, 抽屉保持 100dvh 原位(见 _isSoftKb)
     _baseH=window.innerHeight;
     _kbEst=0;
     if(_vk){ try{ _vk.addEventListener('geometrychange', _syncVH); }catch(e){} }   // 只读, 不改 overlaysContent
