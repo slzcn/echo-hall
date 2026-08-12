@@ -1781,10 +1781,12 @@
       #hall{height:-webkit-fill-available}
     }
     .hall-top{padding-top:calc(14px + env(safe-area-inset-top))}
-    /* ★小屏 icon 不横移: 桌面 lobby-head 与 #hall 同为 860 居中(同 290 内缩), 各自再叠 --hall-px 相等 → 对齐。
-       小屏 #hall 满宽(left:0), 而 lobby-head 已被 #lobby padding 内缩一个 --hall-px; 若 lobby-tools 再 right:--hall-px
-       就双重内缩 → icon 比聊天室多缩 14px(实测 rightGap 28 vs 14)。故小屏归零: icon 贴 lobby-head 右沿=聊天室 icon 位。 */
-    .lobby-tools{right:0}
+    /* ★icon 归零仅限【触屏移动端】: 那里 #hall 满宽(left:0), lobby-head 已被 #lobby padding 内缩一个 --hall-px,
+       lobby-tools 再 right:--hall-px 就双重内缩 → 比聊天室 icon 多缩 14px; 故触屏归零, icon 贴 lobby-head 右沿=聊天室 icon 位。
+       ★但 max-width:1366 也命中【PC 窗口收窄到 888~1366】: 那里首页仍是 860 居中框, 若 right:0 则 icon 贴框沿, 比下方
+       内缩了 --hall-px 的内容(频道卡/房间行)右沿多突出 14px —— 主人所见"右上角 icon 和下方内容没对齐"。故加 hover:none 限定,
+       PC 各宽度都保持 base 的 right:var(--hall-px), icon 右沿与内容右沿严格对齐。 */
+    @media (hover:none) and (pointer:coarse){ .lobby-tools{right:0} }
     /* 输入框外框距当前可视底边严格 5px；安全区不再叠加到业务间距。 */
     .composer{padding-bottom:15px}
     .channels{grid-template-columns:1fr}
@@ -1981,7 +1983,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260812-privalign';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260813-iconalign';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
