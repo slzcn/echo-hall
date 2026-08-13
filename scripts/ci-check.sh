@@ -247,6 +247,19 @@ else
 fi
 
 # ─────────────────────────────────────────
+# 1b16. 覆盖式键盘空 resize 旅程
+# ─────────────────────────────────────────
+section "1b16. 覆盖式键盘空 resize 保留估算旅程"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行覆盖式键盘空 resize 旅程"
+elif node scripts/journey-kb-overlay-empty-resize.js; then
+  pass "覆盖式键盘空 resize 保留估算、真实缩高切真值，旧实现必红"
+else
+  fail "覆盖式键盘空 resize 旅程失败"
+fi
+
+# ─────────────────────────────────────────
 # 1b12. 历史翻阅到顶终态旅程
 # ─────────────────────────────────────────
 section "1b12. 公开房封顶 / 私密房到最早终态旅程"

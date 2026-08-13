@@ -256,8 +256,10 @@
 
   if (viewport) {
     viewport.addEventListener('resize', () => {
-      // ★V30：真信号回来了 → 撤销估算，切回真值主链。
-      if (estimatedKbH > 0) estimatedKbH = 0;
+      // ★V60：resize 事件不等于几何信号。小米 18 Fold 覆盖式键盘会发空 resize，
+      //   innerHeight/vv.height 都不变；此时不能撤销刚建立的 estimatedKbH，否则 composer 又回到底部被键盘盖住。
+      const hasRealVvChange = !!(signalBaseline && Math.abs(viewport.height - signalBaseline.vvH) > 1);
+      if (estimatedKbH > 0 && hasRealVvChange) estimatedKbH = 0;
       scheduleLayout();
     }, { passive: true });
     viewport.addEventListener('scroll', () => {
