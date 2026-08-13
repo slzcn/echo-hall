@@ -221,9 +221,15 @@ async function ensureAuth(){
     catch(e){ console.warn('anon signin 超时', e); toast(EH_CONFIG.text.err_initId); return null; }
     if(error || !data?.user){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
-    // ★ 防冒充: 匿名登录后强制重掋随机名字, 避免旧缓存的正式账号名字(如 yiran)被新匿名 uid 带入 DB 产生“匿名 yiran”重复临时身份
-    // 触发场景: admin 退出时未清 localStorage → me.name/emoji 残留 → 匿名登录后 → upsert 写入一条“临时 yiran”。
-    try{ if(me){ me.registered=false; me.role='user'; me.username=''; } rollIdentity(); }catch(e){}
+    // ★ 防冒充: 仅当本地缓存残留着正式账号身份(registered/username/email)时才重掷随机名字,
+    //   避免旧缓存的正式账号名字(如 yiran)被新匿名 uid 带入 DB 产生“临时 yiran”冲突。
+    //   触发场景: admin 退出时未清 localStorage → me.name/emoji 残留。
+    // ★ 修正(2026-08-13): 纯临时身份(本来就是随机匿名名)不重掷——保留用户登录前已选中的名字。
+    const hadRegIdentity = !!(me && (me.registered || me.username || me.email));
+    try{
+      if(me){ me.registered=false; me.role='user'; me.username=''; }
+      if(hadRegIdentity){ rollIdentity(); }   // 只在残留正式身份时重掷, 否则保留临时名
+    }catch(e){}
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
   // 真实 session 是匿名的, 但缓存 me 还标着正式账号 → 同样纠正+重掷昵称(防旧缓存残留冒充+同名)
