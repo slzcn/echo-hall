@@ -20,7 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # push 可能一次包含多个原子提交；必须拿到 github.event.before，
+          # 否则提交范围检查会因浅克隆报 fatal: bad object。
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
