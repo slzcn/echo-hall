@@ -251,7 +251,17 @@
   }
 
   window.addEventListener('resize', scheduleLayout, { passive: true });
-  window.addEventListener('orientationchange', () => { baseFullH = 0; setTimeout(settleChatLayout, 250); }, { passive: true });
+  window.addEventListener('orientationchange', () => {
+    // ★V58（VK 双减修复）：只在【键盘确认落下】时才把 baseFullH=0；键盘弹起中转屏保留旧全高。
+    //   旧实现无条件 baseFullH=0 → visibleHeight() 的 full 退化成【已缩的 innerH/vv.h】
+    //   → 再减一次 vkH/estimatedKbH = 双减(#hall 被过度压缩、composer 浮空)。
+    //   落下判定与 applyLayout 复位分支同款三条件：!chatFocused && estimatedKbH===0 && VK.boundingRect.height===0。
+    //   键盘弹起态保留旧 baseFullH；等键盘落下后 applyLayout 会自动把 baseFullH 刷新到新朝向真全高。
+    let vkDown = true;
+    try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkDown = false; } catch (_) {}
+    if (!chatFocused && estimatedKbH === 0 && vkDown) baseFullH = 0;
+    setTimeout(settleChatLayout, 250);
+  }, { passive: true });
 
   if (virtualKeyboard) {
     // ★V53（主人思路：参考弹起信号解弹回）：overlaysContent=true 把键盘设成“覆盖式”（悬浮盖内容、viewport 不缩）
