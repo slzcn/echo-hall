@@ -23,7 +23,7 @@ assert(config.includes("historyTopPublicLimit:'已显示最近 {n} 条消息；�
 assert(config.includes("historyTopPublicEnd:'这里就是公开房最早的记录了'"),'公开房未达到上限使用最早记录提示文案');
 assert(config.includes("historyTopPrivate:'这里就是这个房最早的记录了'"),'私密房使用最早记录提示文案');
 assert(admin.includes("所有公开/官方房通用")&&admin.includes('上限500'),'后台明确显示公开房通用及可配置上限');
-assert(admin.includes("Math.min(Math.max(v,1),2000)"),'后台将公开房历史条数限制在 1～2000');
+assert(admin.includes("Math.min(Math.max(v,1),500)"),'后台将公开房历史条数限制在 1～500');
 assert(app.includes("addHistoryEnd('public',publicEndText)"),'公开房历史真正渲染完成后插入终态');
 assert(app.includes("addHistoryEnd('private',EH_CONFIG.text.historyTopPrivate"),'私密房到最早时插入终态');
 

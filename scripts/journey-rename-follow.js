@@ -44,6 +44,7 @@ function harness(msgs, snapshot, souls){
   const ctx={
     console,
     lastUsersSnapshot: snapshot,
+    roomUserIdentity: new Map(),
     soulUidSet: new Set(souls||[]),
     safeColor:(c)=> c || '#888',
     safeEmoji:(e)=> e || '',
@@ -109,7 +110,7 @@ const snapshot=[
                                   'const u=null; if(!u || !u.name) return;');
   if(mutant===production) throw new Error('FAIL: 未能构造反证变异体(定位锚点失效)');
   const local=[ mkMsg({uid:UID_A,name:'旧名A',color:'#111',emoji:'🐱'}) ];
-  const ctx={ console, lastUsersSnapshot:snapshot, soulUidSet:new Set(),
+  const ctx={ console, lastUsersSnapshot:snapshot, roomUserIdentity:new Map(), soulUidSet:new Set(),
     safeColor:c=>c||'#888', safeEmoji:e=>e||'', avEmoji:e=>e,
     document:{ querySelectorAll:sel=> sel==='#stream .msg[data-uid]'?local:[] } };
   vm.runInNewContext(mutant, ctx, {filename:'js/app.js#rename-follow.mutant'});
