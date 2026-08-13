@@ -3349,11 +3349,18 @@ function hideToLatest(){ const b=$('#toLatestBtn'); if(!b) return; b.classList.r
 function updateToLatest(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()){ hideToLatest(); } else { b.classList.add('on'); } }
 // 新消息到达但用户在翻历史 → 角标 +1
 function bumpUnread(){ const b=$('#toLatestBtn'); if(!b) return; if(nearBottom()) return; _unreadCount++; const d=$('#tlDot'); if(d) d.textContent = _unreadCount>99?'99+':String(_unreadCount); b.classList.add('on','has-new'); }
+// 用户持续上滑查看私密房历史时，接近顶部自动复用现有“加载更早”入口；按钮仍保留给失败重试和无障碍操作。
+function maybeLoadOlderOnScroll(stream){
+  if(!stream || stream.scrollTop>80) return;
+  const btn=$('#loadMoreBtn');
+  if(!btn || btn.disabled) return;
+  doLoadMore(btn);
+}
 (function bindToLatest(){
   const attach=()=>{
     const s=$('#stream'), b=$('#toLatestBtn'); if(!s||!b) return false;
     if(s._tlBound) return true; s._tlBound=true;
-    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); recordScrollAnchor(); }); };
+    let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); recordScrollAnchor(); maybeLoadOlderOnScroll(s); }); };
     s.addEventListener('scroll', kick, {passive:true});
     // ★偶发不显示的根因: 翻历史时消息到达打字机/图片加载/神曲卡/特效会"事后撑高" stream,
     //   离底距离变大却不触发 scroll → updateToLatest 不跑 → 按钮该现不现。用 MutationObserver
