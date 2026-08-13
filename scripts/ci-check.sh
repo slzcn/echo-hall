@@ -13,6 +13,7 @@
 #   1b3. 作曲进度与曲名行为回归
 #   1b4. 匿名首次进站完整旅程（旧错误实现反证）
 #   1b5. BGM 作曲完整旅程（中间态/禁重入/成功失败恢复）
+#   1b6. 主聊天输入法完整旅程（尾随 Enter / 菜单协同 / 高度恢复）
 #   1c. BGM 鉴权行为回归（令牌门禁 / 401 单次刷新）
 #   1d. Edge Function 安全不变量（鉴权 / 越权 / 输入边界）
 #   2. BUILD_VER (index.html) == ver.txt 内容
@@ -163,6 +164,19 @@ elif node scripts/journey-bgm-compose.js; then
   pass "BGM 中间态 / 禁重入 / 成功失败恢复 + 旧错误实现反证通过"
 else
   fail "BGM 作曲完整旅程回归失败"
+fi
+
+# ─────────────────────────────────────────
+# 1b6. 主聊天输入法完整旅程
+# ─────────────────────────────────────────
+section "1b6. 主聊天输入法完整旅程"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行输入法完整旅程测试"
+elif node scripts/journey-composer-ime.js; then
+  pass "输入法尾随 Enter / 菜单协同 / 高度恢复 + 旧错误实现反证通过"
+else
+  fail "主聊天输入法完整旅程回归失败"
 fi
 
 # ─────────────────────────────────────────

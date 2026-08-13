@@ -7324,9 +7324,13 @@ $('#rpX').onclick=()=>clearReply();
 const cin=$('#cin');
 let _inputRaf=0;
 let _cinComposing=false;
+let _cinCompositionEndedAt=0;
+function _cinEventTime(e){
+  return e && Number.isFinite(e.timeStamp) && e.timeStamp > 0 ? e.timeStamp : Date.now();
+}
 if(cin){
-cin.addEventListener('compositionstart',()=>{ _cinComposing=true; });
-cin.addEventListener('compositionend',()=>{ _cinComposing=false; syncSendBtn(); });
+cin.addEventListener('compositionstart',()=>{ _cinComposing=true; _cinCompositionEndedAt=0; });
+cin.addEventListener('compositionend',(e)=>{ _cinComposing=false; _cinCompositionEndedAt=_cinEventTime(e); syncSendBtn(); });
 cin.addEventListener('input',()=>{
   // 高度/按钮/斜杠菜单用 rAF 合并, 避免每字符触发 layout thrash
   if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
@@ -7353,6 +7357,10 @@ cin.addEventListener('input',()=>{
   cin._lastLen=v.length;
 });
 cin.addEventListener('keydown',e=>{
+  // compositionend 后部分 Safari/WebView 会补发同一物理按键的 Enter，虽已 isComposing=false 仍属于候选确认。
+  // 只保护极短尾随窗口，窗口外的明确 Enter 仍正常发送。
+  const eventTime=_cinEventTime(e);
+  if(_cinCompositionEndedAt && eventTime>=_cinCompositionEndedAt && eventTime-_cinCompositionEndedAt<80){ return; }
   // 中文拼音／五笔候选期的 Enter、Tab、方向键属于输入法，不得被菜单或发送逻辑抢走。
   // e.isComposing 是标准信号，keyCode 229 兼容部分 Android IME，自维护状态兜底漏报事件。
   if(_cinComposing || e.isComposing || e.keyCode===229) return;

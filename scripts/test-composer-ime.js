@@ -41,7 +41,7 @@ function createHarness({ atActive = false, slashActive = false } = {}) {
 function key(overrides = {}) {
   let prevented = false;
   return {
-    key: 'Enter', shiftKey: false, isComposing: false, keyCode: 13,
+    key: 'Enter', shiftKey: false, isComposing: false, keyCode: 13, timeStamp: 1000,
     preventDefault() { prevented = true; },
     get prevented() { return prevented; },
     ...overrides,
@@ -67,14 +67,16 @@ test('Android IME keyCode=229 时 Enter 不发送', () => {
   const h = createHarness(); h.handlers.keydown(key({ keyCode: 229 }));
   assert(h.calls.send === 0, `send=${h.calls.send}`);
 });
-test('compositionstart 到 compositionend 之间 Enter 不发送', () => {
+test('compositionstart 到 compositionend 尾随 Enter 均不发送，稍后 Enter 正常发送', () => {
   const h = createHarness();
   assert(typeof h.handlers.compositionstart === 'function', '缺 compositionstart 监听');
   assert(typeof h.handlers.compositionend === 'function', '缺 compositionend 监听');
-  h.handlers.compositionstart({}); h.handlers.keydown(key());
+  h.handlers.compositionstart({ timeStamp: 2000 }); h.handlers.keydown(key({ timeStamp: 2050 }));
   assert(h.calls.send === 0, `合成期 send=${h.calls.send}`);
-  h.handlers.compositionend({}); h.handlers.keydown(key());
-  assert(h.calls.send === 1, `合成结束后 send=${h.calls.send}`);
+  h.handlers.compositionend({ timeStamp: 2100 }); h.handlers.keydown(key({ timeStamp: 2101 }));
+  assert(h.calls.send === 0, `合成结束尾随 Enter send=${h.calls.send}`);
+  h.handlers.keydown(key({ timeStamp: 2400 }));
+  assert(h.calls.send === 1, `稍后明确 Enter send=${h.calls.send}`);
 });
 test('合成态不会抢 @ 菜单 Enter', () => {
   const h = createHarness({ atActive: true }); h.handlers.compositionstart({}); h.handlers.keydown(key());
