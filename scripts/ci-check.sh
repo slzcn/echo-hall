@@ -11,6 +11,8 @@
 #   1b. 主聊天输入法行为回归（composition / Enter）
 #   1b2. 匿名登录名字保留行为回归
 #   1b3. 作曲进度与曲名行为回归
+#   1b4. 匿名首次进站完整旅程（旧错误实现反证）
+#   1b5. BGM 作曲完整旅程（中间态/禁重入/成功失败恢复）
 #   1c. BGM 鉴权行为回归（令牌门禁 / 401 单次刷新）
 #   1d. Edge Function 安全不变量（鉴权 / 越权 / 输入边界）
 #   2. BUILD_VER (index.html) == ver.txt 内容
@@ -135,6 +137,32 @@ elif node scripts/test-bgm-progress-title.js; then
   pass "作曲进度状态 / 曲名规范 10 项行为回归通过"
 else
   fail "作曲进度与曲名行为回归失败"
+fi
+
+# ─────────────────────────────────────────
+# 1b4. 匿名首次进站完整旅程
+# ─────────────────────────────────────────
+section "1b4. 匿名首次进站完整旅程"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行匿名首次进站旅程测试"
+elif node scripts/journey-anon-first-time.js; then
+  pass "匿名首次进站 6 步旅程 + 旧错误实现反证通过"
+else
+  fail "匿名首次进站旅程回归失败"
+fi
+
+# ─────────────────────────────────────────
+# 1b5. BGM 作曲完整旅程
+# ─────────────────────────────────────────
+section "1b5. BGM 作曲完整旅程"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行 BGM 作曲旅程测试"
+elif node scripts/journey-bgm-compose.js; then
+  pass "BGM 中间态 / 禁重入 / 成功失败恢复 + 旧错误实现反证通过"
+else
+  fail "BGM 作曲完整旅程回归失败"
 fi
 
 # ─────────────────────────────────────────
@@ -298,6 +326,31 @@ if [ "${CI:-}" = "true" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
   fi
 else
   pass "本地运行，跳过 diff 范围检查（CI 环境会启用）"
+fi
+
+# ─────────────────────────────────────────
+# 7. 用户旅程门（生产代码命中状态/异步/身份维度时强制 journey 覆盖）
+# ─────────────────────────────────────────
+section "7. 用户旅程覆盖门"
+
+if [ ! -f scripts/journey-gate.py ]; then
+  fail "scripts/journey-gate.py 缺失；能力门禁不能静默放行"
+else
+  if [ "${CI:-}" = "true" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+    JOURNEY_RANGE="${GITHUB_BASE_SHA:-HEAD~1}..HEAD"
+    if python3 scripts/journey-gate.py --repo . --diff-range "$JOURNEY_RANGE"; then
+      pass "本次生产代码改动满足用户旅程覆盖要求"
+    else
+      fail "本次生产代码命中用户旅程维度，但缺 journey 测试或明确豁免"
+    fi
+  else
+    # 本地使用 staged/工作树 diff；没有 diff 时脚本会自行通过。
+    if python3 scripts/journey-gate.py --repo .; then
+      pass "本地改动满足用户旅程覆盖要求"
+    else
+      fail "本地改动命中用户旅程维度，但缺 journey 测试或明确豁免"
+    fi
+  fi
 fi
 
 # ─────────────────────────────────────────
