@@ -8,6 +8,7 @@
 #
 # 检查项（P1 最小可行门禁，全部零依赖或只依赖 Node/Python 标准工具）：
 #   1. 内联 <script> JavaScript 语法检查（用 node --check）
+#   1b. 主聊天输入法行为回归（composition / Enter）
 #   2. BUILD_VER (index.html) == ver.txt 内容
 #   3. SW_VERSION (sw.js) 与 BUILD_VER 一致
 #   4. index.html / admin.html 里已知重复 DOM ID 数量没上涨（回归监控）
@@ -94,6 +95,19 @@ PY
 fi
 
 # ─────────────────────────────────────────
+# 1b. 主聊天输入法行为回归
+# ─────────────────────────────────────────
+section "1b. 主聊天输入法行为回归"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行输入法行为测试"
+elif node scripts/test-composer-ime.js; then
+  pass "composition / Enter / 菜单抢键 7 项行为回归通过"
+else
+  fail "主聊天输入法行为回归失败"
+fi
+
+# ─────────────────────────────────────────
 # 2. BUILD_VER == ver.txt
 # ─────────────────────────────────────────
 section "2. BUILD_VER (index.html) == ver.txt"
@@ -177,13 +191,24 @@ sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]
 src = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in sources if p.exists())
 warned = 0
 for pat, (name, base, allow) in baselines.items():
-    hits = len(re.findall(pat, src))
+    raw_hits = len(re.findall(pat, src))
+    hits = raw_hits
+    note = ''
+    # compositionstart/end 两个监听器由 scripts/test-composer-ime.js 做行为回归，
+    # 从“无语义的危险 API 密度”中扣除；不是放宽总阈值。
+    if name == 'addEventListener':
+        approved = len(re.findall(r"cin\.addEventListener\('composition(?:start|end)'", src))
+        if approved != 2:
+            print(f'  ✗ composition 行为门禁预期 2 个监听器，实际 {approved} 个')
+            warned += 1
+        hits = raw_hits - approved
+        note = f'（原始 {raw_hits}，扣除行为测试覆盖的 composition {approved} 处）'
     limit = base + allow
     if hits > limit:
-        print(f'  ✗ {name}: {hits} 处（基线 {base}，允许 +{allow}，超限 {hits - limit}）')
+        print(f'  ✗ {name}: {hits} 处{note}（基线 {base}，允许 +{allow}，超限 {hits - limit}）')
         warned += 1
     else:
-        print(f'  ✓ {name}: {hits} 处（基线 {base}，上限 {limit}）')
+        print(f'  ✓ {name}: {hits} 处{note}（基线 {base}，上限 {limit}）')
 sys.exit(warned)
 PY
 if [ $? -ne 0 ]; then FAIL=$((FAIL+1)); fi

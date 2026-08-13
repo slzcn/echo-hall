@@ -7258,7 +7258,10 @@ $('#rpX').onclick=()=>clearReply();
 // 输入框
 const cin=$('#cin');
 let _inputRaf=0;
+let _cinComposing=false;
 if(cin){
+cin.addEventListener('compositionstart',()=>{ _cinComposing=true; });
+cin.addEventListener('compositionend',()=>{ _cinComposing=false; syncSendBtn(); });
 cin.addEventListener('input',()=>{
   // 高度/按钮/斜杠菜单用 rAF 合并, 避免每字符触发 layout thrash
   if(!_inputRaf) _inputRaf=requestAnimationFrame(()=>{
@@ -7285,6 +7288,9 @@ cin.addEventListener('input',()=>{
   cin._lastLen=v.length;
 });
 cin.addEventListener('keydown',e=>{
+  // 中文拼音／五笔候选期的 Enter、Tab、方向键属于输入法，不得被菜单或发送逻辑抢走。
+  // e.isComposing 是标准信号，keyCode 229 兼容部分 Android IME，自维护状态兜底漏报事件。
+  if(_cinComposing || e.isComposing || e.keyCode===229) return;
   // @菜单激活时，方向键/回车/Tab 选中，Esc 关闭 —— 优先于发送
   if(_atActive){
     if(e.key==='ArrowDown'){ e.preventDefault(); _atSel=(_atSel+1)%_atList.length; renderAtMenu(); return; }
