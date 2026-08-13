@@ -669,7 +669,8 @@
      【居中源根因 07-28 02:37】列表页 #bgmMenu 的 DOM 祖先链：.lobby-tools ← .lobby-head（L504 text-align:center）← #lobby。
      text-align 是继承属性，不受 position:absolute 影响；→ 无 text-align 定义的子元素（.bgm-sec-title、.bgm-empty等）全部继承居中。
      直接在容器级 .skin-menu.bgm-menu 上 text-align:left 一次性截断继承（.mode-opt 自己写 center 不受影响）*/
-  .skin-menu.bgm-menu{max-height:52vh;overflow-y:auto;overscroll-behavior:contain;text-align:left}
+  /* 【07-28→08-14】官方/灵魂各封顶 5 条后列表有界，去掉滚动，按内容自然铺开(主人要求:不要滚动条) */
+  .skin-menu.bgm-menu{overflow:visible;text-align:left}
   
   /* 分组标题：【定稿 07-28 02:37】左对齐（容器级已截断继承，只需写 padding）
      text-align 默认从容器 .skin-menu.bgm-menu 继承 left；padding-left:12px 与曲目行圆点左缘对齐 */
@@ -2009,7 +2010,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260814-xiaomi18emptyresize';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260814-bgmshow5';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2456,7 +2457,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260814-roombgm5"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260813-keepaliverename"></script>
+<script src="./js/app.js?v=20260814-bgmshow5"></script>
 <script src="./js/keyboard.js?v=20260814-xiaomi18emptyresize"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/dm.js?v=20260812-kbmin"></script>

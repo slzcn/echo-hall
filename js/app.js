@@ -594,7 +594,7 @@ function _bgmActiveUrl(){
   }catch(_){ return ''; }
 }
 // 每组显示条数 —— 后台可配（eh_rooms.bgm_show_official / bgm_show_soul），缺失/大厅走全局兜底
-const BGM_SHOW_DEFAULT=3;
+const BGM_SHOW_DEFAULT=5;
 function bgmShowN(room, kind /* 'official' | 'soul' */){
   const col= kind==='soul' ? 'bgm_show_soul' : 'bgm_show_official';
   const v = room && room[col];
