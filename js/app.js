@@ -2414,6 +2414,8 @@ async function refreshPresence(){
   lastUsersSnapshot=users;
   renderPresenceAvatars(users);
   renderTyping(users);
+  // 在场真人改名后, 回补其已渲染的历史消息旧名(与灵魂 refreshRenderedSoulIdentity 同理)
+  try{ refreshRenderedUserIdentity(); }catch(_){}
   // 持久化光墙快照(最多30人)→ 下次进同房先乐观铺出来, 消除"现拉一个网络往返"的空窗
   try{
     if(data && curRoom && curRoom.id===_rid){
@@ -2533,6 +2535,14 @@ function _buildMsgElRaw(m, isHistory){
     m.is_bot=true;
     const s=soulLatestBy(m.user_id, m.name);
     if(s){ m={...m, is_bot:true, name:s.name, emoji:s.emoji, color:s.color}; }
+  }
+  // 真人身份跟随最新(与灵魂同理): 消息存的是发送时 name/emoji/color 快照, 但一个还在场的用户
+  // 改名/换头像后, 其历史消息仍显旧名 → "同一头像、历史旧名、现在新名"的割裂。用其【当前在场身份】
+  // 覆盖旧快照, 让改名全站(含历史)一致(符合"状态忠实表现": 记录锚在 user_id, 名字是身份的当前属性)。
+  // 边界: 匿名/虚空(m.anon)不跟 —— 无持久身份、@会泄露, 该定格在发言那一刻; 已离场用户不在在场集→维持快照。
+  else if(!m.anon && m.user_id){
+    const live=liveIdentityByUid(m.user_id);
+    if(live && live.name && live.name!==m.name){ m={...m, name:live.name, emoji:live.emoji||m.emoji, color:live.color||m.color}; }
   }
   // 前端纵深防御: 灵魂控制标记([REACT:x]/[SONG:x]/[EMOJI]/[ACT]/[PROJ])万一以文本外泄
   //(worker 已修但历史库里那条 "[REACT:😏]" 还在), 渲染前清掉, 不让标记字面显示给用户。
@@ -3430,6 +3440,45 @@ function isSoulUser(uid, name){
 }
 // 取灵魂的最新展示身份(先按 uid, 再按名字兜底)
 function soulLatestBy(uid, name){ return (uid && roomSouls.find(x=>x.auth_uid===uid)) || (name && roomSouls.find(x=>x.name===name)) || null; }
+// 取【当前在场真人】按 uid 的最新展示身份(名字/头像/色)。数据源 = lastUsersSnapshot(每 15s 心跳自愈,
+// 含我自己且用最新 me.name)。命中→返回其当前身份, 用于让改名回溯覆盖历史消息旧快照(见 buildMsgEl)。
+// 只认在场用户: 早已离场者不在快照里→返回 null→历史维持发送时快照(成本最低, 覆盖 99% 场景)。
+function liveIdentityByUid(uid){
+  if(!uid || !Array.isArray(lastUsersSnapshot)) return null;
+  const u=lastUsersSnapshot.find(x=>x && x.user_id===uid);
+  return u ? { name:u.name, emoji:u.emoji, color:u.color } : null;
+}
+// 在场真人改名/换头像后, 已渲染在 DOM 的历史消息还带旧快照 → 就地回补(与 refreshRenderedSoulIdentity 同理,
+// 应对 loadHistory 早于 presence 到位、或快照路径直接贴旧 HTML 的情况)。每次 refreshPresence 后调一次。
+function refreshRenderedUserIdentity(){
+  if(!Array.isArray(lastUsersSnapshot) || !lastUsersSnapshot.length) return;
+  const byUid=new Map();
+  lastUsersSnapshot.forEach(u=>{ if(u && u.user_id) byUid.set(u.user_id, u); });
+  document.querySelectorAll('#stream .msg[data-uid]').forEach(el=>{
+    const uid=el.dataset.uid;
+    if(!uid || (soulUidSet && soulUidSet.has(uid))) return;   // 灵魂走 refreshRenderedSoulIdentity, 不重复处理
+    if(el.dataset.void==='1') return;                          // 虚空/匿名不跟改名(该定格)
+    const u=byUid.get(uid); if(!u || !u.name) return;
+    const c=safeColor(u.color), ic=safeEmoji(u.emoji)||'👤';
+    const nm=el.querySelector('.meta .nm');
+    if(nm && nm.textContent!==u.name){
+      nm.textContent=u.name; nm.style.color=c;
+      el.dataset.name=u.name;
+      // @头像/点击对TA 也跟着更新到新名(否则点旧名 @ 出错名)
+      const av=el.querySelector('.av'); if(av && av.dataset.atname) av.dataset.atname=u.name;
+    }
+    // 头像 emoji/色跟随(保留可能存在的角标子节点; 真人一般无 soul-dot/bow, 但稳妥起见只换文本+样式)
+    const av=el.querySelector('.av');
+    if(av){
+      const cur=av.getAttribute('style')||'';
+      const want=`background:${c}22;color:${c};box-shadow:inset 0 0 0 1.5px ${c}`;
+      if(cur!==want){ av.setAttribute('style', want); }
+      const emojiNow=(av.textContent||'').trim();
+      if(ic && emojiNow && emojiNow!==ic){ const kids=[...av.children].map(k=>k.outerHTML).join(''); av.innerHTML=avEmoji(ic)+kids; }
+      el.style.setProperty('--av-c', c);
+    }
+  });
+}
 async function loadRoomSouls(rid){
   roomSouls=[]; soulUidSet=new Set(); soulNameSet=new Set();
   const applyData=(data)=>{ roomSouls=data||[]; soulUidSet=new Set(roomSouls.map(s=>s.auth_uid)); soulNameSet=new Set(roomSouls.map(s=>s.name)); refreshRenderedSoulIdentity(); };
@@ -7188,6 +7237,15 @@ async function saveProfile(){
     }
     return;
   }
+  // 自己改名后, 立即让在场快照里"我"的条目同步新身份, 并回补自己已渲染的历史消息旧名(不等下次 15s 心跳)
+  try{
+    if(Array.isArray(lastUsersSnapshot)){
+      const meRow=lastUsersSnapshot.find(u=>u&&u.user_id===myUid);
+      if(meRow){ meRow.name=me.name; meRow.emoji=me.emoji; meRow.color=me.color; }
+    }
+    refreshRenderedUserIdentity();
+    if(curRoom){ beat().catch(()=>{}); }   // 心跳把新名写回 eh_presence, 让房里其他人也尽快解析到
+  }catch(_){}
   // 同步刷新大厅顶部昵称(否则要整页刷新才更新)
   if($('#lobbyName')){ $('#lobbyName').textContent=me.name; $('#lobbyName').style.color=me.color; }
   const mb=$('#meBtn'); if(mb){ setAvatarEmoji(mb, me.emoji); mb.style.color=me.color; }
