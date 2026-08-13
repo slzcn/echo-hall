@@ -406,17 +406,50 @@ if [ "${CI:-}" = "true" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
   else
     CHANGED="$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)"
   fi
-  # 简单分领域：keyboard=index.html 里 kb/vv 区域；bgm=bgm 关键词；pwa=sw.js/manifest；db=sql/
-  # 这里只做一个粗糙提示：如果 index.html + sw.js + sql/ 都动了，很可能又是「混合提交」
-  hit_index=$(echo "$CHANGED" | grep -c '^index\.html$' || true)
-  hit_sw=$(echo "$CHANGED"    | grep -c '^sw\.js$'      || true)
-  hit_sql=$(echo "$CHANGED"   | grep -c '^sql/'          || true)
-  hit_admin=$(echo "$CHANGED" | grep -c '^admin\.html$'  || true)
-  domains=$(( (hit_index>0) + (hit_sw>0) + (hit_sql>0) + (hit_admin>0) ))
+  # 领域判定：版本同步只改 BUILD_VER / ADMIN_VER / SW_VERSION 时不算业务改动；
+  # 一旦同一文件还包含真实业务行，仍按对应领域计数，避免用版本号掩盖混合提交。
+  CHANGED_DIFF="$(git diff "$BASE" HEAD --unified=0 2>/dev/null || true)"
+  readarray -t DOMAINS < <(python3 - "$CHANGED_DIFF" <<'PY'
+import re, sys
+
+diff=sys.argv[1]
+current=''
+meaningful={}
+for line in diff.splitlines():
+    if line.startswith('+++ b/'):
+        current=line[6:]
+        meaningful.setdefault(current, False)
+        continue
+    if not current or line.startswith(('+++','---','@@')):
+        continue
+    if not line.startswith(('+','-')):
+        continue
+    text=line[1:].strip()
+    if not text:
+        continue
+    if current=='index.html' and re.fullmatch(r"(?:var\s+)?BUILD_VER\s*=\s*['\"][^'\"]+['\"]\s*;?", text):
+        continue
+    if current=='admin.html' and re.fullmatch(r"(?:var\s+)?ADMIN_VER\s*=\s*['\"][^'\"]+['\"]\s*;?", text):
+        continue
+    if current=='sw.js' and re.fullmatch(r"(?:const\s+)?SW_VERSION\s*=\s*['\"][^'\"]+['\"]\s*;?", text):
+        continue
+    if current in ('ver.txt','ver-admin.txt'):
+        continue
+    meaningful[current]=True
+
+domains=[]
+if meaningful.get('index.html'): domains.append('index')
+if meaningful.get('sw.js'): domains.append('sw')
+if any(meaningful.get(f,False) for f in meaningful if f.startswith('sql/')): domains.append('sql')
+if meaningful.get('admin.html'): domains.append('admin')
+print('\n'.join(domains))
+PY
+)
+  domains=${#DOMAINS[@]}
   if [ "$domains" -ge 3 ]; then
-    fail "本次 diff 同时触碰 $domains 个领域（index/sw/sql/admin）— 拆分成原子提交"
+    fail "本次 diff 同时触碰 $domains 个业务领域（index/sw/sql/admin）— 拆分成原子提交"
   else
-    pass "本次 diff 触碰 $domains 个领域（≤2 视为原子提交）"
+    pass "本次 diff 触碰 $domains 个业务领域（版本同步文件不计入业务领域）"
   fi
 else
   pass "本地运行，跳过 diff 范围检查（CI 环境会启用）"
