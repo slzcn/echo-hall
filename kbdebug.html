@@ -46,6 +46,11 @@
 </div>
 
 <div class="card">
+  <h2>🔔 事件计数器（验证 keyboard.js 能否被触发）</h2>
+  <div id="ev" class="row"></div>
+</div>
+
+<div class="card">
   <h2>📸 可视区截图数值</h2>
   <div id="vp" class="row"></div>
 </div>
@@ -70,6 +75,24 @@
   var estimatedKbH = 0;
   var chatFocused = false;
 
+  // ★ 事件计数器：验证 keyboard.js 到底能不能被触发
+  //   applyLayout 靠 window.resize / vv.resize / vv.scroll / vk.geometrychange 四条入口
+  //   小米 18 Fold 弹键盘时 innerH 从 718 缩到 408——这个缩高到底发了 resize 事件没？
+  var evtCounts = { winResize: 0, vvResize: 0, vvScroll: 0, vkGeom: 0, focusIn: 0, focusOut: 0 };
+  var lastEvtName = '-';
+  var lastEvtTs = 0;
+  function logEvt(name) { evtCounts[name]++; lastEvtName = name; lastEvtTs = Date.now(); }
+  window.addEventListener('resize', function(){ logEvt('winResize'); }, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function(){ logEvt('vvResize'); }, { passive: true });
+    window.visualViewport.addEventListener('scroll', function(){ logEvt('vvScroll'); }, { passive: true });
+  }
+  try {
+    if (navigator.virtualKeyboard) {
+      navigator.virtualKeyboard.addEventListener('geometrychange', function(){ logEvt('vkGeom'); });
+    }
+  } catch(_){}
+
   // 简单复刻 keyboard.js 的 visibleHeight
   function ehVisibleH(){
     var vv = window.visualViewport;
@@ -90,8 +113,8 @@
   function v(val){ return '<span class="v">'+val+'</span>' }
 
   var probe = document.getElementById('probe');
-  probe.addEventListener('focus', function(){ chatFocused = true; if(!baseFullH) baseFullH = window.innerHeight; });
-  probe.addEventListener('blur', function(){ chatFocused = false; });
+  probe.addEventListener('focus', function(){ chatFocused = true; if(!baseFullH) baseFullH = window.innerHeight; logEvt('focusIn'); });
+  probe.addEventListener('blur', function(){ chatFocused = false; logEvt('focusOut'); });
 
   function tick(){
     var vv = window.visualViewport;
@@ -148,6 +171,16 @@
       h('#hall 会被写成 = ')+v(expectedHallH)+' px\n'+
       h('是否满足触屏软键盘布局 = ')+v(mqCoarse?'YES':'NO (走桌面布局！)');
 
+    // ★ 事件计数器：主人弹键盘看数字涨不涨
+    var msSinceEvt = lastEvtTs ? (Date.now() - lastEvtTs) : -1;
+    document.getElementById('ev').innerHTML =
+      h('window.resize = ')+v(evtCounts.winResize)+'  <-- keyboard.js 主入口！\n'+
+      h('vv.resize = ')+v(evtCounts.vvResize)+'  <-- keyboard.js 入口 2\n'+
+      h('vv.scroll = ')+v(evtCounts.vvScroll)+'\n'+
+      h('vk.geometrychange = ')+v(evtCounts.vkGeom)+'\n'+
+      h('focusin/focusout = ')+v(evtCounts.focusIn+'/'+evtCounts.focusOut)+'\n'+
+      h('最后一个事件 = ')+v(lastEvtName + (msSinceEvt>=0 ? '  ('+msSinceEvt+'ms 前)' : ''));
+
     // ★ 超大结论横幅（糊图也能从色块判读）
     var verdict = document.getElementById('verdict');
     if (!kbUp) {
@@ -172,6 +205,13 @@
       lines.push('<span style="font-size:22px">SOFTKB=' + (mqCoarse ? 'YES' : 'NO') + '</span>');
       lines.push('<span style="font-size:20px">IH=' + window.innerHeight + ' VV=' + (vv ? Math.round(vv.height) : '-') + ' VK=' + vkH + '</span>');
       lines.push('<span style="font-size:22px">VIS=' + visH + 'px</span>');
+      // ★ 将事件计数提到横幅、长习判一眼，事件=0 就是真根因
+      var evTotal = evtCounts.winResize + evtCounts.vvResize + evtCounts.vvScroll + evtCounts.vkGeom;
+      lines.push('<span style="font-size:20px">EVT winR=' + evtCounts.winResize + ' vvR=' + evtCounts.vvResize + ' vkG=' + evtCounts.vkGeom + '</span>');
+      if (evTotal === 0) {
+        lines.push('<span style="font-size:20px;font-weight:normal">❌ 弹键盘后零事件 → applyLayout 未被触发</span>');
+        bg = '#c33';
+      }
       if (!mqCoarse) {
         lines.push('<span style="font-size:18px;font-weight:normal">❌ keyboard.js 未进入软键盘布局</span>');
         bg = '#c33';
