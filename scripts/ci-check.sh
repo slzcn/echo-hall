@@ -9,6 +9,7 @@
 # 检查项（P1 最小可行门禁，全部零依赖或只依赖 Node/Python 标准工具）：
 #   1. 内联 <script> JavaScript 语法检查（用 node --check）
 #   1b. 主聊天输入法行为回归（composition / Enter）
+#   1c. Edge Function 安全不变量（鉴权 / 越权 / 输入边界）
 #   2. BUILD_VER (index.html) == ver.txt 内容
 #   3. SW_VERSION (sw.js) 与 BUILD_VER 一致
 #   4. index.html / admin.html 里已知重复 DOM ID 数量没上涨（回归监控）
@@ -105,6 +106,21 @@ elif node scripts/test-composer-ime.js; then
   pass "composition / Enter / 菜单抢键 7 项行为回归通过"
 else
   fail "主聊天输入法行为回归失败"
+fi
+
+# ─────────────────────────────────────────
+# 1c. Edge Function 安全不变量
+# ─────────────────────────────────────────
+section "1c. Edge Function 安全不变量"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行 Edge 安全测试"
+elif [ ! -f supabase/functions/eh-bgm-gen/index.ts ] || [ ! -f supabase/functions/eh-sing-cover/index.ts ]; then
+  warn "私密 Edge Function 源码不在公开仓库；公开 CI 跳过，本地部署前必须运行 scripts/test-edge-auth.js"
+elif node scripts/test-edge-auth.js; then
+  pass "音频生成鉴权 / 越权 / 输入边界 11 项安全不变量通过"
+else
+  fail "Edge Function 安全不变量失败"
 fi
 
 # ─────────────────────────────────────────

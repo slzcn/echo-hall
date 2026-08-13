@@ -5192,7 +5192,7 @@ async function sendBgmGen(desc){
   try{
     const session=await sb.auth.getSession();
     const token=session&&session.data&&session.data.session&&session.data.session.access_token;
-    const body={userId:myUid,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:bgmGeneratedTitle(clean,room),broadcast};
+    const body={userId:myUid,roomId:room.id,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:bgmGeneratedTitle(clean,room),broadcast};
     const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
     const out=await r.json().catch(()=>({}));
     if(!r.ok||!out.ok){
@@ -5490,7 +5490,10 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     // ★服务端直传桶: 带 roomId+mid → Edge 生成后自己传桶回 songUrl, 省"2MB base64 回传+atob+浏览器再传"整段(~9s)。
     //   path 与前端旧逻辑一致(songs/<roomId>/<mid>.mp3), 服务端上传失败会自动退回 base64(见下)。
     _payload.roomId = startRoomId || 'unknown'; _payload.mid = String(mid);
-    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_payload),signal:_ac.signal});
+    const _session=await sb.auth.getSession();
+    const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
+    if(!_token) throw new Error('cover auth missing');
+    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+_token},body:JSON.stringify(_payload),signal:_ac.signal});
     if(!resp.ok) throw new Error('cover HTTP '+resp.status);
     const res=await resp.json();
     if(!res.ok || (!res.coverMp3_b64 && !res.songUrl)) throw new Error('cover no audio');
