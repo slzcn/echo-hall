@@ -146,11 +146,16 @@
         settleChatLayout();
         return;
       }
-      // 信号 3：VK.boundingRect 当前为真值（开始 0 后变非 0 又变 0——三信号全哑时很少命中，作为上限兵入共同处理）
+      // 信号 3：VK.boundingRect 曾非 0 现在回 0（键盘物理收起）→ 清零估算。
+      //   小米 WebView 覆盖式键盘常不触发 vv.resize / focusout，activeElement 也可能仍是 #cin、
+      //   innerH 只微动 <50 → 只有这条 VK 现值信号能把估算拉回来。
       try {
         const r = virtualKeyboard && virtualKeyboard.boundingRect;
         if (r && r.height === 0 && vkGeomHits > (signalBaseline?.vkHits || 0)) {
-          // 曾有 geometrychange 峙峰 rect 但现在回 0 → 真实收起。但走不到这里、上面 vv/vk 监听已处理。
+          estimatedKbH = 0;
+          clearInterval(collapseTimer); collapseTimer = 0;
+          settleChatLayout();
+          return;
         }
       } catch (_) {}
     }, 300);
