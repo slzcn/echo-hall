@@ -1573,6 +1573,9 @@ async function enterRoom(room){
       refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
       loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions())           // 拉本房灵魂居民(展示层)
     ]);
+    // ★keep-alive 贴的是旧 DOM 快照, 跳过了 loadHistory→loadRoomUserIdentity。这里从还原后的 DOM
+    //   扫 uid 补一次真人权威身份表, 让离场者改名(如 61女王→热血狼)在秒回房路径也跟随, 不留旧名。
+    loadRoomUserIdentity();
     room.role = memRes?.value?.data?.role || 'member';
     { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
     return;
@@ -3536,19 +3539,27 @@ async function loadRoomSouls(rid){
 //   与 loadRoomSouls 对等——只不过灵魂表整房一次拉全, 真人表按"历史里真出现过的人"增量拉(全站真人几十个,
 //   单房上限也就一二十个, IN 批量一发即回)。拉完就地回补一次已渲染历史, 让离场者的改名也跟随。
 //   eh_users 的 RLS(users_select = auth.uid() IS NOT NULL)允许任何已登录会话读他人 name/emoji/color, 无需改库。
+// rows 传【历史查询结果】(loadHistory 路径, 有 anon 字段最准); 不传/为空时【从已渲染 DOM 扫 data-uid】
+//   —— keep-alive 秒回房直接贴旧 DOM 快照、跳过 loadHistory, 那条路径全靠 DOM 扫描补身份表(与
+//   refreshRenderedSoulIdentity 扫 DOM 同理), 否则离场者(如改名后的"61女王")旧名永远留在快照里。
 async function loadRoomUserIdentity(rows){
   try{
-    if(!sb || !Array.isArray(rows) || !rows.length) return;
-    // 收集本批出现的【非匿名、有 uid、且尚未在表里】的真人 uid; 灵魂走 roomSouls 不重复拉。
+    if(!sb) return;
     const want=[];
     const seen=new Set();
-    rows.forEach(m=>{
-      const uid=m && m.user_id;
-      if(!uid || m.anon) return;
+    const consider=(uid, isAnon)=>{
+      if(!uid || isAnon) return;
       if(soulUidSet && soulUidSet.has(uid)) return;
       if(roomUserIdentity.has(uid) || seen.has(uid)) return;
       seen.add(uid); want.push(uid);
-    });
+    };
+    if(Array.isArray(rows) && rows.length){
+      // 收集本批出现的【非匿名、有 uid、且尚未在表里】的真人 uid; 灵魂走 roomSouls 不重复拉。
+      rows.forEach(m=>{ if(m) consider(m.user_id, m.anon); });
+    } else {
+      // 无 rows: 从当前 #stream 已渲染消息扫 uid(虚空/匿名消息带 data-void='1', 跳过)。
+      document.querySelectorAll('#stream .msg[data-uid]').forEach(el=>{ consider(el.dataset.uid, el.dataset.void==='1'); });
+    }
     if(!want.length) return;
     const { data, error } = await sb.from('eh_users').select('id,name,emoji,color').in('id', want);
     if(error || !Array.isArray(data)) return;

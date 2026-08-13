@@ -151,4 +151,41 @@ function identity(){
   assert(local[0]._nm.textContent==='61女王', '反证 2b: 无身份表兜底 → 61女王历史永远定格旧名(正是修复前的 bug)');
 }
 
-console.log('\n✅ 正式用户改名旅程通过：在场→快照跟随；离场→权威身份表反查跟随(61女王案)；匿名/陌生→定格；灵魂链不受影响。');
+// ---- keep-alive 秒回房路径：loadRoomUserIdentity 无 rows 时从 DOM 扫 uid 补身份表 ----
+// (秒回房直接贴旧 DOM 快照、跳过 loadHistory→无 rows; 若不从 DOM 扫描, 离场者旧名永留快照 = 主人看到的"还有")
+{
+  const s2=source.indexOf('async function loadRoomUserIdentity(rows){');
+  const e2=source.indexOf('// 消息流灵魂头像"在场才呼吸"', s2);
+  if(s2<0||e2<0) throw new Error('FAIL: 无法定位 loadRoomUserIdentity');
+  const prod2=source.slice(s2,e2);
+
+  // 场景: DOM 里有离场者 61女王(UID_D)+匿名(UID_B, data-void=1)+灵魂(UID_S)。无 rows 入参。
+  const dom=[
+    mkMsg({uid:UID_D,name:'61女王',color:'#5a5',emoji:'👑'}),
+    mkMsg({uid:UID_B,name:'匿名旧名',color:'#222',emoji:'👻',isVoid:true}),
+    mkMsg({uid:UID_S,name:'灵魂旧名',color:'#444',emoji:'🤖'}),
+  ];
+  let queried=null;
+  const map=new Map();
+  const ctx={
+    console, sb:{
+      from(t){ return { select(){ return { in(col, ids){ queried={t,col,ids};
+        return Promise.resolve({ data:[{id:UID_D,name:'热血狼',emoji:'🐺',color:'#e33'}], error:null }); } }; } }; }
+    },
+    soulUidSet:new Set([UID_S]),
+    roomUserIdentity:map,
+    refreshRenderedUserIdentity(){ ctx._refreshed=(ctx._refreshed||0)+1; },
+    document:{ querySelectorAll:sel=> sel==='#stream .msg[data-uid]'?dom:[] },
+  };
+  vm.runInNewContext(prod2, ctx, {filename:'js/app.js#loadRoomUserIdentity'});
+  (async()=>{
+    await ctx.loadRoomUserIdentity();   // 不传 rows → 走 DOM 扫描分支
+    assert(queried && queried.t==='eh_users', '步骤 11: 无 rows 时从 DOM 扫 uid, 批量查 eh_users');
+    assert(queried.ids.includes(UID_D), '步骤 12: 扫到离场者 61女王 uid 入批');
+    assert(!queried.ids.includes(UID_B), '步骤 13: 匿名(data-void)不入批');
+    assert(!queried.ids.includes(UID_S), '步骤 14: 灵魂 uid 不入批(走 roomSouls)');
+    assert(map.get(UID_D) && map.get(UID_D).name==='热血狼', '步骤 15: 身份表填入离场者现名(热血狼)');
+    assert(ctx._refreshed===1, '步骤 16: 拉到后就地回补一次 DOM(keep-alive 秒回房也跟随改名)');
+    console.log('\n✅ 正式用户改名旅程通过：进房/秒回房两路径都跟随；离场→权威身份表反查(61女王案)；匿名/陌生→定格；灵魂链不受影响。');
+  })().catch(e=>{ console.error(e.message||e); process.exit(1); });
+}
