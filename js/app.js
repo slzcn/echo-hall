@@ -735,7 +735,11 @@ function buildBgmMenu(m, soulOverride){
     }
     // ⑤ 灵魂现场生成（仅房间页；大厅无当前房间，不提供）
     if(room && !isLobby){
-      html.push(`<div class="skin-opt bgm-gen-row" data-action="gen"><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">请灵魂制作一首…</span></div>`);
+      const _gen=!!window._ehBgmGenerating;
+      const _rowCls = _gen ? 'skin-opt bgm-gen-row disabled' : 'skin-opt bgm-gen-row';
+      const _rowAct = _gen ? '' : ' data-action="gen"';
+      const _rowTxt = _gen ? '🎼 灵魂正在作曲…' : '请灵魂制作一首…';
+      html.push(`<div class="${_rowCls}"${_rowAct}><span class="dot" style="color:var(--green);background:var(--green)"></span><span class="bgm-flex">${_rowTxt}</span></div>`);
     }
   m.innerHTML=html.join('');
   // 顶部两颗胶囊：自动 / 关闭 互斥
@@ -767,7 +771,12 @@ function buildBgmMenu(m, soulOverride){
     el.onclick=async (e)=>{
       e.stopPropagation();
       const act=el.dataset.action;
-      if(act==='gen'){ m.classList.remove('on'); syncBgmActive(); try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){} return; }
+      if(act==='gen'){
+        if(window._ehBgmGenerating){ toast('灵魂正在为你作曲, 再给它一会儿'); return; }
+        m.classList.remove('on'); syncBgmActive();
+        try{ await sendBgmGen('按当前房间气氛现场生成一首纯器乐 BGM'); }catch(_){}
+        return;
+      }
       const url=el.dataset.url; if(!url) return;
       // 点歌曲永远进入/保持手动模式；回自动只通过顶部「自动」按钮。
       // 不再把“再次点已选歌曲”解释为回自动，避免首曲恰好正在播放时看起来点不动、随机重播造成跳动。
@@ -899,11 +908,20 @@ function initBgmUI(){
   //   • reason='library' → 曲库增删（新生成一首），需重建 DOM
   //   • 其他（切曲/换房）→ 只更新选中态，避免全量重绘导致的跳动
   window.addEventListener('eh:bgm-changed', (e)=>{
-    const isLib=(e&&e.detail&&e.detail.reason)==='library';
+    const reason=e&&e.detail&&e.detail.reason;
+    const isLib=reason==='library';
+    const isGenerating=reason==='generating';
     [menuLobby,menuHall].forEach(m=>{
       if(!m||!m.classList.contains('on')) return;
       if(isLib){ m._bgmPickCache=null; buildBgmMenu(m); refreshBgmSoulLib(m, true); }  // 新曲入库：先用旧缓存重抽, 再强拉最新灵魂曲库补渲染
-      else refreshBgmSelState(m);
+      else if(isGenerating){
+        const row=m.querySelector('.bgm-gen-row'); if(!row) return;
+        const gen=!!window._ehBgmGenerating;
+        row.classList.toggle('disabled', gen);
+        if(gen){ row.removeAttribute('data-action'); } else { row.setAttribute('data-action','gen'); }
+        const flex=row.querySelector('.bgm-flex');
+        if(flex) flex.textContent=gen?'🎼 灵魂正在作曲…':'请灵魂制作一首…';
+      } else refreshBgmSelState(m);
     });
   });
 }
@@ -5178,11 +5196,11 @@ function bgmGeneratedTitle(desc,room){
   if(clean) return clean;
   // 兜底: 按房间意象给策展名(带轻微变体避免千篇一律)
   const rn=String((room&&room.name)||'').trim();
-  if(/午夜|深夜|电台/.test(rn)) return pick(['午夜回声','凌晨的电台','没人的深夜频率']);
-  if(/技术|代码/.test(rn)) return pick(['代码微光','改到天亮','屏幕前的深夜']);
-  if(/虚空|回音/.test(rn)) return pick(['星际回声','把秘密扔进宇宙','银河那头']);
-  if(/私密/.test(rn)||(room&&room.kind==='private')) return pick(['耳边低语','关上门以后','只说给你听']);
-  return pick(['此刻回声','说不清的心情','留给自己的一首','当下这一刻']);
+  if(/午夜|深夜|电台/.test(rn)) return pick(['午夜回声','凌晨电台','独自频率','夜里一盏']);
+  if(/技术|代码/.test(rn)) return pick(['代码微光','编译夜色','屏前深夜','终端小调']);
+  if(/虚空|回音/.test(rn)) return pick(['星际回声','宇宙耳语','银河尾音','真空微风']);
+  if(/私密/.test(rn)||(room&&room.kind==='private')) return pick(['耳边低语','只说给你','门后小语','夜话轻陈']);
+  return pick(['光的褶皱','一寸夜色','未寄之信','心事微光','无题小调','半个回声','面向自己','一句未语']);
 }
 async function bgmAccessToken(forceRefresh){
   if(!sb) return '';
@@ -5212,6 +5230,7 @@ async function sendBgmGen(desc){
   if(_ehBgmGenerating){ toast('灵魂正在为你作曲，先别催它'); return; }
   const now=Date.now(); if(sendBgmGen._t && now-sendBgmGen._t<4000){ toast('灵魂手还没闲下来，稍等几秒'); return; } sendBgmGen._t=now;
   _ehBgmGenerating=true;
+  try{ window._ehBgmGenerating=true; window.dispatchEvent(new CustomEvent('eh:bgm-changed',{detail:{reason:'generating',on:true}})); }catch(_){}
   const room=curRoom;
   const broadcast=bgmBroadcastPhrase(desc);
   const clean=String(desc||'当前房间气氛').replace(/让(全房间|大家|所有人)(也)?听|广播/gi,'').trim().slice(0,500);
@@ -5250,7 +5269,10 @@ async function sendBgmGen(desc){
     try{ ehLog('bgm_generated',{title:row.title,broadcast,room_name:room.name}); }catch(_){}
     try{ window.dispatchEvent(new CustomEvent('eh:bgm-changed',{detail:{reason:'library'}})); }catch(_){}
   }catch(e){ console.warn('sendBgmGen',e); toast('灵魂暂时走神了，稍后再试'); }
-  finally{ _ehBgmGenerating=false; }
+  finally{
+    _ehBgmGenerating=false;
+    try{ window._ehBgmGenerating=false; window.dispatchEvent(new CustomEvent('eh:bgm-changed',{detail:{reason:'generating',on:false}})); }catch(_){}
+  }
 }
 async function showMyBgmLibrary(){
   if(!myUid){try{await ensureAuth()}catch(_){} }

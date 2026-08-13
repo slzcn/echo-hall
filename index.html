@@ -691,6 +691,9 @@
   
   .skin-menu.bgm-menu .bgm-gen-row{color:var(--sub)}
   .skin-menu.bgm-menu .bgm-gen-row:hover{color:var(--ink)}
+  .skin-menu.bgm-menu .bgm-gen-row.disabled{color:var(--sub);opacity:.75;cursor:default;pointer-events:none}
+  .skin-menu.bgm-menu .bgm-gen-row.disabled .dot{animation:bgmGenPulse 1.2s ease-in-out infinite}
+  @keyframes bgmGenPulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.35)}}
 
   /* ★上下 padding 22px: 灵魂头像呼吸光环(box-shadow 0 0 16px 2px + inset -3px + 呼吸 scale 1.08)峰值向外约 ~21px。
      .presence 有 overflow-x:auto → 浏览器把 overflow-y 也算成 auto(会纵向裁剪), 原 10px padding 只留 9px 余量,
@@ -2001,7 +2004,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260813-anonname';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260813-bgmprogress';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2448,7 +2451,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260807-dm"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260813-anonname"></script>
+<script src="./js/app.js?v=20260813-bgmprogress"></script>
 <script src="./js/keyboard.js?v=20260812-kbbase"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/dm.js?v=20260812-kbmin"></script>

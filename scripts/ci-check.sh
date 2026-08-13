@@ -10,6 +10,7 @@
 #   1. 内联 <script> JavaScript 语法检查（用 node --check）
 #   1b. 主聊天输入法行为回归（composition / Enter）
 #   1b2. 匿名登录名字保留行为回归
+#   1b3. 作曲进度与曲名行为回归
 #   1c. BGM 鉴权行为回归（令牌门禁 / 401 单次刷新）
 #   1d. Edge Function 安全不变量（鉴权 / 越权 / 输入边界）
 #   2. BUILD_VER (index.html) == ver.txt 内容
@@ -121,6 +122,19 @@ elif node scripts/test-anon-identity.js; then
   pass "匿名登录保留名字 / 残留正式账号重掷 6 项行为回归通过"
 else
   fail "匿名名字行为回归失败"
+fi
+
+# ─────────────────────────────────────────
+# 1b3. 作曲进度与曲名行为回归
+# ─────────────────────────────────────────
+section "1b3. 作曲进度与曲名行为回归"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行作曲进度与曲名行为测试"
+elif node scripts/test-bgm-progress-title.js; then
+  pass "作曲进度状态 / 曲名规范 10 项行为回归通过"
+else
+  fail "作曲进度与曲名行为回归失败"
 fi
 
 # ─────────────────────────────────────────
