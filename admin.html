@@ -1731,6 +1731,7 @@ $('#apBtn').onclick=async()=>{
       ct.uids=Array.isArray(ct.uids)?ct.uids:[];
       if(ct.uids.includes(_apPick.id)){ toast('该用户已在'+ct.name+'名单中'); return; }
       ct.uids.push(_apPick.id);
+      _tierUserBrief[_apPick.id]=_apPick;
       if(await saveConfigKey('customTiers',_customTiers)){ if(CFG_CACHE) CFG_CACHE.customTiers=JSON.parse(JSON.stringify(_customTiers)); toast('已加为'+ct.name+(ct.icon?' '+ct.icon:'')); _apClearPick(); renderCustomTiers(); }
     }
   } finally { btn.disabled=false; }
@@ -2823,7 +2824,14 @@ $('#entCustomSaveBtn')?.addEventListener('click',async()=>{
 // 默认档只有显示名可改, 存进 tierNames; 自定义档整份对象存进 customTiers 数组。
 const TIER_DEF_NAME={ super:'超级管理员', admin:'管理员', reg:'正式用户', anon:'临时用户' };
 const TIER_DEF_ROWS=[['super','超级管理员'],['admin','管理员'],['reg','正式用户'],['anon','临时用户']];
-let _tierNamesDraft={}, _customTiers=[];
+let _tierNamesDraft={}, _customTiers=[], _tierUserBrief={};
+async function loadTierUserBrief(){
+  const ids=[...new Set((_customTiers||[]).flatMap(ct=>Array.isArray(ct&&ct.uids)?ct.uids:[]).filter(Boolean))];
+  if(!ids.length){ _tierUserBrief={}; return; }
+  const r=await api('/user-brief?ids='+encodeURIComponent(ids.join(',')));
+  if(!r.ok || !Array.isArray(r.body&&r.body.users)) return; // 失败时保留 UID 降级，不阻断配置编辑
+  _tierUserBrief=Object.fromEntries(r.body.users.filter(u=>u&&u.id).map(u=>[u.id,u]));
+}
 async function loadTiers(){
   const cfg=await loadConfig();
   _tierNamesDraft=Object.assign({}, TIER_DEF_NAME, (cfg&&cfg.tierNames)||{});
@@ -2831,6 +2839,7 @@ async function loadTiers(){
   let cts = Array.isArray(cfg&&cfg.customTiers) ? JSON.parse(JSON.stringify(cfg.customTiers)) : null;
   if(!cts){ cts=[{ id:'vip', name:(cfg&&cfg.tierNames&&cfg.tierNames.vip)||'贵宾', icon:'💎', level:(cfg&&cfg.vipTreatment==='super')?'super':'admin', uids:Array.isArray(cfg&&cfg.vipUids)?cfg.vipUids.slice():[] }]; }
   _customTiers=cts;
+  await loadTierUserBrief();
   renderTierDefaults(); renderCustomTiers(); renderRoleSeg();
   if(_apRole!=='super'&&_apRole!=='admin'&&!_customTiers.some(c=>c.id===_apRole)) setApRole('admin');
 }
@@ -2841,6 +2850,12 @@ function renderTierDefaults(){
     <input data-tname="${k}" value="${esc(_tierNamesDraft[k]||def)}" maxlength="12" style="flex:1;min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(10,12,24,.5);color:var(--ink);font-size:13px">
   </div>`).join('');
   box.querySelectorAll('[data-tname]').forEach(el=>el.oninput=()=>{ _tierNamesDraft[el.dataset.tname]=el.value; markDirty(); });
+}
+function tierMemberHtml(uid){
+  const u=_tierUserBrief[uid];
+  if(!u) return `<code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink)">${esc(uid)}</code>`;
+  const displayName=u.name||'(无昵称)', username=u.username?` <span style="color:var(--cyan);font-size:12px">@${esc(u.username)}</span>`:'';
+  return `<span style="font-size:18px;flex:0 0 auto">${safeEmoji(u.emoji)||'👤'}</span><span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(displayName)}</b>${username}<br><code style="font-size:11px;color:var(--dim);word-break:break-all">${esc(uid)}</code></span>`;
 }
 function renderCustomTiers(){
   const box=$('#tierCustomList'); if(!box) return;
@@ -2862,7 +2877,7 @@ function renderCustomTiers(){
     <div style="font-size:12.5px;color:var(--dim);margin-bottom:6px">名单(${(ct.uids||[]).length} 人; 上方「任命身份」选此类型可加, 这里可移除)</div>
     <div class="ct-uids" data-i="${i}" style="display:flex;flex-direction:column;gap:6px">${
       (ct.uids||[]).length ? (ct.uids||[]).map((uid,j)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px">
-        <code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink)">${esc(uid)}</code>
+        ${tierMemberHtml(uid)}
         <button class="mini-btn ct-uid-del" data-i="${i}" data-j="${j}" style="border-color:var(--magenta);color:var(--magenta);flex:0 0 auto">移除</button>
       </div>`).join('') : '<div style="color:var(--dim);font-size:12px">暂无成员</div>'
     }</div>

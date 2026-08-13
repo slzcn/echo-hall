@@ -820,6 +820,26 @@ Deno.serve(async (req)=>{
   //
   // GET /users?page&pageSize&q&filter=all|anon|real&sort=created_at.desc|name.asc
   //   分页拉用户列表, 返回 total 供前端分页条使用
+  // GET /user-brief?ids=uid1,uid2,...
+  // 自定义身份名单按稳定 UID 批量反查当前昵称/用户名；最多 200 人。
+  if (action === "user-brief" && req.method === "GET") {
+    const ids = [...new Set((url.searchParams.get("ids") || "").split(",")
+      .map((v)=>v.trim()).filter((v)=>/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(v)).slice(0, 200))];
+    if (!ids.length) return j({ users: [] });
+    const inIds = pgIn(ids);
+    const [profiles, accounts] = await Promise.all([
+      sbGet("eh_users?select=id,name,emoji,color&id=in.(" + inIds + ")"),
+      sbGet("eh_accounts?select=auth_uid,username&auth_uid=in.(" + inIds + ")"),
+    ]);
+    const byId: any = {};
+    if (Array.isArray(profiles)) profiles.forEach((u:any)=>{ if(u?.id) byId[u.id] = { ...u, username: "" }; });
+    if (Array.isArray(accounts)) accounts.forEach((a:any)=>{
+      if (!a?.auth_uid) return;
+      byId[a.auth_uid] = { ...(byId[a.auth_uid] || { id:a.auth_uid, name:"", emoji:"", color:"" }), username:a.username || "" };
+    });
+    return j({ users: ids.map((id)=>byId[id]).filter(Boolean) });
+  }
+
   if (action === "users" && req.method === "GET") {
     const page = clampInt(url.searchParams.get("page"), 1, 1, 1000000);
     const pageSize = clampInt(url.searchParams.get("pageSize"), 50, 1, 200);
