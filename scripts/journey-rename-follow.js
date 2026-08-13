@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 /** 正式用户改名旅程（前后一致性）：
- *  一个还【在场】的正式用户改名/换头像后, 其已渲染的历史消息旧名/旧头像必须跟着变成新身份;
- *  匿名/虚空消息、以及【已离场】用户的历史消息必须定格在发送时快照; 灵魂走另一条链不被本函数动。
+ *  真人改名/换头像后, 其已渲染的历史消息旧名/旧头像必须跟着变成新身份——身份来源两层, 与灵魂 roomSouls 对等:
+ *    1) 在场者: lastUsersSnapshot(presence 心跳, 最新鲜, 优先)
+ *    2) 离场者: roomUserIdentity(进房按历史 uid 批量拉 eh_users 的权威身份表, 兜住不在 presence 里的人, 如"61女王")
+ *  匿名/虚空消息(无持久身份)必须定格在发送时快照; 查不到身份(纯陌生 uid)也定格; 灵魂走另一条链不被本函数动。
  *  运行真实 liveIdentityByUid + refreshRenderedUserIdentity(从 js/app.js 抽取, 不复刻)。 */
 const fs=require('fs'),vm=require('vm'),path=require('path');
 const source=fs.readFileSync(path.join(__dirname,'..','js','app.js'),'utf8');
@@ -39,12 +41,11 @@ function mkMsg({uid,name,color,emoji,isVoid}){
   return msg;
 }
 
-function harness(msgs, snapshot, souls){
-  const stream={ _msgs:msgs };
+function harness(msgs, snapshot, souls, identity){
   const ctx={
     console,
     lastUsersSnapshot: snapshot,
-    roomUserIdentity: new Map(),
+    roomUserIdentity: identity || new Map(),   // 离场者权威身份表(进房批量拉 eh_users 的产物)
     soulUidSet: new Set(souls||[]),
     safeColor:(c)=> c || '#888',
     safeEmoji:(e)=> e || '',
@@ -60,62 +61,94 @@ function harness(msgs, snapshot, souls){
   return ctx;
 }
 
-// 场景：4 条历史消息
-const UID_A='uid-alice', UID_B='uid-bob', UID_C='uid-carol', UID_S='uid-soul';
-const msgs=[
-  mkMsg({uid:UID_A,name:'旧名A',color:'#111',emoji:'🐱'}),                 // 在场且改名 → 应跟随
-  mkMsg({uid:UID_B,name:'匿名旧名',color:'#222',emoji:'👻',isVoid:true}),  // 匿名/虚空 → 定格
-  mkMsg({uid:UID_C,name:'离场者',color:'#333',emoji:'🦊'}),                // 不在快照 → 定格
-  mkMsg({uid:UID_S,name:'灵魂旧名',color:'#444',emoji:'🤖'}),              // 灵魂 → 本函数不碰
-];
+// 场景：5 条历史消息
+const UID_A='uid-alice', UID_B='uid-bob', UID_C='uid-carol', UID_D='uid-diva', UID_S='uid-soul';
+function scene(){
+  return [
+    mkMsg({uid:UID_A,name:'旧名A',color:'#111',emoji:'🐱'}),                 // 在场且改名 → 跟随(快照)
+    mkMsg({uid:UID_B,name:'匿名旧名',color:'#222',emoji:'👻',isVoid:true}),  // 匿名/虚空 → 定格
+    mkMsg({uid:UID_C,name:'陌生离场者',color:'#333',emoji:'🦊'}),            // 不在快照也不在身份表 → 定格
+    mkMsg({uid:UID_D,name:'61女王',color:'#5a5',emoji:'👑'}),               // 离场但在权威身份表 → 跟随(反查 eh_users)
+    mkMsg({uid:UID_S,name:'灵魂旧名',color:'#444',emoji:'🤖'}),              // 灵魂 → 本函数不碰
+  ];
+}
 // 当前在场快照：Alice 已改成"月见/🌙"、灵魂也在场但改了名(应被 soulUidSet 挡住不动)
 const snapshot=[
   {user_id:UID_A, name:'月见', color:'#0af', emoji:'🌙'},
   {user_id:UID_S, name:'灵魂新名', color:'#f0a', emoji:'🌟'},
 ];
+// 权威身份表：61女王(离场)已在 eh_users 改名"热血狼/🐺"; Alice 也在表里但用旧名(应被更新鲜的在场快照覆盖)
+function identity(){
+  return new Map([
+    [UID_D, {name:'热血狼', emoji:'🐺', color:'#e33'}],
+    [UID_A, {name:'表里旧名A', emoji:'🐱', color:'#111'}],
+  ]);
+}
 
-// ---- 直接单元验证 liveIdentityByUid ----
+// ---- 直接单元验证 liveIdentityByUid 的两层数据源 ----
 {
-  const ctx=harness(msgs.map(m=>m), snapshot, [UID_S]);
+  const ctx=harness(scene(), snapshot, [UID_S], identity());
   const liveA=ctx.liveIdentityByUid(UID_A);
-  assert(liveA && liveA.name==='月见' && liveA.emoji==='🌙', '步骤 0a: liveIdentityByUid 命中在场用户返回其当前身份');
-  assert(ctx.liveIdentityByUid(UID_C)===null, '步骤 0b: 已离场用户不在快照 → 返回 null(历史将维持快照)');
-  assert(ctx.liveIdentityByUid('')===null, '步骤 0c: 空 uid 安全返回 null');
+  assert(liveA && liveA.name==='月见' && liveA.emoji==='🌙', '步骤 0a: 在场者优先取 presence 快照(月见), 压过身份表旧名');
+  const liveD=ctx.liveIdentityByUid(UID_D);
+  assert(liveD && liveD.name==='热血狼' && liveD.emoji==='🐺', '步骤 0b: 离场者从权威身份表反查到新名(热血狼)——61女王案');
+  assert(ctx.liveIdentityByUid(UID_C)===null, '步骤 0c: 既不在场也不在身份表 → 返回 null(历史维持快照)');
+  assert(ctx.liveIdentityByUid('')===null, '步骤 0d: 空 uid 安全返回 null');
 }
 
 // ---- 旅程验证 refreshRenderedUserIdentity 就地回补 ----
 {
-  const local=[
-    mkMsg({uid:UID_A,name:'旧名A',color:'#111',emoji:'🐱'}),
-    mkMsg({uid:UID_B,name:'匿名旧名',color:'#222',emoji:'👻',isVoid:true}),
-    mkMsg({uid:UID_C,name:'离场者',color:'#333',emoji:'🦊'}),
-    mkMsg({uid:UID_S,name:'灵魂旧名',color:'#444',emoji:'🤖'}),
-  ];
-  const ctx=harness(local, snapshot, [UID_S]);
+  const local=scene();
+  const ctx=harness(local, snapshot, [UID_S], identity());
   ctx.refreshRenderedUserIdentity();
 
   assert(local[0]._nm.textContent==='月见', '步骤 1: 在场用户改名 → 历史消息名字跟随为"月见"');
   assert(local[0].dataset.name==='月见', '步骤 2: data-name 跟随更新(点击/@ 用新名)');
   assert(local[0]._av.dataset.atname==='月见', '步骤 3: 头像 atname 跟随(@ 出正确新名)');
-  assert(local[0]._nm.style.color==='#0af', '步骤 4: 名字颜色跟随新身份');
+  assert(local[0]._nm.style.color==='#0af', '步骤 4: 名字颜色跟随在场新身份(非身份表旧色)');
 
   assert(local[1]._nm.textContent==='匿名旧名', '步骤 5: 匿名/虚空消息定格, 不跟改名(无持久身份、@会泄露)');
-  assert(local[2]._nm.textContent==='离场者', '步骤 6: 已离场用户历史定格(不在在场快照)');
-  assert(local[3]._nm.textContent==='灵魂旧名', '步骤 7: 灵魂消息不被真人链改动(走 refreshRenderedSoulIdentity)');
+  assert(local[2]._nm.textContent==='陌生离场者', '步骤 6: 既不在场也不在身份表 → 定格(反查不到)');
+
+  assert(local[3]._nm.textContent==='热血狼', '步骤 7: 【离场者】改名跟随——61女王历史里的旧名回补成 eh_users 现名"热血狼"');
+  assert(local[3].dataset.name==='热血狼', '步骤 8: 离场者 data-name 也跟随(@ 出其现名)');
+  assert(local[3]._nm.style.color==='#e33', '步骤 9: 离场者名字颜色跟随身份表新色');
+
+  assert(local[4]._nm.textContent==='灵魂旧名', '步骤 10: 灵魂消息不被真人链改动(走 refreshRenderedSoulIdentity)');
 }
 
-// ---- 反证：把在场判定短路(视所有人为已离场)后, 改名不再跟随, 前后一致性被旅程抓红 ----
+// ---- 反证 1：把在场判定短路(所有人视作查不到)后, 改名不再跟随, 前后一致性被旅程抓红 ----
 {
   const mutant=production.replace('const u=byUid.get(uid); if(!u || !u.name) return;',
                                   'const u=null; if(!u || !u.name) return;');
   if(mutant===production) throw new Error('FAIL: 未能构造反证变异体(定位锚点失效)');
   const local=[ mkMsg({uid:UID_A,name:'旧名A',color:'#111',emoji:'🐱'}) ];
-  const ctx={ console, lastUsersSnapshot:snapshot, roomUserIdentity:new Map(), soulUidSet:new Set(),
+  const ctx={ console, lastUsersSnapshot:snapshot, roomUserIdentity:identity(), soulUidSet:new Set(),
     safeColor:c=>c||'#888', safeEmoji:e=>e||'', avEmoji:e=>e,
     document:{ querySelectorAll:sel=> sel==='#stream .msg[data-uid]'?local:[] } };
   vm.runInNewContext(mutant, ctx, {filename:'js/app.js#rename-follow.mutant'});
   ctx.refreshRenderedUserIdentity();
-  assert(local[0]._nm.textContent==='旧名A', '反证通过：断掉在场回补后, 改名不再跟随(旧实现必红)');
+  assert(local[0]._nm.textContent==='旧名A', '反证 1：断掉回补后, 改名不再跟随(旧实现必红)');
 }
 
-console.log('\n✅ 正式用户改名旅程通过：在场→历史跟随新身份；匿名/离场→定格；灵魂链不受影响。');
+// ---- 反证 2：只认在场快照、砍掉身份表兜底(旧实现)→ 离场者 61女王 永远显示旧名, 被旅程抓红 ----
+{
+  const oldImpl=production
+    .replace(/const r=\(roomUserIdentity && roomUserIdentity\.get\) \? roomUserIdentity\.get\(uid\) : null;\n  return r \? \{ name:r\.name, emoji:r\.emoji, color:r\.color \} : null;/,
+             'return null;')
+    .replace('if(roomUserIdentity && roomUserIdentity.forEach) roomUserIdentity.forEach((v,uid)=>{ if(uid && v && v.name) byUid.set(uid, {user_id:uid, name:v.name, emoji:v.emoji, color:v.color}); });',
+             '/* 旧实现: 无身份表兜底 */');
+  if(oldImpl===production) throw new Error('FAIL: 未能构造"无身份表兜底"反证(锚点失效)');
+  const local=[ mkMsg({uid:UID_D,name:'61女王',color:'#5a5',emoji:'👑'}) ];
+  const ctx=harness(local, snapshot, [], identity());
+  const src2=oldImpl;
+  const ctx2={ console, lastUsersSnapshot:snapshot, roomUserIdentity:identity(), soulUidSet:new Set(),
+    safeColor:c=>c||'#888', safeEmoji:e=>e||'', avEmoji:e=>e,
+    document:{ querySelectorAll:sel=> sel==='#stream .msg[data-uid]'?local:[] } };
+  vm.runInNewContext(src2, ctx2, {filename:'js/app.js#rename-follow.noidentity'});
+  assert(ctx2.liveIdentityByUid(UID_D)===null, '反证 2a: 无身份表兜底 → 离场者反查返回 null');
+  ctx2.refreshRenderedUserIdentity();
+  assert(local[0]._nm.textContent==='61女王', '反证 2b: 无身份表兜底 → 61女王历史永远定格旧名(正是修复前的 bug)');
+}
+
+console.log('\n✅ 正式用户改名旅程通过：在场→快照跟随；离场→权威身份表反查跟随(61女王案)；匿名/陌生→定格；灵魂链不受影响。');

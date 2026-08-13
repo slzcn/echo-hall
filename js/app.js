@@ -1906,6 +1906,8 @@ async function loadHistory(first){
     const frag=document.createDocumentFragment();
     head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag);
+    // 按本屏历史里出现过的真人 uid 批量拉权威身份表(含离场者), 拉完就地回补历史→改名跟随(见 loadRoomUserIdentity)
+    loadRoomUserIdentity(rows);
     // 刷新停留原位: 本轮要还原就【别贴底】, 交给 restoreScrollAnchor 定位到锚点(锚点可能在后续 idle 批里才落 DOM, 内含重试)
     let _restored=false;
     if(_suppressAutoBottom){ try{ _restored=restoreScrollAnchor(_enterRid); }catch(_){} }
@@ -1971,6 +1973,7 @@ async function loadHistory(first){
     if(moreBtn) moreBtn.remove();
     stream.insertBefore(frag, stream.firstChild);
     if(canLoadMore) addLoadMore(true);
+    loadRoomUserIdentity(rows);   // 续载的更早历史里可能出现新的(离场)真人 → 增量补身份表, 让其改名也跟随
     // 锚定回位: 新内容插在顶部, 把锚元素拉回它插入前的屏内位置(多帧兜异步撑高)
     if(anchorEl){
       const fix=()=>{ const cur=anchorEl.getBoundingClientRect().top; const d=cur-anchorTop; if(Math.abs(d)>1) stream.scrollTop += d; };
@@ -2219,6 +2222,10 @@ async function beat(extra){
 const presenceMap = new Map();   // user_id → DOM 节点
 let _presenceSettled = false;    // 进场动效: 光墙首批渲染完成后置真; 之后新增的真人头像才弹入(避免进房齐弹)
 let lastUsersSnapshot = [];       // 供 renderTyping 复用
+// 本房【真人权威身份表】uid→{name,emoji,color}: 进房时按历史里出现过的 uid 批量拉一次 eh_users。
+// 与灵魂 roomSouls 对等——历史消息存的是发送时【昵称快照】+ 稳定 user_id 锚点, 渲染时按 uid 反查最新身份,
+// 从而让【已离场】真人的改名也能回溯覆盖历史(在场者由 lastUsersSnapshot 覆盖, 更新鲜)。切房清空重建。
+let roomUserIdentity = new Map();
 
 // 在线列表骨架占位: 进房到 presence 数据回来期间撑住高度, 消除闪烁
 function presenceSkeleton(n){
@@ -3453,20 +3460,30 @@ function isSoulUser(uid, name){
 }
 // 取灵魂的最新展示身份(先按 uid, 再按名字兜底)
 function soulLatestBy(uid, name){ return (uid && roomSouls.find(x=>x.auth_uid===uid)) || (name && roomSouls.find(x=>x.name===name)) || null; }
-// 取【当前在场真人】按 uid 的最新展示身份(名字/头像/色)。数据源 = lastUsersSnapshot(每 15s 心跳自愈,
-// 含我自己且用最新 me.name)。命中→返回其当前身份, 用于让改名回溯覆盖历史消息旧快照(见 buildMsgEl)。
-// 只认在场用户: 早已离场者不在快照里→返回 null→历史维持发送时快照(成本最低, 覆盖 99% 场景)。
+// 取按 uid 的最新展示身份(名字/头像/色), 用于让改名回溯覆盖历史消息旧快照(见 buildMsgEl)。
+// 数据源两层, 与灵魂 roomSouls 的思路对齐:
+//   1) lastUsersSnapshot —— 【在场】真人(每 15s 心跳自愈, 含我自己且用最新 me.name), 最新鲜, 优先。
+//   2) roomUserIdentity —— 进房时按历史里出现过的 uid 批量拉 eh_users 得到的【权威身份表】,
+//      垫底兜住【已离场】真人(不在 presence 里但改过名的人, 如"61女王"→"热血狼")→改名同样回溯覆盖历史。
+// 都命中不了(纯匿名/查不到)→返回 null → 历史维持发送时快照。
 function liveIdentityByUid(uid){
-  if(!uid || !Array.isArray(lastUsersSnapshot)) return null;
-  const u=lastUsersSnapshot.find(x=>x && x.user_id===uid);
-  return u ? { name:u.name, emoji:u.emoji, color:u.color } : null;
+  if(!uid) return null;
+  if(Array.isArray(lastUsersSnapshot)){
+    const u=lastUsersSnapshot.find(x=>x && x.user_id===uid);
+    if(u) return { name:u.name, emoji:u.emoji, color:u.color };
+  }
+  const r=(roomUserIdentity && roomUserIdentity.get) ? roomUserIdentity.get(uid) : null;
+  return r ? { name:r.name, emoji:r.emoji, color:r.color } : null;
 }
-// 在场真人改名/换头像后, 已渲染在 DOM 的历史消息还带旧快照 → 就地回补(与 refreshRenderedSoulIdentity 同理,
-// 应对 loadHistory 早于 presence 到位、或快照路径直接贴旧 HTML 的情况)。每次 refreshPresence 后调一次。
+// 真人改名/换头像后, 已渲染在 DOM 的历史消息还带旧快照 → 就地回补(与 refreshRenderedSoulIdentity 同理,
+// 应对 loadHistory 早于 presence/身份表到位、或快照路径直接贴旧 HTML 的情况)。
+// 每次 refreshPresence 后、以及进房批量拉完 roomUserIdentity 后各调一次。
 function refreshRenderedUserIdentity(){
-  if(!Array.isArray(lastUsersSnapshot) || !lastUsersSnapshot.length) return;
   const byUid=new Map();
-  lastUsersSnapshot.forEach(u=>{ if(u && u.user_id) byUid.set(u.user_id, u); });
+  // 先垫【离场者权威身份】(进房批量拉的 eh_users), 再让【在场快照】覆盖其上(更新鲜、含我自己最新 me.name)。
+  if(roomUserIdentity && roomUserIdentity.forEach) roomUserIdentity.forEach((v,uid)=>{ if(uid && v && v.name) byUid.set(uid, {user_id:uid, name:v.name, emoji:v.emoji, color:v.color}); });
+  if(Array.isArray(lastUsersSnapshot)) lastUsersSnapshot.forEach(u=>{ if(u && u.user_id) byUid.set(u.user_id, u); });
+  if(!byUid.size) return;
   document.querySelectorAll('#stream .msg[data-uid]').forEach(el=>{
     const uid=el.dataset.uid;
     if(!uid || (soulUidSet && soulUidSet.has(uid))) return;   // 灵魂走 refreshRenderedSoulIdentity, 不重复处理
@@ -3514,6 +3531,31 @@ async function loadRoomSouls(rid){
     soulsCache[rid]={ at:Date.now(), p };
     applyData(await p);
   }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
+}
+// 进房/续载后, 按历史 rows 里出现过的真人 uid 批量拉 eh_users, 填 roomUserIdentity(权威身份表)。
+//   与 loadRoomSouls 对等——只不过灵魂表整房一次拉全, 真人表按"历史里真出现过的人"增量拉(全站真人几十个,
+//   单房上限也就一二十个, IN 批量一发即回)。拉完就地回补一次已渲染历史, 让离场者的改名也跟随。
+//   eh_users 的 RLS(users_select = auth.uid() IS NOT NULL)允许任何已登录会话读他人 name/emoji/color, 无需改库。
+async function loadRoomUserIdentity(rows){
+  try{
+    if(!sb || !Array.isArray(rows) || !rows.length) return;
+    // 收集本批出现的【非匿名、有 uid、且尚未在表里】的真人 uid; 灵魂走 roomSouls 不重复拉。
+    const want=[];
+    const seen=new Set();
+    rows.forEach(m=>{
+      const uid=m && m.user_id;
+      if(!uid || m.anon) return;
+      if(soulUidSet && soulUidSet.has(uid)) return;
+      if(roomUserIdentity.has(uid) || seen.has(uid)) return;
+      seen.add(uid); want.push(uid);
+    });
+    if(!want.length) return;
+    const { data, error } = await sb.from('eh_users').select('id,name,emoji,color').in('id', want);
+    if(error || !Array.isArray(data)) return;
+    data.forEach(u=>{ if(u && u.id) roomUserIdentity.set(u.id, { name:u.name, emoji:u.emoji, color:u.color }); });
+    // 拉到就地回补已渲染历史(离场者改名跟随的关键: presence 里没有他们, 只有这张表能反查到新名)
+    try{ refreshRenderedUserIdentity(); }catch(_){}
+  }catch(_){ /* 身份表拉取失败静默: 历史退回发送时快照, 不影响聊天 */ }
 }
 // 消息流灵魂头像"在场才呼吸": 按当前 presence 在场集给 #stream 里的灵魂消息 toggle .onair。
 //   铁律=动效跟"在不在场"走。在场集(users)含在场真人+在场灵魂; 用 uid 为主、名字兜底(漫游灵魂多 uid)。
@@ -6381,7 +6423,7 @@ async function leaveRoom(){
   // 离房清理 presence 相关本地状态，避免旧房头像/typing 快照残留到下一房或长期占内存。
   try{ if(_presDebounce){ clearTimeout(_presDebounce); _presDebounce=null; } }catch(_){ }
   try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
-  try{ presenceMap.clear(); lastUsersSnapshot=[]; }catch(_){ }
+  try{ presenceMap.clear(); lastUsersSnapshot=[]; roomUserIdentity=new Map(); }catch(_){ }
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 离房停兜底轮询
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
