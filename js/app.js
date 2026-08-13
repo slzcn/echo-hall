@@ -1652,8 +1652,44 @@ async function softRefreshRoom(){
   finally{ _softRefreshing=false; if(nm) nm.classList.remove('refreshing'); }
 }
 
+// 公开房命中 48 条预取快照后，后台请求仍会拿到最近最多 500 条；把缺失的更早消息分批补到顶部。
+// 只由首屏预取命中路径触发；普通 tail refresh 仍只补新消息，避免反复扫描历史。
+async function prependMissingPublicHistory(room, rows){
+  if(!room || !curRoom || curRoom.id!==room.id || !Array.isArray(rows) || !rows.length) return;
+  const stream=$('#stream');
+  if(!stream) return;
+  const present=new Set([...stream.querySelectorAll('[data-mid]')].map(e=>String(e.dataset.mid||'')));
+  let missing=rows.filter(m=>m && m.id!=null && !present.has(String(m.id)));
+  if(!missing.length) return;
+  const first=stream.querySelector('[data-mid]');
+  const firstId=first ? Number(first.dataset.mid) : Infinity;
+  // 补旧历史，不碰比当前 DOM 更新的空窗消息；新消息仍交给 refreshSnapshotTail 原逻辑 append。
+  missing=missing.filter(m=>Number(m.id)<firstId);
+  if(!missing.length) return;
+  const batchN=TUNE('idleBatchN',30);
+  const idle=cb=>new Promise(resolve=>{
+    const run=()=>{ cb(); resolve(); };
+    if(window.requestIdleCallback) requestIdleCallback(run,{timeout:250}); else setTimeout(run,16);
+  });
+  while(missing.length){
+    if(!curRoom || curRoom.id!==room.id) return;  // 分批期间切房，立即停止，防串房
+    const batch=missing.splice(-batchN);          // 先补最接近当前首条的旧消息
+    const anchor=stream.querySelector('[data-mid]');
+    const anchorTop=anchor ? anchor.getBoundingClientRect().top : 0;
+    await idle(()=>{
+      if(!curRoom || curRoom.id!==room.id) return;
+      const frag=document.createDocumentFragment();
+      batch.forEach(m=>{ const el=buildMsgEl(m,true); if(el) frag.appendChild(el); });
+      stream.insertBefore(frag,stream.firstChild);
+      if(anchor){ const d=anchor.getBoundingClientRect().top-anchorTop; if(Math.abs(d)>1) stream.scrollTop+=d; }
+      try{ resyncMsgOwnership(); }catch(_){}
+      fetchEchoes(batch.map(m=>m.id));
+    });
+  }
+}
+
 // 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
-async function refreshSnapshotTail(room){
+async function refreshSnapshotTail(room, fillOlder=false){
   if(_snapTailBusy) return;   // 并发锁: 多触发点同时补拉会各自漏判→重复append, 串行化
   _snapTailBusy=true;
   try{
@@ -1665,6 +1701,7 @@ async function refreshSnapshotTail(room){
     //   若不校验就 append, 会把本房消息塞进当前(别的)房→串房。发现已离房则放弃。
     if(!curRoom || curRoom.id!==room.id) return;
     dedupProjInHistory(rows);   // 与 loadHistory 同款去重: 灵魂投影的 proj 与 msg 重复时跳过 proj
+    if(fillOlder) prependMissingPublicHistory(room,rows).catch(e=>console.warn('public history fill',e));
     const stream=$('#stream');
     const near = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;  // 补前先判断是否贴底
     // 当前 DOM 里已渲染的最大 mid: 补拉只接"比它更新的空窗消息"(append到底部)。
@@ -1883,7 +1920,7 @@ async function loadHistory(first){
     try{ setTimeout(()=>{ try{ resyncMsgOwnership(); }catch(e){} }, 800); }catch(e){}   // 再延迟兜底(等session彻底恢复)
     try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 400); }catch(e){}   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
     // 用了预取缓存 → 缓存可能已滞后(最长60s), 后台补拉一次最新, 覆盖"预取到进房"的空窗新消息(修"进房非最新, 要刷新")
-    if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r).catch(()=>{}); }, 60); }
+    if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r, true).catch(()=>{}); }, 60); }
     fetchEchoes(head.map(m=>m.id));
     if(canLoadMore) addLoadMore();
     // 剩余较早消息分批 idle 渲染, 不阻塞首屏
