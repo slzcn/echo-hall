@@ -1922,6 +1922,9 @@ async function loadHistory(first){
     // 用了预取缓存 → 缓存可能已滞后(最长60s), 后台补拉一次最新, 覆盖"预取到进房"的空窗新消息(修"进房非最新, 要刷新")
     if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r, true).catch(()=>{}); }, 60); }
     fetchEchoes(head.map(m=>m.id));
+    const publicEndText=isPublic&&rows.length
+      ? (EH_CONFIG.text[rows.length>=TUNE('publicRecentLimit',500)?'historyTopPublicLimit':'historyTopPublicEnd']||'已到当前历史范围的最早记录').replace('{n}',String(TUNE('publicRecentLimit',500)))
+      : '';
     if(canLoadMore) addLoadMore();
     // 剩余较早消息分批 idle 渲染, 不阻塞首屏
     if(rest.length){
@@ -1943,8 +1946,10 @@ async function loadHistory(first){
         try{ resyncMsgOwnership(); }catch(e){}   // 这批较早消息里自己发的也归位到右侧
         fetchEchoes(batch.map(m=>m.id));
         if(rest.length) schedule(drainRest);
+        else if(publicEndText) addHistoryEnd('public',publicEndText);
       };
-      schedule(drainRest);
+      if(rest.length) schedule(drainRest);
+      else if(publicEndText) addHistoryEnd('public',publicEndText);
     }
     // 预热最近几首已生成神曲: 进房看到的歌还没点就预取好, 点击秒播(只拉最新3首省流量)
     try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){}
@@ -1954,9 +1959,11 @@ async function loadHistory(first){
     // ★加载更早: 用"锚元素定位"而非"像素差"恢复滚动位置。
     //   旧法 scrollTop=scrollHeight-prevH 在 content-visibility:auto(离屏气泡按估算高占位)下会飘 → 插入后视觉跳动/卡顿感。
     //   改: 记住插入前的第一条真实消息元素, 插完把它重新滚回原来那个屏内偏移, 逐帧稳到位, 不受估算高影响。
-    // 拉到空(超时/无更早) → 别动按钮: 有 canLoadMore 说明可能还有(超时), 留给 doLoadMore 复位可重试;
-    //   无 canLoadMore 说明真到底了, 移除按钮。不再"先 remove 后发现没内容"把按钮弄丢。
-    if(!rows.length){ if(moreBtn && !canLoadMore) moreBtn.remove(); return; }
+    // 拉到空且确认没有更早记录：保留明确终态，不再静默移除按钮；超时路径仍由按钮保留并允许重试。
+    if(!rows.length){
+      if(moreBtn && !canLoadMore){ moreBtn.remove(); addHistoryEnd('private',EH_CONFIG.text.historyTopPrivate||'这里就是这个房最早的记录了'); }
+      return;
+    }
     const anchorEl = stream.querySelector('.msg[data-mid]');
     const anchorTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
     const frag=document.createDocumentFragment();
@@ -1994,6 +2001,12 @@ async function doLoadMore(btn){
     const b2=$('#loadMoreBtn');   // loadHistory 成功会 remove 旧按钮并按 canLoadMore 重建, 这里只复位仍存在的那个
     if(b2 && b2.disabled){ b2.classList.remove('loading'); b2.disabled=false; b2.textContent=old; }
   }
+}
+function addHistoryEnd(kind,text){
+  const stream=$('#stream'); if(!stream) return;
+  const old=stream.querySelector('.history-end'); if(old) old.remove();
+  const el=document.createElement('div'); el.className='history-end'; el.dataset.historyEnd=kind; el.textContent=text;
+  stream.insertBefore(el,stream.firstChild);
 }
 function addLoadMore(top){
   const stream=$('#stream');

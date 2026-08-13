@@ -133,6 +133,10 @@ const EH_CONFIG_DEFAULT = {
     // 空状态/提示
     publicEmpty:'还没有公开房，建一个吧', roomFirstMsg:'还没有人说话，来当第一个',
     connecting:'连接中…', loading:'加载中…',
+    // 历史到顶终态(读到最早/上限时的显式反馈, 让用户知道不是卡住)
+    historyTopPublicLimit:'已显示最近 {n} 条消息；更早的内容不在公开房快照范围内',
+    historyTopPublicEnd:'这里就是公开房最早的记录了',
+    historyTopPrivate:'这里就是这个房最早的记录了',
     // 入场页
     entrySlogan:'临时用户 · 无需注册',
     entryBtn:'匿 名 进 入',

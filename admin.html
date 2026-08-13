@@ -2536,7 +2536,7 @@ $('#textSearchInput')?.addEventListener('input',e=>filterText(e.target.value));
 // ---- ⚙️ 运行参数 UI ----
 // [key, 中文名, 单位/说明, options?] options 非空=下拉选择(枚举); 空=数字输入
 const TUNING_FIELDS=[
-  ['publicRecentLimit','公开房进房显示条数','公开/官方房一次拉最近多少条(上限500)'],
+  ['publicRecentLimit','公开房进房显示条数','所有公开/官方房通用 · 一次拉多少条最近消息 · 默认500 · 上限500 · 改后下次进房生效']
   ['historyPage','私密房每页条数','私密房「加载更早」翻页步长'],
   ['prefetchN','预取条数','列表页悬停/进房预取的消息数'],
   ['prefetchTtlMs','预取缓存有效期','毫秒, 超时重拉'],
@@ -2579,7 +2579,7 @@ function collectTuning(){
     } else {
       let v=parseInt(el.value,10);
       if(isNaN(v)||v<0) v=def[k];
-      if(k==='publicRecentLimit') v=Math.min(v,500);
+      if(k==='publicRecentLimit') v=Math.min(Math.max(v,1),500);
       out[k]=v;
     }
   });
