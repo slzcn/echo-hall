@@ -18,6 +18,9 @@
   //   一起缩到 180, 于是 full-估算 = 180-68 = 112(把已经缩掉的键盘又扣一遍 → 双减)。用落键盘时的稳定全高
   //   做分母: 折叠屏 min(180, 457-174)=180 估算天然失效(min 取已缩的真值), 覆盖式(vv/innerH 不缩)才真正扣高。
   let baseFullH = 0;
+  // ★V59：折叠屏展开/收折时，键盘仍弹起但 innerHeight 会随新屏幕几何改变。
+  //   记录上次布局宽度，供 applyLayout 在既有 resize 链里区分“普通键盘缩高”和“折叠/展开”。
+  let layoutWidth = 0;
 
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
@@ -60,6 +63,19 @@
       if (el.style.height) el.style.height = '';
       return;
     }
+    // ★V59：折叠屏展开/收折时复用 resize → applyLayout，不新增监听器。
+    //   键盘弹起且宽度发生变化，说明屏幕几何改变；此时 innerHeight 已是“新全高-键盘高”，
+    //   用 innerHeight + 实际/估算键盘高重建新全高，避免继续沿用闭合态 baseFullH。
+    const currentWidth = window.innerWidth;
+    const widthChanged = layoutWidth > 0 && currentWidth !== layoutWidth;
+    if (widthChanged && chatFocused) {
+      let vkH = 0;
+      try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkH = Math.round(r.height); } catch (_) {}
+      if (vkH > 0) baseFullH = Math.max(baseFullH, window.innerHeight + vkH);
+      else if (estimatedKbH > 0) baseFullH = Math.max(baseFullH, window.innerHeight + estimatedKbH);
+    }
+    layoutWidth = currentWidth;
+
     // ★V57：键盘确定落下时(未聚焦且无估算/无覆盖式键盘几何), 当前 innerH 即真全高 → 刷新持久基线。
     //   进 hall、收键盘、转屏后都会走到这里把 baseFullH 校到当前朝向的全高, 避免陈旧竖屏高污染横屏。
     if (!chatFocused && estimatedKbH === 0) {
