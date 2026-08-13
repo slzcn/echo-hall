@@ -5178,6 +5178,27 @@ function bgmGeneratedTitle(desc,room){
   if(/私密/.test(rn)||(room&&room.kind==='private')) return pick(['耳边低语','关上门以后','只说给你听']);
   return pick(['此刻回声','说不清的心情','留给自己的一首','当下这一刻']);
 }
+async function bgmAccessToken(forceRefresh){
+  if(!sb) return '';
+  if(forceRefresh){
+    try{
+      const rr=await withTimeout(sb.auth.refreshSession(),8000,{data:{session:null}});
+      const rt=rr&&rr.data&&rr.data.session&&rr.data.session.access_token;
+      if(rt) return rt;
+    }catch(e){ console.warn('[bgm] refreshSession',e); }
+  }
+  try{
+    const session=await resolveSession();
+    const token=session&&session.access_token;
+    if(token) return token;
+  }catch(e){ console.warn('[bgm] resolveSession',e); }
+  // 本地还留着 uid 不代表认证仍有效；必须让统一认证流程恢复出真实 session。
+  try{ await ensureAuth(); }catch(e){ console.warn('[bgm] ensureAuth',e); }
+  try{
+    const session=await resolveSession();
+    return session&&session.access_token||'';
+  }catch(_){ return ''; }
+}
 async function sendBgmGen(desc){
   if(!curRoom) return;
   if(!myUid){ try{await ensureAuth();}catch(_){} }
@@ -5190,14 +5211,27 @@ async function sendBgmGen(desc){
   const clean=String(desc||'当前房间气氛').replace(/让(全房间|大家|所有人)(也)?听|广播/gi,'').trim().slice(0,500);
   toast('🎼 灵魂开始作曲了，约需一两分钟…');
   try{
-    const session=await sb.auth.getSession();
-    const token=session&&session.data&&session.data.session&&session.data.session.access_token;
+    let token=await bgmAccessToken(false);
+    if(!token){ toast('登录状态已过期，请重新登录后再作曲'); return; }
     const body={userId:myUid,roomId:room.id,roomKind:bgmRoomKind(),roomName:room.name,prompt:`纯器乐、无人声。${clean}`,title:bgmGeneratedTitle(clean,room),broadcast};
-    const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
-    const out=await r.json().catch(()=>({}));
+    const request=async(t)=>{
+      const r=await fetch(EH_BGM_FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify(body)});
+      const out=await r.json().catch(()=>({}));
+      return {r,out};
+    };
+    let result=await request(token);
+    // 令牌刚好过期时自动刷新一次；只重试一次，避免重复生成和额度重复消耗。
+    if(result.r.status===401){
+      token=await bgmAccessToken(true);
+      if(!token){ toast('登录状态已过期，请重新登录后再作曲'); return; }
+      result=await request(token);
+    }
+    const {r,out}=result;
     if(!r.ok||!out.ok){
       if(out.error==='quota_exceeded') toast(`灵魂今天已经为你做满 ${out.limit||5} 首了，先从曲库里挑一首吧`);
-      else toast('灵魂这次没接住，点一下重试就好');
+      else if(r.status===401||out.error==='auth_required'||out.error==='invalid_token') toast('登录状态已过期，请重新登录后再作曲');
+      else if(r.status===403||out.error==='room_forbidden') toast('房间身份已变化，请退出房间后重新进入');
+      else toast('灵魂这次没接住，稍后再试');
       return;
     }
     const row={id:out.id,title:out.title||body.title,url:out.url,room_name:room.name,created_at:new Date().toISOString()};

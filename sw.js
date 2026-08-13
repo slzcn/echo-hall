@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v270-20260813-audioauth';
+const SW_VERSION = 'eh-sw-v270-20260813-audioauth2';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -25,6 +25,8 @@ function isVendorLib(url) {
 //   URL 即内容标识。此前同源 script 走 network-first(见旧注释), 每次刷新全量重下 app.js(167KB gzip)
 //   +其余 = "刷新慢"的结构性根因。有了指纹, 换版时 URL 必变 → cache-first 绝不会混版本:
 //   命中秒返, 指纹一变即 miss 下载一次并清同名旧版。仅拦 /js/*.js?v=, 不碰 sw.js/config 无指纹场景。
+// 当前 SW 激活时清掉旧 JS_CACHE；每次新 SW 只会多下载一次本地 JS，
+// 换来不再出现“旧 index.html → 旧指纹 → 永久命中旧 app.js”的缓存自锁。
 const JS_CACHE = 'eh-js-v1';
 function isVersionedJs(url) {
   return url.origin === self.location.origin
@@ -76,13 +78,16 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      // 强制清光所有 eh-shell-* 和 eh-cdn-* 旧缓存，只保留当前版 SHELL_CACHE/CDN_CACHE
-      // 避免旧 SW 缓存的 index.html 被新 SW 听用导致样式不同步（bgm30→bgm31 踩雷）
-      Promise.all(keys.filter((k) => (k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    // 清 shell/cdn 旧版本；同时清一次持久 JS 缓存，杜绝旧指纹自锁。
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((k) => ((k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE) || k === JS_CACHE)
+        .map((k) => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', (e) => {
