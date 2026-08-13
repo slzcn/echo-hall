@@ -414,7 +414,7 @@
   @media (prefers-reduced-motion:reduce){
     .bg-orb,.mood-aura{animation:none !important}
     .bgm-btn:not(.muted){animation:none !important}
-    .msg.soul .av,.pav.soul-av .av-ic,.pav.soul-av.soul-live .av-ic::before,.pav.pav-live .av-ic,.pav.pav-live .av-ic::after,.pav:not(.soul-av) .av-ic::after{animation:none !important}
+    .msg.soul .av,.msg.soul .av::after,.pav.soul-av .av-ic,.pav.soul-av .av-ic::after,.pav.soul-av.soul-live .av-ic::before,.pav.pav-live .av-ic,.pav.pav-live .av-ic::after,.pav:not(.soul-av) .av-ic::after{animation:none !important}
     /* 进场 logo/标题: 保留一次性显影(logoIn/titleReveal), 只关常驻流光/扫光/呼吸 */
     .logo{animation:logoIn 1s cubic-bezier(.2,.9,.3,1.3) both !important}
     .title{animation:titleReveal 1s cubic-bezier(.2,.8,.2,1) both !important}
@@ -1084,25 +1084,28 @@
   .msg.soul .av{position:relative}
   /* 光环外观常在(身份标记), 但【呼吸只在该灵魂当前在场时跑】(.onair)——铁律: 动效跟"在不在场"走不跟"是不是AI"走。
      离开房间的灵魂(历史消息)光环静止(opacity:.9 清晰), 不再"不在房间还在动"。onair 由 syncStreamOnair 按 presence 在场集 toggle。 */
-  .msg.soul .av::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;will-change:opacity;opacity:.9;
+  .msg.soul .av::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;will-change:opacity,transform;transform-origin:center;opacity:.9;
     /* inset 内辉光 + 外扩光晕。外圈 reach 收到 12px(原 18+2=20): 让头像左沿并入 --hall-px(小屏 14)后
        光环仍完整不被 stream 的 overflow 横向裁, 换取四区左沿真对齐(见 .stream 注释)。 */
     box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--soul-c,var(--violet)) 90%,transparent),
                inset 0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 55%,transparent),
                0 0 8px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 50%,transparent),
                0 0 12px 0 color-mix(in srgb,var(--soul-c,var(--violet)) 28%,transparent)}
-  .msg.soul.onair .av::after{animation:soulHalo 3.4s ease-in-out infinite}  /* 在场→呼吸 */
-  @keyframes soulHalo{0%,100%{opacity:.5} 50%{opacity:1}}
+  .msg.soul.onair .av::after{animation:soulHalo 3s ease-in-out infinite}  /* 在场→呼吸 */
+  /* 呼吸=光环真的一张一缩(scale)+明暗起伏, 不只跑 opacity —— 小头像上纯 opacity 几乎看不出"在呼吸",
+     加一点 scale 让辉光实际吞吐, "存在感"才立起来。仍是慢而柔的一口气(3s), 与打字心跳(1.4s、急促、连头像本体一起缩)明显区分:
+     这里只缩【光环 ::after】不动头像本体, 是"在场待命"的静息呼吸, 非"正在说话"的活跃态。 */
+  @keyframes soulHalo{0%,100%{opacity:.55;transform:scale(.94)} 50%{opacity:1;transform:scale(1.05)}}
   /* ===== 光墙灵魂头像: 同款 inset 内辉光呼吸; 活跃(.soul-live)时呼吸更快, 像心跳加速 ===== */
   .pav.soul-av .av-ic{position:relative}
   /* 光墙灵魂头像: inset 内辉光 + 外扩光晕(容器 .presence 竖直有 22px padding, 外光不被裁)。
      外光走 ::after 的 box-shadow(非 inset), 呼吸只跑 opacity。 */
-  .pav.soul-av .av-ic::after{content:"";border:none;inset:0;border-radius:inherit;will-change:opacity;
+  .pav.soul-av .av-ic::after{content:"";border:none;inset:0;border-radius:inherit;will-change:opacity,transform;transform-origin:center;
     box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pav-c,var(--cyan)) 90%,transparent),
                inset 0 0 8px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent),
                0 0 10px 0 color-mix(in srgb,var(--pav-c,var(--cyan)) 55%,transparent),
                0 0 18px 2px color-mix(in srgb,var(--pav-c,var(--cyan)) 30%,transparent);
-    animation:soulHalo 3.8s ease-in-out infinite}
+    animation:soulHalo 3.2s ease-in-out infinite}
   /* ===== 活跃态(soul-live: 正在打字/思考, typing_at<3.5s) 视觉质变 =====
      旧版只把 halo 提速(3.8s→1.5s), 小头像上快慢肉眼分不出=没变化。
      新增三重叠加, 全是【振幅/形态】级差异, 一眼能看出"它在动":
@@ -2004,7 +2007,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260813-renamefollow';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260813-soulbreath';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
