@@ -22,6 +22,9 @@
 <body>
 <h1>🔬 键盘诊断（小米18 Fold）</h1>
 
+<!-- ★超大结论横幅：即使截图糊字，也能从色块/大字判读关键结论 -->
+<div id="verdict" style="font:bold 34px/1.25 sans-serif;text-align:center;padding:18px 10px;margin-bottom:12px;border-radius:10px;background:#222;color:#fff">等待键盘弹起…</div>
+
 <div class="card">
   <h2>👆 请点这个输入框弹起键盘，然后看下方数据</h2>
   <input type="text" placeholder="点这里弹起键盘，输入随便什么" id="probe" autocomplete="off">
@@ -141,6 +144,36 @@
       h('ehVisibleH() = ')+v(visH)+' px\n'+
       h('#hall 会被写成 = ')+v(expectedHallH)+' px\n'+
       h('是否满足触屏软键盘布局 = ')+v(mqCoarse?'YES':'NO (走桌面布局！)');
+
+    // ★ 超大结论横幅（糊图也能从色块判读）
+    var verdict = document.getElementById('verdict');
+    if (!kbUp) {
+      verdict.style.background = '#333';
+      verdict.style.color = '#fff';
+      verdict.innerHTML = '键盘未弹起<br><span style="font-size:20px;font-weight:normal">请点上面输入框</span>';
+    } else {
+      // 弹起后判定：
+      // A) 640px 的 media query 命中不命中
+      // B) ehVisibleH() 够不够放 composer（需 ≥ 200px，hall 内需留给 stream + composer）
+      var lines = [];
+      var bg = '#0a3';  // 默认绿
+      if (!mqLow640) {
+        lines.push('❌ 640px 断点未命中');
+        lines.push('<span style="font-size:18px;font-weight:normal">→ hall 走桌面 CSS（max-height:92dvh）</span>');
+        bg = '#c33';
+      } else {
+        lines.push('✅ 640px 断点命中');
+        lines.push('<span style="font-size:18px;font-weight:normal">iw=' + window.innerWidth + '</span>');
+      }
+      lines.push('<span style="font-size:22px">visH=' + visH + 'px</span>');
+      if (visH < 200) {
+        lines.push('<span style="font-size:18px;font-weight:normal">❌ hall 太矮，composer 会被裁</span>');
+        bg = '#c33';
+      }
+      verdict.style.background = bg;
+      verdict.style.color = '#fff';
+      verdict.innerHTML = lines.join('<br>');
+    }
 
     requestAnimationFrame(tick);
   }
