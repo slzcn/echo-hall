@@ -2854,8 +2854,13 @@ function renderTierDefaults(){
 function tierMemberHtml(uid){
   const u=_tierUserBrief[uid];
   if(!u) return `<code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink)">${esc(uid)}</code>`;
-  const displayName=u.name||'(无昵称)', username=u.username?` <span style="color:var(--cyan);font-size:12px">@${esc(u.username)}</span>`:'';
-  return `<span style="font-size:18px;flex:0 0 auto">${safeEmoji(u.emoji)||'👤'}</span><span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(displayName)}</b>${username}<br><code style="font-size:11px;color:var(--dim);word-break:break-all">${esc(uid)}</code></span>`;
+  const emo=`<span style="font-size:18px;flex:0 0 auto">${safeEmoji(u.emoji)||'👤'}</span>`;
+  const nickSub=u.name?` <span style="color:var(--dim);font-size:12px">· ${esc(u.name)}</span>`:'';
+  const uidLine=`<br><code style="font-size:11px;color:var(--dim);word-break:break-all">${esc(uid)}</code>`;
+  // 主标识优先用「@用户名」(唯一、不可改); 缺 username 老账号退回昵称; 都缺再退回 UID
+  if(u.username) return `${emo}<span style="flex:1;min-width:0"><b style="color:var(--ink)">@${esc(u.username)}</b>${nickSub}${uidLine}</span>`;
+  if(u.name)     return `${emo}<span style="flex:1;min-width:0"><b style="color:var(--ink)">${esc(u.name)}</b> <span style="color:var(--dim);font-size:12px">(未绑定用户名)</span>${uidLine}</span>`;
+  return `${emo}<span style="flex:1;min-width:0"><code style="font-size:12px;color:var(--ink);word-break:break-all">${esc(uid)}</code></span>`;
 }
 function renderCustomTiers(){
   const box=$('#tierCustomList'); if(!box) return;
