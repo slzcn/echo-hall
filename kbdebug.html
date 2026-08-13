@@ -134,7 +134,10 @@
       h('vv.width = ')+v(vv?Math.round(vv.width):'-');
 
     var visH = ehVisibleH();
-    var kbUp = (vv && vv.height < window.innerHeight - 50) || vkH > 0;
+    // 覆盖式键盘可能既不缩 innerHeight，也不缩 visualViewport，VK API 还可能缺失。
+    // 诊断页输入框仍处于 focus 时就视为键盘应已弹起，保证顶部横幅能露出关键值。
+    var probeFocused = document.activeElement === probe;
+    var kbUp = probeFocused || (vv && vv.height < window.innerHeight - 50) || vkH > 0;
     var expectedHallH = visH;  // Echo Hall #hall.style.height 会被写成这个
     document.getElementById('vh').innerHTML =
       h('chatFocused (模拟) = ')+v(chatFocused)+'\n'+
@@ -154,7 +157,8 @@
     } else {
       // 弹起后判定：
       // A) 640px 的 media query 命中不命中
-      // B) ehVisibleH() 够不够放 composer（需 ≥ 200px，hall 内需留给 stream + composer）
+      // B) keyboard.js 的触屏软键盘门控是否命中
+      // C) 浏览器是否提供了可用的 VV / VK 缩高信号
       var lines = [];
       var bg = '#0a3';  // 默认绿
       if (!mqLow640) {
@@ -165,7 +169,16 @@
         lines.push('✅ 640px 断点命中');
         lines.push('<span style="font-size:18px;font-weight:normal">iw=' + window.innerWidth + '</span>');
       }
-      lines.push('<span style="font-size:22px">visH=' + visH + 'px</span>');
+      lines.push('<span style="font-size:22px">SOFTKB=' + (mqCoarse ? 'YES' : 'NO') + '</span>');
+      lines.push('<span style="font-size:20px">IH=' + window.innerHeight + ' VV=' + (vv ? Math.round(vv.height) : '-') + ' VK=' + vkH + '</span>');
+      lines.push('<span style="font-size:22px">VIS=' + visH + 'px</span>');
+      if (!mqCoarse) {
+        lines.push('<span style="font-size:18px;font-weight:normal">❌ keyboard.js 未进入软键盘布局</span>');
+        bg = '#c33';
+      } else if ((!vv || Math.abs(vv.height - window.innerHeight) < 50) && vkH === 0) {
+        lines.push('<span style="font-size:18px;font-weight:normal">❌ 浏览器未提供键盘几何信号</span>');
+        bg = '#c33';
+      }
       if (visH < 200) {
         lines.push('<span style="font-size:18px;font-weight:normal">❌ hall 太矮，composer 会被裁</span>');
         bg = '#c33';
