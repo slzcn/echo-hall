@@ -56,4 +56,7 @@
 - **折叠屏专项旅程**：展开重建基线、普通手机宽度不变不污染、收折不双减、估算键盘路径全部通过；旧实现展开态可视高 480（应为 521），反证必红。
 - **本地全量 CI**：全部通过；旅程门禁识别 `scripts/journey-kb-foldable.js` 并放行。
 - **版本一致性**：`BUILD_VER=20260813-foldablekb`、`SW_VERSION=eh-sw-v283-20260813-foldablekb`、`ver.txt=20260813-foldablekb`，`keyboard.js?v=20260813-foldablekb`。
-- **远端 CI / Pages / 线上文件核验**：提交推送后回填。
+- **提交**：`b74c2e0`，已推送 `main`。
+- **远端 CI**：GitHub Actions `CI Gate`（run `31718664718`）success。
+- **Pages 部署**：`Deploy to GitHub Pages`（run `31718664620`）success；`pages build and deployment`（run `31718664095`）success。
+- **线上真实文件核验**：`https://slzcn.github.io/echo-hall/` 的 `index.html`、`ver.txt`、`js/keyboard.js` 均 HTTP 200；线上版本为 `20260813-foldablekb`；`BUILD_VER`、脚本缓存指纹、`layoutWidth`/`widthChanged` 折叠屏基线和 `innerHeight + vkH`、`innerHeight + estimatedKbH` 重建路径全部命中。
