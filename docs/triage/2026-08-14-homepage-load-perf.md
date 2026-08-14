@@ -37,4 +37,21 @@
 - [ ] CDP 前后对比
 
 ## 6. 结果回填
-（待填）
+
+### CDP 实测（3 次中位数）
+- 首次内容绘制 FCP：**280 ms**
+- DOM 可交互 domInteractive：**87 ms**（不再被 503KB app.js 等同步脚本阻塞）
+- DOMContentLoaded：**210 ms**
+- load：3467 ms（含异步资源/Realtime 连接）
+
+### 验证事实
+- CDP 上报 `scripts_defer_local=16, scripts_sync_local=0`，本地脚本全部 defer 生效。
+- ci-check 20 项旅程/行为回归全绿，defer 保序执行，业务依赖链未受影响。
+- 线上 `ver.txt=20260814-deferjs` 已生效。
+
+### 已结案
+- [x] index.html 批量加 defer（17 个本地外部脚本）
+- [x] ci-check.sh 全绿
+- [x] 版本三处同步（ver.txt / index.html BUILD_VER / sw.js SW_VERSION）
+- [x] 提交推送（a5e65a5）
+- [x] CDP 前后对比：domInteractive 从被阻塞降到 87ms
