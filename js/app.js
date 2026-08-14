@@ -3675,9 +3675,9 @@ function renderAtMenu(){
     <span class="ai-nm">${esc(c.name)}</span>
     ${c.isSoul?`<span class="ai-tag" style="--ec:${safeColor(c.color)};background:color-mix(in srgb,${safeColor(c.color)} 16%,transparent)">✦AI</span>`:''}
   </div>`).join('');
+  menu.scrollTop=0;
+  bindMenuTap(menu, '.at-item', i=>pickAt(i));   // 同 slash: 点选/滑动分离, 见 bindMenuTap
   menu.classList.add('on');
-  // 同 slash-item: pointerdown+preventDefault, 键盘弹起时首触即选中, 不被 blur 吞掉第一下(pickAt 会 refocus)。
-  menu.querySelectorAll('.at-item').forEach(el=>el.onpointerdown=ev=>{ ev.preventDefault(); pickAt(+el.dataset.i); });
 }
 function hideAt(){ _atActive=false; $('#atMenu').classList.remove('on'); }
 // 点在线光墙的头像 → 往输入框插入 @该用户(快捷@)
@@ -6028,6 +6028,38 @@ async function findMemberByName(name){
 }
 function secureRand(){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296; }
 
+// 菜单项"点选 vs 滑动"分离(手机)——既保住键盘不收, 又能上下滑浏览、不误选。slash 与 @提及 共用。
+//   痛点(主人反馈): 之前 onpointerdown→preventDefault→立即 pickSlash。键盘是保住了(preventDefault 挡了 blur),
+//     但① 手指一落即选中, 根本没法上下滑动浏览; ② preventDefault 连原生滚动一起挡掉, 命令多时够不到下面几条。
+//   解法: pointerdown 仍 preventDefault(继续保住 #cin 焦点/键盘不收, 并挡掉原生滚动)+ 记起点;
+//     pointermove 位移超阈值即判"在滑动"→ 手动改 scrollTop 滚列表(原生滚动已被挡, 得自己驱动)+ 标记 moved;
+//     pointerup 只有"几乎没动"(moved=false)才算点选→触发 pick。桌面鼠标同一套也成立(点击几乎零位移=点选)。
+//     setPointerCapture 保证手指滑出某一项外仍收得到 move/up 事件。CSS 里菜单 touch-action:none 杜绝原生滚动打架。
+function bindMenuTap(menu, itemSel, onPick){
+  const TAP_SLOP = 8; // px: 位移小于此值算"原地点选", 否则算滑动浏览
+  let downI=-1, sy=0, lastY=0, moved=false, pid=null;
+  menu.querySelectorAll(itemSel).forEach(el=>{
+    // 每次开菜单都是全新 el(innerHTML 重建), 用赋值式即可, 无累积; 不用 addEventListener。
+    el.onpointerdown=ev=>{
+      ev.preventDefault();                        // 保住 #cin 焦点(iOS 不收键盘)+ 挡原生滚动(改手动驱动)
+      downI=+el.dataset.i; moved=false; sy=lastY=ev.clientY; pid=ev.pointerId;
+      try{ menu.setPointerCapture(pid); }catch(_){}
+    };
+  });
+  menu.onpointermove=ev=>{
+    if(downI<0) return;
+    const dy=ev.clientY-lastY; lastY=ev.clientY;
+    if(Math.abs(ev.clientY-sy)>TAP_SLOP){ moved=true; menu.scrollTop-=dy; }   // 滑动: 手动滚
+  };
+  const finish=()=>{
+    const i=downI, m=moved; downI=-1; moved=false;
+    if(pid!=null){ try{ menu.releasePointerCapture(pid); }catch(_){} pid=null; }
+    if(i>=0 && !m) onPick(i);                      // 只有原地点选才触发, 滑动浏览不误选
+  };
+  menu.onpointerup=finish;
+  menu.onpointercancel=()=>{ downI=-1; moved=false; if(pid!=null){ try{menu.releasePointerCapture(pid);}catch(_){} pid=null; } };
+}
+
 // 斜杠菜单 UI
 let _slashActive=false, _slashSel=0, _slashList=[];
 function renderSlashMenu(filter){
@@ -6036,10 +6068,8 @@ function renderSlashMenu(filter){
   if(!_slashList.length){ hideSlash(); return; }
   if(_slashSel>=_slashList.length) _slashSel=0;
   menu.innerHTML=_slashList.map((c,i)=>`<div class="slash-item ${i===_slashSel?'sel':''}" data-i="${i}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
-  // ★用 pointerdown+preventDefault 而非 click: 输入框聚焦(键盘弹起)时, 点菜单项的第一下会先 blur 输入框
-  //   → iOS 收键盘 → composer/菜单整体下移, 这一下的 click 落空, 得点第二次才中(主人反馈"命令要点两次")。
-  //   preventDefault 挡掉焦点转移, 键盘不收、布局不动, 首触即触发。pickSlash 会自己 refocus #cin。
-  menu.querySelectorAll('.slash-item').forEach(el=>el.onpointerdown=ev=>{ ev.preventDefault(); pickSlash(+el.dataset.i); });
+  menu.scrollTop=0;
+  bindMenuTap(menu, '.slash-item', i=>pickSlash(i));   // 点选/滑动分离: 见 bindMenuTap
   menu.classList.add('on'); _slashActive=true;
 }
 function pickSlash(i){
