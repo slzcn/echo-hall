@@ -17,7 +17,7 @@ TIMEOUT = 12            # 秒；超过视为“卡死/超时”
 SLOW_WARN = 6.0         # 秒；主页响应超过此值记 slow
 CTX = ssl.create_default_context()
 TREND_FILE = os.path.expanduser("~/.openclaw/workspace/memory/echo-health-trend.json")
-EDGE_SLOW = 5.0          # Edge Function 探活响应阈值
+EDGE_SLOW = 8.0          # Edge Function 探活响应阈值（serverless 冷启动 5-8s 属正常，>8s 才告警）
 RPC_SLOW = 3.0           # 关键业务只读查询阈值
 
 def _get(url, timeout=TIMEOUT):
@@ -143,18 +143,19 @@ def probe_business_readonly():
         if st != 200: issues.append(f"关键 RPC {name} 异常 HTTP={st}（进房/历史可能卡住）")
         elif dt > RPC_SLOW: issues.append(f"关键 RPC {name} 响应慢 {round(dt,2)}s")
     # Edge Functions：故意使用无效/缺失业务参数，预期得到明确 4xx；5xx/超时才代表函数异常。
+    # method=None → POST；"OPTIONS" 走 CORS 预检，只验连通，不真触发函数执行（用于付费/写库/AI 函数）。
     edge_cases = (
-      ("eh-auth", "/functions/v1/eh-auth/resolve", {}, {400}),
-      ("eh-bgm-gen", "/functions/v1/eh-bgm-gen", {}, {401}),
-      ("eh-sing-cover", "/functions/v1/eh-sing-cover", {}, {401}),
-      # eh-soul-tick 无强鉴权门（无 token 返 200），只验"连通、非 5xx、非超时"
-      ("eh-soul-tick", "/functions/v1/eh-soul-tick", {}, {200, 400, 401, 403, 404}),
-      ("eh-admin-api", "/functions/v1/eh-admin-api", {}, {401}),
+      ("eh-auth", "/functions/v1/eh-auth/resolve", {}, {400}, None),
+      ("eh-bgm-gen", "/functions/v1/eh-bgm-gen", {}, {401}, None),
+      ("eh-sing-cover", "/functions/v1/eh-sing-cover", {}, {401}, None),
+      # eh-soul-tick 会真触发灵魂 AI tick；用 OPTIONS 预检只探连通，不真唤醒执行，避免探测拖出冷启动 5s+
+      ("eh-soul-tick", "/functions/v1/eh-soul-tick", None, {200, 204}, "OPTIONS"),
+      ("eh-admin-api", "/functions/v1/eh-admin-api", {}, {401}, None),
     )
-    for name,path,payload,expected in edge_cases:
+    for name,path,payload,expected,method in edge_cases:
         try:
-            st, raw, dt = _sb_request(path,key,payload,"POST",timeout=15)
-            info[name]={"http":st,"time":round(dt,3)}
+            st, raw, dt = _sb_request(path,key,payload,method or "POST",timeout=15)
+            info[name]={"http":st,"time":round(dt,3),"method":method or "POST"}
             if st >= 500 or st not in expected: issues.append(f"Edge Function {name} 探活异常 HTTP={st}（预期 {sorted(expected)}）")
             elif dt > EDGE_SLOW: issues.append(f"Edge Function {name} 冷启动/响应慢 {round(dt,2)}s")
         except Exception as e:
