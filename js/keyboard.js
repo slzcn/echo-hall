@@ -226,7 +226,9 @@
           if (realKbH) {
             estimatedKbH = realKbH;
           } else {
-            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.38);
+            // ★V61：安卓折叠屏 PWA 的覆盖式 IME 无几何信号时，38% 会让输入框仍落进键盘边缘；
+            //   只增加 1 个百分点的安全余量。真实 vv/innerH/VK 信号路径不走这里。
+            estimatedKbH = Math.round((viewport ? viewport.height : window.innerHeight) * 0.39);
           }
           // ★V45：估算启用后启动轮询，检测“键盘收起”信号（小米 PWA 上收键盘不一定触发 focusout，也不一定发 vv.resize）。
           startKbCollapseWatch();

@@ -77,7 +77,9 @@
     // 聚焦瞬间键盘还没起, 真正时机是随后的 geometrychange / vv.resize / window.resize; 320ms 后若仍无真值就估算兜底。
     setTimeout(()=>{
       if(document.activeElement===$('#dmChatInput') && _kbHeightRaw()===0){
-        _kbEst=Math.round((_baseH||window.innerHeight)*0.38);
+        // 安卓折叠屏 PWA 的覆盖式 IME 无几何信号时，38% 会让输入框仍落进键盘边缘；
+        // 只增加 1 个百分点的安全余量。真实 vv/innerH/VK 信号路径不走这里。
+        _kbEst=Math.round((_baseH||window.innerHeight)*0.39);
       }
       _syncVH();
     }, 320);
