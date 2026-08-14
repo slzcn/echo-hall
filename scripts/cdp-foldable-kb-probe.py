@@ -70,39 +70,48 @@ def run_chatroom(ws):
     return {"ok": ok, "gap": gap, "hallH": after['hallH'], "cinBottom": after['cinBottom']}
 
 def run_dm(ws):
-    """场景 B：私信抽屉 —— dm.js 是封闭 IIFE，CDP 无法直接调内部函数。
-    验证两件可靠的事：(1) 兜底公式 39%；(2) CSS 布局事实：抽屉高钉成 439 后 composer 落在键盘顶沿上方。
-    真软键盘 vv/VK 事件序列桌面 Chrome 触发不全，仍靠真机。"""
-    print(f"\n=== 场景 B：私信抽屉（兜底公式 + CSS 布局事实）===")
+    """场景 B：经 kbdebug 测试钩子执行完整私信生产链路。"""
+    print(f"\n=== 场景 B：私信抽屉（真实 focus → 320ms 兜底链路）===")
     has = ev(ws, "!!document.getElementById('dmChatDrawer') && !!document.getElementById('dmChatInput')")
     print(f"#dmChatDrawer + #dmChatInput 存在: {has}")
     if not has:
-        print("  私信抽屉 DOM 未渲染，跳过场景 B"); return None
-    base = FULL_H
-    est = round(base * 0.39)      # 280，与 dm.js _onFocus 内 39% 同源
-    dmvh = max(160, base - est)   # 439
-    kb_top = base - est           # 439
-    print(f"兜底公式: baseH={base} 估算键盘高={est}(39%) → --dm-vh={dmvh}px 键盘顶沿={kb_top}")
-    layout = ev(ws, """(function(){
+        print("  私信抽屉 DOM 未渲染，失败"); return {"ok": False, "reason": "missing-dom"}
+    hooked = ev(ws, "!!(window.__ehDmKbDebug && window.__ehDmKbDebug.bind)")
+    print(f"kbdebug 私信测试钩子存在: {hooked}")
+    if not hooked:
+        print("  私信测试钩子不存在，失败"); return {"ok": False, "reason": "missing-hook"}
+    ev(ws, """(function(){
       var d=document.getElementById('dmChatDrawer');
       d.classList.add('on'); d.style.display='flex';
-      d.style.setProperty('--dm-vh', '__DMVH__px');
-      void d.offsetHeight;
+      window.__ehDmKbDebug.bind();
+      document.getElementById('dmChatInput').focus();
+    })()""")
+    time.sleep(0.5)
+    layout = ev(ws, """(function(){
+      var d=document.getElementById('dmChatDrawer');
       var inp=document.getElementById('dmChatInput');
       var comp=document.querySelector('#dmChatDrawer .dm-composer') || inp.closest('.dm-composer') || inp.parentElement;
       var dr=d.getBoundingClientRect(), cr=comp.getBoundingClientRect(), ir=inp.getBoundingClientRect();
       return {drawerBottom:Math.round(dr.bottom), drawerH:Math.round(dr.height),
               compBottom:Math.round(cr.bottom), inputBottom:Math.round(ir.bottom),
-              dmvhSet:getComputedStyle(d).getPropertyValue('--dm-vh').trim()};
-    })()""".replace("__DMVH__", str(dmvh)))
+              dmvhSet:getComputedStyle(d).getPropertyValue('--dm-vh').trim(),
+              debug:window.__ehDmKbDebug.snapshot()};
+    })()""")
     if not layout:
-        print("  量不到布局（抽屉结构与预期不符），跳过"); return None
+        print("  量不到布局，失败"); return {"ok": False, "reason": "missing-layout"}
+    est = EXPECTED_EST
+    dmvh = FULL_H - est
+    kb_top = dmvh
+    print(f"内部状态 baseH={layout['debug']['baseH']} kbEst={layout['debug']['kbEst']} kbRaw={layout['debug']['kbRaw']}")
     print(f"抽屉高={layout['drawerH']} 底沿={layout['drawerBottom']} --dm-vh实设='{layout['dmvhSet']}'")
     print(f"composer底沿={layout['compBottom']} 输入框底沿={layout['inputBottom']} 键盘顶沿={kb_top}")
     gap = kb_top - layout['inputBottom']
-    ok = layout['inputBottom'] <= kb_top + 2 and layout['drawerH'] <= dmvh + 2
-    print(f"{'✓' if ok else '✗'} 私信输入框间隙={gap}px（>=0=露出）；抽屉高={layout['drawerH']}<={dmvh}")
-    return {"ok": ok, "gap": gap, "drawerH": layout['drawerH'], "inputBottom": layout['inputBottom'], "dmvh": dmvh}
+    ok = (layout['debug']['kbEst'] == est and layout['debug']['kbRaw'] == 0 and
+          layout['inputBottom'] <= kb_top + 2 and layout['drawerH'] <= dmvh + 2)
+    print(f"{'✓' if ok else '✗'} 私信完整兜底链路生效；输入框间隙={gap}px（>=0=露出）")
+    ev(ws, "window.__ehDmKbDebug.unbind()")
+    return {"ok": ok, "gap": gap, "drawerH": layout['drawerH'],
+            "inputBottom": layout['inputBottom'], "dmvh": dmvh, "kbEst": layout['debug']['kbEst']}
 
 if __name__ == "__main__":
     ws, tid = setup()

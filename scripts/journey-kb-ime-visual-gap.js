@@ -19,5 +19,7 @@ assert(newKb > oldKb, '新估算比旧估算多留出键盘安全余量');
 assert(h - newKb < h - oldKb, '聊天室可视容器相对旧实现再缩短，输入框避开键盘覆盖边缘');
 assert(oldRatio !== ratio, '反证：旧 38% 与当前 39% 是可区分的单变量实现');
 assert(/_kbHeightRaw\(\)===0/.test(dm), '私信只在没有真实键盘高度时才使用估算');
+assert(/URLSearchParams\(location\.search\)\.has\('kbdebug'\)/.test(dm), '私信测试钩子只在 kbdebug 诊断页开放');
+assert(/__ehDmKbDebug=\{/.test(dm) && /bind:bindChatViewport/.test(dm), 'CDP 可调用私信真实键盘绑定链路');
 assert(/realKbH\)/.test(keyboard), '聊天室拿到真实键盘高度时优先使用真实值');
 console.log('\n✅ 安卓折叠屏无信号 IME 安全余量旅程通过；真实几何信号路径保持不变。');

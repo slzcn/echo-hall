@@ -106,6 +106,17 @@
     _baseH=0; _kbEst=0;
   }
 
+  // 仅键盘诊断页开放内部链路给 CDP 自动化；普通页面不挂任何测试接口。
+  try{
+    if(new URLSearchParams(location.search).has('kbdebug')){
+      window.__ehDmKbDebug={
+        bind:bindChatViewport,
+        unbind:unbindChatViewport,
+        snapshot:()=>({baseH:_baseH,kbEst:_kbEst,kbRaw:_kbHeightRaw()})
+      };
+    }
+  }catch(e){}
+
   // 时间显示与聊天室一致(app.js fmtTime): 今天只显时分, 昨天/今年/跨年逐级补日期。
   //   优先复用 app.js 的全局 fmtTime(经典 <script> 同作用域), 保证两处逻辑永远同源;
   //   万一取不到再本地兜底(同样带日期, 别退回"只有时分"漏了历史私信的日期)。
