@@ -45,8 +45,11 @@
     const full = Math.max(baseFullH || 0, window.innerHeight, viewport ? viewport.height : 0);
     let vkH = 0;
     try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkH = Math.round(r.height); } catch (_) {}
-    if (vkH > 0) vis = Math.min(vis, full - vkH);            // 覆盖式键盘: vv/innerH 不缩, 从全高扣实时键盘高
-    if (estimatedKbH > 0) vis = Math.min(vis, full - estimatedKbH);  // 三信号全哑 WebView 估算兜底
+    // ★V62（真机四组数据推翻「38→39」后重写）：只在 innerH、vv 都未缩（vis 接近 full＝真覆盖式 IME）时
+    //   才从全高减 VK/估算；若 vis 已被平台缩（resizes-content / iOS），min(innerH,vv.h) 已是真可视高，
+    //   不再减（免双减）。私信一直稳＝读真值不减，聊天室对齐同一策略。
+    if (vkH > 0 && vis >= full - 4) vis = Math.min(vis, full - vkH);
+    if (estimatedKbH > 0 && vis >= full - 4) vis = Math.min(vis, full - estimatedKbH);
     return Math.max(1, Math.round(vis));
   }
 

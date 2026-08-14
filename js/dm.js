@@ -50,6 +50,7 @@
   const _vv = window.visualViewport;
   const _vk = navigator.virtualKeyboard || null;
   let _baseH=0, _kbEst=0;
+  let _baseStableAt=0, _baseStableH=0;   // ★V62：无键盘态候选全高 + 起始时刻，稳定超过 300ms 才认作 _baseH（防折叠浏览器地址栏收展的 innerHeight 波动把中间态当新全高）
   // ★PC(非触屏)不跑键盘避让: 桌面聚焦输入框【不】弹软键盘, 视口不该收缩。旧版无条件跑 → PC 上聚焦后
   //   320ms 估算兜底把抽屉压到 0.38h="弹起", 输入框凭空跳上来。桌面就该原位不动 → 门禁掉整套逻辑。
   function _isSoftKb(){ try{ return window.matchMedia('(hover:none) and (pointer:coarse)').matches; }catch(e){ return true; } }
@@ -66,8 +67,14 @@
     const d=$('#dmChatDrawer'); if(!d || !d.classList.contains('on')) return;
     if(window.scrollY!==0){ try{ window.scrollTo(0,0); }catch(e){} }   // 文档滚回顶, 免 fixed 抽屉相对可视区漂移
     let kb=_kbHeightRaw();
-    // 无键盘态(kb=0 且没在估算): 当前 innerHeight 即真全高 → 校准 _baseH, 通吃折叠屏展开/折叠、工具栏增减。
-    if(kb===0 && _kbEst===0) _baseH=window.innerHeight;
+    // ★V62：无键盘态(kb=0 且没在估算)才有资格校准 _baseH，但折叠浏览器地址栏收展会让 innerHeight
+    //   短暂波动 → 不能立刻把中间态当真全高。要求同一候选高稳定 ≥300ms 才落地为 _baseH，杜绝污染。
+    if(kb===0 && _kbEst===0){
+      const cur=window.innerHeight;
+      if(!_baseH){ _baseH=cur; _baseStableH=cur; _baseStableAt=Date.now(); }   // 首次直接建基线
+      else if(Math.abs(cur-_baseStableH)>2){ _baseStableH=cur; _baseStableAt=Date.now(); }   // 候选变了→重新计时
+      else if(cur>_baseH && Date.now()-_baseStableAt>=300){ _baseH=cur; }       // 只在“稳定的更大全高”上抬升(展开/收地址栏后真全高变大)
+    }
     if(kb===0 && _kbEst>0) kb=_kbEst;                                  // 真信号哑 → 用估算兜底
     const h = Math.max(160, (_baseH||window.innerHeight) - kb);
     d.style.setProperty('--dm-vh', Math.round(h)+'px');
