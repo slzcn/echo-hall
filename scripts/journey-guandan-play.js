@@ -1,0 +1,202 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * journey-guandan-play.js — 掼蛋完整用户旅程回归
+ *
+ * 用户旅程:
+ *   1. 玩家在房间里敲 /掼蛋 → handleSlash 认得(不当普通消息发出去)
+ *   2. 入室牌桌起局 → 4 席 2 队(0&2 我方 / 1&3 对方), 3 家 AI 用房里灵魂命名, 玩家坐 0 席
+ *   3. 出牌轮转(级牌抬权/红桃级牌逢人配/接风) → 打到 3 家出完必分完整名次
+ *   4. 结算落一行战绩: 含 seed + 完整 transition log(moves) → 可服务端复核/回看
+ *   5. 战绩行 my_delta 与引擎结算一致; 名次/升级/双下自洽
+ *   6. 再来一局延续对局: 上局名次触发进贡/还贡/抗贡, 赢队升级带入下一副
+ *
+ * 关键断言(反 anti-pattern「只测功能点不测旅程」):
+ *   · 命令必须被 SLASH_CMDS 收录且 handleSlash 路由(否则玩家敲了没反应)
+ *   · 记录行的 seed 能重放出同一个 result(否则回看/复核是假的)
+ *   · 战绩卡编码→解码闭环字段序一致(否则卡渲染错乱)
+ *   · UI 契约锁(入室化/倒计时/动效/轮次/级牌百搭/进贡横幅)防体验回退
+ */
+const fs = require('fs');
+const path = require('path');
+const Engine = require('../js/games/guandan-engine.js');
+const AI = require('../js/games/guandan-ai.js');
+const Rules = require('../js/games/guandan-rules.js');
+
+function assert(ok, msg){ if(!ok) throw new Error('FAIL: '+msg); console.log('✓ '+msg); }
+
+const APP_JS = path.join(__dirname, '..', 'js', 'app.js');
+const src = fs.readFileSync(APP_JS, 'utf8');
+
+// ── 步骤1: 命令已接入 ───────────────────────────────────────
+assert(/\{c:'\/掼蛋'/.test(src), 'SLASH_CMDS 收录 /掼蛋(菜单可见)');
+assert(/cmd==='\/掼蛋'/.test(src), "handleSlash 路由 /掼蛋 → launchGuandan");
+assert(/async function launchGuandan\(\)/.test(src), 'launchGuandan 存在');
+assert(/async function recordGuandanResult\(/.test(src), 'recordGuandanResult 存在(全记落库)');
+assert(/game:'guandan'[\s\S]{0,600}moves:\s*log/.test(src), '掼蛋战绩写入 eh_game_results 且含 moves(回看数据源)');
+assert(src.indexOf("cmd==='/掼蛋'") < src.lastIndexOf('return false'), '/掼蛋 分支在 return false 之前(不会被当普通消息)');
+assert(/querySelector\('\.gd-room'\)/.test(src) && /launchGuandan/.test(src),
+  '重复敲 /掼蛋 被拦(已有 .gd-room 时不再叠桌)');
+
+// ── 步骤2-5: 起局 → 打到底 → 落一行战绩 ─────────────────────
+function buildRow(res, log, names, souls){
+  const soulUids = (souls||[]).map(s=>s&&s.user_id).filter(Boolean);
+  const players = [0,1,2,3].map(seat=>({
+    seat, name:names[seat], is_ai: seat!==0,
+    uid: seat===0 ? 'me-uid' : (soulUids[seat-1]||null),
+    team: seat%2,
+  }));
+  return {
+    game:'guandan', seed: log[0] && log[0].seed || null,
+    players,
+    winner_seats: res.finishOrder.filter(s=> (s%2)===res.winnerTeam),
+    loser_seats:  res.finishOrder.filter(s=> (s%2)!==res.winnerTeam),
+    score:res.advance, spring:false, bombs:res.bombs,
+    my_seat:0, my_delta:res.delta[0], my_won:res.winnerTeam===0,
+    is_ai: players.map(p=>p.is_ai), is_ranked:false, moves:log,
+  };
+}
+
+function playFull(seed, level, teamLevels, prevResult){
+  let st = Engine.createGame({ seed, level, teamLevels,
+    isAI:[false,true,true,true], names:['你','灵魂下','灵魂对','灵魂上'], prevResult });
+  let g=0;
+  while(st.phase==='play'){
+    if(g++>3000) throw new Error('play loop @'+seed);
+    const s=st.turn;
+    const tgt=(st.table.lastPlay && st.table.lastPlay.seat!==s)?st.table.lastPlay.parse:null;
+    const mv=AI.decide({ seat:s, hand:st.players[s].hand, tableParse:tgt,
+      lastSeat: st.table.lastPlay?st.table.lastPlay.seat:null,
+      handsLeft: st.players.map(p=>p.hand.length), level: st.level });
+    try{
+      if(mv.action==='pass') Engine.applyPass(st,s);
+      else Engine.applyPlay(st,s,mv.cards);
+    }catch(e){
+      try{ Engine.applyPass(st,s); }
+      catch(_){ Engine.applyPlay(st,s,AI.chooseLead(st.players[s].hand,st.level)); }
+    }
+  }
+  return st;
+}
+
+let recorded=0, winsForMe=0;
+for(let seed=100; seed<130; seed++){
+  const st = playFull(seed, 2, [2,2]);
+  const names=['你','灵魂下','灵魂对','灵魂上'];
+  const souls=[{user_id:'soul-1',name:'灵魂下'},{user_id:'soul-2',name:'灵魂对'},{user_id:'soul-3',name:'灵魂上'}];
+  const row = buildRow(st.result, st.log, names, souls);
+  recorded++;
+
+  if(!(row.seed!=null)) throw new Error('seed missing @'+seed);
+  if(!(Array.isArray(row.moves)&&row.moves.length>3)) throw new Error('moves too short @'+seed);
+  if(!(row.is_ai[0]===false && row.is_ai[1]===true && row.is_ai[2]===true && row.is_ai[3]===true)) throw new Error('is_ai wrong @'+seed);
+  if(row.my_won && row.my_delta<=0) throw new Error('赢了但加分<=0 @'+seed);
+  if(!row.my_won && row.my_delta>=0) throw new Error('输了但没扣分 @'+seed);
+  if(row.winner_seats.length!==2 || row.loser_seats.length!==2) throw new Error('每队 2 人自洽 @'+seed);
+  if(row.my_won) winsForMe++;
+
+  // seed+moves 重放 → 与记录行完全一致(回看/复核为真)
+  const rp = Engine.replay(st.log);
+  if(rp.result.delta[0] !== row.my_delta) throw new Error('重放 my_delta 不一致 @'+seed);
+  if(JSON.stringify(rp.result.finishOrder)!==JSON.stringify(st.result.finishOrder)) throw new Error('重放名次不一致 @'+seed);
+  if(rp.result.advance!==st.result.advance) throw new Error('重放升级量不一致 @'+seed);
+}
+assert(recorded===30, `30 局旅程全部落库成行 (我方胜 ${winsForMe} 局)`);
+assert(winsForMe>0 && winsForMe<30, '胜负两种结局都出现过(战绩加减分双向都验到)');
+
+// ── 步骤6: 再来一局延续对局(进贡/升级带入下一副) ───────────
+let sawTribute=false, sawLevelUp=false, chainGames=0;
+{
+  let level=2, teamLevels=[2,2], prev=null;
+  for(let seed=300; seed<316; seed++){
+    const st = playFull(seed, level, teamLevels, prev);
+    const res = st.result;
+    chainGames++;
+    // 进贡流程被触发(第二副起有上局结果)
+    if(prev){
+      if(st.tribute===null) throw new Error('有上局结果却没进贡流程 @'+seed);
+      sawTribute=true;
+      // 进贡+还贡后仍守恒: 各家 27 张、总 108
+      const total = st.players.reduce((n,p)=>n+p.hand.length,0);
+      // 注: 打完后手牌已出光, 这里只能验起手守恒 → 用重放起局态验
+      const rp = Engine.replay(st.log);
+      // 重放能复现终局即证明进贡转移被 log 完整记录
+      if(JSON.stringify(rp.result.finishOrder)!==JSON.stringify(res.finishOrder)) throw new Error('含进贡的重放不一致 @'+seed);
+    }
+    // 升级带入: 赢队等级应 = min(14, before+advance)
+    if(res.teamLevelsAfter[res.winnerTeam] > res.teamLevelsBefore[res.winnerTeam]) sawLevelUp=true;
+    // 下一副延续态
+    if(res.matchWon){ level=2; teamLevels=[2,2]; prev=null; }
+    else { teamLevels=res.teamLevelsAfter.slice(); level=teamLevels[res.nextDealerTeam];
+      prev={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
+  }
+}
+assert(chainGames===16, `连续对局链 16 副全部推进(延续升级/进贡)`);
+assert(sawTribute, '第二副起进贡流程被触发(进贡/还贡/抗贡)');
+assert(sawLevelUp, '赢队等级随名次上升(升级带入下一副)');
+
+// ── 步骤7: 起手守恒(进贡后各家仍 27 张、总 108) ─────────────
+{
+  const prev = { finishOrder:[0,2,1,3], winnerTeam:0 };  // 双下
+  const st = Engine.createGame({ seed:99, level:2, teamLevels:[2,2], dealerTeam:0,
+    isAI:[false,true,true,true], prevResult: prev });
+  assert(st.tribute!==null, '有上局结果 → 起局即触发进贡');
+  if(!st.tribute.refused){
+    assert(st.players.every(p=>p.hand.length===27), '进贡+还贡后各家仍 27 张(守恒)');
+    assert(st.players.reduce((n,p)=>n+p.hand.length,0)===108, '进贡后总牌数仍 108');
+  }
+}
+
+// ── 步骤8: 和聊天融合(开局留痕 + 结束战绩卡 + 再来一局) ───────
+assert(/sendSystemAct\(`开了一桌掼蛋/.test(src), '开局在聊天室留一行(触发聊天内容, 非静默开桌)');
+assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
+assert(/onResult:[\s\S]{0,220}postGuandanResult\(res,\s*log,\s*names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
+assert(/postGuandanResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+// 编码 → 解码闭环: 生产 text 编码字段序与 buildGameEl 的 gd 分支解码字段序一致
+assert(/\['game','gd',\s*win,\s*res\.advance,\s*fromLvl,\s*toLvl,\s*res\.doubleDown\?1:0,\s*res\.matchWon\?1:0,\s*myRankIdx,\s*res\.bombs\|\|0,\s*mateName\]/.test(src),
+  'postGuandanResult 编码字段序固定(win|advance|fromLvl|toLvl|doubleDown|matchWon|myRankIdx|bombs|mateName)');
+assert(/if\(ev==='gd'\)/.test(src), 'buildGameEl 有 gd 分支(把战绩卡渲染回来)');
+assert(/data-gd-again/.test(src), '战绩卡含"再来一局"入口(data-gd-again)');
+assert(/again\.onclick=[\s\S]{0,120}launchGuandan\(\)/.test(src), '"再来一局"点击直接开新局');
+assert(/p\[1\]==='gd'[\s\S]{0,120}掼蛋/.test(src), '消息预览把 gd 卡显示成"🎴 掼蛋 · 胜/负"(不露原始 game|gd| 编码)');
+
+// ── 步骤9: 牌桌 UX 契约(入室化/倒计时/动效/轮次/级牌百搭/进贡) ─
+const UI_JS = path.join(__dirname, '..', 'js', 'games', 'guandan-ui.js');
+const ui = fs.readFileSync(UI_JS, 'utf8');
+
+// (1) 入室化
+assert(/getElementById\('hall'\)/.test(ui), '牌桌优先挂进聊天室 #hall(入室牌桌)');
+assert(/\.gd-room\{position:absolute/.test(ui), '牌桌用 absolute 铺满房间(非全屏遮罩)');
+// (2) 倒计时兜底
+assert(/HUMAN_PLAY_MS/.test(ui), '定义人类出牌回合时限');
+assert(/function armTurn\(/.test(ui) && /onHumanTimeout/.test(ui), '每回合武装倒计时 + 人类超时兜底');
+assert(/超时 · 自动不出/.test(ui) && /超时 · 自动出牌/.test(ui), '到点自动过/自动出(不卡死)');
+assert(/requestAnimationFrame\(tick\)/.test(ui), '倒计时环用 rAF 平滑驱动');
+// (3) 动效 + (4) 轮次感
+assert(/fly-bot/.test(ui) && /fly-top/.test(ui), '出牌有方向性飞入动画');
+assert(/gd-boom/.test(ui) && /function boom\(/.test(ui), '炸弹/天王炸有震屏+爆炸特效');
+assert(/轮到你/.test(ui), '中央横幅明确"轮到你出牌"');
+assert(/\.gd-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn class)');
+// (5) AI 队友协作: 传 lastSeat
+assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'guandan-ui 向 AI.decide 传 lastSeat(队友协作判据)');
+// (6) 终端自适应: CSS 变量 + 大屏放大
+assert(/\.gd-room\{[\s\S]*--cw:38px;[\s\S]*--av:42px/.test(ui), '牌桌尺寸提为 CSS 变量默认小屏值');
+assert(/\.card\{width:var\(--cw/.test(ui), '大牌宽度吃 --cw 变量');
+assert(/\.gd-avr\{width:var\(--av/.test(ui), '头像尺寸吃 --av 变量');
+assert(/\.gd-hand \.card\{margin-left:var\(--hand-ov/.test(ui), '手牌重叠吃 --hand-ov 变量');
+assert(/@media \(min-width:600px\)[\s\S]{0,260}--cw:44px/.test(ui) && /@media \(min-width:900px\)[\s\S]{0,260}--cw:52px/.test(ui),
+  '600/900px 媒体查询把牌桌变量整体放大');
+// (7) 级牌/百搭全程可视(掼蛋特有)
+assert(/isWild\(card, level\)/.test(ui) && /wbadge">配/.test(ui), '红桃级牌逢人配标"配"(百搭可辨识)');
+assert(/naturalRank\(card\)===level/.test(ui) && /\.card\.lvl/.test(ui), '级牌描金边(级牌抬权可视)');
+assert(/gd-lvl/.test(ui) && /我方 \$\{LVL_LABEL/.test(ui), '顶栏显示本局级牌 + 双方队伍等级');
+// (8) 进贡横幅(掼蛋特有)
+assert(/function showTributeBanner\(/.test(ui) && /gd-tribute/.test(ui), '开局进贡有横幅提示');
+assert(/抗贡成功/.test(ui) && /进贡 · /.test(ui), '横幅区分进贡/抗贡两态');
+// (9) 音效 + 特效
+assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
+assert(/sfx\('send'\)/.test(ui) && /sfx\('mention'\)/.test(ui) && /sfx\('boom'\)/.test(ui), '出牌/轮到你/炸弹各有音效');
+assert(/iWon[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
+assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
+
+console.log('\n✅ 掼蛋旅程全部通过');

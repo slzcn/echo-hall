@@ -2557,6 +2557,32 @@ function buildGameEl(m){
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchDoudizhu(); }catch(_){} };
     return el;
   }
+  // 🎴 掼蛋战绩卡: game|gd|<win|lose>|<advance>|<fromLvl>|<toLvl>|<doubleDown 0/1>|<matchWon 0/1>|<myRankIdx 0-3>|<bombs>|<队友名…>
+  //   前 10 段全是枚举/数字(无 |), 队友名放末段并 slice(10).join('|') 兜住名字里的 |。
+  if(ev==='gd'){
+    const win=p[2]==='win';
+    const advance=parseInt(p[3],10)||1;
+    const fromLvl=parseInt(p[4],10)||2;
+    const toLvl=parseInt(p[5],10)||2;
+    const doubleDown=p[6]==='1';
+    const matchWon=p[7]==='1';
+    const myRankIdx=parseInt(p[8],10);
+    const bombs=parseInt(p[9],10)||0;
+    const mateName=esc(p.slice(10).join('|')||'');
+    const RANKN=['头游','二游','三游','末游'];
+    const lvlName=(r)=>({11:'J',12:'Q',13:'K',14:'A'}[r]||String(r));
+    const c=win?'#22FF95':'#FF5D6C';
+    const el=document.createElement('div'); el.className='game-card ddz-card '+(win?'ddz-win':'ddz-lose');
+    el.style.setProperty('--gc', c);
+    const headline = matchWon ? (win?'🏆 通关胜利':'对方通关') : ((win?'我方':'对方')+'升级');
+    el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎴</span><span class="gc-kind">掼蛋 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">${RANKN[myRankIdx]||'—'}</span><b class="ddz-delta">${lvlName(fromLvl)}→${lvlName(toLvl)}</b><span class="ddz-unit">${matchWon?'🏆':'级'}</span></div>`
+      +`<div class="ddz-detail">${headline} · ${doubleDown?'双下 +3 级':'单下 +'+advance+' 级'}${mateName?(' · 队友 '+mateName):''}${bombs?(' · '+bombs+'炸'):''}</div>`
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-gd-again="1">🎴 再来一局</button><span class="gc-tip">或发 <b>/掼蛋</b></span></div>`;
+    const again=el.querySelector('[data-gd-again]');
+    if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchGuandan(); }catch(_){} };
+    return el;
+  }
   return null;
 }
 function buildMsgEl(m, isHistory){
@@ -4639,6 +4665,7 @@ function msgPreview(m){
       if(p[1]==='verdict')return '🐢 主持判定';
       if(p[1]==='reveal') return '🐢 揭晓汤底';
       if(p[1]==='ddz'){ const w=p[2]==='win'; const d=parseInt(p[4],10)||0; return '🃏 斗地主 · '+(w?'胜':'负')+' '+(d>=0?'+':'')+d+'分'; }
+      if(p[1]==='gd'){ const w=p[2]==='win'; return '🎴 掼蛋 · '+(w?'胜':'负'); }
       return '🐢 海龟汤';
     }
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
@@ -5957,6 +5984,7 @@ const SLASH_CMDS=[
   {c:'/胶囊', d:'/胶囊 7天 想说的话 → 封存进时间胶囊，到期由灵魂在房里念出'},
   {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
   {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
+  {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -5983,6 +6011,9 @@ async function handleSlash(text){
   }
   if(cmd==='/斗地主'||cmd==='/ddz'||cmd==='/doudizhu'){
     await launchDoudizhu(); return true;
+  }
+  if(cmd==='/掼蛋'||cmd==='/guandan'||cmd==='/gd'){
+    await launchGuandan(); return true;
   }
   if(cmd==='/bgm切换'){
     if(!arg){ await showMyBgmLibrary(); return true; }
@@ -6064,6 +6095,70 @@ async function recordGameResult(game, res, log, names, avatars, souls){
   };
   try{ await sb.from('eh_game_results').insert(row); }
   catch(e){ console.warn('[ddz] record result failed', e); }
+}
+
+// ── 掼蛋:唤起入室牌桌。4 席 2 队(0&2 一队/1&3 一队), 3 家 AI 用房里灵魂命名/头像。──
+async function launchGuandan(){
+  if(!window.EHGuandanGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(!curRoom){ toast('先进一个房间再开局'); return; }
+  // 防重复开桌:已有牌局在进行就不叠第二张(否则两套引擎+定时器同时跑)
+  if(document.querySelector('.gd-room')){ toast('牌局进行中，先返回再开新局'); return; }
+  let souls=[];
+  try{ souls = await prefetchSouls(curRoom.id); }catch(_){}
+  const pick=(souls||[]).filter(s=>s&&s.name).slice(0,3);
+  // 座位: 0=我 1=下家 2=对家/队友 3=上家
+  const names   = [me.name||'你', pick[0]?.name || '灵魂·下家', pick[1]?.name || '灵魂·队友', pick[2]?.name || '灵魂·上家'];
+  const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '🤝', pick[2]?.emoji || '👾'];
+  try{ sendSystemAct(`开了一桌掼蛋 🎴 · 队友 ${names[2]} · 对手 ${names[1]}、${names[3]}`).catch(()=>{}); }catch(_){}
+  window.EHGuandanGame.open({
+    names, avatars,
+    onResult: (res, log, meta)=>{
+      recordGuandanResult(res, log, names, avatars, pick).catch(()=>{});
+      postGuandanResult(res, log, names, meta).catch(()=>{});
+    },
+  });
+}
+// 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
+async function postGuandanResult(res, log, names, meta){
+  if(!myUid || !curRoom) return;
+  const mySeat=(meta&&meta.mySeat)||0;
+  const myTeam=mySeat%2;
+  const win  = res.winnerTeam===myTeam ? 'win' : 'lose';
+  const myRankIdx = res.finishOrder.indexOf(mySeat);
+  const fromLvl = res.teamLevelsBefore[res.winnerTeam];
+  const toLvl   = res.teamLevelsAfter[res.winnerTeam];
+  const mateName = names[(mySeat+2)%4] || '';
+  const text=['game','gd', win, res.advance, fromLvl, toLvl, res.doubleDown?1:0, res.matchWon?1:0, myRankIdx, res.bombs||0, mateName].join('|');
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(data && el) el.dataset.mid=data.id;
+  }catch(e){ console.warn('[gd] post result failed', e); }
+}
+// 记录掼蛋战绩(seed+log 供复核/回看)。4 席结构; 失败静默。
+async function recordGuandanResult(res, log, names, avatars, souls){
+  if(!myUid || !curRoom) return;
+  const soulUids=(souls||[]).map(s=>s&&s.user_id).filter(Boolean);
+  const players=[0,1,2,3].map(seat=>({
+    seat, name:names[seat], is_ai: seat!==0,
+    uid: seat===0 ? myUid : (soulUids[seat-1]||null),
+    team: seat%2,
+  }));
+  const row={
+    game:'guandan', room_id:curRoom.id, room_name:curRoom.name||null,
+    seed: (log[0] && log[0].seed) || null,
+    players,
+    winner_seats: res.finishOrder.filter(s=> (s%2)===res.winnerTeam),
+    loser_seats:  res.finishOrder.filter(s=> (s%2)!==res.winnerTeam),
+    landlord_seat:-1, landlord_won:false,
+    score:res.advance, final_multiplier:1, spring:false, bombs:res.bombs,
+    my_uid:myUid, my_seat:0, my_delta:res.delta[0], my_won:res.winnerTeam===0,
+    is_ai:players.map(p=>p.is_ai), is_ranked:false,
+    moves:log, ended_at:new Date().toISOString(),
+  };
+  try{ await sb.from('eh_game_results').insert(row); }
+  catch(e){ console.warn('[gd] record result failed', e); }
 }
 
 async function sendSystemAct(text){

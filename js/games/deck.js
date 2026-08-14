@@ -97,6 +97,24 @@
     return { seed: s, hands, bottom };
   }
 
+  // ── 掼蛋发牌 ───────────────────────────────────────────────
+  // 两副牌 108 张(2×54)。4 家各 27 张, 无底牌。返回 {seed, hands:[27,27,27,27]}。
+  //   两副牌 id 冲突: 第二副所有 id 追加后缀 'x'(s14→s14x, js→jsx), 保持全局唯一。
+  //   级牌抬权 / 红桃级牌百搭 全在 guandan-rules 里按 level 动态处理, 这里只发不判。
+  function doubleDeck(){
+    const cards = standardDeck();                     // 第一副
+    for (const c of standardDeck()){                  // 第二副: id 追加 'x'
+      cards.push(Object.assign({}, c, { id: c.id + 'x', deck: 1 }));
+    }
+    return cards;
+  }
+  function dealGuandan(seed){
+    const { seed: s, cards } = shuffle(doubleDeck(), seed);
+    const hands = [[], [], [], []];
+    for (let i = 0; i < 108; i++) hands[i % 4].push(cards[i]);   // 每家 27 张
+    return { seed: s, hands };
+  }
+
   // 手牌规范排序:大在前(rank 降序),同 rank 按固定花色序,便于渲染与 AI。
   function sortHand(cards){
     const suitOrder = {'♠':0,'♥':1,'♣':2,'♦':3};
@@ -111,6 +129,6 @@
     RANKS, RANK_LABEL, SUITS, SUIT_KEY,
     makeCard, standardDeck,
     mulberry32, freshSeed, shuffle,
-    dealDoudizhu, sortHand,
+    dealDoudizhu, doubleDeck, dealGuandan, sortHand,
   };
 });
