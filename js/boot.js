@@ -89,7 +89,32 @@ function bootSupabase(){
     // 兜底: 预绘了 hall 但迟迟没进恢复流程(session 真失效/过期) → 回落入场页, 不卡空骨架。
     // 必须延时: onAuthStateChange 把 resumeAfterAuth 塞进 setTimeout(0), 若此处同步回落会把预绘的 hall
     // 立刻打回 enter, 等 setTimeout 跑完又跳回 hall(实测刷新后 enter→10s→hall 的严重抖动)。给 auth 就绪留足时间。
-    setTimeout(()=>{ if(!authHandled && !curRoom && $('#hall').classList.contains('on')) goScene('enter'); }, 4000);
+    // 兜底: 预绘了 hall 但迟迟没进恢复流程(session 真失效/过期) → 回落入场页，不卡空骨架。
+    // ★ 2026-08-14 升级（主人报"进程死后刷新卡登录页、点哪都没反应、半天才进来"）：
+    //   1) 冗需变短 → 冗启动（reload/无 SW client） 1.5s，其他 3s，旧 4s 的硬等反而让"点哪没反应"时窗拉长。
+    //   2) 可打断 → 预绘 hall 骨架期间用户任意点击/键盘即立即回落，把 UI 从"点哪没反应"解放。
+    //   3) 后台追认 → 回落 enter 后若 session 迟到还会在 onAuthStateChange/session-restore 里触发 resumeAfterAuth，无缝接回。
+    const isColdStart = (()=>{ try{
+      const t=performance.getEntriesByType('navigation')[0];
+      return !t || t.type==='reload' || !navigator.serviceWorker?.controller;
+    }catch(_){ return true; } })();
+    const fallbackMs = isColdStart ? 1500 : 3000;
+    let fallbackFired = false;
+    const doFallback = (via)=>{
+      if(fallbackFired) return;
+      if(authHandled) return;
+      if(curRoom) return;
+      if(!$('#hall').classList.contains('on')) return;
+      fallbackFired = true;
+      try{ document.onpointerdown = null; document.onkeydown = null; }catch(_){}
+      try{ console.warn('[boot] auth 迟到、回落入场页 via='+via); }catch(_){}
+      goScene('enter');
+    };
+    const onUserPoke = ()=> doFallback('user-poke');
+    // 用事件属性避免新增 addEventListener 调用，仍在捕获阶段之前尽快解锁预绘骨架。
+    document.onpointerdown = onUserPoke;
+    document.onkeydown = onUserPoke;
+    setTimeout(()=> doFallback('timeout'), fallbackMs);
   })();
 }
 // defer 脚本在 DOMContentLoaded 前按序执行完 → 那时 window.supabase 必就绪。已就绪则立即引导。

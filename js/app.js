@@ -193,10 +193,13 @@ async function resolveSession(){
   let session=null;
   try{ ({ data:{ session } } = await withTimeout(sb.auth.getSession(), 3500, { data:{ session:null } })); }
   catch(e){ console.warn('[auth] getSession 超时', e); session=null; }
-  // 曾登录过(本地 me.registered 或有 username/email) 但这次没读到 → 不带超时再读一次兜底
+  // 曾登录过(本地 me.registered 或有 username/email) 但这次没读到 → 再读一次兜底（带 5s 超时）
+  // ★ 2026-08-14 修：原“兵岕不带超时底”在 GoTrue 内部 autoRefresh 网络 hang 住时会无限等待，
+  //   正是“进程死后刷新卡登录页/点哪没反应”的根因。兜底仍保留但封 5s（比首次 3.5s 宽松），
+  //   还是没拿到 → 既然真的不可达，宁可走失效处理让用户重登，不能封死 UI。
   const everReg = !!(me && (me.registered || me.username || me.email));
   if(!session?.user && everReg){
-    try{ const rr=await sb.auth.getSession(); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){}
+    try{ const rr = await withTimeout(sb.auth.getSession(), 5000, null); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){}
   }
   return session;
 }
