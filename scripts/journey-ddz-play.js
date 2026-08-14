@@ -33,6 +33,9 @@ assert(/async function recordGameResult\(/.test(src), 'recordGameResult 存在(�
 assert(/eh_game_results/.test(src) && /moves:\s*log/.test(src), '战绩写入 eh_game_results 且含 moves(回看数据源)');
 // 命令未接入时会掉进 return false(当普通消息发) —— 反证该分支确实在 /斗地主 之前不吞
 assert(src.indexOf("cmd==='/斗地主'") < src.lastIndexOf('return false'), '/斗地主 分支在 return false 之前(不会被当普通消息)');
+// 防重复开桌:launchDoudizhu 里在 open 之前挡掉已有牌局(否则叠两张桌+两套定时器)
+assert(/querySelector\('\.ddz-room'\)/.test(src) && /launchDoudizhu/.test(src),
+  '重复敲 /斗地主 被拦(已有 .ddz-room 时不再叠桌)');
 
 // ── 步骤2-4: 起局 → 打到底 → 落一行战绩 ─────────────────────
 // 复刻 recordGameResult 里"从 result+log 组装行"的核心逻辑,验证与引擎一致。
@@ -122,5 +125,8 @@ assert(/fly-bot/.test(ui) && /fly-top/.test(ui), '出牌有方向性飞入动画
 assert(/ddzBoom|ddz-boom/.test(ui) && /function boom\(/.test(ui), '炸弹/王炸有震屏+爆炸特效');
 assert(/ddz-turnbanner/.test(ui) && /轮到你/.test(ui), '中央横幅明确"轮到谁"(轮到你出牌高亮)');
 assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn class)');
+
+// (5) AI 队友协作:game-ui 必须把 lastSeat 传给 AI.decide, 否则农民认不出队友会互相压牌
+assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 lastSeat(农民协作的判据)');
 
 console.log('\n✅ 斗地主旅程全部通过');

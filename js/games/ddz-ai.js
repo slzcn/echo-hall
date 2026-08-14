@@ -202,14 +202,15 @@
 
   // ── 决策入口 ────────────────────────────────────────────────
   // state 需含:seat, hand(该 AI 手牌), tableParse(要压的牌;null=首出),
-  //   handsLeft:[n0,n1,n2](各家剩牌数,合法公开信息), landlord, iAmLandlord。
+  //   lastSeat(桌面这手是谁出的;null=首出), handsLeft:[n0,n1,n2](各家剩牌数),
+  //   landlord, iAmLandlord。
   // 返回 {action:'play', cards} | {action:'pass'}。
   function decide(ctx){
     const hand = ctx.hand;
     const target = ctx.tableParse || null;
     const { plays, bombs, rocket } = candidates(hand, target);
 
-    // 对手是否即将赢(报单/报双):公开的剩牌数
+    // 对手是否即将赢(报单/报双):只看「真对手」的剩牌数(队友快赢不算威胁)
     const oppMin = minOpponentCards(ctx);
     const urgent = oppMin <= 2;
 
@@ -217,6 +218,14 @@
       // 首出:选一手「走小散牌」的。优先出最小单张/顺子,避免拆炸/王。
       const lead = chooseLead(hand, plays, bombs, rocket, ctx);
       return { action:'play', cards: lead };
+    }
+
+    // 队友协作:桌面这手是我队友(同为农民)出的 → 一般让牌不压自己人,
+    //   除非能「一把出完」直接终结本方胜(农民任一家清空即赢)。
+    if (isTeammateLead(ctx)){
+      const finisher = plays.find(p => p.cards.length === hand.length);
+      if (finisher) return { action:'play', cards: finisher.cards };
+      return { action:'pass' };
     }
 
     // 跟牌:有能压的普通牌 → 出最小的那手(保守),除非能一把走完
@@ -287,10 +296,27 @@
     return cost;
   }
 
+  // 桌面这手牌是不是我队友出的(仅农民之间成立)。缺 lastSeat/landlord 信息时返回 false。
+  function isTeammateLead(ctx){
+    if (ctx.lastSeat==null || ctx.landlord==null) return false;
+    const iAmPeasant = ctx.seat !== ctx.landlord;
+    const leaderIsPeasant = ctx.lastSeat !== ctx.landlord;
+    return iAmPeasant && leaderIsPeasant && ctx.lastSeat !== ctx.seat;
+  }
+  // 「真对手」的最小剩牌数:我是地主→两农民都是对手;我是农民→只有地主是对手。
+  // 队友(另一农民)剩牌少不构成威胁,不该据此浪费炸弹。缺 landlord 信息时退化为「所有别家」。
   function minOpponentCards(ctx){
     if (!ctx.handsLeft) return 99;
     let mn = 99;
-    ctx.handsLeft.forEach((n,seat)=>{ if (seat!==ctx.seat && n < mn) mn = n; });
+    ctx.handsLeft.forEach((n,seat)=>{
+      if (seat===ctx.seat) return;
+      if (ctx.landlord!=null){
+        const iAmLord = ctx.seat===ctx.landlord;
+        const seatIsOpp = iAmLord ? (seat!==ctx.landlord) : (seat===ctx.landlord);
+        if (!seatIsOpp) return;    // 队友:跳过
+      }
+      if (n < mn) mn = n;
+    });
     return mn;
   }
   // 是否值得动炸弹(非紧急时):手牌很少 or 炸弹多可以搏

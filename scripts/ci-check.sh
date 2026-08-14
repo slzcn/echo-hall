@@ -149,10 +149,10 @@ section "1b3d. 斗地主游戏引擎"
 
 if ! command -v node >/dev/null 2>&1; then
   fail "node 未安装，无法运行斗地主引擎测试"
-elif node scripts/test-ddz-rules.js >/dev/null && node scripts/test-ddz-engine.js >/dev/null && node scripts/journey-ddz-play.js >/dev/null; then
-  pass "斗地主牌型/比较 50 项 + 引擎/AI自对弈40局/回看重放 + /斗地主完整旅程 全部通过"
+elif node scripts/test-ddz-rules.js >/dev/null && node scripts/test-ddz-engine.js >/dev/null && node scripts/test-ddz-fuzz.js >/dev/null && node scripts/journey-ddz-play.js >/dev/null; then
+  pass "斗地主牌型/比较 50 项 + 引擎/AI自对弈40局/回看重放 + 模糊压测400局6万项不变量(守恒/零和/重放/队友协作) + /斗地主完整旅程 全部通过"
 else
-  fail "斗地主回归失败（牌型识别 / 状态机 / AI合法性 / replay一致性 / 命令旅程）"
+  fail "斗地主回归失败（牌型识别 / 状态机 / AI合法性 / 模糊不变量 / replay一致性 / 命令旅程）"
 fi
 
 # ─────────────────────────────────────────

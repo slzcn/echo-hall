@@ -5977,6 +5977,8 @@ async function handleSlash(text){
 async function launchDoudizhu(){
   if(!window.EHDdzGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
+  // 防重复开桌:已有牌局在进行就不叠第二张(否则两套引擎+定时器同时跑)
+  if(document.querySelector('.ddz-room')){ toast('牌局进行中，先返回再开新局'); return; }
   // 取房里灵魂当对手(公开信息:灵魂本就是房间住民)
   let souls=[];
   try{ souls = await prefetchSouls(curRoom.id); }catch(_){}

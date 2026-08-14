@@ -462,6 +462,7 @@
       if (st.phase !== 'play' || st.turn !== seat) return;
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==seat) ? st.table.lastPlay.parse : null;
       const mv = AI.decide({ seat, hand: st.players[seat].hand, tableParse: target,
+        lastSeat: st.table.lastPlay ? st.table.lastPlay.seat : null,
         handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: seat===st.landlord });
       if (mv.action === 'pass'){ doPass(seat); return; }
       try { var r = Engine.applyPlay(st, seat, mv.cards); }
