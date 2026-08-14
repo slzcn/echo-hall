@@ -147,6 +147,8 @@ def probe_business_readonly():
       ("eh-auth", "/functions/v1/eh-auth/resolve", {}, {400}),
       ("eh-bgm-gen", "/functions/v1/eh-bgm-gen", {}, {401}),
       ("eh-sing-cover", "/functions/v1/eh-sing-cover", {}, {401}),
+      # eh-soul-tick 无强鉴权门（无 token 返 200），只验"连通、非 5xx、非超时"
+      ("eh-soul-tick", "/functions/v1/eh-soul-tick", {}, {200, 400, 401, 403, 404}),
       ("eh-admin-api", "/functions/v1/eh-admin-api", {}, {401}),
     )
     for name,path,payload,expected in edge_cases:
@@ -174,6 +176,35 @@ def probe_business_readonly():
             if ast not in (200,206) or len(audio)<1000 or "audio" not in ctype: issues.append(f"音频母版资源异常 HTTP={ast} sample={len(audio)} type={ctype}")
     except Exception as e:
         info["master_manifest"]={"error":str(e)}; issues.append(f"音频母版链路异常：{e}")
+    # 历史用户生成歌曲（eh-song 桶）抽样可播放：不真生成，只验证已有产物可读。
+    # 走 eh_public_songs RPC 拿最近公开歌曲 url，取第一首 Range 采样验证文件完整。
+    try:
+        st, raw, dt = _sb_request("/rest/v1/rpc/eh_public_songs", key, {"p_limit": 5, "p_room": None}, "POST", timeout=RPC_SLOW+6)
+        songs = []
+        try: songs = json.loads(raw.decode("utf-8")) if raw else []
+        except Exception: songs = []
+        n = len(songs) if isinstance(songs, list) else 0
+        info["user_songs"] = {"http": st, "time": round(dt,3), "rows": n}
+        if st != 200:
+            issues.append(f"历史歌曲列表 eh_public_songs 异常 HTTP={st}")
+        elif n > 0:
+            song = songs[0] if isinstance(songs[0], dict) else {}
+            song_url = song.get("url") or song.get("song_url") or song.get("audio_url") or song.get("file_url")
+            if song_url:
+                full = song_url if song_url.startswith("http") else f"{BASE}/{song_url.lstrip('/')}"
+                full = full + ("&" if "?" in full else "?") + f"_={int(time.time())}"
+                try:
+                    sreq=urllib.request.Request(full,headers={"Range":"bytes=0-4095","User-Agent":"echo-health/1.0"})
+                    st0=time.time()
+                    with urllib.request.urlopen(sreq,timeout=TIMEOUT,context=CTX) as sr:
+                        sst=sr.status; sbytes=sr.read(4096); sctype=sr.headers.get("Content-Type",""); sdt=time.time()-st0
+                    info["user_song_audio"]={"http":sst,"time":round(sdt,3),"sample_bytes":len(sbytes),"content_type":sctype}
+                    if sst not in (200,206) or len(sbytes)<1000 or "audio" not in sctype:
+                        issues.append(f"历史生成歌曲不可播放 HTTP={sst} sample={len(sbytes)} type={sctype}")
+                except Exception as e:
+                    info["user_song_audio"]={"error":str(e)}; issues.append(f"历史生成歌曲抽样异常：{e}")
+    except Exception as e:
+        info["user_songs"]={"error":str(e)}  # 无公开歌曲不告警（空站初期属正常）
     return issues, info
 
 def probe_supabase():
