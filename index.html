@@ -862,6 +862,20 @@
   .reveal-card .gc-bottom{font-size:14.5px;line-height:1.74;color:var(--ink);white-space:pre-wrap;word-break:break-word;font-weight:500}
   .reveal-card{animation:revealPop .5s cubic-bezier(.2,.9,.3,1.2)}
   @keyframes revealPop{0%{opacity:0;transform:scale(.9) translateY(10px)}100%{opacity:1;transform:none}}
+  /* 🃏 斗地主战绩卡: 胜绿/负品红, 大比分 + 一行明细 + 再来一局入口 */
+  .ddz-card{animation:revealPop .42s cubic-bezier(.2,.9,.3,1.15)}
+  .ddz-card .ddz-scoreline{display:flex;align-items:baseline;gap:8px;margin:4px 0 7px}
+  .ddz-card .ddz-role{font-size:12px;color:var(--sub);padding:2px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--gc,#00E5D4) 40%,transparent)}
+  .ddz-card .ddz-delta{font-size:30px;font-weight:900;line-height:1;letter-spacing:.5px;color:color-mix(in srgb,var(--gc,#00E5D4) 85%,var(--ink));text-shadow:0 0 18px color-mix(in srgb,var(--gc,#00E5D4) 45%,transparent)}
+  .ddz-card .ddz-unit{font-size:13px;color:var(--sub)}
+  .ddz-card .ddz-detail{font-size:12.5px;line-height:1.6;color:var(--ink);opacity:.9}
+  .ddz-card .ddz-again-row{display:flex;align-items:center;gap:11px;margin-top:11px;padding-top:10px;border-top:1px dashed color-mix(in srgb,var(--gc,#00E5D4) 30%,transparent)}
+  .ddz-card .ddz-again-btn{flex:none;padding:8px 16px;border-radius:11px;font-weight:800;font-size:13.5px;cursor:pointer;letter-spacing:.4px;
+    background:color-mix(in srgb,var(--gc,#00E5D4) 20%,var(--panel));color:color-mix(in srgb,var(--gc,#00E5D4) 82%,var(--ink));
+    border:1px solid color-mix(in srgb,var(--gc,#00E5D4) 52%,transparent);transition:.14s}
+  .ddz-card .ddz-again-btn:hover{background:color-mix(in srgb,var(--gc,#00E5D4) 32%,var(--panel));transform:translateY(-1px)}
+  .ddz-card .ddz-again-btn:active{transform:scale(.96)}
+  .ddz-card .ddz-again-row .gc-tip{margin:0;padding:0;border:0;color:var(--dim)}
   /* 判定条: 居中的小胶囊, 颜色随裁决走(是/否/无关/接近/通关) */
   .game-verdict{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;margin:7px auto;max-width:min(520px,92%);
     flex:none;font-size:13px;animation:slidein .28s}
@@ -2014,7 +2028,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260814-loginavatar';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260814-ddzchat';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2466,8 +2480,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/ddz-rules.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-engine.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-ai.js?v=20260814-ddz3"></script>
-<script defer src="./js/games/game-ui.js?v=20260814-ddz3"></script>
-<script defer src="./js/app.js?v=20260814-loginavatar"></script>
+<script defer src="./js/games/game-ui.js?v=20260814-ddzchat"></script>
+<script defer src="./js/app.js?v=20260814-ddzchat"></script>
 <script defer src="./js/keyboard.js?v=20260814-imegap39"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260814-dmkbfull"></script>

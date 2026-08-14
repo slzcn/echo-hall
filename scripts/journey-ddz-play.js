@@ -129,4 +129,41 @@ assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn c
 // (5) AI 队友协作:game-ui 必须把 lastSeat 传给 AI.decide, 否则农民认不出队友会互相压牌
 assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 lastSeat(农民协作的判据)');
 
+// ── 步骤6: 和聊天融合(主人反馈:游戏结束后聊天室什么都没留下) ─────
+// 三条不可回退断言, 对治"开局/结束都不触发聊天内容":
+//   ① 开局在房间留一行(act) → 游戏"触发了聊天内容"
+//   ② 结束后落一张 kind:'game' 战绩卡(ddz 事件, 编码可被 buildGameEl 解回)
+//   ③ 战绩卡带"再来一局"入口, 点了直接开新局 → 快速循环
+assert(/sendSystemAct\(`开了一桌斗地主/.test(src), '开局在聊天室留一行(触发聊天内容, 非静默开桌)');
+assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
+assert(/onResult:[\s\S]{0,160}postDdzResult\(res,\s*names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
+assert(/postDdzResult[\s\S]{0,400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+// 编码 → 解码闭环: 生产用的 text 编码字段序与 buildGameEl 的 ddz 分支解码字段序一致
+assert(/\['game','ddz',\s*win,\s*role,\s*res\.delta\[0\],\s*res\.base,\s*res\.finalMultiplier,\s*res\.bombs\|\|0,\s*res\.spring\?1:0,\s*res\.landlordWon\?1:0,\s*lordName\]/.test(src),
+  'postDdzResult 编码字段序固定(win|role|delta|base|mult|bombs|spring|lordWon|lordName)');
+assert(/if\(ev==='ddz'\)/.test(src), 'buildGameEl 有 ddz 分支(把战绩卡渲染回来)');
+assert(/data-ddz-again/.test(src), '战绩卡含"再来一局"入口(data-ddz-again)');
+assert(/again\.onclick=[\s\S]{0,120}launchDoudizhu\(\)/.test(src), '"再来一局"点击直接开新局(每卡 onclick, 不新增 #stream 委托监听)');
+// 预览/通知不能露原始编码
+assert(/p\[1\]==='ddz'[\s\S]{0,120}斗地主/.test(src), '消息预览把 ddz 卡显示成"🃏 斗地主 · 胜/负"(不露原始 game|ddz| 编码)');
+
+// ── 步骤7: 终端自适应(主人反馈:大屏元素不够饱满) ────────────
+// 牌/座位/头像/手牌重叠尺寸全部走 CSS 变量, 且大屏媒体查询把变量整体放大。
+assert(/\.ddz-room\{[\s\S]*--cw:44px;[\s\S]*--av:52px/.test(ui), '牌桌尺寸提为 CSS 变量(--cw/--av...)默认小屏值');
+assert(/\.card\{width:var\(--cw/.test(ui), '大牌宽度吃 --cw 变量(不再写死 44px)');
+assert(/\.ddz-avr\{width:var\(--av/.test(ui), '头像尺寸吃 --av 变量');
+assert(/\.ddz-hand \.card\{margin-left:var\(--hand-ov/.test(ui), '手牌重叠吃 --hand-ov 变量');
+assert(/@media \(min-width:600px\)[\s\S]{0,200}--cw:50px/.test(ui) && /@media \(min-width:900px\)[\s\S]{0,220}--cw:58px/.test(ui),
+  '600/900px 媒体查询把牌桌变量整体放大(大屏饱满)');
+assert(/\.ddz-opps\{[\s\S]*max-width:var\(--oppmax/.test(ui), '大屏对手区限宽居中(不松散飘两边)');
+
+// ── 步骤8: 音效 + 特效(主人反馈:音效特效可以加上) ──────────
+// 复用聊天室 EhSfx 合成器, 全程 try/catch(未加载静默, 绝不打断牌局)。
+assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
+assert(/sfx\('send'\)/.test(ui) && /sfx\('mention'\)/.test(ui) && /sfx\('boom'\)/.test(ui), '出牌/轮到你/炸弹各有音效');
+assert(/iWon[\s\S]{0,80}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
+assert(/function confetti\(\)/.test(ui) && /ddz-confetti/.test(ui), '存在胜利彩带(confetti)');
+assert(/if \(mine && !lastMyTurn\)\{ sfx\('mention'\); vibrate/.test(ui), '"刚轮到我"上升沿才提示音+震动(不每帧响)');
+assert(/if \(deal\)\{[\s\S]{0,80}justdealt/.test(ui), '发牌那一帧错峰入场动画(justdealt)');
+
 console.log('\n✅ 斗地主旅程全部通过');

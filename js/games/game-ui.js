@@ -28,9 +28,22 @@
     s.id = CSS_ID;
     s.textContent = `
 /* 入室牌桌:挂在 #hall 内, absolute 铺满(房间变成牌桌), 不是全屏黑色浮层 */
+/* ★终端自适应: 所有尺寸走 CSS 变量, 小屏默认, 大屏媒体查询整体放大 → 大屏不再"元素不够饱满" */
 .ddz-room{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;overflow:hidden;
   background:linear-gradient(180deg,var(--bg2,#0d1524),var(--bg,#070a12));
-  border-radius:inherit;animation:ddzRoomIn .22s cubic-bezier(.2,.9,.3,1)}
+  border-radius:inherit;animation:ddzRoomIn .22s cubic-bezier(.2,.9,.3,1);
+  --cw:44px;--ch:62px;--cn:15px;--cs:12px;--cc:25px;      /* 大牌尺寸 + 内部字号 */
+  --cmw:28px;--cmh:40px;                                  /* mini 牌(底牌/座位) */
+  --av:52px;--avf:23px;--seatw:104px;                     /* 头像/emoji/座位宽 */
+  --hand-ov:-20px;--hand-pad:24px;--banner:13px;--oppmax:none}
+@media (min-width:600px) and (min-height:620px){
+  .ddz-room{--cw:50px;--ch:70px;--cn:17px;--cs:13px;--cc:28px;--cmw:32px;--cmh:45px;
+    --av:60px;--avf:27px;--seatw:120px;--hand-ov:-22px;--hand-pad:28px;--banner:15px;--oppmax:560px}
+}
+@media (min-width:900px) and (min-height:700px){
+  .ddz-room{--cw:58px;--ch:81px;--cn:20px;--cs:14px;--cc:33px;--cmw:36px;--cmh:51px;
+    --av:72px;--avf:32px;--seatw:140px;--hand-ov:-26px;--hand-pad:34px;--banner:17px;--oppmax:640px}
+}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ddz-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line,rgba(0,229,212,.24));flex-shrink:0}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
@@ -43,14 +56,14 @@
 .ddz-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0}
 .ddz-felt.shake{animation:ddzShake .42s cubic-bezier(.36,.07,.19,.97)}
 @keyframes ddzShake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
-.ddz-opps{display:flex;justify-content:space-around;padding:12px 12px 2px}
+.ddz-opps{display:flex;justify-content:space-around;padding:12px 12px 2px;max-width:var(--oppmax,none);margin:0 auto;width:100%;box-sizing:border-box}
 /* 座位(对手 + 自己) 公共外观 */
-.ddz-seat{display:flex;flex-direction:column;align-items:center;gap:3px;width:104px;position:relative}
-.ddz-avr{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;
+.ddz-seat{display:flex;flex-direction:column;align-items:center;gap:3px;width:var(--seatw,104px);position:relative}
+.ddz-avr{width:var(--av,52px);height:var(--av,52px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;
   background:transparent;transition:background .15s}
 .ddz-seat.turn .ddz-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .ddz-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:23px;background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
+  font-size:var(--avf,23px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .ddz-seat.turn .ddz-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
 .ddz-seat.landlord .ddz-avr .av::after{content:'👑';position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:15px}
 .ddz-seat .nm{font-size:11px;color:var(--sub);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -64,7 +77,7 @@
 .ddz-say.show{opacity:1}
 /* 中央出牌区 */
 .ddz-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:4px 16px;min-height:120px;position:relative}
-.ddz-turnbanner{font-size:13px;letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
+.ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
 .ddz-turnbanner.mine{color:var(--accent);font-weight:800;font-size:15px;text-shadow:var(--glow-cyan)}
 .ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
 .ddz-turnbanner .clk.urgent{color:var(--magenta,#ff2d8e);animation:ddzBlink .6s steps(2,start) infinite}
@@ -80,18 +93,18 @@
 .ddz-boom{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:40px;font-weight:900;letter-spacing:.05em;
   color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:ddzBoom .7s ease-out forwards}
 @keyframes ddzBoom{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
-/* 卡牌 */
-.card{width:44px;height:62px;border-radius:7px;background:#fff;position:relative;flex:none;
+/* 卡牌 (尺寸/字号走 --cw/--ch/--cn... 变量, 大屏媒体查询整体放大) */
+.card{width:var(--cw,44px);height:var(--ch,62px);border-radius:7px;background:#fff;position:relative;flex:none;
   box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:'Arial Narrow',Arial,sans-serif}
 .card.red{color:#e0263e}.card.blk{color:#1a1e28}
-.card .cn{position:absolute;top:3px;left:4px;font-size:15px;font-weight:800;line-height:1;text-align:center}
-.card .cs{position:absolute;top:18px;left:5px;font-size:12px;line-height:1}
-.card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:25px;opacity:.92}
-.card.joker .cc{font-size:19px}
+.card .cn{position:absolute;top:3px;left:4px;font-size:var(--cn,15px);font-weight:800;line-height:1;text-align:center}
+.card .cs{position:absolute;top:18px;left:5px;font-size:var(--cs,12px);line-height:1}
+.card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,25px);opacity:.92}
+.card.joker .cc{font-size:calc(var(--cc,25px) * .76)}
 .card.joker.big{background:linear-gradient(150deg,#fff,#ffe9b8)}
 .card.joker.small{background:linear-gradient(150deg,#fff,#e8ecff)}
 .card.back{background:repeating-linear-gradient(45deg,#243056,#243056 5px,#1a2440 5px,#1a2440 10px);border:1px solid #3a4a80}
-.card.mini{width:28px;height:40px}.card.mini .cn{font-size:11px}.card.mini .cs{font-size:8px;top:13px}.card.mini .cc{font-size:15px}
+.card.mini{width:var(--cmw,28px);height:var(--cmh,40px)}.card.mini .cn{font-size:11px}.card.mini .cs{font-size:8px;top:13px}.card.mini .cc{font-size:15px}
 /* 我的座位标(手牌上方左侧) */
 .ddz-me{display:flex;align-items:center;gap:9px;padding:4px 14px 0}
 .ddz-me .ddz-seat{flex-direction:row;width:auto;gap:8px}
@@ -101,8 +114,8 @@
 .ddz-me .meta .nm{max-width:150px}
 /* 手牌扇形 */
 .ddz-hand-wrap{padding:2px 10px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
-.ddz-hand{display:flex;justify-content:center;padding:24px 0 6px;min-height:92px;flex-wrap:nowrap}
-.ddz-hand .card{margin-left:-20px;transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center}
+.ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap}
+.ddz-hand .card{margin-left:var(--hand-ov,-20px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center}
 .ddz-hand .card:first-child{margin-left:0}
 .ddz-hand.locked .card{cursor:default}
 .ddz-hand .card.sel{transform:translateY(-18px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent)}
@@ -136,6 +149,10 @@
   border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;
   opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center}
 .ddz-toast.show{opacity:1}
+/* 胜利彩带: 顶部撒下一排 emoji, 各自随机横移+旋转飘落, 1.4s 后自清(showOver 里生成) */
+.ddz-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
+.ddz-confetti i{position:absolute;top:-8%;font-size:20px;animation:ddzFall linear forwards;will-change:transform,opacity}
+@keyframes ddzFall{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(115%) rotate(var(--r,540deg));opacity:0}}
 `;
     document.head.appendChild(s);
   }
@@ -172,6 +189,14 @@
     let selected = new Set();     // 选中的 card id
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
+
+    // ── 音效 + 触感(复用聊天室 EhSfx 合成器; 未加载则静默, 全程 try/catch 不打断牌局) ──
+    function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
+    function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
+    let dealAnim = true;          // 下一次 renderHand 播发牌错峰入场(开局/重发/再来一局各触发一次)
+    let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
+    let lastMyTurn = false;       // "轮到我"上升沿: 只在刚轮到时提示音+震动, 不每帧响
+    sfx('arrive');                // 开桌一声
 
     // 定时器:AI 行动 + 回合倒计时(环 + 到点兜底)
     let aiTimer = null;
@@ -288,12 +313,30 @@
         // 方向:自己出的从下方飞入, 对手从上方飞入
         els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
         if (Rules.isBomb(lp.parse)) boom(lp.parse.type==='rocket'?'王 炸':'炸 弹');
+        else if (lp.seat!==mySeat) sfx('receive');   // 对手落牌轻响(我自己出牌的 send 音在 doPlay)
       }
     }
     function boom(txt){
+      sfx('boom'); vibrate([12,40,20]);
       els.felt.classList.remove('shake'); void els.felt.offsetWidth; els.felt.classList.add('shake');
       const b = document.createElement('div'); b.className='ddz-boom'; b.textContent='💥 '+txt;
       els.felt.appendChild(b); setTimeout(()=>b.remove(), 750);
+    }
+    // 胜利彩带: 顶部撒 16 片 emoji, 各自随机横位/时长/旋转飘落, 2.2s 后整体自清。
+    function confetti(){
+      const box = document.createElement('div'); box.className='ddz-confetti';
+      const EM = ['🎉','🃏','✨','🎊','⭐','💠'];
+      for (let i=0;i<16;i++){
+        const s = document.createElement('i');
+        s.textContent = EM[Math.floor(secureRand()*EM.length)];
+        s.style.left = (secureRand()*100)+'%';
+        s.style.animationDuration = (1.1+secureRand()*0.7)+'s';
+        s.style.animationDelay = (secureRand()*0.25)+'s';
+        s.style.setProperty('--r', (360+Math.floor(secureRand()*540))+'deg');
+        box.appendChild(s);
+      }
+      els.felt.appendChild(box);
+      setTimeout(()=>box.remove(), 2200);
     }
 
     // ── 我的手牌 ──
@@ -301,9 +344,11 @@
       const myTurn = st.phase==='play' && st.turn===mySeat;
       els.hand.className = 'ddz-hand' + (myTurn?'':' locked');
       els.hand.innerHTML = '';
-      st.players[mySeat].hand.forEach(card=>{
+      const deal = dealAnim; dealAnim = false;   // 只在发牌那一帧错峰入场, 之后普通重绘不动画
+      st.players[mySeat].hand.forEach((card, idx)=>{
         const el = cardEl(card);
         if (selected.has(card.id)) el.classList.add('sel');
+        if (deal){ el.style.animationDelay = (idx*20)+'ms'; el.classList.add('justdealt'); }
         el.addEventListener('click', ()=>{
           if (st.phase!=='play' || st.turn!==mySeat) return;
           if (selected.has(card.id)) selected.delete(card.id); else selected.add(card.id);
@@ -336,6 +381,8 @@
       const seat = st.phase==='bid' ? st.bid.turn : st.turn;
       turnSeatActive = seat;
       const mine = seat===mySeat;
+      if (mine && !lastMyTurn){ sfx('mention'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
+      lastMyTurn = mine;
       turnDur = mine ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS) : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
       turnStart = Date.now();
 
@@ -421,19 +468,21 @@
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; renderAll(); return; }
       renderAll();
     }
     function doPlay(){
       const cards = [...selected].map(findCardById);
       try { var r = Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
+      sfx('send');
       selected.clear(); hintCycle=[];
       renderAll();
       if (r && r.over){ showOver(); return; }
     }
     function doPass(seat){
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
+      if (seat===mySeat) sfx('back');
       say(seat,'不出');
       renderAll();
     }
@@ -508,8 +557,10 @@
           <button class="ddz-btn primary" id="ddzDone">收工</button>
         </div>`;
       els.felt.appendChild(over);
+      if (iWon){ sfx('sparkle'); setTimeout(()=>sfx('bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
+      else { sfx('void'); vibrate(120); }
       over.querySelector('#ddzAgain').addEventListener('click', ()=>{
-        over.remove(); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); hintCycle=[]; lastShownKey=''; renderAll();
+        over.remove(); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){
@@ -519,6 +570,8 @@
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
+      if (lastLord===null && st.landlord!=null) sfx('enter');   // 地主刚揭晓: 一声定音
+      lastLord = st.landlord;
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(onHumanTimeout);
     }
