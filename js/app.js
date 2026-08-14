@@ -138,6 +138,10 @@ function reconcileEmoji(){
 }
 function saveIdentity(){ try{ localStorage.setItem(LS_ID, JSON.stringify(me)); }catch(e){} }
 function paintIdentity(){
+  if(!me) return;
+  // 每次绘制前再做一次临时身份配对校验：登录恢复/异步资料回填可能在首次加载后重新写入 me，
+  // 只在这里校正可由名字推导的临时头像；正式账号头像是用户自定义值，不能被名字覆盖。
+  if(!me.registered && !me.username && !me.email && reconcileEmoji()){ try{ saveIdentity(); }catch(_){} }
   const av=$('#idAv'); if(!av) return;
   av.textContent=me.emoji; av.style.background=me.color+'22';
   av.style.boxShadow=`0 0 24px ${safeColor(me.color)}55, inset 0 0 0 1.5px ${safeColor(me.color)}`; av.style.color=me.color;
@@ -2529,6 +2533,30 @@ function buildGameEl(m){
       +`<div class="gc-tip">想再来一局? 发 <b>/海龟汤</b> 开新的一锅 🍲</div>`;
     return el;
   }
+  // 🃏 斗地主战绩卡: game|ddz|<win|lose>|<lord|peasant>|<delta>|<base>|<mult>|<bombs>|<spring 0/1>|<lordWon 0/1>|<地主名…>
+  //   前 10 段全是枚举/数字(无 |), 地主名放末段并 slice(10).join('|') 兜住名字里的 |。
+  if(ev==='ddz'){
+    const win=p[2]==='win';
+    const role=p[3]==='lord'?'地主':'农民';
+    const delta=parseInt(p[4],10)||0;
+    const base=esc(p[5]||'1');
+    const mult=esc(p[6]||'1');
+    const bombs=parseInt(p[7],10)||0;
+    const spring=p[8]==='1';
+    const lordWon=p[9]==='1';
+    const lordName=esc(p.slice(10).join('|')||'');
+    const c=win?'#22FF95':'#FF5D6C';
+    const el=document.createElement('div'); el.className='game-card ddz-card '+(win?'ddz-win':'ddz-lose');
+    el.style.setProperty('--gc', c);
+    el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🃏</span><span class="gc-kind">斗地主 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">${role}</span><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">分</span></div>`
+      +`<div class="ddz-detail">${lordName?('👑 '+lordName+' 坐庄 · '):''}${lordWon?'地主赢':'农民赢'} · 底分 ${base} ×${mult}${bombs?(' · '+bombs+'炸'):''}${spring?' · 🌸春天':''}</div>`
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-ddz-again="1">🃏 再来一局</button><span class="gc-tip">或发 <b>/斗地主</b></span></div>`;
+    // "再来一局"直接开新局(每张卡各自 onclick, 历史重渲也各自绑定, 不叠监听——避免 #stream 委托增开 addEventListener)
+    const again=el.querySelector('[data-ddz-again]');
+    if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchDoudizhu(); }catch(_){} };
+    return el;
+  }
   return null;
 }
 function buildMsgEl(m, isHistory){
@@ -4610,6 +4638,7 @@ function msgPreview(m){
       if(p[1]==='soup')   return '🐢 海龟汤《'+(p[2]||'')+'》开局';
       if(p[1]==='verdict')return '🐢 主持判定';
       if(p[1]==='reveal') return '🐢 揭晓汤底';
+      if(p[1]==='ddz'){ const w=p[2]==='win'; const d=parseInt(p[4],10)||0; return '🃏 斗地主 · '+(w?'胜':'负')+' '+(d>=0?'+':'')+d+'分'; }
       return '🐢 海龟汤';
     }
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
@@ -5988,10 +6017,30 @@ async function launchDoudizhu(){
   const pick = (souls||[]).filter(s=>s&&s.name).slice(0,2);
   const names   = [me.name||'你', pick[0]?.name || '灵魂·左', pick[1]?.name || '灵魂·右'];
   const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '👾'];
+  // 开局在聊天室留一行(让游戏"触发聊天内容"): 谁开了桌 + 对手是谁。失败静默,不挡开局。
+  try{ sendSystemAct(`开了一桌斗地主 🃏 · 对手 ${names[1]}、${names[2]}`).catch(()=>{}); }catch(_){}
   window.EHDdzGame.open({
     names, avatars,
-    onResult: (res, log, meta)=>{ recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{}); },
+    onResult: (res, log, meta)=>{
+      recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{});
+      postDdzResult(res, names).catch(()=>{});   // 结束后聊天室留一张战绩卡(含"再来一局"入口)
+    },
   });
+}
+// 结束后往聊天室发一张斗地主战绩卡(kind:'game', ddz 事件)。含胜负/角色/得分/倍数/炸弹/春天 + 再来一局入口。
+//   编码见 buildGameEl 的 ddz 分支。走与普通消息同一条本地回显+落库路径(insert 后回填真实 mid 供 realtime 去重)。
+async function postDdzResult(res, names){
+  if(!myUid || !curRoom) return;
+  const win  = res.winners.includes(0) ? 'win' : 'lose';
+  const role = (res.landlord===0) ? 'lord' : 'peasant';
+  const lordName = names[res.landlord] || '';
+  const text = ['game','ddz', win, role, res.delta[0], res.base, res.finalMultiplier, res.bombs||0, res.spring?1:0, res.landlordWon?1:0, lordName].join('|');
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(data && el) el.dataset.mid=data.id;   // 回填真实 id → realtime 回声按 mid 去重, 不重复
+  }catch(e){ console.warn('[ddz] post result failed', e); }
 }
 // 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
 async function recordGameResult(game, res, log, names, avatars, souls){
