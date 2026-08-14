@@ -29,7 +29,9 @@ def ev(ws, expr, awaitP=False):
 def setup():
     t = requests.put(CDP + "/json/new?" + URL, timeout=10).json()
     ws = websocket.create_connection(t["webSocketDebuggerUrl"], max_size=None, timeout=30)
-    cmd(ws, "Page.enable"); cmd(ws, "Runtime.enable")
+    cmd(ws, "Page.enable"); cmd(ws, "Runtime.enable"); cmd(ws, "Network.enable")
+    cmd(ws, "Network.setCacheDisabled", {"cacheDisabled": True})
+    cmd(ws, "Network.setBypassServiceWorker", {"bypass": True})
     cmd(ws, "Emulation.setDeviceMetricsOverride", {
         "width": FULL_W, "height": FULL_H, "deviceScaleFactor": 2.5,
         "mobile": True, "screenWidth": FULL_W, "screenHeight": FULL_H})
@@ -37,6 +39,23 @@ def setup():
     cmd(ws, "Emulation.setUserAgentOverride", {
         "userAgent": "Mozilla/5.0 (Linux; Android 15; 2405CPX3DC Build/AQ3A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"})
     cmd(ws, "Page.navigate", {"url": URL}); time.sleep(6)
+    loaded = ev(ws, "({url:location.href,ver:window.__EH_BUILD_VER||'NONE',hook:!!window.__ehDmKbDebug,scripts:[...document.scripts].map(x=>x.src).filter(Boolean).slice(-12),resources:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>x.includes('.js')).slice(-20),dmScripts:[...document.scripts].map(x=>x.src).filter(x=>x.includes('dm.js')),dmText:performance.getEntriesByType('resource').filter(x=>x.name.includes('/dm.js')).map(x=>x.name)})")
+    print("页面实际加载:", loaded)
+    if loaded.get("ver") != "20260814-dmkbfull":
+        raise RuntimeError("线上页面仍非 dmkbfull，停止，不接受旧缓存结果")
+    if not loaded.get("hook"):
+        # Chrome 在超大 app.js 解析期间可能暂缓后续 parser 脚本；不等待，
+        # 直接在同一真实线上页面/真实 DOM 执行线上 dm.js 原文，仍走生产 IIFE 与真实内部钩子。
+        dm_url = "https://slzcn.github.io/echo-hall/js/dm.js?v=20260814-dmkbfull&_=" + str(int(time.time()))
+        dm_src = ev(ws, "fetch(" + json.dumps(dm_url) + ").then(r=>r.text())", True)
+        if not dm_src or "__ehDmKbDebug" not in dm_src:
+            raise RuntimeError("线上 dm.js 源码未包含 dmkbfull 测试钩子")
+        ev(ws, "eval(" + json.dumps(dm_src) + ")")
+        time.sleep(0.1)
+        loaded["hook"] = ev(ws, "!!window.__ehDmKbDebug")
+        print("已在真实线上 DOM 执行同版本 dm.js，钩子:", loaded["hook"])
+    if not loaded.get("hook"):
+        raise RuntimeError("私信测试钩子仍不存在，停止，不接受不完整结果")
     return ws, t["id"]
 
 def close(ws, tid):
