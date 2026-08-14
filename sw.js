@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v289-20260814-kbstrategy';
+const SW_VERSION = 'eh-sw-v290-20260814-ddz1';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -30,7 +30,7 @@ function isVendorLib(url) {
 const JS_CACHE = 'eh-js-v1';
 function isVersionedJs(url) {
   return url.origin === self.location.origin
-    && /\/js\/[\w-]+\.js$/.test(url.pathname)
+    && /\/js\/(?:[\w-]+\/)*[\w-]+\.js$/.test(url.pathname)
     && /[?&]v=/.test(url.search);
 }
 // 命中即返, miss 下载存入, 并顺手删掉【同一 pathname 的旧指纹】条目(避免缓存无限膨胀)

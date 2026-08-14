@@ -2010,7 +2010,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260814-kbstrategy';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260814-ddz1';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2457,7 +2457,13 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </script>
 <script src="./js/config.js?v=20260814-roombgm5"></script>
 <script src="./js/config-runtime.js?v=20260802-entryFreezeFix"></script>
-<script src="./js/app.js?v=20260814-imegap39"></script>
+<!-- 斗地主小游戏引擎(纯函数内核,客户端与未来 Edge 共用同一份) -->
+<script src="./js/games/deck.js?v=20260814-ddz1"></script>
+<script src="./js/games/ddz-rules.js?v=20260814-ddz1"></script>
+<script src="./js/games/ddz-engine.js?v=20260814-ddz1"></script>
+<script src="./js/games/ddz-ai.js?v=20260814-ddz1"></script>
+<script src="./js/games/game-ui.js?v=20260814-ddz1"></script>
+<script src="./js/app.js?v=20260814-ddz1"></script>
 <script src="./js/keyboard.js?v=20260814-imegap39"></script>
 <script src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script src="./js/dm.js?v=20260814-dmkbfull"></script>

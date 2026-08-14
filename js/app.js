@@ -5924,6 +5924,7 @@ const SLASH_CMDS=[
   {c:'/bgm库', d:'/bgm库 → 查看我的 BGM 曲库'},
   {c:'/胶囊', d:'/胶囊 7天 想说的话 → 封存进时间胶囊，到期由灵魂在房里念出'},
   {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
+  {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -5948,6 +5949,9 @@ async function handleSlash(text){
   if(cmd==='/胶囊库'||cmd==='/我的胶囊'){
     await showMyCapsules(); return true;
   }
+  if(cmd==='/斗地主'||cmd==='/ddz'||cmd==='/doudizhu'){
+    await launchDoudizhu(); return true;
+  }
   if(cmd==='/bgm切换'){
     if(!arg){ await showMyBgmLibrary(); return true; }
     await switchMyBgm(arg); return true;
@@ -5968,6 +5972,46 @@ async function handleSlash(text){
   }
   return false; // 非命令，按普通消息发
 }
+
+// ── 斗地主:唤起牌桌浮层。两家 AI 用房里的灵魂居民命名/头像(没有则用默认)。──
+async function launchDoudizhu(){
+  if(!window.EHDdzGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(!curRoom){ toast('先进一个房间再开局'); return; }
+  // 取房里灵魂当对手(公开信息:灵魂本就是房间住民)
+  let souls=[];
+  try{ souls = await prefetchSouls(curRoom.id); }catch(_){}
+  const pick = (souls||[]).filter(s=>s&&s.name).slice(0,2);
+  const names   = [me.name||'你', pick[0]?.name || '灵魂·左', pick[1]?.name || '灵魂·右'];
+  const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '👾'];
+  window.EHDdzGame.open({
+    names, avatars,
+    onResult: (res, log, meta)=>{ recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{}); },
+  });
+}
+// 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
+async function recordGameResult(game, res, log, names, avatars, souls){
+  if(!myUid || !curRoom) return;
+  const soulUids = (souls||[]).map(s=>s&&s.user_id).filter(Boolean);
+  const players = [0,1,2].map(seat=>({
+    seat, name:names[seat], is_ai: seat!==0,
+    uid: seat===0 ? myUid : (soulUids[seat-1]||null),
+    role: seat===res.landlord ? 'landlord' : 'peasant',
+  }));
+  const row = {
+    game, room_id:curRoom.id, room_name:curRoom.name||null,
+    seed: log[0] && log[0].seed || null,
+    players, winner_seats:res.winners, loser_seats:res.losers,
+    landlord_seat:res.landlord, landlord_won:res.landlordWon,
+    score: res.score, final_multiplier:res.finalMultiplier, spring:!!res.spring, bombs:res.bombs,
+    my_uid: myUid, my_seat:0, my_delta:res.delta[0], my_won:res.winners.includes(0),
+    is_ai: players.map(p=>p.is_ai), is_ranked:false,
+    moves: log,           // 回看数据源(transition log)
+    ended_at: new Date().toISOString(),
+  };
+  try{ await sb.from('eh_game_results').insert(row); }
+  catch(e){ console.warn('[ddz] record result failed', e); }
+}
+
 async function sendSystemAct(text){
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'act'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
