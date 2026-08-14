@@ -51,7 +51,10 @@
 .gd-partner{display:flex;justify-content:center;padding:8px 8px 0}
 .gd-mid{flex:1;display:flex;align-items:stretch;min-height:0}
 .gd-side{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 4px;flex:none}
-.gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative}
+.gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative;isolation:isolate}
+.gd-center::before{content:'';position:absolute;left:2%;right:2%;top:8%;bottom:8%;border-radius:50%/42%;
+  background:radial-gradient(ellipse at center,rgba(0,229,212,.07),rgba(0,229,212,.02) 55%,transparent 72%);
+  border:1px solid rgba(0,229,212,.07);z-index:-1;pointer-events:none}
 /* 座位 */
 .gd-seat{display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,82px);position:relative}
 .gd-avr{width:var(--av,42px);height:var(--av,42px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;background:transparent;transition:background .15s}
@@ -67,6 +70,9 @@
 .gd-tag{font-size:9px;letter-spacing:.06em;padding:0 5px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
 .gd-tag.mate{color:var(--accent);border-color:var(--accent)}
 .gd-tag.rank{color:var(--amber);border-color:var(--amber);font-weight:700}
+.gd-tag.alarm{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);font-weight:800;animation:gdBlink .7s steps(2,start) infinite}
+.gd-seat.alarm .cnt b{color:var(--magenta,#ff2d8e)}
+.gd-seat.alarm .gd-avr .av{border-color:var(--magenta,#ff2d8e);box-shadow:0 0 10px rgba(255,45,142,.5)}
 .gd-say{position:absolute;top:48px;font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
 .gd-say.show{opacity:1}
 .gd-mini-hand{display:flex;margin-top:3px}
@@ -116,7 +122,7 @@
 .gd-me .meta{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
 /* 手牌 */
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
-.gd-hand{display:flex;justify-content:center;flex-wrap:wrap;padding:var(--hand-pad,16px) 0 4px;min-height:78px}
+.gd-hand{display:flex;justify-content:center;flex-wrap:nowrap;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
 .gd-hand .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px}
 .gd-hand .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
@@ -133,6 +139,8 @@
 .gd-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .gd-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .gd-btn.ghost{background:transparent;color:var(--sub)}
+.gd-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
+.gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
 /* 结算 */
 .gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:rgba(4,6,12,.86);backdrop-filter:blur(3px);animation:gdRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
@@ -154,6 +162,24 @@
   }
 
   const LVL_LABEL = (lvl)=> Deck.RANK_LABEL[lvl===2?15:lvl] || String(lvl);
+  // 选牌牌型中文名(选牌即时反馈, 对标大厂"出 · 顺子"体验)
+  function typeLabel(p){
+    if(!p) return '';
+    switch(p.type){
+      case 'single': return '单张';
+      case 'pair': return '对子';
+      case 'trio': return '三张';
+      case 'fullhouse': return '三带二';
+      case 'straight': return '顺子';
+      case 'pairline': return '连对';
+      case 'trioline': return '钢板';
+      case 'straightflush': return '同花顺';
+      case 'jokerbomb': return '天王炸';
+      case 'bomb': return (p.size||4)+'炸';
+      default: return '';
+    }
+  }
+  const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
 
   function cardEl(card, level, opts){
     opts = opts || {};
@@ -243,8 +269,38 @@
       if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1500);
     }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
-    function close(){ clearTimers(); room.remove(); }
+    const onResize = ()=>layoutHand();
+    function close(){ clearTimers(); window.removeEventListener('resize', onResize); room.remove(); }
     $('#gdX').addEventListener('click', close);
+    window.addEventListener('resize', onResize);
+
+    // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
+    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null;
+    function handCardAt(x,y){ const el=document.elementFromPoint(x,y); if(!el) return null; const c=el.closest('.card'); return (c && els.hand.contains(c)) ? c : null; }
+    function applyPaintIdx(i){
+      const c = els.hand.children[i]; if(!c) return;
+      const id = c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);
+      if(paintMode==='select') selected.add(id); else selected.delete(id);
+      c.classList.toggle('sel', selected.has(id));
+    }
+    function paintTo(c){
+      if(!c) return; const idx=+c.dataset.idx;
+      if(paintLastIdx==null) applyPaintIdx(idx);
+      else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
+      paintLastIdx=idx; updatePlayBtn();
+    }
+    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; }
+    els.hand.addEventListener('pointerdown', (e)=>{
+      if(st.phase!=='play' || st.turn!==mySeat) return;
+      const c=handCardAt(e.clientX,e.clientY); if(!c) return;
+      painting=true; paintSeen=new Set(); paintLastIdx=null;
+      paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
+      try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
+      paintTo(c); e.preventDefault();
+    });
+    els.hand.addEventListener('pointermove', (e)=>{ if(painting) paintTo(handCardAt(e.clientX,e.clientY)); });
+    els.hand.addEventListener('pointerup', endPaint);
+    els.hand.addEventListener('pointercancel', endPaint);
 
     // id → card 表(整两副牌重建 lastPlay 用)
     const ALL = {}; Deck.doubleDeck().forEach(c=>ALL[c.id]=c);
@@ -262,12 +318,15 @@
       const isMate = Engine.partnerOf(mySeat)===seat;
       const badge = finishBadge(seat);
       const done = p.hand.length===0;
+      // 剩牌告警: 未出完且 ≤2 张 → 座位报牌(对标大厂残局紧张感)
+      const alarm = st.phase==='play' && !done && p.hand.length<=2;
       const miniHand = (mini && !done) ? `<div class="gd-mini-hand">${Array.from({length:Math.min(p.hand.length,10)}).map(()=>'').join('')}</div>` : '';
       const tags = [];
       if (isMate) tags.push('<span class="gd-tag mate">队友</span>');
       else if (seat!==mySeat) tags.push('<span class="gd-tag">对手</span>');
       if (badge) tags.push(`<span class="gd-tag rank">${badge}</span>`);
-      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}" data-seat="${seat}" style="--p:360">
+      if (alarm) tags.push(`<span class="gd-tag alarm">⚠ 报牌</span>`);
+      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
@@ -331,15 +390,24 @@
       const sorted = Rules.sortHand(st.players[mySeat].hand, st.level);
       sorted.forEach((card, idx)=>{
         const el = cardEl(card, st.level);
+        el.dataset.idx = idx;
         if (selected.has(card.id)) el.classList.add('sel');
         if (deal){ el.style.animationDelay=(idx*11)+'ms'; el.classList.add('justdealt'); }
-        el.addEventListener('click', ()=>{
-          if (st.phase!=='play' || st.turn!==mySeat) return;
-          if (selected.has(card.id)) selected.delete(card.id); else selected.add(card.id);
-          el.classList.toggle('sel'); updatePlayBtn();
-        });
         els.hand.appendChild(el);
       });
+      layoutHand();
+    }
+    // 手牌单排自适应: 牌多时动态收紧叠放, 永远吃满一行不换行(对标大厂手牌扇)
+    function layoutHand(){
+      const cards = els.hand.children;
+      const n = cards.length; if (!n) return;
+      const W = els.hand.clientWidth; if (!W) return;
+      const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 38;
+      // 单排排满: 步距 step 使 cw + (n-1)*step ≤ W; 牌少时封顶给自然扇形叠放
+      let step = n>1 ? (W - cw) / (n - 1) : 0;
+      step = Math.min(step, cw * 0.64);         // 上限: 不过度分散
+      const ov = Math.round(step - cw);          // 负外边距(叠放量)
+      for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
     }
 
     function setBanner(){
@@ -393,6 +461,15 @@
       if (okBtn && st.table.lastPlay && st.table.lastPlay.seat!==mySeat)
         okBtn = Rules.beats(p, st.table.lastPlay.parse, st.level);
       btn.disabled=!okBtn;
+      // 选牌实时牌型反馈: 合法则报牌型, 炸弹按钮变红发光(对标大厂"出·同花顺")
+      const boom = okBtn && isBoomType(p);
+      btn.classList.toggle('boom-ready', !!boom);
+      if (okBtn){
+        const lab = typeLabel(p);
+        btn.innerHTML = boom ? `💥 出 <span class="bt">${lab}</span>` : `出牌 <span class="bt">${lab}</span>`;
+      } else {
+        btn.textContent = '出牌';
+      }
     }
 
     function doPlay(){

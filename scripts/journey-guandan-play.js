@@ -199,4 +199,28 @@ assert(/sfx\('send'\)/.test(ui) && /sfx\('mention'\)/.test(ui) && /sfx\('boom'\)
 assert(/iWon[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
 assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
 
+// ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────
+// (10a) 手牌单排自适应: 动态叠放吃满一行, 永不换行(治"27 张断裂成第二排")
+assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌单排自适应)');
+assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutHand 按可用宽算步距(牌多自动收紧, 单排排满)');
+assert(/\.gd-hand\{[^}]*flex-wrap:nowrap/.test(ui), '手牌 flex-wrap:nowrap(不换行, 杜绝断裂第二排)');
+assert(/function renderHand\(\)[\s\S]{0,700}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
+assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
+  'resize 时重排手牌且关桌时解绑(转屏/分屏自适应, 不泄漏监听)');
+// (10b) 划选: 指针涂抹式多选(治"不能划过连选")
+assert(/pointerdown/.test(ui) && /pointermove/.test(ui) && /pointerup/.test(ui), '手牌绑定 pointer 事件(可拖动)');
+assert(/function paintTo\(/.test(ui) && /applyPaintIdx/.test(ui), '涂抹选牌: 按索引区间填充(拖过整段连选, 快拖不漏牌)');
+assert(/paintMode = selected\.has\([\s\S]{0,40}\? 'deselect' : 'select'/.test(ui), '按下即按当前态决定涂选/涂消(反复拖动可增可减)');
+assert(/\.gd-hand\{[^}]*touch-action:none/.test(ui), '手牌 touch-action:none(拖选不被页面滚动打断)');
+assert(/setPointerCapture/.test(ui), '拖选用 setPointerCapture(拖出牌面也不断)');
+// (10c) 选牌实时牌型反馈 + 炸弹按钮
+assert(/function typeLabel\(/.test(ui) && /同花顺/.test(ui) && /钢板/.test(ui), '选牌牌型中文名映射(单张/对子/顺子/钢板/同花顺/天王炸)');
+assert(/boom-ready/.test(ui) && /isBoomType/.test(ui), '出牌按钮: 炸弹类型变红发光(boom-ready)');
+assert(/btn\.innerHTML = boom \?[\s\S]{0,120}出 <span class="bt">/.test(ui), '出牌按钮报出牌型("出 · 顺子")');
+// (10d) 剩牌告警(残局紧张感)
+assert(/p\.hand\.length<=2/.test(ui) && /gd-tag alarm">⚠ 报牌/.test(ui), '任一玩家 ≤2 张时座位报牌告警');
+assert(/\.gd-seat\.alarm/.test(ui), '报牌座位有告警高亮态(alarm class)');
+// (10e) 牌桌氛围底(治大片空白)
+assert(/\.gd-center::before/.test(ui) && /radial-gradient\(ellipse/.test(ui), '中央有牌桌氛围底(空白变桌面)');
+
 console.log('\n✅ 掼蛋旅程全部通过');
