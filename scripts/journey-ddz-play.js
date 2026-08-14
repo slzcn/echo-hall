@@ -100,4 +100,27 @@ assert(winsForMe>0 && winsForMe<20, '胜负两种结局都出现过(战绩加减
 // ── 反证: 若把 my_delta 记成恒正, 上面输局的断言会红 ──────────
 console.log('✓ 反证覆盖:输局 my_delta 必为负(记分方向不能写死)');
 
+// ── 步骤5: 牌桌 UX 契约(入室化 / 倒计时 / 动效 / 轮次感) ─────
+// 主人四点反馈对应四条不可回退的 UX 断言。UI 无 DOM 环境, 这里做源级契约锁,
+// 防止"改回全屏浮层 / 砍掉倒计时 / 去掉落牌动画 / 看不出轮到谁"再次发生。
+const UI_JS = path.join(__dirname, '..', 'js', 'games', 'game-ui.js');
+const ui = fs.readFileSync(UI_JS, 'utf8');
+
+// (1) 入室化:挂进聊天室 #hall 而非全屏 fixed 黑色浮层
+assert(/getElementById\('hall'\)/.test(ui), '牌桌优先挂进聊天室 #hall(入室牌桌,不是弹层)');
+assert(/\.ddz-room\{position:absolute/.test(ui), '牌桌用 absolute 铺满房间(非 position:fixed 全屏遮罩)');
+assert(!/\.ddz-mask\{position:fixed/.test(ui), '旧的 .ddz-mask 全屏浮层已移除');
+
+// (2) 出牌倒计时:人类回合有时限, 到点自动兜底(与断线托管同源)
+assert(/HUMAN_PLAY_MS/.test(ui) && /HUMAN_BID_MS/.test(ui), '定义人类出牌/叫分回合时限');
+assert(/function armTurn\(/.test(ui) && /onHumanTimeout/.test(ui), '每回合武装倒计时 + 人类超时兜底');
+assert(/超时 · 自动不出/.test(ui) && /超时 · 自动出牌/.test(ui), '到点自动过/自动出(不卡死在等玩家)');
+assert(/requestAnimationFrame\(tick\)/.test(ui), '倒计时环用 rAF 平滑驱动(--p conic 环)');
+
+// (3) 落牌动效 + (4) 轮次感:飞入动画 + 活动席高亮环 + 中央横幅
+assert(/fly-bot/.test(ui) && /fly-top/.test(ui), '出牌有方向性飞入动画(自己下方/对手上方)');
+assert(/ddzBoom|ddz-boom/.test(ui) && /function boom\(/.test(ui), '炸弹/王炸有震屏+爆炸特效');
+assert(/ddz-turnbanner/.test(ui) && /轮到你/.test(ui), '中央横幅明确"轮到谁"(轮到你出牌高亮)');
+assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn class)');
+
 console.log('\n✅ 斗地主旅程全部通过');
