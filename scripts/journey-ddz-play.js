@@ -166,4 +166,11 @@ assert(/function confetti\(\)/.test(ui) && /ddz-confetti/.test(ui), '存在胜�
 assert(/if \(mine && !lastMyTurn\)\{ sfx\('yourturn'\); vibrate/.test(ui), '"刚轮到我"上升沿才提示音+震动(不每帧响)');
 assert(/if \(deal\)\{[\s\S]{0,80}justdealt/.test(ui), '发牌那一帧错峰入场动画(justdealt)');
 
+// ── 步骤9: 座位参数化(联机地基: 真人可坐非 0 席, DOM 槽位绕 mySeat 旋转) ──
+// 治"联机把别人座位画在我的位置/手牌数对不上人"。单机 mySeat=0 时旋转恰为 [1,2], 行为不变。
+assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席)');
+assert(/OPP_SEATS\s*=\s*\[\(mySeat\+1\)%3,\s*\(mySeat\+2\)%3\]/.test(ui), '对手槽位绕 mySeat 相对旋转((me+1)/(me+2))');
+assert(/els\.opps\.innerHTML = OPP_SEATS\.map/.test(ui), 'renderSeats 用旋转后对手槽(非写死[1,2])');
+assert(/isAI:\s*gameIsAI/.test(ui), 'createGame 吃 opts.isAI(host 按座位实况标人/机, 含重发/再来一局)');
+
 console.log('\n✅ 斗地主旅程全部通过');

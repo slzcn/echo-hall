@@ -238,16 +238,18 @@
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[gd] engine not loaded'); return null; }
     injectCSS();
 
-    const mySeat = 0;
+    const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
     const names = opts.names || ['你','下家','对家','上家'];
     const avatars = opts.avatars || ['🙂','🤖','🤝','👾'];
+    // 座位→DOM 槽位: 以 mySeat 为底, 顺时针 下家(右)/对家(上)/上家(左) 相对旋转(单机 mySeat=0 时恰为 1/2/3)
+    const SEAT_R = (mySeat+1)%4, SEAT_T = (mySeat+2)%4, SEAT_L = (mySeat+3)%4;
     // 对局延续态(再来一局用): 队等级 + 上局结果(触发进贡)
     let matchLevels = (opts.match && opts.match.teamLevels) ? opts.match.teamLevels.slice() : [2,2];
     let matchDealer = (opts.match && typeof opts.match.dealerTeam==='number') ? opts.match.dealerTeam : 0;
     let prevResult = (opts.match && opts.match.prevResult) || null;
 
     function newDeal(){
-      return Engine.createGame({ isAI:[false,true,true,true], names,
+      return Engine.createGame({ isAI: opts.isAI || [false,true,true,true], names,
         teamLevels: matchLevels, dealerTeam: matchDealer,
         level: matchLevels[matchDealer], prevResult });
     }
@@ -369,9 +371,9 @@
       </div>`;
     }
     function renderSeats(){
-      els.p2.innerHTML = seatHTML(2);   // 对家/队友(上)
-      els.p3.innerHTML = seatHTML(3);   // 上家(左)
-      els.p1.innerHTML = seatHTML(1);   // 下家(右)
+      els.p2.innerHTML = seatHTML(SEAT_T);   // 对家/队友(上)
+      els.p3.innerHTML = seatHTML(SEAT_L);   // 上家(左)
+      els.p1.innerHTML = seatHTML(SEAT_R);   // 下家(右)
       els.me.innerHTML = seatHTML(mySeat);
       els.lvl.innerHTML = `打 <b>${LVL_LABEL(st.level)}</b> · 我方 ${LVL_LABEL(st.teamLevels[Engine.teamOf(mySeat)])} · 对方 ${LVL_LABEL(st.teamLevels[1-Engine.teamOf(mySeat)])}`;
     }

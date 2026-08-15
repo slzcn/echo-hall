@@ -252,4 +252,13 @@ assert(/function gtLaunchLocal\(/.test(src) && /EHGuandanGame\.open/.test(src), 
 assert(/status==='playing'[\s\S]{0,160}gtEnter/.test(src), '座上真人翻到 playing 自动进牌桌(realtime 驱动)');
 assert(/removeChannel\(gtChan\)/.test(src) && /_gtTables\.clear\(\)/.test(src), '离房清理 gtChan + 座位缓存(不泄漏/不串房)');
 
+// ── 步骤12: 座位参数化(联机地基: 真人可坐非 0 席, DOM 槽位绕 mySeat 旋转) ──
+// 治"联机把别人座位画在我的位置/队友判断错位"。单机 mySeat=0 时旋转恰为 1/2/3, 行为不变。
+assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席)');
+assert(/SEAT_R\s*=\s*\(mySeat\+1\)%4/.test(ui) && /SEAT_T\s*=\s*\(mySeat\+2\)%4/.test(ui) && /SEAT_L\s*=\s*\(mySeat\+3\)%4/.test(ui),
+  '座位槽位绕 mySeat 相对旋转(右+1/上+2(队友)/左+3)');
+assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHTML\(SEAT_R\)/.test(ui),
+  'renderSeats 用旋转后槽位(非写死 1/2/3)');
+assert(/isAI:\s*opts\.isAI/.test(ui), 'newDeal 吃 opts.isAI(host 按座位实况标人/机)');
+
 console.log('\n✅ 掼蛋旅程全部通过');

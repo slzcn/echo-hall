@@ -211,10 +211,13 @@
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
     injectCSS();
 
-    const mySeat = 0;
+    const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
     const names = opts.names || ['你', '灵魂·左', '灵魂·右'];
     const avatars = opts.avatars || ['🙂','🤖','👾'];
-    let st = Engine.createGame({ isAI:[false,true,true], names });
+    const gameIsAI = opts.isAI || [false,true,true];                    // 联机: host 按座位实况标人/机
+    // 对手 DOM 槽位: 以 mySeat 为基, 顺位 (me+1)/(me+2)(单机 mySeat=0 时恰为 1/2)
+    const OPP_SEATS = [(mySeat+1)%3, (mySeat+2)%3];
+    let st = Engine.createGame({ isAI: gameIsAI, names });
     let selected = new Set();     // 选中的 card id
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
@@ -302,7 +305,7 @@
       </div>`;
     }
     function renderSeats(){
-      els.opps.innerHTML = [1,2].map(seatHTML).join('');
+      els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
       els.me.innerHTML = seatHTML(mySeat);
       // 底牌:未定地主时盖着,定了亮出来
       els.bottom.innerHTML = '';
@@ -510,7 +513,7 @@
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
     }
     function doPlay(){
@@ -602,7 +605,7 @@
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       over.querySelector('#ddzAgain').addEventListener('click', ()=>{
-        over.remove(); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
+        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){

@@ -130,6 +130,43 @@ async function main(){
     await ctx.close();
   }
 
+  // ---------- C. 联机座位参数化: 真人坐非 0 席时 DOM 槽位相对旋转 ----------
+  // 单机 mySeat=0 时 底=0/右=1/上=2/左=3; 联机真人可坐 2 席 → 槽位须绕 mySeat 旋转,
+  // 否则会把别人的座位画在"我的位置"、手牌张数对不上人。反"renderSeats 写死 seat 号"回退。
+  {
+    const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true });
+    const page = await ctx.newPage();
+    const errs = []; page.on('pageerror', e => errs.push(e.message));
+    await page.setContent('<!doctype html><meta charset=utf-8>'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+CSSVARS
+      + '#hall{position:relative;width:100%;height:100vh;overflow:hidden}</style><body><div id="hall"></div>', { waitUntil:'load' });
+    for (const f of ['deck.js','guandan-rules.js','guandan-engine.js','guandan-ai.js','guandan-ui.js',
+                     'ddz-rules.js','ddz-engine.js','ddz-ai.js','game-ui.js'])
+      await page.addScriptTag({ content: G(f) });
+    // 掼蛋: 我坐 2 席 → 底=2 右=(2+1)%4=3 上=(2+2)%4=0 左=(2+3)%4=1
+    const gd = await page.evaluate(() => {
+      window.EHGuandanGame.open({ mySeat:2, names:['甲','乙','丙','丁'], avatars:['🅰','🅱','🅲','🅳'], onResult(){} });
+      const ds = sel => { const s=document.querySelector(sel+' .gd-seat'); return s?s.getAttribute('data-seat'):null; };
+      const r = { me:ds('#gdMe'), right:ds('#gdP1'), top:ds('#gdP2'), left:ds('#gdP3') };
+      document.querySelector('.gd-room').remove();
+      return r;
+    });
+    if (gd.me!=='2') bad(`掼蛋 mySeat=2 时底部槽应画 2 席, 实为 ${gd.me}`); else ok('掼蛋非0席: 底部=我(2)');
+    if (gd.right!=='3'||gd.top!=='0'||gd.left!=='1') bad(`掼蛋座位旋转错: 右${gd.right}/上${gd.top}/左${gd.left} (应 3/0/1)`); else ok('掼蛋非0席: 右3/上0(队友)/左1 旋转正确');
+    // 斗地主: 我坐 1 席 → 底=1, 对手=[(1+1)%3, (1+2)%3]=[2,0]
+    const dz = await page.evaluate(() => {
+      window.EHDdzGame.open({ mySeat:1, names:['甲','乙','丙'], avatars:['🅰','🅱','🅲'], onResult(){} });
+      const me = document.querySelector('#ddzMe .ddz-seat'); const opps=[...document.querySelectorAll('#ddzOpps .ddz-seat')];
+      const r = { me: me?me.getAttribute('data-seat'):null, opps: opps.map(o=>o.getAttribute('data-seat')) };
+      document.querySelector('.ddz-room').remove();
+      return r;
+    });
+    if (dz.me!=='1') bad(`斗地主 mySeat=1 时底部槽应画 1 席, 实为 ${dz.me}`); else ok('斗地主非0席: 底部=我(1)');
+    if (dz.opps.join(',')!=='2,0') bad(`斗地主对手旋转错: [${dz.opps}] (应 2,0)`); else ok('斗地主非0席: 对手区=[2,0] 旋转正确');
+    if (errs.length) bad('座位旋转渲染报错: ' + errs.slice(0,2).join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
   if (fails.length) { console.log(`\n❌ 可视化回归 ${fails.length} 项失败`); process.exit(1); }
   console.log('\n✅ 游戏卡/牌桌真实渲染布局回归全部通过');
