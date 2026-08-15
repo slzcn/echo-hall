@@ -339,6 +339,10 @@
       <div class="ddz-toast" id="ddzToast"></div>`;
     mountEl.appendChild(room);
 
+    // F2 边打边聊: 牌桌内嵌聊天坞 + 弹幕(复用 app 注入的房间发送通道/身份; 未注入则不挂)
+    const dock = (opts.chat && root.EHTableChat)
+      ? root.EHTableChat.mount(room, { send: opts.chat.send, me: opts.chat.me }) : null;
+
     const $ = sel => room.querySelector(sel);
     const els = {
       opps:$('#ddzOpps'), felt:$('#ddzFelt'), banner:$('#ddzBanner'), who:$('#ddzWho'), played:$('#ddzPlayed'),
@@ -363,7 +367,7 @@
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
     }
     const onResize = ()=>layoutHand();
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(chip){ chip.remove(); chip=null; } room.remove(); }
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); }
     window.addEventListener('resize', onResize);
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回到牌桌) ──
@@ -839,7 +843,7 @@
     if (isHost && transport && transport.onMove){
       transport.onMove((seat, move)=>applyMove(seat, move));
     }
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, pushSnapshot: snap=>{ if(isGuest){ st=snapToState(snap); renderAll(); if(st.phase==='over') showOver(); } } };
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); }, pushSnapshot: snap=>{ if(isGuest){ st=snapToState(snap); renderAll(); if(st.phase==='over') showOver(); } } };
   }
 
   // ── 小工具 ──

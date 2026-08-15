@@ -323,6 +323,10 @@
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
 
+    // F2 边打边聊: 牌桌内嵌聊天坞 + 弹幕(复用 app 注入的房间发送通道/身份; 未注入则不挂)
+    const dock = (opts.chat && root.EHTableChat)
+      ? root.EHTableChat.mount(room, { send: opts.chat.send, me: opts.chat.me }) : null;
+
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#gdFelt'), p1:$('#gdP1'), p2:$('#gdP2'), p3:$('#gdP3'),
       banner:$('#gdBanner'), who:$('#gdWho'), played:$('#gdPlayed'), me:$('#gdMe'),
@@ -336,7 +340,7 @@
     }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
     const onResize = ()=>layoutHand();
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(chip){ chip.remove(); chip=null; } room.remove(); }
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
     let minimized=false, chip=null;
@@ -774,7 +778,7 @@
 
     renderAll();
     showTributeBanner();
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st };
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
   function rand(a){ return a[Math.floor(secureRand()*a.length)]; }

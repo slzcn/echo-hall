@@ -2085,6 +2085,9 @@ async function subscribeMessages(rid){
       }
       // 灵魂居民消息：兜底标记 is_bot(旧消息该列可能为空)。按 uid 或名字兜底(同名多uid副本)
       if(isSoulUser(m.user_id, m.name)){ m.is_bot=true; }
+      // F2: 有活跃牌局时, 把这条房间消息也喂给牌桌(弹幕横掠绒面 + 坞列表)。
+      //   放在灵魂入队 return 之前 —— 你对面的灵魂说话也要在牌桌上看得见(它就是你的对手)。
+      feedGameRoomMsg(m);
       // ★灵魂文字消息(msg/act)改走渲染队列: 无论 realtime 逐条到还是补拉批量灌, 都由 flusher 一条条节奏吐出,
       //   避免"一口气冒好几条"。入队后本条不再走下面的同步 append(队列内做完全部副作用)。
       if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
@@ -2297,7 +2300,7 @@ function gtLaunchLocal(row){
   const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
   const names=seats.map(s=>s.name||'玩家'); const avatars=seats.map(s=>s.emoji||'🙂');
   const pick=seats.slice(1).filter(s=>s.kind==='soul').map(s=>({user_id:s.uid,name:s.name,emoji:s.emoji}));
-  _ehGame = window.EHGuandanGame.open({ names, avatars,
+  _ehGame = window.EHGuandanGame.open({ names, avatars, chat: ehGameChatBridge(),
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,names,avatars,pick).catch(()=>{});
       postGuandanResult(res,log,names,meta).catch(()=>{});
@@ -6137,6 +6140,20 @@ async function handleSlash(text){
 
 // 当前活跃牌局控制器(斗地主/掼蛋共用单例; 一次只允许一桌)。F1: "返回"折叠不销毁, 再开同类/异类游戏时先把它拉回来。
 let _ehGame = null;
+// F2 边打边聊: 牌桌内聊天坞发消息 → 就是一条正常房间消息(走 eh_messages, 同步进 #stream, 别人也收得到)。
+//   坞自己乐观上屏, 故这里不做 #stream 乐观(realtime 回推时 buildMsgEl 会补进消息流)。
+async function ehTableChatSend(text){
+  text = String(text||'').trim();
+  if(!text || !curRoom || !myUid) return;
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text, kind:'msg' };
+  try{ EhSfx.play('send'); }catch(_){}
+  const { error } = await sb.from('eh_messages').insert(payload);
+  if(error){ console.warn('tableChatSend', error); toast(EH_CONFIG.text.err_sendFail); }
+}
+// 传给牌桌 open() 的聊天桥: 发送通道 + 我的身份(判定"这条是不是我发的")
+function ehGameChatBridge(){ return { send: ehTableChatSend, me: { uid:myUid, name:me.name, emoji:me.emoji, color:me.color } }; }
+// 把一条房间消息喂给当前活跃牌局(弹幕 + 坞列表); 无活跃牌局或不支持则忽略。
+function feedGameRoomMsg(m){ try{ if(_ehGame && _ehGame.onRoomMsg) _ehGame.onRoomMsg(m); }catch(_){} }
 function _restoreActiveGameIfAny(){
   if(document.querySelector('.ddz-room, .gd-room')){
     if(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
@@ -6160,7 +6177,7 @@ async function launchDoudizhu(){
   // 开局在聊天室留一行(让游戏"触发聊天内容"): 谁开了桌 + 对手是谁。失败静默,不挡开局。
   try{ sendSystemAct(`开了一桌斗地主 🃏 · 对手 ${names[1]}、${names[2]}`).catch(()=>{}); }catch(_){}
   _ehGame = window.EHDdzGame.open({
-    names, avatars,
+    names, avatars, chat: ehGameChatBridge(),
     onResult: (res, log, meta)=>{
       recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{});
       postDdzResult(res, names).catch(()=>{});   // 结束后聊天室留一张战绩卡(含"再来一局"入口)
