@@ -126,7 +126,7 @@
     const g = groups(hand, level);
 
     if (!target){
-      return { action:'play', cards: chooseLead(hand, level) };
+      return { action:'play', cards: chooseLead(hand, level, ctx) };
     }
 
     // 队友控场: 桌面这手是对家出的 → 让牌(除非能一把走完)
@@ -168,7 +168,10 @@
   }
 
   // 首出: 走长牌型清散牌, 留大牌/百搭/炸压轴
-  function chooseLead(hand, level){
+  //   ★残局意识(ctx 可选): 若「对家之外的真对手」已报单(剩 1 张), 领出别甩小单张送他走 ——
+  //     剩 1 张者跟不了任何 ≥2 张牌型(1 张也组不成炸), 优先领非单牌型憋住他;
+  //     实在只有单张可领, 就领最大的单张(他大概率压不过, 只能过)。
+  function chooseLead(hand, level, ctx){
     let combos = genCombos(hand, level, 0);
     if (!combos.length) combos = genCombos(hand, level, groups(hand,level).wilds.length);
     if (!combos.length) return [hand[hand.length-1]];   // 兜底最小单张
@@ -178,7 +181,18 @@
 
     const order = { straight:0, pairline:0, trioline:0, fullhouse:1, trio:2, pair:3, single:4 };
     const nonBomb = combos.filter(c=>!Rules.isBomb(c.parse));
-    const pool = nonBomb.length ? nonBomb : combos;
+    let pool = nonBomb.length ? nonBomb : combos;
+
+    // 对手报单: 收窄到多张牌型憋死他; 只有单张时改甩最大单张
+    const oppMin = ctx ? minOpponentCards(ctx) : 99;
+    if (oppMin === 1){
+      const multi = pool.filter(c => c.cards.length >= 2);
+      if (multi.length){ pool = multi; }
+      else {
+        const singles = pool.filter(c => c.parse.type==='single');
+        if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
+      }
+    }
     pool.sort((a,b)=>{
       const ra=order[a.parse.type]??9, rb=order[b.parse.type]??9;
       if (ra!==rb) return ra-rb;

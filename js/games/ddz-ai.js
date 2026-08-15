@@ -254,7 +254,10 @@
   }
 
   // 首出策略:走小牌。顺子/连对/飞机 > 三带 > 对 > 单;排除炸弹/王炸/含2的顺。
-  function chooseLead(hand, plays, bombs, rocket){
+  //   ★残局意识(ctx 可选): 若「真对手」已报单(剩 1 张), 领出别甩小单张送他走脱 ——
+  //     剩 1 张者跟不了任何 ≥2 张的牌型, 优先领非单牌型把他憋住;
+  //     实在只有单张可领, 就领最大的单张(他大概率压不过, 只能过)。
+  function chooseLead(hand, plays, bombs, rocket, ctx){
     if (!plays.length){
       // 只剩炸弹/王炸也得出
       if (bombs.length) return bombs[0];
@@ -264,12 +267,24 @@
     // 若能一把走完(手牌全出) → 直接出
     const finisher = plays.find(p => p.cards.length === hand.length);
     if (finisher) return finisher.cards;
+
+    // 对手报单: 收窄候选到多张牌型(憋死剩 1 张的对手); 只有单张时改甩最大单张
+    const oppMin = ctx ? minOpponentCards(ctx) : 99;
+    let pool = plays;
+    if (oppMin === 1){
+      const multi = plays.filter(p => p.cards.length >= 2);
+      if (multi.length){ pool = multi; }
+      else {
+        const singles = plays.filter(p => p.parse.type==='single');
+        if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
+      }
+    }
     // 优先长牌型(顺子/连对/飞机)清散牌,同类取点最小
     const rank = (p)=>{
       const order = { straight:0, pairs:0, plane:0, plane_single:0, plane_pair:1, trio_single:2, trio_pair:2, trio:3, pair:4, single:5 };
       return (order[p.parse.type] ?? 9);
     };
-    plays.sort((a,b)=>{
+    pool.sort((a,b)=>{
       const ra=rank(a), rb=rank(b);
       if (ra!==rb) return ra-rb;
       // 同类:长的优先(清更多牌),再点小优先
@@ -277,8 +292,8 @@
       return a.parse.key - b.parse.key;
     });
     // 避免首出就甩 2/王的单张(留着控场):若最优是大单张且有别的选择,换
-    const nonBig = plays.filter(p=>!(p.parse.type==='single' && p.parse.key>=15));
-    return (nonBig[0] || plays[0]).cards;
+    const nonBig = pool.filter(p=>!(p.parse.type==='single' && p.parse.key>=15));
+    return (nonBig[0] || pool[0]).cards;
   }
 
   // 提示排序: 产出 best-first 的可出牌序列(每项 card[]), UI 的「提示」直接吃它。

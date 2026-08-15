@@ -108,5 +108,30 @@ const LV = 2; // 打 2, 避免 ♥2 百搭干扰(测试牌里不放 ♥2)
   ok(new Set(keys).size===keys.length, '提示序列无重复项');
 }
 
+// ── ⑪ 残局意识: 真对手报单(剩1张)时领出全散单 → 甩最大单张憋他, 不送小单 ──
+{
+  // 我 seat0(队 0/2), 对手 seat1/3; seat1 报单(剩1张)。手全散单 4/7/10/K
+  const hand = [C(4,'♠'), C(7,'♣'), C(10,'♦'), C(13,'♠')];
+  const r1 = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,1,4,4], level:LV });
+  ok(r1.cards.length===1 && r1.cards[0].rank===13, '残局全单张·对手报单: 领最大单张(K)憋他, 不送最小单(4)');
+  // 无人报单 → 照常领最小单张清散牌
+  const r2 = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,5,4,4], level:LV });
+  ok(r2.cards.length===1 && r2.cards[0].rank===4, '残局全单张·无人报单: 照常领最小单张(4)清散牌');
+}
+
+// ── ⑫ 残局意识: 有对子可领·对手报单 → 优先领非单牌型(报单者跟不了≥2张) ──
+{
+  const hand = [C(5,'♠'), C(8,'♣'), C(11,'♠'), C(11,'♥')]; // 散单5/8 + 一对J
+  const r = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,1,4,4], level:LV });
+  ok(r.cards.length>=2, '残局有对子·对手报单: 领非单牌型(≥2张)憋住报单者');
+}
+
+// ── ⑬ 队友报单不误判为对手(队友 seat2 剩1张不改变领出策略) ──
+{
+  const hand = [C(4,'♠'), C(7,'♣'), C(10,'♦'), C(13,'♠')];
+  const r = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,4,1,4], level:LV });
+  ok(r.cards[0].rank===4, '队友报单不算对手: 照常领最小单张(4)');
+}
+
 console.log(`\n掼蛋提示智能: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

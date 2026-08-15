@@ -96,5 +96,32 @@ function sameSet(a,b){ return ids(a)===ids(b); }
   ok(new Set(keys).size===keys.length, '提示序列无重复项');
 }
 
+// ── ⑪ 残局意识: 真对手报单(剩1张)时领出, 全是单张 → 甩最大单张憋他, 不送小单 ← 主人报的"我剩1张AI还出小单张"──
+{
+  // 地主(seat0)手里全散单: 3/6/9/K; 农民 seat1 报单(剩1张)
+  const hand = [c(3),c(6),c(9),c(13)];
+  const r1 = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,1,5], landlord:0, iAmLandlord:true });
+  ok(r1.action==='play' && r1.cards.length===1 && r1.cards[0].rank===13, '残局全单张·对手报单: 领最大单张(K)憋他, 不送最小单(3)');
+  // 无人报单(都剩5张) → 照常领最小单张清散牌
+  const r2 = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,5,5], landlord:0, iAmLandlord:true });
+  ok(r2.action==='play' && r2.cards.length===1 && r2.cards[0].rank===3, '残局全单张·无人报单: 照常领最小单张(3)清散牌');
+}
+
+// ── ⑫ 残局意识: 有多张牌型可领时·对手报单 → 优先领非单牌型(剩1张跟不了) ──
+{
+  // 手牌: 一对7 + 散单 4/10; 农民 seat1 报单
+  const hand = [c(4), c(7,'♠'), c(7,'♥'), c(10)];
+  const r = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,1,5], landlord:0, iAmLandlord:true });
+  ok(r.action==='play' && r.cards.length>=2, '残局有对子·对手报单: 领非单牌型(≥2张)憋住报单者');
+}
+
+// ── ⑬ 队友报单不误判为对手(我是农民, 队友农民剩1张不该改变领出策略) ──
+{
+  // 我 seat1 农民, 地主 seat0; 队友 seat2 农民报单(剩1) → 队友不是对手, minOpp 只看地主
+  const hand = [c(3),c(6),c(9),c(13)];
+  const r = AI.decide({ seat:1, hand, tableParse:null, lastSeat:null, handsLeft:[5,4,1], landlord:0, iAmLandlord:false });
+  ok(r.action==='play' && r.cards[0].rank===3, '队友(农民)报单不算对手: 照常领最小单张');
+}
+
 console.log(`\n斗地主提示智能: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
