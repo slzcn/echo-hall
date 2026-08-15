@@ -1116,6 +1116,8 @@ let curRoom = null;        // {id,name,emoji,kind,topic,role}
 let msgChan = null;        // Realtime postgres_changes 频道
 let _tailPollTimer = null; // 房内周期兜底轮询: 补住 realtime socket 僵死(切后台/弱网/降频)期间漏投的消息
 let presChan = null;       // Realtime presence 频道
+let gtChan = null;         // Realtime 联机牌桌频道(eh_game_tables 座位/局态变化)
+const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
 let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
@@ -1577,6 +1579,7 @@ async function enterRoom(room){
     const [memRes] = await Promise.allSettled([
       sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
       setupPresence(room),
+      setupGameTables(room),           // 联机牌桌座位实时同步
       refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
       loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions())           // 拉本房灵魂居民(展示层)
     ]);
@@ -1607,7 +1610,7 @@ async function enterRoom(room){
   if(await joinAsMember(room)===false) return;
   const tasks=[ histP || loadHistory(true),
     sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-    setupPresence(room),
+    setupPresence(room), setupGameTables(room),
     loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions()) ];
   // allSettled: 单个失败不拖垮全流程,不再因一次抖动卡死在"连接中"
   const results = await Promise.allSettled(tasks);
@@ -2221,6 +2224,83 @@ async function setupPresence(room){
   // 心跳 + 清理定时器
   heartbeatTimer = setInterval(async()=>{ beat().catch(()=>{}); refreshPresence().catch(()=>{}); }, 15000);
 }
+
+// ───────── 真人联机牌桌(phase-1 轻联机): 座位大厅 + realtime 同步 ─────────
+// 座位/局态存 eh_game_tables, 一切写走 eh_gt_* RPC。牌桌卡是一条 kind:'game' 消息(text=game|gt|id|game),
+// 卡的座位按【实时 table 行】渲染: realtime 推 → gtRenderCard 找到 [data-gt-id] 就地重绘(不新增监听)。
+async function setupGameTables(room){
+  if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
+  _gtTables.clear();
+  gtChan = sb.channel('room-gt:'+room.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'eh_game_tables',filter:'room_id=eq.'+room.id}, p=>{
+      const row=p.new; if(!row || !curRoom || curRoom.id!==room.id) return;
+      const prev=_gtTables.get(row.id);
+      _gtTables.set(row.id,row); gtRenderCard(row);
+      // 本人在座且刚翻到 playing → 座上真人自动进牌桌(host 已在 gtStart 里开过, 这里管其他人)
+      if(row.status==='playing' && (!prev||prev.status!=='playing') && row.host_uid!==myUid){
+        const mine=(row.seats||[]).some(s=>s.kind==='human'&&s.uid===myUid);
+        if(mine) gtEnter(row.id);
+      }
+    }).subscribe();
+  try{ const {data}=await sb.from('eh_game_tables').select('*').eq('room_id',room.id).in('status',['lobby','playing']);
+    (data||[]).forEach(r=>{ _gtTables.set(r.id,r); gtRenderCard(r); }); }catch(_){}
+}
+function gtCtx(row){
+  const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
+  return { myUid, hostName:(seats[0]&&seats[0].name)||'',
+    souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
+    actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
+      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
+}
+function gtRenderInto(el,row){ if(window.EHTable) try{ EHTable.renderLobby(el,row,gtCtx(row)); }catch(_){} }
+function gtRenderCard(row){ const el=document.querySelector(`[data-gt-id="${row.id}"]`); if(el) gtRenderInto(el,row); }
+async function gtEnsureRow(id){
+  if(_gtTables.has(id)) return _gtTables.get(id);
+  try{ const {data}=await sb.from('eh_game_tables').select('*').eq('id',id).maybeSingle();
+    if(data){ _gtTables.set(id,data); return data; } }catch(_){}
+  return null;
+}
+function gtErr(e){ const m=(e&&e.message)||'';
+  if(/seat taken/.test(m)) return '这个座位被占了';
+  if(/host only/.test(m)) return '只有房主能操作';
+  if(/not joinable/.test(m)) return '牌局已开始，进不去了';
+  if(/already started/.test(m)) return '已经开始啦';
+  if(/not authenticated/.test(m)) return '先登录再上桌';
+  return '操作失败，稍后再试'; }
+async function gtRpc(fn,args){
+  try{ const {data,error}=await sb.rpc(fn,args); if(error) throw error;
+    if(data && data.id){ _gtTables.set(data.id,data); gtRenderCard(data); } return data;
+  }catch(e){ toast(gtErr(e)); return null; }
+}
+async function gtJoin(id,seat){ await gtRpc('eh_gt_join',{p_table:id,p_seat:seat,p_name:me.name,p_emoji:me.emoji}); }
+async function gtLeave(id){ await gtRpc('eh_gt_leave',{p_table:id}); }
+async function gtSeatSoul(id,seat,soul){ await gtRpc('eh_gt_seat_soul',{p_table:id,p_seat:seat,p_soul:soul}); }
+async function gtKick(id,seat){ await gtRpc('eh_gt_kick',{p_table:id,p_seat:seat}); }
+async function gtClose(id){ await gtRpc('eh_gt_close',{p_table:id}); }
+async function gtStart(id){
+  let seed=0; try{ seed=crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed=Math.floor(Math.random()*4294967296); }
+  const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
+  if(row) gtLaunchLocal(row);
+}
+// host 开局: 在本机跑引擎, 用真实座位名单当四家(phase-1 host 权威; 联机对战下一步接入)。
+function gtLaunchLocal(row){
+  if(!window.EHGuandanGame || document.querySelector('.gd-room')) return;
+  const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
+  const names=seats.map(s=>s.name||'玩家'); const avatars=seats.map(s=>s.emoji||'🙂');
+  const pick=seats.slice(1).filter(s=>s.kind==='soul').map(s=>({user_id:s.uid,name:s.name,emoji:s.emoji}));
+  window.EHGuandanGame.open({ names, avatars,
+    onResult:(res,log,meta)=>{
+      recordGuandanResult(res,log,names,avatars,pick).catch(()=>{});
+      postGuandanResult(res,log,names,meta).catch(()=>{});
+      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+    } });
+}
+function gtEnter(id){
+  const row=_gtTables.get(id); if(!row) return;
+  if(row.host_uid===myUid){ gtLaunchLocal(row); return; }
+  toast('房主已开局 · 联机对战即将接入');
+}
+
 async function beat(extra){
   if(!curRoom) return;
   if(!myUid){ await ensureAuth(); if(!myUid) return; } // 兜底：myUid 未就绪先补登录
@@ -2497,6 +2577,16 @@ function buildGameEl(m){
   const ev=p[1];
   const host=esc(m.name||'主持');
   const hostColor=safeColor(m.color, '#00E5D4');
+  // 🎴/🃏 联机牌桌卡: game|gt|<table_id>|<game>。座位以实时 eh_game_tables 行为准(不塞进文本)。
+  if(ev==='gt'){
+    const tableId=p[2];
+    const el=document.createElement('div'); el.className='game-card gt-card'; el.dataset.gtId=tableId;
+    el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--sub,#86cbc6)">牌桌加载中…</span></div>';
+    const row=_gtTables.get(tableId);
+    if(row){ gtRenderInto(el,row); }
+    else { gtEnsureRow(tableId).then(r=>{ if(r) gtRenderCard(r); }); }
+    return el;
+  }
   if(ev==='soup'){
     // 兜底: 汤面是易含 | 的自由文本, 若被切成多段(p.length>5), 末段=难度, 中间全部并回汤面。
     const title=esc(p[2]||'无题之汤');
@@ -6101,22 +6191,28 @@ async function recordGameResult(game, res, log, names, avatars, souls){
 async function launchGuandan(){
   if(!window.EHGuandanGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
-  // 防重复开桌:已有牌局在进行就不叠第二张(否则两套引擎+定时器同时跑)
   if(document.querySelector('.gd-room')){ toast('牌局进行中，先返回再开新局'); return; }
-  let souls=[];
-  try{ souls = await prefetchSouls(curRoom.id); }catch(_){}
-  const pick=(souls||[]).filter(s=>s&&s.name).slice(0,3);
-  // 座位: 0=我 1=下家 2=对家/队友 3=上家
-  const names   = [me.name||'你', pick[0]?.name || '灵魂·下家', pick[1]?.name || '灵魂·队友', pick[2]?.name || '灵魂·上家'];
-  const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '🤝', pick[2]?.emoji || '👾'];
-  try{ sendSystemAct(`开了一桌掼蛋 🎴 · 队友 ${names[2]} · 对手 ${names[1]}、${names[3]}`).catch(()=>{}); }catch(_){}
-  window.EHGuandanGame.open({
-    names, avatars,
-    onResult: (res, log, meta)=>{
-      recordGuandanResult(res, log, names, avatars, pick).catch(()=>{});
-      postGuandanResult(res, log, names, meta).catch(()=>{});
-    },
-  });
+  // 开一张【联机牌桌】(幂等: 同房已有活桌则复用同一张, 不叠第二桌)。房里其他真人可点卡加入。
+  let row=null;
+  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'guandan',p_name:me.name,p_emoji:me.emoji});
+    if(error) throw error; row=data; }
+  catch(e){ toast('开桌失败，稍后再试'); return; }
+  if(!row){ toast('开桌失败'); return; }
+  _gtTables.set(row.id,row);
+  // 该桌还没牌桌卡 → host 发一张到聊天室(全房可见可加入); 已有则滚动定位过去。
+  if(row.host_uid===myUid && !row.msg_id){
+    const text=window.EHTable ? EHTable.encode(row.id,'guandan') : ('game|gt|'+row.id+'|guandan');
+    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+    if(el){ $('#stream').appendChild(el); scrollStream(); }
+    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+    }catch(e){ console.warn('[gt] post table card failed', e); }
+  } else {
+    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
+    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
+    else toast('本房已有一桌，往上翻找牌桌卡加入');
+  }
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
 async function postGuandanResult(res, log, names, meta){
@@ -6661,6 +6757,8 @@ async function leaveRoom(){
   if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
   if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 离房停兜底轮询
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
+  if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
+  _gtTables.clear();
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
   curRoom=null;

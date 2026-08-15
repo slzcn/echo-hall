@@ -147,8 +147,12 @@ assert(sawLevelUp, '赢队等级随名次上升(升级带入下一副)');
   }
 }
 
-// ── 步骤8: 和聊天融合(开局留痕 + 结束战绩卡 + 再来一局) ───────
-assert(/sendSystemAct\(`开了一桌掼蛋/.test(src), '开局在聊天室留一行(触发聊天内容, 非静默开桌)');
+// ── 步骤8: 和聊天融合(开桌=牌桌卡入室 + 结束战绩卡 + 再来一局) ───────
+// 开桌不再静默/只留一行, 而是开一张【联机牌桌】并把牌桌卡发进聊天室, 全房可见可加入。
+assert(/rpc\('eh_gt_open'/.test(src), '/掼蛋 开桌走 eh_gt_open(建联机牌桌, 非本地单机)');
+assert(/kind:'game'[\s\S]{0,80}buildMsgEl/.test(src) || /text[\s\S]{0,60}EHTable\.encode\(row\.id/.test(src),
+  '开桌把牌桌卡(kind:game, game|gt)发进聊天室(全房可见)');
+assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,220}postGuandanResult\(res,\s*log,\s*names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
 assert(/postGuandanResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
@@ -222,5 +226,28 @@ assert(/p\.hand\.length<=2/.test(ui) && /gd-tag alarm">⚠ 报牌/.test(ui), '�
 assert(/\.gd-seat\.alarm/.test(ui), '报牌座位有告警高亮态(alarm class)');
 // (10e) 牌桌氛围底(治大片空白)
 assert(/\.gd-center::before/.test(ui) && /radial-gradient\(ellipse/.test(ui), '中央有牌桌氛围底(空白变桌面)');
+
+// ── 步骤11: 真人联机牌桌(座位大厅 + 实时同步 + host 权威开局) ────────
+// 治"真人加入不了/开桌是单机"。座位状态存 eh_game_tables, 一切写走 eh_gt_* RPC, 卡按实时行渲染。
+const TN_JS = path.join(__dirname, '..', 'js', 'games', 'table-net.js');
+const tn = fs.readFileSync(TN_JS, 'utf8');
+// (11a) 牌桌卡模块: 编码/解码闭环 + 座位渲染
+assert(/root\.EHTable\s*=/.test(tn), 'table-net 挂出 window.EHTable(牌桌卡模块)');
+assert(/function encode\([\s\S]{0,120}'game','gt'/.test(tn), 'EHTable.encode 产出 game|gt|id|game 文本(与 buildGameEl 解码同序)');
+assert(/function renderLobby\(/.test(tn) && /gt-seat/.test(tn), '存在 renderLobby 渲染 4 席牌桌卡');
+assert(/ctx\.actions\.join\(/.test(tn) && /ctx\.actions\.seatSoul\(/.test(tn) && /ctx\.actions\.start\(/.test(tn),
+  '空位有「加入」/host「邀请灵魂」/「开始」动作(接 ctx.actions)');
+assert(/\.onclick=/.test(tn) && !/addEventListener\(/.test(tn), '卡内按钮用 .onclick(不叠 addEventListener, 护住密度门)');
+// (11b) app.js 接线: 开桌/座位 RPC + realtime 同步 + host 开局
+assert(/'eh_gt_join'/.test(src) && /'eh_gt_leave'/.test(src) && /'eh_gt_seat_soul'/.test(src)
+  && /'eh_gt_kick'/.test(src) && /'eh_gt_start'/.test(src) && /'eh_gt_close'/.test(src),
+  '座位六动作全接 eh_gt_* RPC(join/leave/seat_soul/kick/start/close)');
+assert(/async function setupGameTables\(/.test(src), '进房建 setupGameTables(联机牌桌订阅)');
+assert(/channel\('room-gt:'[\s\S]{0,200}table:'eh_game_tables'/.test(src), 'realtime 订阅 eh_game_tables 座位/局态变化');
+assert(/function gtRenderCard\(/.test(src) && /data-gt-id/.test(src), '座位变化就地重绘牌桌卡(按 data-gt-id 定位, 不新增监听)');
+assert(/if\(ev==='gt'\)/.test(src), "buildGameEl 有 gt 分支(把牌桌卡渲染回来)");
+assert(/function gtLaunchLocal\(/.test(src) && /EHGuandanGame\.open/.test(src), 'host 权威: 开始后本机跑引擎开局(gtLaunchLocal)');
+assert(/status==='playing'[\s\S]{0,160}gtEnter/.test(src), '座上真人翻到 playing 自动进牌桌(realtime 驱动)');
+assert(/removeChannel\(gtChan\)/.test(src) && /_gtTables\.clear\(\)/.test(src), '离房清理 gtChan + 座位缓存(不泄漏/不串房)');
 
 console.log('\n✅ 掼蛋旅程全部通过');
