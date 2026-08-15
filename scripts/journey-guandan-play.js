@@ -261,4 +261,17 @@ assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHT
   'renderSeats 用旋转后槽位(非写死 1/2/3)');
 assert(/isAI:\s*opts\.isAI/.test(ui), 'newDeal 吃 opts.isAI(host 按座位实况标人/机)');
 
+// ── 步骤13: 理牌(一键自动 + 手动拖排, 共用一个按钮) — 提示体验不输腾讯 ──
+// #gdSort 一个按钮: 短按=一键理牌(按级牌大小), 长按=进手动拖排模式自由码牌。
+assert(/id="gdSort"[\s\S]{0,40}理牌/.test(ui), '手牌区有理牌按钮(#gdSort)');
+assert(/function autoSort\(\)/.test(ui) && /function setArrange\(/.test(ui), '一键自动理牌 autoSort + 手动模式切换 setArrange 并存');
+assert(/function handOrder\(\)/.test(ui) && /Rules\.sortHand\(hand,\s*st\.level\)/.test(ui), 'handOrder: 默认按级牌 Rules.sortHand 自动理牌(级牌抬权入序)');
+assert(/if \(customOrder\)/.test(ui), '手动理牌后按玩家排定的 id 顺序摆(customOrder 优先于自动)');
+assert(/if\(arrangeMode\)\{ startReorder\(e\); return; \}/.test(ui), '手动模式下 pointerdown 走拖排而非划选(共用手牌指针管道)');
+assert(/function startReorder\(/.test(ui) && /function moveReorder\(/.test(ui) && /function endReorder\(/.test(ui),
+  '拖排三段: 起拖/移动/落位(复用划选的 pointer 基建)');
+assert(/dropX < r\.left \+ r\.width\/2/.test(ui), '落位按放下点与各牌中线判定插入位(所见即所得)');
+assert(/setArrange\(!arrangeMode\)/.test(ui), '长按≥350ms 切手动理牌模式(与一键共用一个按钮)');
+assert(/customOrder=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一局重置理牌态(不带旧自定义序进新副)');
+
 console.log('\n✅ 掼蛋旅程全部通过');

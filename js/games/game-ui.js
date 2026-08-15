@@ -152,6 +152,15 @@
 .ddz-hand:not(.locked) .card.sel:hover{transform:translateY(-18px)}
 .ddz-hand .card.justdealt{animation:ddzDeal .3s ease}
 @keyframes ddzDeal{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+/* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮 */
+.ddz-hand-wrap{position:relative}
+.ddz-sort{position:absolute;right:10px;top:1px;z-index:6;padding:5px 11px;border-radius:11px;font-size:12px;font-weight:800;
+  border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none}
+.ddz-sort:active{transform:scale(.94)}
+.ddz-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
+.ddz-hand.arranging{touch-action:none}
+.ddz-hand.arranging .card{cursor:grab}
+.ddz-hand.arranging .card.dragging{cursor:grabbing;transition:none;box-shadow:0 12px 24px rgba(0,0,0,.55),0 0 0 2px var(--amber);z-index:50}
 /* 操作条 */
 .ddz-acts{display:flex;gap:10px;justify-content:center;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 .ddz-btn{flex:1;max-width:130px;padding:11px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
@@ -255,7 +264,7 @@
         </div>
       </div>
       <div class="ddz-me" id="ddzMe"></div>
-      <div class="ddz-hand-wrap"><div class="ddz-hand" id="ddzHand"></div></div>
+      <div class="ddz-hand-wrap"><button class="ddz-sort" id="ddzSort" aria-label="理牌">🔀 理牌</button><div class="ddz-hand" id="ddzHand"></div></div>
       <div id="ddzCtrl"></div>
       <div class="ddz-toast" id="ddzToast"></div>`;
     mountEl.appendChild(room);
@@ -283,7 +292,9 @@
       if (actionTimer){ clearTimeout(actionTimer); actionTimer = null; }
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
     }
-    function close(){ clearTimers(); room.remove(); }
+    const onResize = ()=>layoutHand();
+    function close(){ clearTimers(); window.removeEventListener('resize', onResize); room.remove(); }
+    window.addEventListener('resize', onResize);
     $('#ddzX').addEventListener('click', close);
 
     // lastPlay 只存 id,需要一张 id→card 表(用整副牌重建)
@@ -373,16 +384,27 @@
     }
 
     // ── 我的手牌 ──
+    // 摆放顺序: 自动理牌走 Deck.sortHand(与引擎发牌同序); 手动理牌后按玩家排定的 id 顺序摆
+    function handOrder(){
+      const hand = st.players[mySeat].hand;
+      if (customOrder){
+        const pos = new Map(customOrder.map((id,i)=>[id,i]));
+        return hand.slice().sort((a,b)=>(pos.has(a.id)?pos.get(a.id):9999)-(pos.has(b.id)?pos.get(b.id):9999));
+      }
+      return Deck.sortHand ? Deck.sortHand(hand) : hand;
+    }
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat;
-      els.hand.className = 'ddz-hand' + (myTurn?'':' locked');
+      els.hand.className = 'ddz-hand' + (myTurn||arrangeMode?'':' locked') + (arrangeMode?' arranging':'');
       els.hand.innerHTML = '';
       const deal = dealAnim; dealAnim = false;   // 只在发牌那一帧错峰入场, 之后普通重绘不动画
-      st.players[mySeat].hand.forEach((card, idx)=>{
+      handOrder().forEach((card, idx)=>{
         const el = cardEl(card);
+        el.dataset.id = card.id;
         if (selected.has(card.id)) el.classList.add('sel');
         if (deal){ el.style.animationDelay = (idx*20)+'ms'; el.classList.add('justdealt'); }
         el.addEventListener('click', ()=>{
+          if (arrangeMode) return;                          // 手动理牌模式: 点击不选牌(拖动重排)
           if (st.phase!=='play' || st.turn!==mySeat) return;
           const willSel = !selected.has(card.id);
           if (willSel) selected.add(card.id); else selected.delete(card.id);
@@ -392,7 +414,74 @@
         });
         els.hand.appendChild(el);
       });
+      layoutHand();
     }
+    // 手牌单排自适应: 牌多时(开局 17~20 张)动态收紧叠放, 永远吃满一行不换行不溢出屏幕。
+    // 治斗地主原 CSS 固定 --hand-ov 叠放, 17 张在 390px 上两侧溢出、首尾牌跑到屏外点不到。
+    function layoutHand(){
+      const cards = els.hand.children;
+      const n = cards.length; if (!n) return;
+      const W = els.hand.clientWidth; if (!W) return;
+      const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 44;
+      let step = n>1 ? (W - cw) / (n - 1) : 0;
+      step = Math.min(step, cw * 0.62);          // 上限: 牌少时不过度分散, 保留自然扇形
+      const ov = Math.round(step - cw);          // 负外边距(叠放量)
+      for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
+    }
+
+    // ── 理牌: 一键自动(短按) / 手动拖排(长按切模式), 共用 #ddzSort 一个按钮 ──
+    // customOrder=null 时 renderHand 走 Deck.sortHand 自动理牌; 非空则按玩家排定的 id 顺序摆。
+    // 斗地主原本是点击选牌(非划选), 手动理牌模式下点击不选牌、改为拖动重排。
+    let customOrder = null, arrangeMode = false;
+    let dragCard = null, dragId = null, dragStartX = 0;
+    function handCardAt(x,y){ const el=document.elementFromPoint(x,y); if(!el) return null; const c=el.closest('.card'); return (c && els.hand.contains(c)) ? c : null; }
+    function setArrange(on){
+      arrangeMode = on;
+      const btn = $('#ddzSort'); if(btn){ btn.classList.toggle('active', on); btn.innerHTML = on ? '✓ 完成' : '🔀 理牌'; }
+      els.hand.classList.toggle('arranging', on);
+      if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序，松手即定'); }
+      else renderHand();
+    }
+    function autoSort(){ customOrder = null; renderHand(); sfx('cardsel'); toast('已按大小理牌'); }
+    function startReorder(e){
+      const c = handCardAt(e.clientX,e.clientY); if(!c) return;
+      dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX;
+      c.classList.add('dragging');
+      try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    }
+    function moveReorder(e){
+      if(!dragCard) return;
+      const dx = e.clientX - dragStartX;
+      dragCard.style.transform = `translateY(-18px) translateX(${dx}px) scale(1.06)`;
+      e.preventDefault();
+    }
+    function endReorder(e){
+      if(!dragCard) return;
+      const dropX = e.clientX;
+      const others = [...els.hand.children].filter(c=>c!==dragCard);
+      let insert = others.length;
+      for(let i=0;i<others.length;i++){ const r=others[i].getBoundingClientRect(); if(dropX < r.left + r.width/2){ insert=i; break; } }
+      const order = others.map(c=>c.dataset.id); order.splice(insert, 0, dragId);
+      customOrder = order;
+      dragCard.classList.remove('dragging'); dragCard.style.transform=''; dragCard.style.zIndex='';
+      dragCard = null; dragId = null;
+      sfx('cardsel'); renderHand();
+    }
+    els.hand.addEventListener('pointerdown', (e)=>{ if(arrangeMode) startReorder(e); });
+    els.hand.addEventListener('pointermove', (e)=>{ if(dragCard) moveReorder(e); });
+    els.hand.addEventListener('pointerup', (e)=>{ if(dragCard) endReorder(e); });
+    els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); });
+    // 短按=一键理牌(或手动模式下=完成退出); 长按≥350ms=切手动理牌模式
+    (function bindSort(){
+      const btn=$('#ddzSort'); if(!btn) return;
+      let pressTimer=null, longFired=false;
+      btn.addEventListener('pointerdown', ()=>{ longFired=false; pressTimer=setTimeout(()=>{ longFired=true; setArrange(!arrangeMode); }, 350); });
+      const cancel=()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
+      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; if(arrangeMode){ setArrange(false); } else autoSort(); });
+      btn.addEventListener('pointerleave', cancel);
+      btn.addEventListener('pointercancel', cancel);
+    })();
 
     // ── 轮次横幅 + 倒计时环 ──
     function setBanner(){
@@ -513,7 +602,7 @@
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
     }
     function doPlay(){
@@ -605,7 +694,7 @@
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       over.querySelector('#ddzAgain').addEventListener('click', ()=>{
-        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
+        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){

@@ -162,6 +162,14 @@
 .gd-hand:not(.locked) .card.sel:hover{transform:translateY(-16px)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
+/* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮 */
+.gd-hand-wrap{position:relative}
+.gd-sort{position:absolute;right:8px;top:1px;z-index:6;padding:5px 11px;border-radius:11px;font-size:12px;font-weight:800;
+  border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none}
+.gd-sort:active{transform:scale(.94)}
+.gd-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
+.gd-hand.arranging .card{cursor:grab}
+.gd-hand.arranging .card.dragging{cursor:grabbing;transition:none;box-shadow:0 12px 24px rgba(0,0,0,.55),0 0 0 2px var(--amber);z-index:50}
 /* 操作条 */
 .gd-acts{display:flex;gap:9px;justify-content:center;padding:8px 14px calc(11px + env(safe-area-inset-bottom,0px))}
 .gd-btn{flex:1;max-width:120px;padding:11px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
@@ -286,7 +294,7 @@
         </div>
       </div>
       <div class="gd-me" id="gdMe"></div>
-      <div class="gd-hand-wrap"><div class="gd-hand" id="gdHand"></div></div>
+      <div class="gd-hand-wrap"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div class="gd-hand" id="gdHand"></div></div>
       <div id="gdCtrl"></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
@@ -327,6 +335,7 @@
     }
     function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; }
     els.hand.addEventListener('pointerdown', (e)=>{
+      if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
       if(st.phase!=='play' || st.turn!==mySeat) return;
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
       painting=true; paintSeen=new Set(); paintLastIdx=null;
@@ -334,9 +343,60 @@
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       paintTo(c); e.preventDefault();
     });
-    els.hand.addEventListener('pointermove', (e)=>{ if(painting) paintTo(handCardAt(e.clientX,e.clientY)); });
-    els.hand.addEventListener('pointerup', endPaint);
-    els.hand.addEventListener('pointercancel', endPaint);
+    els.hand.addEventListener('pointermove', (e)=>{
+      if(dragCard){ moveReorder(e); return; }
+      if(painting) paintTo(handCardAt(e.clientX,e.clientY));
+    });
+    els.hand.addEventListener('pointerup', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
+    els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
+
+    // ── 理牌: 一键自动(短按) / 手动拖排(长按切模式), 共用 #gdSort 一个按钮 ──
+    // customOrder=null 时 renderHand 走 Rules.sortHand 自动理牌; 非空则按玩家排定的 id 顺序摆。
+    let customOrder = null, arrangeMode = false;
+    let dragCard = null, dragId = null, dragStartX = 0;
+    function setArrange(on){
+      arrangeMode = on;
+      const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); btn.innerHTML = on ? '✓ 完成' : '🔀 理牌'; }
+      els.hand.classList.toggle('arranging', on);
+      if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序，松手即定'); }
+      else renderHand();
+    }
+    function autoSort(){ customOrder = null; renderHand(); sfx('cardsel'); toast('已按大小理牌'); }
+    function startReorder(e){
+      const c = handCardAt(e.clientX,e.clientY); if(!c) return;
+      dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX;
+      c.classList.add('dragging');
+      try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    }
+    function moveReorder(e){
+      if(!dragCard) return;
+      const dx = e.clientX - dragStartX;
+      dragCard.style.transform = `translateY(-18px) translateX(${dx}px) scale(1.06)`;
+      e.preventDefault();
+    }
+    function endReorder(e){
+      if(!dragCard) return;
+      const dropX = e.clientX;
+      const others = [...els.hand.children].filter(c=>c!==dragCard);
+      let insert = others.length;
+      for(let i=0;i<others.length;i++){ const r=others[i].getBoundingClientRect(); if(dropX < r.left + r.width/2){ insert=i; break; } }
+      const order = others.map(c=>c.dataset.id); order.splice(insert, 0, dragId);
+      customOrder = order;
+      dragCard.classList.remove('dragging'); dragCard.style.transform=''; dragCard.style.zIndex='';
+      dragCard = null; dragId = null;
+      sfx('cardsel'); renderHand();
+    }
+    // 短按=一键理牌(或手动模式下=完成退出); 长按≥350ms=切手动理牌模式
+    (function bindSort(){
+      const btn=$('#gdSort'); if(!btn) return;
+      let pressTimer=null, longFired=false;
+      btn.addEventListener('pointerdown', ()=>{ longFired=false; pressTimer=setTimeout(()=>{ longFired=true; setArrange(!arrangeMode); }, 350); });
+      const cancel=()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
+      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; if(arrangeMode){ setArrange(false); } else autoSort(); });
+      btn.addEventListener('pointerleave', cancel);
+      btn.addEventListener('pointercancel', cancel);
+    })();
 
     // id → card 表(整两副牌重建 lastPlay 用)
     const ALL = {}; Deck.doubleDeck().forEach(c=>ALL[c.id]=c);
@@ -419,12 +479,21 @@
       els.felt.appendChild(box); setTimeout(()=>box.remove(),2300);
     }
 
+    // 手牌摆放顺序: 自动理牌走 Rules.sortHand(级牌感知); 手动理牌后按玩家排定的 id 顺序摆(已出的牌自然从序列消失)
+    function handOrder(){
+      const hand = st.players[mySeat].hand;
+      if (customOrder){
+        const pos = new Map(customOrder.map((id,i)=>[id,i]));
+        return hand.slice().sort((a,b)=>(pos.has(a.id)?pos.get(a.id):9999)-(pos.has(b.id)?pos.get(b.id):9999));
+      }
+      return Rules.sortHand(hand, st.level);
+    }
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat;
-      els.hand.className='gd-hand'+(myTurn?'':' locked');
+      els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
-      const sorted = Rules.sortHand(st.players[mySeat].hand, st.level);
+      const sorted = handOrder();
       sorted.forEach((card, idx)=>{
         const el = cardEl(card, st.level);
         el.dataset.idx = idx;
@@ -634,6 +703,7 @@
         else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
           prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
         st=newDeal(); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
+        customOrder=null; if(arrangeMode) setArrange(false);
         sfx('deal'); renderAll(); showTributeBanner();
       });
       over.querySelector('#gdDone').addEventListener('click', close);

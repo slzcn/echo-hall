@@ -173,4 +173,28 @@ assert(/OPP_SEATS\s*=\s*\[\(mySeat\+1\)%3,\s*\(mySeat\+2\)%3\]/.test(ui), '对�
 assert(/els\.opps\.innerHTML = OPP_SEATS\.map/.test(ui), 'renderSeats 用旋转后对手槽(非写死[1,2])');
 assert(/isAI:\s*gameIsAI/.test(ui), 'createGame 吃 opts.isAI(host 按座位实况标人/机, 含重发/再来一局)');
 
+// ── 步骤10: 理牌(一键自动 + 手动拖排, 共用一个按钮) — 提示体验不输腾讯 ──
+// 治"手牌只能引擎默认序、不能自己码牌"。#ddzSort 一个按钮: 短按=一键理牌, 长按=进手动拖排模式。
+assert(/id="ddzSort"[\s\S]{0,40}理牌/.test(ui), '手牌区有理牌按钮(#ddzSort, 与掼蛋一致)');
+assert(/function autoSort\(\)/.test(ui) && /function setArrange\(/.test(ui), '一键自动理牌 autoSort + 手动模式切换 setArrange 并存');
+assert(/function handOrder\(\)/.test(ui) && /Deck\.sortHand\(hand\)/.test(ui), 'handOrder: 默认走 Deck.sortHand 自动理牌(与引擎发牌同序)');
+assert(/if \(customOrder\)/.test(ui), '手动理牌后按玩家排定的 id 顺序摆(customOrder 优先于自动)');
+assert(/if \(arrangeMode\) return;/.test(ui), '手动理牌模式下点击不选牌(改为拖动重排, 不误触出牌)');
+assert(/function startReorder\(/.test(ui) && /function moveReorder\(/.test(ui) && /function endReorder\(/.test(ui),
+  '拖排三段: 起拖/移动/落位(斗地主原为点选, 拖排能力新增)');
+assert(/els\.hand\.addEventListener\('pointerdown',[\s\S]{0,60}startReorder/.test(ui), '手牌绑 pointerdown → 手动模式起拖');
+assert(/dropX < r\.left \+ r\.width\/2/.test(ui), '落位按放下点与各牌中线判定插入位(所见即所得)');
+assert(/长按[\s\S]{0,40}setArrange|setArrange\(!arrangeMode\)/.test(ui), '长按≥350ms 切手动理牌模式(与一键共用一个按钮)');
+assert(/customOrder=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '重发/再来一局重置理牌态(不带旧自定义序进新局)');
+assert(/\.ddz-hand\.arranging\{touch-action:none\}/.test(ui), '手动理牌时手牌 touch-action:none(拖排不被页面滚动打断)');
+
+// ── 步骤11: 手牌单排自适应(治开局 17~20 张两侧溢出屏外点不到) ──
+// 斗地主原用固定 --hand-ov 叠放, 17 张在 390px 上首尾牌跑到屏幕外。对齐掼蛋 layoutHand 动态收紧。
+assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌单排自适应, 与掼蛋同源)');
+assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutHand 按可用宽算步距(牌多自动收紧, 永不溢出)');
+assert(/\.ddz-hand\{[^}]*flex-wrap:nowrap/.test(ui), '手牌 flex-wrap:nowrap(不换行, 单排)');
+assert(/els\.hand\.appendChild\(el\);\s*\}\);\s*layoutHand\(\);/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
+assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
+  'resize 重排手牌且关桌解绑(转屏自适应, 不泄漏监听)');
+
 console.log('\n✅ 斗地主旅程全部通过');
