@@ -102,13 +102,13 @@ async function run(){
   s.emit(s.listeners.document,'focusin',{ target:s.cin });
   await tick(300);
 
-  // 现在物理收键盘：VK.boundingRect.height 回 0，又一次 geometrychange
+  // 现在物理收键盘：VK.boundingRect.height 回 0，但【不再发 geometrychange】
+  //   （主人手机真实场景：系统输入法/部分 WebView 收键盘时只更新 boundingRect，不派事件）
+  //   → 只剩 300ms 轮询 tick 能靠“当前 boundingRect.height===0”把估算清零。
   s.vk.boundingRect={height:0};
-  s.emit(s.listeners.virtualKeyboard,'geometrychange',{ target:s.vk });
-  await tick(20);
 
   // 关键：实际 WebView 上 geometrychange 常不靠，不发时只剩 300ms 轮询 tick
-  // startKbCollapseWatch 里新加的信号 3 需要在轮询内看到 rect.height===0 且 vkGeomHits > baseline
+  // startKbCollapseWatch 里的信号 3 需要在轮询内看到 rect.height===0 即清零（不再要求 vkGeomHits 增长）
   await tick(400);
   const heightAfterClose=parseInt(s.hall.style.height,10);
   return { heightAfterFocus, heightAfterClose };
@@ -129,13 +129,24 @@ async function run(){
     requestAnimationFrame: s2.win.requestAnimationFrame,
     cancelAnimationFrame: s2.win.cancelAnimationFrame,
   });
-  const anchor=`if (r && r.height === 0 && vkGeomHits > (signalBaseline?.vkHits || 0)) {
+  const anchor=`try {
+        const r = virtualKeyboard && virtualKeyboard.boundingRect;
+        // 不要求 vkGeomHits 增长：部分 Android PWA 只更新 boundingRect，不派 geometrychange。
+        if (r && r.height === 0) {
+          dismissSoftKeyboardLayout();
+          return;
+        }
+      } catch (_) {}`;
+  const empty=`try {
+        const r = virtualKeyboard && virtualKeyboard.boundingRect;
+        // (旧实现：信号 3 要求 vkGeomHits 增长——WebView 不再发 geometrychange 时永远不成立)
+        if (r && r.height === 0 && vkGeomHits > (signalBaseline?.vkHits || 0)) {
           estimatedKbH = 0;
           clearInterval(collapseTimer); collapseTimer = 0;
           settleChatLayout();
           return;
-        }`;
-  const empty=`// (旧实现：信号 3 为空)`;
+        }
+      } catch (_) {}`;
   const legacy=src.replace(anchor, empty);
   if(legacy===src){ console.error('❌ 反证锚点未命中'); process.exit(1); }
   vm.runInContext(legacy, ctx2);
@@ -150,7 +161,7 @@ async function run(){
   s2.emit(s2.listeners.document,'focusin',{ target:s2.cin });
   await tick(300);
   s2.vk.boundingRect={height:0};
-  // 关键：旧实现下，不再重新发 geometrychange，只靠轮询 → 旧代码无信号 3 → 无法清零
+  // 关键：旧实现下，不再重新发 geometrychange，只靠轮询 → 旧代码信号 3 要求 vkGeomHits 增长 → 无法清零
   await tick(400);
   const h2=parseInt(s2.hall.style.height,10);
   console.log('  旧实现 focus→',h1,' close→',h2);

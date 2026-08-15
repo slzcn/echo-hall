@@ -138,6 +138,17 @@
     resetDocumentScroll();
   }
 
+  // 安卓 PWA 点系统输入法“收起”时，焦点可能仍留在 #cin，且 WebView 不发 focusout、resize 或 VK geometrychange。
+  // 复位必须独立于输入框焦点：清掉估算态和轮询，再按当前真实可视区恢复 #hall。
+  function dismissSoftKeyboardLayout() {
+    chatFocused = false;
+    keyboardRect = null;
+    estimatedKbH = 0;
+    if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
+    if (collapseTimer) { clearInterval(collapseTimer); collapseTimer = 0; }
+    settleChatLayout();
+  }
+
   // ★V45：小米 PWA 三信号全哑时，键盘收起同样无信号。启动轮询 fallback：
   // 在沉入估算态后，每 300ms 重探 VK.boundingRect / env(keyboard-inset-height) / window.innerHeight。
   // 任一信号变化到“键盘已收”情形（真值=0 或 innerH 回升）→ 清零 estimatedKbH + 重经布局。
@@ -170,10 +181,9 @@
       //   innerH 只微动 <50 → 只有这条 VK 现值信号能把估算拉回来。
       try {
         const r = virtualKeyboard && virtualKeyboard.boundingRect;
-        if (r && r.height === 0 && vkGeomHits > (signalBaseline?.vkHits || 0)) {
-          estimatedKbH = 0;
-          clearInterval(collapseTimer); collapseTimer = 0;
-          settleChatLayout();
+        // 不要求 vkGeomHits 增长：部分 Android PWA 只更新 boundingRect，不派 geometrychange。
+        if (r && r.height === 0) {
+          dismissSoftKeyboardLayout();
           return;
         }
       } catch (_) {}
@@ -249,12 +259,7 @@
   document.addEventListener('focusout', event => {
     if (event.target === chatInput()) {
       if (!usesSoftKeyboardLayout()) return;
-      chatFocused = false;
-      keyboardRect = null;
-      // ★V30：失焦清零估算键盘高 + 取消待定定时器。
-      estimatedKbH = 0;
-      if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
-      settleChatLayout();
+      dismissSoftKeyboardLayout();
     }
     if (event.target === popupInput) popupInput = null;
   }, { passive: true });
@@ -345,10 +350,7 @@
   //   visibleHeight() 会在有 VK.boundingRect 时把键盘高扣掉 → 覆盖式/占位式两种模式都返回真实可视高。
   window.__ehKbVisibleH = function () { try { return visibleHeight(); } catch (_) { return (viewport ? viewport.height : window.innerHeight); } };
   window.__ehKbReset = function () {
-    chatFocused = false;
-    keyboardRect = null;
-    estimatedKbH = 0;
-    if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
+    dismissSoftKeyboardLayout();
     const el = hall();
     if (el) el.style.height = '';
     document.documentElement.style.removeProperty('--vh');
