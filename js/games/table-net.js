@@ -14,7 +14,7 @@
     var s=document.createElement('style'); s.id=CSS_ID;
     s.textContent=[
       '.gt-card{border:1px solid var(--line,rgba(0,229,212,.24));border-radius:14px;padding:12px 13px;',
-        'background:linear-gradient(160deg,rgba(0,229,212,.06),rgba(13,21,36,.5));max-width:340px}',
+        'background:linear-gradient(160deg,rgba(0,229,212,.06),rgba(13,21,36,.5))}',
       '.gt-head{display:flex;align-items:center;gap:7px;margin-bottom:10px}',
       '.gt-head .ge{font-size:17px}',
       '.gt-head .gk{font-weight:800;color:var(--accent,#00e5d4);letter-spacing:.02em}',
