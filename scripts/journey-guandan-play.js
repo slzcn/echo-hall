@@ -238,6 +238,8 @@ assert(/function renderLobby\(/.test(tn) && /gt-seat/.test(tn), '存在 renderLo
 assert(/ctx\.actions\.join\(/.test(tn) && /ctx\.actions\.seatSoul\(/.test(tn) && /ctx\.actions\.start\(/.test(tn),
   '空位有「加入」/host「邀请灵魂」/「开始」动作(接 ctx.actions)');
 assert(/\.onclick=/.test(tn) && !/addEventListener\(/.test(tn), '卡内按钮用 .onclick(不叠 addEventListener, 护住密度门)');
+// 反回退: 座位区必须单列纵向。曾因 2 列(每列~145px)塞不下 头像+名+灵魂下拉+踢人钮 → host 视角横向溢出 81px 被截。
+assert(/\.gt-teams\{[^}]*flex-direction:column/.test(tn), '座位区单列纵向(gt-teams column)——防两列挤爆截断灵魂下拉/长名');
 // (11b) app.js 接线: 开桌/座位 RPC + realtime 同步 + host 开局
 assert(/'eh_gt_join'/.test(src) && /'eh_gt_leave'/.test(src) && /'eh_gt_seat_soul'/.test(src)
   && /'eh_gt_kick'/.test(src) && /'eh_gt_start'/.test(src) && /'eh_gt_close'/.test(src),
