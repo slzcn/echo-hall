@@ -283,7 +283,8 @@
     function newDeal(){
       return Engine.createGame({ isAI: opts.isAI || [false,true,true,true], names,
         teamLevels: matchLevels, dealerTeam: matchDealer,
-        level: matchLevels[matchDealer], prevResult });
+        level: matchLevels[matchDealer], prevResult,
+        seed: (prevResult ? undefined : opts.seed) });
     }
     let st = newDeal();
     let selected = new Set();

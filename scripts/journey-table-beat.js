@@ -91,47 +91,56 @@ const DRIVE_GD = `(() => {
   return window.__beats;
 })()`;
 
-async function beatTrip(browser, tag, files, openExpr, driveExpr, wantLandlord){
-  const { ctx, page, errs } = await newHall(browser, files);
-  await page.evaluate(openExpr);
-  const beats = await page.evaluate(driveExpr);
+// 固定 seed 集合 —— 让整局完全可复现(deck 洗牌吃 seed, 两 AI 均零 Math.random)。
+// 每个 seed 各验一整局不变量, 跨 seed 聚合验"灵魂确有入戏", 全程无随机 → CI 不 flaky。
+const SEEDS = [1, 2, 3, 4, 5, 6];
 
-  // 1. 发出了 beat, 每条 text 非空
-  if (!Array.isArray(beats) || !beats.length) bad(`[${tag}] 整局没发出任何 beat(onBeat 没接上?)`);
-  else ok(`[${tag}] 一整局发出 ${beats.length} 条战报`);
-  const emptyText = (beats||[]).filter(b => !b || !b.text || !String(b.text).trim());
-  if (emptyText.length) bad(`[${tag}] 有 ${emptyText.length} 条 beat 文案为空`); else ok(`[${tag}] 每条战报都有文案`);
+async function beatTrip(browser, tag, files, buildOpenExpr, driveExpr, wantLandlord){
+  const all = [];              // 全 seed 汇总, 供聚合断言
+  let dealsWithOver = 0, dealsWithLandlord = 0, bombTotal = 0, bombBad = 0;
+  const allErrs = [];
 
-  const byType = t => (beats||[]).filter(b => b && b.type === t);
+  for (const seed of SEEDS){
+    // 每 seed 一张全新页 —— 杜绝上一局残留 AI 定时器跨局污染 window.__beats
+    const { ctx, page, errs } = await newHall(browser, files);
+    await page.evaluate(buildOpenExpr(seed));
+    const beats = await page.evaluate(driveExpr);
+    if (errs.length) allErrs.push(...errs);
+    await ctx.close();
+    if (!Array.isArray(beats)) { bad(`[${tag}] seed ${seed}: 驱动没返回 beat 数组`); continue; }
+    all.push(...beats);
+    const byType = t => beats.filter(b => b && b.type === t);
 
-  // 2. 终局战报
-  if (!byType('over').length) bad(`[${tag}] 缺终局战报(type=over)`);
-  else ok(`[${tag}] 终局战报:「${byType('over')[0].text}」`);
-
-  // 3. 斗地主必有定地主战报
-  if (wantLandlord){
-    if (!byType('landlord').length) bad(`[${tag}] 缺定地主战报(type=landlord)`);
-    else ok(`[${tag}] 定地主战报:「${byType('landlord')[0].text}」`);
+    // 每局: 文案非空
+    if (beats.some(b => !b || !b.text || !String(b.text).trim())) bad(`[${tag}] seed ${seed}: 有战报文案为空`);
+    // 每局: 终局战报
+    if (byType('over').length) dealsWithOver++; else bad(`[${tag}] seed ${seed}: 缺终局战报(type=over)`);
+    // 斗地主每局: 定地主战报
+    if (wantLandlord){ if (byType('landlord').length) dealsWithLandlord++; else bad(`[${tag}] seed ${seed}: 缺定地主战报(type=landlord)`); }
+    // ★每局硬不变量: 真人(名"你")动作绝不配台词
+    const humanQuip = beats.filter(b => b && b.quip && b.actor === '你');
+    if (humanQuip.length) bad(`[${tag}] seed ${seed}: ★真人被误配入戏台词(${humanQuip.length} 条) —— quip 只该属于 AI 灵魂`);
+    // 炸弹战报: 若出现须高光档 + 文案含"炸"
+    const bombs = byType('bomb').concat(byType('rocket'));
+    bombTotal += bombs.length;
+    bombBad += bombs.filter(b => !b.big || !/炸/.test(b.text)).length;
   }
 
-  // 4. ★真人(名"你")的动作绝不配台词
-  const humanQuip = (beats||[]).filter(b => b && b.quip && b.actor === '你');
-  if (humanQuip.length) bad(`[${tag}] ★真人被误配了入戏台词(${humanQuip.length} 条) —— quip 只该属于 AI 灵魂`);
-  else ok(`[${tag}] 真人动作不配台词(台词只属于灵魂对手)`);
-  // 且确有灵魂配过台词(否则第 4 条是空过) —— 灵魂对手一整局至少入戏一次
-  const soulQuip = (beats||[]).filter(b => b && b.quip && b.actor && b.actor !== '你');
-  if (!soulQuip.length) bad(`[${tag}] 灵魂对手整局一句入戏台词都没有(quip 生成挂了?)`);
-  else ok(`[${tag}] 灵魂对手入戏台词 ${soulQuip.length} 句, 如「${soulQuip[0].actor}: ${soulQuip[0].quip}」`);
+  ok(`[${tag}] ${SEEDS.length} 局固定牌局各驱动到终局, 共 ${all.length} 条战报`);
+  if (dealsWithOver === SEEDS.length) ok(`[${tag}] 每局都有终局战报, 如「${all.find(b=>b.type==='over')?.text}」`);
+  if (wantLandlord && dealsWithLandlord === SEEDS.length) ok(`[${tag}] 每局都有定地主战报, 如「${all.find(b=>b.type==='landlord')?.text}」`);
+  if (!all.some(b => b && b.quip && b.actor === '你')) ok(`[${tag}] 全程真人动作零台词(台词只属于灵魂对手)`);
 
-  // 5. 炸弹战报若出现须为高光档且文案含"炸"
-  const bombs = byType('bomb').concat(byType('rocket'));
-  if (bombs.length){
-    const badBomb = bombs.filter(b => !b.big || !/炸/.test(b.text));
-    if (badBomb.length) bad(`[${tag}] 炸弹战报未标高光档/文案缺"炸"`); else ok(`[${tag}] 炸弹战报 ${bombs.length} 条(高光档)`);
-  } else ok(`[${tag}] 本局无炸弹(不强制)`);
+  // 聚合: 灵魂确有入戏(证 quip 路径真通)
+  const soulQuip = all.filter(b => b && b.quip && b.actor && b.actor !== '你');
+  if (!soulQuip.length) bad(`[${tag}] ${SEEDS.length} 局灵魂对手一句入戏台词都没有(quip 生成挂了?)`);
+  else ok(`[${tag}] 灵魂对手累计入戏 ${soulQuip.length} 句, 如「${soulQuip[0].actor}: ${soulQuip[0].quip}」`);
 
-  if (errs.length) bad(`[${tag}] 页面报错: ` + errs.slice(0,2).join(' | '));
-  await ctx.close();
+  // 炸弹档位
+  if (bombTotal){ if (bombBad) bad(`[${tag}] 有炸弹战报未标高光档/文案缺"炸"`); else ok(`[${tag}] 炸弹战报累计 ${bombTotal} 条, 均高光档`); }
+  else ok(`[${tag}] 这批牌局无炸弹(不强制)`);
+
+  if (allErrs.length) bad(`[${tag}] 页面报错: ` + allErrs.slice(0,2).join(' | '));
 }
 
 async function main(){
@@ -145,13 +154,13 @@ async function main(){
   console.log('── 斗地主 牌局直播旅程 ──');
   await beatTrip(browser, '斗地主',
     ['deck.js','ddz-rules.js','ddz-engine.js','ddz-ai.js','game-ui.js'],
-    `window.__beats=[]; window.__g = window.EHDdzGame.open({ names:['你','灵魂左','灵魂右'], avatars:['🙂','🤖','👾'], onBeat:b=>window.__beats.push(b), onResult(){} });`,
+    seed => `window.__beats=[]; window.__g = window.EHDdzGame.open({ seed:${seed}, names:['你','灵魂左','灵魂右'], avatars:['🙂','🤖','👾'], onBeat:b=>window.__beats.push(b), onResult(){} });`,
     DRIVE_DDZ, true);
 
   console.log('\n── 掼蛋 牌局直播旅程 ──');
   await beatTrip(browser, '掼蛋',
     ['deck.js','guandan-rules.js','guandan-engine.js','guandan-ai.js','guandan-ui.js'],
-    `window.__beats=[]; window.__g = window.EHGuandanGame.open({ names:['你','灵魂下','灵魂对','灵魂上'], avatars:['🙂','🔥','🌙','⚡'], onBeat:b=>window.__beats.push(b), onResult(){} });`,
+    seed => `window.__beats=[]; window.__g = window.EHGuandanGame.open({ seed:${seed}, names:['你','灵魂下','灵魂对','灵魂上'], avatars:['🙂','🔥','🌙','⚡'], onBeat:b=>window.__beats.push(b), onResult(){} });`,
     DRIVE_GD, false);
 
   await browser.close();

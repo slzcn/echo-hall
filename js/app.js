@@ -4199,9 +4199,13 @@ function _soulMsgDelay(text){
   return 450 + Math.min(n * 34, 1400);
 }
 // 该 mid 是否"已在视野内"(DOM 已渲染 或 正排在队列里)——两条路径入队前都要问一次, 防重复渲染。
+// ★兜底扫队列数组本身: _soulQPending 在出队一瞬会先被 delete(旧逻辑), 若此刻另一条路径(补拉/重连)
+//   撞进来, 仅查 pending+DOM 都可能扑空(append 尚未完成) → 同一 mid 被入队两次 → 重复上屏。
+//   扫队列数组做兜底, 与 DOM 判重形成双保险。
 function _soulMsgKnown(mid){
   if(mid==null) return false;
   if(_soulQPending.has(mid)) return true;
+  for(let i=0;i<_soulQ.length;i++){ if(_soulQ[i] && _soulQ[i].id===mid) return true; }
   return !!document.querySelector(`[data-mid="${mid}"]`);
 }
 function enqueueSoulMsg(m){
@@ -4216,15 +4220,19 @@ async function _flushSoulQ(){
   try{
     while(_soulQ.length){
       const m = _soulQ.shift();
-      _soulQPending.delete(m.id);
+      // ★关键: 不能在这里就 delete pending —— 从 delete 到 appendChild 之间存在异步真空窗,
+      //   其它路径(realtime INSERT / refreshSnapshotTail / 20s 轮询 / 前台多拍补拉)撞进来会
+      //   同时看到 pending=false + DOM 无 [data-mid=X] → 重复入队 → 重复上屏。
+      //   改为 append 之后再 delete, 让 DOM 判重永远接得住并发查询(这是大厅"消息重复冒出"的根因)。
       // 出队时重新判断是否贴底(用户可能中途翻了历史), 并再查一次 DOM 防重复(另一路径抢先渲染过)
-      if(document.querySelector(`[data-mid="${m.id}"]`)) continue;
+      if(document.querySelector(`[data-mid="${m.id}"]`)){ _soulQPending.delete(m.id); continue; }
       const wasNear = nearBottom();
       // 内容即将上屏 → 此刻才抹掉该灵魂"正在输入"(在队列等待期间保留输入态, 让"打字→冒泡"更像真人)
       if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
       const el = buildMsgEl(m);
       if(el){
         $('#stream').appendChild(el);
+        _soulQPending.delete(m.id);   // ★append 完再 delete: 判重真空窗关闭
         if(wasNear) scrollStream(true); else bumpUnread();
         ehFx(el, 'fx-soul', 1200);
         try{ EhSfx.play('soul'); }catch(_){}

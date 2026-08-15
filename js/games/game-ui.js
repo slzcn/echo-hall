@@ -296,7 +296,7 @@
         }
       } catch(_){}
     }
-    let st = isGuest ? snapToState(opts.snapshot) : Engine.createGame({ isAI: gameIsAI, names });
+    let st = isGuest ? snapToState(opts.snapshot) : Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed });
     let selected = new Set();     // 选中的 card id
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
