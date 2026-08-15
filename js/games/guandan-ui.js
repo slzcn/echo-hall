@@ -36,6 +36,34 @@
 @media (min-width:900px) and (min-height:700px){
   .gd-room{--cw:52px;--ch:73px;--cn:18px;--cs:13px;--cc:30px;--cmw:30px;--cmh:43px;
     --av:62px;--avf:28px;--seatw:124px;--hand-ov:-16px;--hand-pad:28px;--banner:17px;--maxw:820px}}
+/* 大屏(平板横屏/桌面): 元素进一步放大, 中央牌桌收束不空旷, 操作区更饱满 */
+@media (min-width:1000px) and (min-height:760px){
+  .gd-room{--cw:60px;--ch:84px;--cn:21px;--cs:15px;--cc:35px;--cmw:34px;--cmh:48px;
+    --av:82px;--avf:38px;--seatw:150px;--hand-ov:-12px;--hand-pad:30px;--banner:20px;--maxw:860px}
+  .gd-mid{max-height:440px}                              /* 收束中央牌桌高度, 不让空椭圆撑满竖屏 */
+  .gd-felt{justify-content:center}                        /* 牌桌整体在多余竖向空间里居中, 上下留白对称 */
+  .gd-partner{padding-top:14px}
+  .gd-seat .nm{font-size:13px}
+  .gd-seat .cnt{font-size:13px}
+  .gd-banner{min-height:26px}
+  .gd-banner.mine{font-size:20px}
+  .gd-played{min-height:96px}
+  .gd-me .gd-avr{width:46px;height:46px}
+  .gd-me .gd-avr .av{font-size:22px}
+  .gd-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
+  .gd-acts{gap:14px;padding-top:12px}}
+/* 竖屏平板等"窄而高"屏: 宽度够不到大屏断点, 但高屏空间大 → 元素放大 + 收束中央牌桌并居中 */
+@media (min-width:600px) and (max-width:999px) and (min-height:900px){
+  .gd-room{--cw:56px;--ch:78px;--cn:20px;--cs:14px;--cc:33px;--cmw:32px;--cmh:45px;
+    --av:74px;--avf:34px;--seatw:140px;--hand-ov:-14px;--hand-pad:28px;--banner:18px;--maxw:760px}
+  .gd-mid{max-height:420px}
+  .gd-felt{justify-content:center}
+  .gd-partner{padding-top:12px}
+  .gd-seat .nm{font-size:13px}
+  .gd-seat .cnt{font-size:13px}
+  .gd-banner.mine{font-size:19px}
+  .gd-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
+  .gd-acts{gap:14px}}
 @keyframes gdRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .gd-bar{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--line,rgba(0,229,212,.24));flex-shrink:0}
 .gd-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
@@ -93,6 +121,9 @@
 .gd-passtag{color:var(--dim);font-size:13px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:5px 14px;animation:gdFlyTop .22s}
 .gd-boom{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:38px;font-weight:900;letter-spacing:.05em;color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:gdBoom .7s ease-out forwards}
 @keyframes gdBoom{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
+.gd-flash{position:absolute;inset:0;z-index:5;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(ellipse at center,rgba(255,45,142,.3),rgba(255,45,142,.07) 45%,transparent 70%);animation:gdFlash .5s ease-out forwards}
+@keyframes gdFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 /* 进贡横幅 */
 .gd-tribute{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:4px;align-items:center;
   background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);border-radius:12px;padding:7px 14px;max-width:88%;
@@ -227,7 +258,8 @@
     function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     let dealAnim = true, lastMyTurn = false, lastFinishedN = 0;
-    sfx('arrive');
+    let lastSelTick = 0;
+    sfx('arrive'); sfx('deal');
 
     let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0;
 
@@ -282,6 +314,8 @@
       const id = c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);
       if(paintMode==='select') selected.add(id); else selected.delete(id);
       c.classList.toggle('sel', selected.has(id));
+      // 选牌轻触音: 只在"选中"时响 + 60ms 节流, 避免划选连点像机关枪
+      if(paintMode==='select'){ const now=(performance&&performance.now)?performance.now():Date.now(); if(now-lastSelTick>60){ lastSelTick=now; sfx('cardsel'); } }
     }
     function paintTo(c){
       if(!c) return; const idx=+c.dataset.idx;
@@ -359,13 +393,14 @@
         void els.played.offsetWidth;
         els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
         if (Rules.isBomb(lp.parse)) boom(bombName(lp.parse));
-        else if (lp.seat!==mySeat) sfx('receive');
+        else if (lp.seat!==mySeat) sfx('cardplay');
       }
     }
     function bombName(p){ return p.type==='jokerbomb'?'天 王 炸':(p.type==='straightflush'?'同 花 顺':(p.size+' 炸')); }
     function boom(txt){
       sfx('boom'); vibrate([12,40,20]);
       els.felt.classList.remove('shake'); void els.felt.offsetWidth; els.felt.classList.add('shake');
+      const fl=document.createElement('div'); fl.className='gd-flash'; els.felt.appendChild(fl); setTimeout(()=>fl.remove(),520);
       const b=document.createElement('div'); b.className='gd-boom'; b.textContent='💥 '+txt;
       els.felt.appendChild(b); setTimeout(()=>b.remove(),750);
     }
@@ -422,7 +457,7 @@
       clearTimers();
       if (st.phase==='over') return;
       const seat=st.turn, mine=seat===mySeat;
-      if (mine && !lastMyTurn){ sfx('mention'); vibrate(18); }
+      if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
       turnDur = mine ? HUMAN_PLAY_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
       turnStart = Date.now();
@@ -443,14 +478,25 @@
       if (st.phase!=='play'){ els.ctrl.innerHTML=''; return; }
       const myTurn=st.turn===mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
+      // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
+      let plays=[];
+      if (myTurn){
+        const target = mustBeat ? st.table.lastPlay.parse : null;
+        plays = AI.hints({ hand: st.players[mySeat].hand, tableParse:target, level:st.level });
+      }
+      const noBeat = myTurn && mustBeat && plays.length===0;   // 要压却压不过 → 只能不出
       els.ctrl.innerHTML=`<div class="gd-acts">
-        <button class="gd-btn ghost" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>不出</button>
-        <button class="gd-btn ghost" id="gdHint" ${!myTurn?'disabled':''}>提示</button>
+        <button class="gd-btn ${noBeat?'primary':'ghost'}" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'压不过 · 不出':'不出'}</button>
+        <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="gd-btn primary" id="gdPlay" disabled>出牌</button>
       </div>`;
       $('#gdPass').addEventListener('click', ()=>doPass(mySeat));
       $('#gdPlay').addEventListener('click', doPlay);
       $('#gdHint').addEventListener('click', doHint);
+      // 只有唯一合法打法(常见于残局/剩一对) → 直接替玩家选好, 省得一张张点
+      if (myTurn && plays.length===1 && selected.size===0){
+        selected = new Set(plays[0].map(c=>c.id)); renderHand();
+      }
       updatePlayBtn();
     }
     function updatePlayBtn(){
@@ -476,12 +522,12 @@
       const cards=[...selected].map(findCardById).filter(Boolean);
       try{ var r=Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
-      sfx('send'); selected.clear(); hintCycle=[];
+      sfx('cardplay'); selected.clear(); hintCycle=[];
       afterMove(r);
     }
     function doPass(seat){
       try{ Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
-      if(seat===mySeat) sfx('back');
+      if(seat===mySeat) sfx('pass');
       say(seat,'不出'); afterMove({});
     }
     function doHint(){
@@ -578,7 +624,7 @@
           <button class="gd-btn primary" id="gdDone">收工</button>
         </div>`;
       els.felt.appendChild(over);
-      if(iWon){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
+      if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       over.querySelector('#gdAgain').addEventListener('click', ()=>{
         over.remove();
@@ -586,7 +632,7 @@
         else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
           prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
         st=newDeal(); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
-        renderAll(); showTributeBanner();
+        sfx('deal'); renderAll(); showTributeBanner();
       });
       over.querySelector('#gdDone').addEventListener('click', close);
       if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat }); }catch(_){} }

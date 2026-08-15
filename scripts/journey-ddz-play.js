@@ -160,10 +160,10 @@ assert(/\.ddz-opps\{[\s\S]*max-width:var\(--oppmax/.test(ui), '大屏对手区�
 // ── 步骤8: 音效 + 特效(主人反馈:音效特效可以加上) ──────────
 // 复用聊天室 EhSfx 合成器, 全程 try/catch(未加载静默, 绝不打断牌局)。
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
-assert(/sfx\('send'\)/.test(ui) && /sfx\('mention'\)/.test(ui) && /sfx\('boom'\)/.test(ui), '出牌/轮到你/炸弹各有音效');
+assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui) && /sfx\('landlord'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌/地主揭晓各有音');
 assert(/iWon[\s\S]{0,80}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
 assert(/function confetti\(\)/.test(ui) && /ddz-confetti/.test(ui), '存在胜利彩带(confetti)');
-assert(/if \(mine && !lastMyTurn\)\{ sfx\('mention'\); vibrate/.test(ui), '"刚轮到我"上升沿才提示音+震动(不每帧响)');
+assert(/if \(mine && !lastMyTurn\)\{ sfx\('yourturn'\); vibrate/.test(ui), '"刚轮到我"上升沿才提示音+震动(不每帧响)');
 assert(/if \(deal\)\{[\s\S]{0,80}justdealt/.test(ui), '发牌那一帧错峰入场动画(justdealt)');
 
 console.log('\n✅ 斗地主旅程全部通过');

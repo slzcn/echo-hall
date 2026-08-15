@@ -199,8 +199,8 @@ assert(/function showTributeBanner\(/.test(ui) && /gd-tribute/.test(ui), '开局
 assert(/抗贡成功/.test(ui) && /进贡 · /.test(ui), '横幅区分进贡/抗贡两态');
 // (9) 音效 + 特效
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
-assert(/sfx\('send'\)/.test(ui) && /sfx\('mention'\)/.test(ui) && /sfx\('boom'\)/.test(ui), '出牌/轮到你/炸弹各有音效');
-assert(/iWon[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
+assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌各有音');
+assert(/iWon\)\{[\s\S]{0,200}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
 assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
 
 // ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────

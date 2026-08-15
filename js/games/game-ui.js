@@ -44,6 +44,32 @@
   .ddz-room{--cw:58px;--ch:81px;--cn:20px;--cs:14px;--cc:33px;--cmw:36px;--cmh:51px;
     --av:72px;--avf:32px;--seatw:140px;--hand-ov:-26px;--hand-pad:34px;--banner:17px;--oppmax:640px}
 }
+/* 大屏(平板横屏/桌面): 牌/头像/座位放大, 中央出牌区收束居中不空旷, 操作区更饱满 */
+@media (min-width:1000px) and (min-height:760px){
+  .ddz-room{--cw:66px;--ch:92px;--cn:23px;--cs:16px;--cc:38px;--cmw:40px;--cmh:56px;
+    --av:84px;--avf:38px;--seatw:160px;--hand-ov:-22px;--hand-pad:38px;--banner:20px;--oppmax:720px}
+  .ddz-felt{justify-content:center}                       /* 牌桌内容整体竖向居中, 上下留白对称 */
+  .ddz-room .ddz-center{flex:none;margin:16px 0}          /* 中央区收到内容自然高(压过 base flex:1), 不再撑出半空盒子 */
+  .ddz-opps{padding-top:6px}
+  .ddz-seat .nm{font-size:13px}
+  .ddz-seat .cnt{font-size:13px}
+  .ddz-played{min-height:100px}
+  .ddz-turnbanner{min-height:26px}
+  .ddz-turnbanner.mine{font-size:20px}
+  .ddz-me .ddz-avr{width:48px;height:48px}
+  .ddz-me .ddz-avr .av{font-size:22px}
+  .ddz-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
+  .ddz-acts{gap:14px}}
+/* 竖屏平板等"窄而高"屏: 宽度够不到大屏断点, 但高屏空间大 → 元素放大 + 收束中央区居中 */
+@media (min-width:600px) and (max-width:999px) and (min-height:900px){
+  .ddz-room{--cw:62px;--ch:87px;--cn:22px;--cs:15px;--cc:36px;--cmw:38px;--cmh:53px;
+    --av:76px;--avf:34px;--seatw:150px;--hand-ov:-22px;--hand-pad:34px;--banner:18px;--oppmax:680px}
+  .ddz-felt{justify-content:center}
+  .ddz-room .ddz-center{flex:none;margin:16px 0}
+  .ddz-seat .nm{font-size:13px}
+  .ddz-seat .cnt{font-size:13px}
+  .ddz-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
+  .ddz-acts{gap:14px}}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ddz-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line,rgba(0,229,212,.24));flex-shrink:0}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
@@ -93,6 +119,9 @@
 .ddz-boom{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:40px;font-weight:900;letter-spacing:.05em;
   color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:ddzBoom .7s ease-out forwards}
 @keyframes ddzBoom{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
+.ddz-flash{position:absolute;inset:0;z-index:5;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(ellipse at center,rgba(255,45,142,.3),rgba(255,45,142,.07) 45%,transparent 70%);animation:ddzFlash .5s ease-out forwards}
+@keyframes ddzFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 /* 卡牌 (尺寸/字号走 --cw/--ch/--cn... 变量, 大屏媒体查询整体放大) */
 .card{width:var(--cw,44px);height:var(--ch,62px);border-radius:7px;background:#fff;position:relative;flex:none;
   box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:'Arial Narrow',Arial,sans-serif}
@@ -196,7 +225,7 @@
     let dealAnim = true;          // 下一次 renderHand 播发牌错峰入场(开局/重发/再来一局各触发一次)
     let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
     let lastMyTurn = false;       // "轮到我"上升沿: 只在刚轮到时提示音+震动, 不每帧响
-    sfx('arrive');                // 开桌一声
+    sfx('arrive'); sfx('deal');   // 开桌一声 + 洗牌发牌
 
     // 定时器:AI 行动 + 回合倒计时(环 + 到点兜底)
     let aiTimer = null;
@@ -313,12 +342,13 @@
         // 方向:自己出的从下方飞入, 对手从上方飞入
         els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
         if (Rules.isBomb(lp.parse)) boom(lp.parse.type==='rocket'?'王 炸':'炸 弹');
-        else if (lp.seat!==mySeat) sfx('receive');   // 对手落牌轻响(我自己出牌的 send 音在 doPlay)
+        else if (lp.seat!==mySeat) sfx('cardplay');   // 对手落牌拍击音(我自己出牌的音在 doPlay)
       }
     }
     function boom(txt){
       sfx('boom'); vibrate([12,40,20]);
       els.felt.classList.remove('shake'); void els.felt.offsetWidth; els.felt.classList.add('shake');
+      const fl=document.createElement('div'); fl.className='ddz-flash'; els.felt.appendChild(fl); setTimeout(()=>fl.remove(),520);
       const b = document.createElement('div'); b.className='ddz-boom'; b.textContent='💥 '+txt;
       els.felt.appendChild(b); setTimeout(()=>b.remove(), 750);
     }
@@ -351,8 +381,10 @@
         if (deal){ el.style.animationDelay = (idx*20)+'ms'; el.classList.add('justdealt'); }
         el.addEventListener('click', ()=>{
           if (st.phase!=='play' || st.turn!==mySeat) return;
-          if (selected.has(card.id)) selected.delete(card.id); else selected.add(card.id);
+          const willSel = !selected.has(card.id);
+          if (willSel) selected.add(card.id); else selected.delete(card.id);
           el.classList.toggle('sel');
+          if (willSel) sfx('cardsel');   // 选牌轻触音(取消不响)
           updatePlayBtn();
         });
         els.hand.appendChild(el);
@@ -381,7 +413,7 @@
       const seat = st.phase==='bid' ? st.bid.turn : st.turn;
       turnSeatActive = seat;
       const mine = seat===mySeat;
-      if (mine && !lastMyTurn){ sfx('mention'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
+      if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
       lastMyTurn = mine;
       turnDur = mine ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS) : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
       turnStart = Date.now();
@@ -443,14 +475,24 @@
     function renderActBar(){
       const myTurn = st.turn === mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat !== mySeat;
+      // 智能预判: 轮到我时先算可出的牌(best-first)。压不过=引导不出; 唯一打法=自动选好。
+      let plays = [];
+      if (myTurn){
+        const target = mustBeat ? st.table.lastPlay.parse : null;
+        plays = AI.hints(st.players[mySeat].hand, target);
+      }
+      const noBeat = myTurn && mustBeat && plays.length===0;
       els.ctrl.innerHTML = `<div class="ddz-acts">
-        <button class="ddz-btn ghost" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>不出</button>
-        <button class="ddz-btn ghost" id="ddzHint" ${!myTurn?'disabled':''}>提示</button>
+        <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'压不过 · 不出':'不出'}</button>
+        <button class="ddz-btn ghost" id="ddzHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
       $('#ddzPass').addEventListener('click', ()=>doPass(mySeat));
       $('#ddzPlay').addEventListener('click', doPlay);
       $('#ddzHint').addEventListener('click', doHint);
+      if (myTurn && plays.length===1 && selected.size===0){
+        selected = new Set(plays[0].map(c=>c.id)); renderHand();
+      }
       updatePlayBtn();
     }
     function updatePlayBtn(){
@@ -468,21 +510,21 @@
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
     }
     function doPlay(){
       const cards = [...selected].map(findCardById);
       try { var r = Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
-      sfx('send');
+      if (!Rules.isBomb(r && r.played)) sfx('cardplay');   // 出牌拍击音(炸弹交给 boom, 不叠)
       selected.clear(); hintCycle=[];
       renderAll();
       if (r && r.over){ showOver(); return; }
     }
     function doPass(seat){
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
-      if (seat===mySeat) sfx('back');
+      if (seat===mySeat) sfx('pass');
       say(seat,'不出');
       renderAll();
     }
@@ -557,10 +599,10 @@
           <button class="ddz-btn primary" id="ddzDone">收工</button>
         </div>`;
       els.felt.appendChild(over);
-      if (iWon){ sfx('sparkle'); setTimeout(()=>sfx('bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
+      if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       over.querySelector('#ddzAgain').addEventListener('click', ()=>{
-        over.remove(); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; renderAll();
+        over.remove(); st = Engine.createGame({isAI:[false,true,true],names}); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){
@@ -570,7 +612,7 @@
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
-      if (lastLord===null && st.landlord!=null) sfx('enter');   // 地主刚揭晓: 一声定音
+      if (lastLord===null && st.landlord!=null) sfx('landlord');   // 地主刚揭晓: 号角定音
       lastLord = st.landlord;
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(onHumanTimeout);

@@ -355,7 +355,15 @@ const EhSfx=(function(){
     sparkle(){ tone(1568,0,.11,'sine',.22); tone(2093,.06,.13,'triangle',.17); tone(2637,.13,.15,'sine',.15); tone(3136,.2,.17,'triangle',.11); },  // 庆祝: 上行铃音闪烁
     bloom(){ tone(523,0,.22,'sine',.2); tone(784,.07,.24,'sine',.17); tone(1046,.15,.28,'triangle',.13); },   // 温情绽放: 柔和上行大三和弦
     // 进场专属(比 receive 更有仪式感、够响): 上行三连音亮起
-    arrive(){ tone(587,0,.14,'triangle',.24); tone(880,.06,.16,'sine',.2); tone(1175,.14,.2,'triangle',.15); }
+    arrive(){ tone(587,0,.14,'triangle',.24); tone(880,.06,.16,'sine',.2); tone(1175,.14,.2,'triangle',.15); },
+    // ── 牌桌专属音效(斗地主/掼蛋) ──
+    deal(){ noise(0,.05,.34,5200,1400); noise(.06,.05,.3,4800,1200); noise(.12,.05,.28,4400,1000); noise(.18,.06,.24,4000,800); noise(.25,.06,.2,3600,700); },  // 洗牌发牌: 连续纸张摩擦扫
+    cardplay(){ noise(0,.085,.5,4200,600); tone(340,0,.055,'triangle',.13,190); },  // 出牌拍击: 纸张甩击 + 一记轻闷响
+    cardsel(){ tone(2400,0,.028,'triangle',.075); },  // 选牌微击: 极短高频轻点
+    pass(){ noise(0,.14,.24,1600,340); tone(420,0,.11,'sine',.06,240); },  // 过牌: 柔和下扫气声
+    yourturn(){ tone(784,0,.1,'sine',.16); tone(1175,.07,.17,'triangle',.13); },  // 轮到你: 上行两音提示
+    landlord(){ tone(392,0,.16,'sawtooth',.2,392); tone(587,.1,.18,'triangle',.18); tone(784,.22,.26,'sine',.16); tone(1046,.34,.3,'triangle',.13); },  // 地主揭晓: 上行号角式四连音
+    spring(){ tone(659,0,.16,'triangle',.2); tone(880,.1,.18,'sine',.18); tone(1175,.2,.2,'triangle',.16); tone(1568,.3,.24,'sine',.15); tone(2093,.42,.3,'triangle',.13); }  // 春天/双下: 更长的上行欢庆音阶
   };
   function unlock(){ ensure(); }
   function play(name){
