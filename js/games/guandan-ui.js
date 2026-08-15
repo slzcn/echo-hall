@@ -488,10 +488,8 @@
       const hand=st.players[mySeat].hand;
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==mySeat)?st.table.lastPlay.parse:null;
       if(!hintCycle.length){
-        let cs = AI.genCombos(hand, st.level, AI.groups(hand,st.level).wilds.length);
-        if(target) cs = cs.filter(c=>Rules.beats(c.parse,target,st.level));
-        cs.sort((a,b)=> a.cards.length-b.cards.length || a.parse.key-b.parse.key);
-        hintCycle = cs.map(c=>c.cards); hintIdx=0;
+        // best-first: 能一把走完排最前(剩一对提示打对子而非拆单张), 领出走长牌型、跟牌走最小代价
+        hintCycle = AI.hints({ hand, tableParse:target, level:st.level }); hintIdx=0;
       }
       if(!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
       const pick=hintCycle[hintIdx%hintCycle.length]; hintIdx++;

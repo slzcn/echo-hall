@@ -489,10 +489,10 @@
     function doHint(){
       const hand = st.players[mySeat].hand;
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
-      // 循环提示:多套可出方案轮着给, 再点一次换一套
+      // 循环提示:多套可出方案轮着给, 再点一次换一套。best-first: 能一把走完排最前,
+      // 领出走长牌型垫单张, 跟牌走最小代价、炸弹垫底(剩一对提示打整对而非拆单张)。
       if (!hintCycle.length){
-        const { plays, bombs, rocket } = AI.candidates(hand, target);
-        hintCycle = [...plays.map(p=>p.cards||p), ...bombs.map(b=>b.cards||b), ...(rocket?[rocket.cards||rocket]:[])];
+        hintCycle = AI.hints(hand, target);
         hintIdx = 0;
       }
       if (!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }

@@ -190,6 +190,48 @@
     return (notBig[0] || pool[0]).cards;
   }
 
+  // 提示排序: 产出 best-first 的可打牌序列(每项 card[])。UI 的「提示」直接吃它。
+  // 核心智能: ① 能一把走完的牌型永远排最前(剩一对就提示打对子, 而不是拆成单张一张张出);
+  //           ② 领出时先出长牌型清散牌、单张垫底、不轻易甩大单张/拆炸;
+  //           ③ 跟牌时最小代价的一手优先、炸弹垫底(除非炸弹能一把走完)。
+  function hints(ctx){
+    const level = ctx.level || 2;
+    const hand = ctx.hand || [];
+    const target = ctx.tableParse || null;
+    const g = groups(hand, level);
+    let combos = genCombos(hand, level, g.wilds.length);
+    if (target) combos = combos.filter(c=>Rules.beats(c.parse, target, level));
+    if (!combos.length) return [];
+    const handN = hand.length;
+    const isB = c=>Rules.isBomb(c.parse);
+    const leadOrder = { straight:0, pairline:0, trioline:0, fullhouse:1, trio:2, pair:3, single:5 };
+    combos.sort((a,b)=>{
+      // ① 一把走完 → 最优先(无论领出/跟牌)
+      const fa = a.cards.length===handN ? 0:1, fb = b.cards.length===handN ? 0:1;
+      if (fa!==fb) return fa-fb;
+      if (!target){
+        // 领出: 长牌型优先清散牌; 炸弹/大单张垫底; 拆炸代价高的靠后
+        const ba = isB(a)?8:(leadOrder[a.parse.type]??6);
+        const bb = isB(b)?8:(leadOrder[b.parse.type]??6);
+        if (ba!==bb) return ba-bb;
+        const bigA = (a.parse.type==='single' && a.parse.key>=14)?1:0;
+        const bigB = (b.parse.type==='single' && b.parse.key>=14)?1:0;
+        if (bigA!==bigB) return bigA-bigB;
+        if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
+        const ca=playCost(a,hand,level), cb=playCost(b,hand,level);
+        if (ca!==cb) return ca-cb;
+        return a.parse.key-b.parse.key;                                   // 点小优先
+      }
+      // 跟牌: 非炸优先(炸弹垫底), 再按代价最小
+      const ba = isB(a)?1:0, bb = isB(b)?1:0;
+      if (ba!==bb) return ba-bb;
+      const ca=playCost(a,hand,level), cb=playCost(b,hand,level);
+      if (ca!==cb) return ca-cb;
+      return a.cards.length-b.cards.length;
+    });
+    return combos.map(c=>c.cards);
+  }
+
   function playCost(play, hand, level){
     let cost = play.parse.key;
     const g = groups(hand, level);
@@ -215,6 +257,6 @@
   }
 
   return {
-    decide, chooseLead, genCombos, allBombs, groups, findLines,
+    decide, chooseLead, hints, genCombos, allBombs, groups, findLines,
   };
 });

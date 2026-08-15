@@ -281,6 +281,46 @@
     return (nonBig[0] || plays[0]).cards;
   }
 
+  // 提示排序: 产出 best-first 的可出牌序列(每项 card[]), UI 的「提示」直接吃它。
+  //   ① 能一把走完的牌型永远排最前(剩一对提示打整对, 而不是拆成单张一张张出);
+  //   ② 领出先出长牌型清散牌、单张垫底、不首选甩 2/王大单张;
+  //   ③ 跟牌走最小代价、炸弹/王炸垫底(除非炸弹恰好能一把走完)。
+  function hints(hand, target){
+    const { plays, bombs, rocket } = candidates(hand, target || null);
+    const handN = hand.length;
+    let bombItems = [
+      ...bombs.map(cards=>({cards, parse:Rules.parse(cards)})),
+      ...(rocket ? [{cards:rocket, parse:Rules.parse(rocket)}] : []),
+    ].filter(x=>x.parse);
+    if (target) bombItems = bombItems.filter(x=>Rules.beats(x.parse, target)); // 跟牌只留能压的炸
+
+    const list = plays.slice();
+    if (!target){
+      const order = { straight:0, pairs:0, plane:0, plane_single:0, plane_pair:1, trio_single:2, trio_pair:2, trio:3, pair:4, single:5 };
+      list.sort((a,b)=>{
+        const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
+        if (fa!==fb) return fa-fb;                                       // ① 走完优先
+        const ra=order[a.parse.type]??9, rb=order[b.parse.type]??9;
+        if (ra!==rb) return ra-rb;                                       // 长牌型优先
+        const bigA=(a.parse.type==='single'&&a.parse.key>=15)?1:0;
+        const bigB=(b.parse.type==='single'&&b.parse.key>=15)?1:0;
+        if (bigA!==bigB) return bigA-bigB;                               // 大单张(2/王)垫后
+        if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
+        return a.parse.key-b.parse.key;
+      });
+    } else {
+      list.sort((a,b)=>{
+        const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
+        if (fa!==fb) return fa-fb;                                       // ① 走完优先
+        return playCost(a,hand)-playCost(b,hand);                        // 最小代价
+      });
+    }
+    // 炸弹垫底; 但能一把走完的炸弹提到最前
+    const goBombs = bombItems.filter(x=>x.cards.length===handN).map(x=>x.cards);
+    const restBombs = bombItems.filter(x=>x.cards.length!==handN).map(x=>x.cards);
+    return [...goBombs, ...list.map(p=>p.cards), ...restBombs];
+  }
+
   // 出这手牌的「代价」:拆散了大牌/炸弹惩罚高;点数越大代价越高。
   function playCost(play, hand){
     let cost = play.parse.key;
@@ -327,6 +367,6 @@
   return {
     scoreHand, chooseBid, decide,
     // 暴露供单测
-    candidates, enumBasics, findChains, chooseLead,
+    candidates, enumBasics, findChains, chooseLead, hints,
   };
 });
