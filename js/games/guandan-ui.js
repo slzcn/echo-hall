@@ -338,6 +338,21 @@
       const b = room.querySelector(`.gd-seat[data-seat="${seat}"] .gd-say`);
       if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1500);
     }
+    // ── F3 牌局直播: 高光瞬间(炸弹/报单/头游/终局升级)播报给聊天室(opts.onBeat 由 app.js 注入)。
+    //   灵魂对手配即时入戏台词(quip): say() 气泡 + 随 beat 进聊天流, 模板化零延迟(不塞 LLM 到热路径)。
+    const gameIsAI = opts.isAI || [false,true,true,true];
+    const QUIP = {
+      bomb:  ['轰！接不接得住','这把我说了算','让开让开','炸你没商量'],
+      danpai:['就剩一张咯～','要走啦','你们慢慢磨','头游预定'],
+      finish:['走咯，先撤一步～','头游到手 😎','剩下你们玩','漂亮收工'],
+      win:   ['升级喽','这盘归我们队','承让承让','技高一筹'],
+    };
+    function emitBeat(b){ if(typeof opts.onBeat==='function'){ try{ opts.onBeat(Object.assign({ game:'gd' }, b)); }catch(_){} } }
+    function beatQuip(seat, kind){
+      if(!(gameIsAI && gameIsAI[seat])) return null;
+      const q = rand(QUIP[kind]||[]); if(!q) return null;
+      say(seat, q); return q;
+    }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
     const onResize = ()=>layoutHand();
     function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); }
@@ -513,8 +528,16 @@
       if (changed){
         void els.played.offsetWidth;
         els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
-        if (Rules.isBomb(lp.parse)) boom(bombName(lp.parse));
-        else if (lp.seat!==mySeat) sfx('cardplay');
+        const nm = st.players[lp.seat].name;
+        if (Rules.isBomb(lp.parse)){
+          const bn = bombName(lp.parse);
+          boom(bn);
+          emitBeat({ type:'bomb', actor:nm, big:true, text:`💥 ${nm} 甩出${bn.replace(/ /g,'')}！`, quip: beatQuip(lp.seat, 'bomb') });
+        } else if (lp.seat!==mySeat) sfx('cardplay');
+        // 报单: 出完只剩最后一张(solo 有真实手牌; guest 脱敏跳过)
+        const rest = st.players[lp.seat].hand;
+        if (Array.isArray(rest) && rest.length === 1)
+          emitBeat({ type:'danpai', actor:nm, text:`⚠️ ${nm} 只剩最后一张牌！`, quip: beatQuip(lp.seat, 'danpai') });
       }
     }
     function bombName(p){ return p.type==='jokerbomb'?'天 王 炸':(p.type==='straightflush'?'同 花 顺':(p.size+' 炸')); }
@@ -672,6 +695,17 @@
       selected=new Set(pick.map(c=>c.id)); renderHand(); updatePlayBtn();
     }
 
+    // 供联机(host 权威应用远程真人动作)/测试驱动任意席一手, 与 aiStep 同源(掼蛋无叫分, 只 play/pass)。
+    function applyMove(seat, move){
+      if(!move || st.phase!=='play' || st.turn!==seat) return;
+      if(move.action==='pass'){ doPass(seat); return; }
+      if(move.action==='play'){
+        const hand=st.players[seat].hand;
+        const cards=(move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
+        let r; try{ r=Engine.applyPlay(st, seat, cards); }catch(e){ return; }
+        sfx('cardplay'); maybeBanter(seat); afterMove(r);
+      }
+    }
     function aiStep(seat){
       if (st.phase!=='play' || st.turn!==seat) return;
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==seat)?st.table.lastPlay.parse:null;
@@ -696,8 +730,16 @@
     }
 
     function afterMove(r){
-      // 有人刚出完(名次+1) → 一声提示
-      if (st.finished.length>lastFinishedN){ sfx('sparkle'); lastFinishedN=st.finished.length; }
+      // 有人刚出完(名次+1) → 一声提示 + 播报名次(头游/二游/三游)
+      if (st.finished.length>lastFinishedN){
+        sfx('sparkle');
+        const seat = st.finished[st.finished.length-1];
+        const rankNm = ['头游','二游','三游'][st.finished.length-1] || '出完';
+        const nm = st.players[seat].name;
+        emitBeat({ type:'finish', actor:nm, big:st.finished.length===1,
+          text:`🏆 ${nm} 打完 · ${rankNm}`, quip: st.finished.length===1 ? beatQuip(seat,'finish') : null });
+        lastFinishedN=st.finished.length;
+      }
       renderAll();
       if (r && r.over){ showOver(); }
     }
@@ -766,6 +808,12 @@
         sfx('deal'); renderAll(); showTributeBanner();
       });
       over.querySelector('#gdDone').addEventListener('click', close);
+      // F3 终局战报进聊天流(升级/双下/通关一并播报); 头游若是灵魂配一句收官台词
+      const champSeat = res.finishOrder[0];
+      emitBeat({ type:'over', actor:st.players[champSeat]?st.players[champSeat].name:winSide, big:true,
+        text: res.matchWon ? `🏆 ${winSide}打过 A · 通关胜利！`
+          : `🏁 ${winSide}升级 ${lvlFrom}→${lvlTo}（+${res.advance} · ${res.doubleDown?'双下':'单下'}）`,
+        quip: beatQuip(champSeat, 'win') });
       if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat }); }catch(_){} }
       if (minimized) updateChip();   // 折叠中终局: 片子翻到"点看战报"态并高亮
     }
@@ -778,7 +826,7 @@
 
     renderAll();
     showTributeBanner();
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
   function rand(a){ return a[Math.floor(secureRand()*a.length)]; }

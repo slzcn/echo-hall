@@ -848,7 +848,9 @@
   .game-card{margin:12px auto;max-width:min(520px,92%);padding:15px 17px 14px;border-radius:16px;animation:slidein .34s;flex:none;
     background:linear-gradient(150deg,color-mix(in srgb,var(--gc,#00E5D4) 15%,var(--panel-solid)),var(--panel-solid) 62%);
     border:1px solid color-mix(in srgb,var(--gc,#00E5D4) 42%,transparent);
-    box-shadow:0 0 0 1px color-mix(in srgb,var(--gc,#00E5D4) 12%,transparent),0 14px 34px -14px color-mix(in srgb,var(--gc,#00E5D4) 55%,transparent);position:relative;overflow:hidden}
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--gc,#00E5D4) 12%,transparent),0 14px 34px -14px color-mix(in srgb,var(--gc,#00E5D4) 55%,transparent);position:relative;overflow:hidden;
+    contain:layout paint;will-change:transform}
+  .game-card.no-anim,.msg.no-anim .game-card{animation:none}
   .game-card::before{content:'';position:absolute;inset:0;background:radial-gradient(120% 80% at 12% 0%,color-mix(in srgb,var(--gc,#00E5D4) 16%,transparent),transparent 60%);pointer-events:none}
   .game-card .gc-head{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--sub);margin-bottom:9px;flex-wrap:wrap}
   .game-card .gc-emoji{font-size:16px}
@@ -902,6 +904,15 @@
   .ar-actions .ar-recall:hover{background:color-mix(in srgb,var(--magenta) 12%,transparent)}
   .sysmsg{text-align:center;font-size:11.5px;color:var(--dim);padding:5px}
   .sysmsg b{color:var(--sub)}
+  /* F3 牌局直播: 高光战报行(定地主/炸弹/报单/春天/终局)—— 比普通 sysmsg 更亮一档, 带左侧霓虹竖条 */
+  .sysmsg.gamebeat{color:var(--sub);font-size:12px;font-weight:600;padding:6px 10px;margin:2px auto;max-width:340px;
+    background:rgba(0,229,212,.06);border-left:2px solid var(--accent,#00e5d4);border-radius:0 8px 8px 0;
+    animation:gbIn .28s ease-out}
+  .sysmsg.gamebeat.big{color:var(--amber,#ffc24d);border-left-color:var(--amber,#ffc24d);background:rgba(255,194,77,.08)}
+  /* 灵魂入戏台词: 以对手身份呈现, 洋红名 + 常规文字, 稍暗不抢战报 */
+  .sysmsg.gamebeat-quip{color:var(--sub);font-size:11.5px;padding:2px 10px 5px;margin:0 auto;max-width:340px;text-align:left;font-style:italic}
+  .sysmsg.gamebeat-quip .gb-who{color:var(--magenta,#ff2d8e);font-weight:700;font-style:normal;margin-right:5px}
+  @keyframes gbIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
 
   /* ===== 进场动效系统: 自己进房的类型化"入场横幅"(替代朴素 sysmsg) ===== */
   /* 更炸版: 横幅弹性砸入 + 旋转流光边框 + 呼吸辉光; 高阶档另配全屏光幕(见 .ent-stage) */
@@ -2028,7 +2039,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260815-tablechat';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260815-gamebeats';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2482,14 +2493,14 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/ddz-rules.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-engine.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-ai.js?v=20260815-hint"></script>
-<script defer src="./js/games/game-ui.js?v=20260815-tablechat"></script>
+<script defer src="./js/games/game-ui.js?v=20260815-gamebeats"></script>
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <script defer src="./js/games/guandan-rules.js?v=20260814-guandan"></script>
 <script defer src="./js/games/guandan-engine.js?v=20260814-guandan"></script>
 <script defer src="./js/games/guandan-ai.js?v=20260815-hint"></script>
-<script defer src="./js/games/guandan-ui.js?v=20260815-tablechat"></script>
+<script defer src="./js/games/guandan-ui.js?v=20260815-gamebeats"></script>
 <script defer src="./js/games/table-net.js?v=20260815-hint-smart"></script>
-<script defer src="./js/app.js?v=20260815-tablechat"></script>
+<script defer src="./js/app.js?v=20260815-gamebeats"></script>
 <script defer src="./js/keyboard.js?v=20260814-imegap39"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260814-dmkbfull"></script>

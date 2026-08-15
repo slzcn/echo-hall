@@ -113,6 +113,10 @@
     injectCSS();
     var meta=GAME_META[row.game]||GAME_META.guandan;
     var seats=Array.isArray(row.seats)?row.seats.slice().sort(function(a,b){return a.seat-b.seat;}):[];
+    // Realtime 可能重复投递同一行；状态未变化时跳过整卡重绘，避免无意义的布局/绘制抖动。
+    var sig=String(row.status||'')+'|'+String(row.host_uid||'')+'|'+JSON.stringify(seats);
+    if(el.dataset.gtSig===sig) return el;
+    el.dataset.gtSig=sig;
     ctx.status=row.status; ctx.isHost=(row.host_uid===ctx.myUid);
     ctx.iAmPlaying=seats.some(function(s){ return s.kind==='human' && s.uid===ctx.myUid; });
     var humans=seats.filter(function(s){return s.kind==='human';}).length;

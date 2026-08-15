@@ -361,6 +361,23 @@
       setTimeout(()=>bubble.classList.remove('show'), 1600);
     }
 
+    // ── F3 牌局直播: 把高光瞬间(定地主/炸弹/报单/终局)播报给聊天室(opts.onBeat 由 app.js 注入)。
+    //   AI 对手(灵魂)配即时入戏台词(quip): 走 say() 气泡 + 随 beat 进聊天流, 模板化零延迟 —— 不塞 LLM
+    //   到牌局热路径(内网网关一条要 15-21s, 直播就废了)。真人自己的动作不配台词(自己知道)。
+    const QUIP = {
+      bomb:   ['轰！尝尝这个','这把我说了算','接不接得住','让开让开'],
+      rocket: ['王炸！全场最靓','火箭起飞 🚀','这局我锁了','无解，认输吧'],
+      danpai: ['就剩一张咯～','要赢啦要赢啦','你们慢慢磨','胜利在望'],
+      win:    ['承让承让','这局归我','下次再战','技高一筹 😎'],
+    };
+    function emitBeat(b){ if (typeof opts.onBeat === 'function'){ try{ opts.onBeat(Object.assign({ game:'ddz' }, b)); }catch(_){} } }
+    // 一手落定后按 seat 是否灵魂配台词: AI 走气泡+聊天, 真人不配。返回 quip(供 beat 带入聊天)
+    function beatQuip(seat, kind){
+      if (!(gameIsAI && gameIsAI[seat])) return null;
+      const q = rand(QUIP[kind] || []); if (!q) return null;
+      say(seat, q); return q;
+    }
+
     function clearTimers(){
       if (aiTimer){ clearTimeout(aiTimer); aiTimer = null; }
       if (actionTimer){ clearTimeout(actionTimer); actionTimer = null; }
@@ -465,8 +482,18 @@
         void els.played.offsetWidth;                // 强制回流, 让下一行的动画类重新触发
         // 方向:自己出的从下方飞入, 对手从上方飞入
         els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
-        if (Rules.isBomb(lp.parse)) boom(lp.parse.type==='rocket'?'王 炸':'炸 弹');
-        else if (lp.seat!==mySeat) sfx('cardplay');   // 对手落牌拍击音(我自己出牌的音在 doPlay)
+        const nm = st.players[lp.seat].name;
+        if (Rules.isBomb(lp.parse)){
+          const rocket = lp.parse.type==='rocket';
+          boom(rocket?'王 炸':'炸 弹');
+          emitBeat({ type: rocket?'rocket':'bomb', actor:nm, big:true,
+            text: `💥 ${nm} ${rocket?'放了王炸':'扔出炸弹'}！倍数 ×${st.multiplier}`,
+            quip: beatQuip(lp.seat, rocket?'rocket':'bomb') });
+        } else if (lp.seat!==mySeat) sfx('cardplay');   // 对手落牌拍击音(我自己出牌的音在 doPlay)
+        // 报单: 这手出完只剩最后一张(solo 才有真实手牌; guest 手牌脱敏跳过)
+        const rest = st.players[lp.seat].hand;
+        if (Array.isArray(rest) && rest.length === 1)
+          emitBeat({ type:'danpai', actor:nm, text:`⚠️ ${nm} 只剩最后一张牌！`, quip: beatQuip(lp.seat, 'danpai') });
       }
     }
     function boom(txt){
@@ -820,12 +847,21 @@
       if (typeof opts.onResult === 'function'){
         try { opts.onResult(res, st.log, { mySeat, roleTxt }); } catch(_){}
       }
+      // F3 终局战报进聊天流(春天/炸弹倍数一并播报); 赢家若是灵魂配一句收官台词
+      const winNm = st.players[res.winners[0]] ? st.players[res.winners[0]].name : (res.landlordWon?'地主':'农民');
+      emitBeat({ type:'over', actor:winNm, big:true,
+        text:`🏁 ${res.landlordWon?'地主':'农民'}方胜 · 底分 ${res.base} × ${res.finalMultiplier}${res.spring?' · 春天翻倍':''}${res.bombs?` · ${res.bombs} 炸`:''}`,
+        quip: beatQuip(res.winners[0], 'win') });
       if (minimized) updateChip();   // 折叠中终局: 片子翻到"点看战报"态并高亮
     }
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
-      if (lastLord===null && st.landlord!=null) sfx('landlord');   // 地主刚揭晓: 号角定音
+      if (lastLord===null && st.landlord!=null){
+        sfx('landlord');   // 地主刚揭晓: 号角定音
+        const nm = st.players[st.landlord].name;
+        emitBeat({ type:'landlord', actor:nm, big:true, text:`🎪 ${nm} 抢到地主 · ${st.multiplier} 倍起` });
+      }
       lastLord = st.landlord;
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
       // guest 无本地引擎(host 托管超时); 折叠期间也不催我的回合(离席看聊天不该被自动过牌)

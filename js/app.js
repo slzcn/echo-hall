@@ -2264,7 +2264,13 @@ function gtCtx(row){
       kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
 }
 function gtRenderInto(el,row){ if(window.EHTable) try{ EHTable.renderLobby(el,row,gtCtx(row)); }catch(_){} }
-function gtRenderCard(row){ const el=document.querySelector(`[data-gt-id="${row.id}"]`); if(el) gtRenderInto(el,row); }
+function gtRenderCard(row){
+  const el=document.querySelector(`[data-gt-id="${row.id}"]`);
+  if(!el) return;
+  // Realtime 更新只改牌桌内容，不让已存在的卡片重播入场动画。
+  el.classList.add('no-anim');
+  gtRenderInto(el,row);
+}
 async function gtEnsureRow(id){
   if(_gtTables.has(id)) return _gtTables.get(id);
   try{ const {data}=await sb.from('eh_game_tables').select('*').eq('id',id).maybeSingle();
@@ -2300,7 +2306,7 @@ function gtLaunchLocal(row){
   const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
   const names=seats.map(s=>s.name||'玩家'); const avatars=seats.map(s=>s.emoji||'🙂');
   const pick=seats.slice(1).filter(s=>s.kind==='soul').map(s=>({user_id:s.uid,name:s.name,emoji:s.emoji}));
-  _ehGame = window.EHGuandanGame.open({ names, avatars, chat: ehGameChatBridge(),
+  _ehGame = window.EHGuandanGame.open({ names, avatars, chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,names,avatars,pick).catch(()=>{});
       postGuandanResult(res,log,names,meta).catch(()=>{});
@@ -6154,6 +6160,28 @@ async function ehTableChatSend(text){
 function ehGameChatBridge(){ return { send: ehTableChatSend, me: { uid:myUid, name:me.name, emoji:me.emoji, color:me.color } }; }
 // 把一条房间消息喂给当前活跃牌局(弹幕 + 坞列表); 无活跃牌局或不支持则忽略。
 function feedGameRoomMsg(m){ try{ if(_ehGame && _ehGame.onRoomMsg) _ehGame.onRoomMsg(m); }catch(_){} }
+// F3 牌局直播: 把牌桌高光瞬间(定地主/炸弹/报单/头游/终局升级)以【本地临时行】播到聊天流 ——
+//   折叠牌桌回聊天时也能追牌局进展。AI 对手的入戏台词(quip)另起一行以灵魂身份呈现。
+//   刻意只本地渲染(不落 eh_messages、不广播): solo 战报是"直播解说"而非聊天记录, 且 .sysmsg 类
+//   会被刷新快照剔除(见 persistRoomSnap), 不污染历史。多人观战的共享直播留给 F4。
+function ehGameBeat(b){
+  if(!b || !b.text) return;
+  try{
+    const stream = $('#stream'); if(!stream) return;
+    const wasNear = nearBottom();
+    const row = document.createElement('div');
+    row.className = 'sysmsg gamebeat' + (b.big?' big':'');
+    row.innerHTML = esc(b.text);
+    stream.appendChild(row);
+    if(b.quip && b.actor){
+      const q = document.createElement('div');
+      q.className = 'sysmsg gamebeat-quip';
+      q.innerHTML = '<span class="gb-who">'+esc(b.actor)+'</span>'+esc(b.quip);
+      stream.appendChild(q);
+    }
+    if(wasNear) scrollStream();
+  }catch(_){}
+}
 function _restoreActiveGameIfAny(){
   if(document.querySelector('.ddz-room, .gd-room')){
     if(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
@@ -6177,7 +6205,7 @@ async function launchDoudizhu(){
   // 开局在聊天室留一行(让游戏"触发聊天内容"): 谁开了桌 + 对手是谁。失败静默,不挡开局。
   try{ sendSystemAct(`开了一桌斗地主 🃏 · 对手 ${names[1]}、${names[2]}`).catch(()=>{}); }catch(_){}
   _ehGame = window.EHDdzGame.open({
-    names, avatars, chat: ehGameChatBridge(),
+    names, avatars, chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onResult: (res, log, meta)=>{
       recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{});
       postDdzResult(res, names).catch(()=>{});   // 结束后聊天室留一张战绩卡(含"再来一局"入口)
