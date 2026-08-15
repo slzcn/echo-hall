@@ -2263,7 +2263,26 @@ function gtCtx(row){
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
       kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
 }
-function gtRenderInto(el,row){ if(window.EHTable) try{ EHTable.renderLobby(el,row,gtCtx(row)); }catch(_){} }
+function gtRenderInto(el,row){
+  if(!window.EHTable){ console.warn('[gt] EHTable 未就绪, 牌桌卡暂无法渲染'); return; }
+  try{ EHTable.renderLobby(el,row,gtCtx(row)); }
+  catch(e){ console.warn('[gt] renderLobby 抛错', e); }
+}
+// 异步把牌桌卡"补水"成真卡: 直接就地渲染进 el(不靠 querySelector 再找, 免 DOM 时序竞态)。
+// 行拿不到(散桌/网络抖动/会话过期)时给【可重试的诚实态】, 绝不永远停在"加载中…"。
+// journey-exempt: 牌桌卡渲染(happy path renderLobby)已由 EHTable 渲染层 + 线上真库验证覆盖;
+//   本次仅加防御性兜底/重试分支, 而 app.js 无可启动的浏览器旅程 harness(现有 journey 只 boot
+//   js/games/*, 不 boot 全量 app.js), 为单一防御分支专起 playwright 全站引导既笨重又易 flaky。
+async function gtHydrateCard(el, id){
+  const r = await gtEnsureRow(id);
+  if(r){ gtRenderInto(el, r); return; }
+  el.classList.add('gt-card');
+  el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--dim,#498d88)">牌桌信息拿不到</span></div>'
+    +'<div class="gt-foot"><span class="gt-tip" style="color:var(--dim,#498d88)">可能已散桌，或网络/登录波动</span>'
+    +'<button class="gt-btn ghost" data-gt-retry="1">重试</button></div>';
+  const btn=el.querySelector('[data-gt-retry]');
+  if(btn) btn.onclick=()=>{ el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--sub,#86cbc6)">牌桌加载中…</span></div>'; gtHydrateCard(el, id); };
+}
 function gtRenderCard(row){
   const el=document.querySelector(`[data-gt-id="${row.id}"]`);
   if(!el) return;
@@ -2273,8 +2292,10 @@ function gtRenderCard(row){
 }
 async function gtEnsureRow(id){
   if(_gtTables.has(id)) return _gtTables.get(id);
-  try{ const {data}=await sb.from('eh_game_tables').select('*').eq('id',id).maybeSingle();
-    if(data){ _gtTables.set(id,data); return data; } }catch(_){}
+  try{ const {data,error}=await sb.from('eh_game_tables').select('*').eq('id',id).maybeSingle();
+    if(error) throw error;
+    if(data){ _gtTables.set(id,data); return data; } }
+  catch(e){ console.warn('[gt] 取牌桌行失败', id, e && e.message); }
   return null;
 }
 function gtErr(e){ const m=(e&&e.message)||'';
@@ -2602,7 +2623,7 @@ function buildGameEl(m){
     el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--sub,#86cbc6)">牌桌加载中…</span></div>';
     const row=_gtTables.get(tableId);
     if(row){ gtRenderInto(el,row); }
-    else { gtEnsureRow(tableId).then(r=>{ if(r) gtRenderCard(r); }); }
+    else { gtHydrateCard(el, tableId); }
     return el;
   }
   if(ev==='soup'){
