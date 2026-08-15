@@ -35,8 +35,11 @@ assert(/async function launchGuandan\(\)/.test(src), 'launchGuandan 存在');
 assert(/async function recordGuandanResult\(/.test(src), 'recordGuandanResult 存在(全记落库)');
 assert(/game:'guandan'[\s\S]{0,600}moves:\s*log/.test(src), '掼蛋战绩写入 eh_game_results 且含 moves(回看数据源)');
 assert(src.indexOf("cmd==='/掼蛋'") < src.lastIndexOf('return false'), '/掼蛋 分支在 return false 之前(不会被当普通消息)');
-assert(/querySelector\('\.gd-room'\)/.test(src) && /launchGuandan/.test(src),
-  '重复敲 /掼蛋 被拦(已有 .gd-room 时不再叠桌)');
+// 防重复开桌 + F1 融合: 开桌前走 _restoreActiveGameIfAny() —— 已有牌桌时不叠桌,
+// 折叠态则展开回同一局, 否则提示先收工; 单桌约束斗地主/掼蛋共用一个守卫。
+assert(/function _restoreActiveGameIfAny\(\)/.test(src), '存在 _restoreActiveGameIfAny(已有牌桌时的统一处置)');
+assert(/querySelector\('\.ddz-room, \.gd-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋牌桌(单桌约束)');
+assert(/if\(_restoreActiveGameIfAny\(\)\) return;/.test(src), '重复敲 /掼蛋 被拦(已有牌桌 → 展开或提示, 不再叠桌)');
 
 // ── 步骤2-5: 起局 → 打到底 → 落一行战绩 ─────────────────────
 function buildRow(res, log, names, souls){

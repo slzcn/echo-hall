@@ -33,9 +33,13 @@ assert(/async function recordGameResult\(/.test(src), 'recordGameResult 存在(�
 assert(/eh_game_results/.test(src) && /moves:\s*log/.test(src), '战绩写入 eh_game_results 且含 moves(回看数据源)');
 // 命令未接入时会掉进 return false(当普通消息发) —— 反证该分支确实在 /斗地主 之前不吞
 assert(src.indexOf("cmd==='/斗地主'") < src.lastIndexOf('return false'), '/斗地主 分支在 return false 之前(不会被当普通消息)');
-// 防重复开桌:launchDoudizhu 里在 open 之前挡掉已有牌局(否则叠两张桌+两套定时器)
-assert(/querySelector\('\.ddz-room'\)/.test(src) && /launchDoudizhu/.test(src),
-  '重复敲 /斗地主 被拦(已有 .ddz-room 时不再叠桌)');
+// 防重复开桌 + F1 融合: launchDoudizhu 在 open 之前走 _restoreActiveGameIfAny()。
+// 已有牌桌时不叠桌 —— 若牌桌是折叠态(活牌桌片)则展开回同一局, 否则提示先收工;
+// 二者都 return 掉, 绝不叠两张桌 + 两套定时器。这比旧的"静默拦掉"更顺(丝滑回桌)。
+assert(/function _restoreActiveGameIfAny\(\)/.test(src), '存在 _restoreActiveGameIfAny(已有牌桌时的统一处置)');
+assert(/querySelector\('\.ddz-room, \.gd-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋牌桌(单桌约束)');
+assert(/if\(_restoreActiveGameIfAny\(\)\) return;/.test(src), '重复敲 /斗地主 被拦(已有牌桌 → 展开或提示, 不再叠桌)');
+assert(/isMinimized\(\)[\s\S]{0,60}\.restore\(\)/.test(src), '已有牌桌若为折叠态则展开回同一局(不销毁重开)');
 
 // ── 步骤2-4: 起局 → 打到底 → 落一行战绩 ─────────────────────
 // 复刻 recordGameResult 里"从 result+log 组装行"的核心逻辑,验证与引擎一致。

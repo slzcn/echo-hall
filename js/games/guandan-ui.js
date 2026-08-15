@@ -196,6 +196,30 @@
 .gd-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
 .gd-confetti i{position:absolute;top:-8%;font-size:20px;animation:gdFall linear forwards;will-change:transform,opacity}
 @keyframes gdFall{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(115%) rotate(var(--r,540deg));opacity:0}}
+/* ── F1 融合: "返回"不销毁牌局, 折叠成右下角活牌桌片(PiP), 牌局后台继续; 点片展开回牌桌 ── */
+.gd-room.gd-collapsing{transition:transform .24s cubic-bezier(.4,0,1,1),opacity .24s;transform-origin:100% 100%;
+  transform:scale(.14) translate(60%,64%);opacity:0;pointer-events:none}
+.gd-room.gd-expanding{animation:gdExpand .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes gdExpand{from{transform-origin:100% 100%;transform:scale(.14) translate(60%,64%);opacity:0}to{transform:none;opacity:1}}
+.gd-chip{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:18;
+  display:flex;align-items:center;gap:9px;max-width:min(74vw,264px);padding:8px 12px 8px 11px;cursor:pointer;
+  background:linear-gradient(135deg,var(--panel-solid,#132a29),var(--bg2,#0d1524));
+  border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;color:var(--ink,#eaf6ff);
+  box-shadow:0 10px 28px rgba(0,0,0,.5);animation:gdChipIn .26s cubic-bezier(.2,.9,.3,1);
+  -webkit-tap-highlight-color:transparent;user-select:none}
+@keyframes gdChipIn{from{opacity:0;transform:translateY(10px) scale(.88)}to{opacity:1;transform:none}}
+.gd-chip .ck-ic{font-size:21px;line-height:1;position:relative;flex:none}
+.gd-chip .ck-tx{display:flex;flex-direction:column;min-width:0;line-height:1.28}
+.gd-chip .ck-t{font-size:12px;font-weight:800;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-chip .ck-s{font-size:11px;color:var(--sub,#86cbc6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-chip .ck-x{margin-left:1px;flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--line,rgba(0,229,212,.24));
+  display:grid;place-items:center;font-size:12px;color:var(--sub,#86cbc6)}
+.gd-chip.turn{border-color:var(--accent,#00e5d4);box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 16px var(--accent,rgba(0,229,212,.55))}
+.gd-chip.turn .ck-ic::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--accent,#00e5d4);
+  animation:gdChipPulse 1.05s ease-out infinite;pointer-events:none}
+@keyframes gdChipPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
+.gd-chip.over{border-color:var(--amber,#ffc24d)}
+.gd-chip.over .ck-s{color:var(--amber,#ffc24d)}
 `;
     document.head.appendChild(s);
   }
@@ -312,8 +336,39 @@
     }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
     const onResize = ()=>layoutHand();
-    function close(){ clearTimers(); window.removeEventListener('resize', onResize); room.remove(); }
-    $('#gdX').addEventListener('click', close);
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(chip){ chip.remove(); chip=null; } room.remove(); }
+
+    // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
+    let minimized=false, chip=null;
+    function chipStatus(){
+      if (st.phase==='over'){ const w=st.result && Engine.teamOf(mySeat)===st.result.winnerTeam;
+        return { t:'掼蛋', s:(w?'🏁 你方赢了 · 点看战报':'🏁 本副结束 · 点看战报'), cls:'over' }; }
+      const mine=st.turn===mySeat, my=st.players[mySeat];
+      return { t:'掼蛋 · 打'+LVL_LABEL(st.level), s:(mine?'⚡ 轮到你出牌':('等 '+st.players[st.turn].name+' 出牌'))+' · 你 '+(my&&my.hand?my.hand.length:'?')+' 张', cls: mine?'turn':'' };
+    }
+    function updateChip(){ if(!minimized||!chip) return; const i=chipStatus();
+      chip.className='gd-chip'+(i.cls?(' '+i.cls):''); chip.querySelector('.ck-t').textContent=i.t; chip.querySelector('.ck-s').textContent=i.s; }
+    function minimize(){
+      if (minimized) return; minimized=true;
+      room.classList.remove('gd-expanding'); room.classList.add('gd-collapsing');
+      setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
+      if (!chip){
+        chip=document.createElement('div'); chip.className='gd-chip';
+        chip.innerHTML=`<span class="ck-ic">🎴</span><span class="ck-tx"><b class="ck-t">掼蛋</b><span class="ck-s"></span></span><span class="ck-x">↗</span>`;
+        chip.addEventListener('click', restore);
+        mountEl.appendChild(chip);
+      } else chip.style.display='';
+      renderAll(); sfx('click');
+    }
+    function restore(){
+      if (!minimized) return; minimized=false;
+      if (chip) chip.style.display='none';
+      room.style.display=''; room.classList.remove('gd-collapsing');
+      void room.offsetWidth; room.classList.add('gd-expanding');
+      setTimeout(()=>room.classList.remove('gd-expanding'), 300);
+      renderAll(); sfx('click');
+    }
+    $('#gdX').addEventListener('click', minimize);
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
@@ -708,16 +763,18 @@
       });
       over.querySelector('#gdDone').addEventListener('click', close);
       if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat }); }catch(_){} }
+      if (minimized) updateChip();   // 折叠中终局: 片子翻到"点看战报"态并高亮
     }
 
     function renderAll(){
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
-      armTurn(onHumanTimeout);
+      armTurn(minimized ? null : onHumanTimeout);   // 折叠期间不催我的回合(离席看聊天不该被自动过牌)
+      if (minimized) updateChip();
     }
 
     renderAll();
     showTributeBanner();
-    return { close, state:()=>st };
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st };
   }
 
   function rand(a){ return a[Math.floor(secureRand()*a.length)]; }

@@ -191,6 +191,31 @@
 .ddz-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
 .ddz-confetti i{position:absolute;top:-8%;font-size:20px;animation:ddzFall linear forwards;will-change:transform,opacity}
 @keyframes ddzFall{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(115%) rotate(var(--r,540deg));opacity:0}}
+/* ── F1 融合: "返回"不销毁牌局, 而是把牌桌折叠成右下角活牌桌片(PiP), 牌局在后台继续; 点片展开回牌桌 ── */
+/*    折叠/展开都朝右下角那枚片做 zoom, 读起来是"同一个东西叠进/长出片子", 让 chat⇄table 是一个连续空间 */
+.ddz-room.ddz-collapsing{transition:transform .24s cubic-bezier(.4,0,1,1),opacity .24s;transform-origin:100% 100%;
+  transform:scale(.14) translate(60%,64%);opacity:0;pointer-events:none}
+.ddz-room.ddz-expanding{animation:ddzExpand .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes ddzExpand{from{transform-origin:100% 100%;transform:scale(.14) translate(60%,64%);opacity:0}to{transform:none;opacity:1}}
+.ddz-chip{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:18;
+  display:flex;align-items:center;gap:9px;max-width:min(74vw,264px);padding:8px 12px 8px 11px;cursor:pointer;
+  background:linear-gradient(135deg,var(--panel-solid,#132a29),var(--bg2,#0d1524));
+  border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;color:var(--ink,#eaf6ff);
+  box-shadow:0 10px 28px rgba(0,0,0,.5);animation:ddzChipIn .26s cubic-bezier(.2,.9,.3,1);
+  -webkit-tap-highlight-color:transparent;user-select:none}
+@keyframes ddzChipIn{from{opacity:0;transform:translateY(10px) scale(.88)}to{opacity:1;transform:none}}
+.ddz-chip .ck-ic{font-size:21px;line-height:1;position:relative;flex:none}
+.ddz-chip .ck-tx{display:flex;flex-direction:column;min-width:0;line-height:1.28}
+.ddz-chip .ck-t{font-size:12px;font-weight:800;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddz-chip .ck-s{font-size:11px;color:var(--sub,#86cbc6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddz-chip .ck-x{margin-left:1px;flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--line,rgba(0,229,212,.24));
+  display:grid;place-items:center;font-size:12px;color:var(--sub,#86cbc6)}
+.ddz-chip.turn{border-color:var(--accent,#00e5d4);box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 16px var(--accent,rgba(0,229,212,.55))}
+.ddz-chip.turn .ck-ic::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--accent,#00e5d4);
+  animation:ddzChipPulse 1.05s ease-out infinite;pointer-events:none}
+@keyframes ddzChipPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
+.ddz-chip.over{border-color:var(--amber,#ffc24d)}
+.ddz-chip.over .ck-s{color:var(--amber,#ffc24d)}
 `;
     document.head.appendChild(s);
   }
@@ -226,7 +251,52 @@
     const gameIsAI = opts.isAI || [false,true,true];                    // 联机: host 按座位实况标人/机
     // 对手 DOM 槽位: 以 mySeat 为基, 顺位 (me+1)/(me+2)(单机 mySeat=0 时恰为 1/2)
     const OPP_SEATS = [(mySeat+1)%3, (mySeat+2)%3];
-    let st = Engine.createGame({ isAI: gameIsAI, names });
+    // ── 联机模式 ── solo=单机(默认) / host=本机权威跑引擎+广播脱敏快照 / guest=只渲染快照+回传动作
+    const mode = opts.mode || 'solo';
+    const isHost = mode === 'host', isGuest = mode === 'guest';
+    const transport = opts.transport || null;
+    const TableSync = root.EHTableSync;
+    function sendMove(move){ try{ if(transport && transport.sendMove) transport.sendMove(move); }catch(_){} }
+    // host: 每次状态推进后, 给每席产出脱敏快照(别家手牌只留张数)并广播
+    function broadcast(){
+      if (!isHost || !transport || !transport.broadcast || !TableSync) return;
+      try { transport.broadcast(st.players.map((_,seat)=>TableSync.makeSnapshot(st, seat))); } catch(_){}
+    }
+    // guest: 把收到的快照重建成 render 兼容的 st —— 别家 hand 用等长占位(只有张数会被渲染, 牌面不下发)
+    function snapToState(snap){
+      if (!snap) return { phase:'play', turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
+        bid:null, result:null, bottom:[], table:{lastPlay:null,passesInRow:0},
+        players:[0,1,2].map(seat=>({seat,name:names[seat]||('席'+seat),isAI:gameIsAI[seat],hand:[]})) };
+      return {
+        phase:snap.phase, turn:snap.turn, landlord:(snap.landlord==null?null:snap.landlord),
+        multiplier:snap.multiplier||1, base:snap.base||1, bombs:snap.bombs||0,
+        bid:snap.bid||null, result:snap.result||null,
+        bottom: snap.bottom ? snap.bottom : Array.from({length:snap.bottomCount||0},()=>({})),
+        table: snap.table || {lastPlay:null,passesInRow:0},
+        players: snap.players.map(p=>({ seat:p.seat, name:p.name, isAI:p.isAI,
+          hand: p.hand ? p.hand : Array.from({length:p.count||0},()=>({_hidden:true})) })),
+      };
+    }
+    // host 接收远程真人回传的动作 → 经引擎权威校验后应用(非本人回合/非法一律忽略)
+    function applyMove(seat, move){
+      if (!move || st.phase==='over') return;
+      try {
+        if (st.phase==='bid'){ if(st.bid.turn!==seat) return; if(move.action==='call') doCall(seat, move.val); return; }
+        if (st.phase==='play'){
+          if (st.turn!==seat) return;
+          if (move.action==='pass'){ doPass(seat); return; }
+          if (move.action==='play'){
+            const hand = st.players[seat].hand;
+            const cards = (move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
+            let r; try{ r = Engine.applyPlay(st, seat, cards); }catch(e){ return; }
+            if (!Rules.isBomb(r&&r.played)) sfx('cardplay');
+            maybeBanter(seat); renderAll();
+            if (r && r.over) showOver();
+          }
+        }
+      } catch(_){}
+    }
+    let st = isGuest ? snapToState(opts.snapshot) : Engine.createGame({ isAI: gameIsAI, names });
     let selected = new Set();     // 选中的 card id
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
@@ -293,9 +363,45 @@
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
     }
     const onResize = ()=>layoutHand();
-    function close(){ clearTimers(); window.removeEventListener('resize', onResize); room.remove(); }
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(chip){ chip.remove(); chip=null; } room.remove(); }
     window.addEventListener('resize', onResize);
-    $('#ddzX').addEventListener('click', close);
+
+    // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回到牌桌) ──
+    // "返回"不再销毁牌局: 牌桌 zoom 进右下角一枚活牌桌片, 引擎/定时器后台继续跑(AI 照走),
+    // 轮到自己时片子脉冲提醒且不判超时(离席看聊天不该被自动过牌); 点片子再 zoom 回全牌桌。
+    let minimized = false, chip = null;
+    function chipStatus(){
+      if (st.phase==='over'){ const w = st.result && st.result.winners.includes(mySeat); return { t:'斗地主', s:(w?'🏁 你赢了 · 点看战报':'🏁 本局结束 · 点看战报'), cls:'over' }; }
+      if (st.phase==='bid'){ const mine=st.bid.turn===mySeat;
+        return { t:'斗地主 · 叫分', s: mine?'⚡ 轮到你叫分':('等 '+st.players[st.bid.turn].name+' 叫分'), cls: mine?'turn':'' }; }
+      const mine = st.turn===mySeat, my=st.players[mySeat];
+      return { t:'斗地主', s:(mine?'⚡ 轮到你出牌':('等 '+st.players[st.turn].name+' 出牌'))+' · 你 '+(my&&my.hand?my.hand.length:'?')+' 张', cls: mine?'turn':'' };
+    }
+    function updateChip(){ if(!minimized||!chip) return; const i=chipStatus();
+      chip.className='ddz-chip'+(i.cls?(' '+i.cls):''); chip.querySelector('.ck-t').textContent=i.t; chip.querySelector('.ck-s').textContent=i.s; }
+    function minimize(){
+      if (minimized) return; minimized=true;
+      room.classList.remove('ddz-expanding'); room.classList.add('ddz-collapsing');
+      setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
+      if (!chip){
+        chip=document.createElement('div'); chip.className='ddz-chip';
+        chip.innerHTML=`<span class="ck-ic">🃏</span><span class="ck-tx"><b class="ck-t">斗地主</b><span class="ck-s"></span></span><span class="ck-x">↗</span>`;
+        chip.addEventListener('click', restore);
+        mountEl.appendChild(chip);
+      } else chip.style.display='';
+      renderAll();      // 以 minimized 态重排: armTurn 不再催我的回合 + 刷新片子文案
+      sfx('click');
+    }
+    function restore(){
+      if (!minimized) return; minimized=false;
+      if (chip) chip.style.display='none';
+      room.style.display=''; room.classList.remove('ddz-collapsing');
+      void room.offsetWidth; room.classList.add('ddz-expanding');
+      setTimeout(()=>room.classList.remove('ddz-expanding'), 300);
+      renderAll();      // 折叠期间 AI 可能已推进, 回来刷到最新
+      sfx('click');
+    }
+    $('#ddzX').addEventListener('click', minimize);
 
     // lastPlay 只存 id,需要一张 id→card 表(用整副牌重建)
     const ALL = {}; Deck.standardDeck().forEach(c=>ALL[c.id]=c);
@@ -507,7 +613,10 @@
       const mine = seat===mySeat;
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
       lastMyTurn = mine;
-      turnDur = mine ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS) : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
+      // host 上的远程真人席: 给足真人回合时限, 到点由 aiStep 托管出牌(与本人超时兜底同源)
+      const remoteHuman = isHost && !mine && !gameIsAI[seat];
+      turnDur = (mine || remoteHuman) ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS)
+              : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
       turnStart = Date.now();
 
       const seatEl = seatOf(seat);
@@ -531,8 +640,8 @@
       };
       tick();
 
-      if (!mine){
-        // AI:到点自己行动(环长度=思考时长)
+      if (!mine && !isGuest){
+        // solo/host: AI 席到点行动; host 上远程真人席到点由 aiStep 托管。guest 从不本地驱动任何席(host 权威)
         aiTimer = setTimeout(()=>aiStep(seat), turnDur);
       }
     }
@@ -599,6 +708,7 @@
 
     // ── 动作 ──
     function doCall(seat, val){
+      if (isGuest){ if(seat!==mySeat) return; sendMove({action:'call',val}); say(seat,val>0?val+'分！':'不叫'); toast('已叫分…'); return; }
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
@@ -607,6 +717,7 @@
     }
     function doPlay(){
       const cards = [...selected].map(findCardById);
+      if (isGuest){ if(!cards.length) return; sendMove({action:'play',cards:cards.map(c=>({id:c.id}))}); selected.clear(); hintCycle=[]; sfx('cardplay'); toast('已出牌…'); return; }
       try { var r = Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
       if (!Rules.isBomb(r && r.played)) sfx('cardplay');   // 出牌拍击音(炸弹交给 boom, 不叠)
@@ -615,6 +726,7 @@
       if (r && r.over){ showOver(); return; }
     }
     function doPass(seat){
+      if (isGuest){ if(seat!==mySeat) return; sendMove({action:'pass'}); sfx('pass'); say(seat,'不出'); toast('已过…'); return; }
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
       if (seat===mySeat) sfx('pass');
       say(seat,'不出');
@@ -676,8 +788,10 @@
 
     // ── 结算浮层 ──
     function showOver(){
+      if (showOver._done) return; showOver._done = true;   // 幂等: guest 会连收多张 over 快照, 只弹一次
       clearTimers();
       const res = st.result;
+      if (!res) { showOver._done = false; return; }
       const iWon = res.winners.includes(mySeat);
       const over = document.createElement('div');
       over.className = 'ddz-over ' + (iWon?'win':'lose');
@@ -694,12 +808,15 @@
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       over.querySelector('#ddzAgain').addEventListener('click', ()=>{
+        if (isGuest){ toast('等房主再来一局…'); if(transport && transport.sendMove) sendMove({action:'again'}); return; }
+        showOver._done=false;
         over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){
         try { opts.onResult(res, st.log, { mySeat, roleTxt }); } catch(_){}
       }
+      if (minimized) updateChip();   // 折叠中终局: 片子翻到"点看战报"态并高亮
     }
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
@@ -707,12 +824,22 @@
       if (lastLord===null && st.landlord!=null) sfx('landlord');   // 地主刚揭晓: 号角定音
       lastLord = st.landlord;
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
-      armTurn(onHumanTimeout);
+      // guest 无本地引擎(host 托管超时); 折叠期间也不催我的回合(离席看聊天不该被自动过牌)
+      armTurn((isGuest || minimized) ? null : onHumanTimeout);
+      broadcast();                                // host: 推送每席脱敏快照
+      if (minimized) updateChip();                // 折叠时把最新态同步到右下角活牌桌片
     }
 
     // 开局
     renderAll();
-    return { close, state:()=>st };
+    // guest: 订阅 host 广播的快照 → 重建 st 重绘; host: 订阅远程真人回传动作 → 权威校验后应用
+    if (isGuest && transport && transport.onSnapshot){
+      transport.onSnapshot(snap=>{ st = snapToState(snap); renderAll(); if(st.phase==='over') showOver(); });
+    }
+    if (isHost && transport && transport.onMove){
+      transport.onMove((seat, move)=>applyMove(seat, move));
+    }
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, pushSnapshot: snap=>{ if(isGuest){ st=snapToState(snap); renderAll(); if(st.phase==='over') showOver(); } } };
   }
 
   // ── 小工具 ──

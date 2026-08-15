@@ -2292,11 +2292,12 @@ async function gtStart(id){
 }
 // host 开局: 在本机跑引擎, 用真实座位名单当四家(phase-1 host 权威; 联机对战下一步接入)。
 function gtLaunchLocal(row){
-  if(!window.EHGuandanGame || document.querySelector('.gd-room')) return;
+  if(!window.EHGuandanGame) return;
+  if(_restoreActiveGameIfAny()) return;
   const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
   const names=seats.map(s=>s.name||'玩家'); const avatars=seats.map(s=>s.emoji||'🙂');
   const pick=seats.slice(1).filter(s=>s.kind==='soul').map(s=>({user_id:s.uid,name:s.name,emoji:s.emoji}));
-  window.EHGuandanGame.open({ names, avatars,
+  _ehGame = window.EHGuandanGame.open({ names, avatars,
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,names,avatars,pick).catch(()=>{});
       postGuandanResult(res,log,names,meta).catch(()=>{});
@@ -6134,12 +6135,22 @@ async function handleSlash(text){
   return false; // 非命令，按普通消息发
 }
 
+// 当前活跃牌局控制器(斗地主/掼蛋共用单例; 一次只允许一桌)。F1: "返回"折叠不销毁, 再开同类/异类游戏时先把它拉回来。
+let _ehGame = null;
+function _restoreActiveGameIfAny(){
+  if(document.querySelector('.ddz-room, .gd-room')){
+    if(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
+    else toast('先收工当前牌局再开新的');
+    return true;
+  }
+  return false;
+}
 // ── 斗地主:唤起牌桌浮层。两家 AI 用房里的灵魂居民命名/头像(没有则用默认)。──
 async function launchDoudizhu(){
   if(!window.EHDdzGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
-  // 防重复开桌:已有牌局在进行就不叠第二张(否则两套引擎+定时器同时跑)
-  if(document.querySelector('.ddz-room')){ toast('牌局进行中，先返回再开新局'); return; }
+  // 已有牌局(进行中或折叠成活牌桌片)→ 不叠第二桌, 折叠态直接拉回牌桌
+  if(_restoreActiveGameIfAny()) return;
   // 取房里灵魂当对手(公开信息:灵魂本就是房间住民)
   let souls=[];
   try{ souls = await prefetchSouls(curRoom.id); }catch(_){}
@@ -6148,7 +6159,7 @@ async function launchDoudizhu(){
   const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '👾'];
   // 开局在聊天室留一行(让游戏"触发聊天内容"): 谁开了桌 + 对手是谁。失败静默,不挡开局。
   try{ sendSystemAct(`开了一桌斗地主 🃏 · 对手 ${names[1]}、${names[2]}`).catch(()=>{}); }catch(_){}
-  window.EHDdzGame.open({
+  _ehGame = window.EHDdzGame.open({
     names, avatars,
     onResult: (res, log, meta)=>{
       recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{});
@@ -6199,7 +6210,7 @@ async function recordGameResult(game, res, log, names, avatars, souls){
 async function launchGuandan(){
   if(!window.EHGuandanGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
-  if(document.querySelector('.gd-room')){ toast('牌局进行中，先返回再开新局'); return; }
+  if(_restoreActiveGameIfAny()) return;
   // 开一张【联机牌桌】(幂等: 同房已有活桌则复用同一张, 不叠第二桌)。房里其他真人可点卡加入。
   let row=null;
   try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'guandan',p_name:me.name,p_emoji:me.emoji});
