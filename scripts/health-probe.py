@@ -213,11 +213,16 @@ def probe_supabase():
     issues = []
     info = {}
     ts = int(time.time())
-    # 打 REST 根（带 anon key），200/401/404 都算服务在（只看网络可达+延迟）；超时/5xx=后端异常。
+    # 打 REST 根并带公开 anon key。无 key 的 401 也代表服务在线，但会让报告看起来像故障。
     try:
+        key = _public_anon_key()
         req = urllib.request.Request(
-            f"{SB_URL}/rest/v1/?_={ts}",
-            headers={"User-Agent": "echo-health/1.0"},
+            f"{SB_URL}/rest/v1/eh_rooms?select=id&limit=1",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "User-Agent": "echo-health/1.0",
+            },
         )
         t0 = time.time()
         try:
@@ -229,6 +234,8 @@ def probe_supabase():
         info["rest"] = {"http": st, "time": round(dt, 3)}
         if st >= 500:
             issues.append(f"Supabase REST 5xx HTTP={st}（后端异常，聊天室可能收发消息失败）")
+        elif st != 200:
+            issues.append(f"Supabase REST 只读探测异常 HTTP={st}（带公开 anon key）")
         elif dt > SB_SLOW:
             issues.append(f"Supabase REST 响应慢 {round(dt,2)}s（阈值 {SB_SLOW}s，用户可能感觉卡）")
     except (urllib.error.URLError, TimeoutError, Exception) as e:
@@ -267,6 +274,7 @@ def probe_cdp():
     import websocket
     errs = []
     failed_resources = []
+    request_urls = {}
     try:
         ws = websocket.create_connection(ws_url, timeout=8)
         mid = [0]
@@ -292,14 +300,25 @@ def probe_cdp():
                 a = msg["params"].get("args", [])
                 errs.append("console.error: " + (a[0].get("value", "") if a else "")[:200])
             elif m == "Log.entryAdded" and msg["params"]["entry"].get("level") == "error":
-                errs.append("Log.error: " + msg["params"]["entry"].get("text", "")[:200])
+                text = msg["params"]["entry"].get("text", "")
+                # Chrome 会把同一次 Network.loadingFailed 再写一条 Log.error；网络失败统一在下方重试后判断。
+                if "net::ERR_" not in text:
+                    errs.append("Log.error: " + text[:200])
+            elif m == "Network.requestWillBeSent":
+                p = msg.get("params", {})
+                request_urls[p.get("requestId")] = p.get("request", {}).get("url")
             elif m == "Network.loadingFailed":
                 p=msg.get("params",{}); err=p.get("errorText") or "资源加载失败"
                 # 新导航/主动取消媒体预加载会产生 ERR_ABORTED，不是线上资源故障。
-                if not p.get("canceled") and err != "net::ERR_ABORTED": failed_resources.append(err[:120])
+                if not p.get("canceled") and err != "net::ERR_ABORTED":
+                    failed_resources.append({"error": err[:120], "url": request_urls.get(p.get("requestId"))})
             elif m == "Network.responseReceived":
                 p=msg.get("params",{}); resp=p.get("response",{}); status=int(resp.get("status") or 0)
-                if status >= 400: failed_resources.append(f"HTTP {status} " + str(resp.get("url", ""))[:160])
+                if status >= 400:
+                    failed_resources.append({
+                        "error": f"HTTP {status}",
+                        "url": str(resp.get("url", ""))[:500] or None,
+                    })
         # 白屏检测：核心 DOM 是否存在
         r = send("Runtime.evaluate", {"expression": "!!document.getElementById('hall') && document.body && document.body.childElementCount>0", "returnByValue": True})
         white = None
@@ -359,15 +378,44 @@ def probe_cdp():
         ws.close()
         try: requests.get(f"http://127.0.0.1:9222/json/close/{tab_id}", timeout=3)
         except Exception: pass
-        info = {"js_errors": errs, "failed_resources": failed_resources, "white_screen": white, "realtime_ws": rt_state, "performance": perf}
+        # CDN/本地链路偶发断连不等于资源损坏。失败 URL 独立重试一次，成功则仅记录，不告警。
+        persistent_failures, recovered_resources = [], []
+        seen = set()
+        for item in failed_resources:
+            url = item.get("url")
+            marker = (item.get("error"), url)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            if not url or not url.startswith(("http://", "https://")):
+                persistent_failures.append(item)
+                continue
+            try:
+                retry_url = url + ("&" if "?" in url else "?") + f"health_retry={int(time.time())}"
+                st, _, _ = _get(retry_url)
+                if st < 400:
+                    recovered_resources.append(item)
+                else:
+                    persistent_failures.append({**item, "retry_http": st})
+            except Exception as e:
+                persistent_failures.append({**item, "retry_error": str(e)[:120]})
+        info = {
+            "js_errors": errs,
+            "failed_resources": persistent_failures,
+            "recovered_resources": recovered_resources,
+            "white_screen": white,
+            "realtime_ws": rt_state,
+            "performance": perf,
+        }
         issues = []
         if white:
             issues.append("白屏：核心 DOM(#hall) 未渲染")
         # 只报真正的运行时异常/error，不报 warn
         if errs:
             issues.append(f"页面运行时报错 {len(errs)} 条：" + " | ".join(errs[:3]))
-        if failed_resources:
-            issues.append(f"资源加载失败 {len(failed_resources)} 条：" + " | ".join(failed_resources[:3]))
+        if persistent_failures:
+            summary = [f"{x.get('error')} {x.get('url') or '(URL未知)'}" for x in persistent_failures[:3]]
+            issues.append(f"资源加载持续失败 {len(persistent_failures)} 条：" + " | ".join(summary))
         if perf.get("load") and perf["load"] > 10000:
             issues.append(f"首屏 load 过慢 {perf['load']}ms（阈值 10000ms）")
         if rt_state and rt_state != "open":
