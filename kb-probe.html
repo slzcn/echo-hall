@@ -1,0 +1,94 @@
+<!doctype html>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>EH 键盘信号探测器</title>
+<style>
+  html,body{margin:0;background:#0e0e12;color:#e8e8ef;font:14px/1.5 -apple-system,system-ui}
+  #box{padding:14px;padding-bottom:env(safe-area-inset-bottom)}
+  #cin{width:100%;padding:12px;box-sizing:border-box;border-radius:10px;border:1px solid #444;background:#1c1c24;color:#fff;font-size:16px}
+  #log{white-space:pre-wrap;font:12px/1.35 ui-monospace,Menlo,monospace;color:#a8f;margin-top:10px;max-height:60vh;overflow:auto;background:#141420;padding:10px;border-radius:8px}
+  button{padding:10px 14px;border-radius:8px;background:#2a2a38;color:#fff;border:0;margin-right:8px;margin-top:8px;font-size:14px}
+  #copy{background:#3a5}
+  h3{margin:0 0 6px}
+  small{color:#889}
+</style>
+<div id=box>
+  <h3>EH 键盘信号探测器</h3>
+  <small>操作：① 点下方输入框（键盘弹起）→ ② 打两个字 → ③ 按输入法自带的"收起键盘"按钮（不要点空白/切页）→ ④ 等 3 秒 → 点"复制日志"发给我。</small>
+  <input id=cin placeholder="点我 → 弹键盘 → 打字 → 收键盘">
+  <div>
+    <button id=start>▶ 开始录制</button>
+    <button id=stop>■ 停止</button>
+    <button id=copy>📋 复制日志</button>
+    <button id=clear>🗑 清空</button>
+  </div>
+  <div id=log>等待开始…</div>
+</div>
+<script>
+(function(){
+  const log = document.getElementById('log');
+  const cin = document.getElementById('cin');
+  let rows = [];
+  let iv = 0;
+  let t0 = 0;
+  const vv = window.visualViewport;
+  const vk = navigator.virtualKeyboard;
+  try { if(vk){ vk.overlaysContent = false; } } catch(_){}
+
+  function envH(){
+    const p = document.createElement('div');
+    p.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;height:env(keyboard-inset-height,0px)';
+    document.body.appendChild(p);
+    const h = p.getBoundingClientRect().height;
+    p.remove();
+    return Math.round(h);
+  }
+
+  function snap(tag){
+    const t = performance.now() - t0;
+    const iH = window.innerHeight;
+    const vH = vv ? Math.round(vv.height) : -1;
+    const vT = vv ? Math.round(vv.offsetTop) : -1;
+    const r  = (vk && vk.boundingRect) || {height:-1};
+    const vkH = r.height;
+    const ae = document.activeElement;
+    const focused = ae === cin ? 'cin' : (ae ? (ae.tagName + (ae.id ? '#'+ae.id : '')) : 'null');
+    const eH = envH();
+    const row = `[${t.toFixed(0).padStart(5,' ')}ms] ${tag.padEnd(14)} iH=${iH} vvH=${vH} vvT=${vT} vkH=${vkH} envKb=${eH} focus=${focused}`;
+    rows.push(row);
+    log.textContent = rows.slice(-40).join('\n');
+    log.scrollTop = log.scrollHeight;
+  }
+
+  document.getElementById('start').onclick = () => {
+    rows = [];
+    t0 = performance.now();
+    snap('start');
+    if(iv) clearInterval(iv);
+    iv = setInterval(() => snap('tick'), 200);
+  };
+  document.getElementById('stop').onclick = () => {
+    if(iv){ clearInterval(iv); iv = 0; }
+    snap('stop');
+  };
+  document.getElementById('copy').onclick = async () => {
+    const txt = rows.join('\n') + '\n\nUA=' + navigator.userAgent + '\nscreen=' + screen.width + 'x' + screen.height + ' dpr=' + devicePixelRatio + '\ndisplay-mode=' + (matchMedia('(display-mode:standalone)').matches ? 'standalone' : 'browser');
+    try { await navigator.clipboard.writeText(txt); alert('已复制 ' + rows.length + ' 行日志，粘贴回聊天里发给我。'); }
+    catch(e){ prompt('长按复制这段日志:', txt); }
+  };
+  document.getElementById('clear').onclick = () => { rows = []; log.textContent = '已清空'; };
+
+  cin.addEventListener('focus', () => snap('focus'));
+  cin.addEventListener('blur',  () => snap('blur'));
+  cin.addEventListener('input', () => snap('input'));
+  if(vv){
+    vv.addEventListener('resize', () => snap('vv.resize'));
+    vv.addEventListener('scroll', () => snap('vv.scroll'));
+  }
+  window.addEventListener('resize', () => snap('win.resize'));
+  window.addEventListener('orientationchange', () => snap('orient'));
+  if(vk){
+    vk.addEventListener('geometrychange', () => snap('vk.geom'));
+  }
+  document.addEventListener('visibilitychange', () => snap('vis:'+(document.hidden?'hidden':'show')));
+})();
+</script>
