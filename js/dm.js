@@ -78,6 +78,7 @@
     if(kb===0 && _kbEst>0) kb=_kbEst;                                  // 真信号哑 → 用估算兜底
     const h = Math.max(160, (_baseH||window.innerHeight) - kb);
     d.style.setProperty('--dm-vh', Math.round(h)+'px');
+    d.classList.toggle('dm-kb-up', kb>0);
     scrollBottom();                                                    // 抽屉变矮把 stream 挤扁后重新贴底
   }
   function _onFocus(){
@@ -116,7 +117,7 @@
     if(_vv){ _vv.removeEventListener('resize', _syncVH); }
     window.removeEventListener('resize', _syncVH);
     const inp=$('#dmChatInput'); if(inp){ inp.removeEventListener('focus', _onFocus); inp.removeEventListener('blur', _onBlur); }
-    const d=$('#dmChatDrawer'); if(d) d.style.removeProperty('--dm-vh');
+    const d=$('#dmChatDrawer'); if(d){ d.style.removeProperty('--dm-vh'); d.classList.remove('dm-kb-up'); }
     _baseH=0; _kbEst=0;
   }
 
