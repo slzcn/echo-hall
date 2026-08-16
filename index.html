@@ -1784,7 +1784,7 @@
      safe-area 交给抽屉外层 .drawer 的 padding-bottom 兜底(键盘遮住时 iOS 会把 inset 归 0, 不会双留白)。 */
   .dm-composer{flex-shrink:0;display:flex;gap:8px;align-items:center;padding:12px 0 10px;
     border-top:1px solid var(--line)}
-  #dmChatDrawer.dm-kb-up .dm-composer{padding-bottom:0}
+  #dmChatDrawer.dm-kb-up .dm-composer{padding-bottom:5px}
   .dm-composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);
     border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;outline:none;transition:.2s;-webkit-appearance:none;appearance:none}
   /* type=search 自带的清除叉/放大镜(仅为规避密码管理器把它当凭据框而用 search 语义, 视觉上仍是普通输入框): 一律去掉 */
@@ -2510,7 +2510,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/app.js?v=20260816-texas"></script>
 <script defer src="./js/keyboard.js?v=20260816-kb-gap5"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
-<script defer src="./js/dm.js?v=20260816-kb-gap0"></script>
+<script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
 <script defer src="./js/ambient-fx.js?v=20260802-entryFreezeFix"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
