@@ -9,12 +9,24 @@
 //   (4) host 权威: 非本人回合 / 超过筹码 的动作被引擎拒(客户端无权改权威状态);
 //   (5) 收敛一致: 打到终局, 每个客人手里最后一张快照的公共态(阶段/底池/公共牌/赢家)与 host 权威 result 一致。
 // 全程只走"快照下发 + 动作回传", 不给客人 seed/牌堆 —— 正是线上真联机的信息边界。
+const fs     = require('fs');
+const path   = require('path');
 const Engine = require('../js/games/poker-engine.js');
 const AI     = require('../js/games/poker-ai.js');
 const Net    = require('../js/games/poker-net.js');
 
 let step = 0, failed = false;
 function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [${step}] ${msg}`); } else console.log(`✓ [${step}] ${msg}`); }
+
+// 浏览器真实加载链：传输层必须存在，且必须在 UI/app 前加载。Node 直接 require 能通过，不能替代这条运行时契约。
+{
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const netAt = html.indexOf('js/games/poker-net.js');
+  const uiAt  = html.indexOf('js/games/poker-ui.js');
+  const appAt = html.indexOf('js/app.js');
+  assert(netAt >= 0, 'index.html 加载 poker-net.js（真实浏览器具备 EHPokerNet）');
+  assert(netAt < uiAt && uiAt < appAt, '德州联机脚本顺序为 net → ui → app');
+}
 
 // ── 桌面配置: 4 席。0=host 真人, 1=AI/灵魂席, 2 & 3 = 远程真人(各自客户端) ──
 const SEATS = 4;
