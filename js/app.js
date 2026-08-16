@@ -1265,8 +1265,8 @@ function chSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="ch-skel"><div
 function rmSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="rm-skel"><div class="sk-b sk-ric"></div><div class="sk-b sk-rnm"></div></div>'; return s; }
 async function renderOfficial(soft){
   const box=$('#channels');
-  // soft 刷新: 卡片 DOM 已在则只静默刷新在线数/预览，不清空重建(消除返回闪烁)
-  if(soft && box.children.length){
+  // soft 刷新: 只有真实房间卡已渲染时才静默刷新。骨架节点也会占 children，不能拿它判断内容已就绪。
+  if(soft && box.querySelector('.ch[data-rid]')){
     box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
     prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'official'})));
     return;
@@ -1294,7 +1294,7 @@ async function renderOfficial(soft){
 }
 async function renderPublic(soft){
   const box=$('#publicRooms'), empty=$('#publicEmpty');
-  if(soft && box.children.length){
+  if(soft && box.querySelector('.ch[data-rid]')){
     box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
     prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'public'})));
     return;
@@ -1371,7 +1371,7 @@ async function fillRoomStats(box, rid){
 async function renderMyRooms(soft){
   if(!myUid){ $('#myRooms').innerHTML=''; return; }
   const boxE=$('#myRooms');
-  if(soft && boxE.children.length){
+  if(soft && boxE.querySelector('.rm[data-rid]')){
     prefetchAll([...boxE.querySelectorAll('.rm[data-rid]')].map(c=>({id:c.dataset.rid,kind:'private'})));
     return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
   }
