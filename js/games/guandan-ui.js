@@ -280,13 +280,36 @@
     let matchDealer = (opts.match && typeof opts.match.dealerTeam==='number') ? opts.match.dealerTeam : 0;
     let prevResult = (opts.match && opts.match.prevResult) || null;
 
+    // ── 联机(host 权威)双模式: guest 只渲染 host 广播的脱敏公共快照 + 回传自己动作, 不建局/不跑引擎 ──
+    //   单机路径(isGuest=false)完全走原逻辑, 零改动; 所有 guest 行为一律走 isGuest 分支旁路。
+    const mode = opts.mode || 'local';
+    const isGuest = mode === 'guest';
+    const remoteSeats = opts.remoteSeats || [];          // host 视角: 哪些席是远程真人(等其回传, 超时代打)
+    const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
+    const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
+    const GNet = root.EHGuandanNet;
+    let myHand = [];        // guest: 自己手牌(从 eh_gt_hands 拉到)
+    let lastSnap = null;    // guest: 最近一张公共快照
+    let dealNo = 0;         // 本桌第几副(host 广播随快照带出; guest 据此识别新一副去拉手牌)
+    let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复出牌
+    const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打(不出/领出)
+
     function newDeal(){
       return Engine.createGame({ isAI: opts.isAI || [false,true,true,true], names,
         teamLevels: matchLevels, dealerTeam: matchDealer,
         level: matchLevels[matchDealer], prevResult,
         seed: (prevResult ? undefined : opts.seed) });
     }
-    let st = newDeal();
+    // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
+    function waitingState(){
+      return { phase:'wait', seed:undefined, level: (matchLevels[matchDealer]||2), teamLevels: matchLevels.slice(),
+        dealerTeam: matchDealer, turn:-1, bombs:0, finished:[], table:{ lastPlay:null, passesInRow:0 },
+        players:[0,1,2,3].map(s=>({ id:'p'+s, seat:s, team:s%2, name:(names[s]||('席'+s)),
+          isAI: !!(opts.isAI && opts.isAI[s]), hand:[] })),
+        tribute:null, result:null };
+    }
+    let st = isGuest ? waitingState() : newDeal();
     let selected = new Set();
     let hintCycle = [], hintIdx = 0;
 
@@ -294,7 +317,7 @@
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     let dealAnim = true, lastMyTurn = false, lastFinishedN = 0;
     let lastSelTick = 0;
-    sfx('arrive'); sfx('deal');
+    sfx('arrive'); if(!isGuest) sfx('deal');   // guest 未拿到手牌前不响发牌音
 
     let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0;
 
@@ -363,6 +386,8 @@
     function chipStatus(){
       if (st.phase==='over'){ const w=st.result && Engine.teamOf(mySeat)===st.result.winnerTeam;
         return { t:'掼蛋', s:(w?'🏁 你方赢了 · 点看战报':'🏁 本副结束 · 点看战报'), cls:'over' }; }
+      if (st.phase!=='play' || st.turn<0)   // 联机 guest 等 host 首帧 / 换副空窗
+        return { t:'掼蛋', s:'⏳ 等待开局…', cls:'' };
       const mine=st.turn===mySeat, my=st.players[mySeat];
       return { t:'掼蛋 · 打'+LVL_LABEL(st.level), s:(mine?'⚡ 轮到你出牌':('等 '+st.players[st.turn].name+' 出牌'))+' · 你 '+(my&&my.hand?my.hand.length:'?')+' 张', cls: mine?'turn':'' };
     }
@@ -572,7 +597,7 @@
       return Rules.sortHand(hand, st.level);
     }
     function renderHand(){
-      const myTurn = st.phase==='play' && st.turn===mySeat;
+      const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
@@ -602,6 +627,8 @@
     function setBanner(){
       const b=els.banner;
       if (st.phase==='over'){ b.className='gd-banner'; b.textContent=''; return; }
+      if (st.phase!=='play' || st.turn<0){ b.className='gd-banner'; b.textContent='⏳ 等待开局…'; return; }
+      if (isGuest && awaitingHost){ b.className='gd-banner'; b.textContent='⏳ 已出牌 · 等待裁决…'; return; }
       const seat=st.turn, mine=seat===mySeat;
       if (mine){ b.className='gd-banner mine'; b.innerHTML=`🫵 轮到你出牌 <span class="clk" id="gdClk"></span>`; }
       else { b.className='gd-banner'; b.innerHTML=`${escapeHtml(st.players[seat].name)} 思考中… <span class="clk" id="gdClk"></span>`; }
@@ -609,11 +636,14 @@
     function seatOf(seat){ return room.querySelector(`.gd-seat[data-seat="${seat}"]`); }
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase==='over') return;
+      if (st.phase!=='play' || st.turn<0) return;
       const seat=st.turn, mine=seat===mySeat;
+      if (isGuest && awaitingHost) return;   // guest 回传后等裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
-      turnDur = mine ? HUMAN_PLAY_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
+      // host 视角: 远程真人席只等其回传(宽限 REMOTE_TIMEOUT_MS 后托管); 本机 AI 席走 AI 节奏。
+      const remote = !isGuest && isRemote(seat);
+      turnDur = mine ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)));
       turnStart = Date.now();
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       const tick=()=>{
@@ -625,11 +655,23 @@
         ringRAF=requestAnimationFrame(tick);
       };
       tick();
-      if(!mine) aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+      // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程席(超时托管)/host 本机 AI 席。
+      if (mine) return;
+      if (isGuest) return;                                             // guest 只渲染, host 是唯一裁判
+      if (remote) aiTimer=setTimeout(()=>onRemoteTimeout(seat), turnDur);
+      else aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+    }
+    // host: 远程真人超时未回传 → host 托管代打(与 aiStep 同源, 出完即随 afterMove 广播)。
+    function onRemoteTimeout(seat){
+      if (st.phase!=='play' || st.turn!==seat) return;
+      toast('远客超时 · 暂由房主托管');
+      aiStep(seat);
     }
 
     function renderCtrl(){
       if (st.phase!=='play'){ els.ctrl.innerHTML=''; return; }
+      if (isGuest && awaitingHost){   // 已回传动作, 锁操作条防重复
+        els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ 等待裁决…</button></div>`; return; }
       const myTurn=st.turn===mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
       // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
@@ -674,12 +716,25 @@
 
     function doPlay(){
       const cards=[...selected].map(findCardById).filter(Boolean);
+      if (isGuest){
+        // guest: 本地已用 updatePlayBtn 校验合法, 只回传动作(id 数组), 由 host 引擎权威裁决 + 广播新快照
+        if (!cards.length || awaitingHost) return;
+        if (onAction) onAction({ action:'play', cards: cards.map(c=>c.id) });
+        sfx('cardplay'); selected.clear(); hintCycle=[]; awaitingHost=true;
+        setBanner(); renderCtrl(); renderHand(); return;
+      }
       try{ var r=Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
       sfx('cardplay'); selected.clear(); hintCycle=[];
       afterMove(r);
     }
     function doPass(seat){
+      if (isGuest){   // guest 只能替自己不出, 回传给 host
+        if (awaitingHost) return;
+        if (onAction) onAction({ action:'pass' });
+        sfx('pass'); say(mySeat,'不出'); awaitingHost=true;
+        setBanner(); renderCtrl(); renderHand(); return;
+      }
       try{ Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
       if(seat===mySeat) sfx('pass');
       say(seat,'不出'); afterMove({});
@@ -697,15 +752,16 @@
     }
 
     // 供联机(host 权威应用远程真人动作)/测试驱动任意席一手, 与 aiStep 同源(掼蛋无叫分, 只 play/pass)。
+    // 返回 true=引擎接受并应用; false=非本人回合/非法/牌不在手 → 调用方应 resync 把权威快照重播给客人纠偏。
     function applyMove(seat, move){
-      if(!move || st.phase!=='play' || st.turn!==seat) return;
-      if(move.action==='pass'){ doPass(seat); return; }
-      if(move.action==='play'){
+      if(!move || st.phase!=='play' || st.turn!==seat) return false;
+      try{
+        if(move.action==='pass'){ Engine.applyPass(st, seat); say(seat,'不出'); afterMove({}); return true; }
         const hand=st.players[seat].hand;
         const cards=(move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
-        let r; try{ r=Engine.applyPlay(st, seat, cards); }catch(e){ return; }
-        sfx('cardplay'); maybeBanter(seat); afterMove(r);
-      }
+        const r=Engine.applyPlay(st, seat, cards);
+        sfx('cardplay'); maybeBanter(seat); afterMove(r); return true;
+      }catch(e){ return false; }
     }
     function aiStep(seat){
       if (st.phase!=='play' || st.turn!==seat) return;
@@ -741,8 +797,41 @@
           text:`🏆 ${nm} 打完 · ${rankNm}`, quip: st.finished.length===1 ? beatQuip(seat,'finish') : null });
         lastFinishedN=st.finished.length;
       }
+      broadcast();          // host: 每次状态变更后广播脱敏公共快照 + 重写各远程席私牌行(掼蛋手牌动态)
       renderAll();
       if (r && r.over){ showOver(); }
+    }
+
+    // ── host: 产出脱敏公共快照并交给 app.js 广播(顺带把各远程真人席【当前】手牌写回私牌表, 掼蛋出一张变一次) ──
+    function broadcast(){
+      if (isGuest || !onSync || !GNet) return;
+      try{ onSync(GNet.snapshot(st, dealNo), st); }catch(_){}
+    }
+    // ── guest: 收到 host 广播的公共快照 → 组伪状态渲染。换副时重置手牌/动画; 终局弹战报。 ──
+    function applySnapshot(snap){
+      if (!snap || !GNet) return;
+      const prevPhase = st ? st.phase : null;
+      const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || (prevPhase==='over' && snap.phase==='play');
+      if (isNewDeal){
+        dealAnim=true; selected.clear(); hintCycle=[]; customOrder=null;
+        lastShownKey=''; lastFinishedN=0; lastMyTurn=false;
+        if (arrangeMode) setArrange(false);
+        const ov=els.felt.querySelector('.gd-over'); if(ov) ov.remove();
+      }
+      awaitingHost=false;                 // 快照到达即解锁(host 已裁决)
+      dealNo = (typeof snap.dealNo==='number') ? snap.dealNo : dealNo;
+      lastSnap = snap;
+      st = GNet.pseudoState(snap, mySeat, myHand);
+      renderAll();
+      if (isNewDeal) showTributeBanner();
+      if (st.phase==='over' && st.result && prevPhase!=='over') showOver();
+      if (minimized) updateChip();
+    }
+    // ── guest: 收到自己那副手牌(来自 eh_gt_hands, RLS 只放行本人)。可传 id 数组或牌对象数组。 ──
+    function feedHand(cards){
+      myHand = (cards||[]).map(c=> (c && c.id) ? c : findCardById(c)).filter(Boolean);
+      if (st && st.players[mySeat]) st.players[mySeat].hand = myHand.map(c=>GNet?GNet.cardPlain(c):c);
+      renderHand(); renderCtrl(); if(minimized) updateChip();
     }
 
     function onHumanTimeout(){
@@ -788,25 +877,27 @@
       const lvlLine = res.matchWon
         ? `🏆 ${winSide}打过 A，通关胜利！`
         : `${winSide}升级：${lvlFrom} → <b>${lvlTo}</b>（+${res.advance}，${res.doubleDown?'双下':'单下'}）`;
+      // guest 无权开新一副: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报。只留"收工"。
+      const againLabel = isGuest ? '等房主开局…' : (res.matchWon?'新对局':'打下一副');
       over.innerHTML=`
         <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
         <div class="rank-list">${rows}</div>
         <div class="lvlup">${lvlLine}</div>
         <div class="gd-acts" style="margin-top:4px">
-          <button class="gd-btn" id="gdAgain">${res.matchWon?'新对局':'打下一副'}</button>
+          <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
           <button class="gd-btn primary" id="gdDone">收工</button>
         </div>`;
       els.felt.appendChild(over);
       if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
-      over.querySelector('#gdAgain').addEventListener('click', ()=>{
+      if (!isGuest) over.querySelector('#gdAgain').addEventListener('click', ()=>{
         over.remove();
         if (res.matchWon){ matchLevels=[2,2]; matchDealer=0; prevResult=null; }
         else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
           prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
-        st=newDeal(); selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
+        st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
         customOrder=null; if(arrangeMode) setArrange(false);
-        sfx('deal'); renderAll(); showTributeBanner();
+        sfx('deal'); broadcast(); renderAll(); showTributeBanner();
       });
       over.querySelector('#gdDone').addEventListener('click', close);
       // F3 终局战报进聊天流(升级/双下/通关一并播报); 头游若是灵魂配一句收官台词
@@ -827,7 +918,10 @@
 
     renderAll();
     showTributeBanner();
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
+    if (!isGuest) broadcast();   // host: 开局首帧即广播(顺带写各远程席初始手牌)
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove,
+      onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
+      onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
   function rand(a){ return a[Math.floor(secureRand()*a.length)]; }

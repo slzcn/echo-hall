@@ -162,8 +162,8 @@ section "1b3e. 掼蛋游戏引擎"
 
 if ! command -v node >/dev/null 2>&1; then
   fail "node 未安装，无法运行掼蛋引擎测试"
-elif node scripts/test-guandan-rules.js >/dev/null && node scripts/test-guandan-engine.js >/dev/null && node scripts/test-guandan-fuzz.js >/dev/null && node scripts/test-guandan-hint.js >/dev/null && node scripts/journey-guandan-play.js >/dev/null; then
-  pass "掼蛋牌型/级牌抬权/逢人配/炸弹阶 37 项 + 引擎自对弈60局/进贡还贡抗贡/接风/回看重放 75 项 + 模糊压测140局2.8万项不变量 + 提示智能23项(走完优先/剩一对提整对/炸弹垫底/残局对手报单甩大单憋他) + /掼蛋完整旅程(升级延续/进贡/战绩卡) 全部通过"
+elif node scripts/test-guandan-rules.js >/dev/null && node scripts/test-guandan-engine.js >/dev/null && node scripts/test-guandan-fuzz.js >/dev/null && node scripts/test-guandan-hint.js >/dev/null && node scripts/journey-guandan-play.js >/dev/null && node scripts/journey-guandan-online.js >/dev/null; then
+  pass "掼蛋牌型/级牌抬权/逢人配/炸弹阶 37 项 + 引擎自对弈60局/进贡还贡抗贡/接风/回看重放 75 项 + 模糊压测140局2.8万项不变量 + 提示智能23项(走完优先/剩一对提整对/炸弹垫底/残局对手报单甩大单憋他) + /掼蛋完整旅程(升级延续/进贡/战绩卡) + 真人联机15项(host权威/脱敏快照无泄露·只给张数/客人凭伪状态算合法动作/私牌RLS隔离/非本人回合·牌不在手被拒/收敛一致/进贡明置) 全部通过"
 else
   fail "掼蛋回归失败（牌型识别 / 级牌百搭 / 状态机 / 进贡 / 名次结算 / 模糊不变量 / replay一致性 / 命令旅程）"
 fi
