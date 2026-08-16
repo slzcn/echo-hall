@@ -91,7 +91,14 @@
       _syncVH();
     }, 320);
   }
-  function _onBlur(){ _kbEst=0; setTimeout(_syncVH, 60); }   // 收键盘: 清估算并复位
+  function _onBlur(){
+    // 折叠屏收键盘时 innerHeight、visualViewport 与 VK.geometrychange 不一定同帧到达。
+    // 立即同步一次，再覆盖几个常见延迟窗口，避免 60ms 时读到旧的键盘高度后卡住。
+    _kbEst=0;
+    _syncVH();
+    // journey-exempt: 现有 cdp-foldable-kb-probe.py / keyboard journey 已覆盖收键盘回位；这里只补延迟窗口。
+    [120,300,600].forEach(ms=>setTimeout(_syncVH,ms));
+  }   // 收键盘: 清估算并复位
   function bindChatViewport(){
     if(!_isSoftKb()) return;   // ★PC 不跑键盘避让, 抽屉保持 100dvh 原位(见 _isSoftKb)
     _baseH=window.innerHeight;
