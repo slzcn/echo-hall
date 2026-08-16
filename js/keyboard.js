@@ -90,6 +90,13 @@
     }
     // 不再区分聊天聚焦/未聚焦：#hall 高度始终跟随真实可视区。
     // 避免未聚焦时 CSS 100svh 与 visualViewport.height 差距造成的首次进 hall 底部留白。
+    // 键盘弹起态收窄 composer 底部安全区，避免输入框与 IME 顶沿多出 10px 空隙。
+    try {
+      let vkH = 0;
+      try { const r = virtualKeyboard && virtualKeyboard.boundingRect; if (r && r.height > 0) vkH = r.height; } catch (_) {}
+      const kbUp = !!(chatFocused && (vkH > 0 || estimatedKbH > 0));
+      document.documentElement.classList.toggle('kb-up', kbUp);
+    } catch (_) {}
     const next = `${visibleHeight()}px`;
     if (el.style.height !== next) {
       // ★键盘弹起/收回改变 #hall 高度 → #stream 这个滚动容器随之变矮/变高。
