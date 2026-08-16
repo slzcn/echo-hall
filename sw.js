@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v308-20260816-aiendgame';
+const SW_VERSION = 'eh-sw-v309-20260816-navfix';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -155,25 +155,36 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // ★导航文档(index.html / navigate): stale-while-revalidate(2026-08-03 下拉刷新提速)。
-  //   旧策略 network-first: reload 后死等 fetch(index.html) 从 GitHub Pages 返回才换页 —— 国内访问 Pages
-  //   慢/不稳时, 下拉刷新"刷新中"就一直卡着(每次都重下整份 ~196KB HTML)。改 SWR: 缓存壳秒返, 页面立即
-  //   换新、"刷新中"立即消失; 后台拉最新写缓存。壳只是容器, 聊天/房间数据运行时从 Supabase 实时拉、不靠它;
-  //   真有新版由页面内 BUILD_VER 比对 ver.txt(仍 network-first)自愈再 reload 一次, 那次已被本次后台 fetch
-  //   暖好缓存 → 秒拿新壳。稳态(无新版)下拉刷新即秒切, 不再等 Pages。
+  // ★导航文档(index.html / navigate): network-first + 3s 兜底(2026-08-16 白屏事故修)。
+  //   旧策略 stale-while-revalidate: 缓存壳秒返, 后台再更新——若旧壳引用的资源指纹已被新版下线,
+  //   或旧 SW 存过一个坏中间态, 页面就会先跑坏壳、看起来"刷不出来", 得强清缓存才回来。
+  //   新策略: 3 秒内拿到网络新壳就直接用; 超时/失败才用缓存兜底(保离线可用), 拿到网络时同步更新缓存。
+  //   壳很小(<200KB), 3 秒 GH Pages 基本能回; 拉不动才降级到缓存, 不会因单次网络抖动整站白屏。
+  // journey-exempt: 事故根因是 SW 缓存策略, 无功能旅程覆盖; 后续如加导航自愈旅程再回填。
   const isNav = req.mode === 'navigate' || req.destination === 'document' ||
     url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
   if (isNav) {
-    e.respondWith(
-      caches.open(SHELL_CACHE).then(async (cache) => {
-        const cached = (await cache.match(req)) || (await cache.match('./index.html'));
-        const fresh = fetch(req).then((res) => {
-          if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
-          return res;
-        }).catch(() => cached);
-        return cached || fresh;   // 有缓存: 秒返 + 后台更新; 无缓存(首访): 等网络
-      })
-    );
+    e.respondWith((async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      const cached = (await cache.match(req)) || (await cache.match('./index.html'));
+      const networkPromise = fetch(req).then((res) => {
+        if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
+        return res;
+      });
+      if (!cached) return networkPromise.catch(() => Response.error());
+      // 3 秒内拿到网络就用网络; 否则用缓存兜底, 后台继续更新缓存
+      let settled = false;
+      return await new Promise((resolve) => {
+        const timer = setTimeout(() => { if (!settled) { settled = true; resolve(cached); } }, 3000);
+        networkPromise.then((res) => {
+          if (settled) return;
+          settled = true; clearTimeout(timer); resolve(res || cached);
+        }).catch(() => {
+          if (settled) return;
+          settled = true; clearTimeout(timer); resolve(cached);
+        });
+      });
+    })());
     return;
   }
 
