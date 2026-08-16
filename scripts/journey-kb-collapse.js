@@ -91,6 +91,13 @@ async function run(){
   await tick(300);
   const heightAfterFocus=parseInt(s.hall.style.height,10);
 
+  // 真实折叠屏路径：VK 初始 boundingRect 一直为 0，只有 250ms 估算，没有正值 geometrychange。
+  // 旧实现会在下一轮 300ms 轮询把这个初始 0 误判成收键盘，导致 hall 闪回全高。
+  await tick(400);
+  const heightWithInitialZeroVk=parseInt(s.hall.style.height,10);
+  assert(heightWithInitialZeroVk>0 && heightWithInitialZeroVk<800,
+    '步骤 1b: 初始 VK=0 时估算态不能被轮询误清, hall 保持键盘避让高度');
+
   // 触发一次非 0 geometrychange 抬升 vkGeomHits（真实弹起峰值）
   s.vk.boundingRect={height:340};
   s.emit(s.listeners.virtualKeyboard,'geometrychange',{ target:s.vk });
@@ -132,7 +139,9 @@ async function run(){
   const anchor=`try {
         const r = virtualKeyboard && virtualKeyboard.boundingRect;
         // 不要求 vkGeomHits 增长：部分 Android PWA 只更新 boundingRect，不派 geometrychange。
-        if (r && r.height === 0) {
+        // 初始 boundingRect=0 不是收键盘；必须先看到过正高度，后续回到 0 才能清估算。
+        if (r && r.height > 0) vkHadPositiveGeometry = true;
+        if (vkHadPositiveGeometry && r && r.height === 0) {
           dismissSoftKeyboardLayout();
           return;
         }

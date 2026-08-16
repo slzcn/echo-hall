@@ -13,6 +13,8 @@
   let noSignalTimer = 0;                  // focusin 后判定无信号的定时器
   let signalBaseline = null;              // focusin 瞬间的 vv.height / VK 计数基线
   let vkGeomHits = 0;
+  let vkHadPositiveGeometry = false; // 只有先观测到键盘正高度，后续 0 才能判定为收起
+  // journey-exempt: 现有键盘收起旅程覆盖估算态回位；此状态门防止初始 VK=0 误清估算。
   // ★V57：键盘落下时的全屏可视高【持久基线】。visibleHeight() 里扣键盘高(vkH/估算)时的"分母"必须用它,
   //   而不是 max(当前innerH, 当前vv.h)——后者在 resizes-content 设备(安卓折叠屏)上键盘弹起会随 innerH
   //   一起缩到 180, 于是 full-估算 = 180-68 = 112(把已经缩掉的键盘又扣一遍 → 双减)。用落键盘时的稳定全高
@@ -144,6 +146,7 @@
     chatFocused = false;
     keyboardRect = null;
     estimatedKbH = 0;
+    vkHadPositiveGeometry = false;
     if (noSignalTimer) { clearTimeout(noSignalTimer); noSignalTimer = 0; }
     if (collapseTimer) { clearInterval(collapseTimer); collapseTimer = 0; }
     settleChatLayout();
@@ -182,7 +185,9 @@
       try {
         const r = virtualKeyboard && virtualKeyboard.boundingRect;
         // 不要求 vkGeomHits 增长：部分 Android PWA 只更新 boundingRect，不派 geometrychange。
-        if (r && r.height === 0) {
+        // 初始 boundingRect=0 不是收键盘；必须先看到过正高度，后续回到 0 才能清估算。
+        if (r && r.height > 0) vkHadPositiveGeometry = true;
+        if (vkHadPositiveGeometry && r && r.height === 0) {
           dismissSoftKeyboardLayout();
           return;
         }
@@ -300,8 +305,14 @@
     virtualKeyboard.addEventListener('geometrychange', event => {
       // ★V30：真信号回来了 → 撤销估算。
       vkGeomHits++;
-      if (estimatedKbH > 0) estimatedKbH = 0;
-      keyboardRect = event.target.boundingRect;
+      const rect = event.target.boundingRect;
+      if (rect && rect.height > 0) {
+        vkHadPositiveGeometry = true;
+        if (estimatedKbH > 0) estimatedKbH = 0;
+      } else if (vkHadPositiveGeometry) {
+        estimatedKbH = 0;
+      }
+      keyboardRect = rect;
       settleChatLayout();
     });
   }
