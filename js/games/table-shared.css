@@ -1,0 +1,298 @@
+/* ============================================================
+ * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
+ * ------------------------------------------------------------
+ * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
+ * 已经共享了 --accent/--ink/--panel/--amber/--magenta 等主题变量, 但:
+ *   1) 卡牌 font-family: 'Arial Narrow' 在 Windows/安卓上没字体, 回退丑
+ *   2) 卡牌背面用 45° 斜条纹, 生硬 2018 风
+ *   3) 桌面是纯渐变 bg, 没有绿毡质感
+ *   4) 顶栏是"秃字" (SF Mono 15/800), 没有 chip 化
+ *   5) 聊天坞 / 弹幕层与聊天室 accent 边线呼应不够
+ *
+ * 本文件做四件事(全部通过 .ddz-room/.gd-room/.pk-room 后代选择器命中,
+ * 不需要改三个 UI 的 JS/HTML 结构, 只在 index.html 里加一行 <link>):
+ *   A. 字体链修正: 全场统一 -apple-system,"PingFang SC"...
+ *      卡牌数字/花色用 "SF Pro Rounded","Nunito",... (自带 fallback)
+ *   B. 卡牌背面换成暗玻璃 + 微光斜纹 (无生硬条纹)
+ *   C. 三款桌面共享 "绿绒毡" 径向渐变底 (在 .ddz-felt/.gd-felt/.pk-felt 上)
+ *   D. 顶栏 chip 化: 图标 + 名称 + 局数 + conn pill 抱成一整条
+ *   E. 聊天坞 & 弹幕层升级毛玻璃 + accent 呼应边
+ *
+ * 保守原则: 只补/覆盖视觉相关 CSS, 不改布局/尺寸变量/交互. CI 有专项 journey
+ * 验证三款视觉一致性 + 字体链无 Arial Narrow.
+ * ============================================================ */
+
+/* ── A. 字体链修正 ────────────────────────────────────────── */
+.ddz-room, .gd-room, .pk-room{
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+               "Segoe UI", "Hiragino Sans GB", sans-serif;
+}
+/* 卡牌数字/花色: 用圆润无衬线, 数字保留 tabular-nums 对齐 */
+.ddz-room .card, .gd-room .card, .pk-room .card{
+  font-family: "SF Pro Rounded", "SF Pro Display", -apple-system,
+               "PingFang SC", "Segoe UI Emoji", "Helvetica Neue",
+               Arial, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* 顶栏标题/座位名/剩余牌数: 中英一致, 不再落到 SF Mono */
+.ddz-title, .gd-title, .pk-title,
+.ddz-seat .nm, .gd-seat .nm, .pk-seat .nm,
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk,
+.ddz-turnbanner, .gd-banner, .pk-msg, .pk-me .pk-hint{
+  font-family: inherit;
+}
+/* 筹码/局数/剩牌数字保留 tnum 视觉 */
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk, .pk-pot, .pk-me .pk-stk,
+.ddz-turnbanner .clk, .gd-banner .clk, .pk-me .pk-clk{
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── B. 卡牌背面: 换掉 45° 斜条纹, 走暗玻璃 + 微光 ────────── */
+.ddz-room .card.back,
+.gd-room  .card.back,
+.pk-room  .card.back{
+  background:
+    radial-gradient(circle at 30% 22%, rgba(0, 229, 212, .18), transparent 55%),
+    radial-gradient(circle at 74% 76%, rgba(156, 133, 255, .16), transparent 60%),
+    linear-gradient(150deg, #182742 0%, #0f1a2c 45%, #0a1220 100%) !important;
+  border: 1px solid rgba(0, 229, 212, .28) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .04),
+    inset 0 6px 12px rgba(0, 0, 0, .35),
+    0 2px 6px rgba(0, 0, 0, .45);
+  position: relative;
+  overflow: hidden;
+}
+.ddz-room .card.back::after,
+.gd-room  .card.back::after,
+.pk-room  .card.back::after{
+  content: "";
+  position: absolute;
+  inset: 6% 12%;
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg,
+      transparent 0%, transparent 46%,
+      rgba(0, 229, 212, .18) 50%,
+      transparent 54%, transparent 100%),
+    linear-gradient(45deg,
+      transparent 0%, transparent 46%,
+      rgba(156, 133, 255, .16) 50%,
+      transparent 54%, transparent 100%);
+  opacity: .55;
+  pointer-events: none;
+}
+/* 卡牌正面: 白底不动, 但角标数字更清晰 (稍加对比 + 半衬阴影, 手机上不糊) */
+.ddz-room .card:not(.back) .cn,
+.gd-room  .card:not(.back) .cn,
+.pk-room  .card:not(.back) .cn{
+  font-weight: 900;
+  letter-spacing: -.02em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+.ddz-room .card.red, .gd-room .card.red, .pk-room .card.red{ color:#d81e37; }
+.ddz-room .card.blk, .gd-room .card.blk, .pk-room .card.blk{ color:#151a24; }
+
+/* ── C. 桌面绿绒毡 (三款一致的桌面质感) ───────────────────── */
+/* 用 layered radial 做"聚光灯 + 桌面纹理"; ::after 已用作 shake/flash 的地方绕开 */
+.ddz-felt, .gd-felt, .pk-felt{
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% 40%,
+      rgba(0, 90, 78, .22),
+      rgba(0, 40, 40, .10) 55%,
+      transparent 75%),
+    radial-gradient(ellipse 140% 80% at 50% -10%,
+      rgba(0, 229, 212, .06),
+      transparent 65%);
+}
+/* 德州 pk-table::before 已经有绿毡椭圆, 加一层内阴影拉出"皮革"质感 */
+.pk-room .pk-table::before{
+  box-shadow:
+    inset 0 2px 30px rgba(0, 0, 0, .55),
+    inset 0 0 0 1px rgba(255, 255, 255, .04),
+    inset 0 -20px 40px rgba(0, 0, 0, .35),
+    0 0 24px rgba(0, 229, 212, .08);
+}
+
+/* ── D. 顶栏 chip 化: 让 title + dot + mult/lvl/blinds + conn 抱在一起 ── */
+.ddz-bar, .gd-bar, .pk-bar{
+  padding: 10px 14px !important;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, .28),
+    rgba(0, 0, 0, .06));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.ddz-title, .gd-title, .pk-title{
+  font-size: 14px !important;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 229, 212, .10);
+  border: 1px solid rgba(0, 229, 212, .28);
+  letter-spacing: .05em !important;
+}
+.ddz-title .dot, .gd-title .dot, .pk-title .dot{
+  width: 7px !important; height: 7px !important;
+}
+/* 局数/等级/盲注 chip: 三款都是右上角的小 pill, 统一质感 */
+.ddz-mult, .gd-lvl, .pk-blinds{
+  background: rgba(255, 194, 77, .10);
+  padding: 3px 10px !important;
+  font-size: 11.5px !important;
+}
+/* 关闭按钮: 更好按 */
+.ddz-x, .gd-x, .pk-x{
+  height: 30px !important;
+  padding: 0 12px !important;
+  font-size: 12.5px !important;
+  transition: all .14s;
+}
+.ddz-x:hover, .gd-x:hover, .pk-x:hover{ background: rgba(0, 229, 212, .08); }
+
+/* ── E. 座位卡片化 (在原有 conic 高亮环之外补一层玻璃底) ──── */
+/* 只给非 turn 态补微弱 chip 底, turn 态本身已很显眼 */
+.ddz-seat .ddz-avr, .gd-seat .gd-avr, .pk-seat .pk-avr{
+  transition: box-shadow .18s, transform .18s;
+}
+.ddz-seat .nm, .gd-seat .nm, .pk-seat .nm{
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+}
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk{
+  font-weight: 600;
+}
+/* 掼蛋的 gd-tag (队友/等级/警戒) 字号从 9px 提到 10.5px, 更容易识别 */
+.gd-room .gd-tag{ font-size: 10.5px !important; padding: 1px 6px !important; }
+/* 座位下方浮泡的"表情包/话"更"聊天感": 加箭头小三角+微光 */
+.ddz-say, .gd-say, .pk-say{
+  border-radius: 12px !important;
+  background: rgba(19, 42, 41, .92) !important;
+  border-color: rgba(0, 229, 212, .32) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+}
+
+/* ── F. Conn pill 统一: 圆角一致, 高度对齐 title chip ────── */
+.ddz-conn, .gd-conn, .pk-conn{
+  height: 22px;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center;
+  font-size: 10.5px !important;
+  letter-spacing: .04em !important;
+  vertical-align: middle !important;
+}
+
+/* ── G. 聊天坞 + 弹幕层升级 (与聊天室 accent 呼应) ───────── */
+.ddz-room .tchat-toggle,
+.gd-room  .tchat-toggle,
+.pk-room  .tchat-toggle{
+  background: linear-gradient(135deg,
+    rgba(0, 229, 212, .18),
+    rgba(19, 42, 41, .8)) !important;
+  border: 1px solid rgba(0, 229, 212, .45) !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .45),
+    0 0 0 1px rgba(255, 255, 255, .04) inset,
+    0 0 14px rgba(0, 229, 212, .18) !important;
+  transition: transform .14s, box-shadow .18s;
+}
+.ddz-room .tchat-toggle:hover,
+.gd-room  .tchat-toggle:hover,
+.pk-room  .tchat-toggle:hover{
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, .5),
+    0 0 20px rgba(0, 229, 212, .32) !important;
+}
+.ddz-room .tchat-panel,
+.gd-room  .tchat-panel,
+.pk-room  .tchat-panel{
+  border: 1px solid rgba(0, 229, 212, .32) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg,
+    rgba(8, 14, 22, .90),
+    rgba(6, 12, 20, .80)) !important;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(255, 255, 255, .04) inset !important;
+}
+.ddz-room .tchat-row .rn,
+.gd-room  .tchat-row .rn,
+.pk-room  .tchat-row .rn{
+  font-weight: 700;
+}
+.ddz-room .tchat-bullet,
+.gd-room  .tchat-bullet,
+.pk-room  .tchat-bullet{
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .35) !important;
+}
+.ddz-room .tchat-bullet.me,
+.gd-room  .tchat-bullet.me,
+.pk-room  .tchat-bullet.me{
+  background: linear-gradient(135deg,
+    rgba(0, 229, 212, .18),
+    rgba(6, 34, 32, .7)) !important;
+}
+.ddz-room .tchat-bullet.soul,
+.gd-room  .tchat-bullet.soul,
+.pk-room  .tchat-bullet.soul{
+  background: linear-gradient(135deg,
+    rgba(255, 45, 142, .22),
+    rgba(40, 10, 28, .7)) !important;
+}
+
+/* ── H. 折叠 chip (右下角 PiP) 收敛质感 ─────────────────── */
+.ddz-chip, .gd-chip, .pk-chip{
+  border-radius: 18px !important;
+  padding: 9px 13px 9px 12px !important;
+  background: linear-gradient(135deg,
+    rgba(19, 42, 41, .95),
+    rgba(13, 21, 36, .95)) !important;
+  border: 1px solid rgba(0, 229, 212, .45) !important;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(255, 255, 255, .04) inset !important;
+}
+.ddz-chip .ck-t, .gd-chip .ck-t, .pk-chip .ck-t{ font-size: 12.5px !important; }
+.ddz-chip .ck-s, .gd-chip .ck-s, .pk-chip .ck-s{ font-size: 11px !important; }
+
+/* ── I. 操作按钮触感统一 (更 Apple 一点) ─────────────────── */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn{
+  transition:
+    transform .12s cubic-bezier(.34, 1.56, .64, 1),
+    box-shadow .16s,
+    background .16s !important;
+}
+.ddz-btn:not(:disabled):hover,
+.gd-btn:not(:disabled):hover,
+.pk-b:not(:disabled):hover{
+  transform: translateY(-1px);
+}
+.ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
+  transform: scale(.95) !important;
+}
+
+/* ── J. 结算面板玻璃化 ────────────────────────────────────── */
+.ddz-over, .gd-over, .pk-over{
+  background: rgba(4, 6, 12, .78) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* ── K. 手牌底部渐隐: 有"托盘"感, 不像悬空贴纸 ─────────── */
+.ddz-hand-wrap, .gd-hand-wrap{
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      rgba(0, 0, 0, .12) 40%,
+      rgba(0, 0, 0, .28) 100%) !important;
+  border-top: 1px solid rgba(0, 229, 212, .18) !important;
+}

@@ -2041,7 +2041,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260816-exp1';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260816-exp2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2491,6 +2491,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <!-- 斗地主小游戏引擎(纯函数内核,客户端与未来 Edge 共用同一份) -->
 <script defer src="./js/games/deck.js?v=20260814-guandan"></script>
 <!-- 牌桌内嵌聊天坞 + 弹幕(F2 边打边聊): 两桌共用, 须在 game-ui/guandan-ui 之前加载 -->
+<link rel="stylesheet" href="./js/games/table-shared.css?v=20260816-exp2">
 <script defer src="./js/games/table-chat.js?v=20260815-tablechat"></script>
 <script defer src="./js/games/ddz-rules.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-engine.js?v=20260814-ddz2"></script>

@@ -124,7 +124,7 @@
 @keyframes ddzFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 /* 卡牌 (尺寸/字号走 --cw/--ch/--cn... 变量, 大屏媒体查询整体放大) */
 .card{width:var(--cw,44px);height:var(--ch,62px);border-radius:7px;background:#fff;position:relative;flex:none;
-  box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:'Arial Narrow',Arial,sans-serif}
+  box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
 .card.red{color:#e0263e}.card.blk{color:#1a1e28}
 .card .cn{position:absolute;top:3px;left:4px;font-size:var(--cn,15px);font-weight:800;line-height:1;text-align:center}
 .card .cs{position:absolute;top:18px;left:5px;font-size:var(--cs,12px);line-height:1}
@@ -132,7 +132,7 @@
 .card.joker .cc{font-size:calc(var(--cc,25px) * .76)}
 .card.joker.big{background:linear-gradient(150deg,#fff,#ffe9b8)}
 .card.joker.small{background:linear-gradient(150deg,#fff,#e8ecff)}
-.card.back{background:repeating-linear-gradient(45deg,#243056,#243056 5px,#1a2440 5px,#1a2440 10px);border:1px solid #3a4a80}
+.card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
 .card.mini{width:var(--cmw,28px);height:var(--cmh,40px)}.card.mini .cn{font-size:11px}.card.mini .cs{font-size:8px;top:13px}.card.mini .cc{font-size:15px}
 /* 我的座位标(手牌上方左侧) */
 .ddz-me{display:flex;align-items:center;gap:9px;padding:4px 14px 0}
