@@ -38,7 +38,7 @@ assert(src.indexOf("cmd==='/掼蛋'") < src.lastIndexOf('return false'), '/掼�
 // 防重复开桌 + F1 融合: 开桌前走 _restoreActiveGameIfAny() —— 已有牌桌时不叠桌,
 // 折叠态则展开回同一局, 否则提示先收工; 单桌约束斗地主/掼蛋共用一个守卫。
 assert(/function _restoreActiveGameIfAny\(\)/.test(src), '存在 _restoreActiveGameIfAny(已有牌桌时的统一处置)');
-assert(/querySelector\('\.ddz-room, \.gd-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋牌桌(单桌约束)');
+assert(/querySelector\('\.ddz-room, \.gd-room, \.pk-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋/德州牌桌(单桌约束)');
 assert(/if\(_restoreActiveGameIfAny\(\)\) return;/.test(src), '重复敲 /掼蛋 被拦(已有牌桌 → 展开或提示, 不再叠桌)');
 
 // ── 步骤2-5: 起局 → 打到底 → 落一行战绩 ─────────────────────

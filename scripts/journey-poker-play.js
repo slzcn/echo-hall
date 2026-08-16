@@ -84,5 +84,55 @@ const alive = aliveSeats();
 assert(alive.length >= 1, `收敛: 剩 ${alive.length} 名幸存者 (${alive.map(i=>names[i]+':'+stacks[i]).join(', ')})`);
 assert(alive.length === 1 || handNo === 60, alive.length === 1 ? `打出唯一赢家 ${names[alive[0]]}` : `到手数上限 60 手仍在博弈`);
 
+// ── 步骤: 聊天融合 + app.js/UI 接入闭环(静态源码断言, 治"引擎能跑但接不进聊天室") ──
+// 编码→解码字段序必须一致(否则战绩卡渲染错乱); launchTexas 把房里灵魂映射成 5 性格 AI 上桌。
+const fs = require('fs'), path = require('path');
+const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const src = R('js/app.js');
+const ui  = R('js/games/poker-ui.js');
+const html = R('index.html');
+
+// slash 命令 + 唤起
+assert(/\{c:'\/德州'/.test(src), '/德州 已注册进 SLASH_CMDS(聊天可直接开局)');
+assert(/cmd==='\/德州'\|\|cmd==='\/texas'\|\|cmd==='\/poker'\|\|cmd==='\/holdem'/.test(src), 'handleSlash 认 /德州·/texas·/poker·/holdem');
+assert(/async function launchTexas\(/.test(src), '存在 launchTexas(唤起绒面牌桌)');
+assert(/window\.EHPokerGame\.open\(/.test(src), 'launchTexas 调 EHPokerGame.open 开桌');
+assert(/mySeat:0/.test(src) && /isAI\s*=\s*names\.map\(\(_,i\)=>\s*i!==0\)/.test(src), '我坐底位(mySeat 0), 其余席位标记为 AI');
+assert(/archetype:\s*s\.archetype\|\|s\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
+assert(/\.slice\(0,5\)/.test(src) && /while\(pick\.length<2\)/.test(src), '最多带 5 灵魂上桌, 不足两家补默认对手(保证可开局)');
+
+// 结束回调 → 战绩卡 + 落库
+assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');
+assert(/postTexasResult\(res, names, meta\)/.test(src) && /recordTexasResult\(res, log, names, avatars, soulPick, meta\)/.test(src),
+  'onResult 里发战绩卡 + 落库战绩(seed/log 供回看)');
+assert(/async function postTexasResult\(/.test(src), '存在 postTexasResult(发德州战绩卡)');
+// 编码→解码闭环: 生产字段序与 buildGameEl 的 nlhe 分支解码字段序一致
+assert(/\['game','nlhe', outcome, delta, hand\|\|'-', potTotal, champName\]\.join\('\|'\)/.test(src),
+  '战绩卡编码 game|nlhe|outcome|delta|hand|pot|champ(字段序钉死)');
+assert(/postTexasResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/if\(ev==='nlhe'\)/.test(src), 'buildGameEl 有 nlhe 分支(把战绩卡渲染回来)');
+assert(/const champName=esc\(p\.slice\(6\)\.join\('\|'\)\|\|''\)/.test(src), '赢家名取 slice(6).join("|")(兜住名字里的 | 不截断)');
+assert(/data-nlhe-again/.test(src) && /data-nlhe-again[\s\S]{0,200}launchTexas\(\)/.test(src), '战绩卡"下一局"按钮接 launchTexas');
+assert(/p\[1\]==='nlhe'[\s\S]{0,160}德州扑克/.test(src), '消息预览把 nlhe 卡显示成"🎰 德州扑克 · 胜/负/平"(不露原始 game|nlhe| 编码)');
+assert(/game:'nlhe'/.test(src) && /from\('eh_game_results'\)\.insert\(row\)/.test(src), '战绩落 eh_game_results(game=nlhe, N 席结构)');
+assert(/\.ddz-room,\s*\.gd-room,\s*\.pk-room/.test(src), '_restoreActiveGameIfAny 认 .pk-room(返回聊天后能折叠回活牌桌)');
+
+// UI 接线
+assert(/root\.EHPokerGame\s*=\s*\{ open \}/.test(ui), 'poker-ui 导出 EHPokerGame.open');
+assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席地基)');
+assert(/AI\.personaForSoul\(soul\)\.key/.test(ui), '灵魂原型→打法性格映射(personaForSoul)');
+assert(/function applyMove\(seat, move\)/.test(ui), 'applyMove 就位(供 host 权威应用远程真人动作/测试驱动)');
+// 反回退: 对手须落在【上弧】收在桌内(曾因 ±43% 侧位戳出屏外点不到)
+assert(/const cx = 50 \+ 40\*Math\.cos\(t\)/.test(ui) && /const cy = 46 - 34\*Math\.sin\(t\)/.test(ui),
+  '对手沿上弧分布(横40%/竖34%收在桌内)——防侧位溢出屏外');
+assert(/for\(let i=st\.board\.length;i<5;i\+\+\)/.test(ui), '公共牌区恒 5 槽(已发+暗背占位)');
+assert(/function onHumanTimeout\(/.test(ui) && /HUMAN_ACT_MS/.test(ui), '到我行动亮倒计时, 超时自动过牌/弃牌');
+assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80}opts\.onResult\(res, st\.log/.test(ui),
+  '摊牌结算里回调 onResult(res, log, meta)(把结果交回聊天室)');
+
+// index.html 已挂 4 个扑克脚本 + 版本指纹
+assert(/poker-eval\.js\?v=/.test(html) && /poker-engine\.js\?v=/.test(html) && /poker-ai\.js\?v=/.test(html) && /poker-ui\.js\?v=/.test(html),
+  'index.html 挂齐 poker-eval/engine/ai/ui 四脚本(带 ?v= 指纹)');
+
 console.log(`\n德州扑克旅程: 打了 ${handNo} 手, ${step} 步全过${failed ? ' —— 有失败' : ''}`);
 process.exit(failed ? 1 : 0);

@@ -239,6 +239,50 @@ async function main(){
     await ctx.close();
   }
 
+  // ---------- E. 德州扑克绒面牌桌: 桌位不溢出/公共牌5位/我2张底牌/操作区不被切 ----------
+  // 治"椭圆桌对手位算错跑屏外""公共牌槽缺位""操作按钮被切在桌下"。真渲一桌(我坐0席),
+  // 断言: (1)三名对手座位都落在牌桌矩形内(不溢出屏外点不到);
+  //       (2)公共牌区恒 5 槽(已发+暗背占位); (3)我的底牌 2 张; (4)操作区底部不被切出 .pk-room。
+  {
+    const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true });
+    const page = await ctx.newPage();
+    const errs = []; page.on('pageerror', e => errs.push(e.message));
+    await page.setContent('<!doctype html><meta charset=utf-8>'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+CSSVARS
+      + '#hall{position:relative;width:100%;height:100vh;overflow:hidden}</style><body><div id="hall"></div>', { waitUntil:'load' });
+    for (const f of ['deck.js','poker-eval.js','poker-engine.js','poker-ai.js','poker-ui.js'])
+      await page.addScriptTag({ content: G(f) });
+    await page.evaluate(() => window.EHPokerGame.open({ names:['你','阿岩','小凶','疯哥'], avatars:['🙂','🗿','🔥','🤪'], sb:5, bb:10, startStack:1000, onResult(){} }));
+    // 翻牌前我不一定首个行动(庄在上家), 轮到我操作区才出按钮 → 等 AI 依次行动到我
+    await page.waitForSelector('#pkFold', { timeout: 15000 }).catch(()=>{});
+    await page.waitForTimeout(200);
+    const d = await page.evaluate(() => {
+      const room=document.querySelector('.pk-room'); const rr=room.getBoundingClientRect();
+      const table=document.querySelector('.pk-table'); const tr=table.getBoundingClientRect();
+      const acts=document.querySelector('.pk-acts'); const ar=acts?acts.getBoundingClientRect():null;
+      const seats=[...document.querySelectorAll('.pk-table .pk-seat')];
+      // 对手座位溢出屏外(桌矩形之外)张数
+      const seatOut=seats.filter(s=>{const r=s.getBoundingClientRect();
+        return r.left<tr.left-2||r.right>tr.right+2||r.top<tr.top-2||r.bottom>tr.bottom+2;}).length;
+      const boardSlots=document.querySelectorAll('#pkBoard .card').length;
+      const holeCards=document.querySelectorAll('.pk-me .pk-hole .card').length;
+      const hasActBtns=!!(document.querySelector('#pkFold')&&document.querySelector('#pkCall'));
+      return { nSeats:seats.length, seatOut, boardSlots, holeCards, hasActBtns,
+        actsCutBelowRoom: ar?Math.round(ar.bottom-rr.bottom):0,
+        actsRight: ar?Math.round(ar.right):0, vw:window.innerWidth };
+    });
+    if (errs.length) bad('德州牌桌渲染报错: ' + errs.slice(0,2).join(' | '));
+    if (d.nSeats !== 3) bad(`德州对手席应 3 个(n=4去我), 实渲 ${d.nSeats}`); else ok('德州对手席 3 个全渲');
+    if (d.seatOut > 0) bad(`${d.seatOut} 个对手座位溢出牌桌(跑屏外)`); else ok('德州对手座位全在牌桌内');
+    if (d.boardSlots !== 5) bad(`公共牌区应 5 槽(含暗背占位), 实 ${d.boardSlots}`); else ok('公共牌区恒 5 槽');
+    if (d.holeCards !== 2) bad(`我的底牌应 2 张, 实 ${d.holeCards}`); else ok('我的底牌 2 张');
+    if (!d.hasActBtns) bad('操作区弃牌/跟注按钮缺失(轮到我时应显示)'); else ok('操作区按钮完整(弃牌/过跟/加注)');
+    if (d.actsCutBelowRoom > 1) bad(`操作区被切在牌桌下方 ${d.actsCutBelowRoom}px`); else ok('操作区完整可见(未被切)');
+    if (d.actsRight > d.vw + 1) bad(`操作区右溢出 ${d.actsRight - d.vw}px`); else ok(`操作区不超右沿 (${d.actsRight}≤${d.vw})`);
+    if (WANT_SHOTS) await page.screenshot({ path: path.join(SHOT_DIR,'poker.png') });
+    await ctx.close();
+  }
+
   await browser.close();
   if (fails.length) { console.log(`\n❌ 可视化回归 ${fails.length} 项失败`); process.exit(1); }
   console.log('\n✅ 游戏卡/牌桌真实渲染布局回归全部通过');

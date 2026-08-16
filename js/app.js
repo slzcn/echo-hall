@@ -2712,6 +2712,27 @@ function buildGameEl(m){
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchGuandan(); }catch(_){} };
     return el;
   }
+  // 🎰 德州扑克战绩卡: game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
+  //   前 6 段无 |, 赢家名放末段 slice(6).join('|') 兜住名字里的 |。
+  if(ev==='nlhe'){
+    const outcome=p[2]||'even';
+    const win=outcome==='win';
+    const delta=parseInt(p[3],10)||0;
+    const hand=esc(p[4]||'-');
+    const pot=parseInt(p[5],10)||0;
+    const champName=esc(p.slice(6).join('|')||'');
+    const c=win?'#22FF95':(outcome==='lose'?'#FF5D6C':'#8FA6E8');
+    const el=document.createElement('div'); el.className='game-card ddz-card '+(win?'ddz-win':(outcome==='lose'?'ddz-lose':''));
+    el.style.setProperty('--gc', c);
+    const title = win?'胜':(outcome==='lose'?'负':'平');
+    el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎰</span><span class="gc-kind">德州扑克 · ${title}</span><span class="gc-host">${host}</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">这手</span><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">筹码</span></div>`
+      +`<div class="ddz-detail">${champName?('🏆 '+champName+' 赢下 '+pot+' 底池'):('赢下 '+pot+' 底池')}${hand&&hand!=='-'?(' · '+hand):''}</div>`
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-nlhe-again="1">🎰 下一局</button><span class="gc-tip">或发 <b>/德州</b></span></div>`;
+    const again=el.querySelector('[data-nlhe-again]');
+    if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchTexas(); }catch(_){} };
+    return el;
+  }
   return null;
 }
 function buildMsgEl(m, isHistory){
@@ -4803,6 +4824,7 @@ function msgPreview(m){
       if(p[1]==='reveal') return '🐢 揭晓汤底';
       if(p[1]==='ddz'){ const w=p[2]==='win'; const d=parseInt(p[4],10)||0; return '🃏 斗地主 · '+(w?'胜':'负')+' '+(d>=0?'+':'')+d+'分'; }
       if(p[1]==='gd'){ const w=p[2]==='win'; return '🎴 掼蛋 · '+(w?'胜':'负'); }
+      if(p[1]==='nlhe'){ const o=p[2]; const d=parseInt(p[3],10)||0; return '🎰 德州扑克 · '+(o==='win'?'胜':o==='lose'?'负':'平')+' '+(d>=0?'+':'')+d; }
       return '🐢 海龟汤';
     }
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
@@ -6122,6 +6144,7 @@ const SLASH_CMDS=[
   {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
   {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
   {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
+  {c:'/德州', d:'/德州 → 和房里的灵魂打一局德州扑克 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -6151,6 +6174,9 @@ async function handleSlash(text){
   }
   if(cmd==='/掼蛋'||cmd==='/guandan'||cmd==='/gd'){
     await launchGuandan(); return true;
+  }
+  if(cmd==='/德州'||cmd==='/texas'||cmd==='/poker'||cmd==='/holdem'){
+    await launchTexas(); return true;
   }
   if(cmd==='/bgm切换'){
     if(!arg){ await showMyBgmLibrary(); return true; }
@@ -6212,7 +6238,7 @@ function ehGameBeat(b){
   }catch(_){}
 }
 function _restoreActiveGameIfAny(){
-  if(document.querySelector('.ddz-room, .gd-room')){
+  if(document.querySelector('.ddz-room, .gd-room, .pk-room')){
     if(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
     else toast('先收工当前牌局再开新的');
     return true;
@@ -6240,6 +6266,72 @@ async function launchDoudizhu(){
       postDdzResult(res, names).catch(()=>{});   // 结束后聊天室留一张战绩卡(含"再来一局"入口)
     },
   });
+}
+// ── 德州扑克:唤起绒面牌桌。房里灵魂当对手(全局意识 AI, 5 灵魂性格映射打法), 我坐底位。──
+async function launchTexas(){
+  if(!window.EHPokerGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(!curRoom){ toast('先进一个房间再开局'); return; }
+  if(_restoreActiveGameIfAny()) return;
+  let allSouls=[];
+  try{ allSouls = await prefetchSouls(curRoom.id); }catch(_){}
+  // 最多带 5 个灵魂上桌(连我共 6 人), 至少凑 2 家(不足则补默认对手)
+  const pick=(allSouls||[]).filter(s=>s&&s.name).slice(0,5);
+  const DEF=[{name:'阿岩',emoji:'🗿'},{name:'小凶',emoji:'🔥'},{name:'疯哥',emoji:'🤪'}];
+  while(pick.length<2) pick.push(DEF[pick.length]||{name:'对手'+pick.length,emoji:'🤖'});
+  const names   = [me.name||'你', ...pick.map(s=>s.name)];
+  const avatars = [me.emoji||'🙂', ...pick.map(s=>s.emoji||'🤖')];
+  const isAI    = names.map((_,i)=> i!==0);
+  const souls   = [null, ...pick.map(s=>({ archetype: s.archetype||s.soul_archetype||null }))];
+  const soulPick= pick.map(s=>({user_id:s.user_id,name:s.name,emoji:s.emoji}));
+  try{ sendSystemAct(`开了一桌德州扑克 🎰 · 对手 ${pick.map(s=>s.name).join('、')}`).catch(()=>{}); }catch(_){}
+  _ehGame = window.EHPokerGame.open({
+    names, avatars, isAI, souls, mySeat:0, sb:5, bb:10, startStack:1000,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onResult:(res,log,meta)=>{
+      recordTexasResult(res, log, names, avatars, soulPick, meta).catch(()=>{});
+      postTexasResult(res, names, meta).catch(()=>{});
+    },
+  });
+}
+// 结束后往聊天室发一张德州战绩卡(kind:'game', nlhe 事件): game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
+async function postTexasResult(res, names, meta){
+  if(!myUid || !curRoom) return;
+  const delta=(meta&&meta.delta)||0;
+  const outcome = delta>0?'win':(delta<0?'lose':'even');
+  const potTotal=(res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+  const champSeat=(res.winnersBySeat||[])[0];
+  const champName=names[champSeat]||'';
+  const hand=(meta&&meta.handName)||'';
+  const text=['game','nlhe', outcome, delta, hand||'-', potTotal, champName].join('|');
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(data && el) el.dataset.mid=data.id;
+  }catch(e){ console.warn('[nlhe] post result failed', e); }
+}
+// 记录德州战绩(seed+log 供复核/回看)。N 席结构; 失败静默。
+async function recordTexasResult(res, log, names, avatars, souls, meta){
+  if(!myUid || !curRoom) return;
+  const soulUids=(souls||[]).map(s=>s&&s.user_id).filter(Boolean);
+  const players=names.map((nm,seat)=>({
+    seat, name:nm, is_ai: seat!==0,
+    uid: seat===0 ? myUid : (soulUids[seat-1]||null),
+  }));
+  const delta=(meta&&meta.delta)||0;
+  const row={
+    game:'nlhe', room_id:curRoom.id, room_name:curRoom.name||null,
+    seed:(log[0] && log[0].seed) || null,
+    players,
+    winner_seats: res.winnersBySeat||[], loser_seats:[],
+    landlord_seat:-1, landlord_won:false,
+    score: delta, final_multiplier:1, spring:false, bombs:0,
+    my_uid:myUid, my_seat:0, my_delta:delta, my_won:(res.winnersBySeat||[]).includes(0),
+    is_ai:players.map(p=>p.is_ai), is_ranked:false,
+    moves:log, ended_at:new Date().toISOString(),
+  };
+  try{ await sb.from('eh_game_results').insert(row); }
+  catch(e){ console.warn('[nlhe] record result failed', e); }
 }
 // 结束后往聊天室发一张斗地主战绩卡(kind:'game', ddz 事件)。含胜负/角色/得分/倍数/炸弹/春天 + 再来一局入口。
 //   编码见 buildGameEl 的 ddz 分支。走与普通消息同一条本地回显+落库路径(insert 后回填真实 mid 供 realtime 去重)。

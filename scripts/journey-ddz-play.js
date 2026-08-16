@@ -37,7 +37,7 @@ assert(src.indexOf("cmd==='/斗地主'") < src.lastIndexOf('return false'), '/�
 // 已有牌桌时不叠桌 —— 若牌桌是折叠态(活牌桌片)则展开回同一局, 否则提示先收工;
 // 二者都 return 掉, 绝不叠两张桌 + 两套定时器。这比旧的"静默拦掉"更顺(丝滑回桌)。
 assert(/function _restoreActiveGameIfAny\(\)/.test(src), '存在 _restoreActiveGameIfAny(已有牌桌时的统一处置)');
-assert(/querySelector\('\.ddz-room, \.gd-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋牌桌(单桌约束)');
+assert(/querySelector\('\.ddz-room, \.gd-room, \.pk-room'\)/.test(src), '_restoreActiveGameIfAny 认得已开的斗地主/掼蛋/德州牌桌(单桌约束)');
 assert(/if\(_restoreActiveGameIfAny\(\)\) return;/.test(src), '重复敲 /斗地主 被拦(已有牌桌 → 展开或提示, 不再叠桌)');
 assert(/isMinimized\(\)[\s\S]{0,60}\.restore\(\)/.test(src), '已有牌桌若为折叠态则展开回同一局(不销毁重开)');
 
@@ -141,7 +141,7 @@ assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 la
 assert(/sendSystemAct\(`开了一桌斗地主/.test(src), '开局在聊天室留一行(触发聊天内容, 非静默开桌)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,160}postDdzResult\(res,\s*names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
-assert(/postDdzResult[\s\S]{0,400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/async function postDdzResult\([\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
 // 编码 → 解码闭环: 生产用的 text 编码字段序与 buildGameEl 的 ddz 分支解码字段序一致
 assert(/\['game','ddz',\s*win,\s*role,\s*res\.delta\[0\],\s*res\.base,\s*res\.finalMultiplier,\s*res\.bombs\|\|0,\s*res\.spring\?1:0,\s*res\.landlordWon\?1:0,\s*lordName\]/.test(src),
   'postDdzResult 编码字段序固定(win|role|delta|base|mult|bombs|spring|lordWon|lordName)');
