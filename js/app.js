@@ -1125,7 +1125,9 @@ let msgChan = null;        // Realtime postgres_changes 频道
 let _tailPollTimer = null; // 房内周期兜底轮询: 补住 realtime socket 僵死(切后台/弱网/降频)期间漏投的消息
 let presChan = null;       // Realtime presence 频道
 let gtChan = null;         // Realtime 联机牌桌频道(eh_game_tables 座位/局态变化)
+let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } }
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
 let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
@@ -2241,6 +2243,7 @@ async function setupPresence(room){
 // 卡的座位按【实时 table 行】渲染: realtime 推 → gtRenderCard 找到 [data-gt-id] 就地重绘(不新增监听)。
 async function setupGameTables(room){
   if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
+  _gtCleanupPlay();
   _gtTables.clear();
   gtChan = sb.channel('room-gt:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_game_tables',filter:'room_id=eq.'+room.id}, p=>{
@@ -2320,10 +2323,11 @@ async function gtStart(id){
   const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
   if(row) gtLaunchLocal(row);
 }
-// host 开局: 在本机跑引擎, 用真实座位名单当四家(phase-1 host 权威; 联机对战下一步接入)。
+// host 开局: 在本机跑引擎当权威。按 row.game 分派到对应牌桌 UI。
 function gtLaunchLocal(row){
-  if(!window.EHGuandanGame) return;
   if(_restoreActiveGameIfAny()) return;
+  if(row.game==='nlhe') return gtLaunchPoker(row);
+  if(!window.EHGuandanGame) return;
   const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
   const names=seats.map(s=>s.name||'玩家'); const avatars=seats.map(s=>s.emoji||'🙂');
   const pick=seats.slice(1).filter(s=>s.kind==='soul').map(s=>({user_id:s.uid,name:s.name,emoji:s.emoji}));
@@ -2337,7 +2341,93 @@ function gtLaunchLocal(row){
 function gtEnter(id){
   const row=_gtTables.get(id); if(!row) return;
   if(row.host_uid===myUid){ gtLaunchLocal(row); return; }
-  toast('房主已开局 · 联机对战即将接入');
+  if(row.game==='nlhe'){ gtEnterPoker(row); return; }
+  toast('房主已开局 · 联机对战即将接入');   // 掼蛋/斗地主客人端待接
+}
+
+// 从 table 行抽出【按座位号索引】的入座数组; 空位/AI/灵魂 → host 本机 AI 驱动, 真人(非我)→ 远程席。
+function gtSeatArrays(row){
+  const seats=(row.seats||[]).filter(s=>s&&typeof s.seat==='number').slice().sort((a,b)=>a.seat-b.seat);
+  const soulMap={}; (roomSouls||[]).forEach(s=>{ if(s&&s.auth_uid) soulMap[s.auth_uid]=s; });
+  const names=[],avatars=[],isAI=[],ids=[],souls=[];
+  seats.forEach((s,i)=>{
+    const human=s.kind==='human';
+    names[i]=s.name || (human?'玩家':(s.kind==='soul'?'灵魂':'牌手'+(i+1)));
+    avatars[i]=s.emoji || (human?'🙂':(s.kind==='soul'?'👤':'🤖'));
+    isAI[i]=!human;                       // 灵魂/AI/空位一律 host 本机 AI 代打
+    ids[i]=s.uid||null;
+    const soul=(s.kind==='soul'&&soulMap[s.uid])||null;
+    souls[i]=soul?{ archetype: soul.archetype||soul.soul_archetype||soul.persona||null, name:soul.name, emoji:soul.emoji }:null;
+  });
+  const mySeat=seats.findIndex(s=>s.kind==='human'&&s.uid===myUid);
+  const remoteSeats=seats.filter(s=>s.kind==='human'&&s.uid!==myUid).map(s=>s.seat);
+  return { seats, n:seats.length, names, avatars, isAI, ids, souls, mySeat, remoteSeats };
+}
+// host: 只把【远程真人席】的底牌写进 eh_gt_hands(RLS 保证各自只读到自己那行); host/AI/灵魂席由本机引擎持有, 不落库。
+function gtWritePokerHands(tableId, state, A){
+  const hands=A.remoteSeats.map(seat=>{
+    const p=state.players[seat]; if(!p||!A.ids[seat]) return null;
+    return { seat, uid:A.ids[seat], hand:(p.hole||[]).map(c=>({rank:c.rank,suit:c.suit,label:c.label,id:c.id})) };
+  }).filter(Boolean);
+  if(!hands.length) return;
+  sb.rpc('eh_gt_set_hands',{p_table:tableId,p_hands:hands}).then(({error})=>{ if(error) console.warn('[nlhe] set hands', error.message); }, ()=>{});
+}
+// ── 德州联机 · HOST: 本机跑引擎当裁判, 每步产脱敏快照广播 + 写远程席底牌; 收远程动作经引擎校验后应用。──
+function gtLaunchPoker(row){
+  if(!window.EHPokerGame || !window.EHPokerNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  const A=gtSeatArrays(row);
+  if(A.mySeat<0){ toast('你不在这桌'); return; }
+  _gtCleanupPlay();
+  let lastHandWritten=-1;
+  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  chan.on('broadcast',{event:'act'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      const ok=_ehGame.applyMove(payload.seat, payload.move);
+      if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
+    })
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); })  // 新客人上线 → 立刻补一帧
+    .subscribe();
+  const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+  _ehGame = window.EHPokerGame.open({
+    names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
+    mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onSync:(state,hno)=>{
+      try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}
+      if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A); }
+    },
+    onResult:(res,log,meta)=>{
+      recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
+      postTexasResult(res,A.names,meta).catch(()=>{});
+      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+    },
+  });
+}
+// ── 德州联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己底牌; 出牌发回 host 权威校验。──
+function gtEnterPoker(row){
+  if(!window.EHPokerGame || !window.EHPokerNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(_restoreActiveGameIfAny()) return;
+  const A=gtSeatArrays(row);
+  if(A.mySeat<0){ toast('你不在这桌'); return; }
+  _gtCleanupPlay();
+  let lastPulled=-1;
+  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const pull=()=>{ sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
+      if(error){ console.warn('[nlhe] my hand', error.message); return; }
+      if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(data||[]);
+    }, ()=>{}); };
+  chan.on('broadcast',{event:'snap'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.applySnapshot||!payload) return;
+      _ehGame.applySnapshot(payload);
+      if(payload.handNo!==lastPulled){ lastPulled=payload.handNo; pull(); }   // 新一手 → 拉自己底牌
+    })
+    .subscribe((status)=>{ if(status==='SUBSCRIBED'){ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){} } });
+  _ehGame = window.EHPokerGame.open({
+    mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
+    sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
+    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+  });
+  setTimeout(pull, 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次底牌
 }
 
 async function beat(extra){
@@ -6145,6 +6235,7 @@ const SLASH_CMDS=[
   {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
   {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
   {c:'/德州', d:'/德州 → 和房里的灵魂打一局德州扑克 🎰'},
+  {c:'/德州联机', d:'/德州联机 → 开一桌德州，房里真人点卡加入同桌对战 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -6174,6 +6265,9 @@ async function handleSlash(text){
   }
   if(cmd==='/掼蛋'||cmd==='/guandan'||cmd==='/gd'){
     await launchGuandan(); return true;
+  }
+  if(cmd==='/德州联机'||cmd==='/texas-online'||cmd==='/holdem-online'||cmd==='/poker-online'){
+    await launchTexasOnline(); return true;
   }
   if(cmd==='/德州'||cmd==='/texas'||cmd==='/poker'||cmd==='/holdem'){
     await launchTexas(); return true;
@@ -6293,6 +6387,32 @@ async function launchTexas(){
     },
   });
 }
+// ── 德州联机:开一张【联机牌桌】(座位大厅), 房里真人可点卡加入同桌真人对战。空位由 AI(灵魂)补齐。──
+//   与 /德州(单机陪玩) 并存: 这条走 eh_game_tables + gt-play 频道 host 权威(见 gtLaunchPoker/gtEnterPoker)。
+async function launchTexasOnline(){
+  if(!window.EHPokerGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(!curRoom){ toast('先进一个房间再开局'); return; }
+  if(_restoreActiveGameIfAny()) return;
+  let row=null;
+  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'nlhe',p_name:me.name,p_emoji:me.emoji});
+    if(error) throw error; row=data; }
+  catch(e){ toast('开桌失败，稍后再试'); return; }
+  if(!row){ toast('开桌失败'); return; }
+  _gtTables.set(row.id,row);
+  if(row.host_uid===myUid && !row.msg_id){
+    const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
+    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+    if(el){ $('#stream').appendChild(el); scrollStream(); }
+    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+    }catch(e){ console.warn('[gt] post table card failed', e); }
+  } else {
+    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
+    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
+    else toast('本房已有一桌，往上翻找牌桌卡加入');
+  }
+}
 // 结束后往聊天室发一张德州战绩卡(kind:'game', nlhe 事件): game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
 async function postTexasResult(res, names, meta){
   if(!myUid || !curRoom) return;
@@ -6319,6 +6439,7 @@ async function recordTexasResult(res, log, names, avatars, souls, meta){
     uid: seat===0 ? myUid : (soulUids[seat-1]||null),
   }));
   const delta=(meta&&meta.delta)||0;
+  const ms=(meta&&typeof meta.mySeat==='number')?meta.mySeat:0;   // 联机时我不一定坐 0 席
   const row={
     game:'nlhe', room_id:curRoom.id, room_name:curRoom.name||null,
     seed:(log[0] && log[0].seed) || null,
@@ -6326,7 +6447,7 @@ async function recordTexasResult(res, log, names, avatars, souls, meta){
     winner_seats: res.winnersBySeat||[], loser_seats:[],
     landlord_seat:-1, landlord_won:false,
     score: delta, final_multiplier:1, spring:false, bombs:0,
-    my_uid:myUid, my_seat:0, my_delta:delta, my_won:(res.winnersBySeat||[]).includes(0),
+    my_uid:myUid, my_seat:ms, my_delta:delta, my_won:(res.winnersBySeat||[]).includes(ms),
     is_ai:players.map(p=>p.is_ai), is_ranked:false,
     moves:log, ended_at:new Date().toISOString(),
   };

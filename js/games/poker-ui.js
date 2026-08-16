@@ -10,7 +10,13 @@
 //   · 操作: 弃牌 / 过牌 / 跟注 / 下注·加注(滑杆 + ½池/池/全下快捷)。摊牌翻底牌 + 报成手牌型。
 //   · 一手打完带结算(赢池/输光), "再来一局"延续筹码 + 轮庄; 有人筹码归零则出局, 不足两人自动重新带入。
 //   · onResult(result, log, meta) 交给聊天室写战绩 + 直播播报。
-// 无网络; 真人对真人版本另接 table-sync host 权威内核, 复用同一引擎与本 UI(applyMove 已就位)。
+// ------------------------------------------------------------
+// 真人联机(host 权威, 见 poker-net.js): 同一份 open() 三种角色 ——
+//   · local(默认): 真人坐 mySeat, 其余 AI, 引擎全在本机;
+//   · host: opts.remoteSeats 交给远程真人(不由 AI 代打, host 侧兜底超时代打); 每步 opts.onSync(state,handNo)
+//     让 app.js 产出脱敏快照广播 + 写各家底牌; 收到远程动作调 applyMove(seat,move) 经引擎权威校验;
+//   · guest(opts.mode='guest'): 不跑引擎, applySnapshot(snap) 收公共快照 + feedHand(cards) 收自己底牌,
+//     渲染伪状态; 自己出牌走 opts.onAction(move) 发回 host, 绝不本地改权威态。
 // ============================================================
 (function(root){
   'use strict';
@@ -205,6 +211,17 @@
       return AI.PERSONA_KEYS[seat % AI.PERSONA_KEYS.length];
     });
 
+    // ── 联机角色 ──
+    const mode = opts.mode || 'local';
+    const isGuest = mode === 'guest';
+    const remoteSeats = opts.remoteSeats || [];       // host 模式: 由远程真人驱动的席位
+    const isRemote = (seat) => remoteSeats.indexOf(seat) >= 0;
+    const onSync   = (typeof opts.onSync   === 'function') ? opts.onSync   : null;  // host: 每步产出快照广播
+    const onAction = (typeof opts.onAction === 'function') ? opts.onAction : null;  // guest: 动作发回 host
+    const PokerNet = root.EHPokerNet;
+    let myHole = [];       // guest: 自己的两张底牌(牌对象), 由 feedHand 注入
+    let lastSnap = null;   // guest: 最近一张公共快照
+
     const sb = opts.sb || 5, bb = opts.bb || 10;
     const START = opts.startStack || 1000;
     let stacks = names.map(() => START);
@@ -220,7 +237,14 @@
         names, isAI, stacks: stacks.slice(), sb, bb, button, ids: opts.ids });
     }
     let handNo = 0;
-    let st = newHand();
+    // guest 开局尚无快照 → 先给一个"等发牌"占位态; host/local 直接发一手
+    function waitingState(){
+      return { variant:'nlhe', phase:'waiting', street:'preflop', n, button:0, sb, bb,
+        currentBet:0, minRaise:bb, aggressor:null, toAct:-1, pot:0, board:[], result:null,
+        players: names.map((nm,seat)=>({ seat, name:nm||('席'+seat), isAI:!!isAI[seat],
+          stack:START, start:START, hole:[], folded:false, allin:false, committed:0, street:0, acted:false })) };
+    }
+    let st = isGuest ? waitingState() : newHand();
 
     function sfx(nm){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(nm); }catch(_){} }
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
@@ -402,6 +426,7 @@
     }
     function streetName(){ return ({preflop:'翻牌前',flop:'翻牌',turn:'转牌',river:'河牌',showdown:'摊牌',over:'结算'})[st.phase]||''; }
     function renderMsg(){
+      if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.textContent='🎴 等房主发牌…'; return; }
       if (st.phase==='over'){ els.msg.className='pk-msg'; els.msg.textContent=''; return; }
       const seat=st.toAct;
       if (seat===mySeat){ els.msg.className='pk-msg mine'; els.msg.textContent='🫵 轮到你 · '+streetName(); }
@@ -414,7 +439,8 @@
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[mySeat]);
       const holeCards = (showdown ? st.result.reveal[mySeat].hole.map(idCard) : p.hole);
       let hint='';
-      if (st.phase==='over'){
+      if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
+      else if (st.phase==='over'){
         const won=(st.result.winnersBySeat||[]).includes(mySeat);
         hint = won ? '🏆 这手你赢了' : (p.folded?'你已弃牌':'本手结束');
       } else if (p.folded){ hint='你已弃牌 · 观战本手'; }
@@ -482,19 +508,27 @@
 
     function humanAct(action, amount){
       if (st.toAct!==mySeat) return;
+      if (isGuest){                            // 客人: 动作发回 host 权威校验, 绝不本地改状态
+        if(onAction){ try{ onAction({ action, amount }); }catch(_){} }
+        els.acts.innerHTML=''; els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
+        return;
+      }
       try{ var r=Engine.applyAction(st, mySeat, action, amount); }
       catch(e){ toast(actErr(e.message)); return; }
       afterAction(mySeat, action, amount, r);
     }
 
-    // 供联机(host 权威应用远程真人动作)/测试驱动任意席
+    // host 权威应用远程真人动作 / 测试驱动任意席; 返回是否被引擎接受(app.js 据此决定要不要重播快照纠偏)
     function applyMove(seat, move){
-      if(!move || st.toAct!==seat) return;
-      try{ var r=Engine.applyAction(st, seat, move.action, move.amount); }catch(e){ return; }
+      if(isGuest) return false;                // 客人无权威, 不本地应用
+      if(!move || st.toAct!==seat) return false;
+      try{ var r=Engine.applyAction(st, seat, move.action, move.amount); }catch(e){ return false; }
       afterAction(seat, move.action, move.amount, r);
+      return true;
     }
 
     function aiStep(seat){
+      if (isGuest) return;                     // 客人从不本地跑 AI
       if (st.toAct!==seat || st.phase==='over') return;
       let d; try{ d=AI.decide(st, seat, { persona: personaBySeat[seat] || 'tag', samples: 120 }); }catch(e){ d=null; }
       if(!d){ // 兜底: 能过就过, 否则弃
@@ -537,27 +571,43 @@
     // ── 回合驱动: 亮环倒计时 + AI/自动 ──
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase==='over') return;
+      if (st.phase==='over' || st.phase==='waiting') return;
       // 摊牌/结算之外, 无人需行动的中间态不该发生(引擎自动跑完); 安全兜底
       const seat=st.toAct;
       if (seat<0 || !st.players[seat]) return;
       const mine = seat===mySeat;
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
-      turnDur = mine ? HUMAN_ACT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
+      // 谁来推进这一步: 我(本地/relay) · AI(本机决策) · 远程真人(等回传, host 侧兜底代打) · guest 观战他人(静态)
+      const remote = isRemote(seat);
+      const aiSeat = !mine && !remote && !isGuest && isAI[seat];
+      turnDur = mine     ? HUMAN_ACT_MS
+              : aiSeat   ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))
+              : remote   ? (HUMAN_ACT_MS + 6000)   // host 兜底比对端 25s 稍长, 留网络冗余; 久不动就代打
+              : 0;                                 // guest 看别人回合: 不 tick, 静态高亮即可
       turnStart = Date.now();
       const seatEl = mine ? null : els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
       const clk = mine ? $('#pkClk') : null;
+      if (turnDur<=0) return;
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
         if(seatEl) seatEl.style.setProperty('--p',(frac*360).toFixed(1));
         if(mine && clk){ const sec=Math.ceil(remain/1000); clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
-        if(remain<=0){ ringRAF=null; if(mine && typeof onExpire==='function') onExpire(); return; }
+        if(remain<=0){ ringRAF=null;
+          if(mine){ if(typeof onExpire==='function') onExpire(); }
+          else if(remote){ onRemoteTimeout(seat); }
+          return; }
         ringRAF=requestAnimationFrame(tick);
       };
       tick();
-      if(!mine) aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+      if(aiSeat) aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+    }
+    // host 侧: 远程真人久不响应 → 用引擎权威替其过牌/弃牌, 防一人掉线卡死全桌
+    function onRemoteTimeout(seat){
+      if (isGuest || st.toAct!==seat || st.phase==='over') return;
+      const la=Engine.legalActions(st, seat);
+      applyMove(seat, { action: la.canCheck?'check':'fold' });
     }
     function onHumanTimeout(){
       if (st.toAct!==mySeat || st.phase==='over') return;
@@ -592,14 +642,13 @@
         <div class="pk-showrows">${rowsHtml}</div>
         <div class="pk-row" style="margin-top:6px">
           <button class="pk-b" id="pkDone">收工</button>
-          <button class="pk-b call" id="pkAgain">下一手</button>
+          ${isGuest?'<button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>':'<button class="pk-b call" id="pkAgain">下一手</button>'}
         </div>`;
       els.felt.appendChild(over);
       if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
       else if(delta<0){ sfx('void'); vibrate(90); }
-      over.querySelector('#pkAgain').addEventListener('click', ()=>{
-        over.remove(); nextHand();
-      });
+      const againBtn = over.querySelector('#pkAgain');
+      if (againBtn) againBtn.addEventListener('click', ()=>{ over.remove(); nextHand(); });
       over.querySelector('#pkDone').addEventListener('click', close);
 
       // 直播战报 + 结果回调
@@ -630,7 +679,32 @@
       renderPot(); renderBoard(); renderOpponents(); renderMe(); renderMsg(); renderActs();
       armTurn(minimized ? null : onHumanTimeout);
       if (minimized) updateChip();
+      if (onSync && !isGuest){ try{ onSync(st, handNo); }catch(_){} }   // host: 每次状态变更 → 产快照广播 + 写底牌
     }
+
+    // ── guest 端: 收公共快照 / 收自己底牌 → 组伪状态渲染(全程不碰引擎权威) ──
+    function feedHand(cards){
+      myHole = (cards||[]).map(c => (typeof c==='string') ? idCard(c)
+        : (c && c.rank!=null ? Engine.pokerCard(c.rank, c.suit) : null)).filter(Boolean);
+      if (isGuest && lastSnap) rebuildFromSnap(lastSnap);
+    }
+    function rebuildFromSnap(snap){
+      if (!PokerNet){ console.warn('[pk] net not loaded'); return; }
+      st = PokerNet.pseudoState(snap, mySeat, myHole);
+      renderAll();
+    }
+    function applySnapshot(snap){
+      if (!isGuest || !snap) return;
+      const prevHand = handNo;
+      lastSnap = snap; handNo = snap.handNo || 0;
+      if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补
+        const ov=els.felt.querySelector('.pk-over'); if(ov) ov.remove();
+        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; myHole=[];
+      }
+      rebuildFromSnap(snap);
+      if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();
+    }
+    function resync(){ if (onSync && !isGuest){ try{ onSync(st, handNo); }catch(_){} } }  // host: 应新客人之请重播当前态
 
     // id → card (供摊牌/对手明牌重建)
     const SUIT_OF = { s:'♠', h:'♥', c:'♣', d:'♦' };
@@ -639,7 +713,9 @@
     renderAll();
     // 首帧对手位置需等布局稳定
     requestAnimationFrame(positionSeats);
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
+      applyMove, resync, applySnapshot, feedHand, mySeat:()=>mySeat,
+      onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
   function rand(a){ return a[Math.floor(secureRand()*a.length)]; }

@@ -175,8 +175,8 @@ section "1b3e2. 德州扑克游戏引擎"
 
 if ! command -v node >/dev/null 2>&1; then
   fail "node 未安装，无法运行德州扑克引擎测试"
-elif node scripts/test-poker-eval.js >/dev/null && node scripts/test-poker-engine.js >/dev/null && node scripts/test-poker-ai.js >/dev/null && node scripts/test-poker-fuzz.js >/dev/null && node scripts/journey-poker-play.js >/dev/null; then
-  pass "德州扑克成手牌评估34项(9档/破平/轮抽/7张取优) + 引擎47项(盲注/轮转/最小加注/短加不重开/边池分层/200手守恒/100手replay) + 全局意识AI21项(蒙特卡洛胜率贴牌理/Chen打分/强牌进攻弱牌弃/5性格松紧差异/决策确定性/300局全合法守恒) + 模糊压测1200局9484项不变量(守恒/账实相符/赢家资格/牌力最优) + 一整场轮庄旅程 全部通过"
+elif node scripts/test-poker-eval.js >/dev/null && node scripts/test-poker-engine.js >/dev/null && node scripts/test-poker-ai.js >/dev/null && node scripts/test-poker-fuzz.js >/dev/null && node scripts/journey-poker-play.js >/dev/null && node scripts/journey-poker-online.js >/dev/null; then
+  pass "德州扑克成手牌评估34项(9档/破平/轮抽/7张取优) + 引擎47项(盲注/轮转/最小加注/短加不重开/边池分层/200手守恒/100手replay) + 全局意识AI21项(蒙特卡洛胜率贴牌理/Chen打分/强牌进攻弱牌弃/5性格松紧差异/决策确定性/300局全合法守恒) + 模糊压测1200局9484项不变量(守恒/账实相符/赢家资格/牌力最优) + 一整场轮庄旅程 + 真人联机11项(host权威/脱敏快照无泄露/客人凭伪状态算合法动作/私牌RLS隔离/收敛一致) 全部通过"
 else
   fail "德州扑克回归失败（成手牌评估 / 下注状态机 / 边池 / AI合法性 / 模糊不变量 / replay一致性 / 轮庄旅程）"
 fi

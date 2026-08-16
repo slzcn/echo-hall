@@ -60,7 +60,7 @@
     document.head.appendChild(s);
   }
 
-  var GAME_META={ guandan:{emoji:'🎴',label:'掼蛋',teams:true}, doudizhu:{emoji:'🃏',label:'斗地主',teams:false} };
+  var GAME_META={ guandan:{emoji:'🎴',label:'掼蛋',teams:true}, doudizhu:{emoji:'🃏',label:'斗地主',teams:false}, nlhe:{emoji:'🎰',label:'德州',teams:false} };
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
   function encode(tableId, game){ return ['game','gt',tableId,game||'guandan'].join('|'); }
