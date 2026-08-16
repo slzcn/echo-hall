@@ -9,6 +9,8 @@
 //   (4) host 权威: 非本人回合 / 不在手上 / 压不过 的出牌被引擎拒(客户端无权改权威状态);
 //   (5) 收敛一致: 打到终局, 每个客人手里最后一张快照的公共态(名次/升级/赢家)与 host 权威 result 一致。
 // 掼蛋手牌是【动态】的: 每次出牌该家手牌变, host 重写其私牌行 —— 本测试每次广播都让客人重拉自己手牌(模拟 realtime 推送)。
+const fs     = require('fs');
+const path   = require('path');
 const Deck   = require('../js/games/deck.js');
 const Rules  = require('../js/games/guandan-rules.js');
 const Engine = require('../js/games/guandan-engine.js');
@@ -17,6 +19,16 @@ const Net    = require('../js/games/guandan-net.js');
 
 let step = 0, failed = false;
 function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [${step}] ${msg}`); } else console.log(`✓ [${step}] ${msg}`); }
+
+// 浏览器真实加载链：传输层必须存在，且必须在 UI/app 前加载。Node require 全绿不能替代这条运行时契约。
+{
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const netAt = html.indexOf('js/games/guandan-net.js');
+  const uiAt  = html.indexOf('js/games/guandan-ui.js');
+  const appAt = html.indexOf('js/app.js');
+  assert(netAt >= 0, 'index.html 加载 guandan-net.js（真实浏览器具备 EHGuandanNet）');
+  assert(netAt < uiAt && uiAt < appAt, '掼蛋联机脚本顺序为 net → ui → app');
+}
 
 // ── 桌面配置: 4 席 2 队(0&2 一队 / 1&3 一队)。0=host 真人, 2=AI/灵魂席(host本机), 1 & 3 = 远程真人(各自客户端) ──
 const names   = ['房主','远客甲','灵魂对家','远客乙'];

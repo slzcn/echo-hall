@@ -220,6 +220,13 @@
 @keyframes gdChipPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
 .gd-chip.over{border-color:var(--amber,#ffc24d)}
 .gd-chip.over .ck-s{color:var(--amber,#ffc24d)}
+.gd-conn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-right:6px;letter-spacing:.03em;vertical-align:1px}
+.gd-conn.online{background:rgba(0,229,212,.12);color:var(--accent,#00e5d4);border:1px solid rgba(0,229,212,.35)}
+.gd-conn.reconnecting{background:rgba(255,194,77,.14);color:var(--amber,#ffc24d);border:1px solid rgba(255,194,77,.4);animation:gdConnBlink 1s ease-in-out infinite}
+.gd-conn.host_offline{background:rgba(255,93,108,.16);color:#ff5d6c;border:1px solid rgba(255,93,108,.45)}
+@keyframes gdConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
+.gd-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
+
 `;
     document.head.appendChild(s);
   }
@@ -271,6 +278,15 @@
     injectCSS();
 
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
+    let connState = 'online';
+    function connLabel(k){ return ({online:'● 在线', reconnecting:'⟳ 重连中', host_offline:'⚠ 房主离线'})[k] || ''; }
+    function setConn(kind){
+      if(!kind) kind='online';
+      if(kind===connState) return;
+      connState = kind; try{ setBanner(); }catch(_){ } try{ renderCtrl(); }catch(_){ } try{ updateChip(); }catch(_){ }
+      if(kind==='host_offline'){ try{ vibrate([40,80,40]); }catch(_){ } }
+    }
+    function connPill(){ return connState==='online' ? '' : ('<span class="gd-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     const names = opts.names || ['你','下家','对家','上家'];
     const avatars = opts.avatars || ['🙂','🤖','🤝','👾'];
     // 座位→DOM 槽位: 以 mySeat 为底, 顺时针 下家(右)/对家(上)/上家(左) 相对旋转(单机 mySeat=0 时恰为 1/2/3)
@@ -392,7 +408,14 @@
       return { t:'掼蛋 · 打'+LVL_LABEL(st.level), s:(mine?'⚡ 轮到你出牌':('等 '+st.players[st.turn].name+' 出牌'))+' · 你 '+(my&&my.hand?my.hand.length:'?')+' 张', cls: mine?'turn':'' };
     }
     function updateChip(){ if(!minimized||!chip) return; const i=chipStatus();
-      chip.className='gd-chip'+(i.cls?(' '+i.cls):''); chip.querySelector('.ck-t').textContent=i.t; chip.querySelector('.ck-s').textContent=i.s; }
+      const mine=(st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost));
+      let cls='gd-chip'+(i.cls?(' '+i.cls):'');
+      if(mine && document.hidden) cls += ' hidden-alert';
+      chip.className=cls;
+      const tag = connState!=='online' ? (' ['+connLabel(connState).replace(/^[● ⟳ ⚠]+/,'').trim()+']') : '';
+      chip.querySelector('.ck-t').textContent=i.t + tag;
+      chip.querySelector('.ck-s').textContent=i.s;
+    }
     function minimize(){
       if (minimized) return; minimized=true;
       room.classList.remove('gd-expanding'); room.classList.add('gd-collapsing');
@@ -625,13 +648,13 @@
     }
 
     function setBanner(){
-      const b=els.banner;
-      if (st.phase==='over'){ b.className='gd-banner'; b.textContent=''; return; }
-      if (st.phase!=='play' || st.turn<0){ b.className='gd-banner'; b.textContent='⏳ 等待开局…'; return; }
-      if (isGuest && awaitingHost){ b.className='gd-banner'; b.textContent='⏳ 已出牌 · 等待裁决…'; return; }
+      const b=els.banner; const cp=connPill();
+      if (st.phase==='over'){ b.className='gd-banner'; b.innerHTML=cp; return; }
+      if (st.phase!=='play' || st.turn<0){ b.className='gd-banner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
+      if (isGuest && awaitingHost){ b.className='gd-banner'; b.innerHTML=cp+'⏳ 已出牌 · 等待裁决…'; return; }
       const seat=st.turn, mine=seat===mySeat;
-      if (mine){ b.className='gd-banner mine'; b.innerHTML=`🫵 轮到你出牌 <span class="clk" id="gdClk"></span>`; }
-      else { b.className='gd-banner'; b.innerHTML=`${escapeHtml(st.players[seat].name)} 思考中… <span class="clk" id="gdClk"></span>`; }
+      if (mine){ b.className='gd-banner mine'; b.innerHTML=cp+'🫵 轮到你出牌 <span class="clk" id="gdClk"></span>'; }
+      else { b.className='gd-banner'; b.innerHTML=cp+escapeHtml(st.players[seat].name)+' 思考中… <span class="clk" id="gdClk"></span>'; }
     }
     function seatOf(seat){ return room.querySelector(`.gd-seat[data-seat="${seat}"]`); }
     function armTurn(onExpire){
@@ -669,6 +692,9 @@
     }
 
     function renderCtrl(){
+      if (isGuest && connState!=='online'){
+        const label=connState==='host_offline'?'房主离线 · 等待恢复':'连接恢复中…';
+        els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ ${label}</button></div>`; return; }
       if (st.phase!=='play'){ els.ctrl.innerHTML=''; return; }
       if (isGuest && awaitingHost){   // 已回传动作, 锁操作条防重复
         els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ 等待裁决…</button></div>`; return; }
@@ -919,7 +945,8 @@
     renderAll();
     showTributeBanner();
     if (!isGuest) broadcast();   // host: 开局首帧即广播(顺带写各远程席初始手牌)
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove,
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
+      applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }

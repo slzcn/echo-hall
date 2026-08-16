@@ -176,6 +176,13 @@
 .pk-chip.turn .ck-ic::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--accent,#00e5d4);animation:pkChipPulse 1.05s ease-out infinite;pointer-events:none}
 @keyframes pkChipPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
 .pk-chip.over{border-color:var(--amber,#ffc24d)}.pk-chip.over .ck-s{color:var(--amber,#ffc24d)}
+.pk-conn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-right:6px;letter-spacing:.03em;vertical-align:1px}
+.pk-conn.online{background:rgba(0,229,212,.12);color:var(--accent,#00e5d4);border:1px solid rgba(0,229,212,.35)}
+.pk-conn.reconnecting{background:rgba(255,194,77,.14);color:var(--amber,#ffc24d);border:1px solid rgba(255,194,77,.4);animation:pkConnBlink 1s ease-in-out infinite}
+.pk-conn.host_offline{background:rgba(255,93,108,.16);color:#ff5d6c;border:1px solid rgba(255,93,108,.45)}
+@keyframes pkConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
+.pk-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
+
 `;
     document.head.appendChild(s);
   }
@@ -297,6 +304,16 @@
       fold:['这手算了','让给你','弃了弃了','下把再战'],
       win:['筹码归我 😎','读牌成功','谢谢款待','技术活'],
     };
+    // 联机连接状态: online / reconnecting / host_offline —— 由 app.js 通过返回值 setConn(kind) 灌入
+    let connState = 'online';
+    function connLabel(k){ return ({online:'● 在线', reconnecting:'⟳ 重连中', host_offline:'⚠ 房主离线'})[k] || ''; }
+    function setConn(kind){
+      if(!kind) kind='online';
+      if(kind===connState) return;
+      connState = kind;
+      renderMsg(); renderActs(); updateChip();
+      if(kind==='host_offline'){ try{ vibrate([40,80,40]); }catch(_){ } }
+    }
     function emitBeat(b){ if(typeof opts.onBeat==='function'){ try{ opts.onBeat(Object.assign({ game:'nlhe' }, b)); }catch(_){} } }
     function beatQuip(seat, kind){
       if(!(isAI[seat])) return null;
@@ -317,7 +334,14 @@
         cls: mine?'turn':'' };
     }
     function updateChip(){ if(!minimized||!chip) return; const i=chipStatus();
-      chip.className='pk-chip'+(i.cls?(' '+i.cls):''); chip.querySelector('.ck-t').textContent=i.t; chip.querySelector('.ck-s').textContent=i.s; }
+      const mine=(st.toAct===mySeat && st.phase!=='over' && st.phase!=='waiting');
+      let cls='pk-chip'+(i.cls?(' '+i.cls):'');
+      if(mine && document.hidden) cls += ' hidden-alert';
+      chip.className=cls;
+      const tag = connState!=='online' ? (' ['+connLabel(connState).replace(/^[● ⟳ ⚠]+/,'').trim()+']') : '';
+      chip.querySelector('.ck-t').textContent=i.t + tag;
+      chip.querySelector('.ck-s').textContent=i.s;
+    }
     function minimize(){
       if (minimized) return; minimized=true;
       room.classList.remove('pk-expanding'); room.classList.add('pk-collapsing');
@@ -425,12 +449,14 @@
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
     }
     function streetName(){ return ({preflop:'翻牌前',flop:'翻牌',turn:'转牌',river:'河牌',showdown:'摊牌',over:'结算'})[st.phase]||''; }
+    function connPill(){ return connState==='online' ? '' : ('<span class="pk-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     function renderMsg(){
-      if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.textContent='🎴 等房主发牌…'; return; }
-      if (st.phase==='over'){ els.msg.className='pk-msg'; els.msg.textContent=''; return; }
+      const cp = connPill();
+      if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🎴 等房主发牌…'; return; }
+      if (st.phase==='over'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp; return; }
       const seat=st.toAct;
-      if (seat===mySeat){ els.msg.className='pk-msg mine'; els.msg.textContent='🫵 轮到你 · '+streetName(); }
-      else { els.msg.className='pk-msg'; els.msg.textContent=(st.players[seat]?st.players[seat].name:'…')+' 思考中… · '+streetName(); }
+      if (seat===mySeat){ els.msg.className='pk-msg mine'; els.msg.innerHTML=cp+'🫵 轮到你 · '+streetName(); }
+      else { els.msg.className='pk-msg'; els.msg.innerHTML=cp+(st.players[seat]?escapeHtml(st.players[seat].name):'…')+' 思考中… · '+streetName(); }
     }
 
     function renderMe(){
@@ -467,6 +493,11 @@
     let raiseTo = 0;
     function renderActs(){
       const p=st.players[mySeat];
+      if (isGuest && connState!=='online'){
+        const label=connState==='host_offline'?'房主离线 · 等待恢复':'连接恢复中…';
+        els.acts.innerHTML=`<div class="pk-row"><button class="pk-act ghost" disabled>⏳ ${label}</button></div>`;
+        return;
+      }
       const mine = st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
       if (!mine){ els.acts.innerHTML=''; return; }
       const la=Engine.legalActions(st, mySeat);
@@ -715,6 +746,7 @@
     requestAnimationFrame(positionSeats);
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, mySeat:()=>mySeat,
+      setConn, connState:()=>connState,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
