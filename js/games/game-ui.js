@@ -216,6 +216,13 @@
 @keyframes ddzChipPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
 .ddz-chip.over{border-color:var(--amber,#ffc24d)}
 .ddz-chip.over .ck-s{color:var(--amber,#ffc24d)}
+.ddz-conn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-right:6px;letter-spacing:.03em;vertical-align:1px}
+.ddz-conn.online{background:rgba(0,229,212,.12);color:var(--accent,#00e5d4);border:1px solid rgba(0,229,212,.35)}
+.ddz-conn.reconnecting{background:rgba(255,194,77,.14);color:var(--amber,#ffc24d);border:1px solid rgba(255,194,77,.4);animation:ddzConnBlink 1s ease-in-out infinite}
+.ddz-conn.host_offline{background:rgba(255,93,108,.16);color:#ff5d6c;border:1px solid rgba(255,93,108,.45)}
+@keyframes ddzConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
+.ddz-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
+
 `;
     document.head.appendChild(s);
   }
@@ -246,57 +253,77 @@
     injectCSS();
 
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
+    let connState = 'online';
+    function connLabel(k){ return ({online:'● 在线', reconnecting:'⟳ 重连中', host_offline:'⚠ 房主离线'})[k] || ''; }
+    function setConn(kind){
+      if(!kind) kind='online';
+      if(kind===connState) return;
+      connState = kind; try{ setBanner(); }catch(_){ } try{ updateChip(); }catch(_){ }
+      if(kind==='host_offline'){ try{ vibrate([40,80,40]); }catch(_){ } }
+    }
+    function connPill(){ return connState==='online' ? '' : ('<span class="ddz-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     const names = opts.names || ['你', '灵魂·左', '灵魂·右'];
     const avatars = opts.avatars || ['🙂','🤖','👾'];
     const gameIsAI = opts.isAI || [false,true,true];                    // 联机: host 按座位实况标人/机
     // 对手 DOM 槽位: 以 mySeat 为基, 顺位 (me+1)/(me+2)(单机 mySeat=0 时恰为 1/2)
     const OPP_SEATS = [(mySeat+1)%3, (mySeat+2)%3];
-    // ── 联机模式 ── solo=单机(默认) / host=本机权威跑引擎+广播脱敏快照 / guest=只渲染快照+回传动作
-    const mode = opts.mode || 'solo';
-    const isHost = mode === 'host', isGuest = mode === 'guest';
-    const transport = opts.transport || null;
-    const TableSync = root.EHTableSync;
-    function sendMove(move){ try{ if(transport && transport.sendMove) transport.sendMove(move); }catch(_){} }
-    // host: 每次状态推进后, 给每席产出脱敏快照(别家手牌只留张数)并广播
+    // ── 联机(host 权威)双模式: guest 只渲染 host 广播的脱敏公共快照 + 回传自己动作, 不建局/不跑引擎 ──
+    //   单机路径(isGuest=false)完全走原逻辑, 零改动; 所有 guest 行为一律走 isGuest 分支旁路。
+    //   斗地主有【叫分阶段】与【底牌】: 底牌定地主后才随快照明置(见 ddz-net.js); 手牌动态(地主 +3 / 出一张少一张),
+    //   由 host 每次广播时重写各远程席私牌行 —— 快照永不带 seed/log/别家手牌/定地主前的底牌。
+    const mode = opts.mode || 'local';
+    const isGuest = mode === 'guest';
+    const remoteSeats = opts.remoteSeats || [];          // host 视角: 哪些席是远程真人(等其回传, 超时代打)
+    const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
+    const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
+    const GNet = root.EHDdzNet;
+    let myHand = [];        // guest: 自己手牌(从 eh_gt_hands 拉到)
+    let lastSnap = null;    // guest: 最近一张公共快照
+    let dealNo = 0;         // 本桌第几局(host 广播随快照带出; guest 据此识别新一局去拉手牌)
+    let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复
+    const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打
+
+    function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed }); }
+    // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
+    function waitingState(){
+      return { phase:'wait', seed:undefined, turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
+        bid:null, result:null, bottom:[], table:{ lastPlay:null, passesInRow:0 },
+        players:[0,1,2].map(s=>({ id:'p'+s, seat:s, name:(names[s]||('席'+s)),
+          isAI: !!(gameIsAI && gameIsAI[s]), hand:[] })) };
+    }
+    // ── host: 产出脱敏公共快照交给 app.js 广播(顺带把各远程真人席【当前】手牌写回私牌表: 定地主 +3 / 出一张少一张) ──
     function broadcast(){
-      if (!isHost || !transport || !transport.broadcast || !TableSync) return;
-      try { transport.broadcast(st.players.map((_,seat)=>TableSync.makeSnapshot(st, seat))); } catch(_){}
+      if (isGuest || !onSync || !GNet) return;
+      try{ onSync(GNet.snapshot(st, dealNo), st); }catch(_){}
     }
-    // guest: 把收到的快照重建成 render 兼容的 st —— 别家 hand 用等长占位(只有张数会被渲染, 牌面不下发)
-    function snapToState(snap){
-      if (!snap) return { phase:'play', turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
-        bid:null, result:null, bottom:[], table:{lastPlay:null,passesInRow:0},
-        players:[0,1,2].map(seat=>({seat,name:names[seat]||('席'+seat),isAI:gameIsAI[seat],hand:[]})) };
-      return {
-        phase:snap.phase, turn:snap.turn, landlord:(snap.landlord==null?null:snap.landlord),
-        multiplier:snap.multiplier||1, base:snap.base||1, bombs:snap.bombs||0,
-        bid:snap.bid||null, result:snap.result||null,
-        bottom: snap.bottom ? snap.bottom : Array.from({length:snap.bottomCount||0},()=>({})),
-        table: snap.table || {lastPlay:null,passesInRow:0},
-        players: snap.players.map(p=>({ seat:p.seat, name:p.name, isAI:p.isAI,
-          hand: p.hand ? p.hand : Array.from({length:p.count||0},()=>({_hidden:true})) })),
-      };
-    }
-    // host 接收远程真人回传的动作 → 经引擎权威校验后应用(非本人回合/非法一律忽略)
+    // 供联机(host 权威应用远程真人动作)/超时托管驱动任意席一手。含叫分阶段。
+    // 返回 true=引擎接受并应用; false=非本人回合/非法/牌不在手 → 调用方 resync 把权威快照重播给客人纠偏。
     function applyMove(seat, move){
-      if (!move || st.phase==='over') return;
+      if (!move || st.phase==='over' || st.phase==='wait') return false;
       try {
-        if (st.phase==='bid'){ if(st.bid.turn!==seat) return; if(move.action==='call') doCall(seat, move.val); return; }
+        if (st.phase==='bid'){
+          if (!st.bid || st.bid.turn!==seat) return false;
+          if (move.action==='call'){ doCall(seat, move.val); return true; }
+          return false;
+        }
         if (st.phase==='play'){
-          if (st.turn!==seat) return;
-          if (move.action==='pass'){ doPass(seat); return; }
+          if (st.turn!==seat) return false;
+          if (move.action==='pass'){ doPass(seat); return true; }
           if (move.action==='play'){
             const hand = st.players[seat].hand;
             const cards = (move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
-            let r; try{ r = Engine.applyPlay(st, seat, cards); }catch(e){ return; }
+            const r = Engine.applyPlay(st, seat, cards);
             if (!Rules.isBomb(r&&r.played)) sfx('cardplay');
             maybeBanter(seat); renderAll();
             if (r && r.over) showOver();
+            return true;
           }
         }
-      } catch(_){}
+      } catch(e){ return false; }
+      return false;
     }
-    let st = isGuest ? snapToState(opts.snapshot) : Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed });
+    let st = isGuest ? waitingState() : newGame();
     let selected = new Set();     // 选中的 card id
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
@@ -307,7 +334,7 @@
     let dealAnim = true;          // 下一次 renderHand 播发牌错峰入场(开局/重发/再来一局各触发一次)
     let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
     let lastMyTurn = false;       // "轮到我"上升沿: 只在刚轮到时提示音+震动, 不每帧响
-    sfx('arrive'); sfx('deal');   // 开桌一声 + 洗牌发牌
+    sfx('arrive'); if(!isGuest) sfx('deal');   // 开桌一声 + 洗牌发牌(guest 未拿到手牌前不响发牌音)
 
     // 定时器:AI 行动 + 回合倒计时(环 + 到点兜底)
     let aiTimer = null;
@@ -393,13 +420,22 @@
     let minimized = false, chip = null;
     function chipStatus(){
       if (st.phase==='over'){ const w = st.result && st.result.winners.includes(mySeat); return { t:'斗地主', s:(w?'🏁 你赢了 · 点看战报':'🏁 本局结束 · 点看战报'), cls:'over' }; }
+      if (st.phase!=='play' && st.phase!=='bid')   // 联机 guest 等 host 首帧 / 重发空窗
+        return { t:'斗地主', s:'⏳ 等待开局…', cls:'' };
       if (st.phase==='bid'){ const mine=st.bid.turn===mySeat;
         return { t:'斗地主 · 叫分', s: mine?'⚡ 轮到你叫分':('等 '+st.players[st.bid.turn].name+' 叫分'), cls: mine?'turn':'' }; }
       const mine = st.turn===mySeat, my=st.players[mySeat];
       return { t:'斗地主', s:(mine?'⚡ 轮到你出牌':('等 '+st.players[st.turn].name+' 出牌'))+' · 你 '+(my&&my.hand?my.hand.length:'?')+' 张', cls: mine?'turn':'' };
     }
     function updateChip(){ if(!minimized||!chip) return; const i=chipStatus();
-      chip.className='ddz-chip'+(i.cls?(' '+i.cls):''); chip.querySelector('.ck-t').textContent=i.t; chip.querySelector('.ck-s').textContent=i.s; }
+      const mine=(st.phase==='play' && st.turn===mySeat) || (st.phase==='bid' && st.bid && st.bid.turn===mySeat);
+      let cls='ddz-chip'+(i.cls?(' '+i.cls):'');
+      if(mine && document.hidden) cls += ' hidden-alert';
+      chip.className=cls;
+      const tag = connState!=='online' ? (' ['+connLabel(connState).replace(/^[● ⟳ ⚠]+/,'').trim()+']') : '';
+      chip.querySelector('.ck-t').textContent=i.t + tag;
+      chip.querySelector('.ck-s').textContent=i.s;
+    }
     function minimize(){
       if (minimized) return; minimized=true;
       room.classList.remove('ddz-expanding'); room.classList.add('ddz-collapsing');
@@ -531,7 +567,7 @@
       return Deck.sortHand ? Deck.sortHand(hand) : hand;
     }
     function renderHand(){
-      const myTurn = st.phase==='play' && st.turn===mySeat;
+      const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       els.hand.className = 'ddz-hand' + (myTurn||arrangeMode?'':' locked') + (arrangeMode?' arranging':'');
       els.hand.innerHTML = '';
       const deal = dealAnim; dealAnim = false;   // 只在发牌那一帧错峰入场, 之后普通重绘不动画
@@ -622,31 +658,36 @@
 
     // ── 轮次横幅 + 倒计时环 ──
     function setBanner(){
-      const b = els.banner;
-      if (st.phase==='over'){ b.className='ddz-turnbanner'; b.textContent=''; return; }
+      const b = els.banner; const cp = connPill();
+      if (st.phase==='over'){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
+      if (st.phase!=='bid' && st.phase!=='play'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
+      if (isGuest && awaitingHost){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 已提交 · 等待裁决…'; return; }
       const seat = st.phase==='bid' ? st.bid.turn : st.turn;
       const mine = seat===mySeat;
       const verb = st.phase==='bid' ? '叫分' : '出牌';
       if (mine){
         b.className = 'ddz-turnbanner mine';
-        b.innerHTML = `🫵 轮到你${verb} <span class="clk" id="ddzClk"></span>`;
+        b.innerHTML = cp + `🫵 轮到你${verb} <span class="clk" id="ddzClk"></span>`;
       } else {
         b.className = 'ddz-turnbanner';
-        b.innerHTML = `${escapeHtml(st.players[seat].name)} ${st.phase==='bid'?'思考叫分':'思考出牌'}中… <span class="clk" id="ddzClk"></span>`;
+        b.innerHTML = cp + `${escapeHtml(st.players[seat].name)} ${st.phase==='bid'?'思考叫分':'思考出牌'}中… <span class="clk" id="ddzClk"></span>`;
       }
     }
     // 倒计时环:驱动当前活动座位的 conic 环 + 横幅秒数; 到点跑 onExpire(仅人类)
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase==='over') return;
+      if (st.phase!=='bid' && st.phase!=='play') return;   // over/wait: 不武装倒计时
       const seat = st.phase==='bid' ? st.bid.turn : st.turn;
+      if (seat==null || seat<0) return;
       turnSeatActive = seat;
       const mine = seat===mySeat;
+      if (isGuest && awaitingHost) return;   // guest 回传后等 host 裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
       lastMyTurn = mine;
-      // host 上的远程真人席: 给足真人回合时限, 到点由 aiStep 托管出牌(与本人超时兜底同源)
-      const remoteHuman = isHost && !mine && !gameIsAI[seat];
-      turnDur = (mine || remoteHuman) ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS)
+      // host 视角: 远程真人席给足宽限(REMOTE_TIMEOUT_MS), 到点由 onRemoteTimeout→aiStep 托管(与本人超时兜底同源)
+      const remote = !isGuest && isRemote(seat);
+      turnDur = mine ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS)
+              : remote ? REMOTE_TIMEOUT_MS
               : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
       turnStart = Date.now();
 
@@ -671,10 +712,18 @@
       };
       tick();
 
-      if (!mine && !isGuest){
-        // solo/host: AI 席到点行动; host 上远程真人席到点由 aiStep 托管。guest 从不本地驱动任何席(host 权威)
-        aiTimer = setTimeout(()=>aiStep(seat), turnDur);
-      }
+      // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程真人席(超时托管)/host 本机 AI 席。
+      if (mine) return;
+      if (isGuest) return;                                    // guest 只渲染, host 是唯一裁判
+      if (remote) aiTimer = setTimeout(()=>onRemoteTimeout(seat), turnDur);
+      else aiTimer = setTimeout(()=>aiStep(seat), turnDur);
+    }
+    // host: 远程真人超时未回传 → host 托管代打(与 aiStep 同源, 叫分/出牌都能兜)
+    function onRemoteTimeout(seat){
+      const active = st.phase==='bid' ? (st.bid && st.bid.turn) : st.turn;
+      if ((st.phase!=='bid' && st.phase!=='play') || active!==seat) return;
+      toast('远客超时 · 暂由房主托管');
+      aiStep(seat);
     }
     function seatOf(seat){
       return els.opps.querySelector(`.ddz-seat[data-seat="${seat}"]`)
@@ -684,9 +733,11 @@
     // ── 控制区:叫地主 / 出牌 ──
     function renderCtrl(){
       if (st.phase === 'bid'){
+        if (isGuest && awaitingHost){ els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">⏳ 已叫分 · 等待裁决…</div></div>`; return; }
         if (st.bid.turn === mySeat) renderBidBar();
         else els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">等待 ${escapeHtml(st.players[st.bid.turn].name)} 叫分…</div></div>`;
       } else if (st.phase === 'play'){
+        if (isGuest && awaitingHost){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>⏳ 等待裁决…</button></div>`; return; }
         renderActBar();
       } else {
         els.ctrl.innerHTML = '';
@@ -739,16 +790,26 @@
 
     // ── 动作 ──
     function doCall(seat, val){
-      if (isGuest){ if(seat!==mySeat) return; sendMove({action:'call',val}); say(seat,val>0?val+'分！':'不叫'); toast('已叫分…'); return; }
+      if (isGuest){   // guest 只能替自己叫分, 回传给 host 裁决
+        if (seat!==mySeat || awaitingHost) return;
+        if (onAction) onAction({ action:'call', val });
+        say(seat, val>0?val+'分！':'不叫'); awaitingHost=true;
+        setBanner(); renderCtrl(); toast('已叫分…'); return;
+      }
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
       if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
     }
     function doPlay(){
-      const cards = [...selected].map(findCardById);
-      if (isGuest){ if(!cards.length) return; sendMove({action:'play',cards:cards.map(c=>({id:c.id}))}); selected.clear(); hintCycle=[]; sfx('cardplay'); toast('已出牌…'); return; }
+      const cards = [...selected].map(findCardById).filter(Boolean);
+      if (isGuest){   // guest: 本地已用 updatePlayBtn 校验合法, 只回传动作(id 数组), 由 host 引擎权威裁决 + 广播新快照
+        if (!cards.length || awaitingHost) return;
+        if (onAction) onAction({ action:'play', cards: cards.map(c=>c.id) });
+        sfx('cardplay'); selected.clear(); hintCycle=[]; awaitingHost=true;
+        setBanner(); renderCtrl(); renderHand(); return;
+      }
       try { var r = Engine.applyPlay(st, mySeat, cards); }
       catch(e){ toast(playErr(e.message)); return; }
       if (!Rules.isBomb(r && r.played)) sfx('cardplay');   // 出牌拍击音(炸弹交给 boom, 不叠)
@@ -757,7 +818,12 @@
       if (r && r.over){ showOver(); return; }
     }
     function doPass(seat){
-      if (isGuest){ if(seat!==mySeat) return; sendMove({action:'pass'}); sfx('pass'); say(seat,'不出'); toast('已过…'); return; }
+      if (isGuest){   // guest 只能替自己不出, 回传给 host
+        if (seat!==mySeat || awaitingHost) return;
+        if (onAction) onAction({ action:'pass' });
+        sfx('pass'); say(seat,'不出'); awaitingHost=true;
+        setBanner(); renderCtrl(); renderHand(); return;
+      }
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
       if (seat===mySeat) sfx('pass');
       say(seat,'不出');
@@ -838,10 +904,12 @@
       els.felt.appendChild(over);
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
-      over.querySelector('#ddzAgain').addEventListener('click', ()=>{
-        if (isGuest){ toast('等房主再来一局…'); if(transport && transport.sendMove) sendMove({action:'again'}); return; }
+      // guest 无权开新一局: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报; 只留"收工"
+      const againBtn = over.querySelector('#ddzAgain');
+      if (isGuest){ againBtn.textContent='等房主开局…'; againBtn.disabled=true; }
+      else againBtn.addEventListener('click', ()=>{
         showOver._done=false;
-        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll();
+        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); customOrder=null; if(arrangeMode) setArrange(false); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll();
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){
@@ -870,16 +938,39 @@
       if (minimized) updateChip();                // 折叠时把最新态同步到右下角活牌桌片
     }
 
+    // ── guest: 收到 host 广播的公共脱敏快照 → 组伪状态渲染。换副/重发时重置手牌与动画; 终局弹战报。 ──
+    function applySnapshot(snap){
+      if (!snap || !GNet) return;
+      const prevPhase = st ? st.phase : null;
+      const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || ((prevPhase==='over'||prevPhase==='wait') && (snap.phase==='play'||snap.phase==='bid'));
+      if (isNewDeal){
+        dealAnim=true; selected.clear(); hintCycle=[]; customOrder=null;
+        lastShownKey=''; lastMyTurn=false; lastLord=null; showOver._done=false;
+        if (arrangeMode) setArrange(false);
+        const ov=els.felt.querySelector('.ddz-over'); if(ov) ov.remove();
+      }
+      awaitingHost=false;                 // 快照到达即解锁(host 已裁决)
+      dealNo = (typeof snap.dealNo==='number') ? snap.dealNo : dealNo;
+      lastSnap = snap;
+      st = GNet.pseudoState(snap, mySeat, myHand);
+      renderAll();
+      if (st.phase==='over' && st.result && prevPhase!=='over') showOver();
+      if (minimized) updateChip();
+    }
+    // ── guest: 收到自己那副手牌(来自 eh_gt_hands, RLS 只放行本人)。可传 id 数组或牌对象数组。地主领底后 host 会重写本行。 ──
+    function feedHand(cards){
+      myHand = (cards||[]).map(c=> (c && c.id) ? c : findCardById(c)).filter(Boolean);
+      if (st && st.players[mySeat]) st.players[mySeat].hand = myHand.map(c=>GNet?GNet.cardPlain(c):c);
+      renderHand(); renderCtrl(); if(minimized) updateChip();
+    }
+
     // 开局
     renderAll();
-    // guest: 订阅 host 广播的快照 → 重建 st 重绘; host: 订阅远程真人回传动作 → 权威校验后应用
-    if (isGuest && transport && transport.onSnapshot){
-      transport.onSnapshot(snap=>{ st = snapToState(snap); renderAll(); if(st.phase==='over') showOver(); });
-    }
-    if (isHost && transport && transport.onMove){
-      transport.onMove((seat, move)=>applyMove(seat, move));
-    }
-    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, applyMove, onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); }, pushSnapshot: snap=>{ if(isGuest){ st=snapToState(snap); renderAll(); if(st.phase==='over') showOver(); } } };
+    if (!isGuest) broadcast();   // host: 开局首帧即广播脱敏快照(顺带写各远程席初始手牌)
+    return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
+      applyMove, setConn, connState:()=>connState,
+      onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
+      onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 
   // ── 小工具 ──

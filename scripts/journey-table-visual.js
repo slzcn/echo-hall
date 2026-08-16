@@ -56,10 +56,10 @@ assert(/\.ddz-room \.tchat-toggle[\s\S]{0,20}\.gd-room  \.tchat-toggle[\s\S]{0,2
 assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,\s*\.28\)/.test(SHARED),
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
-// D. 版本号已同步升 exp2
-assert(/BUILD_VER='20260816-exp2'/.test(HTML), 'index.html BUILD_VER=20260816-exp2');
-assert(/eh-sw-v315-20260816-exp2/.test(R('sw.js')), 'sw.js SW_VERSION 升 exp2');
-assert(/^20260816-exp2\s*$/.test(R('ver.txt')), 'ver.txt=20260816-exp2');
+// D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
+assert(/BUILD_VER='20260817-ddz-online'/.test(HTML), 'index.html BUILD_VER=20260817-ddz-online');
+assert(/eh-sw-v316-20260817-ddz-online/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v316-ddz-online)');
+assert(/^20260817-ddz-online\s*$/.test(R('ver.txt')), 'ver.txt=20260817-ddz-online');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

@@ -2414,12 +2414,14 @@ function gtLaunchLocal(row){
   if(_restoreActiveGameIfAny()) return;
   if(row.game==='nlhe') return gtLaunchPoker(row);
   if(row.game==='guandan') return gtLaunchGuandan(row);
+  if(row.game==='ddz') return gtLaunchDdz(row);
 }
 function gtEnter(id){
   const row=_gtTables.get(id); if(!row) return;
   if(row.host_uid===myUid){ gtLaunchLocal(row); return; }
   if(row.game==='nlhe'){ gtEnterPoker(row); return; }
   if(row.game==='guandan'){ gtEnterGuandan(row); return; }
+  if(row.game==='ddz'){ gtEnterDdz(row); return; }
   toast('房主已开局 · 该游戏联机对战暂未接入');
 }
 
@@ -2582,6 +2584,84 @@ function gtEnterGuandan(row){
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   gtWatchHostPing(chan, row.host_uid);
   _ehGame = window.EHGuandanGame.open({
+    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
+    chat: ehGameChatBridge(),
+    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+  });
+  setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
+}
+
+// ── 斗地主联机 · 手牌落库: 斗地主手牌【动态】(地主领 3 张底牌 / 每次出牌减少), 故 host 每步都重写各远程真人席当前手牌。
+//   只写【远程真人席】(host/AI/灵魂席由本机引擎持有不落库); 单副牌无 deck 字段; RLS 保证各人只 select 到自己那行。
+function gtWriteDdzHands(tableId, state, A){
+  const hands=A.remoteSeats.map(seat=>{
+    const p=state.players[seat]; if(!p||!A.ids[seat]) return null;
+    return { seat, uid:A.ids[seat], hand:(p.hand||[]).map(c=>({ rank:c.rank, suit:c.suit, joker:(c.joker||null), label:c.label, id:c.id })) };
+  }).filter(Boolean);
+  if(!hands.length) return;
+  sb.rpc('eh_gt_set_hands',{p_table:tableId,p_hands:hands}).then(({error})=>{ if(error) console.warn('[ddz] set hands', error.message); }, ()=>{});
+}
+// ── 斗地主联机 · HOST: 本机跑引擎当裁判, 每步产脱敏公共快照广播 + 重写远程席当前手牌; 收远程动作(叫分/出牌/不出)经引擎校验后应用。──
+//   反作弊: 快照永不带 seed/log/任何人 hand, 只 handCount; 底牌(bottom)在地主揭晓前只给 bottomCount, 揭晓后才公开。
+function gtLaunchDdz(row){
+  if(!window.EHDdzGame || !window.EHDdzNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  const A=gtSeatArrays(row);
+  if(A.mySeat<0){ toast('你不在这桌'); return; }
+  if(A.n<3){ toast('斗地主要坐满 3 席才能开打'); return; }
+  _gtCleanupPlay();
+  const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  chan.on('broadcast',{event:'act'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      const ok=_ehGame.applyMove(payload.seat, payload.move);
+      if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
+    })
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
+  gtBindConnStatus(chan);
+  gtStartHostPing(chan);
+  _ehGame = window.EHDdzGame.open({
+    names:A.names, avatars:A.avatars, isAI:A.isAI,
+    mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onSync:(snap,state)=>{
+      gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
+      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+    },
+    onResult:(res,log,meta)=>{
+      recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
+      postDdzResult(res, A.names).catch(()=>{});
+      ehStashLastGame('ddz', res, log, A.names, meta);
+      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+    },
+  });
+}
+// ── 斗地主联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 叫分/出牌/不出发回 host 权威校验。──
+//   手牌动态: 自己张数一变(发牌 17 / 抢到地主 +3=20 / 我出牌减少) 就重拉; 写库与广播竞态时张数对不上短延时自愈重拉。
+function gtEnterDdz(row){
+  if(!window.EHDdzGame || !window.EHDdzNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(_restoreActiveGameIfAny()) return;
+  const A=gtSeatArrays(row);
+  if(A.mySeat<0){ toast('你不在这桌'); return; }
+  _gtCleanupPlay();
+  let lastMyCount=-1;
+  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const pullHand=(expect)=>{ let tries=0; const go=()=>{
+      sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
+        if(error){ console.warn('[ddz] my hand', error.message); return; }
+        const h=data||[];
+        if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
+        if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
+      }, ()=>{});
+    }; go(); };
+  chan.on('broadcast',{event:'snap'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.onSnapshot||!payload) return;
+      _ehGame.onSnapshot(payload);
+      const mc=(payload.players&&payload.players[A.mySeat])?payload.players[A.mySeat].handCount:null;
+      if(typeof mc==='number' && mc!==lastMyCount){ lastMyCount=mc; if(mc>0) pullHand(mc); }
+    });
+  gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
+  gtWatchHostPing(chan, row.host_uid);
+  _ehGame = window.EHDdzGame.open({
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
@@ -6505,28 +6585,32 @@ function _restoreActiveGameIfAny(){
   }
   return false;
 }
-// ── 斗地主:唤起牌桌浮层。两家 AI 用房里的灵魂居民命名/头像(没有则用默认)。──
+// ── 斗地主:唤起入室牌桌。3 席(1 地主 vs 2 农民), 空位由 AI(灵魂)补齐。──
+//   开一张【联机牌桌】(幂等: 同房已有活桌则复用同一张); 房里其他真人可点卡加入同桌真人对战。
+//   host 权威跑引擎见 gtLaunchDdz; 座位不满 3 真人时空位/灵魂由 host 本机 AI 代打(即单机陪玩体验)。
 async function launchDoudizhu(){
   if(!window.EHDdzGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
-  // 已有牌局(进行中或折叠成活牌桌片)→ 不叠第二桌, 折叠态直接拉回牌桌
   if(_restoreActiveGameIfAny()) return;
-  // 取房里灵魂当对手(公开信息:灵魂本就是房间住民)
-  let souls=[];
-  try{ souls = await prefetchSouls(curRoom.id); }catch(_){}
-  const pick = (souls||[]).filter(s=>s&&s.name).slice(0,2);
-  const names   = [me.name||'你', pick[0]?.name || '灵魂·左', pick[1]?.name || '灵魂·右'];
-  const avatars = [me.emoji||'🙂', pick[0]?.emoji || '🤖', pick[1]?.emoji || '👾'];
-  // 开局在聊天室留一行(让游戏"触发聊天内容"): 谁开了桌 + 对手是谁。失败静默,不挡开局。
-  try{ sendSystemAct(`开了一桌斗地主 🃏 · 对手 ${names[1]}、${names[2]}`).catch(()=>{}); }catch(_){}
-  _ehGame = window.EHDdzGame.open({
-    names, avatars, chat: ehGameChatBridge(), onBeat: ehGameBeat,
-    onResult: (res, log, meta)=>{
-      recordGameResult('doudizhu', res, log, names, avatars, pick).catch(()=>{});
-      postDdzResult(res, names).catch(()=>{});   // 结束后聊天室留一张战绩卡(含"再来一局"入口)
-      ehStashLastGame('ddz', res, log, names, meta);
-    },
-  });
+  let row=null;
+  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'ddz',p_name:me.name,p_emoji:me.emoji});
+    if(error) throw error; row=data; }
+  catch(e){ toast('开桌失败，稍后再试'); return; }
+  if(!row){ toast('开桌失败'); return; }
+  _gtTables.set(row.id,row);
+  if(row.host_uid===myUid && !row.msg_id){
+    const text=window.EHTable ? EHTable.encode(row.id,'ddz') : ('game|gt|'+row.id+'|ddz');
+    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+    if(el){ $('#stream').appendChild(el); scrollStream(); }
+    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+    }catch(e){ console.warn('[gt] post table card failed', e); }
+  } else {
+    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
+    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
+    else toast('本房已有一桌，往上翻找牌桌卡加入');
+  }
 }
 // ── 德州扑克:唤起绒面牌桌。房里灵魂当对手(全局意识 AI, 5 灵魂性格映射打法), 我坐底位。──
 async function launchTexas(){

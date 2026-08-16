@@ -135,12 +135,14 @@ assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 la
 
 // ── 步骤6: 和聊天融合(主人反馈:游戏结束后聊天室什么都没留下) ─────
 // 三条不可回退断言, 对治"开局/结束都不触发聊天内容":
-//   ① 开局在房间留一行(act) → 游戏"触发了聊天内容"
+//   ① 开局不再静默/单机, 而是走 eh_gt_open 建【联机牌桌】并把牌桌卡发进聊天室(全房可见可加入)
 //   ② 结束后落一张 kind:'game' 战绩卡(ddz 事件, 编码可被 buildGameEl 解回)
 //   ③ 战绩卡带"再来一局"入口, 点了直接开新局 → 快速循环
-assert(/sendSystemAct\(`开了一桌斗地主/.test(src), '开局在聊天室留一行(触发聊天内容, 非静默开桌)');
+assert(/async function launchDoudizhu\(\)[\s\S]{0,400}rpc\('eh_gt_open'/.test(src), '/斗地主 开桌走 eh_gt_open(建联机牌桌, 非本地单机)');
+assert(/launchDoudizhu\(\)[\s\S]{0,600}EHTable\.encode\(row\.id,'ddz'\)[\s\S]{0,200}kind:'game'/.test(src), '开桌把牌桌卡(kind:game, game|gt)发进聊天室(全房可见)');
+assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
-assert(/onResult:[\s\S]{0,160}postDdzResult\(res,\s*names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
+assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
 assert(/async function postDdzResult\([\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
 // 编码 → 解码闭环: 生产用的 text 编码字段序与 buildGameEl 的 ddz 分支解码字段序一致
 assert(/\['game','ddz',\s*win,\s*role,\s*res\.delta\[0\],\s*res\.base,\s*res\.finalMultiplier,\s*res\.bombs\|\|0,\s*res\.spring\?1:0,\s*res\.landlordWon\?1:0,\s*lordName\]/.test(src),
