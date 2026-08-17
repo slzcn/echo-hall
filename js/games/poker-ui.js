@@ -86,6 +86,14 @@
 .pk-seat .stk{font-size:11px;color:var(--dim,#498d88);font-variant-numeric:tabular-nums}
 .pk-seat .stk b{color:var(--ink)}
 .pk-seat.allin .stk b{color:var(--magenta,#ff2d8e)}
+/* 入座序列: 未到场的灵魂=虚位(虚线头像+呼吸); 刚落座=弹入 */
+.pk-seat.arriving{opacity:.5}
+.pk-seat.arriving .av{background:transparent;border:1.5px dashed var(--line2,rgba(0,229,212,.4));animation:pkSeatWait 1.2s ease-in-out infinite}
+.pk-seat.arriving .stk{color:var(--dim,#498d88);font-style:italic}
+@keyframes pkSeatWait{0%,100%{opacity:.45}50%{opacity:.9}}
+.pk-seat.pk-justseated{animation:pkSeatPop .42s cubic-bezier(.2,.9,.3,1)}
+@keyframes pkSeatPop{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.pk-cd{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 .pk-mini-hole{display:flex;gap:2px;margin-top:1px;min-height:1px}
 .pk-mini-hole .card{margin:0}
 .pk-say{position:absolute;top:calc(var(--av,44px) + 2px);font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:140px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:8;white-space:nowrap}
@@ -131,7 +139,7 @@
 .pk-qbtn{flex:1;padding:5px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-row{display:flex;gap:9px;justify-content:center}
-.pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
+.pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
 .pk-b:active{transform:scale(.96)}
 .pk-b:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
@@ -229,6 +237,9 @@
     const isRemote = (seat) => remoteSeats.indexOf(seat) >= 0;
     const onSync   = (typeof opts.onSync   === 'function') ? opts.onSync   : null;  // host: 每步产出快照广播
     const onAction = (typeof opts.onAction === 'function') ? opts.onAction : null;  // guest: 动作发回 host
+    // 单机陪玩(我一人 + 灵魂 AI): 才启用"灵魂逐个入座""自动开下一手""真人破产本场终结"这套单人体验;
+    // 联机(host/guest)节奏由真人/房主掌控, 一律不套。
+    const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const PokerNet = root.EHPokerNet;
     let myHole = [];       // guest: 自己的两张底牌(牌对象), 由 feedHand 注入
     let lastSnap = null;   // guest: 最近一张公共快照
@@ -240,8 +251,14 @@
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
     function newHand(seedOverride){
-      // 破产者本手不入座 → 全员重新带入(保证至少两人)
-      if (aliveSeats().length < 2) stacks = names.map(()=>START);
+      // 破产补带: 灵魂/对手破产一律自动补带(练习桌总有对手可打);
+      //   真人破产——单机模式保持 0(showOver 已判本场终结, 根本走不到这里发牌),
+      //   联机模式沿用旧的"全员补带"语义(在线对局不因一人破产而终止, 由房主掌控)。
+      stacks = stacks.map((v, seat) => {
+        if (v > 0) return v;
+        if (seat !== mySeat) return START;          // 灵魂/对手
+        return isLocalSolo ? v : START;             // 真人
+      });
       while (stacks[button] <= 0) button = (button+1)%n;   // 庄家落在有筹码的人身上
       let seed; try{ seed = crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed = Math.floor(Math.random()*4294967296); }
       return Engine.createGame({ seed: seedOverride!=null?seedOverride:(opts.seed!=null && handNo===0?opts.seed:seed),
@@ -249,13 +266,16 @@
     }
     let handNo = 0;
     // guest 开局尚无快照 → 先给一个"等发牌"占位态; host/local 直接发一手
-    function waitingState(){
-      return { variant:'nlhe', phase:'waiting', street:'preflop', n, button:0, sb, bb,
+    function waitingState(phase){
+      return { variant:'nlhe', phase:phase||'waiting', street:'preflop', n, button:0, sb, bb,
         currentBet:0, minRaise:bb, aggressor:null, toAct:-1, pot:0, board:[], result:null,
         players: names.map((nm,seat)=>({ seat, name:nm||('席'+seat), isAI:!!isAI[seat],
           stack:START, start:START, hole:[], folded:false, allin:false, committed:0, street:0, acted:false })) };
     }
-    let st = isGuest ? waitingState() : newHand();
+    // 单机: 开局先进"入座"态(灵魂陆续上桌), 到齐后才发第一手; guest: 等房主发牌; host/其余: 直接发牌
+    let introSeating = isLocalSolo;
+    let arrived = isLocalSolo ? new Set([mySeat]) : null, lastSeated = -1;
+    let st = isGuest ? waitingState() : (isLocalSolo ? waitingState('seating') : newHand());
 
     function sfx(nm){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(nm); }catch(_){} }
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
@@ -395,6 +415,13 @@
         <div class="pk-say"></div>
       </div>`;
     }
+    // 入座阶段: 尚未到场的灵魂座位画成"待入座"虚位
+    function seatEmptyHTML(seat){
+      return `<div class="pk-seat arriving" data-seat="${seat}" style="--p:360">
+        <div class="pk-avr"><div class="av">···</div></div>
+        <div class="nm">${escapeHtml(st.players[seat].name)}</div>
+        <div class="stk">入座中…</div></div>`;
+    }
     function renderOpponents(){
       // 移除旧对手节点(保留 pk-table 内的 center)
       els.table.querySelectorAll('.pk-seat, .pk-commit').forEach(e=>e.remove());
@@ -402,9 +429,12 @@
       for (let d=1; d<order.length; d++){
         const seat = order[d];
         const wrap = document.createElement('div');
-        wrap.innerHTML = seatHTML(seat);
+        const pending = introSeating && arrived && !arrived.has(seat);
+        wrap.innerHTML = pending ? seatEmptyHTML(seat) : seatHTML(seat);
         const seatEl = wrap.firstElementChild;
+        if (introSeating && arrived && seat===lastSeated) seatEl.classList.add('pk-justseated');
         els.table.appendChild(seatEl);
+        if (pending) continue;   // 虚位不摆投入筹码
         // 身前投入(本街) 筹码牌
         const commit = document.createElement('div');
         commit.className='pk-commit'+(st.players[seat].street>0?'':' zero');
@@ -456,6 +486,7 @@
     function connPill(){ return connState==='online' ? '' : ('<span class="pk-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     function renderMsg(){
       const cp = connPill();
+      if (st.phase==='seating'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🪑 灵魂陆续入座…'; return; }
       if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🎴 等房主发牌…'; return; }
       if (st.phase==='over'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp; return; }
       const seat=st.toAct;
@@ -469,7 +500,8 @@
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[mySeat]);
       const holeCards = (showdown ? st.result.reveal[mySeat].hole.map(idCard) : p.hole);
       let hint='';
-      if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
+      if (st.phase==='seating'){ hint='🪑 等灵魂入座后开牌…'; }
+      else if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
       else if (st.phase==='over'){
         const won=(st.result.winnersBySeat||[]).includes(mySeat);
         hint = won ? '🏆 这手你赢了' : (p.folded?'你已弃牌':'本手结束');
@@ -606,7 +638,7 @@
     // ── 回合驱动: 亮环倒计时 + AI/自动 ──
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase==='over' || st.phase==='waiting') return;
+      if (st.phase==='over' || st.phase==='waiting' || st.phase==='seating') return;
       // 摊牌/结算之外, 无人需行动的中间态不该发生(引擎自动跑完); 安全兜底
       const seat=st.toAct;
       if (seat<0 || !st.players[seat]) return;
@@ -664,8 +696,9 @@
         rowsHtml = order.filter(s=>res.reveal[s]).map(seat=>{
           const rv=res.reveal[seat]; const w=(res.winnersBySeat||[]).includes(seat);
           const cards=rv.hole.map(id=>cardEl(idCard(id),{mini:false}).outerHTML).join('');
+          const nm=st.players[seat].name;
           return `<span class="mk">${w?'🏆':''}</span>`
-            +`<span class="nm${w?' won':''}">${escapeHtml(st.players[seat].name)}${seat===mySeat?'（你）':''}</span>`
+            +`<span class="nm${w?' won':''}">${escapeHtml(nm)}${seat===mySeat&&nm!=='你'?'（你）':''}</span>`
             +`<span class="cd">${cards}</span>`
             +`<span class="hn">${rv.hand}</span>`;
         }).join('');
@@ -674,20 +707,60 @@
         rowsHtml = `<span class="pk-foldwin">🏆 ${escapeHtml(st.players[w]?st.players[w].name:'赢家')} 收下底池（其余弃牌）</span>`;
       }
       const potWon = (res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0);
+
+      // ── 本场终结判定(仅单机): 真人输光=本场负; 灵魂全空=通吃(本场胜) ──
+      const myStackNow = my.stack;
+      const soulsAliveNow = st.players.filter(p=> p.seat!==mySeat && p.stack>0).length;
+      const iBust   = isLocalSolo && myStackNow<=0;
+      const iWonAll = isLocalSolo && soulsAliveNow===0 && myStackNow>0;
+      const matchOver = iBust || iWonAll;
+      if (matchOver) over.className = 'pk-over ' + (iBust?'lose':'win');
+
+      // 标题/结算数字
+      const h2 = matchOver ? (iBust ? '💀 你把筹码输光了' : '👑 通吃全场！')
+                           : (delta>0?'🎉 赢下这手':(delta<0?'💸 输了这手':'🤝 打平'));
+      const subLine = matchOver
+        ? `<div class="pk-delta ${iBust?'down':'up'}">本场结束 · 最终 ${myStackNow} 筹码</div>`
+        : `<div class="pk-delta ${delta>=0?'up':'down'}">${delta>=0?'+':''}${delta} 筹码</div>`;
+
+      // 底部按钮: guest 等房主; 本场终结给"再来一局"; 单机常规=自动开下一手; host 常规=手动下一手
+      let footer;
+      if (isGuest){
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>`;
+      } else if (matchOver){
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
+      } else if (isLocalSolo){
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkAgain">下一手 <span id="pkCd" class="pk-cd"></span></button>`;
+      } else {
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkAgain">下一手</button>`;
+      }
       over.innerHTML=`
-        <h2>${delta>0?'🎉 赢下这手':(delta<0?'💸 输了这手':'🤝 打平')}</h2>
-        <div class="pk-delta ${delta>=0?'up':'down'}">${delta>=0?'+':''}${delta} 筹码</div>
+        <h2>${h2}</h2>
+        ${subLine}
         <div class="pk-showrows">${rowsHtml}</div>
-        <div class="pk-row" style="margin-top:6px">
-          <button class="pk-b" id="pkDone">收工</button>
-          ${isGuest?'<button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>':'<button class="pk-b call" id="pkAgain">下一手</button>'}
-        </div>`;
+        <div class="pk-row" style="margin-top:6px">${footer}</div>`;
       els.felt.appendChild(over);
-      if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
+      if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
+      else if(iBust){ sfx('void'); vibrate([90,60,90]); }
       else if(delta<0){ sfx('void'); vibrate(90); }
+
+      // 单机常规: 3s 倒计时自动开下一手(可点"马上开始"提前, "收工"取消)
+      let autoT=null;
+      function stopAuto(){ if(autoT){ clearInterval(autoT); autoT=null; } }
+      if (isLocalSolo && !matchOver){
+        let left=3;
+        const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
+        autoT=setInterval(()=>{
+          left--;
+          if(left<=0){ stopAuto(); if(over.parentNode){ over.remove(); nextHand(); } return; }
+          const c=over.querySelector('#pkCd'); if(c) c.textContent='('+left+'s)';
+        }, 1000);
+      }
       const againBtn = over.querySelector('#pkAgain');
-      if (againBtn) againBtn.addEventListener('click', ()=>{ over.remove(); nextHand(); });
-      over.querySelector('#pkDone').addEventListener('click', close);
+      if (againBtn) againBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); nextHand(); });
+      const restartBtn = over.querySelector('#pkRestart');
+      if (restartBtn) restartBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); resetMatch(); });
+      over.querySelector('#pkDone').addEventListener('click', ()=>{ stopAuto(); close(); });
 
       // 直播战报 + 结果回调
       const champSeat = (res.winnersBySeat||[])[0];
@@ -711,6 +784,47 @@
       sfx('deal');
       renderAll(); positionSeats();
       if (aliveSeats().length<2){}   // newHand 已兜底重新带入
+    }
+
+    // 单机: 本场结束(真人输光)后从头再来 —— 全员重新带入 START, 从第一手开始
+    function resetMatch(){
+      stacks = names.map(()=>START);
+      button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
+      handNo = 0;
+      st = newHand();
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0;
+      sfx('deal');
+      renderAll(); positionSeats();
+    }
+
+    // 单机开局: 我先坐下, 灵魂逐个入座, 到齐后发第一手 —— 消除"一开局灵魂就全在"的假感
+    function runSeatingIntro(){
+      const order = displayOrder();
+      const soulSeats = order.slice(1);          // 除我以外, 按上弧顺序陆续到场
+      arrived = new Set([mySeat]);
+      lastSeated = -1;
+      renderOpponents();                          // 先画一圈虚位
+      const HELLO = ['来了','上桌','入座','等你很久了','开打吧','手气不错今天','谁怕谁'];
+      let i = 0;
+      const step = ()=>{
+        if (!room.isConnected){ return; }         // 已关闭
+        if (i >= soulSeats.length){ setTimeout(beginFirstHand, 460); return; }
+        const seat = soulSeats[i++];
+        arrived.add(seat); lastSeated = seat;
+        sfx('arrive'); vibrate(10);
+        renderOpponents();
+        say(seat, rand(HELLO));
+        setTimeout(step, 600);
+      };
+      setTimeout(step, 420);
+    }
+    function beginFirstHand(){
+      if (!room.isConnected) return;
+      introSeating = false; arrived = null; lastSeated = -1;
+      st = newHand();
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0;
+      sfx('deal');
+      renderAll(); positionSeats();
     }
 
     function renderAll(){
@@ -751,6 +865,8 @@
     renderAll();
     // 首帧对手位置需等布局稳定
     requestAnimationFrame(positionSeats);
+    // 单机: 开局先走灵魂入座序列, 到齐后 beginFirstHand 发第一手
+    if (introSeating) runSeatingIntro();
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
