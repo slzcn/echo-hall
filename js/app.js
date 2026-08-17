@@ -3007,7 +3007,7 @@ function buildGameEl(m){
     const el=document.createElement('div'); el.className='game-card ddz-card '+(win?'ddz-win':'ddz-lose');
     el.style.setProperty('--gc', c);
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🃏</span><span class="gc-kind">斗地主 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
-      +`<div class="ddz-scoreline"><span class="ddz-role">${role}</span><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">分</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">${role}</span><span class="ddz-score-r"><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">分</span></span></div>`
       +`<div class="ddz-detail">${lordName?('👑 '+lordName+' 坐庄 · '):''}${lordWon?'地主赢':'农民赢'} · 底分 ${base} ×${mult}${bombs?(' · '+bombs+'炸'):''}${spring?' · 🌸春天':''}</div>`
       +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-ddz-again="1">🃏 再来一局</button><span class="gc-tip">或发 <b>/斗地主</b></span></div>`;
     // "再来一局"直接开新局(每张卡各自 onclick, 历史重渲也各自绑定, 不叠监听——避免 #stream 委托增开 addEventListener)
@@ -3036,7 +3036,7 @@ function buildGameEl(m){
     el.style.setProperty('--gc', c);
     const headline = matchWon ? (win?'🏆 通关胜利':'对方通关') : ((win?'我方':'对方')+'升级');
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎴</span><span class="gc-kind">掼蛋 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
-      +`<div class="ddz-scoreline"><span class="ddz-role">${RANKN[myRankIdx]||'—'}</span><b class="ddz-delta">${lvlName(fromLvl)}→${lvlName(toLvl)}</b><span class="ddz-unit">${matchWon?'🏆':'级'}</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">${RANKN[myRankIdx]||'—'}</span><span class="ddz-score-r"><b class="ddz-delta">${lvlName(fromLvl)}→${lvlName(toLvl)}</b><span class="ddz-unit">${matchWon?'🏆':'级'}</span></span></div>`
       +`<div class="ddz-detail">${headline} · ${doubleDown?'双下 +3 级':'单下 +'+advance+' 级'}${mateName?(' · 队友 '+mateName):''}${bombs?(' · '+bombs+'炸'):''}</div>`
       +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-gd-again="1">🎴 再来一局</button><span class="gc-tip">或发 <b>/掼蛋</b></span></div>`;
     const again=el.querySelector('[data-gd-again]');
@@ -3059,7 +3059,7 @@ function buildGameEl(m){
     el.style.setProperty('--gc', c);
     const title = win?'胜':(outcome==='lose'?'负':'平');
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎰</span><span class="gc-kind">德州扑克 · ${title}</span><span class="gc-host">${host}</span></div>`
-      +`<div class="ddz-scoreline"><span class="ddz-role">这手</span><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">筹码</span></div>`
+      +`<div class="ddz-scoreline"><span class="ddz-role">这手</span><span class="ddz-score-r"><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">筹码</span></span></div>`
       +`<div class="ddz-detail">${champName?('🏆 '+champName+' 赢下 '+pot+' 底池'):('赢下 '+pot+' 底池')}${hand&&hand!=='-'?(' · '+hand):''}</div>`
       +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-nlhe-again="1">🎰 下一局</button><span class="gc-tip">或发 <b>/德州</b></span></div>`;
     const again=el.querySelector('[data-nlhe-again]');
