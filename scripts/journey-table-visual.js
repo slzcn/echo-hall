@@ -57,9 +57,9 @@ assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260817-ddz-online'/.test(HTML), 'index.html BUILD_VER=20260817-ddz-online');
-assert(/eh-sw-v316-20260817-ddz-online/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v316-ddz-online)');
-assert(/^20260817-ddz-online\s*$/.test(R('ver.txt')), 'ver.txt=20260817-ddz-online');
+assert(/BUILD_VER='20260817-card-width'/.test(HTML), 'index.html BUILD_VER=20260817-card-width');
+assert(/eh-sw-v317-20260817-card-width/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v317-card-width)');
+assert(/^20260817-card-width\s*$/.test(R('ver.txt')), 'ver.txt=20260817-card-width');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

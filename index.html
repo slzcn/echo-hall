@@ -845,7 +845,9 @@
   .ixmsg{text-align:center;font-size:12.5px;color:var(--sub);padding:6px 10px;animation:slidein .3s}
   .ixmsg .ix-em{font-size:16px;vertical-align:-2px}
   /* ===== 🐢 海龟汤游戏卡片 ===== */
-  .game-card{margin:12px auto;max-width:min(520px,92%);padding:15px 17px 14px;border-radius:16px;animation:slidein .34s;flex:none;
+  /* ★宽度固定成一列(不再随内容缩): flex 列容器里 margin:auto 会关掉 stretch → 卡片缩到内容宽 = 一桌一个宽度、忽宽忽窄。
+     改 width:100% 铺满消息列(与 .msg 行同宽), max-width 封顶大屏, 让所有游戏卡(牌桌/战绩/海龟汤)恒等宽、和其他卡对齐。 */
+  .game-card{margin:12px auto;width:100%;max-width:520px;padding:15px 17px 14px;border-radius:16px;animation:slidein .34s;flex:none;
     background:linear-gradient(150deg,color-mix(in srgb,var(--gc,#00E5D4) 15%,var(--panel-solid)),var(--panel-solid) 62%);
     border:1px solid color-mix(in srgb,var(--gc,#00E5D4) 42%,transparent);
     box-shadow:0 0 0 1px color-mix(in srgb,var(--gc,#00E5D4) 12%,transparent),0 14px 34px -14px color-mix(in srgb,var(--gc,#00E5D4) 55%,transparent);position:relative;overflow:hidden;
@@ -2041,7 +2043,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260817-ddz-online';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260817-card-width';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
