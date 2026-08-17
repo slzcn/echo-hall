@@ -148,10 +148,14 @@
 .pk-over.lose h2{color:var(--sub)}
 .pk-over .pk-delta{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
 .pk-over .pk-delta.up{color:var(--accent)}.pk-over .pk-delta.down{color:var(--magenta,#ff2d8e)}
-.pk-over .pk-showrows{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--sub);max-width:90%}
-.pk-over .pk-showrow{display:flex;align-items:center;gap:7px;justify-content:center;flex-wrap:wrap}
-.pk-over .pk-showrow.won{color:var(--ink)}
-.pk-over .pk-showrow .hn{color:var(--amber);font-weight:700}
+/* 摊牌行改对齐网格: 标记/名字/底牌/牌型四列跨行对齐(旧的逐行居中会因赢家多个🏆而参差不齐)。 */
+.pk-over .pk-showrows{display:inline-grid;grid-template-columns:16px auto auto auto;gap:8px 11px;align-items:center;font-size:12px;color:var(--sub);max-width:94%}
+.pk-over .pk-showrows .mk{text-align:center;font-size:13px}
+.pk-over .pk-showrows .nm{justify-self:start;white-space:nowrap;font-weight:600}
+.pk-over .pk-showrows .nm.won{color:var(--ink)}
+.pk-over .pk-showrows .cd{display:inline-flex;gap:3px;justify-self:center}
+.pk-over .pk-showrows .hn{justify-self:end;color:var(--amber);font-weight:700;font-size:11.5px}
+.pk-over .pk-showrows .pk-foldwin{grid-column:1/-1;text-align:center;color:var(--ink)}
 .pk-toast{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:10;pointer-events:none;text-align:center;max-width:80%}
 .pk-toast.show{opacity:1}
 .pk-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:11}
@@ -660,11 +664,14 @@
         rowsHtml = order.filter(s=>res.reveal[s]).map(seat=>{
           const rv=res.reveal[seat]; const w=(res.winnersBySeat||[]).includes(seat);
           const cards=rv.hole.map(id=>cardEl(idCard(id),{mini:false}).outerHTML).join('');
-          return `<div class="pk-showrow${w?' won':''}">${w?'🏆 ':''}<span>${escapeHtml(st.players[seat].name)}${seat===mySeat?'（你）':''}</span><span style="display:inline-flex;gap:3px">${cards}</span><span class="hn">${rv.hand}</span></div>`;
+          return `<span class="mk">${w?'🏆':''}</span>`
+            +`<span class="nm${w?' won':''}">${escapeHtml(st.players[seat].name)}${seat===mySeat?'（你）':''}</span>`
+            +`<span class="cd">${cards}</span>`
+            +`<span class="hn">${rv.hand}</span>`;
         }).join('');
       } else {
         const w=res.winnersBySeat&&res.winnersBySeat[0];
-        rowsHtml = `<div class="pk-showrow won">🏆 ${escapeHtml(st.players[w]?st.players[w].name:'赢家')} 收下底池（其余弃牌）</div>`;
+        rowsHtml = `<span class="pk-foldwin">🏆 ${escapeHtml(st.players[w]?st.players[w].name:'赢家')} 收下底池（其余弃牌）</span>`;
       }
       const potWon = (res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0);
       over.innerHTML=`

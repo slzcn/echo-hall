@@ -57,9 +57,9 @@ assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260817-card-polish'/.test(HTML), 'index.html BUILD_VER=20260817-card-polish');
-assert(/eh-sw-v318-20260817-card-polish/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v318-card-polish)');
-assert(/^20260817-card-polish\s*$/.test(R('ver.txt')), 'ver.txt=20260817-card-polish');
+assert(/BUILD_VER='20260817-poker-showdown'/.test(HTML), 'index.html BUILD_VER=20260817-poker-showdown');
+assert(/eh-sw-v319-20260817-poker-showdown/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v319-poker-showdown)');
+assert(/^20260817-poker-showdown\s*$/.test(R('ver.txt')), 'ver.txt=20260817-poker-showdown');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){
