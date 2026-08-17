@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html admin.html jianghu.html kbdebug.html README.md ver.txt ver-admin.txt sw.js _site/
-          for f in manifest.webmanifest service-worker.js; do
+          for f in manifest.json manifest.webmanifest service-worker.js; do
             [ -f "$f" ] && cp "$f" _site/ || true
           done
           [ -d icons ] && cp -R icons _site/icons || true
