@@ -1422,9 +1422,10 @@ function optimisticCnt(room){
 async function fillRoomStats(box, rid){
   const card=box.querySelector(`.ch[data-rid="${rid}"]`); if(!card) return;
   const since=new Date(Date.now()-35000).toISOString();
-  const [{ count }, { data:recent }] = await Promise.all([
+  // 最近消息与进房预取共用同一 Promise，避免列表预览和 prefetchAll 对同一房间重复请求。
+  const [{ count }, recent] = await Promise.all([
     sb.from('eh_presence').select('*',{count:'exact',head:true}).eq('room_id',rid).gte('last_seen',since),
-    sb.rpc('eh_public_recent',{ rid, lim:20, hide_recalled:true }),   // 拉 20 条: 跳过 enter(进场广播)等非聊天内容取真正"最后一句"; lim:5 开不够——短时间同一用户连续进出 5+ 次会将窗口挡满后误报“还没有人说话”。
+    prefetchRoom(rid, card.dataset.kind||'official'),
   ]);
   const online=count||0;
   const cnt=card.querySelector('.cnt'); if(cnt) cnt.textContent = online>0? online+' 人在线' : '暂无人在线';
@@ -1580,7 +1581,7 @@ function prefetchSouls(rid){
 function prefetchRoom(rid, kind){
   prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
   const hit=prefetchCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return;   // 命中且未过期
+  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return hit.p;   // 命中且未过期
   let p;
   if(kind==='official' || kind==='public'){
     p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N() }).then(({data})=>data||[]).catch(()=>[]);
@@ -1590,6 +1591,7 @@ function prefetchRoom(rid, kind){
           .then(({data})=>data||[]).catch(()=>[]);
   }
   prefetchCache[rid] = { at:Date.now(), p };
+  return p;
 }
 // 列表渲染后主动错峰预取(避免十几房同时打请求拖慢首屏在线数/预览)
 function prefetchAll(rooms){
@@ -8350,15 +8352,14 @@ on('enterBtn','click',async()=>{
   { const ch=$('#channels'); if(ch && !ch.children.length) ch.innerHTML=chSkel(4);
     const pr=$('#publicRooms'); if(pr && !pr.children.length) pr.innerHTML=chSkel(2); }
   // ★不把官方/公开房列表卡在 ensureAuth 之后——它们只读公开 eh_rooms(anon key 即可), 无需 session。
-  //   仅等 supabase 库就绪(awaitSb, 本地轮询几十ms), 立即渲染大厅(官方/公开秒出); 认证并行跑,
-  //   完成后再补渲染一次(私密房 renderMyRooms 需 myUid)。
+  //   仅等 supabase 库就绪(awaitSb, 本地轮询几十ms), 立即渲染大厅；认证并行跑，
+  //   完成后只补私密房，避免整页 renderLobby 重入并重复请求官方/公开房及其动态数据。
   // ★2026-07-26 修回归: awaitSb 超时(弱网库慢)时不能静默吞掉——否则骨架永久卡死且无重试入口。
-  //   超时→显示"点击重试"给出口; 成功→渲染。ensureAuth 无论成败都放开按钮并补渲一次(拿到myUid补私密房;
-  //   失败也补渲一次, 保证官方/公开至少出来, 不整页空)。
+  //   超时→显示"点击重试"给出口；成功→渲染。认证无论成败都放开按钮。
   awaitSb(8000).then(()=>renderLobby())
                .catch(()=>{ try{ lobbyShowRetry(); }catch(_){} });
-  ensureAuth().then(()=>{ btn.disabled=false; renderLobby(myUid?true:false); })
-              .catch(()=>{ btn.disabled=false; renderLobby(false); });
+  ensureAuth().then(()=>{ btn.disabled=false; if(myUid) renderMyRooms(false); })
+              .catch(()=>{ btn.disabled=false; });
 });
 on('backBtn','click',()=>backToLobby());
 // 房间头像 = 房间信息/设置入口(所有人看信息, 房主/管理另有编辑区), 替代原顶部齿轮
