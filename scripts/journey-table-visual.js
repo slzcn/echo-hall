@@ -67,10 +67,21 @@ assert(/\.pk-over-card\{/.test(PK), 'poker-ui 定义结算面板卡 .pk-over-car
 assert(/class="pk-over-card"/.test(PK), 'showOver 把结算内容包进 .pk-over-card');
 assert(/\.pk-over \.pk-showbox\{[^}]*border-top/.test(PK), '结算摊牌区上方有分隔线(pk-showbox border-top)');
 
+// C4. 牌桌浮层展开时隐藏聊天悬浮件(@提醒/回底/神曲球别漂在绒面上); 折叠回聊天(room 内联 display:none)时复原
+assert(/#hall:has\(\.pk-room:not\(\[style\*="display: none"\]\)\)[\s\S]{0,400}\.song-jump\{display:none/.test(HTML),
+  'index.html 用 :has() 在牌桌展开时隐藏 to-latest/mention-jump/song-jump');
+// C5. 三桌顶栏都有牌桌内背景音乐开关按钮(大厅 🎵 被浮层盖住, 打牌时也要能开关 BGM)
+assert(/id="pkMus"/.test(PK) && /\.pk-mus\{/.test(PK), '德州顶栏有 BGM 开关 pkMus');
+assert(/id="gdMus"/.test(GD) && /\.gd-mus\{/.test(GD), '掼蛋顶栏有 BGM 开关 gdMus');
+assert(/id="ddzMus"/.test(DDZ) && /\.ddz-mus\{/.test(DDZ), '斗地主顶栏有 BGM 开关 ddzMus');
+for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
+  assert(/root\.EH_BGM/.test(src), `${name} BGM 开关复用 EH_BGM 控制器(不另造音频实现)`);
+}
+
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260818-safe-top'/.test(HTML), 'index.html BUILD_VER=20260818-safe-top');
-assert(/eh-sw-v325-20260818-safe-top/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v325-safe-top)');
-assert(/^20260818-safe-top\s*$/.test(R('ver.txt')), 'ver.txt=20260818-safe-top');
+assert(/BUILD_VER='20260818-felt-music'/.test(HTML), 'index.html BUILD_VER=20260818-felt-music');
+assert(/eh-sw-v326-20260818-felt-music/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v326-felt-music)');
+assert(/^20260818-felt-music\s*$/.test(R('ver.txt')), 'ver.txt=20260818-felt-music');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

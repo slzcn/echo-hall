@@ -71,8 +71,12 @@
 .gd-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .gd-lvl{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
 .gd-lvl b{color:#fff}
-.gd-x{margin-left:auto;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.gd-mus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gd-mus:hover{color:var(--ink);border-color:var(--line2)}
+.gd-mus.muted{color:var(--dim,#498d88);opacity:.75}
+.gd-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
 .gd-x:hover{color:var(--ink);border-color:var(--line2)}
 .gd-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;max-width:var(--maxw,none);width:100%;margin:0 auto;box-sizing:border-box}
 .gd-felt.shake{animation:gdShake .42s cubic-bezier(.36,.07,.19,.97)}
@@ -344,6 +348,7 @@
       <div class="gd-bar">
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
+        <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">🎵</button>
         <button class="gd-x" id="gdX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="gd-felt" id="gdFelt">
@@ -440,6 +445,11 @@
       renderAll(); sfx('click');
     }
     $('#gdX').addEventListener('click', minimize);
+    // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
+    const musBtn = $('#gdMus');
+    function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
+    paintMus();
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──

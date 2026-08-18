@@ -76,8 +76,12 @@
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .ddz-mult{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 8px;border:1px solid var(--line);border-radius:999px}
-.ddz-x{margin-left:auto;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.ddz-mus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
+.ddz-mus.muted{color:var(--dim,#498d88);opacity:.75}
+.ddz-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
 .ddz-x:hover{color:var(--ink);border-color:var(--line2)}
 /* 牌桌绒面 */
 .ddz-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0}
@@ -350,6 +354,7 @@
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
         <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
+        <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
         <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="ddz-felt" id="ddzFelt">
@@ -462,6 +467,11 @@
       sfx('click');
     }
     $('#ddzX').addEventListener('click', minimize);
+    // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
+    const musBtn = $('#ddzMus');
+    function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
+    paintMus();
 
     // lastPlay 只存 id,需要一张 id→card 表(用整副牌重建)
     const ALL = {}; Deck.standardDeck().forEach(c=>ALL[c.id]=c);
