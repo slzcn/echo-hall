@@ -1360,8 +1360,8 @@ function lobbyShowRetry(){
   };
 }
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
-function chSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="ch-skel"><div class="sk-b sk-icon"></div><div class="sk-b sk-h"></div><div class="sk-b sk-d"></div><div class="sk-b sk-l"></div></div>'; return s; }
-function rmSkel(n){ let s=''; for(let i=0;i<n;i++) s+='<div class="rm-skel"><div class="sk-b sk-ric"></div><div class="sk-b sk-rnm"></div></div>'; return s; }
+const chSkel = window.EH_LOBBY_MODULE.chSkel;   // 房间卡片骨架已迁入 js/modules/lobby.js
+const rmSkel = window.EH_LOBBY_MODULE.rmSkel;
 async function renderOfficial(soft){
   const box=$('#channels');
   // soft 刷新: 只有真实房间卡已渲染时才静默刷新。骨架节点也会占 children，不能拿它判断内容已就绪。

@@ -32,5 +32,18 @@
     return Object.freeze(controller);
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController });
+  // 已迁入本模块的纯函数（零外部依赖，不需注入）。
+  // 房间卡片骨架 HTML 占位：慢网先占位不留空白。
+  function chSkel(n) {
+    var s = '';
+    for (var i = 0; i < n; i++) s += '<div class="ch-skel"><div class="sk-b sk-icon"></div><div class="sk-b sk-h"></div><div class="sk-b sk-d"></div><div class="sk-b sk-l"></div></div>';
+    return s;
+  }
+  function rmSkel(n) {
+    var s = '';
+    for (var i = 0; i < n; i++) s += '<div class="rm-skel"><div class="sk-b sk-ric"></div><div class="sk-b sk-rnm"></div></div>';
+    return s;
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel });
 })(window);
