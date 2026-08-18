@@ -6067,6 +6067,18 @@ async function showMyBgmLibrary(){
   toast('🎼 我的曲库：'+names+(rn?'　输入「/bgm切换 曲名」':'　（进房后再切）'));
   window.__EH_BGM_LIBRARY=list;
 }
+// BGM 边界层：迁移期由独立模块校验并冻结控制器接口；实现暂在 app.js。
+window.EH_BGM = window.EH_BGM_MODULE.createBgmController({
+  on: bgmOn,
+  set: setBgm,
+  init: initBgmUI,
+  buildMenu: buildBgmMenu,
+  startLobby: startLobbyBGM,
+  startRoom: startRoomBGM,
+  playAI: playSongAI,
+  playLegacy: playSongLegacy,
+  generate: generateAndPersistSong,
+});
 async function switchMyBgm(title){
   if(!curRoom){ toast('先进一个房间再切曲'); return; }
   const all=(window.__EH_BGM_LIBRARY||bgmLocalLibrary()).filter(x=>x&&x.room_name===curRoom.name);
