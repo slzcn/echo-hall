@@ -1610,6 +1610,20 @@ function prefetchRoom(rid, kind){
 function prefetchAll(rooms){
   rooms.forEach((r,i)=>setTimeout(()=>prefetchRoom(r.id, r.kind), 120*i));
 }
+// 大厅边界层：先把跨域调用收拢到 EH_LOBBY，后续再把实现整体迁移到 js/modules/lobby.js。
+// 这里保留兼容别名，避免一次性改动 boot.js、index.html 内联逻辑和房间卡片事件。
+// 注意：不要 freeze——阶段 2/3 迁移时需要增量替换成员。
+window.EH_LOBBY = window.EH_LOBBY || {};
+Object.assign(window.EH_LOBBY, {
+  render: renderLobby,
+  renderOfficial,
+  renderPublic,
+  renderMyRooms,
+  showRetry: lobbyShowRetry,
+  fillRoomStats,
+  prefetchRoom,
+  prefetchAll,
+});
 function bindRoomCards(box){
   box.querySelectorAll('.ch').forEach(el=>{
     const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
