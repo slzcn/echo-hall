@@ -154,8 +154,69 @@ window.EH_BGM = createBgmController({
 - [ ] 匿名进入、正式登录、进房、返回大厅、BGM 开关、消息发送全部通过
 - [ ] 新开 devtools 无 `console.error`，`?debug=1` 下能看到分模块诊断
 
-## 六、原始基线数据存档
+## 七、已完成阶段
 
-- `scripts/review/scan-app-boundaries.py`（脚本）
-- `scripts/review/scan-empty-catches.py`（脚本）
-- 基线 JSON 数据首次生成时间：**2026-08-18 21:34**
+### 第 0 阶段：基线扫描（已完成）
+
+提交：`c644625`
+
+- 建立边界扫描器和空 catch 分类器。
+- 固化基线：`app.js` 8646 行、445 个顶层函数、549 个空 catch。
+
+### 第 1 阶段：关键路径错误诊断（已完成）
+
+提交：`14b0389`
+
+- 复用已有 `_ehDbg` ring buffer，新增 `_ehCatch(scope, error)`。
+- 关键路径 A 类空 catch：`81 → 0`。
+- 预期失败 B 类：`87`；C 类：`364`。
+- 默认仍静默，`?debug=1` 或 `window.ehDumpLog()` 可查看，不污染普通用户控制台。
+
+### 第 2 阶段：大厅边界契约（已完成）
+
+提交：`4f4b864`
+
+- 新增 `js/modules/lobby.js`。
+- 通过依赖注入冻结 `EH_LOBBY` 接口。
+- 大厅实现暂留在 `app.js`，下一轮可无行为变化地迁入模块。
+
+### 第 3 阶段：认证边界契约（已完成）
+
+提交：`7ab4f78`
+
+- 新增 `js/modules/auth.js`。
+- 冻结 `EH_AUTH` 接口，覆盖 `authApi`、`awaitSb`、`resolveSession`、`ensureAuth`、身份存取和登出。
+
+### 第 4 阶段：BGM 边界契约（已完成）
+
+提交：`31c2b21`
+
+- 新增 `js/modules/bgm.js`。
+- 冻结 `EH_BGM` 接口，覆盖播放、菜单、大厅/房间 BGM 和 AI 作曲。
+- 保留现有用户手势解锁与音频实现，不做高风险硬搬。
+
+### 第 5 阶段：房间与消息边界契约（已完成）
+
+提交：`13cec85`
+
+- 新增 `js/modules/room.js`、`js/modules/messages.js`。
+- 冻结 `EH_ROOM`、`EH_MESSAGES` 接口。
+- 进出房、实时订阅、历史、快照和消息 DOM 已有明确迁移入口。
+
+### 第 6 阶段：契约自动化门禁（进行中）
+
+- 新增 `scripts/review/test-module-contracts.js`。
+- 每个模块验证：工厂存在、依赖缺失会拒绝、接口成员可调用、控制器被冻结。
+- 当前 5 个模块、33 个依赖全部通过。
+
+## 八、下一步实施
+
+下一阶段不再新增包装层，开始真实迁移：
+
+1. 先迁大厅最独立的 `chSkel`、`rmSkel`、`roomsQuery`、`prefetchRoom`、`prefetchAll`。
+2. 用 `EH_LOBBY` 兼容接口替代 app.js 内部直接调用。
+3. 每次只迁一组函数，迁后删除旧定义，防止双实现漂移。
+4. 再迁认证的 `authApi`、`awaitSb`、`resolveSession`。
+5. 最后迁 BGM、房间和消息实现。
+
+契约阶段只增加了边界，不会降低 `app.js` 行数；真正迁移阶段才会让 `app.js` 缩小。
