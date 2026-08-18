@@ -157,6 +157,14 @@
         var tip=document.createElement('span'); tip.className='gt-tip';
         tip.textContent = humans>1 ? (humans+' 位真人在座 · 空位将由 AI 补齐') : '邀好友加入或拉灵魂 · 空位 AI 补齐';
         foot.appendChild(tip);
+        // 一键请灵魂: 把所有空位一次坐满房里灵魂(排除已坐的); 有空位且有可用灵魂时才出现
+        var seatedSoul={}; seats.forEach(function(s){ if(s.kind==='soul'&&s.uid) seatedSoul[s.uid]=1; });
+        var emptyN=seats.filter(function(s){return s.kind==='empty';}).length;
+        var availSoul=(ctx.souls||[]).filter(function(s){ return s&&s.auth_uid&&!seatedSoul[s.auth_uid]; }).length;
+        if(emptyN>0 && availSoul>0 && ctx.actions.fillSouls){
+          var fill=document.createElement('button'); fill.className='gt-btn ghost'; fill.textContent='🤝 一键请灵魂';
+          fill.onclick=function(){ ctx.actions.fillSouls(); }; foot.appendChild(fill);
+        }
         var close=document.createElement('button'); close.className='gt-btn ghost'; close.textContent='散桌';
         close.onclick=function(){ ctx.actions.close(); }; foot.appendChild(close);
         var go=document.createElement('button'); go.className='gt-btn go'; go.textContent='开始 ▶';

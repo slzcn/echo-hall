@@ -85,7 +85,9 @@ assert(alive.length >= 1, `收敛: 剩 ${alive.length} 名幸存者 (${alive.map
 assert(alive.length === 1 || handNo === 60, alive.length === 1 ? `打出唯一赢家 ${names[alive[0]]}` : `到手数上限 60 手仍在博弈`);
 
 // ── 步骤: 聊天融合 + app.js/UI 接入闭环(静态源码断言, 治"引擎能跑但接不进聊天室") ──
-// 编码→解码字段序必须一致(否则战绩卡渲染错乱); launchTexas 把房里灵魂映射成 5 性格 AI 上桌。
+// 编码→解码字段序必须一致(否则战绩卡渲染错乱)。
+// 2026-08-19 单机/联机合一: /德州 只开【真牌桌】(eh_gt_open), 默认停招募中等真人; 开局走 host 引擎路径
+//   gtLaunchPoker —— EHPokerGame.open + 灵魂性格映射 + onResult 战绩卡 都在这里(不再在 launchTexas 里另起单机局)。
 const fs = require('fs'), path = require('path');
 const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const src = R('js/app.js');
@@ -95,15 +97,19 @@ const html = R('index.html');
 // slash 命令 + 唤起
 assert(/\{c:'\/德州'/.test(src), '/德州 已注册进 SLASH_CMDS(聊天可直接开局)');
 assert(/cmd==='\/德州'\|\|cmd==='\/texas'\|\|cmd==='\/poker'\|\|cmd==='\/holdem'/.test(src), 'handleSlash 认 /德州·/texas·/poker·/holdem');
-assert(/async function launchTexas\(/.test(src), '存在 launchTexas(唤起绒面牌桌)');
-assert(/window\.EHPokerGame\.open\(/.test(src), 'launchTexas 调 EHPokerGame.open 开桌');
-assert(/mySeat:0/.test(src) && /isAI\s*=\s*names\.map\(\(_,i\)=>\s*i!==0\)/.test(src), '我坐底位(mySeat 0), 其余席位标记为 AI');
-assert(/archetype:\s*s\.archetype\|\|s\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
-assert(/\.slice\(0,5\)/.test(src) && /while\(pick\.length<2\)/.test(src), '最多带 5 灵魂上桌, 不足两家补默认对手(保证可开局)');
+assert(/async function launchTexas\(/.test(src), '存在 launchTexas(开真牌桌)');
+assert(/async function launchTexas\(\)\{[\s\S]*?eh_gt_open[\s\S]*?\n\}/.test(src), 'launchTexas 走 eh_gt_open 开真牌桌(不再另起单机 EHPokerGame 局)');
+// 开局在 host 引擎路径 gtLaunchPoker: EHPokerGame.open + 座位名册来自 gtSeatArrays
+assert(/function gtLaunchPoker\(row\)/.test(src) && /window\.EHPokerGame\.open\(/.test(src), 'gtLaunchPoker 调 EHPokerGame.open 开桌');
+assert(/mySeat:A\.mySeat/.test(src) && /isAI:A\.isAI/.test(src), '座位/mySeat/isAI 由 gtSeatArrays 名册驱动(真人坐人席, 灵魂/空位=AI)');
+assert(/isAI\[i\]=!human/.test(src), 'gtSeatArrays: 非真人席(灵魂/AI/空位)一律标记 AI(host 本机代打)');
+assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
+// 灵魂补位: 一个个(座位下拉 seatSoul) 或 一键(gtFillSouls); 空位开局由 SQL/引擎补 AI, 保证可开局
+assert(/async function gtFillSouls\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtFillSouls: 一键把空位坐满房里灵魂(eh_gt_seat_soul)');
 
-// 结束回调 → 战绩卡 + 落库
+// 结束回调 → 战绩卡 + 落库(在 gtLaunchPoker 的 onResult 里, 名册取 A.names/A.avatars)
 assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');
-assert(/postTexasResult\(res, names, meta\)/.test(src) && /recordTexasResult\(res, log, names, avatars, soulPick, meta\)/.test(src),
+assert(/postTexasResult\(res,A\.names,meta\)/.test(src) && /recordTexasResult\(res,log,A\.names,A\.avatars,soulPick,meta\)/.test(src),
   'onResult 里发战绩卡 + 落库战绩(seed/log 供回看)');
 assert(/async function postTexasResult\(/.test(src), '存在 postTexasResult(发德州战绩卡)');
 // 编码→解码闭环: 生产字段序与 buildGameEl 的 nlhe 分支解码字段序一致

@@ -2390,6 +2390,7 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
+      fillSouls:()=>gtFillSouls(_gtTables.get(row.id)||row),
       kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
 }
 function gtRenderInto(el,row){
@@ -6562,8 +6563,7 @@ const SLASH_CMDS=[
   {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
   {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
   {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
-  {c:'/德州', d:'/德州 → 和房里的灵魂打一局德州扑克 🎰'},
-  {c:'/德州联机', d:'/德州联机 → 开一桌德州，房里真人点卡加入同桌对战 🎰'},
+  {c:'/德州', d:'/德州 → 开一桌德州，等真人点卡入座，可一个个/一键请灵魂补位，满意再开局 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -6694,37 +6694,13 @@ async function launchDoudizhu(){
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
 }
-// ── 德州扑克:唤起绒面牌桌。房里灵魂当对手(全局意识 AI, 5 灵魂性格映射打法), 我坐底位。──
+// ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
+//    这是默认: 先等真人, 房主看座位满意了手动点【开始 ▶】才开局(不自动开)。
+//    想凑够人/单人先玩: 牌桌卡上可【一个个请灵魂】(每个空位的 🤝灵魂 下拉) 或【一键请灵魂】(把空位全填上房里灵魂),
+//    灵魂席开局由 host 本机引擎按其性格代打(全局意识 AI, 脱敏快照广播, 真人私牌走 RLS); 空位不焊死, 真人随时点卡换掉 AI 顶位。
+//    合并了旧 /德州(单机陪玩) 与 /德州联机(座位大厅): 只此一条, 单人和联机是同一张桌子, 差别只在"坐进来的是灵魂还是真人"。
 async function launchTexas(){
-  if(!window.EHPokerGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
-  if(!curRoom){ toast('先进一个房间再开局'); return; }
-  if(_restoreActiveGameIfAny()) return;
-  let allSouls=[];
-  try{ allSouls = await prefetchSouls(curRoom.id); }catch(_){}
-  // 最多带 5 个灵魂上桌(连我共 6 人), 至少凑 2 家(不足则补默认对手)
-  const pick=(allSouls||[]).filter(s=>s&&s.name).slice(0,5);
-  const DEF=[{name:'阿岩',emoji:'🗿'},{name:'小凶',emoji:'🔥'},{name:'疯哥',emoji:'🤪'}];
-  while(pick.length<2) pick.push(DEF[pick.length]||{name:'对手'+pick.length,emoji:'🤖'});
-  const names   = [me.name||'你', ...pick.map(s=>s.name)];
-  const avatars = [me.emoji||'🙂', ...pick.map(s=>s.emoji||'🤖')];
-  const isAI    = names.map((_,i)=> i!==0);
-  const souls   = [null, ...pick.map(s=>({ archetype: s.archetype||s.soul_archetype||null }))];
-  const soulPick= pick.map(s=>({user_id:s.user_id,name:s.name,emoji:s.emoji}));
-  try{ sendSystemAct(`开了一桌德州扑克 🎰 · 对手 ${pick.map(s=>s.name).join('、')}`).catch(()=>{}); }catch(_){}
-  _ehGame = window.EHPokerGame.open({
-    names, avatars, isAI, souls, mySeat:0, sb:5, bb:10, startStack:1000,
-    chat: ehGameChatBridge(), onBeat: ehGameBeat,
-    onResult:(res,log,meta)=>{
-      ehStashLastGame('nlhe', res, log, names, meta);
-      recordTexasResult(res, log, names, avatars, soulPick, meta).catch(()=>{});
-      postTexasResult(res, names, meta).catch(()=>{});
-    },
-  });
-}
-// ── 德州联机:开一张【联机牌桌】(座位大厅), 房里真人可点卡加入同桌真人对战。空位由 AI(灵魂)补齐。──
-//   与 /德州(单机陪玩) 并存: 这条走 eh_game_tables + gt-play 频道 host 权威(见 gtLaunchPoker/gtEnterPoker)。
-async function launchTexasOnline(){
-  if(!window.EHPokerGame){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  if(!window.EHPokerGame || !window.EHPokerNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny()) return;
   let row=null;
@@ -6733,20 +6709,35 @@ async function launchTexasOnline(){
   catch(e){ toast('开桌失败，稍后再试'); return; }
   if(!row){ toast('开桌失败'); return; }
   _gtTables.set(row.id,row);
-  if(row.host_uid===myUid && !row.msg_id){
-    const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
-    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-    if(el){ $('#stream').appendChild(el); scrollStream(); }
-    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
-    }catch(e){ console.warn('[gt] post table card failed', e); }
-  } else {
+  // 本房已有一桌(别人开的, 或我之前开过还没散) → 只定位到那张卡, 不重复开
+  if(!(row.host_uid===myUid && !row.msg_id)){
     const card=document.querySelector(`[data-gt-id="${row.id}"]`);
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
+    return;
+  }
+  // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用卡上「🤝灵魂/一键请灵魂」补位, 满意再点「开始 ▶」
+  const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+  }catch(e){ console.warn('[gt] post table card failed', e); }
+}
+// 一键请灵魂: 把当前所有空位从 1 席起依次坐上房里灵魂(排除已坐的), 坐满即止。仅 host 招募中(lobby)可用。
+async function gtFillSouls(row){
+  if(!row || row.status!=='lobby' || row.host_uid!==myUid) return;
+  const seated=new Set((row.seats||[]).filter(s=>s&&s.kind==='soul'&&s.uid).map(s=>s.uid));
+  const empties=(row.seats||[]).filter(s=>s&&s.kind==='empty'&&typeof s.seat==='number').map(s=>s.seat).sort((a,b)=>a-b);
+  const souls=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid&&!seated.has(s.auth_uid));
+  if(!empties.length||!souls.length){ toast('没有可补的空位或灵魂了'); return; }
+  for(let i=0;i<empties.length&&i<souls.length;i++){
+    try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[i],p_soul:souls[i].auth_uid}); }catch(_){}
   }
 }
+// 兼容旧命令 /德州联机 与既有调用点: 已与 /德州 合并为同一张真牌桌
+async function launchTexasOnline(){ return launchTexas(); }
 // 结束后往聊天室发一张德州战绩卡(kind:'game', nlhe 事件): game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
 // ─────────── 战报回看: 内存缓存最近一局(seed+log+meta), 弹层展示重要节点 ───────────
 // 数据源: 引擎 replay(log) 已存在(poker/ddz/guandan 三家 engine 都有), 回看 = 前端跑 replay 拿关键节点渲染。
