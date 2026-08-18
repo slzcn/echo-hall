@@ -1591,25 +1591,15 @@ function prefetchSouls(rid){
   soulsCache[rid] = { at:Date.now(), p };
   return p;
 }
-function prefetchRoom(rid, kind){
-  prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
-  const hit=prefetchCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return hit.p;   // 命中且未过期
-  let p;
-  if(kind==='official' || kind==='public'){
-    p = sb.rpc('eh_public_recent',{ rid, lim:PREFETCH_N() }).then(({data})=>data||[]).catch(()=>[]);
-  } else {
-    // 私密房: 我的房间都是已加入的，直查最近(成员RLS放行)
-    p = sb.from('eh_messages').select('*').eq('room_id',rid).order('id',{ascending:false}).limit(PREFETCH_N())
-          .then(({data})=>data||[]).catch(()=>[]);
-  }
-  prefetchCache[rid] = { at:Date.now(), p };
-  return p;
-}
-// 列表渲染后主动错峰预取(避免十几房同时打请求拖慢首屏在线数/预览)
-function prefetchAll(rooms){
-  rooms.forEach((r,i)=>setTimeout(()=>prefetchRoom(r.id, r.kind), 120*i));
-}
+// prefetchRoom / prefetchAll 实现已迁入 js/modules/lobby.js，这里只做依赖注入。
+// prefetchCache 仍保留在 app.js 作用域内，因为 leaveRoom 会 delete 其中房间的预取项。
+const { prefetchRoom, prefetchAll } = window.EH_LOBBY_MODULE.createPrefetch({
+  sb,
+  prefetchCache,
+  prefetchSouls,
+  readN: PREFETCH_N,
+  readTtl: PREFETCH_TTL,
+});
 // 大厅边界层：迁移期由独立模块校验依赖并冻结接口；业务实现暂在本文件。
 // 后续把实现迁入 js/modules/lobby.js 时，只需替换这里的依赖注入，不改调用方。
 window.EH_LOBBY = window.EH_LOBBY_MODULE.createLobbyController({

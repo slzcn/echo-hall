@@ -45,5 +45,41 @@
     return s;
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel });
+  // 带依赖注入的预取工厂：由 app.js 把 sb、缓存对象、调优参数、灵魂预取函数传进来，
+  // 避免直接读取 window 隐式全局，后续改变依赖不用改模块。
+  function createPrefetch(deps) {
+    deps = deps || {};
+    var sb = deps.sb;
+    var prefetchCache = deps.prefetchCache;
+    var prefetchSouls = deps.prefetchSouls;
+    var readN = deps.readN;
+    var readTtl = deps.readTtl;
+    if (!sb || !prefetchCache || typeof prefetchSouls !== 'function' || typeof readN !== 'function' || typeof readTtl !== 'function') {
+      throw new TypeError('[EH_LOBBY] createPrefetch missing dependencies');
+    }
+    function prefetchRoom(rid, kind) {
+      prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
+      var hit = prefetchCache[rid];
+      if (hit && Date.now() - hit.at < readTtl()) return hit.p;
+      var p;
+      if (kind === 'official' || kind === 'public') {
+        p = sb.rpc('eh_public_recent', { rid: rid, lim: readN() }).then(function (r) { return r && r.data || []; }).catch(function () { return []; });
+      } else {
+        // 私密房: 我的房间都是已加入的，直查最近(成员RLS放行)
+        p = sb.from('eh_messages').select('*').eq('room_id', rid).order('id', { ascending: false }).limit(readN())
+            .then(function (r) { return r && r.data || []; }).catch(function () { return []; });
+      }
+      prefetchCache[rid] = { at: Date.now(), p: p };
+      return p;
+    }
+    // 列表渲染后主动错峰预取(避免十几房同时打请求拖慢首屏在线数/预览)
+    function prefetchAll(rooms) {
+      rooms.forEach(function (r, i) {
+        setTimeout(function () { prefetchRoom(r.id, r.kind); }, 120 * i);
+      });
+    }
+    return { prefetchRoom: prefetchRoom, prefetchAll: prefetchAll };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch });
 })(window);
