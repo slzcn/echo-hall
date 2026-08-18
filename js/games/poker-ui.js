@@ -237,8 +237,9 @@
     const isRemote = (seat) => remoteSeats.indexOf(seat) >= 0;
     const onSync   = (typeof opts.onSync   === 'function') ? opts.onSync   : null;  // host: 每步产出快照广播
     const onAction = (typeof opts.onAction === 'function') ? opts.onAction : null;  // guest: 动作发回 host
-    // 单机陪玩(我一人 + 灵魂 AI): 才启用"灵魂逐个入座""自动开下一手""真人破产本场终结"这套单人体验;
-    // 联机(host/guest)节奏由真人/房主掌控, 一律不套。
+    // 单机陪玩(我一人 + 灵魂 AI): 才启用"灵魂逐个入座""真人破产本场终结/再来一局"这套单人体验。
+    // 注意"自动开下一手"不再是单机独占 —— 见结算 footer: 只要不是 guest, host(单机/联机)都自动连打,
+    // 且不设手动"下一手"按钮, 到点自动发牌(真人一起玩时那种每手必点的门最难受)。想停手点"收工"。
     const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const PokerNet = root.EHPokerNet;
     let myHole = [];       // guest: 自己的两张底牌(牌对象), 由 feedHand 注入
@@ -725,16 +726,15 @@
         ? `<div class="pk-delta ${iBust?'down':'up'}">本场结束 · 最终 ${myStackNow} 筹码</div>`
         : `<div class="pk-delta ${delta>=0?'up':'down'}">${delta>=0?'+':''}${delta} 筹码</div>`;
 
-      // 底部按钮: guest 等房主; 本场终结给"再来一局"; 单机常规=自动开下一手; host 常规=手动下一手
+      // 底部按钮: guest 等房主; 本场终结(仅单机)给"再来一局"; 其余(单机 & 联机 host)全自动开下一手,
+      //   不设手动"下一手"按钮 —— 只显示倒计时(非可点), 到点自动发牌。想停手就点"收工"。
       let footer;
       if (isGuest){
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>`;
       } else if (matchOver){
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
-      } else if (isLocalSolo){
-        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkAgain">下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       } else {
-        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkAgain">下一手</button>`;
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkAuto" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
       over.innerHTML=`
         <h2>${h2}</h2>
@@ -746,11 +746,12 @@
       else if(iBust){ sfx('void'); vibrate([90,60,90]); }
       else if(delta<0){ sfx('void'); vibrate(90); }
 
-      // 单机常规: 3s 倒计时自动开下一手(可点"马上开始"提前, "收工"取消)
+      // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
+      //   联机有其他真人时给多一点时间读结算(5s), 纯单机 3s。
       let autoT=null;
       function stopAuto(){ if(autoT){ clearInterval(autoT); autoT=null; } }
-      if (isLocalSolo && !matchOver){
-        let left=3;
+      if (!isGuest && !matchOver){
+        let left = (remoteSeats.length>0) ? 5 : 3;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         autoT=setInterval(()=>{
           left--;
@@ -758,8 +759,6 @@
           const c=over.querySelector('#pkCd'); if(c) c.textContent='('+left+'s)';
         }, 1000);
       }
-      const againBtn = over.querySelector('#pkAgain');
-      if (againBtn) againBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); nextHand(); });
       const restartBtn = over.querySelector('#pkRestart');
       if (restartBtn) restartBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); resetMatch(); });
       over.querySelector('#pkDone').addEventListener('click', ()=>{ stopAuto(); close(); });

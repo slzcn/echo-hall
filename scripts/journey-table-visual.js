@@ -57,9 +57,9 @@ assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260818-reap-heartbeat'/.test(HTML), 'index.html BUILD_VER=20260818-reap-heartbeat');
-assert(/eh-sw-v322-20260818-reap-heartbeat/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v322-reap-heartbeat)');
-assert(/^20260818-reap-heartbeat\s*$/.test(R('ver.txt')), 'ver.txt=20260818-reap-heartbeat');
+assert(/BUILD_VER='20260818-auto-nexthand'/.test(HTML), 'index.html BUILD_VER=20260818-auto-nexthand');
+assert(/eh-sw-v323-20260818-auto-nexthand/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v323-auto-nexthand)');
+assert(/^20260818-auto-nexthand\s*$/.test(R('ver.txt')), 'ver.txt=20260818-auto-nexthand');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){
