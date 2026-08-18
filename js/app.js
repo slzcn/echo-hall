@@ -44,6 +44,12 @@ const $ = s => document.querySelector(s);
     }catch(_){}
   }
   window._ehDbg = _ehDbg;
+  // 关键路径 catch 统一进 ring buffer：默认静默，?debug=1 或 ehDumpLog() 可见。
+  // 只记录模块与错误对象，不记录消息正文、邮箱、令牌等敏感内容。
+  function _ehCatch(scope, error){
+    try{ _ehDbg('[catch] '+scope, error&&error.message ? error.message : error); }catch(_){ }
+  }
+  window._ehCatch = _ehCatch;
   // ?debug=1 或出问题现场都可 window.ehDumpLog() 拿到全部日志
   window.ehDumpLog = function(){
     try{
@@ -203,7 +209,7 @@ async function resolveSession(){
   //   还是没拿到 → 既然真的不可达，宁可走失效处理让用户重登，不能封死 UI。
   const everReg = !!(me && (me.registered || me.username || me.email));
   if(!session?.user && everReg){
-    try{ const rr = await withTimeout(sb.auth.getSession(), 5000, null); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){}
+    try{ const rr = await withTimeout(sb.auth.getSession(), 5000, null); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){ _ehCatch('ensureAuth',_); }
   }
   return session;
 }
@@ -219,8 +225,8 @@ async function ensureAuth(){
     if(me && me.registered){
       console.warn('[auth] 正式账号 session 确已失效, 清本地登录态, 提示重登(不降级冒充)');
       me.registered=false; me.role='user'; me.username='';
-      try{ saveIdentity(); }catch(e){}
-      try{ toast('登录已过期，请重新登录'); }catch(e){}
+      try{ saveIdentity(); }catch(e){ _ehCatch('ensureAuth',e); }
+      try{ toast('登录已过期，请重新登录'); }catch(e){ _ehCatch('ensureAuth',e); }
       return null;
     }
     let data=null, error=null;
@@ -236,14 +242,14 @@ async function ensureAuth(){
     try{
       if(me){ me.registered=false; me.role='user'; me.username=''; }
       if(hadRegIdentity){ rollIdentity(); }   // 只在残留正式身份时重掷, 否则保留临时名
-    }catch(e){}
+    }catch(e){ _ehCatch('ensureAuth',e); }
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
   // 真实 session 是匿名的, 但缓存 me 还标着正式账号 → 同样纠正+重掷昵称(防旧缓存残留冒充+同名)
   if(session?.user && !session.user.email && me && me.registered){
     me.registered=false; me.role='user'; me.username='';
-    try{ rollIdentity(); }catch(e){}
-    try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){}
+    try{ rollIdentity(); }catch(e){ _ehCatch('ensureAuth',e); }
+    try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){ _ehCatch('ensureAuth',e); }
   }
   // ★正式账号(session 带 email)的档案以【库为准】: 弱网抖动曾把缓存 me 误降级成随机匿名名,
   //   若此时照缓存 upsert 会把正式账号(如超管 yiran)的 name/emoji/color 冲成随机名(踩过)。
@@ -262,7 +268,7 @@ async function ensureAuth(){
         if(prof.emoji && me.emoji!==prof.emoji){ me.emoji=prof.emoji; changed=true; }
         if(prof.color && me.color!==prof.color){ me.color=prof.color; changed=true; }
         if(!me.registered){ me.registered=true; changed=true; }   // 正式 session 必是正式账号
-        if(changed){ try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){} }
+        if(changed){ try{ saveIdentity(); paintIdentity&&paintIdentity(); }catch(e){ _ehCatch('ensureAuth',e); } }
       }
     });
   }else{
@@ -508,15 +514,15 @@ function kickBgmOnGesture(){
       startLobbyBGM();
       if(AudioEngine.playing()) detachBgmGestureUnlock();
     }
-  }catch(_){}
+  }catch(_){ _ehCatch('startRoomBGM',_); }
 }
 function detachBgmGestureUnlock(){
-  try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,kickBgmOnGesture,{capture:true})); }catch(_){}
+  try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,kickBgmOnGesture,{capture:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 }
-try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){}
+try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
 function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){} if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
     // 换房触发时先清过期 override（同房再进不清，续播用户生成曲）
@@ -528,7 +534,7 @@ function startRoomBGM(room){
     try{
       const mem=bgmModeGet(bgmRoomKey(room));
       if(mem.mode==='manual' && mem.url){ _ehBgmOverride={ url:mem.url, name:'手动曲', title:'手动曲', room_name:room.name }; }
-    }catch(_){}
+    }catch(_){ _ehCatch('startRoomBGM',_); }
     // 用户生成曲默认本地覆盖：同房间重新进入时继续播放，不影响其他人。
     if(typeof _ehBgmOverride!=='undefined' && _ehBgmOverride && _ehBgmOverride.room_name===room.name && _ehBgmOverride.url) cfg=_ehBgmOverride;
     else if(room.kind==='official' && ROOM_BGM[room.name]){
@@ -1455,7 +1461,7 @@ async function fillRoomStats(box, rid){
         const c = (last.is_bot ? roomC : (userC || roomC));
         if(c) nmC=` style="color:${c}"`;
       }
-    }catch(e){}
+    }catch(e){ _ehCatch('fillRoomStats',e); }
     prev.innerHTML=(nm?`<b${nmC}>${nm}</b> `:'')+esc(String(txt).slice(0,40));
     if(tm) tm.textContent=fmtAgo(last.created_at);
   } else {
@@ -1644,19 +1650,19 @@ function preRestoreScene(){
   return true;
 }
 async function enterRoom(room){
-  try{ _ehDbg('[enter] rid=', room&&room.id, 'name=', room&&room.name); }catch(_){}
-  try{ window.startMoodWeather && window.startMoodWeather(); }catch(_){}
-  try{ window.ehLog && ehLog('room_enter',{room_id:room&&room.id,name:room&&room.name,kind:room&&room.kind}); }catch(_){}
-  try{ EhSfx.play('enter'); }catch(e){}
-  try{ window.EhFx&&EhFx.warp(); }catch(e){}   // 空间穿越转场
+  try{ _ehDbg('[enter] rid=', room&&room.id, 'name=', room&&room.name); }catch(_){ _ehCatch('enterRoom',_); }
+  try{ window.startMoodWeather && window.startMoodWeather(); }catch(_){ _ehCatch('enterRoom',_); }
+  try{ window.ehLog && ehLog('room_enter',{room_id:room&&room.id,name:room&&room.name,kind:room&&room.kind}); }catch(_){ _ehCatch('enterRoom',_); }
+  try{ EhSfx.play('enter'); }catch(e){ _ehCatch('enterRoom',e); }
+  try{ window.EhFx&&EhFx.warp(); }catch(e){ _ehCatch('enterRoom',e); }   // 空间穿越转场
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
   _presenceSettled = false;   // 进场动效: 新房光墙重新计"首批", 首批渲染不弹入
   curRoom = room;
   // 💋 私密房(尤其邀了狼姐 @wolf)→ 挂"暧昧红"氛围类; 其余房去掉
-  try{ document.body.classList.toggle('priv-heat', room && room.kind==='private'); }catch(_){}
+  try{ document.body.classList.toggle('priv-heat', room && room.kind==='private'); }catch(_){ _ehCatch('enterRoom',_); }
   stopVoice(); stopSong();
   // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
-  try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){}
+  try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){ _ehCatch('enterRoom',e); }
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = !_cachePurged && roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
@@ -1670,7 +1676,7 @@ async function enterRoom(room){
     _restoreScrollPending=false;   // keep-alive 秒回房不走还原(快照已含位置), 顺手清一次性标记防泄漏到下轮
     // 秒还原已渲染消息 + 滚动位置状态。★先剔除快照里烘焙进去的旧进场横幅(否则回房会看到上次的横幅残留)
     let _snapHtml = roomSnap.html;
-    try{ const _d=document.createElement('div'); _d.innerHTML=_snapHtml; _d.querySelectorAll('.entry-banner,.sysmsg').forEach(e=>e.remove()); _snapHtml=_d.innerHTML; }catch(_){}
+    try{ const _d=document.createElement('div'); _d.innerHTML=_snapHtml; _d.querySelectorAll('.entry-banner,.sysmsg').forEach(e=>e.remove()); _snapHtml=_d.innerHTML; }catch(_){ _ehCatch('enterRoom',_); }
     $('#stream').innerHTML=_snapHtml; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
@@ -1678,7 +1684,7 @@ async function enterRoom(room){
     roomSnap=null;
     await ensureAuth();
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
-    try{ entranceBanner(room); }catch(_){}   // 进场动效: keep-alive 回房也要演(否则快速回房看不到进场特效)
+    try{ entranceBanner(room); }catch(_){ _ehCatch('enterRoom',_); }   // 进场动效: keep-alive 回房也要演(否则快速回房看不到进场特效)
     if(await joinAsMember(room)===false) return;
     // allSettled: 任一查询失败也不拖垮其余(避免一次网络抖动 → Promise.all reject → 卡"连接中")
     const [memRes] = await Promise.allSettled([
@@ -1722,15 +1728,15 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){} }
+  try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){ _ehCatch('enterRoom',__); } }
   // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
   scheduleDailyTarot(room && room.id);
   // 漂流瓶: 进房捞回信(我丢的瓶有人回了→漂回来) + 低概率从海里捞一个别人的瓶
-  setTimeout(()=>{ try{ fishMyBottleReplies(); }catch(_){} }, 2600);
-  setTimeout(()=>{ try{ if(secureRand()<0.5) fishBottleFromDB(); }catch(_){} }, 4200);
+  setTimeout(()=>{ try{ fishMyBottleReplies(); }catch(_){ _ehCatch('enterRoom',_); } }, 2600);
+  setTimeout(()=>{ try{ if(secureRand()<0.5) fishBottleFromDB(); }catch(_){ _ehCatch('enterRoom',_); } }, 4200);
   if(_suppressAutoBottom){ _suppressAutoBottom=false; }   // 还原停留位置时不贴底(loadHistory 首屏已交给 restoreScrollAnchor)
   else ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
-  setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){} }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
+  setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){ _ehCatch('enterRoom',_); } }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
@@ -1800,7 +1806,7 @@ async function prependMissingPublicHistory(room, rows){
       batch.forEach(m=>{ const el=buildMsgEl(m,true); if(el) frag.appendChild(el); });
       stream.insertBefore(frag,stream.firstChild);
       if(anchor){ const d=anchor.getBoundingClientRect().top-anchorTop; if(Math.abs(d)>1) stream.scrollTop+=d; }
-      try{ resyncMsgOwnership(); }catch(_){}
+      try{ resyncMsgOwnership(); }catch(_){ _ehCatch('refreshSnapshotTail',_); }
       fetchEchoes(batch.map(m=>m.id));
     });
   }
@@ -1861,10 +1867,10 @@ async function refreshSnapshotTail(room, fillOlder=false){
               const nc=fresh.querySelector('.song-card');
               if(nc && !nc.classList.contains('pending')){
                 nc.classList.add('arrived');
-                try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){}
-                setTimeout(()=>{ try{ nc.classList.remove('arrived'); }catch(_){} }, 3400);
-                try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
-                try{ updateSongQueueBar(); }catch(_){}
+                try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){ _ehCatch('refreshSnapshotTail',_); }
+                setTimeout(()=>{ try{ nc.classList.remove('arrived'); }catch(_){ _ehCatch('refreshSnapshotTail',_); } }, 3400);
+                try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){ _ehCatch('refreshSnapshotTail',_); }
+                try{ updateSongQueueBar(); }catch(_){ _ehCatch('refreshSnapshotTail',_); }
               }
             }
           }
@@ -1877,7 +1883,7 @@ async function refreshSnapshotTail(room, fillOlder=false){
           const fresh=buildMsgEl(m, true);
           if(fresh){ exist.replaceWith(fresh); }
         }
-      }catch(_){}
+      }catch(_){ _ehCatch('refreshSnapshotTail',_); }
     });
     if(near && appended){ ensureBottom(); trimStreamHead(); }   // 有补进新消息且原本贴底 → 精准落底 + 修剪
   }catch(e){ console.warn('refreshSnapshotTail', e); }
@@ -1999,7 +2005,7 @@ async function loadHistory(first){
       rows = (data||[]).slice().reverse();
       if(rows.length){ oldestId = rows[0].id; }
     }
-    if(histTimedOut && curRoom && curRoom.id===_enterRid){ try{ toast('历史加载超时，下拉重试'); }catch(_){ } }
+    if(histTimedOut && curRoom && curRoom.id===_enterRid){ try{ toast('历史加载超时，下拉重试'); }catch(_){ _ehCatch('loadHistory',_); } }
   }
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶, 无更多)
   const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
@@ -2028,7 +2034,7 @@ async function loadHistory(first){
     loadRoomUserIdentity(rows);
     // 刷新停留原位: 本轮要还原就【别贴底】, 交给 restoreScrollAnchor 定位到锚点(锚点可能在后续 idle 批里才落 DOM, 内含重试)
     let _restored=false;
-    if(_suppressAutoBottom){ try{ _restored=restoreScrollAnchor(_enterRid); }catch(_){} }
+    if(_suppressAutoBottom){ try{ _restored=restoreScrollAnchor(_enterRid); }catch(_){ _ehCatch('loadHistory',_); } }
     // ★真凶(修"进房不是最新记录"): 上次在底部刷新 → 无锚点 → _restored=false, 但 _suppressAutoBottom 仍为真,
     //   会让 enterRoom 末尾【跳过 ensureBottom】。而首屏这次 scrollStream 只贴一次, 之后图片/字体/神曲卡/
     //   idle 补渲染继续撑高 stream → 停在半中间, 看着"不是最新"。这里: 没真正还原就把抑制清掉,
@@ -2036,9 +2042,9 @@ async function loadHistory(first){
     if(!_restored){ _suppressAutoBottom=false; scrollStream(); }
     // 兜底回补左右归属: 正式账号 session 恢复慢, 历史可能在 myUid 就绪前渲染→自己的消息判成别人靠左。
     // 无论时序如何, 首屏渲染完再回补一次(渲染时/回补时至少一次拿到真 myUid)。
-    try{ resyncMsgOwnership(); }catch(e){}
-    try{ setTimeout(()=>{ try{ resyncMsgOwnership(); }catch(e){} }, 800); }catch(e){}   // 再延迟兜底(等session彻底恢复)
-    try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){} }, 400); }catch(e){}   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
+    try{ resyncMsgOwnership(); }catch(e){ _ehCatch('loadHistory',e); }
+    try{ setTimeout(()=>{ try{ resyncMsgOwnership(); }catch(e){ _ehCatch('loadHistory',e); } }, 800); }catch(e){ _ehCatch('loadHistory',e); }   // 再延迟兜底(等session彻底恢复)
+    try{ setTimeout(()=>{ try{ updateSongQueueBar(); }catch(e){ _ehCatch('loadHistory',e); } }, 400); }catch(e){ _ehCatch('loadHistory',e); }   // 历史里若有卡住的 pending 神曲 → 启动队列条监视
     // 用了预取缓存 → 缓存可能已滞后(最长60s), 后台补拉一次最新, 覆盖"预取到进房"的空窗新消息(修"进房非最新, 要刷新")
     if(_usedCache && curRoom){ const _r=curRoom; setTimeout(()=>{ if(curRoom&&curRoom.id===_r.id) refreshSnapshotTail(_r, true).catch(()=>{}); }, 60); }
     fetchEchoes(head.map(m=>m.id));
@@ -2063,7 +2069,7 @@ async function loadHistory(first){
         stream.insertBefore(bfrag, stream.firstChild);
         // 保持视觉滚动位置不跳(往顶插入内容会顶高)
         stream.scrollTop = prevTop + (stream.scrollHeight - prevH);
-        try{ resyncMsgOwnership(); }catch(e){}   // 这批较早消息里自己发的也归位到右侧
+        try{ resyncMsgOwnership(); }catch(e){ _ehCatch('loadHistory',e); }   // 这批较早消息里自己发的也归位到右侧
         fetchEchoes(batch.map(m=>m.id));
         if(rest.length) schedule(drainRest);
         else if(publicEndText) addHistoryEnd('public',publicEndText);
@@ -2072,9 +2078,9 @@ async function loadHistory(first){
       else if(publicEndText) addHistoryEnd('public',publicEndText);
     }
     // 预热最近几首已生成神曲: 进房看到的歌还没点就预取好, 点击秒播(只拉最新3首省流量)
-    try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){}
+    try{ const cards=[...stream.querySelectorAll('.song-card:not(.pending)[data-url]')].slice(-3); cards.forEach(c=>{ if(c.dataset.url) prefetchSong(c.dataset.url); }); }catch(_){ _ehCatch('loadHistory',_); }
     // 扫我自己发的卡住的 pending 神曲: 如果存储桶里已有 mp3 → 直接补 patch, 不重新调 MiniMax
-    try{ resumeStuckPendingSongs().catch(()=>{}); }catch(_){}
+    try{ resumeStuckPendingSongs().catch(()=>{}); }catch(_){ _ehCatch('loadHistory',_); }
   } else {
     // ★加载更早: 用"锚元素定位"而非"像素差"恢复滚动位置。
     //   旧法 scrollTop=scrollHeight-prevH 在 content-visibility:auto(离屏气泡按估算高占位)下会飘 → 插入后视觉跳动/卡顿感。
@@ -2139,7 +2145,7 @@ function addLoadMore(top){
 // ---- Realtime 订阅新消息 + echo ----
 async function subscribeMessages(rid){
   // 先 await 清旧 channel, 根治旧房推送串进新房的竞态
-  if(msgChan){ try{ await sb.removeChannel(msgChan); }catch(_){} msgChan=null; }
+  if(msgChan){ try{ await sb.removeChannel(msgChan); }catch(_){ _ehCatch('subscribeMessages',_); } msgChan=null; }
   if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 清旧房的兜底轮询
   msgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
@@ -2159,7 +2165,7 @@ async function subscribeMessages(rid){
       //   enter 不进历史/不留气泡(text 存的是档位字符串, 非聊天内容)。
       if(m.kind==='enter'){
         // 2分钟内同一人只提示一次: 快速进出/来回切房不重复弹进场(避免同时冒两个)
-        if(m.user_id!==myUid && enterDedupOk(m.user_id)){ try{ renderEntrance({ name:m.name, tier:String(m.text||'reg'), roomName:curRoom&&curRoom.name }, false); }catch(_){} }
+        if(m.user_id!==myUid && enterDedupOk(m.user_id)){ try{ renderEntrance({ name:m.name, tier:String(m.text||'reg'), roomName:curRoom&&curRoom.name }, false); }catch(_){ _ehCatch('subscribeMessages',_); } }
         return;
       }
       // 互动: 播特效。震动/闪屏/抖动只给目标本人(挨打的才震), 旁观者看飞行物/撒花但不震。
@@ -2171,12 +2177,12 @@ async function subscribeMessages(rid){
           if(!iSent){
             const tEl=document.querySelector(`#presence .pav[data-uid="${targetUid}"]`)||null;
             const fx=iAmTarget ? ix.fx : Object.assign({}, ix.fx, {vibrate:null, shake:false, flash:null});
-            try{ playInteractionFx(fx, tEl); }catch(_){}
+            try{ playInteractionFx(fx, tEl); }catch(_){ _ehCatch('subscribeMessages',_); }
             // 连击对战: 别人发起的打击类计入战斗态(自己发起的已在 sendInteraction 里记过)
-            if(isHitIx(ix)){ try{ const r=tEl&&tEl.getBoundingClientRect(); combatOnHit(m.user_id, m.name, targetUid, targetName(targetUid), r?r.left+r.width/2:null, r?r.top+r.height/2:null); }catch(_){} }
+            if(isHitIx(ix)){ try{ const r=tEl&&tEl.getBoundingClientRect(); combatOnHit(m.user_id, m.name, targetUid, targetName(targetUid), r?r.left+r.width/2:null, r?r.top+r.height/2:null); }catch(_){ _ehCatch('subscribeMessages',_); } }
           }
           // 合体特效: 所有互动(含自己)都汇入同心共振统计
-          try{ fusionOnInteract(m.user_id, ix, targetUid, targetName(targetUid)); }catch(_){}
+          try{ fusionOnInteract(m.user_id, ix, targetUid, targetName(targetUid)); }catch(_){ _ehCatch('subscribeMessages',_); }
         }
         // 继续往下走 buildMsgEl 渲染系统行(所有人都看到文案)
       }
@@ -2189,17 +2195,17 @@ async function subscribeMessages(rid){
       //   避免"一口气冒好几条"。入队后本条不再走下面的同步 append(队列内做完全部副作用)。
       if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
       // 内容已到达 → 本地立刻抹掉该人"正在输入"并即时刷新 typing bar, 不等 presence 通道(否则会有空档)。
-      if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
+      if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){ _ehCatch('subscribeMessages',_); } }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
-      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){} }
+      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){ _ehCatch('subscribeMessages',e); } }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
       if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
       if(isEmojiOnly(m.text)) burst(m.text);
       notifyIfMentioned(m, el);   // 被 @ → 强提醒
-      try{ trackChatHeat(m); }catch(e){}   // 多人发言声波涟漪
-      if(m.kind==='song') try{ updateSongQueueBar(); }catch(e){}   // 新 pending 神曲 → 刷队列条
-      try{ persistRoomSnap(); }catch(_){}   // 新消息落 → 更新刷新用快照(内部节流)
+      try{ trackChatHeat(m); }catch(e){ _ehCatch('subscribeMessages',e); }   // 多人发言声波涟漪
+      if(m.kind==='song') try{ updateSongQueueBar(); }catch(e){ _ehCatch('subscribeMessages',e); }   // 新 pending 神曲 → 刷队列条
+      try{ persistRoomSnap(); }catch(_){ _ehCatch('subscribeMessages',_); }   // 新消息落 → 更新刷新用快照(内部节流)
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       // 流式:灵魂消息边生成边 UPDATE text → 找到对应气泡打字机式更新 .txt
@@ -2236,9 +2242,9 @@ async function subscribeMessages(rid){
             if(nc && !nc.classList.contains('pending')){
               nc.classList.add('arrived');
               // 音频域加固批B: acapella ready 回写 → 清 120s 降级定时器, 避免误报
-              try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){}
+              try{ const tid=_EH_ACAPELLA_TIMERS.get(String(m.id)); if(tid){ clearTimeout(tid); _EH_ACAPELLA_TIMERS.delete(String(m.id)); } }catch(_){ _ehCatch('subscribeMessages',_); }
               setTimeout(()=>nc.classList.remove('arrived'), 3400);
-              try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){}
+              try{ if(nc.dataset.url) prefetchSong(nc.dataset.url); }catch(_){ _ehCatch('subscribeMessages',_); }
               try{
                 if(m.user_id===myUid){
                   const st=$('#stream');
@@ -2246,11 +2252,11 @@ async function subscribeMessages(rid){
                   const vis = st ? (r.top>=0 && r.bottom<=st.getBoundingClientRect().bottom+40) : false;
                   if(!vis) pushSongReady(m.id);
                 }
-              }catch(_){}
+              }catch(_){ _ehCatch('subscribeMessages',_); }
             }
           }
         }
-        try{ updateSongQueueBar(); }catch(e){}   // 一首谱好归位 → 刷队列条(可能减一首或隐藏)
+        try{ updateSongQueueBar(); }catch(e){ _ehCatch('subscribeMessages',e); }   // 一首谱好归位 → 刷队列条(可能减一首或隐藏)
       } else if(m.kind==='song'){
         // 少见分支：bubble 不存在 才走这里
         el.innerHTML=songHtml(m.text);
@@ -2292,7 +2298,7 @@ async function subscribeMessages(rid){
         // ★关键: 订阅"真正就绪"后补拉一次最新, 兜住"loadHistory 拉完 → 订阅就绪"之间的空窗消息
         // (realtime 异步建立需数百ms, 这段窗口内别人发的消息 loadHistory 没拉到、订阅也没收到 → 原来必须刷新)。
         // 也覆盖掉线重连(SUBSCRIBED 再次触发)期间漏收的消息。用 curRoom 校验防串房。
-        try{ if(curRoom && curRoom.id===rid) refreshSnapshotTail(curRoom).catch(()=>{}); }catch(_){}
+        try{ if(curRoom && curRoom.id===rid) refreshSnapshotTail(curRoom).catch(()=>{}); }catch(_){ _ehCatch('subscribeMessages',_); }
       }
       else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED') setConn(false,'连接中');
     });
@@ -2308,7 +2314,7 @@ async function subscribeMessages(rid){
       if(document.hidden) return;
       if(!curRoom || curRoom.id!==rid){ clearInterval(_tailPollTimer); _tailPollTimer=null; return; }   // 已离房/换房 → 自清
       refreshSnapshotTail(curRoom).catch(()=>{});
-    }catch(_){}
+    }catch(_){ _ehCatch('subscribeMessages',_); }
   }, 20000);
 }
 
@@ -2345,8 +2351,16 @@ async function setupGameTables(room){
       const row=p.new; if(!row || !curRoom || curRoom.id!==room.id) return;
       const prev=_gtTables.get(row.id);
       _gtTables.set(row.id,row); gtRenderCard(row);
-      // 本人在座且刚翻到 playing → 座上真人自动进牌桌(host 已在 gtStart 里开过, 这里管其他人)
-      if(row.status==='playing' && (!prev||prev.status!=='playing') && row.host_uid!==myUid){
+      // host 侧德州: 座位名册变了(有人中途坐下空位/离座) → 喂给正在跑的引擎, 下一手重组牌手
+      //   (真人上桌换掉 AI 顶位 / 走人的席回落 AI)。引擎逐手 newHand 时读最新名册, 座号固定不错位。
+      if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host && row.game==='nlhe'
+         && _ehGame && typeof _ehGame.updateRoster==='function'){
+        try{ _ehGame.updateRoster(gtSeatArrays(row)); }catch(_){}
+      }
+      // 本人在座且桌在 playing 且我还没进这桌 → 自动进牌桌。
+      //   覆盖两种入场: lobby→playing 开局瞬间; 以及德州进行中我刚坐下空位(中途加入)。
+      if(row.status==='playing' && row.host_uid!==myUid
+         && (!_gtActiveTable || _gtActiveTable.id!==row.id)){
         const mine=(row.seats||[]).some(s=>s.kind==='human'&&s.uid===myUid);
         if(mine) gtEnter(row.id);
       }
@@ -2459,11 +2473,12 @@ function gtSeatArrays(row){
   return { seats, n:seats.length, names, avatars, isAI, ids, souls, mySeat, remoteSeats };
 }
 // host: 只把【远程真人席】的底牌写进 eh_gt_hands(RLS 保证各自只读到自己那行); host/AI/灵魂席由本机引擎持有, 不落库。
-function gtWritePokerHands(tableId, state, A){
-  const hands=A.remoteSeats.map(seat=>{
-    const p=state.players[seat]; if(!p||!A.ids[seat]) return null;
-    return { seat, uid:A.ids[seat], hand:(p.hole||[]).map(c=>({rank:c.rank,suit:c.suit,label:c.label,id:c.id})) };
-  }).filter(Boolean);
+//   远程真人席【从当前引擎状态直接推导】(非启动时固化的名册): 这样中途坐下空位的新真人, 引擎重组后
+//   其席位 isAI=false + id=真uid, 底牌会自动开始落库。判据: 非我 + 非AI + id 是合法 uuid(排除 'p'+seat 占位)。
+function gtWritePokerHands(tableId, state, mySeat){
+  const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const hands=(state.players||[]).filter(p=> p && p.seat!==mySeat && !p.isAI && UUID.test(String(p.id||'')))
+    .map(p=>({ seat:p.seat, uid:p.id, hand:(p.hole||[]).map(c=>({rank:c.rank,suit:c.suit,label:c.label,id:c.id})) }));
   if(!hands.length) return;
   sb.rpc('eh_gt_set_hands',{p_table:tableId,p_hands:hands}).then(({error})=>{ if(error) console.warn('[nlhe] set hands', error.message); }, ()=>{});
 }
@@ -2491,7 +2506,7 @@ function gtLaunchPoker(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}
-      if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A); }
+      if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
       ehStashLastGame('nlhe', res, log, A.names, meta);
@@ -2529,6 +2544,8 @@ function gtEnterPoker(row){
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    // 客人筹码输光 → 点"离桌"真的从座位表退出(该席变空, host 下一手把它当 AI 顶位继续开)。
+    onBust:()=>{ gtLeave(row.id); },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可从卡片"进入牌桌"重进)
   });
   setTimeout(pull, 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次底牌
@@ -5542,7 +5559,7 @@ function startMasterPreview(mid, masterUrl, introEnd){
       // 被拦/被打断: 静默收场, 别打扰(预览是锦上添花, 失败不该报错)
       if(_masterPreview&&_masterPreview.token===myToken) stopMasterPreview();
     });
-  }catch(_){}
+  }catch(_){ _ehCatch('playSongAI',_); }
 }
 
 // 神曲播放 dispatcher: 根据 singMode 分发到 legacy(本地合成)/ai(拉URL播高潮)
@@ -5573,7 +5590,7 @@ function playSongAI(el, onEnd){
   //   (实测 funk 副歌 47峰/11字全乱, 见 buildVocalEnvelope 注)。有鼓曲风(funk/dj/kid)不在此集 → 永远走
   //   匀速线性, 不硬上逐字。清唱(acapella)另有专属逐字表分支(buildAcapellaOnsets), jazz/gufeng/rnb 走 warp。
   const VOCAL_WARP_STYLES=new Set(['jazz','gufeng','rnb']);
-  try{ AudioEngine.duck(true); }catch(_){}
+  try{ AudioEngine.duck(true); }catch(_){ _ehCatch('playSongAI',_); }
   el.classList.add('loading');
   const a=new Audio();
   a.preload='auto';
@@ -5658,7 +5675,7 @@ function playSongAI(el, onEnd){
       const MIN_WIN=8;
       if(endAt-startAt < MIN_WIN) startAt=Math.max(0, endAt-MIN_WIN);
     }
-    try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){}
+    try{ if(startAt>0 && startAt<(a.duration||1e9)) a.currentTime=startAt; }catch(_){ _ehCatch('playSongAI',_); }
     // ★异步解码 AudioBuffer 建对齐表(不阻塞播放), 就绪后 syncMarquee 自动切到精准高亮。解码慢/失败则退线性。
     //   分两条路(都只在无鼓曲风 VOCAL_WARP_STYLES 上启用——有鼓的 funk/dj/kid 鼓点会被当成字, 见 buildVocalEnvelope):
     //   ①清唱(acapella): 整首=一遍干净人声, 用 buildAcapellaOnsets 直接算【逐字点亮时刻表】。
@@ -5725,8 +5742,8 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   // 安卓 Chrome: AudioContext 初始 suspended, resume() 异步。带超时保护地等它 running,
   // 但绝不无限阻塞(某些安卓 resume Promise 迟迟不 resolve, 若死等会导致整首歌哑掉——完全没声)。
   // 最多等 ~250ms, 之后无论如何都继续排音符(t0 起始缓冲会给调度留余量)。
-  try{ ctx.resume&&ctx.resume(); }catch(e){}
-  for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(e){} }
+  try{ ctx.resume&&ctx.resume(); }catch(e){ _ehCatch('playSongLegacy',e); }
+  for(let i=0;i<5 && ctx.state!=='running';i++){ await new Promise(r=>setTimeout(r,50)); try{ ctx.resume&&ctx.resume(); }catch(e){ _ehCatch('playSongLegacy',e); } }
   const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,60);   // 与 encodeSong 上限/卡片渲染字数一致(原30会漏唱后半)
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
@@ -5797,8 +5814,8 @@ async function playSongLegacy(lyric, sid, el, onEnd){
       curSong._tts=u;
       speechSynthesis.speak(u);
       // Chrome 有时 speak 后卡在 paused, resume 兜底
-      setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 60);
-    }catch(e){}
+      setTimeout(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){ _ehCatch('playSongLegacy',e); } }, 60);
+    }catch(e){ _ehCatch('playSongLegacy',e); }
   }
   // 结束时间取 旋律时长 与 念词时长 的较大者(念词可能更长, 别提前掐断)
   const ttsDur=hasTTS ? chars.length*0.42/clamp(st.tts?.rate??1.1,0.7,1.6) : 0;
@@ -5806,8 +5823,8 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   }catch(err){
     // 合成/调度中途异常(老旧内核 oscillator 抛错等): 恢复 BGM + 停歌清理, 不让卡片卡在 playing 或 BGM 永久压低
     console.warn('playSongLegacy',err);
-    try{ AudioEngine.duck(false); }catch(_){}
-    try{ stopSong(); }catch(_){}
+    try{ AudioEngine.duck(false); }catch(_){ _ehCatch('playSongLegacy',_); }
+    try{ stopSong(); }catch(_){ _ehCatch('playSongLegacy',_); }
     toast('播放失败');
   }
 }
@@ -5817,10 +5834,10 @@ document.addEventListener('click',e=>{
   const card=btn.closest('.song-card'); if(!card) return;
   // ★ 点完立即 blur: 图标按钮不留焦点, 彻底杀死任何浏览器焦点环(黑边)残留
   // (配合 CSS focus:none 双保险; 有些移动端把触屏点击当 focus-visible, 只能靠 blur 兽底)
-  try{ btn.blur(); }catch(_){}
+  try{ btn.blur(); }catch(_){ _ehCatch('playSongLegacy',_); }
   // 音频解锁铁律: 用户手势的"同步"tick里立刻resume + 播一个静音tick, 让AudioContext真正跑起来
   // 一旦跑起来, 后面async里的start()才有声(iOS Safari/Chrome autoplay policy)
-  try{ if(typeof AudioEngine!=='undefined') AudioEngine.resume(); }catch(_){}
+  try{ if(typeof AudioEngine!=='undefined') AudioEngine.resume(); }catch(_){ _ehCatch('playSongLegacy',_); }
   try{
     const c=ac();
     if(c){
@@ -5830,7 +5847,7 @@ document.addEventListener('click',e=>{
       const wsrc=c.createBufferSource(); wsrc.buffer=wb;
       wsrc.connect(c.destination); wsrc.start(0);
     }
-  }catch(_){}
+  }catch(_){ _ehCatch('playSongLegacy',_); }
   if(card.classList.contains('pending') || card.classList.contains('failed') || card.classList.contains('timeout')){
     const bubble=card.closest('.msg'); const mid=bubble&&bubble.dataset.mid;
     // ★点 pending/failed/timeout 卡: 不要无脑立即重生成(主人要求"进程还正常就别重来")。
@@ -5857,7 +5874,7 @@ document.addEventListener('click',e=>{
     //   仍未成功且还在正常窗口(未超时)→ 不重来只提示; 已超窗口 → 允许重生成。
     (async()=>{
       let healed=false;
-      try{ healed = mid ? await probeSongReady(String(mid), bubble) : false; }catch(_){}
+      try{ healed = mid ? await probeSongReady(String(mid), bubble) : false; }catch(_){ _ehCatch('playSongLegacy',_); }
       if(healed) return;   // 已救回成可播卡, 不再生成
       if(age < SONG_TIMEOUT_MS){ toast('正在生成中,请稍候…'); return; }
       doRegen();
@@ -5878,7 +5895,7 @@ function bgmSaveLocal(row){
   try{
     const a=JSON.parse(localStorage.getItem(LS_BGM_LIBRARY)||'[]').filter(x=>x&&x.id!==row.id);
     a.unshift(row); localStorage.setItem(LS_BGM_LIBRARY,JSON.stringify(a.slice(0,50)));
-  }catch(_){}
+  }catch(_){ _ehCatch('playSongLegacy',_); }
 }
 function bgmLocalLibrary(){ try{return JSON.parse(localStorage.getItem(LS_BGM_LIBRARY)||'[]')}catch(_){return []} }
 function bgmPlayLocal(row){
@@ -5887,7 +5904,7 @@ function bgmPlayLocal(row){
   const rn=(curRoom&&curRoom.name)||row.room_name||'';
   _ehBgmOverride={ ...row, room_name:rn };
   try{ AudioEngine.start({name:'🎼 '+(row.title||'灵魂生成'),url:row.url}); }catch(e){ console.warn('bgm play',e); }
-  try{ toast(`🎼 已切换：${row.title||'灵魂现场曲'}（仅你可听）`); }catch(_){}
+  try{ toast(`🎼 已切换：${row.title||'灵魂现场曲'}（仅你可听）`); }catch(_){ _ehCatch('playSongLegacy',_); }
 }
 // 换房时清掉过期 override，避免上一房的曲挡新房的广播/默认曲。
 function bgmClearOverrideIfRoomChanged(next){
@@ -6232,16 +6249,16 @@ function foregroundResync(){
 }
 document.addEventListener('visibilitychange', ()=>{
   // 隐藏时暂停装饰动画省电, 显示时恢复
-  try{ document.body.classList.toggle('page-hidden', document.hidden); }catch(_){}
-  try{ if(document.hidden){ gtTickTurnAlert(); } else { _turnFlashTitle(false); } }catch(_){ }   // GT 后台轮到我 title 提醒 & 回前台复位
+  try{ document.body.classList.toggle('page-hidden', document.hidden); }catch(_){ _ehCatch('generateAndPersistSong',_); }
+  try{ if(document.hidden){ gtTickTurnAlert(); } else { _turnFlashTitle(false); } }catch(_){ _ehCatch('generateAndPersistSong',_); }   // GT 后台轮到我 title 提醒 & 回前台复位
   if(document.hidden) return;
-  try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){}   // ★V54: 回前台挡引擎恢复的 #cin focus 误弹起
+  try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('generateAndPersistSong',_); }   // ★V54: 回前台挡引擎恢复的 #cin focus 误弹起
   if(!curRoom) return;
   foregroundResync();
 });
 // pageshow(含 bfcache 恢复, persisted=true 时 visibilitychange 可能不发) + window focus: 多源兜底
-window.addEventListener('pageshow', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){} foregroundResync(); });
-window.addEventListener('focus', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){} foregroundResync(); });
+window.addEventListener('pageshow', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('generateAndPersistSong',_); } foregroundResync(); });
+window.addEventListener('focus', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('generateAndPersistSong',_); } foregroundResync(); });
 // 音频域加固批B: 清唱兜底(worker 未回写时 120s 明确降级)
 const _EH_ACAPELLA_TIMERS = new Map();   // mid → timeoutId, 供 worker 回写时清理
 function _ehAcapellaTimeoutMark(mid){
@@ -6253,16 +6270,16 @@ function _ehAcapellaTimeoutMark(mid){
     card.classList.add('timeout');
     const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱服务暂不可用';
     const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','清唱服务暂不可用 · 点击重试');
-  }catch(_){}
+  }catch(_){ _ehCatch('generateAndPersistSong',_); }
   finally{ _EH_ACAPELLA_TIMERS.delete(String(mid)); }
 }
 async function generateAndPersistSong(mid, lyric, sid, el){
-  try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){}
+  try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
   // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){}
-    try{ toast('谱曲中,由后台生成…'); }catch(_){}
+    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){ _ehCatch('generateAndPersistSong',_); }
+    try{ toast('谱曲中,由后台生成…'); }catch(_){ _ehCatch('generateAndPersistSong',_); }
     // 45s 兜底: 清唱合成实测 5~15s(worker 3s 扫 + TTS 合成 + 回写), 45s 足够覆盖 worker 排队/慢网。
     //   原 120s 太长, 让人干等两分钟。worker 若仍未回写 → 明确降级"清唱服务暂不可用", 允许手动重试。
     //   注: UPDATE 事件丢失已由 20s 兜底轮询救回(见 refreshSnapshotTail song 分支), 此 timer 只兜"worker 真挂了"。
@@ -6271,19 +6288,19 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       if(_EH_ACAPELLA_TIMERS.has(key)) clearTimeout(_EH_ACAPELLA_TIMERS.get(key));
       const tid=setTimeout(()=>_ehAcapellaTimeoutMark(key), 45000);
       _EH_ACAPELLA_TIMERS.set(key, tid);
-    }catch(_){}
+    }catch(_){ _ehCatch('generateAndPersistSong',_); }
     return;
   }
   _EH_SONG_GENERATING.add(mid);
   const startRoomId = curRoom && curRoom.id;   // 快照房间id, 防生成中途换房污染 path
   // 音频域加固批B: fetch 加 AbortController 超时(80s), 防 Edge Function 卡住时 _EH_SONG_GENERATING 一直持有 mid, 挡住重试
   const _ac = new AbortController();
-  const _to = setTimeout(()=>{ try{ _ac.abort('timeout'); }catch(_){} }, 80000);
+  const _to = setTimeout(()=>{ try{ _ac.abort('timeout'); }catch(_){ _ehCatch('generateAndPersistSong',_); } }, 80000);
   try{
     const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
     // 挑一首同曲风母版当参考(整个对象: 可能带预存 featureId/duration 供 Edge 跳过 preprocess 加速)
     let master=null;
-    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pickMasterWeighted(pool)||pool[0]; }catch(_){}
+    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pickMasterWeighted(pool)||pool[0]; }catch(_){ _ehCatch('generateAndPersistSong',_); }
     if(!master){ throw new Error('no master for sid '+sid); }
     const masterUrl=new URL(master.url, location.href).href;
     // 调 Edge Function 生成(37s 左右, 前端 80s 硬超时)。
@@ -6310,7 +6327,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       //   outro 常是纯尾奏/衬音、不含显示词, 高亮会对到没唱那句词的音频上(worker 端同此修)。
       const chorus=segs.find(x=>String(x.label).toLowerCase().includes('chorus'));
       if(chorus){ chS=chorus.start||0; chE=chorus.end||0; }
-    }catch(_){}
+    }catch(_){ _ehCatch('generateAndPersistSong',_); }
     // 兜底: 没有 chorus 时用全歌
     if(chE<=chS){ chS=0; chE=res.cover_duration||0; }
     // ★治本: 按 cover 真实时长夹紧 chorus, 别把越界值存进库(修"最后一首歌只响两三秒")。
@@ -6352,13 +6369,13 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     console.warn('[song] generate failed/timeout', isTimeout, e);
     toast(isTimeout ? '神曲生成超时,可重试' : (EH_CONFIG.text.err_singSend||'神曲生成失败'));
     // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
-    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip', isTimeout?'生成超时 · 点击重试':'谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时':'生成失败'; } }catch(_){}
+    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip', isTimeout?'生成超时 · 点击重试':'谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时':'生成失败'; } }catch(_){ _ehCatch('generateAndPersistSong',_); }
   }finally{
     clearTimeout(_to);
     _EH_SONG_GENERATING.delete(mid);
     // ★方向2: 生成结束(成功归队 / 失败 / 超时)即停母版前奏预览 —— 否则会一直循环到用户手动点播才停。
     //   只停 mid 匹配的那条(用户可能已切去别的曲、或又发了新歌启了新预览)。
-    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(mid); }catch(_){}
+    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(mid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
@@ -7903,38 +7920,38 @@ async function sendVerifyEmail(){
 async function logoutIdentity(bound){
   if(!await ehConfirm(bound?'确定退出登录？':'确定退出并换一个新身份？', bound?'退出登录':'切换身份')) return;
   clearLastRoom();   // ★ 同步先清: 不在房间里登出(curRoom=null)时 leaveRoom 会被跳过, 避免 eh_last_room 残留 → 换账号后进错房
-  try{ if(curRoom) await leaveRoom(); }catch(e){}
-  try{ await unsubscribeWorld(); }catch(e){}
-  try{ await sb.auth.signOut(); }catch(e){}
-  try{ localStorage.removeItem(LS_ID); }catch(e){}
+  try{ if(curRoom) await leaveRoom(); }catch(e){ _ehCatch('backToLobby',e); }
+  try{ await unsubscribeWorld(); }catch(e){ _ehCatch('backToLobby',e); }
+  try{ await sb.auth.signOut(); }catch(e){ _ehCatch('backToLobby',e); }
+  try{ localStorage.removeItem(LS_ID); }catch(e){ _ehCatch('backToLobby',e); }
   myUid=null; me=null;
   _myBottles={};   // 换身份清掉旧瓶引用: 新 uid 不该继承前一个身份丢的瓶(回信不属于它)
   _meCache={ rooms:null, msgs:null };   // 清个人空间缓存, 换身份后不残留旧数据
-  try{ localStorage.removeItem(LS_ME_CACHE); }catch(e){}   // 连持久化缓存一起清, 否则新身份秒显旧数据
+  try{ localStorage.removeItem(LS_ME_CACHE); }catch(e){ _ehCatch('backToLobby',e); }   // 连持久化缓存一起清, 否则新身份秒显旧数据
   closeMe();
   // 清空登录框 + 收起, 退出后不残留账密(改为点击时才拉取)
   const la=$('#loginAccount'), lp=$('#loginPassword'), lc=$('#loginCollapse');
   if(la){ la.value=''; la.readOnly=true; } if(lp){ lp.value=''; lp.readOnly=true; }  // 退出后清空并重新上锁, 恢复"未交互不调起凭据"初始态
   if(lc){ lc.classList.remove('on'); const sp=$('#loginToggle')?.querySelector('span'); if(sp) sp.textContent='已有账号？点此登录 ▾'; }
   _autoLoginFired=false;
-  try{ navigator.credentials && navigator.credentials.preventSilentAccess && navigator.credentials.preventSilentAccess(); }catch(e){}
+  try{ navigator.credentials && navigator.credentials.preventSilentAccess && navigator.credentials.preventSilentAccess(); }catch(e){ _ehCatch('backToLobby',e); }
   // 重新生成一个身份并回到入场页
   loadOrRollIdentity(); paintIdentity();
   goScene('enter');
   toast(bound?'已退出登录':'已换新身份');
 }
-function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
+function closeMe(){ try{ if($('#meMask').classList.contains('on')) EhSfx.play('back'); }catch(e){ _ehCatch('backToLobby',e); } $('#meMask').classList.remove('on'); $('#meDrawer').classList.remove('on'); $('#meBtn')&&$('#meBtn').classList.remove('active'); $('#meBtnHall')&&$('#meBtnHall').classList.remove('active'); }
 
 // ============ 返回大厅 ============
-function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
-  try{ document.body.classList.remove('priv-heat'); }catch(_){}   // 离房去掉暧昧红氛围
+function backToLobby(){ try{ EhSfx.play('back'); }catch(e){ _ehCatch('backToLobby',e); }
+  try{ document.body.classList.remove('priv-heat'); }catch(_){ _ehCatch('backToLobby',_); }   // 离房去掉暧昧红氛围
   // 【房间→首页 BGM 弹层缓存失效 07-28 03:08】roomKey 变了但弹层 DOM 御缓存仍携旧房间数据→
   //   下次开菜单官方组虽能因 _roomKey!==roomKey 重抽，但灵魂组只看 _soulLen/_nSoul 会长度巧合复用旧抽样
   //   → 主动清两个弹层缓存，强制下次重新抽
-  try{ var _mLb=document.getElementById('bgmMenu'); if(_mLb) _mLb._bgmPickCache=null; }catch(_){}
-  try{ var _mHall=document.getElementById('bgmMenuHall'); if(_mHall) _mHall._bgmPickCache=null; }catch(_){}
+  try{ var _mLb=document.getElementById('bgmMenu'); if(_mLb) _mLb._bgmPickCache=null; }catch(_){ _ehCatch('backToLobby',_); }
+  try{ var _mHall=document.getElementById('bgmMenuHall'); if(_mHall) _mHall._bgmPickCache=null; }catch(_){ _ehCatch('backToLobby',_); }
   // 丝滑续播: 不打断当前房 BGM, 只切成大厅随机连播模式——当前曲放完后随机连播任意房间 BGM
-  try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){}
+  try{ AudioEngine.toChainAfter(bgmPool()); }catch(_){ _ehCatch('backToLobby',_); }
   applyTheme(sceneOrDefaultTheme());  // 离房恢复全局主题(未锁主题时叠加深夜/节日场景皮肤)
   clearLastRoom();   // ★ 同步立即清标记: 用户明确返回大厅 → 即使立即刷新也不再回旧房间(不等异步 leaveRoom)
   // 秒切场景 + soft 刷新(列表 DOM 还在，不清空重建，只后台刷新数据)，不等 DB 清理
@@ -7949,7 +7966,7 @@ function backToLobby(){ try{ EhSfx.play('back'); }catch(e){}
 // (优先关遮罩,其次退房回大厅),只要还有可拦截层就重新武装 guard 吃掉下一次返回;
 // 到大厅/入场页无可拦截层则放行(真正离开)。UI 主动关闭会留一个 guard,下次返回被静默吸收(可接受)。
 let _navArmed=false;
-function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({eh:1},''); }catch(e){} }
+function ehArm(){ if(_navArmed) return; _navArmed=true; try{ history.pushState({eh:1},''); }catch(e){ _ehCatch('backToLobby',e); } }
 // 从最上层往下判定"这次返回该关掉谁"
 function navTopLayer(){
   // 键盘开着(输入框聚焦)时, 返回键第一优先收键盘 + 输入框失焦 + 复位, 符合安卓习惯(先收键盘再退层)

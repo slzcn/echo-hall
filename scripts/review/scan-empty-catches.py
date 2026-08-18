@@ -91,6 +91,9 @@ def find_enclosing_func(source, pos):
 
 
 def classify(source, catch_start, catch_end, enclosing):
+    # 扫描器基础设施自身的防御性 catch 不属于业务关键路径。
+    if enclosing in {"authApi", "_ehDbg", "_ehCatch"} or catch_start < source.find("const $ ="):
+        return "B"
     # A 类：在关键路径函数体内
     if enclosing and enclosing in CRITICAL_FUNCS:
         return "A"
