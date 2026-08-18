@@ -1622,6 +1622,15 @@ window.EH_LOBBY = window.EH_LOBBY_MODULE.createLobbyController({
   prefetchRoom,
   prefetchAll,
 });
+window.EH_AUTH = window.EH_AUTH_MODULE.createAuthController({
+  api: authApi,
+  awaitReady: awaitSb,
+  resolveSession,
+  ensure: ensureAuth,
+  saveIdentity,
+  loadOrRollIdentity,
+  logout: logoutIdentity,
+});
 function bindRoomCards(box){
   box.querySelectorAll('.ch').forEach(el=>{
     const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
