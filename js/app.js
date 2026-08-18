@@ -6079,6 +6079,19 @@ window.EH_BGM = window.EH_BGM_MODULE.createBgmController({
   playLegacy: playSongLegacy,
   generate: generateAndPersistSong,
 });
+window.EH_ROOM = window.EH_ROOM_MODULE.createRoomController({
+  enter: enterRoom,
+  back: backToLobby,
+  leave: leaveRoom,
+  clearLast: clearLastRoom,
+});
+window.EH_MESSAGES = window.EH_MESSAGES_MODULE.createMessagesController({
+  subscribe: subscribeMessages,
+  loadHistory,
+  refreshSnapshotTail,
+  buildMessage: buildMsgEl,
+  persistSnapshot: persistRoomSnap,
+});
 async function switchMyBgm(title){
   if(!curRoom){ toast('先进一个房间再切曲'); return; }
   const all=(window.__EH_BGM_LIBRARY||bgmLocalLibrary()).filter(x=>x&&x.room_name===curRoom.name);
