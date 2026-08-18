@@ -1133,8 +1133,8 @@ function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); 
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
 //       (2) host 每 8s 发一次 host_ping; guest 15s 未收到 → 判定房主离线, 锁 UI 提醒;
 //       (3) 页面切后台或牌桌折叠时, 若轮到我, title 前置 "🫵" 每秒闪 + 允许时桌面通知 + 一次震动。
-let _gtPingT=null, _gtHostAliveT=null, _gtLastHostAt=0;
-function _gtStopPing(){ if(_gtPingT){ clearInterval(_gtPingT); _gtPingT=null; } if(_gtHostAliveT){ clearInterval(_gtHostAliveT); _gtHostAliveT=null; } _gtLastHostAt=0; }
+let _gtPingT=null, _gtHostAliveT=null, _gtLastHostAt=0, _gtDbKeepT=null;
+function _gtStopPing(){ if(_gtPingT){ clearInterval(_gtPingT); _gtPingT=null; } if(_gtHostAliveT){ clearInterval(_gtHostAliveT); _gtHostAliveT=null; } if(_gtDbKeepT){ clearInterval(_gtDbKeepT); _gtDbKeepT=null; } _gtLastHostAt=0; }
 function gtBindConnStatus(chan, opts){
   opts = opts || {};
   let firstOnline = true;
@@ -1150,11 +1150,17 @@ function gtBindConnStatus(chan, opts){
   });
 }
 // host 侧: 每 8s 发一次 host_ping (payload 里带 uid, guest 只认 host_uid)
-function gtStartHostPing(chan){
+//   另每 ~90s 空刷一次 eh_gt_set_state → 更新桌 updated_at 当 DB 心跳, 供后端"陈旧桌自动作废"
+//   精准区分"在打的桌"(心跳新)与"硬崩留下的死桌"(心跳断 5 分钟)。
+function gtStartHostPing(chan, tableId){
   _gtStopPing();
   const send = ()=>{ try{ chan.send({type:'broadcast',event:'host_ping',payload:{uid:myUid,t:Date.now()}}); }catch(_){ } };
   send();
   _gtPingT = setInterval(send, 8000);
+  if(tableId){
+    const beat = ()=>{ try{ gtRpc('eh_gt_set_state',{p_table:tableId,p_state:null,p_status:''}); }catch(_){ } };
+    _gtDbKeepT = setInterval(beat, 90000);   // 空刷 status/state 不变, 只推进 updated_at
+  }
 }
 // guest 侧: 订阅 host_ping, 15s 未收 → host_offline; 恢复 → online
 function gtWatchHostPing(chan, hostUid){
@@ -2476,7 +2482,7 @@ function gtLaunchPoker(row){
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtBindConnStatus(chan);
-  gtStartHostPing(chan);
+  gtStartHostPing(chan, row.id);
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHPokerGame.open({
@@ -2554,7 +2560,7 @@ function gtLaunchGuandan(row){
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtBindConnStatus(chan);
-  gtStartHostPing(chan);
+  gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
     names:A.names, avatars:A.avatars, isAI:A.isAI,
@@ -2637,7 +2643,7 @@ function gtLaunchDdz(row){
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtBindConnStatus(chan);
-  gtStartHostPing(chan);
+  gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
     names:A.names, avatars:A.avatars, isAI:A.isAI,

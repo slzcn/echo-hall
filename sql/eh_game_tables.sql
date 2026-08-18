@@ -33,32 +33,53 @@ create policy eh_gt_select on public.eh_game_tables
   for select to public using (true);
 -- 写: 无 insert/update/delete policy → 直接表写一律被拒, 只能走下面的 RPC。
 
--- ---- helper: 初始 4 席(0=host, 其余空) ----
-create or replace function public.eh_gt_init_seats(p_uid uuid, p_name text, p_emoji text)
-returns jsonb language sql immutable as $$
-  select jsonb_build_array(
-    jsonb_build_object('seat',0,'kind','human','uid',p_uid,'name',p_name,'emoji',p_emoji),
-    jsonb_build_object('seat',1,'kind','empty'),
-    jsonb_build_object('seat',2,'kind','empty'),
-    jsonb_build_object('seat',3,'kind','empty')
-  );
+-- ---- helper: 按游戏定席位数 ----
+-- 斗地主 3 人、掼蛋 4 人(2v2)、德州最多 6 人; 其余按掼蛋 4 席兜底。
+-- 前端 p_game 实际取值: 'ddz'(斗地主) / 'guandan'(掼蛋) / 'nlhe'(德州)。
+create or replace function public.eh_gt_seat_count(p_game text)
+returns int language sql immutable as $$
+  select case lower(coalesce(p_game,'guandan'))
+    when 'ddz' then 3 when 'doudizhu' then 3
+    when 'nlhe' then 6 when 'holdem' then 6 when 'texas' then 6
+    else 4 end;
 $$;
 
--- ---- RPC: 开桌(host 坐 0 席) ----
+-- ---- helper: 初始 N 席(0=host, 其余空) ----
+create or replace function public.eh_gt_init_seats(p_uid uuid, p_name text, p_emoji text, p_count int)
+returns jsonb language sql immutable as $$
+  select jsonb_agg(
+    case when g.i=0
+      then jsonb_build_object('seat',0,'kind','human','uid',p_uid,'name',p_name,'emoji',p_emoji)
+      else jsonb_build_object('seat',g.i,'kind','empty') end
+    order by g.i)
+  from generate_series(0, greatest(coalesce(p_count,4),1)-1) as g(i);
+$$;
+
+-- ---- RPC: 开桌(host 坐 0 席; 席位数按游戏来) ----
 -- 同房已有活桌则返回那张(幂等: 重复点开桌不叠第二张)。
+-- 开桌前先回收本房陈旧桌(见下): 否则"一房一桌"唯一索引被僵尸桌永久占住, 新局再也开不出来。
 create or replace function public.eh_gt_open(p_room uuid, p_game text, p_name text, p_emoji text)
 returns public.eh_game_tables
 language plpgsql security definer set search_path to 'public' as $$
-declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype;
+declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_cnt int;
 begin
   if v_me is null then raise exception 'not authenticated'; end if;
   if p_room is null then raise exception 'room required'; end if;
+  -- 陈旧桌自动作废(仅本房): lobby 开而不打 30 分钟 / playing 房主心跳断 5 分钟 → 判僵尸桌散掉。
+  --   host 每 ~90s 用 eh_gt_set_state(null,'') 空刷一次 updated_at 当心跳; 真在打的桌不会被误杀,
+  --   硬崩(没触发 onExit)留下的死桌则会在别人下次开桌时被清走。
+  update public.eh_game_tables
+    set status='closed', updated_at=now()
+    where room_id=p_room and status in ('lobby','playing')
+      and ( (status='lobby'   and updated_at < now() - interval '30 minutes')
+         or (status='playing' and updated_at < now() - interval '5 minutes') );
   select * into v_row from public.eh_game_tables
     where room_id=p_room and status in ('lobby','playing') limit 1;
   if found then return v_row; end if;
-  insert into public.eh_game_tables(room_id, game, host_uid, seats)
+  v_cnt := public.eh_gt_seat_count(p_game);
+  insert into public.eh_game_tables(room_id, game, host_uid, seats, seat_count)
     values (p_room, coalesce(p_game,'guandan'), v_me,
-            public.eh_gt_init_seats(v_me, p_name, p_emoji))
+            public.eh_gt_init_seats(v_me, p_name, p_emoji, v_cnt), v_cnt)
     returning * into v_row;
   return v_row;
 end;
