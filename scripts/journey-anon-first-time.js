@@ -31,7 +31,7 @@ function assert(ok, msg) {
 // —— 抽取真实生产代码里的匿名登录分支 ——
 // 锤点: 包含完整 try/catch 结构，避免抽取时断尾
 const anchorStart = 'const hadRegIdentity = !!(me && (me.registered || me.username || me.email));';
-const anchorEnd = '}catch(e){}';
+const anchorEnd = "}catch(e){ _ehCatch('ensureAuth',e); }";   // 分支尾: 与生产代码的错误上报 catch 对齐
 const startIdx = src.indexOf(anchorStart);
 if (startIdx < 0) throw new Error('无法定位匿名登录分支起点');
 const catchIdx = src.indexOf(anchorEnd, startIdx);
@@ -70,6 +70,7 @@ const ctx = {
   paintIdentity: function () {
     /* UI 更新占位 */
   },
+  _ehCatch: function () { /* 生产分支 catch 里的错误上报, 测试里做空桩 */ },
 };
 vm.createContext(ctx);
 

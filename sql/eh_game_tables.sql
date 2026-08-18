@@ -87,15 +87,20 @@ $$;
 grant execute on function public.eh_gt_open(uuid,text,text,text) to public;
 
 -- ---- RPC: 加入一个空座(真人) ----
+-- 招募中(lobby)任何桌都可加入; 进行中(playing)【仅德州】放行 —— 桌注制真牌桌, 路人可随时坐下空位,
+--   host 下一手把该席从 AI 顶位换成真人上桌(掼蛋/斗地主固定阵型, 开局后不接受加入)。
 create or replace function public.eh_gt_join(p_table uuid, p_seat int, p_name text, p_emoji text)
 returns public.eh_game_tables
 language plpgsql security definer set search_path to 'public' as $$
-declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_target jsonb;
+declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_target jsonb; v_nlhe boolean;
 begin
   if v_me is null then raise exception 'not authenticated'; end if;
   select * into v_row from public.eh_game_tables where id=p_table for update;
   if not found then raise exception 'table not found'; end if;
-  if v_row.status <> 'lobby' then raise exception 'not joinable'; end if;
+  v_nlhe := lower(coalesce(v_row.game,'')) in ('nlhe','holdem','texas');
+  if v_row.status <> 'lobby' and not (v_row.status='playing' and v_nlhe) then
+    raise exception 'not joinable';
+  end if;
   if p_seat < 0 or p_seat >= v_row.seat_count then raise exception 'bad seat'; end if;
   -- 先把我当前占的座清空(防一人两座)
   update public.eh_game_tables t set seats = (
@@ -194,27 +199,37 @@ end;
 $$;
 grant execute on function public.eh_gt_kick(uuid,int) to public;
 
--- ---- RPC: 开始(仅 host; 空座补 AI, 落 seed, 转 playing) ----
+-- ---- RPC: 开始(仅 host; 落 seed, 转 playing) ----
+-- 空座处理按游戏分:
+--   · 德州(nlhe): 空座【保持 empty 不焊死】—— 真牌桌语义, 桌注制, 空位随时可被路人坐下(见 eh_gt_join
+--     放行 playing 态加入)。host 本机引擎逐手把 empty 席当 AI 顶位打, 有人坐下则下一手换成真人。
+--   · 掼蛋(2v2 固定队)/斗地主(叫地主): 中途加人无意义, 沿用旧语义把空座补成 AI 焊死, 开局即定员。
 create or replace function public.eh_gt_start(p_table uuid, p_seed bigint)
 returns public.eh_game_tables
 language plpgsql security definer set search_path to 'public' as $$
-declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype;
+declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_nlhe boolean;
 begin
   if v_me is null then raise exception 'not authenticated'; end if;
   select * into v_row from public.eh_game_tables where id=p_table for update;
   if not found then raise exception 'table not found'; end if;
   if v_row.host_uid <> v_me then raise exception 'host only'; end if;
   if v_row.status <> 'lobby' then raise exception 'already started'; end if;
-  update public.eh_game_tables t set
-    seats = (select jsonb_agg(
-      case when (s->>'kind')='empty'
-           then jsonb_build_object('seat',(s->>'seat')::int,'kind','ai',
-                                   'name','机器人'||((s->>'seat')::int),'emoji','🤖')
-           else s end
-      order by (s->>'seat')::int)
-      from jsonb_array_elements(t.seats) s),
-    seed = p_seed, status='playing', updated_at=now()
-  where t.id=p_table returning * into v_row;
+  v_nlhe := lower(coalesce(v_row.game,'')) in ('nlhe','holdem','texas');
+  if v_nlhe then
+    update public.eh_game_tables set seed=p_seed, status='playing', updated_at=now()
+      where id=p_table returning * into v_row;   -- 空座不焊死, 保持 empty
+  else
+    update public.eh_game_tables t set
+      seats = (select jsonb_agg(
+        case when (s->>'kind')='empty'
+             then jsonb_build_object('seat',(s->>'seat')::int,'kind','ai',
+                                     'name','机器人'||((s->>'seat')::int),'emoji','🤖')
+             else s end
+        order by (s->>'seat')::int)
+        from jsonb_array_elements(t.seats) s),
+      seed = p_seed, status='playing', updated_at=now()
+    where t.id=p_table returning * into v_row;
+  end if;
   return v_row;
 end;
 $$;

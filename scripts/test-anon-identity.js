@@ -10,9 +10,10 @@ const src=fs.readFileSync('js/app.js','utf8');
 const anchor='const hadRegIdentity = !!(me && (me.registered || me.username || me.email));';
 const i=src.indexOf(anchor);
 if(i<0) throw new Error('找不到防冒充逻辑锚点');
-const end=src.indexOf('}catch(e){}',i);
+const END="}catch(e){ _ehCatch('ensureAuth',e); }";   // 分支尾: 与生产代码的错误上报 catch 对齐
+const end=src.indexOf(END,i);
 if(end<0) throw new Error('找不到分支结尾');
-const branch=src.slice(i,end+'}catch(e){}'.length);
+const branch=src.slice(i,end+END.length);
 
 function assert(ok,msg){ if(!ok) throw new Error(msg); console.log('✓ '+msg); }
 
@@ -21,6 +22,7 @@ function runBranch(meIn){
   const ctx={
     me:meIn,
     rollIdentity:()=>{ rolled=true; ctx.me={id:ctx.me&&ctx.me.id,name:'随机重掷名',emoji:'🦊',color:'#abc'}; },
+    _ehCatch:()=>{},   // 生产分支 catch 里的错误上报, 测试里做空桩
   };
   vm.createContext(ctx);
   vm.runInContext(branch,ctx);

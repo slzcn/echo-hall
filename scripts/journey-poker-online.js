@@ -167,5 +167,79 @@ assert(sawShowdown || sawFoldWin, '旅程覆盖摊牌/弃牌收池至少一种�
   assert(st._deck && st._deck.cards.length>0, '(对照)原始 state 确实持有 _deck(证明快照是真剥离而非本就没有)');
 }
 
+// ── #60 中途加入 + 名册逐手重组(真牌桌: 空位/AI 顶位, 路人随时坐下换真人)──────────────
+// 复刻 host 侧 applyPendingRoster 的语义: 引擎座位数(n)恒定不变, 只在【手与手之间】切换每席
+// "本机 AI 驱动 / 远程真人驱动", 座号绝对稳定。断言这套切换下防作弊命门全不塌:
+//   (a) 新真人坐下→其席位换成真 uid + 全新买入 START, 且【当手仍由 AI 顶完】, 下一手才真接管;
+//   (b) 切换后快照仍零泄露, 且新真人凭"自己底牌+公共快照"能组出正确伪状态(自己2张/别人0张);
+//   (c) 私牌隔离仍随 uid 走: 新真人只读到自己那行, 读不到他人/host;
+//   (d) 绝对座号稳定: 新真人的 seat 不因"从 AI 变真人"而漂移(anti-cheat 快照层按绝对座号索引)。
+{
+  const N = 4;
+  const nm  = ['房主','灵魂','空位AI','新客'];
+  const rIsAI = [false, true, true, true];   // 起手: 席3 是 AI 顶位(空座焊 AI 之前的等价物)
+  const rUid  = ['uid-h','uid-s','p2','p3']; // 席3 尚无真 uid(占位), 坐下后换真 uid
+  let rRemote = [];                          // 起手无远程真人(席2/3都本机AI跑)
+  let rStacks = [300,300,300,300];
+  let rButton = 3;
+  const rStore = {};
+  const setHands = st => st.players.forEach(p=>{ rStore[p.seat]={uid:rUid[p.seat], hole:p.hole.map(Net.cardPlain)}; });
+  const readAs = (seat,uid)=>{ const h=rStore[seat]; return (h&&h.uid===uid)?h.hole.map(Net.cardPlain):null; };
+
+  let joinLeak=false, joinIso=true, joinerSawOwnHole=false, seatStable=true, joinerFreshBuyin=false;
+
+  // 打多手; 第 1 手后把席3从 AI 换成远程真人(中途坐下), 全新买入 START。
+  //   多打几手(而非只 1 手): 某一手席3可能恰好走 BB 弃牌白捡(walk)而没轮到行动, 多手保证它至少行动一次。
+  for (let h=0; h<8; h++){
+    if (h === 1){
+      // ← applyPendingRoster 等价: 席3 wasAI→nowHuman
+      rIsAI[3] = false; rUid[3] = 'uid-joiner'; rRemote = [3];
+      rStacks[3] = 300;              // 新真人全新买入(对照 poker-ui: !wasHuman&&nowHuman → START)
+      joinerFreshBuyin = (rStacks[3] === 300);
+    }
+    let st;
+    try { st = Engine.createGame({ seed: 80000+h, names:nm, isAI:rIsAI, stacks:rStacks.slice(), sb:5, bb:10, button:rButton, ids:rUid }); }
+    catch(e){ assert(false, `#60 第${h}手建局失败: ${e.message}`); break; }
+    // (d) 席3 永远是 seat===3, 无论 AI/真人
+    if (st.players[3].seat !== 3) seatStable = false;
+    setHands(st);
+
+    let guard=0;
+    while (st.phase!=='over' && guard++<400){
+      const seat = st.toAct;
+      let mv;
+      if (rRemote.indexOf(seat) >= 0){
+        // 远程真人: 凭脱敏快照 + 自己底牌算动作
+        const snap = Net.snapshot(st, h);
+        const chk = Net.assertNoLeak(snap); if(!chk.ok) joinLeak=true;
+        const myHole = readAs(seat, rUid[seat]);
+        const ps = Net.pseudoState(snap, seat, myHole);
+        const mine = (ps.players[seat].hole||[]).length, others = ps.players.some((p,i)=>i!==seat&&(p.hole||[]).length>0);
+        if (seat===3 && mine===2 && !others) joinerSawOwnHole = true;
+        const la = Engine.legalActions(ps, seat);
+        mv = !la.toAct ? {action:'fold'} : (la.canCheck?{action:'check'}:{action:'call'});
+      } else {
+        let d; try{ d = AI.decide(st, seat, {persona:'tag', samples:40}); }catch(_){ d=null; }
+        if(!d){ const la=Engine.legalActions(st,seat); d = la.canCheck?{action:'check'}:{action:'fold'}; }
+        mv = d;
+      }
+      try{ Engine.applyAction(st, seat, mv.action, mv.amount); }
+      catch(_){ try{ Engine.applyAction(st, seat, 'fold'); }catch(__){ guard=999; } }
+    }
+    // (c) 隔离: 新真人读不到 host / 灵魂席底牌
+    if (readAs(0,'uid-joiner')!==null || readAs(1,'uid-joiner')!==null) joinIso=false;
+    st.players.forEach(p=> rStacks[p.seat]=p.stack);
+    // 破产补带(与 UI newHand 一致, 桌不塌)
+    rStacks = rStacks.map(v=> v>0?v:300);
+    rButton = (rButton+1)%N;
+  }
+
+  assert(joinerFreshBuyin, '(60a) 新真人中途坐下 → 全新买入 START 筹码');
+  assert(!joinLeak, '(60b) 名册重组后 host 快照仍全程零泄露');
+  assert(joinerSawOwnHole, '(60b) 中途加入者凭"自己底牌+公共快照"组出正确伪状态(自己2张/别人0张)');
+  assert(joinIso, '(60c) 私牌隔离仍随 uid 走: 新真人读不到 host/灵魂席底牌');
+  assert(seatStable, '(60d) 绝对座号稳定: 席位从 AI 顶位换真人, seat 号不漂移(快照层按绝对座号索引)');
+}
+
 console.log(`\n德州联机旅程: ${step} 步${failed?' —— 有失败':' 全过'}`);
 process.exit(failed ? 1 : 0);

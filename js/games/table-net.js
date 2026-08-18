@@ -74,8 +74,10 @@
     div.className='gt-seat '+teamCls+(kind==='empty'?' gt-empty':' filled')+(isMe?' me':'');
     if(kind==='empty'){
       div.innerHTML='<span class="gt-av">＋</span><span class="gt-nm">空位</span>';
-      // 加入(招募中 && 我没被占座 && 我不是这桌的人时可加入; 若我已在别的座也允许换座)
-      if(ctx.status==='lobby' && !ctx.iAmPlaying){
+      // 加入: 招募中随时可坐; 德州(桌注制真牌桌)进行中也放行 —— 路人点空位坐下, host 下一手换掉 AI 顶位。
+      //   (掼蛋/斗地主固定阵型, 开局后空位已焊成 AI, 不再显示加入。)
+      var canJoin = (ctx.status==='lobby' || (ctx.status==='playing' && ctx.game==='nlhe'));
+      if(canJoin && !ctx.iAmPlaying){
         var b=document.createElement('button'); b.className='gt-mini'; b.textContent='加入';
         b.onclick=function(){ ctx.actions.join(seat.seat); }; div.appendChild(b);
       }
@@ -117,7 +119,7 @@
     var sig=String(row.status||'')+'|'+String(row.host_uid||'')+'|'+JSON.stringify(seats);
     if(el.dataset.gtSig===sig) return el;
     el.dataset.gtSig=sig;
-    ctx.status=row.status; ctx.isHost=(row.host_uid===ctx.myUid);
+    ctx.status=row.status; ctx.game=row.game; ctx.isHost=(row.host_uid===ctx.myUid);
     ctx.iAmPlaying=seats.some(function(s){ return s.kind==='human' && s.uid===ctx.myUid; });
     var humans=seats.filter(function(s){return s.kind==='human';}).length;
 

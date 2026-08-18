@@ -252,7 +252,7 @@ assert(/channel\('room-gt:'[\s\S]{0,200}table:'eh_game_tables'/.test(src), 'real
 assert(/function gtRenderCard\(/.test(src) && /data-gt-id/.test(src), '座位变化就地重绘牌桌卡(按 data-gt-id 定位, 不新增监听)');
 assert(/if\(ev==='gt'\)/.test(src), "buildGameEl 有 gt 分支(把牌桌卡渲染回来)");
 assert(/function gtLaunchLocal\(/.test(src) && /EHGuandanGame\.open/.test(src), 'host 权威: 开始后本机跑引擎开局(gtLaunchLocal)');
-assert(/status==='playing'[\s\S]{0,160}gtEnter/.test(src), '座上真人翻到 playing 自动进牌桌(realtime 驱动)');
+assert(/status==='playing'[\s\S]{0,260}gtEnter/.test(src), '座上真人翻到 playing 自动进牌桌(realtime 驱动)');
 assert(/removeChannel\(gtChan\)/.test(src) && /_gtTables\.clear\(\)/.test(src), '离房清理 gtChan + 座位缓存(不泄漏/不串房)');
 
 // ── 步骤12: 座位参数化(联机地基: 真人可坐非 0 席, DOM 槽位绕 mySeat 旋转) ──

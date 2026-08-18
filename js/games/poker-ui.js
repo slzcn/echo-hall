@@ -221,19 +221,22 @@
     const n = names.length;
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;
     const isAI = opts.isAI || names.map((_, i) => i !== mySeat);
-    // 每个 AI 席位的打法性格(灵魂原型→打法; 无则按座位轮 5 路), 一局内固定
-    const souls = opts.souls || [];
-    const personaBySeat = names.map((_, seat) => {
+    // 每个 AI 席位的打法性格(灵魂原型→打法; 无则按座位轮 5 路)。名册可逐手重组(见 updateRoster),
+    // 故 souls/personaBySeat 用 let, 由 personaFor 统一计算。names/avatars/isAI 是数组, 就地改元素即可。
+    let souls = opts.souls || [];
+    function personaFor(seat){
       if (seat === mySeat || !isAI[seat]) return null;
       const soul = souls[seat] && souls[seat].archetype;
       if (soul) return AI.personaForSoul(soul).key;
       return AI.PERSONA_KEYS[seat % AI.PERSONA_KEYS.length];
-    });
+    }
+    let personaBySeat = names.map((_, seat) => personaFor(seat));
+    let ids = opts.ids ? opts.ids.slice() : null;     // 逐手可变(新真人坐下→其席位换成真 uid)
 
     // ── 联机角色 ──
     const mode = opts.mode || 'local';
     const isGuest = mode === 'guest';
-    const remoteSeats = opts.remoteSeats || [];       // host 模式: 由远程真人驱动的席位
+    let remoteSeats = opts.remoteSeats || [];         // host 模式: 由远程真人驱动的席位(可逐手重组)
     const isRemote = (seat) => remoteSeats.indexOf(seat) >= 0;
     const onSync   = (typeof opts.onSync   === 'function') ? opts.onSync   : null;  // host: 每步产出快照广播
     const onAction = (typeof opts.onAction === 'function') ? opts.onAction : null;  // guest: 动作发回 host
@@ -263,7 +266,7 @@
       while (stacks[button] <= 0) button = (button+1)%n;   // 庄家落在有筹码的人身上
       let seed; try{ seed = crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed = Math.floor(Math.random()*4294967296); }
       return Engine.createGame({ seed: seedOverride!=null?seedOverride:(opts.seed!=null && handNo===0?opts.seed:seed),
-        names, isAI, stacks: stacks.slice(), sb, bb, button, ids: opts.ids });
+        names, isAI, stacks: stacks.slice(), sb, bb, button, ids: ids || undefined });
     }
     let handNo = 0;
     // guest 开局尚无快照 → 先给一个"等发牌"占位态; host/local 直接发一手
@@ -717,19 +720,27 @@
       const iBust   = isLocalSolo && myStackNow<=0;
       const iWonAll = isLocalSolo && soulsAliveNow===0 && myStackNow>0;
       const matchOver = iBust || iWonAll;
+      // 联机破产离桌: guest(非房主)输光即离桌 —— 不再被无限补码, 位子空出可被别人再坐。
+      //   房主是本机裁判/庄家, 保持在桌不判离(否则一崩全桌散); host 自身补码沿用旧逻辑。
+      const iLeaveNow = isGuest && myStackNow<=0;
       if (matchOver) over.className = 'pk-over ' + (iBust?'lose':'win');
+      else if (iLeaveNow) over.className = 'pk-over lose';
 
       // 标题/结算数字
-      const h2 = matchOver ? (iBust ? '💀 你把筹码输光了' : '👑 通吃全场！')
-                           : (delta>0?'🎉 赢下这手':(delta<0?'💸 输了这手':'🤝 打平'));
-      const subLine = matchOver
-        ? `<div class="pk-delta ${iBust?'down':'up'}">本场结束 · 最终 ${myStackNow} 筹码</div>`
+      const busted = iBust || iLeaveNow;
+      const h2 = (matchOver||iLeaveNow)
+        ? (busted ? '💀 你把筹码输光了' : '👑 通吃全场！')
+        : (delta>0?'🎉 赢下这手':(delta<0?'💸 输了这手':'🤝 打平'));
+      const subLine = (matchOver||iLeaveNow)
+        ? `<div class="pk-delta ${busted?'down':'up'}">${iLeaveNow?'离桌 · ':'本场结束 · '}最终 ${myStackNow} 筹码</div>`
         : `<div class="pk-delta ${delta>=0?'up':'down'}">${delta>=0?'+':''}${delta} 筹码</div>`;
 
-      // 底部按钮: guest 等房主; 本场终结(仅单机)给"再来一局"; 其余(单机 & 联机 host)全自动开下一手,
-      //   不设手动"下一手"按钮 —— 只显示倒计时(非可点), 到点自动发牌。想停手就点"收工"。
+      // 底部按钮: 破产离桌(guest 输光)→ 只给"离桌"; guest 常规→等房主; 本场终结(单机)→"再来一局";
+      //   其余(单机 & 联机 host)全自动开下一手, 只显示倒计时(非可点), 到点自动发牌, 想停手点"收工"。
       let footer;
-      if (isGuest){
+      if (iLeaveNow){
+        footer = `<button class="pk-b call" id="pkLeave">离桌</button>`;
+      } else if (isGuest){
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>`;
       } else if (matchOver){
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
@@ -743,11 +754,11 @@
         <div class="pk-row" style="margin-top:6px">${footer}</div>`;
       els.felt.appendChild(over);
       if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
-      else if(iBust){ sfx('void'); vibrate([90,60,90]); }
+      else if(busted){ sfx('void'); vibrate([90,60,90]); }
       else if(delta<0){ sfx('void'); vibrate(90); }
 
       // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
-      //   联机有其他真人时给多一点时间读结算(5s), 纯单机 3s。
+      //   联机有其他真人时给多一点时间读结算(5s), 纯单机 3s。破产离桌不自动进下一手。
       let autoT=null;
       function stopAuto(){ if(autoT){ clearInterval(autoT); autoT=null; } }
       if (!isGuest && !matchOver){
@@ -761,7 +772,12 @@
       }
       const restartBtn = over.querySelector('#pkRestart');
       if (restartBtn) restartBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); resetMatch(); });
-      over.querySelector('#pkDone').addEventListener('click', ()=>{ stopAuto(); close(); });
+      // 破产离桌: 通知 app.js 把我的席位腾空(gtLeave), 再拆本地牌桌。
+      const leaveBtn = over.querySelector('#pkLeave');
+      if (leaveBtn) leaveBtn.addEventListener('click', ()=>{ stopAuto();
+        if(typeof opts.onBust==='function'){ try{ opts.onBust(); }catch(_){} } close(); });
+      const doneBtn = over.querySelector('#pkDone');
+      if (doneBtn) doneBtn.addEventListener('click', ()=>{ stopAuto(); close(); });
 
       // 直播战报 + 结果回调
       const champSeat = (res.winnersBySeat||[])[0];
@@ -775,9 +791,35 @@
       if (minimized) updateChip();
     }
 
+    // ── 逐手重组牌手(host 权威): 中途有人坐下空位/离座 → 下一手边界应用, 绝不打断本手 ──
+    //   我这席(mySeat)永远固定不动; 空位/AI/灵魂席由本机 AI 顶位, 有真人坐下则换真人 + 全新买入 START。
+    //   引擎座位数(n)固定不变(德州 seat_count 恒定), 只切换每席"真人 remote / 本机 AI"的驱动方, 座号不错位。
+    let pendingRoster = null;
+    function updateRoster(A){
+      if (isGuest || !A || !Array.isArray(A.names) || A.names.length !== n) return;
+      pendingRoster = A;
+    }
+    function applyPendingRoster(){
+      const A = pendingRoster; pendingRoster = null;
+      if (!A) return;
+      for (let s=0; s<n; s++){
+        if (s === mySeat) continue;                 // 我这席不受名册改动影响
+        const wasHuman = !isAI[s], nowHuman = !A.isAI[s];
+        names[s]   = A.names[s];
+        avatars[s] = A.avatars[s];
+        isAI[s]    = A.isAI[s];
+        if (ids) ids[s] = A.ids[s] || null;
+        if (A.souls) souls[s] = A.souls[s];
+        if (!wasHuman && nowHuman) stacks[s] = START;   // 新真人坐下: 全新买入
+      }
+      personaBySeat = names.map((_, seat) => personaFor(seat));
+      remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
+    }
+
     function nextHand(){
-      // 写回筹码 → 开新一手
+      // 写回筹码 → (应用中途加入/离座名册变化) → 开新一手
       st.players.forEach(p=> stacks[p.seat]=p.stack);
+      applyPendingRoster();
       button = (button+1)%n;
       handNo++;
       st = newHand();
@@ -869,7 +911,7 @@
     // 单机: 开局先走灵魂入座序列, 到齐后 beginFirstHand 发第一手
     if (introSeating) runSeatingIntro();
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
-      applyMove, resync, applySnapshot, feedHand, mySeat:()=>mySeat,
+      applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
