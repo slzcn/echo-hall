@@ -34,3 +34,35 @@ for (const [name, globalName, factoryName, keys] of modules) {
   if (!rejected) throw new Error(`${name}: missing dependency was not rejected`);
   console.log(`PASS ${name}: ${keys.length} dependencies, frozen, missing-dependency guard`);
 }
+
+// 回归：Supabase 客户端在 app.js 解析时有意为 null，bootSupabase() 稍后才赋值。
+// createPrefetch 必须延迟读取最新客户端，不能在工厂创建时捕获 null 并中断整份 app.js。
+(async function testLateSupabaseInit() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateSb = null;
+  let soulsCalls = 0;
+  let rpcCalls = 0;
+  const prefetch = lobby.createPrefetch({
+    getSb: () => lateSb,
+    prefetchCache: {},
+    prefetchSouls: () => { soulsCalls += 1; },
+    readN: () => 12,
+    readTtl: () => 60000,
+  });
+  const beforeBoot = await prefetch.prefetchRoom('late-room', 'official');
+  if (!Array.isArray(beforeBoot) || beforeBoot.length !== 0 || soulsCalls !== 0) {
+    throw new Error('lobby: prefetch before Supabase boot must safely return []');
+  }
+  lateSb = {
+    rpc: async (name, args) => {
+      rpcCalls += 1;
+      if (name !== 'eh_public_recent' || args.rid !== 'late-room' || args.lim !== 12) throw new Error('lobby: late Supabase arguments mismatch');
+      return { data: [{ id: 7 }] };
+    },
+  };
+  const afterBoot = await prefetch.prefetchRoom('late-room', 'official');
+  if (afterBoot.length !== 1 || afterBoot[0].id !== 7 || soulsCalls !== 1 || rpcCalls !== 1) {
+    throw new Error('lobby: late Supabase client was not read at call time');
+  }
+  console.log('PASS lobby: late Supabase init is resolved at prefetch call time');
+})().catch(err => { console.error(err); process.exitCode = 1; });

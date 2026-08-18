@@ -45,19 +45,21 @@
     return s;
   }
 
-  // 带依赖注入的预取工厂：由 app.js 把 sb、缓存对象、调优参数、灵魂预取函数传进来，
-  // 避免直接读取 window 隐式全局，后续改变依赖不用改模块。
+  // 带依赖注入的预取工厂：sb 是延迟初始化资源，必须在每次预取时通过 getSb() 读取最新值，
+  // 不能在 app.js 解析阶段捕获当时仍为 null 的 sb。
   function createPrefetch(deps) {
     deps = deps || {};
-    var sb = deps.sb;
+    var getSb = deps.getSb;
     var prefetchCache = deps.prefetchCache;
     var prefetchSouls = deps.prefetchSouls;
     var readN = deps.readN;
     var readTtl = deps.readTtl;
-    if (!sb || !prefetchCache || typeof prefetchSouls !== 'function' || typeof readN !== 'function' || typeof readTtl !== 'function') {
+    if (typeof getSb !== 'function' || !prefetchCache || typeof prefetchSouls !== 'function' || typeof readN !== 'function' || typeof readTtl !== 'function') {
       throw new TypeError('[EH_LOBBY] createPrefetch missing dependencies');
     }
     function prefetchRoom(rid, kind) {
+      var sb = getSb();
+      if (!sb) return Promise.resolve([]);   // Supabase 尚未 boot：不抛错、不阻断 app.js，渲染链路稍后会重试。
       prefetchSouls(rid);   // 灵魂列表随消息历史一起预取(列表页错峰,不拖慢首屏)
       var hit = prefetchCache[rid];
       if (hit && Date.now() - hit.at < readTtl()) return hit.p;

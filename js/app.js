@@ -1594,7 +1594,7 @@ function prefetchSouls(rid){
 // prefetchRoom / prefetchAll 实现已迁入 js/modules/lobby.js，这里只做依赖注入。
 // prefetchCache 仍保留在 app.js 作用域内，因为 leaveRoom 会 delete 其中房间的预取项。
 const { prefetchRoom, prefetchAll } = window.EH_LOBBY_MODULE.createPrefetch({
-  sb,
+  getSb: () => sb,
   prefetchCache,
   prefetchSouls,
   readN: PREFETCH_N,
