@@ -170,6 +170,11 @@
       var tp=document.createElement('span'); tp.className='gt-tip';
       tp.textContent = ctx.iAmPlaying ? '你在这局里' : '对局进行中';
       foot.appendChild(tp);
+      // host 随时可散桌: 防"开局后房主离开→桌永远卡 playing"的僵尸桌
+      if(ctx.isHost){
+        var pc=document.createElement('button'); pc.className='gt-btn ghost'; pc.textContent='散桌';
+        pc.onclick=function(){ ctx.actions.close(); }; foot.appendChild(pc);
+      }
       if(ctx.iAmPlaying){
         var enter=document.createElement('button'); enter.className='gt-btn go'; enter.textContent='进入牌桌 ▶';
         enter.onclick=function(){ ctx.actions.enter(); }; foot.appendChild(enter);

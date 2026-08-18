@@ -411,7 +411,9 @@
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
     }
     const onResize = ()=>layoutHand();
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); }
+    let _exited=false;
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+      if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
     window.addEventListener('resize', onResize);
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回到牌桌) ──

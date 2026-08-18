@@ -57,9 +57,9 @@ assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260818-solo-flow'/.test(HTML), 'index.html BUILD_VER=20260818-solo-flow');
-assert(/eh-sw-v320-20260818-solo-flow/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v320-solo-flow)');
-assert(/^20260818-solo-flow\s*$/.test(R('ver.txt')), 'ver.txt=20260818-solo-flow');
+assert(/BUILD_VER='20260818-table-reap'/.test(HTML), 'index.html BUILD_VER=20260818-table-reap');
+assert(/eh-sw-v321-20260818-table-reap/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v321-table-reap)');
+assert(/^20260818-table-reap\s*$/.test(R('ver.txt')), 'ver.txt=20260818-table-reap');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

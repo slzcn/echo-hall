@@ -1127,7 +1127,8 @@ let presChan = null;       // Realtime presence 频道
 let gtChan = null;         // Realtime 联机牌桌频道(eh_game_tables 座位/局态变化)
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } try{ _gtStopPing(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
 //       (2) host 每 8s 发一次 host_ping; guest 15s 未收到 → 判定房主离线, 锁 UI 提醒;
@@ -2343,6 +2344,12 @@ async function setupGameTables(room){
         const mine=(row.seats||[]).some(s=>s.kind==='human'&&s.uid===myUid);
         if(mine) gtEnter(row.id);
       }
+      // 房主散桌(→closed): 我是这桌的客人且正开着牌桌浮层 → 拆场退回, 别让客人卡在死局里
+      if(row.status==='closed' && _gtActiveTable && _gtActiveTable.id===row.id && !_gtActiveTable.host){
+        try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
+        _gtCleanupPlay();
+        try{ toast('房主已散桌'); }catch(_){}
+      }
     }).subscribe();
   try{ const {data}=await sb.from('eh_game_tables').select('*').eq('room_id',room.id).in('status',['lobby','playing']);
     (data||[]).forEach(r=>{ _gtTables.set(r.id,r); gtRenderCard(r); }); }catch(_){}
@@ -2471,6 +2478,7 @@ function gtLaunchPoker(row){
   gtBindConnStatus(chan);
   gtStartHostPing(chan);
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+  _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHPokerGame.open({
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
@@ -2483,8 +2491,11 @@ function gtLaunchPoker(row){
       ehStashLastGame('nlhe', res, log, A.names, meta);
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       postTexasResult(res,A.names,meta).catch(()=>{});
-      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+      // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
+      // 重连者被踢、唯一活桌索引提前释放而重复开桌)。牌桌保持 playing, 只在房主"收工"(onExit)时散桌。
     },
+    // 房主收工 → 引擎权威消失, 必须散桌(置 closed 释放唯一活桌索引 + 通知在座 guest 清场)。
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },
   });
 }
 // ── 德州联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己底牌; 出牌发回 host 权威校验。──
@@ -2507,10 +2518,12 @@ function gtEnterPoker(row){
     });
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   gtWatchHostPing(chan, row.host_uid);
+  _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHPokerGame.open({
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可从卡片"进入牌桌"重进)
   });
   setTimeout(pull, 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次底牌
 }
@@ -2542,6 +2555,7 @@ function gtLaunchGuandan(row){
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtBindConnStatus(chan);
   gtStartHostPing(chan);
+  _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
     names:A.names, avatars:A.avatars, isAI:A.isAI,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
@@ -2554,8 +2568,9 @@ function gtLaunchGuandan(row){
       ehStashLastGame('gd', res, log, A.names, meta);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
-      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});   // 掼蛋"一整副=一次 onResult"=真终局
     },
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
 }
 // ── 掼蛋联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 出牌发回 host 权威校验。──
@@ -2585,10 +2600,12 @@ function gtEnterGuandan(row){
     });
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   gtWatchHostPing(chan, row.host_uid);
+  _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHGuandanGame.open({
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
   setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
 }
@@ -2621,6 +2638,7 @@ function gtLaunchDdz(row){
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtBindConnStatus(chan);
   gtStartHostPing(chan);
+  _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
     names:A.names, avatars:A.avatars, isAI:A.isAI,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
@@ -2633,8 +2651,9 @@ function gtLaunchDdz(row){
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       postDdzResult(res, A.names).catch(()=>{});
       ehStashLastGame('ddz', res, log, A.names, meta);
-      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});
+      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});   // 斗地主"一整副=一次 onResult"=真终局
     },
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
 }
 // ── 斗地主联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 叫分/出牌/不出发回 host 权威校验。──
@@ -2663,10 +2682,12 @@ function gtEnterDdz(row){
     });
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   gtWatchHostPing(chan, row.host_uid);
+  _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHDdzGame.open({
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
   setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
 }
