@@ -47,7 +47,8 @@
     --av:74px;--avf:34px;--seatw:140px;--chip:14px;--maxw:860px}
   .pk-felt{justify-content:center}}
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.pk-bar{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--line,rgba(0,229,212,.24));flex-shrink:0}
+.pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
+  padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
 .pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .pk-blinds{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
@@ -149,15 +150,23 @@
 .pk-b.raise.allin{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);color:#fff;box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6))}
 .pk-b .bt{font-size:11px;font-weight:700;opacity:.85;display:block}
 /* 结算 */
-.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-  background:rgba(4,6,12,.86);backdrop-filter:blur(3px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
+.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
+.pk-over-card{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);box-sizing:border-box;
+  padding:22px 20px 18px;border-radius:20px;animation:pkOverCard .28s cubic-bezier(.2,.9,.3,1) both;
+  background:linear-gradient(180deg,rgba(19,42,41,.66),rgba(6,12,18,.72));border:1px solid var(--line2,rgba(0,229,212,.4));
+  box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
+.pk-over.win .pk-over-card{border-color:rgba(255,194,77,.5);box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 34px rgba(255,194,77,.14),inset 0 1px 0 rgba(255,255,255,.06)}
+@keyframes pkOverCard{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+.pk-over-card .pk-row{width:100%}
 .pk-over h2{font-size:26px;margin:0;letter-spacing:.06em;font-weight:900}
 .pk-over.win h2{color:var(--amber,#ffc24d);text-shadow:0 0 18px rgba(255,194,77,.6)}
 .pk-over.lose h2{color:var(--sub)}
 .pk-over .pk-delta{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
 .pk-over .pk-delta.up{color:var(--accent)}.pk-over .pk-delta.down{color:var(--magenta,#ff2d8e)}
 /* 摊牌行改对齐网格: 标记/名字/底牌/牌型四列跨行对齐(旧的逐行居中会因赢家多个🏆而参差不齐)。 */
-.pk-over .pk-showrows{display:inline-grid;grid-template-columns:16px auto auto auto;gap:8px 11px;align-items:center;font-size:12px;color:var(--sub);max-width:94%}
+.pk-over .pk-showbox{width:100%;display:flex;justify-content:center;border-top:1px solid var(--line,rgba(0,229,212,.24));padding-top:14px;margin-top:2px}
+.pk-over .pk-showrows{display:inline-grid;grid-template-columns:16px auto auto auto;gap:10px 12px;align-items:center;font-size:12px;color:var(--sub);max-width:100%}
 .pk-over .pk-showrows .mk{text-align:center;font-size:13px}
 .pk-over .pk-showrows .nm{justify-self:start;white-space:nowrap;font-weight:600}
 .pk-over .pk-showrows .nm.won{color:var(--ink)}
@@ -748,10 +757,12 @@
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkAuto" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
       over.innerHTML=`
-        <h2>${h2}</h2>
-        ${subLine}
-        <div class="pk-showrows">${rowsHtml}</div>
-        <div class="pk-row" style="margin-top:6px">${footer}</div>`;
+        <div class="pk-over-card">
+          <h2>${h2}</h2>
+          ${subLine}
+          <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
+          <div class="pk-row" style="margin-top:2px">${footer}</div>
+        </div>`;
       els.felt.appendChild(over);
       if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
       else if(busted){ sfx('void'); vibrate([90,60,90]); }

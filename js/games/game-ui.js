@@ -71,7 +71,8 @@
   .ddz-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
   .ddz-acts{gap:14px}}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.ddz-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line,rgba(0,229,212,.24));flex-shrink:0}
+.ddz-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .ddz-mult{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 8px;border:1px solid var(--line);border-radius:999px}

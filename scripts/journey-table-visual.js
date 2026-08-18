@@ -56,10 +56,21 @@ assert(/\.ddz-room \.tchat-toggle[\s\S]{0,20}\.gd-room  \.tchat-toggle[\s\S]{0,2
 assert(/\.ddz-hand-wrap[\s\S]{0,40}\.gd-hand-wrap[\s\S]{0,240}rgba\(0,\s*0,\s*0,\s*\.28\)/.test(SHARED),
   'table-shared.css 手牌区补了底部渐隐托盘感');
 
+// C2. 三桌顶栏必须吃 iOS 状态栏安全区(env(safe-area-inset-top)) —— 治真机顶栏与系统时钟/电量撞车
+//     (反回退: 曾因游戏浮层只补 inset-bottom, 顶栏滑到刘海下与 23:00🛏/信号/电量叠成一团)
+assert(/\.pk-bar\{[^}]*env\(safe-area-inset-top/.test(PK), '德州顶栏 pk-bar 补了 safe-area-inset-top');
+assert(/\.gd-bar\{[^}]*env\(safe-area-inset-top/.test(GD), '掼蛋顶栏 gd-bar 补了 safe-area-inset-top');
+assert(/\.ddz-bar\{[^}]*env\(safe-area-inset-top/.test(DDZ), '斗地主顶栏 ddz-bar 补了 safe-area-inset-top');
+
+// C3. 德州结算不再是浮在纯黑上的裸文字, 收进带边框的面板卡(.pk-over-card)
+assert(/\.pk-over-card\{/.test(PK), 'poker-ui 定义结算面板卡 .pk-over-card(治浮空/死黑)');
+assert(/class="pk-over-card"/.test(PK), 'showOver 把结算内容包进 .pk-over-card');
+assert(/\.pk-over \.pk-showbox\{[^}]*border-top/.test(PK), '结算摊牌区上方有分隔线(pk-showbox border-top)');
+
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260818-real-table'/.test(HTML), 'index.html BUILD_VER=20260818-real-table');
-assert(/eh-sw-v324-20260818-real-table/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v324-real-table)');
-assert(/^20260818-real-table\s*$/.test(R('ver.txt')), 'ver.txt=20260818-real-table');
+assert(/BUILD_VER='20260818-safe-top'/.test(HTML), 'index.html BUILD_VER=20260818-safe-top');
+assert(/eh-sw-v325-20260818-safe-top/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v325-safe-top)');
+assert(/^20260818-safe-top\s*$/.test(R('ver.txt')), 'ver.txt=20260818-safe-top');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){
