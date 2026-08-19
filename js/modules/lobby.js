@@ -187,5 +187,56 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial });
+  // 公开房间列表渲染：Supabase 通过 getter 延迟读取，避免模块初始化早于 bootSupabase。
+  function createRenderPublic(deps) {
+    deps = deps || {};
+    var getSb = deps.getSb;
+    var roomsQuery = deps.roomsQuery;
+    var getBox = deps.getBox;
+    var getEmpty = deps.getEmpty;
+    var chSkel = deps.chSkel;
+    var fillRoomStats = deps.fillRoomStats;
+    var prefetchAll = deps.prefetchAll;
+    var getConfig = deps.getConfig;
+    var roomAccentC = deps.roomAccentC;
+    var esc = deps.esc;
+    var safeEmoji = deps.safeEmoji;
+    var autoTopic = deps.autoTopic;
+    var bindRoomCards = deps.bindRoomCards;
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof autoTopic !== 'function' || typeof bindRoomCards !== 'function') {
+      throw new TypeError('[EH_LOBBY] createRenderPublic missing dependencies');
+    }
+    return async function renderPublic(soft) {
+      var box = getBox();
+      var empty = getEmpty();
+      if (!box || !empty) return { failed: true };
+      if (soft && box.querySelector('.ch[data-rid]')) {
+        box.querySelectorAll('.ch[data-rid]').forEach(function (c) { fillRoomStats(box, c.dataset.rid); });
+        prefetchAll(Array.from(box.querySelectorAll('.ch[data-rid]')).map(function (c) { return { id: c.dataset.rid, kind: 'public' }; }));
+        return;
+      }
+      if (!box.children.length) box.innerHTML = chSkel(2);
+      var sb = getSb();
+      if (!sb) return { failed: true };
+      var result = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind', 'public').eq('archived', false).order('created_at', { ascending: false }));
+      if (result.__timeout) return { failed: true };
+      var data = result.data;
+      var cfg = (getConfig() && getConfig().lobbyDisplay) || {};
+      if (cfg.publicVisible === false) { box.innerHTML = ''; empty.style.display = 'none'; return; }
+      if (!data || !data.length) { box.innerHTML = ''; empty.style.display = 'block'; return; }
+      empty.style.display = 'none';
+      box.innerHTML = data.map(function (r) {
+        return '<div class="ch" data-rid="' + r.id + '" data-nm="' + esc(r.name) + '" data-em="' + safeEmoji(r.emoji) + '" data-kind="public" style="--ch-c:' + roomAccentC(Object.assign({}, r, { kind: 'public' })) + '">' +
+          '<div class="tagk">公开</div><div class="icon">' + safeEmoji(r.emoji) + '</div><h3>' + esc(r.name) + '</h3>' +
+          '<div class="desc">' + esc(r.topic || autoTopic(r.name)) + '</div>' +
+          '<div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>' +
+          '<div class="preview empty" data-prev>加载中…</div></div>';
+      }).join('');
+      bindRoomCards(box);
+      data.forEach(function (r) { fillRoomStats(box, r.id); });
+      prefetchAll(data.map(function (r) { return { id: r.id, kind: 'public' }; }));
+    };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic });
 })(window);

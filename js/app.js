@@ -1375,30 +1375,21 @@ const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial({
   safeEmoji,
   bindRoomCards,
 });
-async function renderPublic(soft){
-  const box=$('#publicRooms'), empty=$('#publicEmpty');
-  if(soft && box.querySelector('.ch[data-rid]')){
-    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
-    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'public'})));
-    return;
-  }
-  if(!box.children.length) box.innerHTML=chSkel(2);   // 慢网先占位
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','public').eq('archived',false).order('created_at',{ascending:false}));
-  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
-  const { data } = _r;
-  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
-  if(cfg.publicVisible===false){ box.innerHTML=''; empty.style.display='none'; return; }
-  if(!data || !data.length){ box.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
-  box.innerHTML=data.map(r=>`<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="public" style="--ch-c:${roomAccentC({...r,kind:'public'})}">
-    <div class="tagk">公开</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(r.name)}</h3>
-    <div class="desc">${esc(r.topic||autoTopic(r.name))}</div>
-    <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
-    <div class="preview empty" data-prev>加载中…</div></div>`).join('');
-  bindRoomCards(box);
-  (data||[]).forEach(r=>fillRoomStats(box, r.id));
-  prefetchAll((data||[]).map(r=>({id:r.id,kind:'public'})));
-}
+const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
+  getSb:()=>sb,
+  roomsQuery,
+  getBox:()=>$('#publicRooms'),
+  getEmpty:()=>$('#publicEmpty'),
+  chSkel,
+  fillRoomStats: (...args)=>fillRoomStats(...args),
+  prefetchAll: (...args)=>prefetchAll(...args),
+  getConfig:()=>EH_CONFIG,
+  roomAccentC,
+  esc,
+  safeEmoji,
+  autoTopic,
+  bindRoomCards,
+});
 // 相对时间: 刚刚/N分钟前/N小时前/N天前
 function fmtAgo(ts){
   const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);

@@ -97,3 +97,51 @@ for (const [name, globalName, factoryName, keys] of modules) {
   if (prefetchCalls !== 1) throw new Error('lobby: fillRoomStats did not use late Supabase client');
   console.log('PASS lobby: fillRoomStats resolves late Supabase at call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
+
+
+// 回归：renderPublic 创建时 sb 尚未 boot，调用时才读取最新客户端，并按公开房间查询。
+(async function testLateSupabaseForPublicRender() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateSb = null;
+  let queryArgs = null;
+  let fillCalls = 0;
+  const box = { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] };
+  Object.defineProperty(box, 'children', { get: () => box.innerHTML ? [{}] : [] });
+  const empty = { style: {} };
+  const render = lobby.createRenderPublic({
+    getSb: () => lateSb,
+    roomsQuery: async q => q,
+    getBox: () => box,
+    getEmpty: () => empty,
+    chSkel: () => '<skeleton>',
+    fillRoomStats: () => { fillCalls += 1; },
+    prefetchAll: () => {},
+    getConfig: () => ({}),
+    roomAccentC: () => '#000',
+    esc: value => String(value),
+    safeEmoji: value => value || '○',
+    autoTopic: () => '默认话题',
+    bindRoomCards: () => {},
+  });
+  const beforeBoot = await render(false);
+  if (!beforeBoot || !beforeBoot.failed) throw new Error('lobby: public render before Supabase boot must fail safely');
+  lateSb = {
+    from: table => ({
+      select: fields => ({
+        eq: (field, value) => ({
+          eq: (field2, value2) => ({
+            order: (field3, options) => {
+              queryArgs = { table, fields, field, value, field2, value2, field3, options };
+              return Promise.resolve({ data: [] });
+            },
+          }),
+        }),
+      }),
+    }),
+  };
+  await render(false);
+  if (!queryArgs || queryArgs.table !== 'eh_rooms' || queryArgs.value !== 'public' || queryArgs.value2 !== false || queryArgs.options.ascending !== false || fillCalls !== 0) {
+    throw new Error('lobby: public render did not use late Supabase client or public query');
+  }
+  console.log('PASS lobby: renderPublic resolves late Supabase at call time');
+})().catch(err => { console.error(err); process.exitCode = 1; });
