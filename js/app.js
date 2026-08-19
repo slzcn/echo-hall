@@ -1376,11 +1376,8 @@ const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
 // 相对时间格式化已迁入大厅模块，保留本地引用以兼容现有调用点。
 const fmtAgo = window.EH_LOBBY_MODULE.fmtAgo;
 // 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
-function optimisticCnt(room){
-  const k=room&&room.knownOnline;
-  if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
-  return '<span class="cnt-led" id="cntLed"></span>连接中…';
-}
+// 进房瞬间的乐观在线数文案已迁入大厅模块：保留本地引用以兼容现有调用点。
+const optimisticCnt = window.EH_LOBBY_MODULE.optimisticCnt;
 const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
   getNavigator:()=>navigator,
   getDocument:()=>document,
@@ -6658,6 +6655,12 @@ async function launchTexas(){
 // 静默(不 toast, 不因空手拦截): 无空位/无灵魂时直接返回, 剩余空位交给本机 AI 代打。仅 host 招募中有效。
 async function gtSeatSoulsIntoEmpties(row){
   if(!row || row.status!=='lobby' || row.host_uid!==myUid) return 0;
+  // ★竞态修: roomSouls 是进房后异步 RPC(eh_room_souls)才灌上的内存名册。临时用户"刚飘入就点开始"时它可能还空,
+  //   于是一个灵魂都没坐进去 → 空位被 eh_gt_start 兜底成"机器人1/机器人2"🤖(主人反馈"点开始是机器人在玩不是灵魂")。
+  //   补位前先兜底: 名册空就当场拉一次(await 到位)再坐; 拉完仍空才认这房真没灵魂, 空位才交给本机 AI。
+  if((!roomSouls || !roomSouls.length) && curRoom && curRoom.id){
+    try{ await loadRoomSouls(curRoom.id); }catch(_){}
+  }
   const seated=new Set((row.seats||[]).filter(s=>s&&s.kind==='soul'&&s.uid).map(s=>s.uid));
   const empties=(row.seats||[]).filter(s=>s&&s.kind==='empty'&&typeof s.seat==='number').map(s=>s.seat).sort((a,b)=>a-b);
   const souls=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid&&!seated.has(s.auth_uid));

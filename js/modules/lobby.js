@@ -54,6 +54,17 @@
     return Math.floor(s / 86400) + '天前';
   }
 
+  // 进房瞬间的乐观在线数文案：已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖。
+  // 纯函数：仅依赖入参 room.knownOnline，无外部运行时耦合。
+  function optimisticCnt(room) {
+    var k = room && room.knownOnline;
+    if (k != null && k >= 0) {
+      var n = k + 1;
+      return '<span class="cnt-led" id="cntLed"></span>~ <b>' + n + '</b> 人在线';
+    }
+    return '<span class="cnt-led" id="cntLed"></span>连接中…';
+  }
+
   // 从房间卡 .cnt 文案读取已知在线数：纯 DOM 辅助，不依赖大厅运行时状态。
   function readKnownOnline(cardEl) {
     try {
@@ -444,5 +455,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);

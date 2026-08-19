@@ -60,6 +60,15 @@ if (knownOnline !== 12 || context.window.EH_LOBBY_MODULE.readKnownOnline({ query
 }
 console.log('PASS lobby: readKnownOnline pure helper is exported');
 
+if (typeof context.window.EH_LOBBY_MODULE.optimisticCnt !== 'function') throw new Error('lobby: optimisticCnt missing');
+const cntWithKnown = context.window.EH_LOBBY_MODULE.optimisticCnt({ knownOnline: 4 });
+if (!/~ <b>5<\/b> 人在线/.test(cntWithKnown)) throw new Error('lobby: optimisticCnt known value mismatch: ' + cntWithKnown);
+const cntUnknown = context.window.EH_LOBBY_MODULE.optimisticCnt({});
+if (!/连接中…/.test(cntUnknown)) throw new Error('lobby: optimisticCnt fallback mismatch: ' + cntUnknown);
+const cntNull = context.window.EH_LOBBY_MODULE.optimisticCnt(null);
+if (!/连接中…/.test(cntNull)) throw new Error('lobby: optimisticCnt null-room fallback mismatch: ' + cntNull);
+console.log('PASS lobby: optimisticCnt pure helper is exported');
+
 // 回归：查询超时实现可能晚于大厅模块装配；未就绪时安全失败，就绪后读取最新函数并保留超时兜底。
 (async function testLateRuntimeForRoomsQuery() {
   const lobby = context.window.EH_LOBBY_MODULE;
