@@ -287,4 +287,11 @@ assert(/rowAt\(y\)/.test(ui), 'handCardAt 先按 y 命中所在排再按 x 命�
 assert(/setArrange\(!arrangeMode\)/.test(ui), '长按≥350ms 切手动理牌模式(与一键共用一个按钮)');
 assert(/rows=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一局重置理牌态(不带旧两排序进新副)');
 
+// ── #61 三家一致: 一副打完 onResult 不再标 done ──────────────
+// 反回退: 曾在 onResult 里 set_state done, 导致「打下一副」(本机 newDeal 就地续桌)后 DB 却是 done →
+// 唯一活桌索引被释放(可重复开桌) + 刷新/重连的 guest 翻到 done 进不来。改为只在房主收工 onExit 时 gtClose。
+const GTL_GD = (src.match(/function gtLaunchGuandan\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(!/p_status:\s*'done'/.test(GTL_GD), 'gtLaunchGuandan onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
+assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_GD), 'gtLaunchGuandan 只在房主收工 onExit 时 gtClose 散桌(桌子随打下一副一直活着)');
+
 console.log('\n✅ 掼蛋旅程全部通过');

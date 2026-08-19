@@ -2512,7 +2512,9 @@ function gtLaunchGuandan(row){
       ehStashLastGame('gd', res, log, A.names, meta);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
-      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});   // 掼蛋"一整副=一次 onResult"=真终局
+      // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
+      // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
+      // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
@@ -2595,7 +2597,9 @@ function gtLaunchDdz(row){
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       postDdzResult(res, A.names).catch(()=>{});
       ehStashLastGame('ddz', res, log, A.names, meta);
-      gtRpc('eh_gt_set_state',{p_table:row.id,p_state:null,p_status:'done'});   // 斗地主"一整副=一次 onResult"=真终局
+      // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
+      // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
+      // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });

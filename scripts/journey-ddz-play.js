@@ -207,4 +207,11 @@ assert(/function handCardAt\([\s\S]{0,200}getBoundingClientRect/.test(ui) && !/f
   'handCardAt 按 x 命中露出的那张(不用 elementFromPoint, 治叠放漏掉最左那张)');
 assert(/el\.dataset\.idx = idx/.test(ui), '每张牌带 data-idx(划选连选补齐整段的依据)');
 
+// ── #61 三家一致: 一副打完 onResult 不再标 done ──────────────
+// 反回退: 曾在 onResult 里 set_state done, 导致「再来一局」(本机 newDeal 就地续桌)后 DB 却是 done →
+// 唯一活桌索引被释放(可重复开桌) + 刷新/重连的 guest 翻到 done 进不来。改为只在房主收工 onExit 时 gtClose。
+const GTL_DDZ = (src.match(/function gtLaunchDdz\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(!/p_status:\s*'done'/.test(GTL_DDZ), 'gtLaunchDdz onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
+assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_DDZ), 'gtLaunchDdz 只在房主收工 onExit 时 gtClose 散桌(桌子随再来一局一直活着)');
+
 console.log('\n✅ 斗地主旅程全部通过');
