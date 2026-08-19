@@ -1362,35 +1362,19 @@ function lobbyShowRetry(){
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
 const chSkel = window.EH_LOBBY_MODULE.chSkel;   // 房间卡片骨架已迁入 js/modules/lobby.js
 const rmSkel = window.EH_LOBBY_MODULE.rmSkel;
-async function renderOfficial(soft){
-  const box=$('#channels');
-  // soft 刷新: 只有真实房间卡已渲染时才静默刷新。骨架节点也会占 children，不能拿它判断内容已就绪。
-  if(soft && box.querySelector('.ch[data-rid]')){
-    box.querySelectorAll('.ch[data-rid]').forEach(c=>fillRoomStats(box, c.dataset.rid));
-    prefetchAll([...box.querySelectorAll('.ch[data-rid]')].map(c=>({id:c.dataset.rid,kind:'official'})));
-    return;
-  }
-  if(!box.children.length) box.innerHTML=chSkel(4);   // 慢网先占位, 不留空白
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,topic').eq('kind','official').order('created_at'));
-  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试, 不清空也不卡死
-  const { data } = _r;   // ★修复: 之前漏解构 data, 官方房渲染读到悬空/全局 data → 首页官方频道空白
-  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
-  const om=(cfg.official&&typeof cfg.official==='object')?cfg.official:{};
-  const visible=(data||[]).map(r=>({r, o:om[r.name]||{}})).filter(x=>x.o.visible!==false);
-  visible.sort((a,b)=>(Number.isFinite(+a.o.order)?+a.o.order:9999)-(Number.isFinite(+b.o.order)?+b.o.order:9999));
-  box.innerHTML=visible.map(({r,o})=>{
-    const c=roomAccentC({...r,kind:'official'});
-    const title=o.title||r.name, desc=o.desc!=null?o.desc:(r.topic||'');
-    return `<div class="ch" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="official" style="--ch-c:${c}">
-      <div class="tagk">官方</div><div class="icon">${safeEmoji(r.emoji)}</div><h3>${esc(title)}</h3>
-      <div class="desc">${esc(desc)}</div>
-      <div class="live"><span class="pulse"></span><span class="cnt">…</span><span class="tm"></span></div>
-      <div class="preview empty" data-prev>加载中…</div></div>`;
-  }).join('');
-  bindRoomCards(box);
-  (data||[]).forEach(r=>fillRoomStats(box, r.id));
-  prefetchAll((data||[]).map(r=>({id:r.id,kind:'official'})));
-}
+const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial({
+  getSb:()=>sb,
+  roomsQuery,
+  getBox:()=>$('#channels'),
+  chSkel,
+  fillRoomStats: (...args)=>fillRoomStats(...args),
+  prefetchAll: (...args)=>prefetchAll(...args),
+  getConfig:()=>EH_CONFIG,
+  roomAccentC,
+  esc,
+  safeEmoji,
+  bindRoomCards,
+});
 async function renderPublic(soft){
   const box=$('#publicRooms'), empty=$('#publicEmpty');
   if(soft && box.querySelector('.ch[data-rid]')){
