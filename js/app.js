@@ -3000,7 +3000,7 @@ function buildGameEl(m){
     const again=el.querySelector('[data-ddz-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchDoudizhu(); }catch(_){} };
     const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay(); }catch(_){} };
+    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('ddz'); }catch(_){} };
     return el;
   }
   // 🎴 掼蛋战绩卡: game|gd|<win|lose>|<advance>|<fromLvl>|<toLvl>|<doubleDown 0/1>|<matchWon 0/1>|<myRankIdx 0-3>|<bombs>|<队友名…>
@@ -3028,7 +3028,7 @@ function buildGameEl(m){
     const again=el.querySelector('[data-gd-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchGuandan(); }catch(_){} };
     const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay(); }catch(_){} };
+    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('gd'); }catch(_){} };
     return el;
   }
   // 🎰 德州扑克战绩卡: game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
@@ -3051,7 +3051,7 @@ function buildGameEl(m){
     const again=el.querySelector('[data-nlhe-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchTexas(); }catch(_){} };
     const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay(); }catch(_){} };
+    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('nlhe'); }catch(_){} };
     return el;
   }
   return null;
@@ -6674,8 +6674,32 @@ window.__ehLastGame = null;   // { game:'ddz|gd|nlhe', log, res, names, meta, at
 function ehStashLastGame(game, res, log, names, meta){
   try{ window.__ehLastGame = { game, log:(log||[]).slice(), res:res||null, names:(names||[]).slice(), meta:meta||null, at:Date.now() }; }catch(_){ }
 }
-function ehShowReplay(){
-  const g = window.__ehLastGame;
+// 回看入口: 内存(host 刚打完那局)优先; 访客/刷新过/被下一局覆盖/点的是旧卡 →
+// 回落到战绩库拉最近一局(可按游戏类型精准取)重建。这是"三家都看不了"的真修: 旧版只认
+// 内存 window.__ehLastGame(host-only + 刷新即丢 + 每局覆盖), 绝大多数点击都落空成"没有可回看的记录"。
+function ehShowReplay(preferGame){
+  const mem = window.__ehLastGame;
+  if(mem && mem.log && mem.log.length && (!preferGame || mem.game===preferGame)){ ehRenderReplay(mem); return; }
+  ehLoadReplayFromDb(preferGame).then(g=>{
+    if(!g || !g.log || !g.log.length){ try{ toast('没有可回看的记录 · 打完一局再来'); }catch(_){ } return; }
+    ehRenderReplay(g);
+  }).catch(()=>{ try{ toast('回看加载失败 · 稍后再试'); }catch(_){ } });
+}
+// 从战绩库拉当前房最近一局(可按 game 过滤)重建。res 留空交给引擎 replay 的终局 result 补齐,
+// 故访客(从不跑引擎、手里没有 res)也能出结算摘要。只取重建必需的 moves(权威 log)+ players(席位名)。
+async function ehLoadReplayFromDb(preferGame){
+  if(!sb || !curRoom) return null;
+  let q = sb.from('eh_game_results').select('game,players,moves,ended_at')
+    .eq('room_id', curRoom.id).order('ended_at',{ascending:false}).limit(1);
+  if(preferGame) q = q.eq('game', preferGame);
+  const { data, error } = await q;
+  if(error || !data || !data.length) return null;
+  const row = data[0];
+  if(!row.moves || !row.moves.length) return null;
+  const names=[]; (row.players||[]).forEach(pl=>{ if(pl && typeof pl.seat==='number') names[pl.seat]=pl.name||('席'+pl.seat); });
+  return { game: row.game, log: row.moves, res: null, names, meta:null, at:0 };
+}
+function ehRenderReplay(g){
   if(!g || !g.log || !g.log.length){ try{ toast('没有可回看的记录 · 打完一局再来'); }catch(_){ } return; }
   // 移除旧层
   const prev = document.querySelector('.eh-replay-modal'); if(prev) prev.remove();
@@ -6687,6 +6711,9 @@ function ehShowReplay(){
     replayed = engine.replay(g.log);
     if(!replayed || replayed.phase!=='over') throw new Error('日志未收敛到终局');
   }catch(e){ try{ toast('回看重建失败 · '+(e&&e.message?e.message:'日志不完整')); }catch(_){ } return; }
+  // 结算摘要: 内存 res 优先, 缺失(DB/访客回看)则取引擎重建的权威终局 result —— 两条路都能出结算行
+  const R = g.res || replayed.result || {};
+  const names = g.names || [];
   // 生成关键节点摘要
   let lines = [];
   try{
@@ -6696,9 +6723,9 @@ function ehShowReplay(){
       const bombs = g.log.filter(e=>e.t==='play' && e.cards && e.cards.length===4).length;   // 粗估
       const dealE = g.log.find(e=>e.t==='deal');
       lines.push(`🃏 斗地主 · seed=${dealE?dealE.seed:'?'}`);
-      if(bids.length){ lines.push('叫分: ' + bids.map(b=>(g.names[b.seat]||('席'+b.seat))+'='+b.val).join(' → ')); }
+      if(bids.length){ lines.push('叫分: ' + bids.map(b=>(names[b.seat]||('席'+b.seat))+'='+b.val).join(' → ')); }
       lines.push('总动作: ' + plays.length + ' 步' + (bombs?(' · 疑似炸弹 '+bombs):''));
-      if(g.res){ lines.push('结算: 地主=' + (g.names[g.res.landlord]||'?') + ' · 得分=' + (g.res.score||0) + ' ×' + (g.res.finalMultiplier||1)); }
+      if(R.landlord!=null){ lines.push('结算: 地主=' + (names[R.landlord]||'?') + ' · 得分=' + (R.score||0) + ' ×' + (R.finalMultiplier||1)); }
     } else if(g.game==='gd'){
       const plays = g.log.filter(e=>e.t==='play');
       const passes = g.log.filter(e=>e.t==='pass');
@@ -6706,7 +6733,7 @@ function ehShowReplay(){
       const dealE = g.log.find(e=>e.t==='deal');
       lines.push(`🎴 掼蛋 · 打 ${dealE?dealE.level:'?'} · seed=${dealE?dealE.seed:'?'}`);
       lines.push('出牌 ' + plays.length + ' 次 · 过牌 ' + passes.length + ' 次' + (bombs?(' · 炸弹 '+bombs):''));
-      if(g.res){ lines.push('结算: 胜方=' + (g.res.winnerTeam===0?'我方':'对方') + ' · 升级=' + (g.res.advance||0)); }
+      if(R.winnerTeam!=null){ lines.push('结算: 胜方=' + (R.winnerTeam===0?'我方':'对方') + ' · 升级=' + (R.advance||0)); }
     } else if(g.game==='nlhe'){
       const acts = g.log.filter(e=>e.t==='action');
       const streetCounts = {};
@@ -6714,10 +6741,10 @@ function ehShowReplay(){
       const dealE = g.log.find(e=>e.t==='deal');
       lines.push(`🎰 德州扑克 · seed=${dealE?dealE.seed:'?'}`);
       lines.push('总动作: ' + acts.length + ' 步 · 街分布: ' + Object.entries(streetCounts).map(([k,v])=>k+'='+v).join(' / '));
-      if(g.res){
-        const pot = (g.res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
-        const champ = (g.res.winnersBySeat||[]).map(x=>g.names[x]||('席'+x)).join('、');
-        lines.push('结算: 底池=' + pot + (champ?(' · 赢家=' + champ):'') + (g.res.wentToShowdown?' · 摊牌':' · 未摊牌'));
+      if(R.pots || R.winnersBySeat){
+        const pot = (R.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+        const champ = (R.winnersBySeat||[]).map(x=>names[x]||('席'+x)).join('、');
+        lines.push('结算: 底池=' + pot + (champ?(' · 赢家=' + champ):'') + (R.wentToShowdown?' · 摊牌':' · 未摊牌'));
       }
     }
   }catch(e){ lines.push('(摘要解析失败: '+e.message+')'); }

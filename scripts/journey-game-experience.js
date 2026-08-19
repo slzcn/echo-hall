@@ -29,6 +29,14 @@ assert(!/Notification\.requestPermission/.test(APP), '不主动弹通知授权�
 assert((APP.match(/data-eh-replay="1"/g)||[]).length===3, '斗地主/掼蛋/德州三张战绩卡都有回看按钮');
 assert(/window\.EHDdzEngine[\s\S]{0,160}window\.EHGuandanEngine[\s\S]{0,160}window\.EHPokerEngine/.test(APP), '回看按游戏选择正确引擎');
 assert(/engine\.replay\(g\.log\)/.test(APP) && /replayed\.phase!==['"]over['"]/.test(APP), '回看先调用 replay(log) 并校验终局，不以摘要冒充回看');
+// 「三家都看不了」真修: 内存 __ehLastGame 是 host-only + 刷新即丢 + 每局覆盖, 大多数点击落空。
+// 现按游戏类型传参, 内存缺失/不匹配时回落战绩库最近一局(eh_game_results.moves)重建, 访客/刷新后也能看。
+assert(/ehShowReplay\('ddz'\)/.test(APP) && /ehShowReplay\('gd'\)/.test(APP) && /ehShowReplay\('nlhe'\)/.test(APP),
+  '三张战绩卡按游戏类型调 ehShowReplay(DB 回落时按 game 精准取那一局)');
+assert(/async function ehLoadReplayFromDb\([\s\S]*?from\('eh_game_results'\)[\s\S]*?order\('ended_at'/.test(APP),
+  '内存没有时回落战绩库(eh_game_results)拉最近一局 moves 重建回看');
+assert(/const R = g\.res \|\| replayed\.result/.test(APP),
+  '结算摘要内存 res 优先, 缺失(访客/DB回看)取引擎重建终局 result —— 无 res 也能出结算行');
 
 function findChrome(){
   const cands=['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/Applications/Chromium.app/Contents/MacOS/Chromium',process.env.CHROME_PATH].filter(Boolean);
