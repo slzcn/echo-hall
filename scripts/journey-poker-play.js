@@ -107,6 +107,9 @@ assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里
 // 灵魂补位: 指定某席用座位下拉 seatSoul; 点「开始」即由 gtStart→gtSeatSoulsIntoEmpties 把空位补满房里灵魂(灵魂来玩, 非匿名 AI)。
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
 assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
+// #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
+const GTL_PK = (src.match(/function gtLaunchPoker\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/A\.remoteSeats\.indexOf\(payload\.seat\)<0\) return/.test(GTL_PK), 'gtLaunchPoker act 处理按 remoteSeats 白名单挡越权席(不代 host/AI/灵魂席出牌)');
 
 // 结束回调 → 战绩卡 + 落库(在 gtLaunchPoker 的 onResult 里, 名册取 A.names/A.avatars)
 assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');

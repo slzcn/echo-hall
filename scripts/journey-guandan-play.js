@@ -293,5 +293,7 @@ assert(/rows=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一�
 const GTL_GD = (src.match(/function gtLaunchGuandan\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(!/p_status:\s*'done'/.test(GTL_GD), 'gtLaunchGuandan onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
 assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_GD), 'gtLaunchGuandan 只在房主收工 onExit 时 gtClose 散桌(桌子随打下一副一直活着)');
+// #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
+assert(/A\.remoteSeats\.indexOf\(payload\.seat\)<0\) return/.test(GTL_GD), 'gtLaunchGuandan act 处理按 remoteSeats 白名单挡越权席(不代 host/AI/灵魂席出牌)');
 
 console.log('\n✅ 掼蛋旅程全部通过');

@@ -2413,6 +2413,11 @@ function gtLaunchPoker(row){
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
+      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
+      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
+      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
+      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
       const ok=_ehGame.applyMove(payload.seat, payload.move);
       if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
     })
@@ -2493,6 +2498,11 @@ function gtLaunchGuandan(row){
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
+      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
+      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
+      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
+      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
       const ok=_ehGame.applyMove(payload.seat, payload.move);
       if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
     })
@@ -2578,6 +2588,11 @@ function gtLaunchDdz(row){
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
+      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
+      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
+      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
+      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
       const ok=_ehGame.applyMove(payload.seat, payload.move);
       if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
     })
