@@ -165,8 +165,18 @@ begin
   if p_seat < 0 or p_seat >= v_row.seat_count then raise exception 'bad seat'; end if;
   v_target := v_row.seats -> p_seat;
   if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
-  select name, emoji into v_name, v_emoji from public.eh_users where id=p_soul;
-  if not found then raise exception 'soul not found'; end if;
+  -- 座位名取【房内原名】(eh_members.name = "狼姐"), 不取 eh_users.name ——
+  -- 后者全表 UNIQUE, 召唤的灵魂副本存的是内部唯一名"狼姐·<uid前6>", 直接坐进座位会把后缀泄漏到牌桌。
+  select m.name, m.emoji into v_name, v_emoji
+    from public.eh_members m where m.room_id=v_row.room_id and m.user_id=p_soul;
+  if v_name is null then   -- 兜底: 无成员行(异常态)时退回灵魂配置表, 再退回 eh_users
+    select s.name, s.emoji into v_name, v_emoji
+      from public.eh_souls s where s.auth_uid=p_soul and s.room_id=v_row.room_id limit 1;
+  end if;
+  if v_name is null then
+    select name, emoji into v_name, v_emoji from public.eh_users where id=p_soul;
+  end if;
+  if v_name is null then raise exception 'soul not found'; end if;
   update public.eh_game_tables
     set seats = jsonb_set(seats, array[p_seat::text],
           jsonb_build_object('seat',p_seat,'kind','soul','uid',p_soul,'name',v_name,'emoji',v_emoji)),
