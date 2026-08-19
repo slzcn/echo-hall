@@ -78,10 +78,31 @@ for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
   assert(/root\.EH_BGM/.test(src), `${name} BGM 开关复用 EH_BGM 控制器(不另造音频实现)`);
 }
 
+// C7. 对标一致性(2026-08-20 benchmark): 把已在某款验证过的手感统一到三款
+//     ① 斗地主出牌钮牌型即时反馈 + 炸弹红钮(此前恒"出牌", 掼蛋早已有) —— 与掼蛋 typeLabel/boom-ready 同源
+assert(/const isBoomType\s*=\s*\(p\)=>\s*!!p\s*&&\s*\(p\.type==='bomb'\|\|p\.type==='rocket'\)/.test(DDZ),
+  '斗地主 updatePlayBtn 有 isBoomType(炸弹/火箭红钮)');
+assert(/class="bt">\$\{lab\}/.test(DDZ) && /\.ddz-btn \.bt\{/.test(DDZ), '斗地主出牌钮报牌型名(.bt 标签)');
+assert(/\.ddz-btn\.primary\.boom-ready\{/.test(DDZ), '斗地主炸弹/火箭钮 boom-ready 红发光');
+//     ② 座位赢家金环: 斗/掼收局给赢家席位挂 .win(德州早有 .pk-seat.win), 三桌视觉一致
+assert(/\.ddz-seat\.win \.ddz-avr \.av\{[^}]*var\(--amber/.test(DDZ), '斗地主座位赢家金环 .ddz-seat.win');
+assert(/\.gd-seat\.win \.gd-avr \.av\{[^}]*var\(--amber/.test(GD), '掼蛋座位赢家金环 .gd-seat.win');
+assert(/isWin\s*=\s*st\.phase==='over'\s*&&\s*st\.result\s*&&\s*st\.result\.winners\.includes\(seat\)/.test(DDZ),
+  '斗地主 seatHTML 按 winners.includes(seat) 判赢家挂 .win');
+assert(/isWin\s*=\s*st\.phase==='over'\s*&&\s*st\.result\s*&&\s*Engine\.teamOf\(seat\)===st\.result\.winnerTeam/.test(GD),
+  '掼蛋 seatHTML 按 teamOf(seat)===winnerTeam 判赢家挂 .win');
+//     ③ 德州筹码飞行动画(对标大厂差距最大项): 街结束身前筹码归池 + 结算底池归赢家 + 底池数字跳动
+assert(/\.pk-flychip\{position:absolute/.test(PK) && /@keyframes pkChipFly/.test(PK), '德州飞行筹码 .pk-flychip + pkChipFly 动画');
+assert(/function collectChipsFx\(\)/.test(PK) && /function maybeCollectChips\(\)/.test(PK), '德州街结束归池 collectChipsFx/maybeCollectChips');
+assert(/function payoutChipsFx\(winners\)/.test(PK), '德州结算推池归赢家 payoutChipsFx');
+assert(/maybeCollectChips\(\);\s*\/\/ 街结束→筹码归池/.test(PK), 'renderAll 在重建座位前调 maybeCollectChips(捕获旧 commit 位置)');
+assert(/over\.classList\.add\('payout-in'\);\s*payoutChipsFx\(res\.winnersBySeat\)/.test(PK), 'showOver 触发推池动画 + 浮层延后淡入');
+assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动 .pk-pot.bump');
+
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260820-benchmark'/.test(HTML), 'index.html BUILD_VER=20260820-benchmark');
-assert(/eh-sw-v349-20260820-benchmark/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v349-benchmark)');
-assert(/^20260820-benchmark\s*$/.test(R('ver.txt')), 'ver.txt=20260820-benchmark');
+assert(/BUILD_VER='20260820-benchmark2'/.test(HTML), 'index.html BUILD_VER=20260820-benchmark2');
+assert(/eh-sw-v350-20260820-benchmark2/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v350-benchmark2)');
+assert(/^20260820-benchmark2\s*$/.test(R('ver.txt')), 'ver.txt=20260820-benchmark2');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart)。灵魂补位: 点【开始】即由 gtStart 先把空位坐满房里灵魂(灵魂来玩,

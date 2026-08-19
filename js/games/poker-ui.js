@@ -108,6 +108,21 @@
   font-size:11px;font-weight:800;color:var(--ink);background:rgba(4,10,14,.6);border:1px solid rgba(255,194,77,.4);border-radius:999px;padding:1px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .pk-commit .pc{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020)}
 .pk-commit.zero{display:none}
+/* 飞行筹码(街结束身前筹码扫入底池 / 结算底池归赢家) —— 对标大厂"筹码归池/推池"手感 */
+.pk-flychip{position:absolute;transform:translate(-50%,-50%);z-index:6;pointer-events:none;will-change:transform,opacity}
+.pk-flychip .pc{display:block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020);box-shadow:0 1px 3px rgba(0,0,0,.5),0 0 4px rgba(255,194,77,.4)}
+.pk-flychip.collect{animation:pkChipFly .42s cubic-bezier(.45,.05,.4,1) forwards}
+.pk-flychip.payout{animation:pkChipFly .5s cubic-bezier(.3,.6,.35,1) forwards}
+@keyframes pkChipFly{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:.15;transform:translate(calc(-50% + var(--dx,0px)),calc(-50% + var(--dy,0px))) scale(.7)}
+}
+.pk-pot.bump{animation:pkPotBump .42s ease}
+@keyframes pkPotBump{0%,100%{transform:scale(1)}38%{transform:scale(1.22);text-shadow:0 0 10px rgba(255,194,77,.7)}}
+/* 结算浮层带推池动画时: 前 ~330ms 保持透明, 让底池筹码在可见绒面上飞向赢家, 之后再淡入盖住 */
+.pk-over.payout-in{animation:pkOverPayoutIn .58s ease both}
+@keyframes pkOverPayoutIn{0%,56%{opacity:0}100%{opacity:1}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
   box-shadow:0 2px 5px rgba(0,0,0,.4);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
@@ -301,6 +316,7 @@
     sfx('arrive'); sfx('deal');
 
     let aiTimer=null, ringRAF=null, streetTimer=null, turnStart=0, turnDur=0;
+    let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
@@ -513,6 +529,60 @@
     function renderPot(){
       els.pot.innerHTML = `<span class="pc"></span>底池 ${st.pot}`;
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
+      // 底池增额时数字跳动(与筹码归池同拍); 新一手底池清零不跳
+      if (lastPotShown>=0 && st.pot>lastPotShown){
+        els.pot.classList.remove('bump'); void els.pot.offsetWidth; els.pot.classList.add('bump');
+      }
+      lastPotShown = st.pot;
+    }
+    // ── 飞行筹码 ──────────────────────────────────────────────
+    //   街结束→身前投入筹码扫入中央底池; 结算→底池推向赢家。纯展示层, 不碰引擎/快照。
+    //   目标点/起点都换算到 els.table 本地坐标(px), 用 CSS 变量 --dx/--dy 驱动 transform。
+    const COLLECT_STREETS = { flop:1, turn:1, river:1, showdown:1, over:1 };
+    function tableRect(){ return els.table.getBoundingClientRect(); }
+    function potCenter(tr){                       // 底池标签中心(相对 table)
+      const pr = els.pot.getBoundingClientRect();
+      return { x: pr.left - tr.left + pr.width/2, y: pr.top - tr.top + pr.height/2 };
+    }
+    function flyChip(tr, sx, sy, tx, ty, kind, delay){
+      const fx=document.createElement('div');
+      fx.className='pk-flychip '+kind;
+      fx.innerHTML='<span class="pc"></span>';
+      fx.style.left=sx+'px'; fx.style.top=sy+'px';
+      fx.style.setProperty('--dx',(tx-sx)+'px');
+      fx.style.setProperty('--dy',(ty-sy)+'px');
+      if(delay) fx.style.animationDelay=delay+'ms';
+      els.table.appendChild(fx);
+      setTimeout(()=>fx.remove(), 560+(delay||0));
+    }
+    // 街结束: 把当前(旧)身前筹码 DOM 位置捕获后, 生成飞向底池的筹码 —— 必须在 renderOpponents 重建座位【之前】调
+    function collectChipsFx(){
+      const chips = els.table.querySelectorAll('.pk-commit:not(.zero)');
+      if (!chips.length) return;
+      const tr = tableRect(); const pot = potCenter(tr);
+      chips.forEach((src,i)=>{
+        const r = src.getBoundingClientRect();
+        const sx = r.left - tr.left + r.width/2, sy = r.top - tr.top + r.height/2;
+        flyChip(tr, sx, sy, pot.x, pot.y, 'collect', i*22);
+      });
+    }
+    function maybeCollectChips(){
+      const from = animPhase; animPhase = st.phase;
+      if (!(from==='preflop'||from==='flop'||from==='turn'||from==='river')) return;  // 只在下注街结束时扫
+      if (st.phase===from || !COLLECT_STREETS[st.phase]) return;
+      collectChipsFx();
+    }
+    // 结算: 底池推向赢家(赢家席位, 我方=底部). winners = 座位号数组
+    function payoutChipsFx(winners){
+      if (!winners || !winners.length) return;
+      const tr = tableRect(); const pot = potCenter(tr);
+      winners.forEach(seat=>{
+        let tx, ty;
+        const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
+        if (seatEl){ const r=seatEl.getBoundingClientRect(); tx=r.left-tr.left+r.width/2; ty=r.top-tr.top+r.height/2; }
+        else { tx = tr.width*0.5; ty = tr.height*0.92; }   // 我(mySeat)固定坐底
+        for(let i=0;i<5;i++) flyChip(tr, pot.x, pot.y, tx, ty, 'payout', i*60);
+      });
     }
     function streetName(){ return ({preflop:'翻牌前',flop:'翻牌',turn:'转牌',river:'河牌',showdown:'摊牌',over:'结算'})[st.phase]||''; }
     function connPill(){ return connState==='online' ? '' : ('<span class="pk-conn '+connState+'">'+connLabel(connState)+'</span>'); }
@@ -798,6 +868,8 @@
           <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
           <div class="pk-row" style="margin-top:2px">${footer}</div>
         </div>`;
+      // 推池动画: 底池飞向赢家席位(我方=底部), 浮层延后淡入让筹码在绒面上先跑完
+      if ((res.winnersBySeat||[]).length){ over.classList.add('payout-in'); payoutChipsFx(res.winnersBySeat); }
       els.felt.appendChild(over);
       if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
       else if(busted){ sfx('void'); vibrate([90,60,90]); }
@@ -869,7 +941,7 @@
       button = (button+1)%n;
       handNo++;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
       sfx('deal');
       renderAll(); positionSeats();
       if (aliveSeats().length<2){}   // newHand 已兜底重新带入
@@ -881,7 +953,7 @@
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -911,12 +983,13 @@
       if (!room.isConnected) return;
       introSeating = false; arrived = null; lastSeated = -1;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
       sfx('deal');
       renderAll(); positionSeats();
     }
 
     function renderAll(){
+      maybeCollectChips();   // 街结束→筹码归池(须在 renderOpponents 重建座位/清 commit 之前捕获旧位置)
       renderPot(); renderBoard(); renderOpponents(); renderMe(); renderMsg(); renderActs();
       armTurn(minimized ? null : onHumanTimeout);
       if (minimized) updateChip();
@@ -940,7 +1013,7 @@
       lastSnap = snap; handNo = snap.handNo || 0;
       if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补
         const ov=els.felt.querySelector('.pk-over'); if(ov) ov.remove();
-        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; myHole=[];
+        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; myHole=[];
       }
       rebuildFromSnap(snap);
       if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();

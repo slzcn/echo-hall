@@ -2061,7 +2061,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-benchmark';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-benchmark2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2544,7 +2544,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/poker-ai.js?v=20260820-tex-loose"></script>
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
 <script defer src="./js/games/poker-net.js?v=20260816-exp1"></script>
-<script defer src="./js/games/poker-ui.js?v=20260819-btn-steady"></script>
+<script defer src="./js/games/poker-ui.js?v=20260820-benchmark2"></script>
 <script defer src="./js/games/table-net.js?v=20260819-swipe-souls"></script>
 <script defer src="./js/modules/lobby.js?v=20260819-optimistic-cnt"></script>
 <script defer src="./js/modules/auth.js?v=20260818-auth-contract"></script>
