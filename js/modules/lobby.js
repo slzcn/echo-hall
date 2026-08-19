@@ -83,5 +83,59 @@
     return { prefetchRoom: prefetchRoom, prefetchAll: prefetchAll };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch });
+  // 动态房间卡片统计：Supabase 通过 getter 延迟读取，避免 app.js 解析时捕获 null。
+  function createFillRoomStats(deps) {
+    deps = deps || {};
+    var getSb = deps.getSb;
+    var prefetchRoom = deps.prefetchRoom;
+    var msgPreview = deps.msgPreview;
+    var roomAccentC = deps.roomAccentC;
+    var esc = deps.esc;
+    var fmtAgo = deps.fmtAgo;
+    var onError = deps.onError || function () {};
+    if (typeof getSb !== 'function' || typeof prefetchRoom !== 'function' || typeof msgPreview !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof fmtAgo !== 'function') {
+      throw new TypeError('[EH_LOBBY] createFillRoomStats missing dependencies');
+    }
+    return async function fillRoomStats(box, rid) {
+      var card = box.querySelector('.ch[data-rid="' + rid + '"]');
+      if (!card) return;
+      var sb = getSb();
+      if (!sb) return;
+      var since = new Date(Date.now() - 35000).toISOString();
+      var result = await Promise.all([
+        sb.from('eh_presence').select('*', { count: 'exact', head: true }).eq('room_id', rid).gte('last_seen', since),
+        prefetchRoom(rid, card.dataset.kind || 'official')
+      ]);
+      var count = result[0] && result[0].count;
+      var recent = result[1];
+      var online = count || 0;
+      var cnt = card.querySelector('.cnt');
+      if (cnt) cnt.textContent = online > 0 ? online + ' 人在线' : '暂无人在线';
+      var last = (Array.isArray(recent) ? recent.find(function (m) { return m && m.kind !== 'enter'; }) : null) || null;
+      var prev = card.querySelector('[data-prev]');
+      var tm = card.querySelector('.tm');
+      if (last) {
+        prev.classList.remove('empty');
+        var txt = msgPreview(last);
+        var isIx = last.kind === 'interact';
+        var nm = isIx ? '' : (last.anon ? '🕳️ 某个回声' : esc(last.name) + ':');
+        var nmC = '';
+        try {
+          if (!last.anon) {
+            var roomC = roomAccentC({ name: card.dataset.nm, kind: card.dataset.kind || 'official' });
+            var userC = last.color && /^#[0-9a-fA-F]{3,8}$/.test(last.color) ? last.color : null;
+            var c = last.is_bot ? roomC : (userC || roomC);
+            if (c) nmC = ' style="color:' + c + '"';
+          }
+        } catch (e) { onError('fillRoomStats', e); }
+        prev.innerHTML = (nm ? '<b' + nmC + '>' + nm + '</b> ' : '') + esc(String(txt).slice(0, 40));
+        if (tm) tm.textContent = fmtAgo(last.created_at);
+      } else {
+        prev.classList.add('empty');
+        prev.textContent = '还没有人说话，来当第一个';
+      }
+    };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats });
 })(window);

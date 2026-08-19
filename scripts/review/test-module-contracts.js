@@ -66,3 +66,34 @@ for (const [name, globalName, factoryName, keys] of modules) {
   }
   console.log('PASS lobby: late Supabase init is resolved at prefetch call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
+
+// 回归：fillRoomStats 创建时 sb 尚未 boot，调用时才读取最新客户端。
+(async function testLateSupabaseForFillStats() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateSb = null;
+  let prefetchCalls = 0;
+  const card = {
+    dataset: { kind: 'official', nm: '大厅' },
+    querySelector: (selector) => {
+      if (selector === '.cnt') return { textContent: '' };
+      if (selector === '[data-prev]') return { classList: { add() {}, remove() {} }, textContent: '', innerHTML: '' };
+      if (selector === '.tm') return { textContent: '' };
+      return null;
+    },
+  };
+  const box = { querySelector: () => card };
+  const fill = lobby.createFillRoomStats({
+    getSb: () => lateSb,
+    prefetchRoom: async () => { prefetchCalls += 1; return []; },
+    msgPreview: () => '',
+    roomAccentC: () => '#000',
+    esc: (x) => String(x),
+    fmtAgo: () => '刚刚',
+  });
+  await fill(box, 'late-room');
+  if (prefetchCalls !== 0) throw new Error('lobby: fillRoomStats touched prefetch before Supabase boot');
+  lateSb = { from: () => ({ select: () => ({ eq: () => ({ gte: async () => ({ count: 2 }) }) }) }) };
+  await fill(box, 'late-room');
+  if (prefetchCalls !== 1) throw new Error('lobby: fillRoomStats did not use late Supabase client');
+  console.log('PASS lobby: fillRoomStats resolves late Supabase at call time');
+})().catch(err => { console.error(err); process.exitCode = 1; });

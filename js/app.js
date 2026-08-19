@@ -1431,43 +1431,6 @@ function optimisticCnt(room){
   if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
   return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
-// 异步填充卡片动态数据: 在线人数 + 最新消息预览 + 活跃时间
-async function fillRoomStats(box, rid){
-  const card=box.querySelector(`.ch[data-rid="${rid}"]`); if(!card) return;
-  const since=new Date(Date.now()-35000).toISOString();
-  // 最近消息与进房预取共用同一 Promise，避免列表预览和 prefetchAll 对同一房间重复请求。
-  const [{ count }, recent] = await Promise.all([
-    sb.from('eh_presence').select('*',{count:'exact',head:true}).eq('room_id',rid).gte('last_seen',since),
-    prefetchRoom(rid, card.dataset.kind||'official'),
-  ]);
-  const online=count||0;
-  const cnt=card.querySelector('.cnt'); if(cnt) cnt.textContent = online>0? online+' 人在线' : '暂无人在线';
-  // 进场广播 enter 不是聊天内容, 不能当大厅"最后一条"预览(否则一进房主页就变"✦ 有人进入了房间")
-  const last=(Array.isArray(recent)? recent.find(m=>m && m.kind!=='enter') : null)||null;
-  const prev=card.querySelector('[data-prev]'), tm=card.querySelector('.tm');
-  if(last){
-    prev.classList.remove('empty');
-    const txt = msgPreview(last);
-    // 互动消息的文案本身就是完整句(已含发起人名, 如"狼姐 朝 yiran 扔了颗炸弹"), 不再加"名字："前缀防重复
-    const _isIx = last.kind==='interact';
-    const nm = _isIx ? '' : (last.anon ? '🕳️ 某个回声' : esc(last.name)+':');
-    // 预览发送者名字色规范: 真人=自己个性色(与房间内消息、光墙统一); 灵魂/空色/匿名=回退房间强调色
-    let nmC='';
-    try{
-      if(!last.anon){
-        const roomC=roomAccentC({name:card.dataset.nm,kind:card.dataset.kind||'official'});
-        const userC=(typeof safeColor==='function' && last.color && /^#[0-9a-fA-F]{3,8}$/.test(last.color)) ? last.color : null;
-        // 灵魂(is_bot)跟房间色, 真人跟自己色, 兜底房间色
-        const c = (last.is_bot ? roomC : (userC || roomC));
-        if(c) nmC=` style="color:${c}"`;
-      }
-    }catch(e){ _ehCatch('fillRoomStats',e); }
-    prev.innerHTML=(nm?`<b${nmC}>${nm}</b> `:'')+esc(String(txt).slice(0,40));
-    if(tm) tm.textContent=fmtAgo(last.created_at);
-  } else {
-    prev.classList.add('empty'); prev.textContent='还没有人说话，来当第一个';
-  }
-}
 async function renderMyRooms(soft){
   if(!myUid){ $('#myRooms').innerHTML=''; return; }
   const boxE=$('#myRooms');
@@ -1599,6 +1562,15 @@ const { prefetchRoom, prefetchAll } = window.EH_LOBBY_MODULE.createPrefetch({
   prefetchSouls,
   readN: PREFETCH_N,
   readTtl: PREFETCH_TTL,
+});
+const fillRoomStats = window.EH_LOBBY_MODULE.createFillRoomStats({
+  getSb: () => sb,
+  prefetchRoom,
+  msgPreview,
+  roomAccentC,
+  esc,
+  fmtAgo,
+  onError: _ehCatch,
 });
 // 大厅边界层：迁移期由独立模块校验依赖并冻结接口；业务实现暂在本文件。
 // 后续把实现迁入 js/modules/lobby.js 时，只需替换这里的依赖注入，不改调用方。
