@@ -1322,9 +1322,11 @@ function soulThemeColor(custom, fallback, name){
   // 3. fallback
   return fallback || ROOM_KIND_C.official;
 }
-// 大厅房间查询带超时: 慢网/弱网下 sb 查询可能永不返回 → 骨架卡死不消失(见 21:09 截图 6KB/s)。
-// 8s 超时后抛错, 由 renderLobby 的重试兜底; 不再无限挂骨架。
-function roomsQuery(q, ms=8000){ return withTimeout(q, ms).catch(()=>({data:null,__timeout:true})); }
+// 大厅房间查询带超时：实现已迁入 lobby 模块；withTimeout 在调用时通过 getter 读取。
+const roomsQuery = window.EH_LOBBY_MODULE.createRoomsQuery({
+  getWithTimeout:()=>withTimeout,
+  defaultTimeout:8000,
+});
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
 const chSkel = window.EH_LOBBY_MODULE.chSkel;   // 房间卡片骨架已迁入 js/modules/lobby.js
 const rmSkel = window.EH_LOBBY_MODULE.rmSkel;

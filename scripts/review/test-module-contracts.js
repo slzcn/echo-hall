@@ -60,6 +60,28 @@ if (knownOnline !== 12 || context.window.EH_LOBBY_MODULE.readKnownOnline({ query
 }
 console.log('PASS lobby: readKnownOnline pure helper is exported');
 
+// 回归：查询超时实现可能晚于大厅模块装配；未就绪时安全失败，就绪后读取最新函数并保留超时兜底。
+(async function testLateRuntimeForRoomsQuery() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateWithTimeout = null;
+  const roomsQuery = lobby.createRoomsQuery({
+    getWithTimeout: () => lateWithTimeout,
+    defaultTimeout: 8000,
+  });
+  const beforeReady = await roomsQuery(Promise.resolve({ data: ['ignored'] }));
+  if (!beforeReady || !beforeReady.__timeout) throw new Error('lobby: roomsQuery before timeout dependency ready must fail safely');
+  let receivedMs = 0;
+  lateWithTimeout = async (query, ms) => { receivedMs = ms; return query; };
+  const afterReady = await roomsQuery(Promise.resolve({ data: [{ id: 1 }] }), 3210);
+  if (receivedMs !== 3210 || !afterReady.data || afterReady.data[0].id !== 1) {
+    throw new Error('lobby: roomsQuery did not resolve late timeout dependency');
+  }
+  lateWithTimeout = async () => { throw new Error('slow network'); };
+  const timedOut = await roomsQuery(Promise.resolve({ data: [] }));
+  if (!timedOut || !timedOut.__timeout) throw new Error('lobby: roomsQuery timeout fallback mismatch');
+  console.log('PASS lobby: roomsQuery resolves late timeout dependency and fails safely');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 // 回归：卡片绑定早于预取／进房实现就绪时不得捕获空值，交互发生时读取最新函数。
 (function testLateRuntimeForRoomCardBinding() {
   const lobby = context.window.EH_LOBBY_MODULE;

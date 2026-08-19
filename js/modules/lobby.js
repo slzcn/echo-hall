@@ -133,6 +133,22 @@
     return { prefetchRoom: prefetchRoom, prefetchAll: prefetchAll };
   }
 
+  // 大厅房间查询超时包装：withTimeout 通过 getter 在调用时读取，避免模块装配阶段捕获尚未就绪的实现。
+  function createRoomsQuery(deps) {
+    deps = deps || {};
+    var getWithTimeout = deps.getWithTimeout;
+    var defaultTimeout = Number.isFinite(+deps.defaultTimeout) ? +deps.defaultTimeout : 8000;
+    if (typeof getWithTimeout !== 'function') {
+      throw new TypeError('[EH_LOBBY] createRoomsQuery missing dependencies');
+    }
+    return function roomsQuery(query, timeout) {
+      var withTimeout = getWithTimeout();
+      if (typeof withTimeout !== 'function') return Promise.resolve({ data: null, __timeout: true });
+      var ms = Number.isFinite(+timeout) ? +timeout : defaultTimeout;
+      return withTimeout(query, ms).catch(function () { return { data: null, __timeout: true }; });
+    };
+  }
+
   // 动态房间卡片统计：Supabase 通过 getter 延迟读取，避免 app.js 解析时捕获 null。
   function createFillRoomStats(deps) {
     deps = deps || {};
@@ -428,5 +444,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);
