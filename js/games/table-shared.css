@@ -117,13 +117,24 @@
 }
 
 /* ── D. 顶栏 chip 化: 让 title + dot + mult/lvl/blinds + conn 抱在一起 ── */
+/* ★顶栏必须让开 iOS/安卓状态栏(时钟/信号/电量): 此前这里的 padding:10px !important 把各 UI 文件里
+   calc(12px + env(safe-area-inset-top)) 一并盖掉 → 顶栏平贴到状态栏, 标题与系统时钟叠字(实拍已证)。
+   这里把 safe-area 收回顶 padding。 */
 .ddz-bar, .gd-bar, .pk-bar{
-  padding: 10px 14px !important;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px !important;
   background: linear-gradient(180deg,
     rgba(0, 0, 0, .28),
     rgba(0, 0, 0, .06));
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+}
+/* ★装成 PWA(standalone)时 env(safe-area-inset-top) 在部分安卓/小米机上不可靠会报 0(见项目记忆),
+   给一个 42px 的地板保底: 无论 env 是否生效, standalone 下顶栏都至少让开状态栏, 不再和时钟撞车。
+   浏览器态(有地址栏, 无此 class)保持 10px+env 的紧凑顶栏。 */
+html.pwa-standalone .ddz-bar,
+html.pwa-standalone .gd-bar,
+html.pwa-standalone .pk-bar{
+  padding-top: max(calc(10px + env(safe-area-inset-top, 0px)), 42px) !important;
 }
 .ddz-title, .gd-title, .pk-title{
   font-size: 14px !important;

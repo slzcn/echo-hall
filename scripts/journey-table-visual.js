@@ -28,8 +28,8 @@ const DDZ    = R('js/games/game-ui.js');
 const GD     = R('js/games/guandan-ui.js');
 const PK     = R('js/games/poker-ui.js');
 
-assert(/js\/games\/table-shared\.css\?v=20260816-exp2/.test(HTML),
-  'index.html 挂了 table-shared.css?v=20260816-exp2');
+assert(/js\/games\/table-shared\.css\?v=20260819-ddz-settle/.test(HTML),
+  'index.html 挂了 table-shared.css?v=20260819-ddz-settle');
 
 // A. 三款 UI 不能再出现 'Arial Narrow'（连回退都不允许，字体链已换成 SF Pro Rounded）
 for(const [name, src] of [['game-ui', DDZ], ['guandan-ui', GD], ['poker-ui', PK]]){
@@ -79,9 +79,9 @@ for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
 }
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260819-replay-fallback'/.test(HTML), 'index.html BUILD_VER=20260819-replay-fallback');
-assert(/eh-sw-v329-20260819-replay-fallback/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v329-replay-fallback)');
-assert(/^20260819-replay-fallback\s*$/.test(R('ver.txt')), 'ver.txt=20260819-replay-fallback');
+assert(/BUILD_VER='20260819-ddz-settle'/.test(HTML), 'index.html BUILD_VER=20260819-ddz-settle');
+assert(/eh-sw-v330-20260819-ddz-settle/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v330-ddz-settle)');
+assert(/^20260819-ddz-settle\s*$/.test(R('ver.txt')), 'ver.txt=20260819-ddz-settle');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart); 灵魂靠一个个(座位 🤝灵魂 下拉)或一键(gtFillSouls)请。

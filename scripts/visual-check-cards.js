@@ -167,16 +167,16 @@ async function main(){
     await ctx.close();
   }
 
-  // ---------- D. 理牌: 一键自动 + 手动拖排(真实渲染 + 合成指针事件) ----------
-  // 治"手牌只能引擎默认序"。真渲两桌, 各验: (1)理牌钮在牌桌内不溢出;
-  // (2)长按进手动模式手牌加 .arranging; (3)拖第一张到末尾 → 手牌顺序真的变了 且张数不减。
+  // ---------- D. 手牌单排自适应 + 理牌(掼蛋有手动拖排; 斗地主已移除, 只验单排不溢出) ----------
+  // 掼蛋(27 张两排): (1)理牌钮不溢出; (2)长按进手动模式加 .arranging; (3)拖第一张到末尾顺序真的变了且张数不减。
+  // 斗地主(≤20 张单排): 不需要手动理牌(主人反馈), 只验首尾牌都落在牌桌内(不溢出屏外点不到)。
   for (const cfg of [
     { name:'掼蛋', mods:['deck.js','guandan-rules.js','guandan-engine.js','guandan-ai.js','guandan-ui.js'],
       open:'window.EHGuandanGame.open({ names:["你","灵魂下","灵魂对","灵魂上"], avatars:["🙂","🔥","🌙","⚡"], onResult(){} })',
       room:'.gd-room', hand:'.gd-hand', sort:'#gdSort' },
     { name:'斗地主', mods:['deck.js','ddz-rules.js','ddz-engine.js','ddz-ai.js','game-ui.js'],
       open:'window.EHDdzGame.open({ names:["你","灵魂A","灵魂B"], avatars:["🙂","🔥","🌙"], onResult(){} })',
-      room:'.ddz-room', hand:'.ddz-hand', sort:'#ddzSort' },
+      room:'.ddz-room', hand:'.ddz-hand' },   // 斗地主无理牌钮(sort 省略)
   ]) {
     const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true });
     const page = await ctx.newPage();
@@ -189,52 +189,59 @@ async function main(){
     await page.waitForTimeout(1800);
     const d = await page.evaluate((cfg) => {
       const room=document.querySelector(cfg.room); const rr=room.getBoundingClientRect();
-      const btn=document.querySelector(cfg.sort); const br=btn.getBoundingClientRect();
       const hand=document.querySelector(cfg.hand);
-      const orderOf = ()=> [...hand.querySelectorAll('.card')].map(c=>c.dataset.id).join(',');
-      const before = orderOf();
       const cards0 = [...hand.querySelectorAll('.card')];
       const nBefore = cards0.length;
       // 手牌单排自适应: 首尾牌都得落在牌桌内(治 17~20 张两侧溢出屏外点不到)
       const fc = cards0[0].getBoundingClientRect(), lcr = cards0[cards0.length-1].getBoundingClientRect();
       const handFit = fc.left >= rr.left - 0.5 && lcr.right <= rr.right + 0.5;
-      // 长按进手动模式: pointerdown → 等 400ms → 期间 setTimeout 触发 setArrange(true)
-      const pe = (t,x,y)=> new PointerEvent(t,{bubbles:true,clientX:x,clientY:y,pointerId:1});
-      btn.dispatchEvent(pe('pointerdown', br.left+5, br.top+5));
-      return { rr, br, before, nBefore, handFit, ok:true };
+      let br = null;
+      if (cfg.sort){   // 掼蛋: 长按进手动模式(pointerdown → 等计时器触发 setArrange(true))
+        const btn=document.querySelector(cfg.sort); br=btn.getBoundingClientRect();
+        const pe = (t,x,y)=> new PointerEvent(t,{bubbles:true,clientX:x,clientY:y,pointerId:1});
+        btn.dispatchEvent(pe('pointerdown', br.left+5, br.top+5));
+      }
+      return { rr, br, nBefore, handFit, ok:true };
     }, cfg);
-    // 等长按计时器(350ms)触发
-    await page.waitForTimeout(450);
-    const d2 = await page.evaluate((cfg) => {
-      const btn=document.querySelector(cfg.sort);
-      const br=btn.getBoundingClientRect();
-      btn.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:br.left+5,clientY:br.top+5,pointerId:1}));
-      const hand=document.querySelector(cfg.hand);
-      const arranging = hand.classList.contains('arranging');
-      // 拖第一张到最后一张之后
-      const cards=[...hand.querySelectorAll('.card')];
-      const first=cards[0], last=cards[cards.length-1];
-      const fr=first.getBoundingClientRect(), lr=last.getBoundingClientRect();
-      const cy=fr.top+fr.height/2;
-      const orderOf=()=> [...hand.querySelectorAll('.card')].map(c=>c.dataset.id).join(',');
-      const before=orderOf();                       // 进手动模式后的当前序(与拖后同一坐标系比)
-      const pe=(t,x,y)=> new PointerEvent(t,{bubbles:true,clientX:x,clientY:y,pointerId:2});
-      // 牌相互叠放, 抓第一张最左侧未被遮挡的一条; 拖到最后一张右侧之后落位
-      hand.dispatchEvent(pe('pointerdown', fr.left+3, cy));
-      const grabbed=!!hand.querySelector('.card.dragging');
-      hand.dispatchEvent(pe('pointermove', lr.right, cy));
-      hand.dispatchEvent(pe('pointerup', lr.right, cy));
-      return { arranging, grabbed, nAfter:hand.querySelectorAll('.card').length, before, after:orderOf() };
-    }, cfg);
-    if (errs.length) bad(`${cfg.name}理牌渲染报错: ` + errs.slice(0,2).join(' | '));
+    let d2 = null;
+    if (cfg.sort){
+      // 等长按计时器(350ms)触发
+      await page.waitForTimeout(450);
+      d2 = await page.evaluate((cfg) => {
+        const btn=document.querySelector(cfg.sort);
+        const br=btn.getBoundingClientRect();
+        btn.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:br.left+5,clientY:br.top+5,pointerId:1}));
+        const hand=document.querySelector(cfg.hand);
+        const arranging = hand.classList.contains('arranging');
+        // 拖第一张到最后一张之后
+        const cards=[...hand.querySelectorAll('.card')];
+        const first=cards[0], last=cards[cards.length-1];
+        const fr=first.getBoundingClientRect(), lr=last.getBoundingClientRect();
+        const cy=fr.top+fr.height/2;
+        const orderOf=()=> [...hand.querySelectorAll('.card')].map(c=>c.dataset.id).join(',');
+        const before=orderOf();                       // 进手动模式后的当前序(与拖后同一坐标系比)
+        const pe=(t,x,y)=> new PointerEvent(t,{bubbles:true,clientX:x,clientY:y,pointerId:2});
+        // 牌相互叠放, 抓第一张最左侧未被遮挡的一条; 拖到最后一张右侧之后落位
+        hand.dispatchEvent(pe('pointerdown', fr.left+3, cy));
+        const grabbed=!!hand.querySelector('.card.dragging');
+        hand.dispatchEvent(pe('pointermove', lr.right, cy));
+        hand.dispatchEvent(pe('pointerup', lr.right, cy));
+        return { arranging, grabbed, nAfter:hand.querySelectorAll('.card').length, before, after:orderOf() };
+      }, cfg);
+    }
+    if (errs.length) bad(`${cfg.name}手牌渲染报错: ` + errs.slice(0,2).join(' | '));
     // 手牌单排自适应: 首尾牌都在牌桌内(不溢出屏外)
     if (!d.handFit) bad(`${cfg.name}手牌两侧溢出牌桌(首尾牌跑到屏外, ${d.nBefore} 张未单排自适应)`); else ok(`${cfg.name}手牌单排自适应不溢出(${d.nBefore} 张全在桌内)`);
-    // 按钮不溢出牌桌右沿/顶
-    if (d.br.right > d.rr.right + 1) bad(`${cfg.name}理牌钮右溢出牌桌 ${Math.round(d.br.right-d.rr.right)}px`); else ok(`${cfg.name}理牌钮在牌桌内(不溢出)`);
-    if (!d2.arranging) bad(`${cfg.name}长按未进手动理牌模式(.arranging 缺失)`); else ok(`${cfg.name}长按→手动理牌模式(.arranging)`);
-    if (d2.nAfter !== d.nBefore) bad(`${cfg.name}拖排后手牌张数变了 ${d.nBefore}→${d2.nAfter}(丢牌/重牌)`); else ok(`${cfg.name}拖排后手牌张数不变(${d2.nAfter})`);
-    if (!d2.grabbed) bad(`${cfg.name}拖排起手未抓到牌(startReorder 未命中)`); else ok(`${cfg.name}拖排起手抓到牌`);
-    if (d2.after === d2.before) bad(`${cfg.name}拖第一张到末尾后顺序没变(手动理牌无效) before=${d2.before.slice(0,40)} after=${d2.after.slice(0,40)}`); else ok(`${cfg.name}手动拖排真的改变了手牌顺序`);
+    if (cfg.sort){
+      // 按钮不溢出牌桌右沿/顶
+      if (d.br.right > d.rr.right + 1) bad(`${cfg.name}理牌钮右溢出牌桌 ${Math.round(d.br.right-d.rr.right)}px`); else ok(`${cfg.name}理牌钮在牌桌内(不溢出)`);
+      if (!d2.arranging) bad(`${cfg.name}长按未进手动理牌模式(.arranging 缺失)`); else ok(`${cfg.name}长按→手动理牌模式(.arranging)`);
+      if (d2.nAfter !== d.nBefore) bad(`${cfg.name}拖排后手牌张数变了 ${d.nBefore}→${d2.nAfter}(丢牌/重牌)`); else ok(`${cfg.name}拖排后手牌张数不变(${d2.nAfter})`);
+      if (!d2.grabbed) bad(`${cfg.name}拖排起手未抓到牌(startReorder 未命中)`); else ok(`${cfg.name}拖排起手抓到牌`);
+      if (d2.after === d2.before) bad(`${cfg.name}拖第一张到末尾后顺序没变(手动理牌无效) before=${d2.before.slice(0,40)} after=${d2.after.slice(0,40)}`); else ok(`${cfg.name}手动拖排真的改变了手牌顺序`);
+    } else {
+      ok(`${cfg.name}无理牌钮(已移除, 手牌恒自动理好)`);
+    }
     if (WANT_SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, cfg.name+'-sort.png') });
     await ctx.close();
   }
