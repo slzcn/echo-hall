@@ -454,7 +454,16 @@
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
     let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null;
-    function handCardAt(x,y){ const el=document.elementFromPoint(x,y); if(!el) return null; const c=el.closest('.card'); return (c && els.hand.contains(c)) ? c : null; }
+    // 手牌左→右叠放, 后牌盖前牌右半 → elementFromPoint 在牌中心会命中右邻牌(漏掉最左那张)。
+    // 改按 x 命中"露出的那张": left ≤ x 里最靠右的一张(最后被指针越过的左沿), x 在首牌之前归首牌。
+    function handCardAt(x,y){
+      const kids=els.hand.children, n=kids.length; if(!n) return null;
+      const hr=els.hand.getBoundingClientRect();
+      if(y < hr.top-40 || y > hr.bottom+40) return null;
+      let pick=kids[0];
+      for(let i=0;i<n;i++){ if(x >= kids[i].getBoundingClientRect().left-0.5) pick=kids[i]; else break; }
+      return pick;
+    }
     function applyPaintIdx(i){
       const c = els.hand.children[i]; if(!c) return;
       const id = c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);

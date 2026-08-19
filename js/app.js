@@ -2312,7 +2312,6 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
-      fillSouls:()=>gtFillSouls(_gtTables.get(row.id)||row),
       kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
 }
 function gtRenderInto(el,row){
@@ -2368,6 +2367,9 @@ async function gtSeatSoul(id,seat,soul){ await gtRpc('eh_gt_seat_soul',{p_table:
 async function gtKick(id,seat){ await gtRpc('eh_gt_kick',{p_table:id,p_seat:seat}); }
 async function gtClose(id){ await gtRpc('eh_gt_close',{p_table:id}); }
 async function gtStart(id){
+  // 点「开始」即先用房里灵魂把空位补满(灵魂=真身份/头像/性格, 不再是匿名🤖机器人), 再开局。
+  // 房里灵魂不够时剩余空位才落到本机 AI 代打。await 完成后 DB 座位已是灵魂, eh_gt_start 据此起局。
+  try{ const row=_gtTables.get(id); if(row) await gtSeatSoulsIntoEmpties(row); }catch(_){}
   let seed=0; try{ seed=crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed=Math.floor(Math.random()*4294967296); }
   const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
   if(row) gtLaunchLocal(row);
@@ -6485,7 +6487,7 @@ const SLASH_CMDS=[
   {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
   {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
   {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
-  {c:'/德州', d:'/德州 → 开一桌德州，等真人点卡入座，可一个个/一键请灵魂补位，满意再开局 🎰'},
+  {c:'/德州', d:'/德州 → 开一桌德州，等真人点卡入座，点开始空位由房里灵魂补齐 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -6618,8 +6620,8 @@ async function launchDoudizhu(){
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
 //    这是默认: 先等真人, 房主看座位满意了手动点【开始 ▶】才开局(不自动开)。
-//    想凑够人/单人先玩: 牌桌卡上可【一个个请灵魂】(每个空位的 🤝灵魂 下拉) 或【一键请灵魂】(把空位全填上房里灵魂),
-//    灵魂席开局由 host 本机引擎按其性格代打(全局意识 AI, 脱敏快照广播, 真人私牌走 RLS); 空位不焊死, 真人随时点卡换掉 AI 顶位。
+//    想凑够人/单人先玩: 直接点【开始 ▶】即把空位补满房里灵魂(gtStart→gtSeatSoulsIntoEmpties); 想指定某灵魂坐某席用每空位的【🤝灵魂】下拉。
+//    灵魂席开局由 host 本机引擎按其性格代打(全局意识 AI, 脱敏快照广播, 真人私牌走 RLS); 空位不焊死, 真人随时点卡换掉灵魂顶位。
 //    合并了旧 /德州(单机陪玩) 与 /德州联机(座位大厅): 只此一条, 单人和联机是同一张桌子, 差别只在"坐进来的是灵魂还是真人"。
 async function launchTexas(){
   if(!window.EHPokerGame || !window.EHPokerNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
@@ -6638,7 +6640,7 @@ async function launchTexas(){
     else toast('本房已有一桌，往上翻找牌桌卡加入');
     return;
   }
-  // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用卡上「🤝灵魂/一键请灵魂」补位, 满意再点「开始 ▶」
+  // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用每空位「🤝灵魂」下拉指定补位, 满意再点「开始 ▶」(空位自动补灵魂)
   const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -6647,16 +6649,19 @@ async function launchTexas(){
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
 }
-// 一键请灵魂: 把当前所有空位从 1 席起依次坐上房里灵魂(排除已坐的), 坐满即止。仅 host 招募中(lobby)可用。
-async function gtFillSouls(row){
-  if(!row || row.status!=='lobby' || row.host_uid!==myUid) return;
+// 灵魂补位: 把当前所有空位从小到大依次坐上房里灵魂(排除已坐的), 灵魂不够则坐到用完为止。
+// 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像/性格)填满, 不再是匿名 AI 机器人。
+// 静默(不 toast, 不因空手拦截): 无空位/无灵魂时直接返回, 剩余空位交给本机 AI 代打。仅 host 招募中有效。
+async function gtSeatSoulsIntoEmpties(row){
+  if(!row || row.status!=='lobby' || row.host_uid!==myUid) return 0;
   const seated=new Set((row.seats||[]).filter(s=>s&&s.kind==='soul'&&s.uid).map(s=>s.uid));
   const empties=(row.seats||[]).filter(s=>s&&s.kind==='empty'&&typeof s.seat==='number').map(s=>s.seat).sort((a,b)=>a-b);
   const souls=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid&&!seated.has(s.auth_uid));
-  if(!empties.length||!souls.length){ toast('没有可补的空位或灵魂了'); return; }
+  let n=0;
   for(let i=0;i<empties.length&&i<souls.length;i++){
-    try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[i],p_soul:souls[i].auth_uid}); }catch(_){}
+    try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[i],p_soul:souls[i].auth_uid}); n++; }catch(_){}
   }
+  return n;
 }
 // 兼容旧命令 /德州联机 与既有调用点: 已与 /德州 合并为同一张真牌桌
 async function launchTexasOnline(){ return launchTexas(); }

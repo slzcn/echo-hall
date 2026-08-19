@@ -196,4 +196,15 @@ assert(/els\.hand\.appendChild\(el\);\s*\}\);\s*layoutHand\(\);/.test(ui), 'rend
 assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
   'resize 重排手牌且关桌解绑(转屏自适应, 不泄漏监听)');
 
+// ── 步骤12: 滑动选牌(主人反馈"不能滑动选牌") ──
+// 斗地主原只逐张 click 单选, 现改与掼蛋同源的指针涂抹: 点=单选, 拖过整段=连选。
+// 反回退: 逐张 click 选牌写法必须消失(否则又变回点一张才选一张、划不动)。
+assert(/touch-action:none/.test(ui) && /\.ddz-hand\{[^}]*touch-action:none/.test(ui), '手牌 .ddz-hand touch-action:none(划选不被页面滚动打断)');
+assert(/function paintTo\(/.test(ui) && /applyPaintIdx/.test(ui), '涂抹选牌: 按索引区间填充(拖过整段连选, 快拖不漏牌)');
+assert(/els\.hand\.addEventListener\('pointerdown'/.test(ui) && /els\.hand\.addEventListener\('pointermove'/.test(ui), '手牌区绑 pointerdown/move 划选(挂容器一次, 不逐张)');
+assert(!/el\.addEventListener\('click'[\s\S]{0,120}selected\.(add|delete)/.test(ui), '旧逐张 click 单选写法已移除(改指针涂抹, 治划不动)');
+assert(/function handCardAt\([\s\S]{0,200}getBoundingClientRect/.test(ui) && !/function handCardAt\([\s\S]{0,80}elementFromPoint/.test(ui),
+  'handCardAt 按 x 命中露出的那张(不用 elementFromPoint, 治叠放漏掉最左那张)');
+assert(/el\.dataset\.idx = idx/.test(ui), '每张牌带 data-idx(划选连选补齐整段的依据)');
+
 console.log('\n✅ 斗地主旅程全部通过');

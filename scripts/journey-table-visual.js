@@ -79,26 +79,30 @@ for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
 }
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260819-ddz-settle'/.test(HTML), 'index.html BUILD_VER=20260819-ddz-settle');
-assert(/eh-sw-v330-20260819-ddz-settle/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v330-ddz-settle)');
-assert(/^20260819-ddz-settle\s*$/.test(R('ver.txt')), 'ver.txt=20260819-ddz-settle');
+assert(/BUILD_VER='20260819-swipe-souls'/.test(HTML), 'index.html BUILD_VER=20260819-swipe-souls');
+assert(/eh-sw-v331-20260819-swipe-souls/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v331-swipe-souls)');
+assert(/^20260819-swipe-souls\s*$/.test(R('ver.txt')), 'ver.txt=20260819-swipe-souls');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
-//     不自动开局(launchTexas 不含 gtStart); 灵魂靠一个个(座位 🤝灵魂 下拉)或一键(gtFillSouls)请。
-//     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 曾开桌即自动 gtStart 抢开局。
+//     不自动开局(launchTexas 不含 gtStart)。灵魂补位: 点【开始】即由 gtStart 先把空位坐满房里灵魂(灵魂来玩,
+//     非匿名 AI 机器人), 想指定某灵魂坐某席仍可用每空位「🤝灵魂」下拉。旧「一键请灵魂」按钮已去掉(开始即代劳)。
+//     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 曾开桌即自动 gtStart 抢开局;
+//     反回退③(主人反馈): 曾点开始拿匿名机器人补位, 现必须用房里灵魂补位。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
 const LT = (APP.match(/async function launchTexas\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌桌: eh_gt_open 开桌 + 贴牌桌卡');
 assert(!/gtStart\s*\(/.test(LT), 'launchTexas 默认不自动开局(停在招募中等真人手动点开始)');
-assert(/async function gtFillSouls\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtFillSouls: 一键把空位坐满房里灵魂(eh_gt_seat_soul)');
-assert(/fillSouls\s*:\s*\(\)\s*=>\s*gtFillSouls/.test(APP), 'gtCtx 暴露 fillSouls 动作给牌桌卡');
-assert(/一键请灵魂/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 招募中(host)有「一键请灵魂」按钮');
-assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(一个个请)');
+assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
+const GS = (APP.match(/async function gtStart\(id\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名 AI)');
+assert(!/gtFillSouls/.test(APP), '旧 gtFillSouls(一键请灵魂)已退休(并入 gtStart 的灵魂补位)');
+assert(!/一键请灵魂/.test(NET) && !/fillSouls/.test(NET), 'table-net 已去掉「一键请灵魂」按钮(点开始即代劳)');
+assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(指定某灵魂坐某席)');
 assert(/async function launchTexasOnline\(\)\{\s*return launchTexas\(\);\s*\}/.test(APP),
   'launchTexasOnline 已退化成 launchTexas 别名(兼容旧命令/调用点)');
-assert(/table-net\.js\?v=20260819-member-upsert/.test(HTML), 'index.html 挂 table-net.js?v=20260819-member-upsert(随改动升号)');
+assert(/table-net\.js\?v=20260819-swipe-souls/.test(HTML), 'index.html 挂 table-net.js?v=20260819-swipe-souls(随改动升号)');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

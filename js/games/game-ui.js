@@ -148,7 +148,7 @@
 .ddz-me .meta .nm{max-width:150px}
 /* 手牌扇形 */
 .ddz-hand-wrap{padding:2px 10px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
-.ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap}
+.ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap;touch-action:none}
 .ddz-hand .card{margin-left:var(--hand-ov,-20px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center}
 .ddz-hand .card:first-child{margin-left:0}
 .ddz-hand.locked .card{cursor:default}
@@ -423,6 +423,44 @@
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
     window.addEventListener('resize', onResize);
 
+    // ── 划选: 指针涂抹式多选(点=单选 / 拖过整段=连选), 取代逐张 click, 与掼蛋同源 ──
+    // 只绑一次(挂在手牌容器上, 手牌重绘不重复绑)。手牌左→右叠放, 后牌盖前牌右半,
+    // 故 handCardAt 不用 elementFromPoint(会在牌中心命中右邻牌漏掉最左那张), 改按 x 命中"露出的那张"。
+    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, lastSelTick=0;
+    function handCardAt(x,y){
+      const kids=els.hand.children, n=kids.length; if(!n) return null;
+      const hr=els.hand.getBoundingClientRect();
+      if(y < hr.top-40 || y > hr.bottom+40) return null;   // 垂直离手牌带太远不算(拖向出牌钮时不误选)
+      let pick=kids[0];                                     // x 在首牌左沿之前 → 归首牌
+      for(let i=0;i<n;i++){ if(x >= kids[i].getBoundingClientRect().left-0.5) pick=kids[i]; else break; }
+      return pick;                                          // left ≤ x 里最靠右的一张 = 指针下露出的那张
+    }
+    function applyPaintIdx(i){
+      const c=els.hand.children[i]; if(!c) return;
+      const id=c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);
+      if(paintMode==='select') selected.add(id); else selected.delete(id);
+      c.classList.toggle('sel', selected.has(id));
+      if(paintMode==='select'){ const now=(performance&&performance.now)?performance.now():Date.now(); if(now-lastSelTick>60){ lastSelTick=now; sfx('cardsel'); } }
+    }
+    function paintTo(c){
+      if(!c) return; const idx=+c.dataset.idx;
+      if(paintLastIdx==null) applyPaintIdx(idx);
+      else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
+      paintLastIdx=idx; updatePlayBtn();
+    }
+    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; }
+    els.hand.addEventListener('pointerdown', (e)=>{
+      if(st.phase!=='play' || st.turn!==mySeat || (isGuest && awaitingHost)) return;
+      const c=handCardAt(e.clientX,e.clientY); if(!c) return;
+      painting=true; paintSeen=new Set(); paintLastIdx=null;
+      paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
+      try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
+      paintTo(c); e.preventDefault();
+    });
+    els.hand.addEventListener('pointermove', (e)=>{ if(painting) paintTo(handCardAt(e.clientX,e.clientY)); });
+    els.hand.addEventListener('pointerup', endPaint);
+    els.hand.addEventListener('pointercancel', endPaint);
+
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回到牌桌) ──
     // "返回"不再销毁牌局: 牌桌 zoom 进右下角一枚活牌桌片, 引擎/定时器后台继续跑(AI 照走),
     // 轮到自己时片子脉冲提醒且不判超时(离席看聊天不该被自动过牌); 点片子再 zoom 回全牌桌。
@@ -584,16 +622,10 @@
       handOrder().forEach((card, idx)=>{
         const el = cardEl(card);
         el.dataset.id = card.id;
+        el.dataset.idx = idx;               // 划选连选按 idx 补齐整段(见 paintTo)
         if (selected.has(card.id)) el.classList.add('sel');
         if (deal){ el.style.animationDelay = (idx*20)+'ms'; el.classList.add('justdealt'); }
-        el.addEventListener('click', ()=>{
-          if (st.phase!=='play' || st.turn!==mySeat) return;
-          const willSel = !selected.has(card.id);
-          if (willSel) selected.add(card.id); else selected.delete(card.id);
-          el.classList.toggle('sel');
-          if (willSel) sfx('cardsel');   // 选牌轻触音(取消不响)
-          updatePlayBtn();
-        });
+        // 选牌统一走手牌区的指针涂抹(点=单选/拖=连选), 见下方 bindPaint(); 不再逐张挂 click
         els.hand.appendChild(el);
       });
       layoutHand();

@@ -104,8 +104,9 @@ assert(/function gtLaunchPoker\(row\)/.test(src) && /window\.EHPokerGame\.open\(
 assert(/mySeat:A\.mySeat/.test(src) && /isAI:A\.isAI/.test(src), '座位/mySeat/isAI 由 gtSeatArrays 名册驱动(真人坐人席, 灵魂/空位=AI)');
 assert(/isAI\[i\]=!human/.test(src), 'gtSeatArrays: 非真人席(灵魂/AI/空位)一律标记 AI(host 本机代打)');
 assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
-// 灵魂补位: 一个个(座位下拉 seatSoul) 或 一键(gtFillSouls); 空位开局由 SQL/引擎补 AI, 保证可开局
-assert(/async function gtFillSouls\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtFillSouls: 一键把空位坐满房里灵魂(eh_gt_seat_soul)');
+// 灵魂补位: 指定某席用座位下拉 seatSoul; 点「开始」即由 gtStart→gtSeatSoulsIntoEmpties 把空位补满房里灵魂(灵魂来玩, 非匿名 AI)。
+assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
+assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
 
 // 结束回调 → 战绩卡 + 落库(在 gtLaunchPoker 的 onResult 里, 名册取 A.names/A.avatars)
 assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');
