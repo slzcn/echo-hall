@@ -55,27 +55,60 @@ returns jsonb language sql immutable as $$
   from generate_series(0, greatest(coalesce(p_count,4),1)-1) as g(i);
 $$;
 
+-- ---- RPC: 陈旧桌回收(任何认证用户可调, 只关"没人玩"的僵尸桌, 幂等安全) ----
+-- 「5 分钟没人玩自动解散」的执行器: lobby 开而不打 / playing 房主心跳断, 5 分钟无 updated_at
+--   变化即判僵尸桌散掉。host 每 ~90s 用 eh_gt_set_state 空刷 updated_at 当心跳, 真在玩的桌不会误杀。
+-- 前端进房时 + 房内定时(每 ~2min)调一次 → 死桌即使没人再开新局也会自动翻成"已散桌"(realtime 推送)。
+create or replace function public.eh_gt_reap(p_room uuid)
+returns int
+language plpgsql security definer set search_path to 'public' as $$
+declare v_n int;
+begin
+  update public.eh_game_tables
+    set status='closed', updated_at=now()
+    where (p_room is null or room_id=p_room)
+      and status in ('lobby','playing')
+      and updated_at < now() - interval '5 minutes';
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+grant execute on function public.eh_gt_reap(uuid) to public;
+
 -- ---- RPC: 开桌(host 坐 0 席; 席位数按游戏来) ----
--- 同房已有活桌则返回那张(幂等: 重复点开桌不叠第二张)。
--- 开桌前先回收本房陈旧桌(见下): 否则"一房一桌"唯一索引被僵尸桌永久占住, 新局再也开不出来。
+-- 「游戏随时可开」语义:
+--   · 开桌前先回收本房陈旧桌(5min 没人玩): 否则"一房一桌"唯一索引被僵尸桌永久占住, 新局再也开不出来。
+--   · 我自己的活桌 + 同一游戏 → 幂等返回那张(双击开局不叠第二张)。
+--   · 我自己的活桌 + 换了游戏 → 关掉旧的再开新的(主人反馈: 不能因为有没开始的游戏就开不了另一个)。
+--   · 别人的活桌 → 一房一桌语义, 返回那张(引导去加入)。
 create or replace function public.eh_gt_open(p_room uuid, p_game text, p_name text, p_emoji text)
 returns public.eh_game_tables
 language plpgsql security definer set search_path to 'public' as $$
-declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_cnt int;
+declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_cnt int; v_g text;
 begin
   if v_me is null then raise exception 'not authenticated'; end if;
   if p_room is null then raise exception 'room required'; end if;
-  -- 陈旧桌自动作废(仅本房): lobby 开而不打 30 分钟 / playing 房主心跳断 5 分钟 → 判僵尸桌散掉。
-  --   host 每 ~90s 用 eh_gt_set_state(null,'') 空刷一次 updated_at 当心跳; 真在打的桌不会被误杀,
-  --   硬崩(没触发 onExit)留下的死桌则会在别人下次开桌时被清走。
+  v_g := lower(coalesce(p_game,'guandan'));
+  -- 陈旧桌自动作废(仅本房): lobby/playing 5 分钟无活动即判僵尸桌散掉(与 eh_gt_reap 同阈值)。
   update public.eh_game_tables
     set status='closed', updated_at=now()
     where room_id=p_room and status in ('lobby','playing')
-      and ( (status='lobby'   and updated_at < now() - interval '30 minutes')
-         or (status='playing' and updated_at < now() - interval '5 minutes') );
+      and updated_at < now() - interval '5 minutes';
   select * into v_row from public.eh_game_tables
     where room_id=p_room and status in ('lobby','playing') limit 1;
-  if found then return v_row; end if;
+  if found then
+    -- 我自己的桌 + 同游戏 → 幂等复用
+    if v_row.host_uid = v_me and lower(coalesce(v_row.game,'')) = v_g then
+      return v_row;
+    end if;
+    -- 我自己的桌 + 换游戏 → 关旧开新(随时另开游戏)
+    if v_row.host_uid = v_me then
+      update public.eh_game_tables set status='closed', updated_at=now() where id=v_row.id;
+    else
+      -- 别人的活桌 → 返回让其去加入(一房一桌)
+      return v_row;
+    end if;
+  end if;
   v_cnt := public.eh_gt_seat_count(p_game);
   insert into public.eh_game_tables(room_id, game, host_uid, seats, seat_count)
     values (p_room, coalesce(p_game,'guandan'), v_me,

@@ -1131,6 +1131,7 @@ let msgChan = null;        // Realtime postgres_changes 频道
 let _tailPollTimer = null; // 房内周期兜底轮询: 补住 realtime socket 僵死(切后台/弱网/降频)期间漏投的消息
 let presChan = null;       // Realtime presence 频道
 let gtChan = null;         // Realtime 联机牌桌频道(eh_game_tables 座位/局态变化)
+let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动解散), 不依赖有人再开桌触发
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
@@ -2259,8 +2260,14 @@ async function setupPresence(room){
 // 卡的座位按【实时 table 行】渲染: realtime 推 → gtRenderCard 找到 [data-gt-id] 就地重绘(不新增监听)。
 async function setupGameTables(room){
   if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
+  if(gtReapTimer){ clearInterval(gtReapTimer); gtReapTimer=null; }
   _gtCleanupPlay();
   _gtTables.clear();
+  // 「5分钟没人玩自动解散」: 进房先回收一次本房陈旧桌, 再每 2min 扫一次。
+  //   reap 只关 5min 无活动的僵尸桌(幂等安全), 关掉即经 realtime 把牌桌卡翻成"已散桌"。
+  const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){} };
+  reap();
+  gtReapTimer = setInterval(reap, 120000);
   gtChan = sb.channel('room-gt:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_game_tables',filter:'room_id=eq.'+room.id}, p=>{
       const row=p.new; if(!row || !curRoom || curRoom.id!==room.id) return;
@@ -7435,6 +7442,7 @@ async function leaveRoom(){
   if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 离房停兜底轮询
   if(presChan){ await sb.removeChannel(presChan); presChan=null; }
   if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
+  if(gtReapTimer){ clearInterval(gtReapTimer); gtReapTimer=null; }
   _gtTables.clear();
   // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
   if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
