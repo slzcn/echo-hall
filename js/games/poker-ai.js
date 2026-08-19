@@ -30,11 +30,11 @@
   //   chenGate 越高越只玩强牌(紧); aggr 越高越爱下注/加注; bluff 诈唬频率;
   //   callEq 跟注需要的最低胜率线(跟注站可低于赔率硬跟); betFrac 下注占底池比例。
   const PERSONAS = {
-    rock:    { key:'rock',    name:'岩石',   chenGate:10, aggr:0.35, bluff:0.02, callEq:0.55, betFrac:0.70, threeBet:0.10 },
-    tag:     { key:'tag',     name:'紧凶',   chenGate:8,  aggr:0.68, bluff:0.12, callEq:0.48, betFrac:0.65, threeBet:0.30 },
-    lag:     { key:'lag',     name:'松凶',   chenGate:5,  aggr:0.82, bluff:0.30, callEq:0.40, betFrac:0.70, threeBet:0.45 },
-    maniac:  { key:'maniac',  name:'疯子',   chenGate:2,  aggr:0.93, bluff:0.48, callEq:0.33, betFrac:0.85, threeBet:0.60 },
-    station: { key:'station', name:'跟注站', chenGate:6,  aggr:0.15, bluff:0.03, callEq:0.28, betFrac:0.50, threeBet:0.05 },
+    rock:    { key:'rock',    name:'岩石',   chenGate:8,  aggr:0.35, bluff:0.02, callEq:0.55, betFrac:0.70, threeBet:0.10 },
+    tag:     { key:'tag',     name:'紧凶',   chenGate:6,  aggr:0.68, bluff:0.12, callEq:0.48, betFrac:0.65, threeBet:0.30 },
+    lag:     { key:'lag',     name:'松凶',   chenGate:4,  aggr:0.82, bluff:0.30, callEq:0.40, betFrac:0.70, threeBet:0.45 },
+    maniac:  { key:'maniac',  name:'疯子',   chenGate:1,  aggr:0.93, bluff:0.48, callEq:0.33, betFrac:0.85, threeBet:0.60 },
+    station: { key:'station', name:'跟注站', chenGate:4,  aggr:0.15, bluff:0.03, callEq:0.28, betFrac:0.50, threeBet:0.05 },
   };
   const PERSONA_KEYS = Object.keys(PERSONAS);
   function persona(key){ return PERSONAS[key] || PERSONAS.tag; }
@@ -163,8 +163,11 @@
     if (state.street === 'preflop' && state.board.length === 0){
       const chen = chenScore(p.hole);
       const bbLeft = p.stack / state.bb;
-      // 门槛: 性格基线 + 每多一个对手抬 1 + 无位置再抬 1
-      let gate = P.chenGate + Math.max(0, nOpp - 1) - (pos ? 1 : 0);
+      // 门槛: 性格基线 + 对手数微调(每2个对手才抬1, 封顶+2) + 无位置再抬 1
+      //   反回退(主人反馈"翻前几乎全弃"): 旧式"每多一对手抬1"在6人桌把门槛抬到+4~+5,
+      //   紧凶(默认)playable 变成 Chen≥12(仅JJ+/AKs≈3%)→级联全弃成死桌。多人局理应收紧,
+      //   但线性叠加过陡; 改成 floor((nOpp-1)/2) 封顶2, 6人桌只抬+2, 保留人越多越紧的方向感。
+      let gate = P.chenGate + Math.min(2, Math.floor(Math.max(0, nOpp - 1) / 2)) - (pos ? 1 : 0);
       const strong = chen >= gate + 4;      // 明显强牌
       const playable = chen >= gate;        // 够玩
 
