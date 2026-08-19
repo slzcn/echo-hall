@@ -40,6 +40,67 @@
   const NEXT_STREET = { preflop:'flop', flop:'turn', turn:'river', river:'showdown' };
   const STREET_DEAL = { flop:3, turn:1, river:1 };
 
+  // ── 发牌偏置(让"买得到牌"成为大概率, 治「过于随机基本无牌可打」) ──
+  //   主人问题: 纯随机洗牌下 6 人桌起手约七成是散牌垃圾, 灵魂级联全弃 → 死桌无聊。
+  //   做法: 洗好牌后, 对【起手是散牌】的座位, 以 actionBias 概率把它的【第二张底牌】
+  //         换成废牌区里一张与第一张"协调(同花/对子/顺连)"的牌 → 起手更常见成搭子。
+  //   命门(反作弊+可回放):
+  //     · 只动第二张底牌 cards[n+i], 且只与【废牌区 index≥2n+8】对换 —— 公共牌(含烧牌,
+  //       最多用到 index 2n+7)、他人底牌、第一张底牌全程不碰; 换出的旧牌落回废牌区。
+  //     · 对【所有座位同等对待】(自己/灵魂一视同仁), 座位处理序按 seed 洗过→无座次偏袒。
+  //     · 全程走 seed 派生 rng → 确定性可复现; 强度写进 deal 日志, replay 照记录重建
+  //       (旧日志无此字段→按 0 偏置重放, 与开此功能前发牌完全一致, 向后兼容不串局)。
+  //   注意只抬"搭子概率", 不保证成牌: 公共牌仍纯随机, 听牌照样会落空——保留博弈。
+  const DEFAULT_ACTION_BIAS = 0.55;
+  function holePlayable(a, b){
+    if (a.rank === b.rank) return true;                        // 对子
+    if (a.suit === b.suit) return true;                        // 同花(含同花小张, 有同花/顺潜力)
+    const hi = Math.max(a.rank, b.rank), lo = Math.min(a.rank, b.rank);
+    if (hi - lo <= 2) return true;                             // 顺连/一间张
+    if (lo >= 11) return true;                                 // 两高张(J 以上)
+    if (hi === 14 && lo >= 10) return true;                    // 大 A 带 10+
+    return false;
+  }
+  // 与锚牌 a 协调(适合换进来当第二张): 同花/对子/顺连一间张
+  function coordinatedWith(a, x){
+    if (x.rank === a.rank) return true;
+    if (x.suit === a.suit) return true;
+    return Math.abs(x.rank - a.rank) <= 2;
+  }
+  // 用 rng 做 Fisher-Yates 打乱一个下标数组(确定性)
+  function shuffleIdx(arr, rng){
+    for (let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(rng() * (i + 1));
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  function arrangeActionDeck(cards, n, rng, strength){
+    if (!(strength > 0)) return cards;
+    const muckStart = 2 * n + 8;                               // 废牌区起点(公共牌+烧牌最多用到 2n+7)
+    if (muckStart >= cards.length) return cards;               // 人太多没废牌可换, 放弃偏置
+    const consumed = new Set();
+    const seatIdx = shuffleIdx(Array.from({ length: n }, (_, i) => i), rng); // 座位处理序打乱→无座次偏袒
+    for (const i of seatIdx){
+      const a = cards[i];                                      // 第一张底牌(锚, 从不移动)
+      const b = cards[n + i];                                  // 第二张底牌(可换)
+      if (holePlayable(a, b)) continue;                        // 已是可玩起手, 不动
+      if (rng() >= strength) continue;                         // 掷骰: 本座位这手不吃偏置
+      // 在废牌区里按打乱序找第一张与锚协调、且未被别座位领走的牌
+      const pool = shuffleIdx(
+        Array.from({ length: cards.length - muckStart }, (_, k) => muckStart + k), rng);
+      for (const m of pool){
+        if (consumed.has(m)) continue;
+        if (coordinatedWith(a, cards[m])){
+          const t = cards[n + i]; cards[n + i] = cards[m]; cards[m] = t; // 换: 第二张↔废牌
+          consumed.add(m);
+          break;
+        }
+      }
+    }
+    return cards;
+  }
+
   // ── 建局 ──────────────────────────────────────────────────
   // opts: { seed, names[], isAI[], stacks[]|startStack, sb, bb, button }
   function createGame(opts){
@@ -54,6 +115,10 @@
     const button = (typeof opts.button === 'number') ? (opts.button % n) : 0;
 
     const { seed, cards } = Deck.shuffle(pokerDeck(), opts.seed);
+    // 发牌偏置: 让散牌座位有概率补成搭子(见 arrangeActionDeck)。强度取自 opts(回放传旧值),
+    //   缺省用 DEFAULT_ACTION_BIAS; 显式 0 = 关闭(旧日志重放走这条, 保持与开此功能前一致)。
+    const actionBias = (opts.actionBias != null) ? +opts.actionBias : DEFAULT_ACTION_BIAS;
+    arrangeActionDeck(cards, n, Deck.mulberry32((seed ^ 0x9e3779b9) >>> 0), actionBias);
 
     const players = names.map((nm, seat) => ({
       id: (opts.ids && opts.ids[seat]) || ('p' + seat),
@@ -68,7 +133,7 @@
       _deck: { cards, cursor: 0 },
       street: 'preflop', currentBet: 0, minRaise: bb, aggressor: null,
       toAct: -1, pot: 0, result: null,
-      log: [{ t:'deal', seed, button, sb, bb, n, stacks: stacks.slice(), names: names.slice() }],
+      log: [{ t:'deal', seed, button, sb, bb, n, stacks: stacks.slice(), names: names.slice(), actionBias }],
     };
 
     // 发底牌: 从庄家左手第一位起, 每人两张(轮发, 与真实一致)
@@ -352,6 +417,9 @@
     const st = createGame(Object.assign({
       seed: dealE.seed, button: dealE.button, sb: dealE.sb, bb: dealE.bb,
       names: dealE.names, stacks: dealE.stacks,
+      // ★发牌偏置按日志记录重建: 旧日志无此字段→0(与开偏置功能前发牌一致), 新日志用记录值。
+      //   缺了这行会让旧局重放误吃默认偏置→底牌与原局不符, 回看/记分复核全错。
+      actionBias: (dealE.actionBias != null ? dealE.actionBias : 0),
     }, opts || {}));
     for (const e of log){
       if (e.t !== 'action') continue;

@@ -2061,7 +2061,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-tex-loose';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-deal-bias';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2540,7 +2540,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/guandan-ui.js?v=20260819-soul-coop"></script>
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <script defer src="./js/games/poker-eval.js?v=20260816-texas"></script>
-<script defer src="./js/games/poker-engine.js?v=20260816-texas"></script>
+<script defer src="./js/games/poker-engine.js?v=20260820-deal-bias"></script>
 <script defer src="./js/games/poker-ai.js?v=20260820-tex-loose"></script>
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
 <script defer src="./js/games/poker-net.js?v=20260816-exp1"></script>
