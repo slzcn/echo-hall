@@ -238,5 +238,46 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic });
+  // 我的私密房间列表：所有运行时资源均通过 getter／注入依赖读取，避免模块初始化时捕获未 boot 的 sb。
+  function createRenderMyRooms(deps) {
+    deps = deps || {};
+    var getSb = deps.getSb, roomsQuery = deps.roomsQuery, getMyUid = deps.getMyUid;
+    var getBox = deps.getBox, getEmpty = deps.getEmpty, rmSkel = deps.rmSkel;
+    var prefetchAll = deps.prefetchAll, getConfig = deps.getConfig;
+    var esc = deps.esc, safeEmoji = deps.safeEmoji, readKnownOnline = deps.readKnownOnline;
+    var enterRoom = deps.enterRoom, copyInvite = deps.copyInvite;
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getMyUid !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof rmSkel !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof readKnownOnline !== 'function' || typeof enterRoom !== 'function' || typeof copyInvite !== 'function') {
+      throw new TypeError('[EH_LOBBY] createRenderMyRooms missing dependencies');
+    }
+    return async function renderMyRooms(soft) {
+      var myUid = getMyUid(), box = getBox();
+      if (!box) return { failed: true };
+      if (!myUid) { box.innerHTML = ''; return; }
+      if (soft && box.querySelector('.rm[data-rid]')) {
+        prefetchAll(Array.from(box.querySelectorAll('.rm[data-rid]')).map(function (c) { return { id: c.dataset.rid, kind: 'private' }; }));
+        return;
+      }
+      if (!box.children.length) box.innerHTML = rmSkel(2);
+      var sb = getSb();
+      if (!sb) return { failed: true };
+      var result = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind', 'private').order('created_at', { ascending: false }));
+      if (result.__timeout) return { failed: true };
+      var data = result.data, cfg = (getConfig() && getConfig().lobbyDisplay) || {}, empty = getEmpty();
+      if (cfg.privateVisible === false) { box.innerHTML = ''; if (empty) empty.style.display = 'none'; return; }
+      if (!data || !data.length) { box.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+      if (empty) empty.style.display = 'none';
+      box.innerHTML = data.map(function (r) {
+        return '<div class="rm" data-rid="' + r.id + '" data-nm="' + esc(r.name) + '" data-em="' + safeEmoji(r.emoji) + '" data-kind="private">' +
+          '<span class="rm-ic">' + safeEmoji(r.emoji) + '</span><span class="rm-nm">' + esc(r.name) + '</span>' +
+          (r.owner === myUid ? '<span class="rm-badge">房主</span>' : '') +
+          (r.invite_code ? '<span class="rm-code" data-code="' + esc(r.invite_code) + '" title="点击复制邀请码">' + esc(r.invite_code) + '<svg class="rm-copy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span>' : '') +
+          '<span class="rm-arr">→</span></div>';
+      }).join('');
+      box.querySelectorAll('.rm').forEach(function (el) { el.onclick = function () { enterRoom({ id: el.dataset.rid, name: el.dataset.nm, emoji: el.dataset.em, kind: 'private', knownOnline: readKnownOnline(el) }); }; });
+      box.querySelectorAll('.rm-code[data-code]').forEach(function (el) { el.onclick = function (e) { e.stopPropagation(); copyInvite(el.dataset.code, el); }; });
+      prefetchAll(data.map(function (r) { return { id: r.id, kind: 'private' }; }));
+    };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms });
 })(window);

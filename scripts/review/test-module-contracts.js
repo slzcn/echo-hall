@@ -145,3 +145,24 @@ for (const [name, globalName, factoryName, keys] of modules) {
   }
   console.log('PASS lobby: renderPublic resolves late Supabase at call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
+
+
+// 回归：私密房列表创建时 sb 尚未 boot，调用时才读取最新客户端。
+(async function testLateSupabaseForMyRooms() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateSb = null, queryCalled = 0;
+  const box = { innerHTML: '', children: [], querySelector: () => null, querySelectorAll: () => [] };
+  const empty = { style: {} };
+  const render = lobby.createRenderMyRooms({
+    getSb: () => lateSb, roomsQuery: async q => { queryCalled += 1; return q; }, getMyUid: () => 'user-1',
+    getBox: () => box, getEmpty: () => empty, rmSkel: () => '<skeleton>', prefetchAll: () => {}, getConfig: () => {},
+    esc: value => String(value), safeEmoji: value => value || '○', readKnownOnline: () => null,
+    enterRoom: () => {}, copyInvite: () => {},
+  });
+  const beforeBoot = await render(false);
+  if (!beforeBoot || !beforeBoot.failed || queryCalled !== 0) throw new Error('lobby: my rooms before Supabase boot must fail safely');
+  lateSb = { from: () => ({ select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [{ id: 'r1', name: '私密房', emoji: '◇', owner: 'user-1' }] }) }) }) }) };
+  await render(false);
+  if (queryCalled !== 1 || !box.innerHTML.includes('私密房')) throw new Error('lobby: my rooms did not use late Supabase client');
+  console.log('PASS lobby: renderMyRooms resolves late Supabase at call time');
+})().catch(err => { console.error(err); process.exitCode = 1; });

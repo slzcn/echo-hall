@@ -1406,30 +1406,21 @@ function optimisticCnt(room){
   if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
   return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
-async function renderMyRooms(soft){
-  if(!myUid){ $('#myRooms').innerHTML=''; return; }
-  const boxE=$('#myRooms');
-  if(soft && boxE.querySelector('.rm[data-rid]')){
-    prefetchAll([...boxE.querySelectorAll('.rm[data-rid]')].map(c=>({id:c.dataset.rid,kind:'private'})));
-    return;   // 私密房卡片无在线数/预览需刷新, 仅重新预取即可
-  }
-  if(!boxE.children.length) boxE.innerHTML=rmSkel(2);   // 慢网先占位
-  const _r = await roomsQuery(sb.from('eh_rooms').select('id,name,emoji,invite_code,owner').eq('kind','private').order('created_at',{ascending:false}));
-  if(_r.__timeout){ return {failed:true}; }   // 超时: 保留骨架, 交给 renderLobby 重试
-  const { data } = _r;
-  const cfg=(EH_CONFIG&&EH_CONFIG.lobbyDisplay)||{};
-  const box=$('#myRooms'); const pe=$('#privEmpty');
-  if(cfg.privateVisible===false){ box.innerHTML=''; if(pe) pe.style.display='none'; return; }
-  if(!data || !data.length){ box.innerHTML=''; if(pe) pe.style.display='block'; return; }
-  if(pe) pe.style.display='none';
-  box.innerHTML=data.map(r=>`<div class="rm" data-rid="${r.id}" data-nm="${esc(r.name)}" data-em="${safeEmoji(r.emoji)}" data-kind="private">
-    <span class="rm-ic">${safeEmoji(r.emoji)}</span><span class="rm-nm">${esc(r.name)}</span>
-    ${r.owner===myUid?'<span class="rm-badge">房主</span>':''}
-    ${r.invite_code?`<span class="rm-code" data-code="${esc(r.invite_code)}" title="点击复制邀请码">${esc(r.invite_code)}<svg class="rm-copy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span>`:''}<span class="rm-arr">→</span></div>`).join('');
-  box.querySelectorAll('.rm').forEach(el=>el.onclick=()=>enterRoom({id:el.dataset.rid,name:el.dataset.nm,emoji:el.dataset.em,kind:'private',knownOnline:readKnownOnline(el)}));
-  box.querySelectorAll('.rm-code[data-code]').forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); copyInvite(el.dataset.code, el); });
-  prefetchAll((data||[]).map(r=>({id:r.id,kind:'private'})));
-}
+const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms({
+  getSb:()=>sb,
+  roomsQuery,
+  getMyUid:()=>myUid,
+  getBox:()=>$('#myRooms'),
+  getEmpty:()=>$('#privEmpty'),
+  rmSkel,
+  prefetchAll: (...args)=>prefetchAll(...args),
+  getConfig:()=>EH_CONFIG,
+  esc,
+  safeEmoji,
+  readKnownOnline,
+  enterRoom,
+  copyInvite,
+});
 // 复制邀请码: 优先 clipboard API, 失败降级 execCommand(webview/非安全上下文兜底), 复制成功给卡片短暂反馈
 function copyInvite(code, el){
   const done=()=>{ if(el){ el.classList.add('copied'); setTimeout(()=>el.classList.remove('copied'),1200); } toast(EH_CONFIG.text.ok_codeCopied||'邀请码已复制'); };
