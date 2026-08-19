@@ -1336,6 +1336,13 @@ const lobbyShowRetry = window.EH_LOBBY_MODULE.createLobbyShowRetry({
   ensureAuth,
   getRenderLobby:()=>renderLobby,
 });
+// 从卡片 .cnt 文案读取已知在线数的纯辅助已迁入大厅模块。
+const readKnownOnline = window.EH_LOBBY_MODULE.readKnownOnline;
+const bindRoomCards = window.EH_LOBBY_MODULE.createBindRoomCards({
+  readKnownOnline,
+  getPrefetchRoom:()=>prefetchRoom,
+  getEnterRoom:()=>enterRoom,
+});
 const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial({
   getSb:()=>sb,
   roomsQuery,
@@ -1366,21 +1373,12 @@ const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
 });
 // 相对时间格式化已迁入大厅模块，保留本地引用以兼容现有调用点。
 const fmtAgo = window.EH_LOBBY_MODULE.fmtAgo;
-// 从卡片 .cnt 文字("N 人在线")解析已知在线数，用于进房乐观显示
-function readKnownOnline(cardEl){
-  try{ const t=cardEl.querySelector('.cnt')?.textContent||''; const m=t.match(/(\d+)/); return m?parseInt(m[1],10):null; }catch(e){ return null; }
-}
 // 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
 function optimisticCnt(room){
   const k=room&&room.knownOnline;
   if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
   return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
-const bindRoomCards = window.EH_LOBBY_MODULE.createBindRoomCards({
-  readKnownOnline,
-  getPrefetchRoom:()=>prefetchRoom,
-  getEnterRoom:()=>enterRoom,
-});
 const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
   getNavigator:()=>navigator,
   getDocument:()=>document,

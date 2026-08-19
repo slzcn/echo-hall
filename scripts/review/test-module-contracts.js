@@ -14,6 +14,13 @@ if (copyInviteInitAt < 0 || myRoomsInitAt < 0 || copyInviteInitAt > myRoomsInitA
 }
 console.log('PASS lobby: app wiring initializes copyInvite before renderMyRooms');
 
+const bindCardsInitAt = appSource.indexOf('const bindRoomCards = window.EH_LOBBY_MODULE.createBindRoomCards');
+const officialInitAt = appSource.indexOf('const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial');
+if (bindCardsInitAt < 0 || officialInitAt < 0 || bindCardsInitAt > officialInitAt) {
+  throw new Error('lobby: bindRoomCards must initialize before renderOfficial dependency injection');
+}
+console.log('PASS lobby: app wiring initializes bindRoomCards before room renderers');
+
 const modules = [
   ['lobby', 'EH_LOBBY_MODULE', 'createLobbyController', ['render', 'renderOfficial', 'renderPublic', 'renderMyRooms', 'showRetry', 'fillRoomStats', 'prefetchRoom', 'prefetchAll']],
   ['auth', 'EH_AUTH_MODULE', 'createAuthController', ['api', 'awaitReady', 'resolveSession', 'ensure', 'saveIdentity', 'loadOrRollIdentity', 'logout']],
@@ -32,6 +39,12 @@ if (typeof context.window.EH_LOBBY_MODULE.fmtAgo !== 'function') throw new Error
 const agoNow = context.window.EH_LOBBY_MODULE.fmtAgo(new Date().toISOString());
 if (agoNow !== '刚刚') throw new Error(`lobby: fmtAgo immediate value mismatch: ${agoNow}`);
 console.log('PASS lobby: fmtAgo pure helper is exported');
+
+const knownOnline = context.window.EH_LOBBY_MODULE.readKnownOnline({ querySelector: () => ({ textContent: '12 人在线' }) });
+if (knownOnline !== 12 || context.window.EH_LOBBY_MODULE.readKnownOnline({ querySelector: () => null }) !== null) {
+  throw new Error('lobby: readKnownOnline parsing mismatch');
+}
+console.log('PASS lobby: readKnownOnline pure helper is exported');
 
 // 回归：卡片绑定早于预取／进房实现就绪时不得捕获空值，交互发生时读取最新函数。
 (function testLateRuntimeForRoomCardBinding() {

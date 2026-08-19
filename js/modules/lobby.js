@@ -54,6 +54,16 @@
     return Math.floor(s / 86400) + '天前';
   }
 
+  // 从房间卡 .cnt 文案读取已知在线数：纯 DOM 辅助，不依赖大厅运行时状态。
+  function readKnownOnline(cardEl) {
+    try {
+      var cnt = cardEl.querySelector('.cnt');
+      var text = cnt && cnt.textContent || '';
+      var match = text.match(/(\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    } catch (e) { return null; }
+  }
+
   // 大厅加载多次失败后的手动重试入口。身份和 renderLobby 都可能晚于模块初始化，点击时再通过 getter 读取。
   function createLobbyShowRetry(deps) {
     deps = deps || {};
@@ -418,5 +428,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);
