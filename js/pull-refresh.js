@@ -112,11 +112,13 @@
     }
   }
 
-  /* 轻量拉 ver.txt(no-store, 2.5s 超时)。超时/失败返回 null → 上层按"无新版"软刷。 */
+  /* 轻量拉 ver.txt(no-store, 800ms 超时)。超时/失败返回 null → 上层按"无新版"软刷。
+     ★8/19: 超时从 2.5s 降到 800ms —— 弱网/断联时不再阻塞下拉刷新体验;
+     版本 check 失败会走软刷兜底, 内容重拉本身走网络, 该失败会自己再兜底成硬刷, 不会漏新版。 */
   function fetchVer(){
     return new Promise(function(resolve, reject){
       var done = false;
-      var to = setTimeout(function(){ if(!done){ done = true; reject(new Error('ver timeout')); } }, 2500);
+      var to = setTimeout(function(){ if(!done){ done = true; reject(new Error('ver timeout')); } }, 800);
       fetch('ver.txt?_=' + Date.now(), { cache:'no-store' }).then(function(r){
         return r.ok ? r.text() : null;
       }).then(function(t){ if(done) return; done = true; clearTimeout(to); resolve((t||'').trim()); },

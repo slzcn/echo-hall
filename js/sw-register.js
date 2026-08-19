@@ -19,13 +19,15 @@ if ('serviceWorker' in navigator) {
           });
         });
       }).catch(function (e) { console.warn('SW register failed:', e && e.message); });
-      // ★V36+：controller 切换后抗 SW【月销】很强的小米浏览器环境，主动重载页面拿新 HTML。
-      // 旧机制留了一个 `_ehSwClaimed` 句柄防循环（同一 controller 只重载一次）。
+      // ★8/19 修二次刷新: controllerchange 不再无脑 reload。
+      //   老逻辑「新 SW 一接管就整页 reload」会跟下拉刷新的 hardReload / 版本自愈的 location.replace 打架,
+      //   出现「刷新一次 → SW 切换 → 又 reload 一次」的二次刷新。
+      //   新策略: 记录 controller 已切换(缓存已是新版), 但不主动 reload;
+      //     - 如果本次页面是刚被硬刷/版本自愈拉起(带 __ehJustReloaded 标记), 直接吞掉;
+      //     - 否则由「版本自愈 check」或下次自然刷新拿新壳, 不打断当前会话。
       navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (window.__ehSwClaimed) return;
         window.__ehSwClaimed = true;
-        console.info('[EH SW] controller changed → reload for fresh shell');
-        try { location.reload(); } catch (_) {}
+        console.info('[EH SW] controller changed (silent, no reload)');
       });
     });
   }

@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v343-20260819-open-reap';
+const SW_VERSION = 'eh-sw-v344-20260819-refresh-perf';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -175,7 +175,7 @@ self.addEventListener('fetch', (e) => {
       // 3 秒内拿到网络就用网络; 否则用缓存兜底, 后台继续更新缓存
       let settled = false;
       return await new Promise((resolve) => {
-        const timer = setTimeout(() => { if (!settled) { settled = true; resolve(cached); } }, 3000);
+        const timer = setTimeout(() => { if (!settled) { settled = true; resolve(cached); } }, 1500);
         networkPromise.then((res) => {
           if (settled) return;
           settled = true; clearTimeout(timer); resolve(res || cached);
