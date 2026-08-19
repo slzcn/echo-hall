@@ -190,7 +190,7 @@ assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'guandan-ui 向 AI.decide 传
 assert(/\.gd-room\{[\s\S]*--cw:38px;[\s\S]*--av:42px/.test(ui), '牌桌尺寸提为 CSS 变量默认小屏值');
 assert(/\.card\{width:var\(--cw/.test(ui), '大牌宽度吃 --cw 变量');
 assert(/\.gd-avr\{width:var\(--av/.test(ui), '头像尺寸吃 --av 变量');
-assert(/\.gd-hand \.card\{margin-left:var\(--hand-ov/.test(ui), '手牌重叠吃 --hand-ov 变量');
+assert(/\.gd-hand-row \.card\{margin-left:var\(--hand-ov/.test(ui), '手牌重叠吃 --hand-ov 变量(两排各自叠放)');
 assert(/@media \(min-width:600px\)[\s\S]{0,260}--cw:44px/.test(ui) && /@media \(min-width:900px\)[\s\S]{0,260}--cw:52px/.test(ui),
   '600/900px 媒体查询把牌桌变量整体放大');
 // (7) 级牌/百搭全程可视(掼蛋特有)
@@ -207,11 +207,11 @@ assert(/iWon\)\{[\s\S]{0,200}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui)
 assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
 
 // ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────
-// (10a) 手牌单排自适应: 动态叠放吃满一行, 永不换行(治"27 张断裂成第二排")
-assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌单排自适应)');
-assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutHand 按可用宽算步距(牌多自动收紧, 单排排满)');
-assert(/\.gd-hand\{[^}]*flex-wrap:nowrap/.test(ui), '手牌 flex-wrap:nowrap(不换行, 杜绝断裂第二排)');
-assert(/function renderHand\(\)[\s\S]{0,700}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
+// (10a) 手牌自适应: 每排动态叠放吃满一行、行内永不换行(治"27 张断裂"); 上下两排是玩家手动理牌所分, 非布局失控换行
+assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌自适应)');
+assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutRow 按可用宽算步距(牌多自动收紧, 每排排满)');
+assert(/\.gd-hand-row\{[^}]*flex-wrap:nowrap/.test(ui), '每排 flex-wrap:nowrap(行内不换行, 杜绝布局失控断裂)');
+assert(/function renderHand\(\)[\s\S]{0,1500}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
 assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
   'resize 时重排手牌且关桌时解绑(转屏/分屏自适应, 不泄漏监听)');
 // (10b) 划选: 指针涂抹式多选(治"不能划过连选")
@@ -264,17 +264,27 @@ assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHT
   'renderSeats 用旋转后槽位(非写死 1/2/3)');
 assert(/isAI:\s*opts\.isAI/.test(ui), 'newDeal 吃 opts.isAI(host 按座位实况标人/机)');
 
-// ── 步骤13: 理牌(一键自动 + 手动拖排, 共用一个按钮) — 提示体验不输腾讯 ──
+// ── 步骤13: 理牌(一键自动 + 手动拖排 + 上下两排码牌) — 提示体验不输腾讯 ──
 // #gdSort 一个按钮: 短按=一键理牌(按级牌大小), 长按=进手动拖排模式自由码牌。
+// 掼蛋手牌多(27 张), 主人反馈"要能上下放置": 手动理牌里可把牌拖到上排/下排分成两排码。
 assert(/id="gdSort"[\s\S]{0,40}理牌/.test(ui), '手牌区有理牌按钮(#gdSort)');
 assert(/function autoSort\(\)/.test(ui) && /function setArrange\(/.test(ui), '一键自动理牌 autoSort + 手动模式切换 setArrange 并存');
-assert(/function handOrder\(\)/.test(ui) && /Rules\.sortHand\(hand,\s*st\.level\)/.test(ui), 'handOrder: 默认按级牌 Rules.sortHand 自动理牌(级牌抬权入序)');
-assert(/if \(customOrder\)/.test(ui), '手动理牌后按玩家排定的 id 顺序摆(customOrder 优先于自动)');
+assert(/function orderedRows\(\)/.test(ui) && /Rules\.sortHand\(hand,\s*st\.level\)/.test(ui), 'orderedRows: 默认按级牌 Rules.sortHand 自动理牌全在下排(级牌抬权入序)');
+assert(/if \(rows\)\{/.test(ui), '手动理牌后按玩家排定的两排 {top,bot} id 顺序摆(rows 优先于自动)');
+// 两排渲染: gd-hand 竖排容器内两个 gd-hand-row(上/下), 卡片带全局阅读序 data-idx 供划选连选
+assert(/gd-hand-row top/.test(ui) && /gd-hand-row bot/.test(ui), 'renderHand 建上/下两个 gd-hand-row 排');
+assert(/\.gd-hand\{[^}]*flex-direction:column/.test(ui), '.gd-hand 竖排布局(容纳上下两排)');
+assert(/function layoutRow\(/.test(ui) && /function layoutHand\(\)\{ for \(const row of els\.hand\.children\) layoutRow/.test(ui),
+  '每排各自 layoutRow 动态收紧叠放(两排独立排满不溢出)');
 assert(/if\(arrangeMode\)\{ startReorder\(e\); return; \}/.test(ui), '手动模式下 pointerdown 走拖排而非划选(共用手牌指针管道)');
 assert(/function startReorder\(/.test(ui) && /function moveReorder\(/.test(ui) && /function endReorder\(/.test(ui),
   '拖排三段: 起拖/移动/落位(复用划选的 pointer 基建)');
-assert(/dropX < r\.left \+ r\.width\/2/.test(ui), '落位按放下点与各牌中线判定插入位(所见即所得)');
+// 落位: y 判上/下排(下排上沿为界), x 判排内插入位; 上排空时有虚线投放区提示可分两排
+assert(/const target = dropY < boundary \? 'top' : 'bot'/.test(ui), '落位按放下点 y 判上/下排(拖到上方=上排)');
+assert(/dropX < r\.left \+ r\.width\/2/.test(ui), '落位按放下点与各牌中线判定排内插入位(所见即所得)');
+assert(/\.gd-hand\.arranging \.gd-hand-row\.top:empty\{/.test(ui), '理牌态空上排显示虚线投放区(引导拖牌分成两排)');
+assert(/rowAt\(y\)/.test(ui), 'handCardAt 先按 y 命中所在排再按 x 命中露出的那张(两排划选/拖牌都对)');
 assert(/setArrange\(!arrangeMode\)/.test(ui), '长按≥350ms 切手动理牌模式(与一键共用一个按钮)');
-assert(/customOrder=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一局重置理牌态(不带旧自定义序进新副)');
+assert(/rows=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一局重置理牌态(不带旧两排序进新副)');
 
 console.log('\n✅ 掼蛋旅程全部通过');

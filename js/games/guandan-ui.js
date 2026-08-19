@@ -158,14 +158,19 @@
 .gd-me .meta{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
 /* 手牌 */
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
-.gd-hand{display:flex;justify-content:center;flex-wrap:nowrap;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
-.gd-hand .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px}
-.gd-hand .card:first-child{margin-left:0}
+.gd-hand{display:flex;flex-direction:column;gap:6px;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
+.gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0}
+.gd-hand-row.top:empty{display:none}
+.gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px}
+.gd-hand-row .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
 .gd-hand .card.sel{transform:translateY(-16px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent);z-index:2}
 .gd-hand:not(.locked) .card:hover{transform:translateY(-7px)}
 .gd-hand:not(.locked) .card.sel:hover{transform:translateY(-16px)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
+/* 手动理牌: 空的上排显示成一条虚线投放区, 提示"拖到此处分组"(掼蛋 27 张可分两排码) */
+.gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
+.gd-hand.arranging .gd-hand-row.top:empty::before{content:'⬆ 拖到此处分成上排';color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.03em}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮 */
 .gd-hand-wrap{position:relative}
@@ -453,19 +458,27 @@
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
-    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null;
-    // 手牌左→右叠放, 后牌盖前牌右半 → elementFromPoint 在牌中心会命中右邻牌(漏掉最左那张)。
-    // 改按 x 命中"露出的那张": left ≤ x 里最靠右的一张(最后被指针越过的左沿), x 在首牌之前归首牌。
+    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, paintCards=null;
+    // 手牌现分上/下两排(掼蛋 27 张可码两排)。先按 y 定位命中哪一排, 再在该排里按 x 命中"露出的那张":
+    // 左→右叠放后牌盖前牌右半, elementFromPoint 在牌中心会命中右邻牌(漏最左那张) → 改逐张比左沿。
+    function rowAt(y){
+      const rowsEl=[...els.hand.children].filter(r=>r.children.length);
+      if(!rowsEl.length) return null;
+      for(const r of rowsEl){ const rr=r.getBoundingClientRect(); if(y>=rr.top-26 && y<=rr.bottom+26) return r; }
+      // 落在两排之外: 取竖直中心最近的一排(拖到边缘也不丢牌)
+      let best=null, bd=Infinity;
+      for(const r of rowsEl){ const rr=r.getBoundingClientRect(); const d=Math.abs(y-(rr.top+rr.bottom)/2); if(d<bd){ bd=d; best=r; } }
+      return best;
+    }
     function handCardAt(x,y){
-      const kids=els.hand.children, n=kids.length; if(!n) return null;
-      const hr=els.hand.getBoundingClientRect();
-      if(y < hr.top-40 || y > hr.bottom+40) return null;
+      const row=rowAt(y); if(!row) return null;
+      const kids=row.children, n=kids.length; if(!n) return null;
       let pick=kids[0];
       for(let i=0;i<n;i++){ if(x >= kids[i].getBoundingClientRect().left-0.5) pick=kids[i]; else break; }
       return pick;
     }
     function applyPaintIdx(i){
-      const c = els.hand.children[i]; if(!c) return;
+      const c = paintCards ? paintCards[i] : els.hand.querySelectorAll('.card')[i]; if(!c) return;
       const id = c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);
       if(paintMode==='select') selected.add(id); else selected.delete(id);
       c.classList.toggle('sel', selected.has(id));
@@ -478,12 +491,13 @@
       else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
       paintLastIdx=idx; updatePlayBtn();
     }
-    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; }
+    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; paintCards=null; }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
       if(st.phase!=='play' || st.turn!==mySeat) return;
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
       painting=true; paintSeen=new Set(); paintLastIdx=null;
+      paintCards=[...els.hand.querySelectorAll('.card')];   // 全局阅读序(上排→下排), 供区间连选按 data-idx 补齐
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       paintTo(c); e.preventDefault();
@@ -496,41 +510,56 @@
     els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
 
     // ── 理牌: 一键自动(短按) / 手动拖排(长按切模式), 共用 #gdSort 一个按钮 ──
-    // customOrder=null 时 renderHand 走 Rules.sortHand 自动理牌; 非空则按玩家排定的 id 顺序摆。
-    let customOrder = null, arrangeMode = false;
-    let dragCard = null, dragId = null, dragStartX = 0;
+    // rows=null 时 renderHand 走 Rules.sortHand 自动理牌(全在下排); 非空则按 {top,bot} 两排的 id 顺序摆。
+    // 掼蛋手牌多(27 张), 允许上下两排码牌: 拖一张到上方虚线区=分到上排, 拖回下方=下排, 排内按 x 定位插入。
+    let rows = null, arrangeMode = false;
+    let dragCard = null, dragId = null, dragStartX = 0, dragStartY = 0;
     function setArrange(on){
       arrangeMode = on;
       const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); btn.innerHTML = on ? '✓ 完成' : '🔀 理牌'; }
       els.hand.classList.toggle('arranging', on);
-      if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序，松手即定'); }
+      if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排'); }
       else renderHand();
     }
-    function autoSort(){ customOrder = null; renderHand(); sfx('cardsel'); toast('已按大小理牌'); }
+    function autoSort(){ rows = null; renderHand(); sfx('cardsel'); toast('已按大小理牌'); }
+    // 读当前 DOM 两排的 id 顺序(落位重算的基准)
+    function domRows(){
+      const [topEl, botEl] = els.hand.children;
+      return { top:[...(topEl?topEl.children:[])].map(c=>c.dataset.id),
+               bot:[...(botEl?botEl.children:[])].map(c=>c.dataset.id) };
+    }
     function startReorder(e){
       const c = handCardAt(e.clientX,e.clientY); if(!c) return;
-      dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX;
+      dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX; dragStartY = e.clientY;
       c.classList.add('dragging');
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
     }
     function moveReorder(e){
       if(!dragCard) return;
-      const dx = e.clientX - dragStartX;
-      dragCard.style.transform = `translateY(-18px) translateX(${dx}px) scale(1.06)`;
+      const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+      dragCard.style.transform = `translate(${dx}px,${dy-6}px) scale(1.06)`;
       e.preventDefault();
     }
     function endReorder(e){
       if(!dragCard) return;
-      const dropX = e.clientX;
-      const others = [...els.hand.children].filter(c=>c!==dragCard);
+      const dropX = e.clientX, dropY = e.clientY;
+      const cur = domRows();
+      cur.top = cur.top.filter(id=>id!==dragId); cur.bot = cur.bot.filter(id=>id!==dragId);
+      // 目标排: 放下点在"下排上沿"之上 → 上排, 否则下排(上排空时其虚线投放区已占位, 故可拖上去建排)
+      const botEl = els.hand.children[1];
+      const boundary = botEl ? botEl.getBoundingClientRect().top : dropY;
+      const target = dropY < boundary ? 'top' : 'bot';
+      const rowEl = els.hand.children[target==='top'?0:1];
+      const arr = target==='top' ? cur.top : cur.bot;
+      const others = [...(rowEl?rowEl.children:[])].filter(c=>c!==dragCard);
       let insert = others.length;
       for(let i=0;i<others.length;i++){ const r=others[i].getBoundingClientRect(); if(dropX < r.left + r.width/2){ insert=i; break; } }
-      const order = others.map(c=>c.dataset.id); order.splice(insert, 0, dragId);
-      customOrder = order;
+      arr.splice(insert, 0, dragId);
+      rows = { top:cur.top, bot:cur.bot };
       dragCard.classList.remove('dragging'); dragCard.style.transform=''; dragCard.style.zIndex='';
       dragCard = null; dragId = null;
-      sfx('cardsel'); renderHand();
+      sfx('cardsel'); vibrate(10); renderHand();
     }
     // 短按=一键理牌(或手动模式下=完成退出); 长按≥350ms=切手动理牌模式
     (function bindSort(){
@@ -633,41 +662,56 @@
     }
 
     // 手牌摆放顺序: 自动理牌走 Rules.sortHand(级牌感知); 手动理牌后按玩家排定的 id 顺序摆(已出的牌自然从序列消失)
-    function handOrder(){
+    // 返回 [上排卡[], 下排卡[]]: rows=null → 上排空, 下排按级牌 Rules.sortHand 自动理牌;
+    // 手动理牌后 → 各排按玩家排定 id 序; 本副新出现/未归位的牌兜到下排末尾(重发不丢牌)。
+    function orderedRows(){
       const hand = st.players[mySeat].hand;
-      if (customOrder){
-        const pos = new Map(customOrder.map((id,i)=>[id,i]));
-        return hand.slice().sort((a,b)=>(pos.has(a.id)?pos.get(a.id):9999)-(pos.has(b.id)?pos.get(b.id):9999));
+      const byId = new Map(hand.map(c=>[c.id,c]));
+      if (rows){
+        const placed = new Set();
+        const pick = (ids)=> ids.filter(id=>byId.has(id) && !placed.has(id)).map(id=>{ placed.add(id); return byId.get(id); });
+        const top = pick(rows.top);
+        let bot = pick(rows.bot);
+        const left = hand.filter(c=>!placed.has(c.id));
+        if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
+        return [top, bot];
       }
-      return Rules.sortHand(hand, st.level);
+      return [[], Rules.sortHand(hand, st.level)];
     }
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
-      const sorted = handOrder();
-      sorted.forEach((card, idx)=>{
-        const el = cardEl(card, st.level);
-        el.dataset.idx = idx;
-        if (selected.has(card.id)) el.classList.add('sel');
-        if (deal){ el.style.animationDelay=(idx*11)+'ms'; el.classList.add('justdealt'); }
-        els.hand.appendChild(el);
+      const rowTop = document.createElement('div'); rowTop.className='gd-hand-row top'; rowTop.dataset.row='0';
+      const rowBot = document.createElement('div'); rowBot.className='gd-hand-row bot'; rowBot.dataset.row='1';
+      els.hand.appendChild(rowTop); els.hand.appendChild(rowBot);
+      const [top, bot] = orderedRows();
+      let idx = 0;   // 全局阅读序(上排先, 下排后): 供划选区间连选按 data-idx 补齐
+      [[top, rowTop], [bot, rowBot]].forEach(([cards, container])=>{
+        cards.forEach(card=>{
+          const el = cardEl(card, st.level);
+          el.dataset.idx = idx++;
+          if (selected.has(card.id)) el.classList.add('sel');
+          if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
+          container.appendChild(el);
+        });
       });
       layoutHand();
     }
-    // 手牌单排自适应: 牌多时动态收紧叠放, 永远吃满一行不换行(对标大厂手牌扇)
-    function layoutHand(){
-      const cards = els.hand.children;
+    // 手牌自适应: 每排各自动态收紧叠放, 永远吃满一行不换行(对标大厂手牌扇)。两排各自算步距。
+    function layoutRow(container){
+      const cards = container.children;
       const n = cards.length; if (!n) return;
       const W = els.hand.clientWidth; if (!W) return;
       const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 38;
-      // 单排排满: 步距 step 使 cw + (n-1)*step ≤ W; 牌少时封顶给自然扇形叠放
+      // 排满: 步距 step 使 cw + (n-1)*step ≤ W; 牌少时封顶给自然扇形叠放
       let step = n>1 ? (W - cw) / (n - 1) : 0;
       step = Math.min(step, cw * 0.64);         // 上限: 不过度分散
       const ov = Math.round(step - cw);          // 负外边距(叠放量)
       for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
     }
+    function layoutHand(){ for (const row of els.hand.children) layoutRow(row); }
 
     function setBanner(){
       const b=els.banner; const cp=connPill();
@@ -861,7 +905,7 @@
       const prevPhase = st ? st.phase : null;
       const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || (prevPhase==='over' && snap.phase==='play');
       if (isNewDeal){
-        dealAnim=true; selected.clear(); hintCycle=[]; customOrder=null;
+        dealAnim=true; selected.clear(); hintCycle=[]; rows=null;
         lastShownKey=''; lastFinishedN=0; lastMyTurn=false;
         if (arrangeMode) setArrange(false);
         const ov=els.felt.querySelector('.gd-over'); if(ov) ov.remove();
@@ -944,7 +988,7 @@
         else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
           prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
         st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
-        customOrder=null; if(arrangeMode) setArrange(false);
+        rows=null; if(arrangeMode) setArrange(false);
         sfx('deal'); broadcast(); renderAll(); showTributeBanner();
       });
       over.querySelector('#gdDone').addEventListener('click', close);
