@@ -107,7 +107,12 @@
   border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
 .ddz-say.show{opacity:1}
 /* 中央出牌区 */
-.ddz-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:4px 16px;min-height:120px;position:relative}
+.ddz-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:4px 16px;min-height:120px;position:relative;isolation:isolate}
+/* 中央绒面椭圆(对标掼蛋/德州: 三家统一有张"桌面"落牌, 不再是空黑 void)。
+   落牌/横幅/passtag 都坐在这张绒面上; 椭圆自身发微光 + 内阴影拉出纵深, z-index:-1 沉底不吃点击。 */
+.ddz-center::before{content:'';position:absolute;left:7%;right:7%;top:9%;bottom:9%;border-radius:50%/44%;
+  background:radial-gradient(ellipse at center,rgba(0,229,212,.09),rgba(0,120,104,.05) 52%,transparent 72%);
+  border:1px solid rgba(0,229,212,.08);box-shadow:inset 0 0 55px rgba(0,0,0,.34);z-index:-1;pointer-events:none}
 .ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
 .ddz-turnbanner.mine{color:var(--accent);font-weight:800;font-size:15px;text-shadow:var(--glow-cyan)}
 .ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
@@ -120,7 +125,11 @@
 @keyframes ddzFlyTop{from{transform:translateY(-50px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 @keyframes ddzFlyBot{from{transform:translateY(52px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 .ddz-passtag{color:var(--dim);font-size:14px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:6px 16px;animation:ddzFlyTop .22s}
-.ddz-bottom-cards{position:absolute;top:6px;right:14px;display:flex;gap:3px;transform:scale(.6);transform-origin:top right;opacity:.9}
+/* 底牌: 顶部居中(两对手之间), 对标腾讯——不再是右上角一堆看不懂的小背。带"底牌"标, 定地主后翻面亮出。 */
+.ddz-bottom-cards{position:absolute;top:2px;left:50%;transform:translateX(-50%) scale(.82);transform-origin:top center;
+  display:flex;flex-direction:column;align-items:center;gap:2px;opacity:.94}
+.ddz-bottom-cards .bc-lbl{font-size:13px;letter-spacing:.28em;color:var(--dim,#498d88);font-weight:600;text-indent:.28em}
+.ddz-bottom-cards .bc-row{display:flex;gap:4px}
 .ddz-boom{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:40px;font-weight:900;letter-spacing:.05em;
   color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:ddzBoom .7s ease-out forwards}
 @keyframes ddzBoom{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
@@ -533,11 +542,16 @@
     function renderSeats(){
       els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
       els.me.innerHTML = seatHTML(mySeat);
-      // 底牌:未定地主时盖着,定了亮出来
+      // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
-      st.bottom.forEach(c=>{
-        els.bottom.appendChild(st.phase==='bid' ? cardBack(true) : cardEl(c,{mini:true}));
-      });
+      if (st.bottom && st.bottom.length){
+        const lbl = document.createElement('div'); lbl.className='bc-lbl'; lbl.textContent='底牌';
+        const row = document.createElement('div'); row.className='bc-row';
+        st.bottom.forEach(c=>{
+          row.appendChild(st.phase==='bid' ? cardBack(true) : cardEl(c,{mini:true}));
+        });
+        els.bottom.appendChild(lbl); els.bottom.appendChild(row);
+      }
     }
 
     // ── 中央桌面:最后一手 + 落牌动画 + 轮次横幅 ──
