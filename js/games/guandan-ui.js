@@ -120,8 +120,12 @@
 .gd-played{display:flex;flex-wrap:wrap;gap:0;min-height:60px;align-items:center;justify-content:center;max-width:100%}
 .gd-played.fly-top{animation:gdFlyTop .28s cubic-bezier(.2,.9,.3,1)}
 .gd-played.fly-bot{animation:gdFlyBot .28s cubic-bezier(.2,.9,.3,1)}
+.gd-played.fly-left{animation:gdFlyLeft .28s cubic-bezier(.2,.9,.3,1)}
+.gd-played.fly-right{animation:gdFlyRight .28s cubic-bezier(.2,.9,.3,1)}
 @keyframes gdFlyTop{from{transform:translateY(-46px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 @keyframes gdFlyBot{from{transform:translateY(48px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+@keyframes gdFlyLeft{from{transform:translateX(-56px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+@keyframes gdFlyRight{from{transform:translateX(56px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 .gd-played .card{margin-left:-18px}.gd-played .card:first-child{margin-left:0}
 .gd-passtag{color:var(--dim);font-size:13px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:5px 14px;animation:gdFlyTop .22s}
 .gd-boom{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:38px;font-weight:900;letter-spacing:.05em;color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:gdBoom .7s ease-out forwards}
@@ -631,7 +635,11 @@
       lp.cards.map(findCardById).forEach(c=> els.played.appendChild(cardEl(c, st.level)));
       if (changed){
         void els.played.offsetWidth;
-        els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
+        // 落牌飞入方向按出牌人座位来(对标真实牌桌: 牌从谁那边推过来): 自己下家右/对家上/上家左
+        els.played.classList.add(
+          lp.seat===mySeat ? 'fly-bot' :
+          lp.seat===SEAT_R ? 'fly-right' :
+          lp.seat===SEAT_L ? 'fly-left' : 'fly-top');
         const nm = st.players[lp.seat].name;
         if (Rules.isBomb(lp.parse)){
           const bn = bombName(lp.parse);

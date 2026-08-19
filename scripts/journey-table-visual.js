@@ -79,9 +79,9 @@ for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
 }
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260819-flop-stagger'/.test(HTML), 'index.html BUILD_VER=20260819-flop-stagger');
-assert(/eh-sw-v338-20260819-flop-stagger/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v338-flop-stagger)');
-assert(/^20260819-flop-stagger\s*$/.test(R('ver.txt')), 'ver.txt=20260819-flop-stagger');
+assert(/BUILD_VER='20260819-fly-dir'/.test(HTML), 'index.html BUILD_VER=20260819-fly-dir');
+assert(/eh-sw-v339-20260819-fly-dir/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v339-fly-dir)');
+assert(/^20260819-fly-dir\s*$/.test(R('ver.txt')), 'ver.txt=20260819-fly-dir');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart)。灵魂补位: 点【开始】即由 gtStart 先把空位坐满房里灵魂(灵魂来玩,

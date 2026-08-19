@@ -122,8 +122,12 @@
 .ddz-played{display:flex;min-height:70px;align-items:center;justify-content:center}
 .ddz-played.fly-top{animation:ddzFlyTop .28s cubic-bezier(.2,.9,.3,1)}
 .ddz-played.fly-bot{animation:ddzFlyBot .28s cubic-bezier(.2,.9,.3,1)}
+.ddz-played.fly-tl{animation:ddzFlyTL .28s cubic-bezier(.2,.9,.3,1)}
+.ddz-played.fly-tr{animation:ddzFlyTR .28s cubic-bezier(.2,.9,.3,1)}
 @keyframes ddzFlyTop{from{transform:translateY(-50px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 @keyframes ddzFlyBot{from{transform:translateY(52px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+@keyframes ddzFlyTL{from{transform:translate(-52px,-42px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+@keyframes ddzFlyTR{from{transform:translate(52px,-42px) scale(.78);opacity:0}to{transform:none;opacity:1}}
 .ddz-passtag{color:var(--dim);font-size:14px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:6px 16px;animation:ddzFlyTop .22s}
 /* 底牌: 顶部居中(两对手之间), 对标腾讯——不再是右上角一堆看不懂的小背。带"底牌"标, 定地主后翻面亮出。 */
 .ddz-bottom-cards{position:absolute;top:2px;left:50%;transform:translateX(-50%) scale(.82);transform-origin:top center;
@@ -582,8 +586,10 @@
       lp.cards.map(findCardById).forEach(c=>els.played.appendChild(cardEl(c)));
       if (changed){
         void els.played.offsetWidth;                // 强制回流, 让下一行的动画类重新触发
-        // 方向:自己出的从下方飞入, 对手从上方飞入
-        els.played.classList.add(lp.seat===mySeat?'fly-bot':'fly-top');
+        // 方向按出牌人座位: 自己从下方飞入, 两个对手分别从左上/右上飞入(对标他们在牌桌的方位)
+        els.played.classList.add(
+          lp.seat===mySeat ? 'fly-bot' :
+          lp.seat===OPP_SEATS[0] ? 'fly-tl' : 'fly-tr');
         const nm = st.players[lp.seat].name;
         if (Rules.isBomb(lp.parse)){
           const rocket = lp.parse.type==='rocket';
