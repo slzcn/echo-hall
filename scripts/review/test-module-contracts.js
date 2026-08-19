@@ -7,6 +7,20 @@ const vm = require('vm');
 
 const root = path.resolve(__dirname, '../../');
 const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+const bindRoomCardsInitAt = appSource.indexOf('const bindRoomCards = window.EH_LOBBY_MODULE.createBindRoomCards');
+const officialRoomsInitAt = appSource.indexOf('const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial');
+const publicRoomsInitAt = appSource.indexOf('const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic');
+if (bindRoomCardsInitAt < 0 || officialRoomsInitAt < 0 || publicRoomsInitAt < 0 || bindRoomCardsInitAt > officialRoomsInitAt || bindRoomCardsInitAt > publicRoomsInitAt) {
+  throw new Error('lobby: bindRoomCards must initialize before room renderer dependency injection');
+}
+const oldBindOrderFixture = `
+  const renderOfficial = createRenderOfficial({ bindRoomCards });
+  const bindRoomCards = createBindRoomCards({});
+`;
+if (!(oldBindOrderFixture.indexOf('const renderOfficial') < oldBindOrderFixture.indexOf('const bindRoomCards'))) {
+  throw new Error('lobby: bindRoomCards old-order counterexample is invalid');
+}
+console.log('PASS lobby: app wiring initializes bindRoomCards before room renderers (old order rejected)');
 const copyInviteInitAt = appSource.indexOf('const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite');
 const myRoomsInitAt = appSource.indexOf('const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms');
 if (copyInviteInitAt < 0 || myRoomsInitAt < 0 || copyInviteInitAt > myRoomsInitAt) {
