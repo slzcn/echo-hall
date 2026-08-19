@@ -45,6 +45,15 @@
     return s;
   }
 
+  // 相对时间显示：纯函数，无需注入运行时依赖。
+  function fmtAgo(ts) {
+    var s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (s < 60) return '刚刚';
+    if (s < 3600) return Math.floor(s / 60) + '分钟前';
+    if (s < 86400) return Math.floor(s / 3600) + '小时前';
+    return Math.floor(s / 86400) + '天前';
+  }
+
   // 大厅加载多次失败后的手动重试入口。身份和 renderLobby 都可能晚于模块初始化，点击时再通过 getter 读取。
   function createLobbyShowRetry(deps) {
     deps = deps || {};
@@ -346,5 +355,5 @@
     return renderLobby;
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
 })(window);

@@ -18,6 +18,13 @@ const context = { window: {} };
 context.window.window = context.window;
 vm.createContext(context);
 
+const lobbyFile = path.join(root, 'js/modules', 'lobby.js');
+vm.runInContext(fs.readFileSync(lobbyFile, 'utf8'), context, { filename: lobbyFile });
+if (typeof context.window.EH_LOBBY_MODULE.fmtAgo !== 'function') throw new Error('lobby: fmtAgo missing');
+const agoNow = context.window.EH_LOBBY_MODULE.fmtAgo(new Date().toISOString());
+if (agoNow !== '刚刚') throw new Error(`lobby: fmtAgo immediate value mismatch: ${agoNow}`);
+console.log('PASS lobby: fmtAgo pure helper is exported');
+
 for (const [name, globalName, factoryName, keys] of modules) {
   const file = path.join(root, 'js/modules', `${name}.js`);
   vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
