@@ -1900,11 +1900,11 @@ async function joinAsMember(room){
     }
     return true;
   }
-  // 公开/官方房自动 upsert 成员(重复靠主键忽略)，套超时防止进房流程卡住。
+  // 公开/官方房自动 upsert 成员(重复走 onConflict 忽略，不再触发 409 冲突重试)，套超时防止进房流程卡住。
   let error=null;
-  try{ ({ error } = await withTimeout(sb.from('eh_members').insert({
+  try{ ({ error } = await withTimeout(sb.from('eh_members').upsert({
     room_id:room.id, user_id:myUid, role:'member', name:me.name, emoji:me.emoji, color:me.color
-  }), 8000, { error:new Error('timeout') })); }catch(e){ error=e; }
+  }, { onConflict:'room_id,user_id', ignoreDuplicates:true }), 8000, { error:new Error('timeout') })); }catch(e){ error=e; }
   if(error && !/duplicate|unique/i.test(error.message||'')) console.warn('join', error);
   return true;
 }
@@ -8060,8 +8060,8 @@ async function createRoom(){
   }
   btn.disabled=false; btn.textContent='生 成 房 间';
   if(!room){ toast(EH_CONFIG.text.err_createRoom); return; }
-  // 房主入成员表
-  await sb.from('eh_members').insert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color});
+  // 房主入成员表(upsert 防重复建房触发 409)
+  await sb.from('eh_members').upsert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color}, { onConflict:'room_id,user_id', ignoreDuplicates:true });
   try{ window.ehLog && ehLog('room_create',{room_id:room.id,name:room.name,kind:room.kind,emoji:room.emoji}); }catch(_){}
   createdRoom=room;
   const wolfHint=$('#wolfHintCreated');
