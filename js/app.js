@@ -1401,19 +1401,13 @@ const renderLobby = window.EH_LOBBY_MODULE.createRenderLobby({
   isLobbyActive:()=>!!($('#lobby')&&$('#lobby').classList.contains('on')),
   showRetry:lobbyShowRetry,
 });
-// 复制邀请码: 优先 clipboard API, 失败降级 execCommand(webview/非安全上下文兜底), 复制成功给卡片短暂反馈
-function copyInvite(code, el){
-  const done=()=>{ if(el){ el.classList.add('copied'); setTimeout(()=>el.classList.remove('copied'),1200); } toast(EH_CONFIG.text.ok_codeCopied||'邀请码已复制'); };
-  const fail=()=>toast(EH_CONFIG.text.err_copyFail||'复制失败，请手动长按');
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(code).then(done, ()=>fallbackCopy(code)?done():fail());
-  } else { fallbackCopy(code)?done():fail(); }
-}
-function fallbackCopy(text){
-  try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.cssText='position:fixed;top:-999px;opacity:0';
-    document.body.appendChild(ta); ta.select(); const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
-  }catch(e){ return false; }
-}
+const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
+  getNavigator:()=>navigator,
+  getDocument:()=>document,
+  getToast:()=>toast,
+  getConfig:()=>EH_CONFIG,
+  getSchedule:()=>setTimeout,
+});
 const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
 let _snapTailBusy=false;   // refreshSnapshotTail 并发锁: 多个补拉触发点(缓存/订阅就绪/keep-alive)会并发,
                            // 各自在对方 append 前查"消息在DOM吗"都判否→重复append(实测同条×3)。串行化根治。

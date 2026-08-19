@@ -355,5 +355,41 @@
     return renderLobby;
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
+  // 复制邀请码：浏览器能力与提示函数均通过 getter 延迟读取，兼容非安全上下文及页面初始化顺序。
+  function createCopyInvite(deps) {
+    deps = deps || {};
+    var getNavigator = deps.getNavigator, getDocument = deps.getDocument;
+    var getToast = deps.getToast, getConfig = deps.getConfig, getSchedule = deps.getSchedule;
+    if (typeof getNavigator !== 'function' || typeof getDocument !== 'function' || typeof getToast !== 'function' || typeof getConfig !== 'function' || typeof getSchedule !== 'function') {
+      throw new TypeError('[EH_LOBBY] createCopyInvite missing dependencies');
+    }
+    function fallbackCopy(text) {
+      try {
+        var doc = getDocument(), ta = doc.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-999px;opacity:0';
+        doc.body.appendChild(ta); ta.select();
+        var ok = doc.execCommand('copy');
+        doc.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+    return function copyInvite(code, el) {
+      var cfg = getConfig() || {}, text = cfg.text || {};
+      var done = function () {
+        if (el) {
+          el.classList.add('copied');
+          getSchedule()(function () { el.classList.remove('copied'); }, 1200);
+        }
+        getToast()(text.ok_codeCopied || '邀请码已复制');
+      };
+      var fail = function () { getToast()(text.err_copyFail || '复制失败，请手动长按'); };
+      var nav = getNavigator();
+      if (nav && nav.clipboard && nav.clipboard.writeText) {
+        nav.clipboard.writeText(code).then(done, function () { fallbackCopy(code) ? done() : fail(); });
+      } else { fallbackCopy(code) ? done() : fail(); }
+    };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite });
 })(window);

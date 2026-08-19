@@ -25,6 +25,25 @@ const agoNow = context.window.EH_LOBBY_MODULE.fmtAgo(new Date().toISOString());
 if (agoNow !== '刚刚') throw new Error(`lobby: fmtAgo immediate value mismatch: ${agoNow}`);
 console.log('PASS lobby: fmtAgo pure helper is exported');
 
+// 回归：复制能力与提示函数可能晚于模块初始化，调用时必须读取最新依赖。
+(async function testLateRuntimeForCopyInvite() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let nav = null, toastText = '', copied = 0;
+  const el = { classList: { add: () => { copied += 1; }, remove: () => {} } };
+  const copy = lobby.createCopyInvite({
+    getNavigator: () => nav,
+    getDocument: () => ({ createElement: () => ({ style: {}, select: () => {} }), body: { appendChild: () => {}, removeChild: () => {} }, execCommand: () => true }),
+    getToast: () => text => { toastText = text; },
+    getConfig: () => ({ text: { ok_codeCopied: '复制成功' } }),
+    getSchedule: () => setTimeout,
+  });
+  nav = { clipboard: { writeText: async code => { if (code !== 'late-code') throw new Error('code mismatch'); } } };
+  await copy('late-code', el);
+  await Promise.resolve();
+  if (copied !== 1 || toastText !== '复制成功') throw new Error('lobby: copyInvite did not resolve late clipboard dependency');
+  console.log('PASS lobby: copyInvite resolves late clipboard dependency');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 for (const [name, globalName, factoryName, keys] of modules) {
   const file = path.join(root, 'js/modules', `${name}.js`);
   vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
