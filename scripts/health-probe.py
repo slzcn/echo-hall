@@ -5,7 +5,7 @@ Echo Hall 线上健康探测（双层）。
   第一层（轻，必跑）：curl 主页/ver/关键 JS —— 可达性、响应时间、版本、资源完整。
   第二层（重，CDP 在则跑）：无头 Chrome 开真实页面，抓 console error / 未捕获异常 / 白屏（核心 DOM 缺失）。
 退出码：0=全绿，非0=有异常（cron 据此决定是否告警）。异常明细打到 stdout（JSON）。
-【铁律】本脚本只探测/报告，绝不改线上代码；功能 bug 走「告警→人分析→改→门禁→真机验收」。
+本脚本只负责产出可信探测结果；异常闭环由定时巡检 agent 按「归因→修复→门禁→部署→复测」执行。
 """
 import sys, json, time, urllib.request, urllib.error, ssl, re, os
 
@@ -19,6 +19,14 @@ CTX = ssl.create_default_context()
 TREND_FILE = os.path.expanduser("~/.openclaw/workspace/memory/echo-health-trend.json")
 EDGE_SLOW = 8.0          # Edge Function 探活响应阈值（serverless 冷启动 5-8s 属正常，>8s 才告警）
 RPC_SLOW = 3.0           # 关键业务只读查询阈值
+
+# 无用户手势的自动化首屏里，Chrome 按规范拒绝 vibrate。这是能力降级，不是页面故障。
+EXPECTED_BROWSER_NOISE = (
+    "Blocked call to navigator.vibrate because user hasn't tapped",
+)
+
+def _is_expected_browser_noise(text):
+    return any(marker in (text or "") for marker in EXPECTED_BROWSER_NOISE)
 
 def _get(url, timeout=TIMEOUT):
     t0 = time.time()
@@ -298,26 +306,33 @@ def probe_cdp():
                 errs.append("JS异常: " + (d.get("exception", {}).get("description") or d.get("text", ""))[:200])
             elif m == "Runtime.consoleAPICalled" and msg["params"].get("type") == "error":
                 a = msg["params"].get("args", [])
-                errs.append("console.error: " + (a[0].get("value", "") if a else "")[:200])
+                text = (a[0].get("value", "") if a else "")
+                if not _is_expected_browser_noise(text):
+                    errs.append("console.error: " + text[:200])
             elif m == "Log.entryAdded" and msg["params"]["entry"].get("level") == "error":
                 text = msg["params"]["entry"].get("text", "")
                 # Chrome 会把同一次 Network.loadingFailed 再写一条 Log.error；网络失败统一在下方重试后判断。
-                if "net::ERR_" not in text:
+                # 无手势 vibrate 拒绝属于浏览器预期能力降级，不计入故障。
+                if "net::ERR_" not in text and not _is_expected_browser_noise(text):
                     errs.append("Log.error: " + text[:200])
             elif m == "Network.requestWillBeSent":
                 p = msg.get("params", {})
-                request_urls[p.get("requestId")] = p.get("request", {}).get("url")
+                req = p.get("request", {})
+                request_urls[p.get("requestId")] = {"url": req.get("url"), "method": req.get("method", "GET")}
             elif m == "Network.loadingFailed":
                 p=msg.get("params",{}); err=p.get("errorText") or "资源加载失败"
                 # 新导航/主动取消媒体预加载会产生 ERR_ABORTED，不是线上资源故障。
                 if not p.get("canceled") and err != "net::ERR_ABORTED":
-                    failed_resources.append({"error": err[:120], "url": request_urls.get(p.get("requestId"))})
+                    req_meta = request_urls.get(p.get("requestId")) or {}
+                    failed_resources.append({"error": err[:120], "url": req_meta.get("url"), "method": req_meta.get("method", "GET")})
             elif m == "Network.responseReceived":
                 p=msg.get("params",{}); resp=p.get("response",{}); status=int(resp.get("status") or 0)
                 if status >= 400:
+                    req_meta = request_urls.get(p.get("requestId")) or {}
                     failed_resources.append({
                         "error": f"HTTP {status}",
                         "url": str(resp.get("url", ""))[:500] or None,
+                        "method": req_meta.get("method", "GET"),
                     })
         # 白屏检测：核心 DOM 是否存在
         r = send("Runtime.evaluate", {"expression": "!!document.getElementById('hall') && document.body && document.body.childElementCount>0", "returnByValue": True})
@@ -388,6 +403,10 @@ def probe_cdp():
                 continue
             seen.add(marker)
             if not url or not url.startswith(("http://", "https://")):
+                persistent_failures.append(item)
+                continue
+            # POST/PATCH/DELETE 不能改成 GET 重放：会丢鉴权和 body，制造 401/405 等伪二次错误。
+            if item.get("method", "GET").upper() not in ("GET", "HEAD"):
                 persistent_failures.append(item)
                 continue
             try:
