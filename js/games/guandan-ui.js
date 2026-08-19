@@ -874,6 +874,7 @@
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==seat)?st.table.lastPlay.parse:null;
       const mv=AI.decide({ seat, hand:st.players[seat].hand, tableParse:target,
         lastSeat: st.table.lastPlay?st.table.lastPlay.seat:null,
+        finished: st.finished ? st.finished.slice() : [],
         handsLeft: st.players.map(p=>p.hand.length), level: st.level });
       if(mv.action==='pass'){
         try{ Engine.applyPass(st,seat); }

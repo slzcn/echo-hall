@@ -133,5 +133,24 @@ const LV = 2; // 打 2, 避免 ♥2 百搭干扰(测试牌里不放 ♥2)
   ok(r.cards[0].rank===4, '队友报单不算对手: 照常领最小单张(4)');
 }
 
+// ── ⑭ 协作: 压制对手领出(别为保 A/2 大单张放对手过牌滚雪球) ──
+{
+  const hand = [C(15,'♠'), C(10,'♣'), C(9,'♦'), C(8,'♠'), C(7,'♥')]; // 唯一能压 A 的是 单2(15)
+  const scene = { seat:0, hand, tableParse:parseOf([C(14,'♣')],LV), lastSeat:1,
+    finished:[], handsLeft:[5,8,5,8], level:LV };
+  ok(AI.decide(Object.assign({coop:false},scene)).action==='pass', '(基线)为保单2大单张放对手过牌');
+  ok(AI.decide(scene).action==='play', '协作: 主动出单2压制对手领出(不死保大单张)');
+}
+
+// ── ⑮ 协作: 对家已头游(finished 含队友) → 全力冲二游拿双下, 压不过也搏炸 ──
+{
+  const hand = [C(5,'♠'),C(5,'♣'),C(5,'♦'),C(5,'♥'), C(9,'♠'),C(8,'♣'),C(7,'♦')]; // 5555 炸 + 3 散, 7 张
+  const scene = { seat:0, hand, tableParse:parseOf([C(15,'♠')],LV), lastSeat:1,
+    finished:[2], handsLeft:[7,8,0,8], level:LV };   // 队友(座2)已出完
+  ok(AI.decide(Object.assign({coop:false},scene)).action==='pass', '(基线)手7张·不紧急 → 不搏炸');
+  const c = AI.decide(scene);
+  ok(c.action==='play' && c.cards.length===4, '协作: 对家已头游 → 上炸冲二游拿双下');
+}
+
 console.log(`\n掼蛋提示智能: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

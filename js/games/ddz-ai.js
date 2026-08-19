@@ -212,7 +212,10 @@
 
     // 对手是否即将赢(报单/报双):只看「真对手」的剩牌数(队友快赢不算威胁)
     const oppMin = minOpponentCards(ctx);
-    const urgent = oppMin <= 2;
+    // ★农民协作: 地主进入残局(≤3 张)就该视为紧迫, 提前动炸弹/大牌拦截, 别等报单才反应 ——
+    //   地主只有一个, 拦住他=本方赢; 拦晚了他一顺就走。故农民对地主的紧迫阈值放宽到 3。
+    const coopPeasant = ctx.coop!==false && isPeasantSeat(ctx, ctx.seat);
+    const urgent = oppMin <= 2 || (coopPeasant && oppMin <= 3);
 
     if (!target){
       // 首出:选一手「走小散牌」的。优先出最小单张/顺子,避免拆炸/王。
@@ -237,7 +240,10 @@
       plays.sort((a,b)=> playCost(a,hand) - playCost(b,hand));
       // 若对手不紧急,且要出的牌点很大(≥2/A)又是单张,倾向 pass 保牌
       const best = plays[0];
-      if (!urgent && best.parse.type==='single' && best.parse.key >= 14 && hand.length > 4){
+      // ★压制地主(队友协作): 我是农民、桌面这手正是地主领出的 → 别为"保 2/A 大单张"而放地主过牌。
+      //   地主一旦顺出散牌就滚雪球; 农民该主动接管牌权把地主的节奏打断。故面对地主领出时取消保牌 pass。
+      const suppressLandlord = ctx.coop!==false && isPeasantSeat(ctx, ctx.seat) && ctx.lastSeat===ctx.landlord;
+      if (!urgent && !suppressLandlord && best.parse.type==='single' && best.parse.key >= 14 && hand.length > 4){
         // 手里还有更小的可跟吗?没有就 pass
         return { action:'pass' };
       }
@@ -351,6 +357,15 @@
     return cost;
   }
 
+  // 座位 s 是不是农民(非地主)。缺 landlord 信息时按「不是地主」保守判 false。
+  function isPeasantSeat(ctx, s){ return ctx.landlord!=null && s!==ctx.landlord; }
+  // 从我这一席起, 环形找下一个「手上还有牌」的座位(跳过已出完的)。缺 handsLeft 时退化为 (seat+1)%3。
+  function nextActiveSeat(ctx){
+    if (ctx.seat==null) return null;
+    const hl = ctx.handsLeft;
+    for (let k=1;k<=2;k++){ const s=(ctx.seat+k)%3; if(!hl || hl[s]>0) return s; }
+    return (ctx.seat+1)%3;
+  }
   // 桌面这手牌是不是我队友出的(仅农民之间成立)。缺 lastSeat/landlord 信息时返回 false。
   function isTeammateLead(ctx){
     if (ctx.lastSeat==null || ctx.landlord==null) return false;

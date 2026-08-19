@@ -192,6 +192,23 @@ console.log('── AI 队友协作 ──');
   const mvNoBomb = AI.decide({ seat:0, hand:mk([[5,4],[8,1],[9,1],[10,1]]), tableParse:Rules.parse(mk([[15,1]])),
     lastSeat:2, handsLeft:[7,1,10], landlord:2, iAmLandlord:false });
   ok(mvNoBomb.action==='pass', '队友快赢不算紧迫,不为压地主大单张浪费炸弹');
+
+  // ── 新增协作: 压制地主(农民面对地主领出别死保大单张放他过牌) ──
+  //   地主(座2)领出 K 单张, 我(农民座0)唯一能压是 A 单张, 手牌 5 张>4, 地主 8 张(不紧急)。
+  //   baseline(coop:false): 触发"保 A 大单张"→ pass; coop(默认): 取消保牌, 接管牌权 → 出 A。
+  const suppScene = { seat:0, hand:mk([[14,1],[9,1],[8,1],[7,1],[5,1]]),
+    tableParse:Rules.parse(mk([[13,1]])), lastSeat:2, handsLeft:[5,8,8], landlord:2, iAmLandlord:false };
+  ok(AI.decide(Object.assign({coop:false}, suppScene)).action==='pass', '(基线)农民为保 A 大单张放地主过牌');
+  ok(AI.decide(suppScene).action==='play', '协作: 农民主动出 A 压制地主领出(不死保大单张)');
+
+  // ── 新增协作: 地主进残局(≤3 张)提前视为紧迫, 农民该动炸弹拦截 ──
+  //   地主(座2)剩 3 张、领出单 2(压不过除非炸); 我有炸 5555 + 散牌(手 6 张>5)。
+  //   baseline: 3 不算紧急且手>5 不搏 → pass; coop: 地主≤3 视紧迫 → 上炸拦截。
+  const urgScene = { seat:0, hand:mk([[5,4],[9,1],[8,1]]), tableParse:Rules.parse(mk([[15,1]])),
+    lastSeat:2, handsLeft:[6,8,3], landlord:2, iAmLandlord:false };
+  ok(AI.decide(Object.assign({coop:false}, urgScene)).action==='pass', '(基线)地主剩3张不算紧迫, 不搏炸');
+  const urgCoop = AI.decide(urgScene);
+  ok(urgCoop.action==='play' && urgCoop.cards.length===4, '协作: 地主进残局(≤3)提前上炸拦截');
 }
 
 console.log(`\n${fail===0?'✅':'❌'} fuzz 压测完成 — pass=${pass} fail=${fail}`);

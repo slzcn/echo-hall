@@ -143,22 +143,28 @@
     if (!follow.length && g.wilds.length)   // 无纯天然可压 → 允许百搭
       follow = genCombos(hand, level, g.wilds.length).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
 
+    const coopMe = ctx.coop!==false;
+    // 队友(对家)是否已经出完 → 本方已锁头游, 我该全力冲二游拿【双下】(最高分), 别再保守保牌。
+    const partnerOut = coopMe && Array.isArray(ctx.finished) &&
+      ctx.finished.some(s => (s%2)===(ctx.seat%2) && s!==ctx.seat);
     const oppMin = minOpponentCards(ctx);
-    const urgent = oppMin <= 2;
+    // ★协作: 对手进残局(≤3)提前视为紧迫; 队友已头游时更要抢着走 → 紧迫阈值放宽。
+    const urgent = oppMin <= 2 || (coopMe && (oppMin <= 3 || partnerOut));
 
     if (follow.length){
       const fin = follow.find(c=>c.cards.length===hand.length);
       if (fin) return { action:'play', cards: fin.cards };
       follow.sort((a,b)=> playCost(a,hand,level) - playCost(b,hand,level));
       const best = follow[0];
-      // 对手不紧急且要甩大单张(≥A/级) → 保牌不跟
-      if (!urgent && best.parse.type==='single' && best.parse.key>=14 && hand.length>4)
+      // ★压制对手(协作): 走到这里桌面必是对手领出(对家领出已在上面让牌)。别为保 A/级大单张
+      //   而放对手过牌滚雪球 —— 主动接管牌权打断对手节奏。故协作开启时取消对手领出的保牌 pass。
+      if (!urgent && !coopMe && best.parse.type==='single' && best.parse.key>=14 && hand.length>4)
         return { action:'pass' };
       return { action:'play', cards: best.cards };
     }
 
-    // 压不过 → 择机上炸
-    if (urgent || hand.length<=6){
+    // 压不过 → 择机上炸 (队友已头游时也更愿意搏炸冲双下)
+    if (urgent || hand.length<=6 || partnerOut){
       const bombs = allBombs(hand, level)
         .filter(c=>Rules.beats(c.parse, target, level))
         .sort((a,b)=>Rules.bombStrength(a.parse)-Rules.bombStrength(b.parse));
