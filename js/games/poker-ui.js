@@ -496,7 +496,12 @@
       els.board.innerHTML='';
       st.board.forEach((c,i)=>{
         const el = cardEl(c,{});
-        if (grew && i>=lastBoardLen) el.classList.add('flip-in');
+        if (grew && i>=lastBoardLen){
+          el.classList.add('flip-in');
+          // 逐张错峰翻开(对标真实发牌员一张张亮翻牌): flop 3 张不再齐刷刷同时翻,
+          // 每张比上一张晚 110ms; pkFlip 用 both 填充, 未到点的牌保持 rotateY(90deg) 隐着不闪现。
+          el.style.animationDelay = ((i - lastBoardLen) * 110) + 'ms';
+        }
         els.board.appendChild(el);
       });
       // 未发的公共牌用暗牌背占位(共 5 张)
