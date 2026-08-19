@@ -499,7 +499,11 @@
       else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
       paintLastIdx=idx; updatePlayBtn();
     }
-    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; paintCards=null; }
+    function endPaint(){
+      const wasSelect = painting && paintMode==='select';
+      painting=false; paintSeen=null; paintLastIdx=null; paintCards=null;
+      if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
+    }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
       if(st.phase!=='play' || st.turn!==mySeat) return;
@@ -818,6 +822,69 @@
       } else {
         btn.textContent = '出牌';
       }
+    }
+
+    // ── 智能补选: 选了搭子的一头, 自动补成定长连张 ────────────────
+    //   掼蛋牌型定长: 顺子=5连单 / 连对(pairline)=3连对 / 钢板(trioline)=2连三。
+    //   选 4,5 → 补成 45678 顺子; 选 44,55 → 补 66 成三连对; 选 三张×1 已是三张(合法)不动。
+    //   规则同斗地主: ①我方回合、增选手势后; ②只补不删; ③已成型且够用不动;
+    //   ④选区须同形且点可连(3..A, 不含 2/王); ⑤【排除百搭/级牌 wild】——补牌不吃百搭,
+    //   让百搭由玩家自己安排, 免得猜错; ⑥领出向上扩, 跟牌补到能压过桌面的最低窗口;
+    //   ⑦一律以 Rules.parse(out, level) + beats 终判, 补不成就原样不动。返回 true=改了选区。
+    function autoExtendSelection(){
+      if (st.phase!=='play' || st.turn!==mySeat) return false;
+      const level = st.level;
+      const hand = (st.players[mySeat] && st.players[mySeat].hand) || [];
+      const sel = [...selected].map(findCardById).filter(Boolean);
+      if (sel.length < 2) return false;
+      if (sel.some(c=>Rules.isWild(c, level))) return false;   // 选区含百搭 → 太微妙, 不猜
+      const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
+      const curP = Rules.parse(sel, level);
+      if (curP && (!target || Rules.beats(curP, target, level))) return false;
+      // 同形校验(按自然点分组)
+      const byR = new Map();
+      for (const c of sel){ if(!byR.has(c.rank)) byR.set(c.rank,[]); byR.get(c.rank).push(c); }
+      const ranks = [...byR.keys()].sort((a,b)=>a-b);
+      if (ranks.some(r=>r>14)) return false;                   // 2(15)/王 不进连张
+      const per = byR.get(ranks[0]).length;
+      if (per<1 || per>3) return false;
+      if (ranks.some(r=>byR.get(r).length!==per)) return false;
+      const lo = ranks[0], hi = ranks[ranks.length-1];
+      // 手牌各点【非百搭】可用张数(补牌不消耗百搭)
+      const handByR = new Map();
+      for (const c of hand){ if(Rules.isWild(c, level)) continue; if(!handByR.has(c.rank)) handByR.set(c.rank,[]); handByR.get(c.rank).push(c); }
+      const has = r => (r>=3 && r<=14 && handByR.has(r) && handByR.get(r).length>=per);
+      for (let r=lo; r<=hi; r++) if(!has(r)) return false;
+      const needLen = per===1 ? 5 : per===2 ? 3 : 2;           // 掼蛋定长
+      if (hi-lo+1 > needLen) return false;
+      // 跟牌只补同型连张
+      if (target){
+        const wantPer = target.type==='straight'?1 : target.type==='pairline'?2 : target.type==='trioline'?3 : 0;
+        if (wantPer!==per) return false;
+      }
+      // 候选窗口顺序: 领出优先 s=lo(向上扩); 跟牌从最低窗口起(升序), 终判交给 parse+beats
+      const windows=[];
+      if (target){ for(let s=Math.max(3,hi-needLen+1); s<=lo; s++) windows.push(s); }
+      else { for(let s=lo; s>=Math.max(3,hi-needLen+1); s--) windows.push(s); }
+      for (const s of windows){
+        const e = s+needLen-1;
+        if (e>14 || e<hi || s>lo) continue;
+        let ok=true; for(let r=s;r<=e;r++) if(!has(r)){ ok=false; break; }
+        if(!ok) continue;
+        const out=[];
+        for (let r=s; r<=e; r++){
+          const take=(byR.get(r)||[]).slice(0,per);
+          if (take.length<per){ for(const c of handByR.get(r)){ if(take.length>=per) break; if(!selected.has(c.id)) take.push(c); } }
+          out.push(...take);
+        }
+        if (out.length===sel.length) continue;
+        const p2 = Rules.parse(out, level);
+        if (!p2) continue;
+        if (target && !Rules.beats(p2, target, level)) continue;
+        selected = new Set(out.map(c=>c.id));
+        return true;
+      }
+      return false;
     }
 
     function doPlay(){

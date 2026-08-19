@@ -461,7 +461,11 @@
       else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
       paintLastIdx=idx; updatePlayBtn();
     }
-    function endPaint(){ painting=false; paintSeen=null; paintLastIdx=null; }
+    function endPaint(){
+      const wasSelect = painting && paintMode==='select';
+      painting=false; paintSeen=null; paintLastIdx=null;
+      if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
+    }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase!=='play' || st.turn!==mySeat || (isGuest && awaitingHost)) return;
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
@@ -795,6 +799,80 @@
       if (okBtn && st.table.lastPlay && st.table.lastPlay.seat!==mySeat)
         okBtn = Rules.beats(p, st.table.lastPlay.parse);
       btn.disabled = !okBtn;
+    }
+
+    // ── 智能补选: 选了搭子的一头, 自动把能成型的连张补齐 ─────────────
+    //   选 4,5 → 补 6,7,8 成顺子; 选 44,55 → 补 66 成连对; 选 三张×2 → 补一组成飞机。
+    //   规则: ①只在我方回合、增选手势后触发; ②只补不删; ③当前选区已是合法牌型(领出)
+    //   或已能压过桌面(跟牌)就不动; ④选区须"同形"(全单/全对/全三)且点可连(不含2/王);
+    //   ⑤领出向【上】扩(保留选区当低端, 契合"选4,5补6,7,8"); 跟牌补到能压过桌面的最低窗口;
+    //   ⑥补出的必须过 Rules.parse 且(跟牌时)能 beats 桌面, 否则原样不动——绝不硬凑。
+    //   返回 true 表示改了选区。复用引擎/规则判定, 不另造牌型逻辑。
+    function autoExtendSelection(){
+      if (st.phase!=='play' || st.turn!==mySeat) return false;
+      const hand = (st.players[mySeat] && st.players[mySeat].hand) || [];
+      const sel = [...selected].map(findCardById).filter(Boolean);
+      if (sel.length < 2) return false;                       // 单张意图不明, 不猜
+      const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
+      const curP = Rules.parse(sel);
+      if (curP && (!target || Rules.beats(curP, target))) return false;   // 已成型且够用
+      // 选区同形校验
+      const byR = new Map();
+      for (const c of sel){ if(!byR.has(c.rank)) byR.set(c.rank,[]); byR.get(c.rank).push(c); }
+      const ranks = [...byR.keys()].sort((a,b)=>a-b);
+      if (ranks.some(r=>r>14)) return false;                  // 含 2/王 不能连
+      const per = byR.get(ranks[0]).length;
+      if (per<1 || per>3) return false;
+      if (ranks.some(r=>byR.get(r).length!==per)) return false;
+      const lo = ranks[0], hi = ranks[ranks.length-1];
+      // 手牌各点可用张数
+      const handByR = new Map();
+      for (const c of hand){ if(!handByR.has(c.rank)) handByR.set(c.rank,[]); handByR.get(c.rank).push(c); }
+      const has = r => (r>=3 && r<=14 && handByR.has(r) && handByR.get(r).length>=per);
+      for (let r=lo; r<=hi; r++) if(!has(r)) return false;    // 选区内空档手里得有牌
+      // 目标长度(rank 段长)
+      let needLen, windows=[];
+      if (target){
+        const tper = target.type==='straight'?1 : target.type==='pairs'?2
+                   : (/^plane/.test(target.type)?3:0);
+        if (!tper || tper!==per) return false;                // 跟牌只补同型连张
+        needLen = target.type==='straight'?target.len
+                : target.type==='pairs'?target.len/2
+                : (target.type==='plane'?target.len/3:(target.type==='plane_single'?target.len/4:target.len/5));
+        if (hi-lo+1 > needLen) return false;
+        // 跟牌: 含[lo,hi]、末端>target.key 的最低窗口(s 升序取第一)
+        for (let s=Math.max(3, hi-needLen+1); s<=lo; s++){ windows.push(s); }
+      } else {
+        needLen = per===1 ? 5 : per===2 ? 3 : 2;              // 顺子≥5 / 连对≥3 / 飞机≥2
+        needLen = Math.max(needLen, hi-lo+1);
+        // 领出: 优先选区当低端向上扩(s=lo 先试), 不成再向下挪
+        for (let s=lo; s>=Math.max(3, hi-needLen+1); s--){ windows.push(s); }
+      }
+      let best=null;
+      for (const s of windows){
+        const e = s+needLen-1;
+        if (e>14 || e<hi || s>lo) continue;
+        let ok=true; for(let r=s;r<=e;r++) if(!has(r)){ ok=false; break; }
+        if(!ok) continue;
+        if (target && e<=target.key) continue;               // 跟牌必须能压过
+        best={s,e}; break;
+      }
+      if (!best) return false;
+      // 组装: 保留选区已选的具体牌, 缺的点从手里补 per 张
+      const out=[];
+      for (let r=best.s; r<=best.e; r++){
+        const take = (byR.get(r)||[]).slice(0, per);
+        if (take.length < per){
+          for (const c of handByR.get(r)){ if(take.length>=per) break; if(!selected.has(c.id)) take.push(c); }
+        }
+        out.push(...take);
+      }
+      const p2 = Rules.parse(out);
+      if (!p2) return false;
+      if (target && !Rules.beats(p2, target)) return false;
+      if (out.length === sel.length) return false;            // 没补进新牌
+      selected = new Set(out.map(c=>c.id));
+      return true;
     }
 
     // ── 动作 ──
