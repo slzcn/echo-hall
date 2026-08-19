@@ -2,13 +2,16 @@
 'use strict';
 
 const fs = require('fs');
-const src = fs.readFileSync('js/app.js', 'utf8');
+const appSrc = fs.readFileSync('js/app.js', 'utf8');
+const lobbySrc = fs.readFileSync('js/modules/lobby.js', 'utf8');
+const src = appSrc + '\n' + lobbySrc;
 
 const checks = [
-  ['官方房 soft 快路径只认真实房间卡', /function renderOfficial[\s\S]*?if\(soft && box\.querySelector\('\.ch\[data-rid\]'\)\)/],
+  // renderOfficial 已迁入 lobby 模块，检查真实生产实现而不是假定函数仍在 app.js。
+  ['官方房 soft 快路径只认真实房间卡', /return async function renderOfficial[\s\S]*?if \(soft && box\.querySelector\('\.ch\[data-rid\]'\)\)/],
   ['公开房 soft 快路径只认真实房间卡', /function renderPublic[\s\S]*?if\(soft && box\.querySelector\('\.ch\[data-rid\]'\)\)/],
   ['私密房 soft 快路径只认真实房间行', /function renderMyRooms[\s\S]*?if\(soft && boxE\.querySelector\('\.rm\[data-rid\]'\)\)/],
-  ['旧 children.length 骨架误判已移除', () => !/if\(soft && (?:box|boxE)\.children\.length\)/.test(src)],
+  ['旧 children.length 骨架误判已移除', () => !/^[ \t]*if\s*\(soft\s*&&\s*(?:box|boxE)\.children\.length\)/m.test(src)],
 ];
 
 let failed = 0;
