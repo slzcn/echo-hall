@@ -138,13 +138,15 @@
 .pk-acts{display:flex;flex-direction:column;gap:8px;padding:8px 14px calc(11px + env(safe-area-inset-bottom,0px));flex-shrink:0}
 .pk-raise{display:flex;align-items:center;gap:9px}
 .pk-raise.hidden{display:none}
+/* ★.reserved: 隐藏但【保留高度】(visibility 非 display) —— 操作条骨架恒定, 滑杆/快捷不显示时也占位, 按钮行不上下跳(主人反馈"按钮别跳来跳去") */
+.pk-raise.reserved,.pk-quick.reserved{visibility:hidden}
 .pk-raise input[type=range]{flex:1;accent-color:var(--accent,#00e5d4);height:22px}
 .pk-raise .pk-amt{min-width:58px;text-align:center;font-size:14px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .pk-quick{display:flex;gap:6px}
 .pk-qbtn{flex:1;padding:5px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-row{display:flex;gap:9px;justify-content:center}
-.pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
+.pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;line-height:18px;cursor:pointer;white-space:nowrap;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
 .pk-b:active{transform:scale(.96)}
 .pk-b:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
@@ -152,7 +154,7 @@
 .pk-b.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .pk-b.raise{background:var(--amber,#ffc24d);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
 .pk-b.raise.allin{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);color:#fff;box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6))}
-.pk-b .bt{font-size:11px;font-weight:700;opacity:.85;display:block}
+.pk-b .bt{font-size:11px;line-height:14px;font-weight:700;opacity:.85;display:block}
 /* 结算 */
 .pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
@@ -557,35 +559,53 @@
 
     // ── 操作区 ──
     let raiseTo = 0;
+    // 操作条禁用骨架: 与激活态【同高同结构】——三键禁用 + 滑杆/快捷占位隐藏。中键文案随状态变(等待/已弃牌/已全下/离线/已提交)。
+    function actsSkeleton(callLbl){
+      return `
+        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
+        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>½ 池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>2×池</button><button class="pk-qbtn" disabled>全下</button></div>
+        <div class="pk-row">
+          <button class="pk-b fold" disabled>弃牌<span class="bt">&nbsp;</span></button>
+          <button class="pk-b call" disabled>${callLbl}<span class="bt">&nbsp;</span></button>
+          <button class="pk-b raise" disabled>加注<span class="bt">&nbsp;</span></button>
+        </div>`;
+    }
     function renderActs(){
       const p=st.players[mySeat];
-      if (isGuest && connState!=='online'){
-        const label=connState==='host_offline'?'房主离线 · 等待恢复':'连接恢复中…';
-        els.acts.innerHTML=`<div class="pk-row"><button class="pk-act ghost" disabled>⏳ ${label}</button></div>`;
+      const offline = isGuest && connState!=='online';
+      const mine = !offline && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
+      // 非本人行动态: 渲染同高禁用骨架(而非清空塌陷), 三键常驻不跳版
+      if (!mine){
+        let callLbl='等待行动';
+        if (offline) callLbl = (connState==='host_offline'?'房主离线':'连接中…');
+        else if (st.phase==='seating') callLbl='等灵魂入座';
+        else if (st.phase==='waiting') callLbl='等房主发牌';
+        else if (st.phase==='showdown'||st.phase==='over') callLbl='本手结束';
+        else if (p && p.folded) callLbl='已弃牌 · 观战';
+        else if (p && p.allin) callLbl='已全下 · 等摊牌';
+        els.acts.innerHTML = actsSkeleton(callLbl);
         return;
       }
-      const mine = st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
-      if (!mine){ els.acts.innerHTML=''; return; }
       const la=Engine.legalActions(st, mySeat);
       const canRaiseLike = la.canBet || la.canRaise;
       const min=la.minRaiseTo, max=la.maxRaiseTo;
       if (raiseTo<min || raiseTo>max) raiseTo = Math.min(Math.max(min, Math.round((st.pot||bb))), max);
-      const callTxt = la.canCheck ? '过牌' : `跟注 <span class="bt">${la.callAmount}</span>`;
+      const callTxt = la.canCheck ? '过牌 <span class="bt">&nbsp;</span>' : `跟注 <span class="bt">${la.callAmount}</span>`;
       const raiseLabel = la.canBet ? '下注' : '加注';
       const isAllinAmt = raiseTo>=max;
       els.acts.innerHTML = `
-        <div class="pk-raise${canRaiseLike?'':' hidden'}">
+        <div class="pk-raise${canRaiseLike?'':' reserved'}">
           <input type="range" id="pkSlider" min="${min}" max="${max}" step="${Math.max(1,Math.round(bb/2))}" value="${raiseTo}">
           <span class="pk-amt" id="pkAmt">${raiseTo}</span>
         </div>
-        <div class="pk-quick${canRaiseLike?'':' hidden'}">
+        <div class="pk-quick${canRaiseLike?'':' reserved'}">
           <button class="pk-qbtn" data-q="half">½ 池</button>
           <button class="pk-qbtn" data-q="pot">底池</button>
           <button class="pk-qbtn" data-q="2x">2×池</button>
           <button class="pk-qbtn" data-q="allin">全下</button>
         </div>
         <div class="pk-row">
-          <button class="pk-b fold" id="pkFold" ${la.canFold?'':'disabled'}>弃牌</button>
+          <button class="pk-b fold" id="pkFold" ${la.canFold?'':'disabled'}>弃牌<span class="bt">&nbsp;</span></button>
           <button class="pk-b call" id="pkCall">${callTxt}</button>
           <button class="pk-b raise ${isAllinAmt?'allin':''}" id="pkRaise" ${canRaiseLike?'':'disabled'}>${isAllinAmt?'全下':raiseLabel} <span class="bt">${isAllinAmt?raiseTo:('至 '+raiseTo)}</span></button>
         </div>`;
@@ -607,7 +627,7 @@
       if (st.toAct!==mySeat) return;
       if (isGuest){                            // 客人: 动作发回 host 权威校验, 绝不本地改状态
         if(onAction){ try{ onAction({ action, amount }); }catch(_){} }
-        els.acts.innerHTML=''; els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
+        els.acts.innerHTML=actsSkeleton('已提交'); els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
         return;
       }
       try{ var r=Engine.applyAction(st, mySeat, action, amount); }
