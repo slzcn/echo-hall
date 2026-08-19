@@ -98,6 +98,28 @@ for (const [name, globalName, factoryName, keys] of modules) {
   console.log('PASS lobby: fillRoomStats resolves late Supabase at call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
 
+// 回归：大厅协调器创建时身份尚未恢复，渲染时必须读取最新身份，不能捕获空值。
+(async function testLateIdentityForLobbyRender() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateMe = null, themeCalls = 0;
+  const nameEl = { textContent: '', style: {} };
+  const render = lobby.createRenderLobby({
+    initThemeUI: () => { themeCalls += 1; },
+    getMe: () => lateMe,
+    getNameEl: () => nameEl,
+    renderOfficial: async () => {}, renderPublic: async () => {}, renderMyRooms: async () => {},
+    isLobbyActive: () => true, showRetry: () => {}, schedule: () => 1,
+  });
+  await render(false);
+  if (nameEl.textContent !== '' || themeCalls !== 1) throw new Error('lobby: render before identity restore must stay safe');
+  lateMe = { name: '迟到身份', color: '#123456' };
+  await render(true);
+  if (nameEl.textContent !== '迟到身份' || nameEl.style.color !== '#123456' || themeCalls !== 1) {
+    throw new Error('lobby: render did not resolve late identity at call time');
+  }
+  console.log('PASS lobby: renderLobby resolves late identity at call time');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 
 // 回归：renderPublic 创建时 sb 尚未 boot，调用时才读取最新客户端，并按公开房间查询。
 (async function testLateSupabaseForPublicRender() {

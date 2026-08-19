@@ -1322,29 +1322,9 @@ function soulThemeColor(custom, fallback, name){
   // 3. fallback
   return fallback || ROOM_KIND_C.official;
 }
-let _themeUIInit=false;
 // 大厅房间查询带超时: 慢网/弱网下 sb 查询可能永不返回 → 骨架卡死不消失(见 21:09 截图 6KB/s)。
 // 8s 超时后抛错, 由 renderLobby 的重试兜底; 不再无限挂骨架。
 function roomsQuery(q, ms=8000){ return withTimeout(q, ms).catch(()=>({data:null,__timeout:true})); }
-let _lobbyRetryTimer=null;
-let _lobbyRetryN=0;   // 已自动重试次数(有成功即清零); 超上限停自动重试, 改给用户可点的"重试"入口
-const LOBBY_RETRY_MAX=4;
-async function renderLobby(soft){
-  if(!_themeUIInit){ initThemeUI(); _themeUIInit=true; }
-  const _ln=$('#lobbyName'); if(_ln){ _ln.textContent=me.name; _ln.style.color=me.color; }
-  const rs=await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
-  // 任一区块因超时/失败没拿到数据 → 稍后自动重试(有上限), 避免骨架永久卡住 + 无限重试空转
-  const anyFail=rs.some(x=>x&&x.failed);
-  if(!anyFail){ _lobbyRetryN=0; return; }   // 全部成功: 重置计数
-  if(_lobbyRetryTimer) return;
-  if(_lobbyRetryN < LOBBY_RETRY_MAX){
-    _lobbyRetryN++;
-    _lobbyRetryTimer=setTimeout(()=>{ _lobbyRetryTimer=null; if($('#lobby')&&$('#lobby').classList.contains('on')) renderLobby(false); }, 2500);
-  } else {
-    // 重试到上限仍失败(真·慢网/离线): 把还卡着骨架的官方区换成可点重试, 给用户反馈+控制权, 不再干耗
-    lobbyShowRetry();
-  }
-}
 // 大厅加载多次失败 → 官方频道区显示"网络较慢，点击重试"(点了清零计数重新拉)
 function lobbyShowRetry(){
   const box=$('#channels'); if(!box) return;
@@ -1354,7 +1334,7 @@ function lobbyShowRetry(){
   // 点重试: 先确保 supabase 库/session 就绪(可能上次是库都没加载出来→sb 为空, 光 renderLobby 拉不到),
   //   再清零计数重渲。库仍拉不到→重新显示重试入口, 不静默卡死。
   if(el) el.onclick=async()=>{
-    _lobbyRetryN=0; box.innerHTML=chSkel(4);
+    renderLobby.resetRetry(); box.innerHTML=chSkel(4);
     try{ await awaitSb(8000); if(!myUid){ ensureAuth().then(()=>renderLobby(true)).catch(()=>{}); } renderLobby(false); }
     catch(_){ lobbyShowRetry(); }
   };
@@ -1420,6 +1400,16 @@ const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms({
   readKnownOnline,
   enterRoom,
   copyInvite,
+});
+const renderLobby = window.EH_LOBBY_MODULE.createRenderLobby({
+  initThemeUI,
+  getMe:()=>me,
+  getNameEl:()=>$('#lobbyName'),
+  renderOfficial,
+  renderPublic,
+  renderMyRooms,
+  isLobbyActive:()=>!!($('#lobby')&&$('#lobby').classList.contains('on')),
+  showRetry:lobbyShowRetry,
 });
 // 复制邀请码: 优先 clipboard API, 失败降级 execCommand(webview/非安全上下文兜底), 复制成功给卡片短暂反馈
 function copyInvite(code, el){

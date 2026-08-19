@@ -279,5 +279,41 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms });
+  // 大厅总协调器：身份与 DOM 都在每次渲染时读取，兼容认证和页面元素延迟就绪。
+  function createRenderLobby(deps) {
+    deps = deps || {};
+    var initThemeUI = deps.initThemeUI, getMe = deps.getMe, getNameEl = deps.getNameEl;
+    var renderOfficial = deps.renderOfficial, renderPublic = deps.renderPublic, renderMyRooms = deps.renderMyRooms;
+    var isLobbyActive = deps.isLobbyActive, showRetry = deps.showRetry;
+    var schedule = deps.schedule || setTimeout;
+    var retryMax = Number.isFinite(+deps.retryMax) ? +deps.retryMax : 4;
+    var retryDelay = Number.isFinite(+deps.retryDelay) ? +deps.retryDelay : 2500;
+    if (typeof initThemeUI !== 'function' || typeof getMe !== 'function' || typeof getNameEl !== 'function' || typeof renderOfficial !== 'function' || typeof renderPublic !== 'function' || typeof renderMyRooms !== 'function' || typeof isLobbyActive !== 'function' || typeof showRetry !== 'function' || typeof schedule !== 'function') {
+      throw new TypeError('[EH_LOBBY] createRenderLobby missing dependencies');
+    }
+    var themeUIInit = false, retryTimer = null, retryN = 0;
+    async function renderLobby(soft) {
+      if (!themeUIInit) { initThemeUI(); themeUIInit = true; }
+      var me = getMe() || {};
+      var nameEl = getNameEl();
+      if (nameEl) { nameEl.textContent = me.name || ''; nameEl.style.color = me.color || ''; }
+      var rs = await Promise.all([renderOfficial(soft), renderPublic(soft), renderMyRooms(soft)]);
+      var anyFail = rs.some(function (x) { return x && x.failed; });
+      if (!anyFail) { retryN = 0; return; }
+      if (retryTimer) return;
+      if (retryN < retryMax) {
+        retryN++;
+        retryTimer = schedule(function () {
+          retryTimer = null;
+          if (isLobbyActive()) renderLobby(false);
+        }, retryDelay);
+      } else {
+        showRetry();
+      }
+    }
+    renderLobby.resetRetry = function () { retryN = 0; };
+    return renderLobby;
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
 })(window);
