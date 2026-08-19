@@ -33,6 +33,34 @@ const agoNow = context.window.EH_LOBBY_MODULE.fmtAgo(new Date().toISOString());
 if (agoNow !== '刚刚') throw new Error(`lobby: fmtAgo immediate value mismatch: ${agoNow}`);
 console.log('PASS lobby: fmtAgo pure helper is exported');
 
+// 回归：卡片绑定早于预取／进房实现就绪时不得捕获空值，交互发生时读取最新函数。
+(function testLateRuntimeForRoomCardBinding() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let latePrefetch = null, lateEnter = null, prefetched = '', entered = null;
+  const listeners = {};
+  const card = {
+    dataset: { rid: 'late-room', nm: '迟到房间', em: '◇', kind: 'public' },
+    querySelector: () => ({ textContent: '2 人在线' }),
+    addEventListener: (name, handler, options) => { listeners[name] = { handler, options }; },
+  };
+  const bind = lobby.createBindRoomCards({
+    readKnownOnline: () => 2,
+    getPrefetchRoom: () => latePrefetch,
+    getEnterRoom: () => lateEnter,
+  });
+  bind({ querySelectorAll: () => [card] });
+  listeners.pointerenter.handler();
+  card.onclick();
+  latePrefetch = (rid, kind) => { prefetched = `${rid}:${kind}`; };
+  lateEnter = room => { entered = room; };
+  listeners.touchstart.handler();
+  card.onclick();
+  if (listeners.touchstart.options.passive !== true || prefetched !== 'late-room:public' || !entered || entered.knownOnline !== 2) {
+    throw new Error('lobby: room card binding did not resolve late runtime dependencies');
+  }
+  console.log('PASS lobby: room card binding resolves late runtime dependencies');
+})();
+
 // 回归：复制能力与提示函数可能晚于模块初始化，调用时必须读取最新依赖。
 (async function testLateRuntimeForCopyInvite() {
   const lobby = context.window.EH_LOBBY_MODULE;

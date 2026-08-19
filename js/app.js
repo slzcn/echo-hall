@@ -1376,6 +1376,11 @@ function optimisticCnt(room){
   if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
   return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
+const bindRoomCards = window.EH_LOBBY_MODULE.createBindRoomCards({
+  readKnownOnline,
+  getPrefetchRoom:()=>prefetchRoom,
+  getEnterRoom:()=>enterRoom,
+});
 const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
   getNavigator:()=>navigator,
   getDocument:()=>document,
@@ -1533,16 +1538,6 @@ window.EH_AUTH = window.EH_AUTH_MODULE.createAuthController({
   loadOrRollIdentity,
   logout: logoutIdentity,
 });
-function bindRoomCards(box){
-  box.querySelectorAll('.ch').forEach(el=>{
-    const room={ id:el.dataset.rid, name:el.dataset.nm, emoji:el.dataset.em, kind:el.dataset.kind };
-    room.knownOnline = readKnownOnline(el);   // 从卡片已显示的在线数取乐观初值
-    const pf=()=>prefetchRoom(room.id, room.kind);
-    el.addEventListener('pointerenter', pf);   // 桌面悬停预取
-    el.addEventListener('touchstart', pf, {passive:true}); // 移动按下预取
-    el.onclick=()=>enterRoom(room);
-  });
-}
 
 // ============ 进入房间 ============
 const SNAP_TTL=30000;   // 快照有效期 30s

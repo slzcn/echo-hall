@@ -391,5 +391,32 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite });
+  // 房间卡交互绑定：预取与进房实现可能晚于大厅模块初始化，事件触发时再通过 getter 读取。
+  function createBindRoomCards(deps) {
+    deps = deps || {};
+    var readKnownOnline = deps.readKnownOnline;
+    var getPrefetchRoom = deps.getPrefetchRoom;
+    var getEnterRoom = deps.getEnterRoom;
+    if (typeof readKnownOnline !== 'function' || typeof getPrefetchRoom !== 'function' || typeof getEnterRoom !== 'function') {
+      throw new TypeError('[EH_LOBBY] createBindRoomCards missing dependencies');
+    }
+    return function bindRoomCards(box) {
+      box.querySelectorAll('.ch').forEach(function (el) {
+        var room = { id: el.dataset.rid, name: el.dataset.nm, emoji: el.dataset.em, kind: el.dataset.kind };
+        room.knownOnline = readKnownOnline(el);
+        var prefetch = function () {
+          var prefetchRoom = getPrefetchRoom();
+          if (typeof prefetchRoom === 'function') prefetchRoom(room.id, room.kind);
+        };
+        el.addEventListener('pointerenter', prefetch);
+        el.addEventListener('touchstart', prefetch, { passive: true });
+        el.onclick = function () {
+          var enterRoom = getEnterRoom();
+          if (typeof enterRoom === 'function') enterRoom(room);
+        };
+      });
+    };
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);
