@@ -98,6 +98,31 @@ for (const [name, globalName, factoryName, keys] of modules) {
   console.log('PASS lobby: fillRoomStats resolves late Supabase at call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
 
+// 回归：重试入口创建时认证与 renderLobby 尚未就绪，点击时必须读取最新运行时依赖。
+(async function testLateRuntimeForLobbyRetry() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateUid = null, lateRender = null, authCalls = 0, readyCalls = 0;
+  const retryEl = {};
+  const box = { innerHTML: '', querySelector: selector => selector === '.lobby-retry' && box.innerHTML.includes('lobby-retry') ? retryEl : null };
+  const showRetry = lobby.createLobbyShowRetry({
+    getBox: () => box, chSkel: n => `<skeleton count="${n}">`,
+    awaitReady: async ms => { if (ms !== 8000) throw new Error('lobby: retry timeout mismatch'); readyCalls += 1; },
+    getMyUid: () => lateUid,
+    ensureAuth: async () => { authCalls += 1; lateUid = 'late-user'; },
+    getRenderLobby: () => lateRender,
+  });
+  showRetry();
+  if (typeof retryEl.onclick !== 'function') throw new Error('lobby: retry handler was not installed');
+  const renderCalls = [];
+  lateRender = soft => { renderCalls.push(soft); };
+  lateRender.resetRetry = () => { renderCalls.push('reset'); };
+  await retryEl.onclick(); await Promise.resolve();
+  if (readyCalls !== 1 || authCalls !== 1 || renderCalls[0] !== 'reset' || !renderCalls.includes(false) || !renderCalls.includes(true)) {
+    throw new Error('lobby: retry did not resolve late auth/render dependencies at click time');
+  }
+  console.log('PASS lobby: retry resolves late auth/render dependencies at click time');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 // 回归：大厅协调器创建时身份尚未恢复，渲染时必须读取最新身份，不能捕获空值。
 (async function testLateIdentityForLobbyRender() {
   const lobby = context.window.EH_LOBBY_MODULE;

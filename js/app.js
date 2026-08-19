@@ -1325,23 +1325,17 @@ function soulThemeColor(custom, fallback, name){
 // 大厅房间查询带超时: 慢网/弱网下 sb 查询可能永不返回 → 骨架卡死不消失(见 21:09 截图 6KB/s)。
 // 8s 超时后抛错, 由 renderLobby 的重试兜底; 不再无限挂骨架。
 function roomsQuery(q, ms=8000){ return withTimeout(q, ms).catch(()=>({data:null,__timeout:true})); }
-// 大厅加载多次失败 → 官方频道区显示"网络较慢，点击重试"(点了清零计数重新拉)
-function lobbyShowRetry(){
-  const box=$('#channels'); if(!box) return;
-  if(box.querySelector('.lobby-retry')) return;   // 已在则不重复插
-  box.innerHTML='<div class="lobby-retry" style="grid-column:1/-1;text-align:center;padding:22px 16px;color:var(--sub);font-size:13px;cursor:pointer;border:1px dashed var(--line2);border-radius:14px">网络较慢，点击重试 ↻</div>';
-  const el=box.querySelector('.lobby-retry');
-  // 点重试: 先确保 supabase 库/session 就绪(可能上次是库都没加载出来→sb 为空, 光 renderLobby 拉不到),
-  //   再清零计数重渲。库仍拉不到→重新显示重试入口, 不静默卡死。
-  if(el) el.onclick=async()=>{
-    renderLobby.resetRetry(); box.innerHTML=chSkel(4);
-    try{ await awaitSb(8000); if(!myUid){ ensureAuth().then(()=>renderLobby(true)).catch(()=>{}); } renderLobby(false); }
-    catch(_){ lobbyShowRetry(); }
-  };
-}
 // 频道卡骨架(慢网先占位): 结构与 .ch 一致
 const chSkel = window.EH_LOBBY_MODULE.chSkel;   // 房间卡片骨架已迁入 js/modules/lobby.js
 const rmSkel = window.EH_LOBBY_MODULE.rmSkel;
+const lobbyShowRetry = window.EH_LOBBY_MODULE.createLobbyShowRetry({
+  getBox:()=>$('#channels'),
+  chSkel,
+  awaitReady:awaitSb,
+  getMyUid:()=>myUid,
+  ensureAuth,
+  getRenderLobby:()=>renderLobby,
+});
 const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial({
   getSb:()=>sb,
   roomsQuery,

@@ -45,6 +45,37 @@
     return s;
   }
 
+  // 大厅加载多次失败后的手动重试入口。身份和 renderLobby 都可能晚于模块初始化，点击时再通过 getter 读取。
+  function createLobbyShowRetry(deps) {
+    deps = deps || {};
+    var getBox = deps.getBox, makeSkeleton = deps.chSkel, awaitReady = deps.awaitReady;
+    var getMyUid = deps.getMyUid, ensureAuth = deps.ensureAuth, getRenderLobby = deps.getRenderLobby;
+    if (typeof getBox !== 'function' || typeof makeSkeleton !== 'function' || typeof awaitReady !== 'function' || typeof getMyUid !== 'function' || typeof ensureAuth !== 'function' || typeof getRenderLobby !== 'function') {
+      throw new TypeError('[EH_LOBBY] createLobbyShowRetry missing dependencies');
+    }
+    function showRetry() {
+      var box = getBox();
+      if (!box || box.querySelector('.lobby-retry')) return;
+      box.innerHTML = '<div class="lobby-retry" style="grid-column:1/-1;text-align:center;padding:22px 16px;color:var(--sub);font-size:13px;cursor:pointer;border:1px dashed var(--line2);border-radius:14px">网络较慢，点击重试 ↻</div>';
+      var el = box.querySelector('.lobby-retry');
+      if (!el) return;
+      el.onclick = async function () {
+        var renderLobby = getRenderLobby();
+        if (typeof renderLobby !== 'function') return;
+        renderLobby.resetRetry();
+        box.innerHTML = makeSkeleton(4);
+        try {
+          await awaitReady(8000);
+          if (!getMyUid()) ensureAuth().then(function () { return getRenderLobby()(true); }).catch(function () {});
+          getRenderLobby()(false);
+        } catch (e) {
+          showRetry();
+        }
+      };
+    }
+    return showRetry;
+  }
+
   // 带依赖注入的预取工厂：sb 是延迟初始化资源，必须在每次预取时通过 getSb() 读取最新值，
   // 不能在 app.js 解析阶段捕获当时仍为 null 的 sb。
   function createPrefetch(deps) {
@@ -315,5 +346,5 @@
     return renderLobby;
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby });
 })(window);
