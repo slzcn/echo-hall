@@ -172,9 +172,13 @@
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
 .gd-hand.arranging .gd-hand-row.top:empty::before{content:'⬆ 拖到此处分成上排';color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.03em}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
-/* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮 */
+/* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
+   放进独立表头条(in-flow, 右对齐), 不再 position:absolute 浮在牌面上——
+   旧版按钮压住最右几张牌的角标(rank 在 top:3px), 满手 27 张时最右牌像"缺角/被裁";
+   选牌上抬 16px 时更糟。收进表头后与牌面彻底分层, 抬牌至多贴到表头底边不再压按钮。 */
 .gd-hand-wrap{position:relative}
-.gd-sort{position:absolute;right:8px;top:1px;z-index:6;padding:5px 11px;border-radius:11px;font-size:12px;font-weight:800;
+.gd-hand-head{display:flex;justify-content:flex-end;align-items:center;padding:2px 6px 3px;min-height:22px}
+.gd-sort{z-index:6;padding:5px 11px;border-radius:11px;font-size:12px;font-weight:800;
   border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none}
 .gd-sort:active{transform:scale(.94)}
 .gd-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
@@ -369,7 +373,7 @@
         </div>
       </div>
       <div class="gd-me" id="gdMe"></div>
-      <div class="gd-hand-wrap"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div class="gd-hand" id="gdHand"></div></div>
+      <div class="gd-hand-wrap"><div class="gd-hand-head"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button></div><div class="gd-hand" id="gdHand"></div></div>
       <div id="gdCtrl"></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
@@ -708,7 +712,9 @@
       // 排满: 步距 step 使 cw + (n-1)*step ≤ W; 牌少时封顶给自然扇形叠放
       let step = n>1 ? (W - cw) / (n - 1) : 0;
       step = Math.min(step, cw * 0.64);         // 上限: 不过度分散
-      const ov = Math.round(step - cw);          // 负外边距(叠放量)
+      // 亚像素外边距, 不 Math.round —— 取整会让每张多漂 ~0.15px, 满手 27 张累积溢出 ~10px
+      // (最右一张右沿越出手牌带自身宽度)。精确到两位小数使 cw+(n-1)*step 恰好吃满 W, 严丝合缝不溢。
+      const ov = (step - cw).toFixed(2);         // 负外边距(叠放量)
       for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
     }
     function layoutHand(){ for (const row of els.hand.children) layoutRow(row); }

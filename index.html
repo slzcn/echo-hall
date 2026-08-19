@@ -2056,7 +2056,7 @@
 <script>
 /* 版本自愈v2: 页面内嵌 BUILD_VER, 拉不缓存 ver.txt 比对, 不一致=有新版立即重载; localStorage 存"已到达版本"防循环; 前后台切换/网络恢复复检 */
 (function(){
-  var BUILD_VER='20260819-ddz-felt';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260819-gd-sort';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     fetch('ver.txt?_='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok){ console.warn('[EH自愈] ver.txt HTTP', r.status); return null; }
@@ -2520,7 +2520,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/guandan-ai.js?v=20260816-navfix"></script>
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <script defer src="./js/games/guandan-net.js?v=20260816-exp1"></script>
-<script defer src="./js/games/guandan-ui.js?v=20260819-guandan-rows"></script>
+<script defer src="./js/games/guandan-ui.js?v=20260819-gd-sort"></script>
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <script defer src="./js/games/poker-eval.js?v=20260816-texas"></script>
 <script defer src="./js/games/poker-engine.js?v=20260816-texas"></script>
