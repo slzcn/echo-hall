@@ -1376,6 +1376,13 @@ function optimisticCnt(room){
   if(k!=null && k>=0){ const n=k+1; return `<span class="cnt-led" id="cntLed"></span>~ <b>${n}</b> 人在线`; }
   return '<span class="cnt-led" id="cntLed"></span>连接中…';
 }
+const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
+  getNavigator:()=>navigator,
+  getDocument:()=>document,
+  getToast:()=>toast,
+  getConfig:()=>EH_CONFIG,
+  getSchedule:()=>setTimeout,
+});
 const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms({
   getSb:()=>sb,
   roomsQuery,
@@ -1400,13 +1407,6 @@ const renderLobby = window.EH_LOBBY_MODULE.createRenderLobby({
   renderMyRooms,
   isLobbyActive:()=>!!($('#lobby')&&$('#lobby').classList.contains('on')),
   showRetry:lobbyShowRetry,
-});
-const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
-  getNavigator:()=>navigator,
-  getDocument:()=>document,
-  getToast:()=>toast,
-  getConfig:()=>EH_CONFIG,
-  getSchedule:()=>setTimeout,
 });
 const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
 let _snapTailBusy=false;   // refreshSnapshotTail 并发锁: 多个补拉触发点(缓存/订阅就绪/keep-alive)会并发,

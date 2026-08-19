@@ -6,6 +6,14 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '../../');
+const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+const copyInviteInitAt = appSource.indexOf('const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite');
+const myRoomsInitAt = appSource.indexOf('const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms');
+if (copyInviteInitAt < 0 || myRoomsInitAt < 0 || copyInviteInitAt > myRoomsInitAt) {
+  throw new Error('lobby: copyInvite must initialize before renderMyRooms dependency injection');
+}
+console.log('PASS lobby: app wiring initializes copyInvite before renderMyRooms');
+
 const modules = [
   ['lobby', 'EH_LOBBY_MODULE', 'createLobbyController', ['render', 'renderOfficial', 'renderPublic', 'renderMyRooms', 'showRetry', 'fillRoomStats', 'prefetchRoom', 'prefetchAll']],
   ['auth', 'EH_AUTH_MODULE', 'createAuthController', ['api', 'awaitReady', 'resolveSession', 'ensure', 'saveIdentity', 'loadOrRollIdentity', 'logout']],
