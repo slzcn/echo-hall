@@ -96,6 +96,8 @@
 .ddz-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:var(--avf,23px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .ddz-seat.turn .ddz-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+.ddz-seat.win .ddz-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
+.ddz-seat.win .nm{color:var(--amber,#ffc24d);font-weight:700}
 .ddz-seat.landlord .ddz-avr .av::after{content:'👑';position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:15px}
 .ddz-seat .nm{font-size:11px;color:var(--sub);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ddz-seat.turn .nm{color:var(--accent);font-weight:700}
@@ -180,6 +182,8 @@
 .ddz-btn.primary:disabled{background:var(--panel);color:var(--ink)}
 .ddz-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .ddz-btn.ghost{background:transparent;color:var(--sub)}
+.ddz-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
+.ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
 /* 叫地主浮条 */
 .ddz-bidbar{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 .ddz-bidbar .q{font-size:13px;color:var(--sub)}
@@ -538,7 +542,8 @@
       const p = st.players[seat];
       const isLord = st.landlord === seat;
       const role = st.landlord==null ? '' : (isLord?'地主':'农民');
-      return `<div class="ddz-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLord?' landlord':''}" data-seat="${seat}" style="--p:360">
+      const isWin = st.phase==='over' && st.result && st.result.winners.includes(seat);
+      return `<div class="ddz-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLord?' landlord':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="ddz-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
         <div class="meta">
           <div class="nm">${escapeHtml(p.name)}</div>
@@ -791,6 +796,28 @@
       }
       updatePlayBtn();
     }
+    // 选牌牌型中文名(选牌即时反馈, 对标大厂"出 · 顺子"体验; 与掼蛋同源)
+    function typeLabel(p){
+      if(!p) return '';
+      switch(p.type){
+        case 'rocket': return '火箭';
+        case 'single': return '单张';
+        case 'pair': return '对子';
+        case 'trio': return '三张';
+        case 'trio_single': return '三带一';
+        case 'trio_pair': return '三带二';
+        case 'bomb': return '炸弹';
+        case 'quad_single': return '四带二';
+        case 'quad_pair': return '四带两对';
+        case 'straight': return '顺子';
+        case 'pairs': return '连对';
+        case 'plane': return '飞机';
+        case 'plane_single': return '飞机带单';
+        case 'plane_pair': return '飞机带对';
+        default: return '';
+      }
+    }
+    const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='rocket');
     function updatePlayBtn(){
       const btn = $('#ddzPlay'); if (!btn) return;
       const cards = [...selected].map(findCardById);
@@ -799,6 +826,15 @@
       if (okBtn && st.table.lastPlay && st.table.lastPlay.seat!==mySeat)
         okBtn = Rules.beats(p, st.table.lastPlay.parse);
       btn.disabled = !okBtn;
+      // 选牌实时牌型反馈: 合法则报牌型, 炸弹/火箭按钮变红发光(对标大厂"出·炸弹")
+      const boom = okBtn && isBoomType(p);
+      btn.classList.toggle('boom-ready', !!boom);
+      if (okBtn){
+        const lab = typeLabel(p);
+        btn.innerHTML = boom ? `💥 出 <span class="bt">${lab}</span>` : `出牌 <span class="bt">${lab}</span>`;
+      } else {
+        btn.textContent = '出牌';
+      }
     }
 
     // ── 智能补选: 选了搭子的一头, 自动把能成型的连张补齐 ─────────────

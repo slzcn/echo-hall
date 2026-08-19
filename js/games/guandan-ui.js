@@ -94,6 +94,8 @@
 .gd-seat.turn .gd-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .gd-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,19px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .gd-seat.turn .gd-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+.gd-seat.win .gd-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
+.gd-seat.win .nm{color:var(--amber,#ffc24d);font-weight:700}
 .gd-seat.mate .gd-avr .av{border-color:var(--accent)}
 .gd-seat .nm{font-size:11px;color:var(--sub);max-width:var(--seatw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gd-seat.turn .nm{color:var(--accent);font-weight:700}
@@ -608,7 +610,8 @@
       else if (seat!==mySeat) tags.push('<span class="gd-tag">对手</span>');
       if (badge) tags.push(`<span class="gd-tag rank">${badge}</span>`);
       if (alarm) tags.push(`<span class="gd-tag alarm">⚠ 报牌</span>`);
-      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}" data-seat="${seat}" style="--p:360">
+      const isWin = st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam;
+      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
