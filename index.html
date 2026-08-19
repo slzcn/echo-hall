@@ -1838,11 +1838,12 @@
        可视区(height:100svh + 键盘态由 keyboard.js 接管), 必须清掉桌面 max-height 上限。
        ★但 max-width:1366 也命中【PC 窗口收窄到 861~1366】(1366 本就是笔记本宽度): 那里 #hall 若满宽贴边,
        而首页(#lobby)仍是 860 居中卡片 → 同一 PC 窗口下"首页居中卡片、聊天室却贴屏满宽"的突兀断层
-       (设计本意见上方 616-619: 桌面态 #hall = 居中卡片, 满屏是"移动端"专属)。故满宽这套下沉到【手机宽度 ≤640】,
-       PC 收窄到 861~1366 回落到 base 的居中卡片(与首页一致); 手机(≤430)仍满屏 + 键盘协同不变。
-       ★用宽度而非 (pointer:coarse) 门控: 实测安卓模拟器上 pointer 报 fine(不可靠), 宽度判定在真机/模拟器都稳。 */
+       (设计本意见上方 616-619: 桌面态 #hall = 居中卡片, 满屏是"移动端"专属)。故普通细指针 PC 仍只在
+       ≤640px 时进满屏；但折叠屏展开态 CSS 宽可达 690px，且它仍是 hover:none + pointer:coarse 的触屏设备，
+       也必须清掉桌面 top:12px / 92dvh 坐标系，否则 keyboard.js 按键盘顶沿写入高度后，#hall 还会整体下移 12px，
+       composer 越过 IME 顶沿。 */
     #hall{--hall-px:14px}
-    @media (max-width:640px){
+    @media (max-width:640px), (hover:none) and (pointer:coarse){
       #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;max-height:none;margin:0;border-radius:0;border:none;align-items:stretch}
       @supports not (height:100svh){
         #hall{height:-webkit-fill-available}
@@ -2060,7 +2061,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260819-refresh-perf';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-fold-ime-coord';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2551,7 +2552,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
 <script defer src="./js/app.js?v=20260819-open-reap"></script>
-<script defer src="./js/keyboard.js?v=20260816-kb-gap5"></script>
+<script defer src="./js/keyboard.js?v=20260820-fold-ime-coord"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
@@ -2564,12 +2565,12 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
      此前它被整段注释掉 = 无论怎么刷都看不到浮层的真因。 -->
 <script defer src="./js/kbdebug.js?v=20260814-imegap39"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script defer src="./js/sw-register.js?v=20260819-refresh-perf"></script>
+<script defer src="./js/sw-register.js?v=20260820-fold-ime-coord"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
 <script defer src="./js/pwa-install.js?v=20260802-entryFreezeFix"></script>
 
-<script defer src="./js/pull-refresh.js?v=20260819-refresh-perf"></script>
+<script defer src="./js/pull-refresh.js?v=20260820-fold-ime-coord"></script>
 <!-- ★内联键盘探针(双保险): 内联=随导航请求走, 不受外部 js 文件持久缓存影响; 无条件执行, 必然显示。
      ?kbdebug 时在屏幕【顶部】显真机视口信号(键盘盖不到顶); 用于定位主聊天室"输入框被键盘遮"到底差在哪个信号。
      普通访问(无参数)完全不挂, 无感。带 ?nokbdebug 关闭。 -->
