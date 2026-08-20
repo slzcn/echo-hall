@@ -1066,7 +1066,7 @@
      隐藏原生滚动条 UI(仍可拖动滚动), 消除那对箭头。 */
   .cin::-webkit-scrollbar{width:0;height:0;display:none}
   .cin::-webkit-scrollbar-button{display:none;width:0;height:0}
-  .cin:focus-visible{outline:none;outline-offset:0}
+  .cin:focus,.cin:focus-visible{-webkit-appearance:none;appearance:none;outline:none!important;outline-offset:0!important;box-shadow:none!important}
   .cin::placeholder{color:var(--dim)}
   .emoji-btn{width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;font-size:22px;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
   .emoji-btn:hover{background:var(--hover);transform:scale(1.15)}
@@ -2068,7 +2068,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-input-focus';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-input-focus-v2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
