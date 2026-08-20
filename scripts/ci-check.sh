@@ -126,6 +126,13 @@ else
   fail "房间生命周期竞态旅程失败"
 fi
 
+section "1a3. 登录与房间操作防重复提交"
+if node scripts/journey-submit-singleflight.js; then
+  pass "登录 / 建房 / 邀请码 single-flight + 失败释放 + 旧实现反证通过"
+else
+  fail "登录与房间操作防重复提交旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
