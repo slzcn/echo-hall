@@ -133,6 +133,41 @@ else
   fail "登录与房间操作防重复提交旅程失败"
 fi
 
+section "1a3b. 下拉刷新失败结果聚合"
+if node scripts/journey-refresh-resilience.js; then
+  pass "下拉刷新任一关键任务失败返回 ok:false / 全部成功返回 ok:true / 旧实现反证通过"
+else
+  fail "下拉刷新失败结果聚合旅程失败"
+fi
+
+section "1a3c. Presence 与私信轮询 single-flight"
+if node scripts/journey-poll-singleflight.js; then
+  pass "慢网挂起不叠加 / 完成后恢复 / 旧 interval 反证通过"
+else
+  fail "Presence 与私信轮询 single-flight 旅程失败"
+fi
+
+section "1a3d. 消息流尺寸观察生命周期"
+if node scripts/journey-stream-observer.js; then
+  pass "忽略逐字 characterData / 结构与事后撑高复判 / 旧 observer 反证通过"
+else
+  fail "消息流尺寸观察旅程失败"
+fi
+
+section "1a3e. 离房快照轻量裁剪"
+if node scripts/journey-room-snapshot.js; then
+  pass "内存快照尾部裁剪 / 游标与回声状态保留 / 旧全量快照反证通过"
+else
+  fail "离房快照轻量裁剪旅程失败"
+fi
+
+section "1a3f. pagehide presence 尽力清理"
+if node scripts/journey-presence-unload.js; then
+  pass "带鉴权 keepalive REST DELETE / 正常离房路径保留 / 旧卸载 Promise 反证通过"
+else
+  fail "pagehide presence 清理旅程失败"
+fi
+
 section "1a4. 语音上传跨房与 Blob URL 生命周期"
 if node scripts/journey-voice-room-race.js; then
   pass "切房拒绝旧语音 / 固定房间 ID / Blob URL 释放 / 旧实现反证通过"
@@ -161,6 +196,20 @@ else
   fail "弹窗无障碍旅程失败"
 fi
 
+section "1a7b. 核心非原生控件键盘无障碍"
+if node scripts/journey-core-controls-a11y.js; then
+  pass "核心控件 role / tabindex / 可访问名称 / Enter+Space / 旧实现反证通过"
+else
+  fail "核心非原生控件无障碍旅程失败"
+fi
+
+section "1a7c. PWA 安装态屏幕方向"
+if node scripts/journey-pwa-orientation.js; then
+  pass "manifest 允许任意方向 / 旧 portrait 锁定反证通过"
+else
+  fail "PWA 屏幕方向契约失败"
+fi
+
 section "1a8. 混合设备键盘判断"
 if node scripts/journey-kb-mixed-input.js; then
   pass "fine-pointer 真实几何 / 硬件键盘免误估 / coarse fallback / 旧实现反证通过"
@@ -180,6 +229,41 @@ if node scripts/journey-subscription-generation.js; then
   pass "消息 / presence / 牌桌旧调用失效 / 局部发布 / 旧实现反证通过"
 else
   fail "房间订阅代次旅程失败"
+fi
+
+section "1a11. 光标拖尾生命周期"
+if node scripts/journey-cursor-trail-lifecycle.js; then
+  pass "空闲／后台停帧 + 移动按需恢复 + 旧永久循环反证通过"
+else
+  fail "光标拖尾生命周期旅程失败"
+fi
+
+section "1a12. 公共房尾刷新 DOM 索引"
+if node scripts/journey-tail-dom-index.js; then
+  pass "一次建 mid Map / 逐行 O(1) 判重 / 旧逐行 selector 反证通过"
+else
+  fail "公共房尾刷新 DOM 索引旅程失败"
+fi
+
+section "1a13. 音频持久缓存容量"
+if node scripts/journey-audio-cache-limit.js; then
+  pass "音频缓存串行写入 / 超限淘汰最旧 / 清理失败不影响播放 / 旧实现反证通过"
+else
+  fail "音频持久缓存容量旅程失败"
+fi
+
+section "1a14. 灵魂预取缓存生命周期"
+if node scripts/journey-souls-cache-eviction.js; then
+  pass "TTL 主动清理 / 数量上限 / pending 与当前房保护 / 旧实现反证通过"
+else
+  fail "灵魂预取缓存生命周期旅程失败"
+fi
+
+section "1a15. 回合提醒定时器生命周期"
+if node scripts/journey-turn-alert-timer.js; then
+  pass "牌桌活跃单例启动 / 收工离房停止 / 旧常驻轮询反证通过"
+else
+  fail "回合提醒定时器生命周期旅程失败"
 fi
 
 # ─────────────────────────────────────────

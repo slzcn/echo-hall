@@ -16,6 +16,7 @@
   let curThread = null;          // 当前打开的会话 {id, otherUid, otherName, otherEmoji, otherColor}
   let _totalUnread = 0;
   let _tailPoll = null;          // 会话窗兜底轮询
+  const _tailPollFlights = new Map();
   let _lastMsgId = 0;            // 已渲染的最大消息 id(兜底轮询/实时去重)
 
   // ---- 缓存(对齐聊天室 prefetchCache/快照): 让打开瞬时, 网络回来再覆盖 ----
@@ -325,19 +326,27 @@
   }
 
   // ---- 兜底轮询(实时丢事件时自愈, 仅会话窗开着时) ----
-  function startTailPoll(){
-    stopTailPoll();
-    _tailPoll=setInterval(async()=>{
-      if(!curThread) return;
+  function pollTail(){
+    if(!curThread) return Promise.resolve();
+    const tid=curThread.id, active=_tailPollFlights.get(tid);
+    if(active) return active;
+    const flight=(async()=>{
       try{
         const {data}=await sb.from('eh_dm_messages').select('id,from_uid,text,created_at')
-          .eq('thread_id',curThread.id).gt('id',_lastMsgId).order('id',{ascending:true});
+          .eq('thread_id',tid).gt('id',_lastMsgId).order('id',{ascending:true});
+        if(!curThread || curThread.id!==tid) return;
         if(data && data.length){ let hadOther=false;
           data.forEach(m=>{ appendMsg(m); if(m.from_uid!==myUid) hadOther=true; });
           scrollBottom(); if(hadOther) markRead();
         }
       }catch(e){}
-    }, 15000);
+    })().finally(()=>{ if(_tailPollFlights.get(tid)===flight) _tailPollFlights.delete(tid); });
+    _tailPollFlights.set(tid,flight);
+    return flight;
+  }
+  function startTailPoll(){
+    stopTailPoll();
+    _tailPoll=setInterval(()=>{ pollTail(); }, 15000);
   }
   function stopTailPoll(){ if(_tailPoll){ clearInterval(_tailPoll); _tailPoll=null; } }
 

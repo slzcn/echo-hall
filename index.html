@@ -2067,7 +2067,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-recruit-card';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-audit-round2';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2141,8 +2141,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <div id="ixFlash"></div>
 <div id="ixSweep"></div>
 <div id="ixWord"></div>
-<div id="counterBtn"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div>
-<div id="guardBtn"><span class="gb-ic">🛡️</span><span class="gb-txt">格挡</span></div>
+<div id="counterBtn" role="button" tabindex="0" aria-label="反击"><span class="cb-ring"></span><span class="cb-ic">⚡</span><span class="cb-txt">反击</span></div>
+<div id="guardBtn" role="button" tabindex="0" aria-label="格挡"><span class="gb-ic">🛡️</span><span class="gb-txt">格挡</span></div>
 <div id="koStun"><!-- 被KO眩晕: 大字倒计时 --><div class="ks-stars">💫</div><div class="ks-title">被 打 晕 了</div><div class="ks-num" id="koStunNum"></div><div class="ks-tip">眩晕中 · 暂时还不了手（还能说话、送暖）</div></div>
 <div id="worldBanner"><span class="wb-shine"></span><span class="wb-txt"></span></div>
 <div class="act-ring" id="actRing"></div>
@@ -2205,8 +2205,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <h3 id="activeModalTitle" data-txt="createRoomTitle">创建房间</h3>
       <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
-        <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
-        <div class="opt" data-kind="private"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
+        <div class="opt on" data-kind="public" role="button" tabindex="0" aria-label="公开房间"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
+        <div class="opt" data-kind="private" role="button" tabindex="0" aria-label="私密房间"><div class="ot">🔒 私密</div><div class="od" data-txt="roomTypePrivateDesc">邀请码进</div></div>
       </div>
       <label class="fld"><span data-txt="roomNameLabel">房间名</span>
         <input id="roomNameIn" maxlength="40" data-txt-ph="roomNamePh" placeholder="比如：午夜同好会"></label>
@@ -2215,14 +2215,14 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <button class="btn-primary" id="doCreateBtn" data-txt="btnCreateRoom">生 成 房 间</button>
     </div>
     <div class="modal-body" id="mCreated" style="display:none">
-      <h3 data-txt="roomCreatedTitle">房间已创建 🎉</h3>
+      <h3 id="createdModalTitle" data-txt="roomCreatedTitle">房间已创建 🎉</h3>
       <p class="modal-sub" id="createdSub" data-txt="inviteShareHint">把邀请码发给朋友，他们就能进来：</p>
       <div class="code-box" id="codeBoxWrap"><span id="codeVal">— — —</span><button class="code-copy" id="codeCopy" data-txt="copyBtn">复制</button></div>
       <p class="modal-sub" id="wolfHintCreated" style="display:none;font-size:11.5px;opacity:.8">想让狼姐来陪聊？进房后点顶部房间头像 → 房间设置开启 🐺</p>
       <button class="btn-primary" id="enterCreatedBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mJoin" style="display:none">
-      <h3 data-txt="joinRoomTitle">用邀请码加入</h3>
+      <h3 id="joinModalTitle" data-txt="joinRoomTitle">用邀请码加入</h3>
       <p class="modal-sub" data-txt="joinRoomSub">输入朋友给你的邀请码：</p>
       <label class="fld"><span data-txt="inviteCodeLabel">邀请码</span>
         <input id="codeIn" maxlength="12" data-txt-ph="inviteCodePh" placeholder="例如 A3F9K2M7QX" style="text-transform:uppercase;letter-spacing:2px;font-size:17px"></label>
@@ -2230,7 +2230,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <button class="btn-primary" id="doJoinBtn" data-txt="btnEnterRoom">进 入 房 间</button>
     </div>
     <div class="modal-body" id="mReg" style="display:none">
-      <h3 data-txt="regTitle">注册账号</h3>
+      <h3 id="regModalTitle" data-txt="regTitle">注册账号</h3>
       <p class="modal-sub" id="regSub" data-txt="regSub">注册后可跨设备用账号密码登录，保留身份与聊天记录。</p>
       <label class="fld"><span data-txt="regUserLabel">用户名</span>
         <input id="regUser" maxlength="20" autocomplete="off" readonly data-noauto data-txt-ph="regUserPh" placeholder="3-20 位，支持中英文"></label>
@@ -2242,7 +2242,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <button class="btn-primary" id="doRegBtn" data-txt="btnRegister">注 册 并 进 入</button>
     </div>
     <div class="modal-body" id="mReset" style="display:none">
-      <h3 data-txt="forgotTitle">找回密码</h3>
+      <h3 id="resetModalTitle" data-txt="forgotTitle">找回密码</h3>
       <p class="modal-sub" data-txt="forgotSub">输入注册时填写的邮箱，我们会发一封重置链接。（注册未填邮箱的账号无法通过此方式找回）</p>
       <label class="fld"><span>邮箱</span>
         <input id="resetEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="off" readonly data-noauto data-txt-ph="forgotEmailPh" placeholder="注册时填的邮箱"></label>
@@ -2250,7 +2250,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       <button class="btn-primary" id="doResetBtn">发 送 重 置 链 接</button>
     </div>
     <div class="modal-body" id="mProfile" style="display:none">
-      <h3 data-txt="editProfileTitle">编辑资料</h3>
+      <h3 id="profileModalTitle" data-txt="editProfileTitle">编辑资料</h3>
       <p class="modal-sub" data-txt="editProfileSub">自定义你的昵称和头像（用户名登录不受影响）。</p>
       <label class="fld"><span data-txt="nickLabel">昵称</span>
         <div style="display:flex;gap:8px"><input id="profName" maxlength="24" data-txt-ph="nickPh" placeholder="显示给别人看的名字" style="flex:1"><button type="button" id="profDice" class="dbtn" style="width:auto;margin-top:0;padding:0 14px;white-space:nowrap">🎲 随机</button></div></label>
@@ -2287,7 +2287,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </div>
 <div class="modal-mask" id="wallMask">
   <div class="glass modal wall-modal">
-    <div class="modal-x" id="wallX">✕</div>
+    <div class="modal-x" id="wallX" role="button" tabindex="0" aria-label="关闭名场面">✕</div>
     <h2 class="modal-title">✨ 名场面</h2>
     <p class="modal-sub">这个房间里被大家共鸣最多的消息</p>
     <div id="wallList" class="wall-list"></div>
@@ -2295,12 +2295,12 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 </div>
 <div class="drawer-mask" id="meMask"></div>
 <div class="drawer" id="meDrawer">
-  <div class="drawer-h"><h3>个人空间</h3><span class="dx" id="meDx">✕</span></div>
+  <div class="drawer-h"><h3>个人空间</h3><span class="dx" id="meDx" role="button" tabindex="0" aria-label="关闭个人空间">✕</span></div>
   <div class="drawer-body" id="meBody"></div>
 </div>
 <div class="drawer-mask" id="gearMask"></div>
 <div class="drawer" id="gearDrawer">
-  <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx">✕</span></div>
+  <div class="drawer-h"><h3>房间设置</h3><span class="dx" id="gearDx" role="button" tabindex="0" aria-label="关闭房间设置">✕</span></div>
   <div class="drawer-body" id="gearBody"></div>
 </div>
 <!-- 私信收件箱: 所有会话线列表 -->
@@ -2342,7 +2342,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <button class="reroll" id="rerollBtn" data-txt="loginSwitchId">↻ 换一个</button>
       </div>
       <button class="btn-primary" id="enterBtn" data-txt="entryBtn">匿 名 进 入</button>
-      <div class="auth-divider clickable" id="loginToggle"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
+      <div class="auth-divider clickable" id="loginToggle" role="button" tabindex="0" aria-label="展开或收起账号登录"><span data-txt="loginToggleShow">已有账号？点此登录 ▾</span></div>
       <div class="login-collapse" id="loginCollapse">
         <form class="login-form" id="loginForm" onsubmit="return false">
           <div class="login-row">
@@ -2352,7 +2352,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
           <div class="modal-err" id="loginErr" style="margin:4px 0 8px"></div>
           <button type="submit" class="btn-line" id="loginBtn" data-txt="btnLogin">登 录</button>
         </form>
-        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" data-txt="loginForgot">忘记密码</b></div>
+        <div class="opt-email" id="toReg" style="margin:12px 0 0;text-align:center" data-txt="loginNoAccount">没有账号？<b id="toRegLink" role="button" tabindex="0" aria-label="注册账号" style="color:var(--cyan)" data-txt="loginGoReg">注册一个 →</b> <span style="color:var(--dim)">|</span> <b style="color:var(--sub)" id="toReset" role="button" tabindex="0" aria-label="找回密码" data-txt="loginForgot">忘记密码</b></div>
       </div>
     </div>
   </div>
@@ -2362,9 +2362,9 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     <div class="lobby-head">
       <h2>回声厅</h2>
       <div class="hall-tools lobby-tools">
-        <div class="tool-btn bgm-btn" id="bgmBtnLobby" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
-        <div class="tool-btn" id="skinBtn" title="皮肤" data-txt-title="titleSkin">🎨</div>
-        <div class="tool-btn me-avatar" id="meBtn" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMe"></span></div>
+        <div class="tool-btn bgm-btn" id="bgmBtnLobby" role="button" tabindex="0" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
+        <div class="tool-btn" id="skinBtn" role="button" tabindex="0" aria-label="皮肤" title="皮肤" data-txt-title="titleSkin">🎨</div>
+        <div class="tool-btn me-avatar" id="meBtn" role="button" tabindex="0" aria-label="个人空间" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMe"></span></div>
       </div>
       <div class="skin-menu" id="skinMenu"></div>
       <div class="skin-menu bgm-menu" id="bgmMenu"></div>
@@ -2392,19 +2392,19 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   <!-- ===== 场景3：聊天厅：独立于通用 stage，避免双层高度链 ===== -->
   <div class="scene" id="hall">
     <div class="hall-top">
-      <div class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
+      <div class="back" id="backBtn" role="button" tabindex="0" aria-label="返回大厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
       <div class="hall-ti">
-        <div class="hall-icon" id="hallIcon">🌐</div>
+        <div class="hall-icon" id="hallIcon" role="button" tabindex="0" aria-label="房间设置">🌐</div>
         <div class="tcol">
           <h3 id="hallName"><span id="hallNameTxt">—</span></h3>
           <div class="cnt" id="hallCnt">连接中…</div>
         </div>
       </div>
       <div class="hall-tools">
-        <div class="tool-btn" id="wallBtn" title="名场面 · 本房高共鸣消息">✨</div>
-        <div class="tool-btn bgm-btn" id="bgmBtnHall" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
-        <div class="tool-btn" id="skinBtnHall" title="皮肤" data-txt-title="titleSkin">🎨</div>
-        <div class="tool-btn me-avatar" id="meBtnHall" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMeHall"></span></div>
+        <div class="tool-btn" id="wallBtn" role="button" tabindex="0" aria-label="名场面" title="名场面 · 本房高共鸣消息">✨</div>
+        <div class="tool-btn bgm-btn" id="bgmBtnHall" role="button" tabindex="0" title="氛围音乐" data-txt-title="titleBgm" aria-label="氛围音乐">🎵</div>
+        <div class="tool-btn" id="skinBtnHall" role="button" tabindex="0" aria-label="皮肤" title="皮肤" data-txt-title="titleSkin">🎨</div>
+        <div class="tool-btn me-avatar" id="meBtnHall" role="button" tabindex="0" aria-label="个人空间" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMeHall"></span></div>
       </div>
       <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
       <div class="skin-menu hall-skin-menu bgm-menu" id="bgmMenuHall"></div>
@@ -2412,31 +2412,31 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream" role="log" aria-live="polite" aria-relevant="additions" aria-busy="false"></div>
     <!-- (神曲"谱曲中"提示已集成到右下角"神"按钮的生成中态, 顶部浮条已移除) -->
-    <div class="to-latest" id="toLatestBtn" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 5 12 10 18 5"></polyline><polyline points="6 15 12 20 18 15"></polyline></svg></div>
+    <div class="to-latest" id="toLatestBtn" role="button" tabindex="0" title="回到最新消息" aria-label="回到最新消息"><span class="tl-dot" id="tlDot"></span><svg class="tl-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 5 12 10 18 5"></polyline><polyline points="6 15 12 20 18 15"></polyline></svg></div>
     <!-- @我提醒: 被@时常驻浮现, 点击定位到最近一条@我的消息(多条则轮流) -->
-    <div class="mention-jump" id="mentionJump" title="有人@我 · 点击查看"><span class="mj-dot" id="mjDot"></span><span class="mj-at">@</span></div>
+    <div class="mention-jump" id="mentionJump" role="button" tabindex="0" aria-label="查看提及我的消息" title="有人@我 · 点击查看"><span class="mj-dot" id="mjDot"></span><span class="mj-at">@</span></div>
     <!-- 神曲谱好提醒: 你点的神曲生成完成时浮现(仿@提醒), 点击跳到那首歌并高亮 -->
-    <div class="song-jump" id="songJump" title="你的神曲谱好了 · 点击去听"><span class="sj-dot" id="sjDot"></span><span class="sj-ring"></span><span class="sj-god">神</span></div>
+    <div class="song-jump" id="songJump" role="button" tabindex="0" aria-label="查看已完成的神曲" title="你的神曲谱好了 · 点击去听"><span class="sj-dot" id="sjDot"></span><span class="sj-ring"></span><span class="sj-god">神</span></div>
     <div class="reply-preview" id="replyPreview">
-      <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX">✕</span>
+      <span class="rp-txt" id="rpTxt"></span><span class="rp-x" id="rpX" role="button" tabindex="0" aria-label="取消回复">✕</span>
     </div>
     <!-- 神曲模式细色条: 一排曲风小胶囊, 当前高亮, 点别的即换曲风 -->
     <div class="song-strip" id="songStrip"></div>
     <form class="composer" onsubmit="return false" autocomplete="off" spellcheck="false">
       <div class="typing-bar" id="typingBar"><span id="typingTxt"></span><span class="d"><i></i><i></i><i></i></span></div>
-      <div class="plus-btn" id="plusBtn" title="更多花样" data-txt-title="titleMore">＋</div>
+      <div class="plus-btn" id="plusBtn" role="button" tabindex="0" aria-label="更多花样" title="更多花样" data-txt-title="titleMore">＋</div>
       <div class="cin-wrap">
-        <div class="emoji-btn cin-emoji" id="emojiBtn" title="表情" data-txt-title="titleEmoji">😊</div>
+        <div class="emoji-btn cin-emoji" id="emojiBtn" role="button" tabindex="0" aria-label="表情" title="表情" data-txt-title="titleEmoji">😊</div>
         <textarea class="cin" id="cin" data-txt-ph="composerPlaceholder" placeholder="说点什么… 打个 / 看命令" rows="1" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" name="eh-chat-input" data-lpignore="true" data-1p-ignore data-form-type="other"></textarea>
         <div class="hold-talk" id="holdTalk" data-txt="holdToTalk">按住 说话</div>
       </div>
       <button type="button" class="go" id="goBtn" style="display:none" aria-label="发送消息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
       <div class="plus-menu" id="plusMenu">
-        <div class="pm-item" id="pmVoice"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
-        <div class="pm-item" id="pmVoid"><span class="pm-ic"><span style="display:inline-block;transform:translateY(-3px)">🕳️</span></span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
-        <div class="pm-item" id="pmSong"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
-        <div class="pm-item" id="pmBottle"><span class="pm-ic">🌊</span><span class="pm-tx"><b>漂流瓶</b><i>匿名 · 跨房随波漂流</i></span></div>
+        <div class="pm-item" id="pmVoice" role="button" tabindex="0" aria-label="语音留声"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
+        <div class="pm-item" id="pmVoid" role="button" tabindex="0" aria-label="说给虚空"><span class="pm-ic"><span style="display:inline-block;transform:translateY(-3px)">🕳️</span></span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
+        <div class="pm-item" id="pmSong" role="button" tabindex="0" aria-label="文字神曲"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
+        <div class="pm-item" id="pmBottle" role="button" tabindex="0" aria-label="漂流瓶"><span class="pm-ic">🌊</span><span class="pm-tx"><b>漂流瓶</b><i>匿名 · 跨房随波漂流</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
       <div class="slash-menu" id="slashMenu"></div>
@@ -2533,17 +2533,17 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/games/table-chat.js?v=20260815-tablechat"></script>
 <script defer src="./js/games/ddz-rules.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-engine.js?v=20260814-ddz2"></script>
-<script defer src="./js/games/ddz-ai.js?v=20260819-soul-coop"></script>
+<script defer src="./js/games/ddz-ai.js?v=20260820-smart-cards"></script>
 <!-- 斗地主真人联机传输层(脱敏快照 · 防作弊): 必须先于 game-ui 加载, UI 启动时读 window.EHDdzNet -->
 <script defer src="./js/games/ddz-net.js?v=20260817-ddz-online"></script>
-<script defer src="./js/games/game-ui.js?v=20260820b-benchmark"></script>
+<script defer src="./js/games/game-ui.js?v=20260820-smart-cards"></script>
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <script defer src="./js/games/guandan-rules.js?v=20260814-guandan"></script>
 <script defer src="./js/games/guandan-engine.js?v=20260814-guandan"></script>
-<script defer src="./js/games/guandan-ai.js?v=20260819-soul-coop"></script>
+<script defer src="./js/games/guandan-ai.js?v=20260820-smart-cards"></script>
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <script defer src="./js/games/guandan-net.js?v=20260816-exp1"></script>
-<script defer src="./js/games/guandan-ui.js?v=20260820b-benchmark"></script>
+<script defer src="./js/games/guandan-ui.js?v=20260820-smart-cards"></script>
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <script defer src="./js/games/poker-eval.js?v=20260816-texas"></script>
 <script defer src="./js/games/poker-engine.js?v=20260820-deal-bias"></script>

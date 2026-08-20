@@ -100,9 +100,9 @@ assert(/over\.classList\.add\('payout-in'\);\s*payoutChipsFx\(res\.winnersBySeat
 assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动 .pk-pot.bump');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260820-recruit-card'/.test(HTML), 'index.html BUILD_VER=20260820-recruit-card');
-assert(/eh-sw-v354-20260820-recruit-card/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v354-recruit-card)');
-assert(/^20260820-recruit-card\s*$/.test(R('ver.txt')), 'ver.txt=20260820-recruit-card');
+assert(/BUILD_VER='20260820-audit-round2'/.test(HTML), 'index.html BUILD_VER=20260820-audit-round2');
+assert(/eh-sw-v356-20260820-audit-round2/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v356-audit-round2)');
+assert(/^20260820-audit-round2\s*$/.test(R('ver.txt')), 'ver.txt=20260820-audit-round2');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart)。招募卡两条路径讲清楚(主人反馈"招募卡不够好使"):
