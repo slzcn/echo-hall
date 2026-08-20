@@ -172,6 +172,19 @@ assert(/if\s*\(over\._leaving\)\s*return/.test(ui), '再来一局按钮防连点
 assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..','js','games','ddz-net.js'),'utf8')),
   'ddz-net.sanitizeResult 透传 reveal(联机 guest 结算可见残局)');
 
+// (6b) 灵魂在场台词气泡: 必须先 renderAll 再 maybeBanter —— say() 写的气泡若在 renderSeats
+//   整段重建之前加, 会被当帧吞掉(从不显示)。反回退时序 bug。
+assert(/renderAll\(\);\s*maybeBanter\(seat\)/.test(ui),
+  'AI 出牌先 renderAll 再 maybeBanter(气泡躲过 renderSeats 重建, 灵魂台词真正上屏)');
+
+// (6c) 中央落牌区大牌型不横向溢出: 飞机带对/连对(20 张)、长顺(12 张)全尺寸会超屏被裁。
+//   layoutPlayed 在放不下时按精确吃满宽收紧叠放; .ddz-played 须 width:100% 让 clientWidth
+//   反映真实可用宽(否则 align-items:center 下它 shrink 到内容宽, 收紧永不触发)。
+assert(/function layoutPlayed\(\)/.test(ui) && /layoutPlayed\(\);/.test(ui),
+  '中央落牌调 layoutPlayed(大牌型动态收紧防横向溢出)');
+assert(/\.ddz-played\{[^}]*width:100%/.test(ui),
+  '.ddz-played width:100%(clientWidth 反映真实可用宽, 收紧公式才生效)');
+
 // ── 步骤6: 和聊天融合(主人反馈:游戏结束后聊天室什么都没留下) ─────
 // 三条不可回退断言, 对治"开局/结束都不触发聊天内容":
 //   ① 开局不再静默/单机, 而是走 eh_gt_open 建【联机牌桌】并把牌桌卡发进聊天室(全房可见可加入)

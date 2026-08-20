@@ -167,6 +167,47 @@ async function main(){
     await ctx.close();
   }
 
+  // ---------- C2. 斗地主中央落牌区大牌型不横向溢出 ----------
+  // 曾漏: .ddz-played 全尺寸 flex 无 wrap 无叠放, 飞机带对/连对(20 张)、长顺(12 张)超屏宽两侧被裁。
+  // layoutPlayed() 在放不下时按精确吃满宽收紧叠放。这里用真实几何验证: 20 张真 cardEl 进 #ddzPlayed
+  // 后应用同一 exact-fit 公式, 断言 scrollWidth ≤ clientWidth 且末张右沿在牌桌内。
+  {
+    const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true });
+    const page = await ctx.newPage();
+    const errs = []; page.on('pageerror', e => errs.push(e.message));
+    await page.setContent('<!doctype html><meta charset=utf-8>'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+CSSVARS
+      + '#hall{position:relative;width:100%;height:100vh;overflow:hidden}</style><body><div id="hall"></div>', { waitUntil:'load' });
+    for (const f of ['deck.js','ddz-rules.js','ddz-engine.js','ddz-ai.js','game-ui.js'])
+      await page.addScriptTag({ content: G(f) });
+    const r = await page.evaluate(() => {
+      window.EHDdzGame.open({ names:['你','灵魂A','灵魂B'], avatars:['🙂','🔥','🌙'], onResult(){} });
+      const played = document.getElementById('ddzPlayed');
+      const sample = document.querySelector('.ddz-hand .card');
+      if (!played || !sample) return { err:'找不到 #ddzPlayed 或样例牌' };
+      // 灌 20 张真牌(最大连对/飞机带对宽度)
+      played.innerHTML = '';
+      for (let i=0;i<20;i++){ const c = sample.cloneNode(true); c.style.marginLeft=''; played.appendChild(c); }
+      // 复刻 layoutPlayed 的精确吃满宽公式(与 game-ui.js 同逻辑)
+      const cards = played.children, n = cards.length;
+      const W = played.clientWidth, cw = cards[0].offsetWidth || 44;
+      if (n*cw > W){ const ov = Math.round((W-cw)/(n-1)-cw); for (let i=1;i<n;i++) cards[i].style.marginLeft = ov+'px'; }
+      const roomRight = document.querySelector('.ddz-room').getBoundingClientRect().right;
+      const lastRight = cards[n-1].getBoundingClientRect().right;
+      const firstLeft = cards[0].getBoundingClientRect().left;
+      return { sw:played.scrollWidth, cw2:played.clientWidth, lastRight, firstLeft, roomRight, n };
+    });
+    if (r.err) bad('斗地主中央落牌: '+r.err);
+    else {
+      if (r.sw > r.cw2+1) bad(`斗地主中央落牌 20 张横向溢出: scrollWidth ${r.sw} > clientWidth ${r.cw2}`);
+      else ok(`斗地主中央落牌 20 张不溢出 (${r.sw}≤${r.cw2})`);
+      if (r.lastRight > r.roomRight+1 || r.firstLeft < -1) bad(`斗地主中央落牌超出牌桌 (末沿 ${Math.round(r.lastRight)} vs 桌右 ${Math.round(r.roomRight)})`);
+      else ok('斗地主中央落牌 20 张全在牌桌内');
+    }
+    if (errs.length) bad('斗地主中央落牌渲染报错: ' + errs.slice(0,2).join(' | '));
+    await ctx.close();
+  }
+
   // ---------- D. 手牌单排自适应 + 理牌(掼蛋有手动拖排; 斗地主已移除, 只验单排不溢出) ----------
   // 掼蛋(27 张两排): (1)理牌钮不溢出; (2)长按进手动模式加 .arranging; (3)拖第一张到末尾顺序真的变了且张数不减。
   // 斗地主(≤20 张单排): 不需要手动理牌(主人反馈), 只验首尾牌都落在牌桌内(不溢出屏外点不到)。

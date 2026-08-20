@@ -369,8 +369,13 @@
     function toast(m, ms){ els.toast.textContent=m; els.toast.classList.add('show');
       clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1300); }
     function say(seat, msg){
-      const b = room.querySelector(`.pk-seat[data-seat="${seat}"] .pk-say`);
-      if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1600);
+      // 延一帧再写气泡: afterAction 里 say() 常在同步 renderAll() 之前调用, 而 renderOpponents
+      // 会整段 remove/重建 .pk-seat 节点, 直接写会被当帧重建吞掉(气泡从不显示)。rAF 到点时
+      // renderAll 已完成, 查到的是新座位节点, 气泡才真正上屏。
+      requestAnimationFrame(()=>{
+        const b = room.querySelector(`.pk-seat[data-seat="${seat}"] .pk-say`);
+        if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1600);
+      });
     }
 
     // ── 直播 + 灵魂入戏 ──

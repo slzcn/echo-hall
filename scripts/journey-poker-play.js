@@ -140,6 +140,11 @@ assert(/function onHumanTimeout\(/.test(ui) && /HUMAN_ACT_MS/.test(ui), '到我�
 assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80}opts\.onResult\(res, st\.log/.test(ui),
   '摊牌结算里回调 onResult(res, log, meta)(把结果交回聊天室)');
 
+// 反回退: 在场发言气泡必须延一帧写(afterAction 里 say() 常在同步 renderAll 之前调用,
+// 而 renderOpponents 会整段 remove/重建 .pk-seat 节点 —— 直接写会被当帧吞掉, 气泡从不显示)。
+assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
+  'say() 延一帧写气泡(躲过 renderAll 对 .pk-seat 的整段重建, 灵魂台词才真正上屏)');
+
 // index.html 已挂 4 个扑克脚本 + 版本指纹
 assert(/poker-eval\.js\?v=/.test(html) && /poker-engine\.js\?v=/.test(html) && /poker-ai\.js\?v=/.test(html) && /poker-ui\.js\?v=/.test(html),
   'index.html 挂齐 poker-eval/engine/ai/ui 四脚本(带 ?v= 指纹)');

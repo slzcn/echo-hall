@@ -143,7 +143,7 @@
 .ddz-turnbanner .clk.urgent{color:var(--magenta,#ff2d8e);animation:ddzBlink .6s steps(2,start) infinite}
 @keyframes ddzBlink{50%{opacity:.35}}
 .ddz-lastwho{font-size:11px;color:var(--sub);min-height:14px}
-.ddz-played{display:flex;min-height:70px;align-items:center;justify-content:center}
+.ddz-played{display:flex;min-height:70px;align-items:center;justify-content:center;width:100%;box-sizing:border-box}
 .ddz-played.fly-top{animation:ddzFlyTop .28s cubic-bezier(.2,.9,.3,1)}
 .ddz-played.fly-bot{animation:ddzFlyBot .28s cubic-bezier(.2,.9,.3,1)}
 .ddz-played.fly-tl{animation:ddzFlyTL .28s cubic-bezier(.2,.9,.3,1)}
@@ -375,7 +375,7 @@
             const cards = (move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
             const r = Engine.applyPlay(st, seat, cards);
             if (!Rules.isBomb(r&&r.played)) sfx('cardplay');
-            maybeBanter(seat); renderAll();
+            renderAll(); maybeBanter(seat);   // 先重绘座位再说话: say() 写的气泡若在 renderAll 前加, 会被 renderSeats 整段重建吞掉(从不显示)
             if (r && r.over) showOver();
             return true;
           }
@@ -645,6 +645,7 @@
       els.played.className = 'ddz-played';          // 先复位
       els.played.innerHTML = '';
       lp.cards.map(findCardById).forEach(c=>els.played.appendChild(cardEl(c)));
+      layoutPlayed();                               // 大牌型(飞机带对/长顺~20 张)动态收紧, 免中央区横向溢出裁切
       if (changed){
         void els.played.offsetWidth;                // 强制回流, 让下一行的动画类重新触发
         // 方向按出牌人座位: 自己从下方飞入, 两个对手分别从左上/右上飞入(对标他们在牌桌的方位)
@@ -722,6 +723,17 @@
       step = Math.min(step, cw * 0.62);          // 上限: 牌少时不过度分散, 保留自然扇形
       const ov = Math.round(step - cw);          // 负外边距(叠放量)
       for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
+    }
+    // 中央落牌区自适应: 飞机带对(4 连三+4 对=20 张)/长顺子在窄屏会超出屏宽两侧被裁。
+    // 仅当整排全尺寸放不下时才按精确吃满宽收紧叠放(放得下则保持自然并排, 不动)。
+    function layoutPlayed(){
+      const cards = els.played.children;
+      const n = cards.length; if (n<=1) return;
+      const W = els.played.clientWidth; if (!W) return;
+      const cw = cards[0].offsetWidth || 44;
+      if (n*cw <= W) return;                       // 放得下: 不叠放
+      const ov = Math.round((W - cw)/(n - 1) - cw);
+      for (let i=1;i<n;i++) cards[i].style.marginLeft = ov+'px';
     }
 
     // 斗地主不设手动理牌(与掼蛋不同): 手牌少、发牌即按大小排好, 点选直接。renderHand 恒走 Deck.sortHand。
@@ -1043,8 +1055,8 @@
       if (mv.action === 'pass'){ doPass(seat); return; }
       try { var r = Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ doPass(seat); return; }   // AI 兜底:决策失误就过
-      maybeBanter(seat);
       renderAll();
+      maybeBanter(seat);   // 先重绘再说话: 气泡若在 renderSeats 之前加会被整段重建吞掉
       if (r && r.over){ showOver(); return; }
     }
     function maybeBanter(seat){
