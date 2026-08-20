@@ -75,9 +75,19 @@ ok(/_streamDedupObs\.observe\(st,\s*\{\s*childList:true\s*\}\)/.test(src) && !/_
   '观察器只挂 childList(不含 subtree): 打字机改后代 .txt 不触发, 密集聊天零额外开销');
 ok(/function scheduleStreamDedup\(\)\{[\s\S]*?if\(_streamDedupRAF\) return;/.test(src),
   'scheduleStreamDedup 用 _streamDedupRAF flag 去抖(dedup 自身 remove 再触发观察时不递归空转)');
-ok(/ensureStreamDedupObserver\(\);/.test(src.slice(src.indexOf('async function enterRoom'), src.indexOf('async function enterRoom')+6000)) ||
-   /try\{ ensureStreamDedupObserver\(\); \}catch/.test(src),
+ok(/try\{ ensureStreamDedupObserver\(\); \}catch/.test(src),
   'enterRoom 里挂载实时清道夫观察器(只挂一次, 由内部 flag 保证)');
+// 挂载即扫: MutationObserver 不回溯已在 DOM 的节点, 而页首防闪脚本先于 app.js 把快照 innerHTML 进 #stream,
+// 那份快照若是旧版烘焙的重复(如真人 yiran"年年有余"冒三遍), 观察器永远看不到 → 必须挂载时立刻扫一遍。
+ok(/_streamDedupObs\.observe\([^)]*\);\s*(?:\/\/[^\n]*\n\s*)*try\{\s*dedupStreamByMid\(st\)/.test(src),
+  'ensureStreamDedupObserver 挂载后立刻 dedupStreamByMid 扫现有子节点(清首帧防闪脚本铺入的历史重复)');
+// 观察器要在 snapHit 分支【之前】挂 —— 否则 keep-alive 秒回房(该分支提前 return)永远挂不上观察器
+{
+  const er = src.slice(src.indexOf('async function enterRoom'), src.indexOf('async function enterRoom')+3000);
+  const iObs = er.indexOf('ensureStreamDedupObserver()');
+  const iSnap = er.indexOf('const snapHit');
+  ok(iObs>=0 && iSnap>=0 && iObs < iSnap, '观察器在 snapHit 分支之前挂载(keep-alive 秒回房路径也覆盖)');
+}
 
 // 算法自证: 同 mid 只留内容最完整(文字最长)的一个; local_ 与嵌套元素不动
 function simDedup(nodes){                 // nodes: [{mid, len, top}] top=是否 stream 直接子

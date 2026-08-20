@@ -188,7 +188,49 @@ async function main(){
   check(live.nested === 1, '[B] 嵌套 echo-bar 未被误删(subtree 不观察)');
   check(live.survivorText === ALINE, '[B] 存活节点文字 = 原句');
 
+  // ── [C] 挂载即扫: 复刻"页首防闪脚本先于 app.js 把旧版烘焙的重复快照 innerHTML 进 #stream" ──
+  //   (实测: 真人 yiran"年年有余"6 天前的老消息今天冒三遍)。MutationObserver 只报挂载之后的增删,
+  //   不回溯已在 DOM 的节点 → 必须在挂载时立刻扫一次。这里【先】铺 3 份同 mid, 【再】挂观察器(带初始扫),
+  //   断言初始扫把预先存在的 3 份塌缩为 1。
+  const swpAttach = /_streamDedupObs\.observe\([^)]*\);\s*(?:\/\/[^\n]*\n\s*)*try\{\s*dedupStreamByMid\(st\)/.test(localSrc);
+  check(swpAttach, '[C] 源码: ensureStreamDedupObserver 挂载后立刻 dedupStreamByMid 扫一遍现有子节点');
+  const earlyAttach = (() => {
+    const er = localSrc.slice(localSrc.indexOf('async function enterRoom'), localSrc.indexOf('async function enterRoom')+3000);
+    const iObs = er.indexOf('ensureStreamDedupObserver()');
+    const iSnap = er.indexOf('const snapHit');
+    return iObs>=0 && iSnap>=0 && iObs < iSnap;   // 观察器挂载在 snapHit 分支之前
+  })();
+  check(earlyAttach, '[C] 源码: 观察器在 snapHit 分支之前挂载(keep-alive 秒回房路径也覆盖)');
+
+  const browser3 = await chromium.launch({ executablePath: exe });
+  const page3 = await browser3.newPage();
+  await page3.setContent('<!doctype html><html><body><div id="stream"></div></body></html>');
+  const attach = await page3.evaluate(async ({ localFn }) => {
+    const st = document.getElementById('stream');
+    const $ = sel => document.querySelector(sel);
+    const dedupStreamByMid = new Function('root', '$',
+      localFn.replace(/^function\s+dedupStreamByMid\s*\([^)]*\)\s*\{/, '').replace(/\}$/, ''));
+    const mk = (mid, txt) => { const w=document.createElement('div'); w.className='msg'; w.dataset.mid=String(mid);
+      const t=document.createElement('div'); t.className='txt'; t.textContent=txt; w.appendChild(t); return w; };
+    // 先铺 3 份(模拟首帧防闪脚本 innerHTML 进来的旧版烘焙重复)——此时观察器还没挂
+    st.appendChild(mk(7991,'年年有余')); st.appendChild(mk(7991,'年年有余')); st.appendChild(mk(7991,'年年有余'));
+    const beforeAttach = st.querySelectorAll(':scope > [data-mid="7991"]').length;
+    // 复刻 ensureStreamDedupObserver: observe(childList) + 挂载即扫
+    let raf=0; const run=()=>{ raf=0; dedupStreamByMid(st,$); };
+    const schedule=()=>{ if(raf) return; raf=requestAnimationFrame(run); };
+    new MutationObserver(schedule).observe(st,{childList:true});
+    dedupStreamByMid(st,$);   // ★挂载即扫(本次修复核心)
+    const frame=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    await frame();
+    return { beforeAttach, afterAttach: st.querySelectorAll(':scope > [data-mid="7991"]').length };
+  }, { localFn });
+  await browser3.close();
+
+  console.log('· [C] 首帧预铺 3 份 → 挂载观察器(带初始扫): before=' + attach.beforeAttach + ' after=' + attach.afterAttach);
+  check(attach.beforeAttach === 3, '[C] 构造: 观察器挂载前 DOM 已有 3 份(模拟首帧防闪脚本铺入)');
+  check(attach.afterAttach === 1, '[C] 挂载即扫把先于观察器存在的 3 份历史重复塌缩为 1(修 yiran 年年有余冒三遍)');
+
   if (fails.length){ console.log('\n❌ 重复气泡验证失败: ' + fails.length + ' 项'); process.exit(1); }
-  console.log('\n✅ [A]线上 dedupStreamByMid 真 Chrome DOM 塌缩双份 + [B]本地新增实时观察器在真浏览器里把"同句冒三遍且不消"一帧内清回一条, 嵌套/临时/其他消息均无副作用');
+  console.log('\n✅ [A]线上 dedup 塌缩双份 + [B]实时观察器一帧内清"冒三遍且不消" + [C]挂载即扫清首帧防闪脚本铺入的历史重复, 全在真 Chrome DOM 验证, 嵌套/临时/其他消息无副作用');
 }
 main().catch(e => { console.error('验证脚本异常:', e); process.exit(1); });

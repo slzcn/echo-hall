@@ -1475,6 +1475,11 @@ function ensureStreamDedupObserver(){
   const st=$('#stream'); if(!st) return;
   _streamDedupObs=new MutationObserver(scheduleStreamDedup);
   _streamDedupObs.observe(st, { childList:true });   // 仅顶层气泡增删, 不看 subtree/文本(打字机不触发)
+  // ★挂载即先扫一遍现有子节点: MutationObserver 只报"挂载之后"的增删, 不回溯已在 DOM 里的节点。
+  //   而页首防闪脚本(index.html)在 app.js 加载【之前】就把 localStorage 快照 innerHTML 进 #stream ——
+  //   若那份快照是旧版(未修)烘焙的重复, 这些气泡先于观察器存在, 观察器永远看不到。故挂载时立刻清一次,
+  //   把首帧铺进来的历史重复(如真人 yiran"年年有余"冒三遍)也一并塌缩。
+  try{ dedupStreamByMid(st); }catch(_){}
 }
 // ============ 刷新停留原位 (scroll anchor) ============
 // 需求: "在哪刷新, 就停留在什么位置, 只刷新数据, 不改变停留位置"。默认刷新会跳回最新(底部),
@@ -1621,6 +1626,10 @@ async function enterRoom(room){
   stopVoice(); stopSong();
   // 记住当前房间: 刷新页面后自动恢复进房(私密房需成员, 也可恢复)
   try{ localStorage.setItem('eh_last_room', JSON.stringify({id:room.id,name:room.name,emoji:room.emoji,kind:room.kind})); }catch(e){ _ehCatch('enterRoom',e); }
+  // ★重复气泡实时清道夫: 尽早挂载(在 snapHit 分支【之前】), 保证 keep-alive 秒回房路径(该分支会提前
+  //   return, 走不到函数末尾)也挂得上; 且挂载时立刻扫一遍——把页首防闪脚本先于 app.js 铺进来的
+  //   首帧快照重复(可能是旧版烘焙的)一并清掉。内部 flag 保证全程只挂一次, 观察的是常驻 #stream 元素。
+  try{ ensureStreamDedupObserver(); }catch(_){ _ehCatch('enterRoom',_); }
   // keep-alive: 快速回到刚离开的同一房间(30s内) → 直接还原 DOM 快照秒显，跳过重拉+重渲染
   const snapHit = !_cachePurged && roomSnap && roomSnap.rid===room.id && (Date.now()-roomSnap.at < SNAP_TTL);
   const kindLabel = room.kind==='private'?'私密':(room.kind==='public'?'公开':'官方');
@@ -1699,7 +1708,6 @@ async function enterRoom(room){
   if(_suppressAutoBottom){ _suppressAutoBottom=false; }   // 还原停留位置时不贴底(loadHistory 首屏已交给 restoreScrollAnchor)
   else ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){ _ehCatch('enterRoom',_); } }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
-  try{ ensureStreamDedupObserver(); }catch(_){ _ehCatch('enterRoom',_); }   // 挂重复气泡实时清道夫(观察 #stream 直接子增删, 一帧内清同 mid 重复; 只挂一次)
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
