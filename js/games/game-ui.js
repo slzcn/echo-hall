@@ -811,7 +811,7 @@
       });
     }
     // 提示用的残局上下文(报单意识): 只喂公开信息(座位/各家剩牌数/地主), 绝不含任何隐藏手牌 → 公平。
-    function hintCtx(){ return { seat: mySeat, handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord }; }
+    function hintCtx(){ return { seat: mySeat, handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, log: st.log }; }
     function renderActBar(){
       const myTurn = st.turn === mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat !== mySeat;
@@ -1024,7 +1024,7 @@
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==seat) ? st.table.lastPlay.parse : null;
       const mv = AI.decide({ seat, hand: st.players[seat].hand, tableParse: target,
         lastSeat: st.table.lastPlay ? st.table.lastPlay.seat : null,
-        handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: seat===st.landlord });
+        handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: seat===st.landlord, log: st.log });
       if (mv.action === 'pass'){ doPass(seat); return; }
       try { var r = Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ doPass(seat); return; }   // AI 兜底:决策失误就过
@@ -1047,7 +1047,7 @@
         if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); return; }
         // 领出必须出牌:托管出最小合法牌(用 AI 决策)
         const mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:null,
-          handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord });
+          handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
         if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); }
       }
     }

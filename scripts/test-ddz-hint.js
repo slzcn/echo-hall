@@ -173,5 +173,46 @@ function sameSet(a,b){ return ids(a)===ids(b); }
   ok(h[0] && h[0].length===1 && h[0][0].rank===13, '提示·报单全单张: 首条=最大单张K(不送最小单3)');
 }
 
+// ── ⑲ 公开读牌·报双领出: 不首推"对手能压过的对子", 改推他跟不了的一手 ← 主人报的核心例 ──
+{
+  // 我 seat0 领出; 对手 seat1 报双(剩2). 手里 一对6 + 三条9 + 单3(6张, 无法一把走完)。
+  //   log 里双王已现 → 对手不可能王炸。三条系(他 2 张跟不了)应排在"可被更高对子压的对6"之前。
+  const hand = [c(6,'♠'),c(6,'♥'), c(9,'♠'),c(9,'♥'),c(9,'♣'), c(3,'♠')];
+  const log = [ {t:'play', seat:2, cards:['js','jb'], ptype:'rocket'} ];
+  const ctx = { seat:0, handsLeft:[6,2,5], landlord:0, log };
+  const h = AI.hints(hand, null, ctx);
+  ok(h[0] && R.parse(h[0]).type!=='pair', '读牌·报双提示领出: 首推他跟不了的一手, 不首推可被压的对子');
+}
+
+// ── ⑳ 公开读牌·报双领出(灵魂 decide): 打 boss 对子憋死, 不打可被压的低对子 ──
+{
+  // 灵魂地主 seat0 领出; 对手 seat1 报双(剩2). 手里 一对5 + 一对2(15). 小王已现→无王炸。
+  //   一对2 是 boss(无更高对子、无王炸能压)→ 领它把只剩 2 张的对手彻底憋住(压不过·跟不了);
+  //   一对5 可能被对手更高对子压走 = 把牌权/走脱机会送出去, 绝不能领。
+  const hand = [c(5,'♠'),c(5,'♥'), c(15,'♠'),c(15,'♥')];
+  const log = [ {t:'play', seat:2, cards:['js'], ptype:'single'} ];
+  const r = AI.decide({ seat:0, hand, tableParse:null, lastSeat:null, handsLeft:[4,2,5], landlord:0, iAmLandlord:true, log });
+  ok(r.action==='play' && r.cards.length===2 && r.cards[0].rank===15, '读牌·报双灵魂领出: 打 boss 对子(2)憋死, 不打可被压的对子5');
+}
+
+// ── ㉑ 无 log 时读牌自动退化: 报双不触发收窄, 兼容旧签名不报错 ──
+{
+  const hand = [c(5,'♠'),c(5,'♥'), c(15,'♠'),c(15,'♥')];
+  const ctx = { seat:0, handsLeft:[4,2,5], landlord:0 };   // 故意不带 log
+  const h = AI.hints(hand, null, ctx);
+  ok(h.length>0, '读牌·无log: 报双不读牌(退回旧行为), 不报错');
+}
+
+// ── ㉒ 公开读牌·报单领出全单张时优先 boss 单(对手压不过, 只能过) ──
+{
+  // 我 seat0 领出; 对手 seat1 报单(剩1). 全散单 3/9/K. log 里 A/2/双王全现 → K 是 boss 单。
+  //   老行为(无读牌)甩最大单 K 恰好也对; 这里验证读牌下仍锁定 boss 单 K(他压不过)。
+  const played = ['s14','h14','c14','d14','s15','h15','c15','d15','js','jb'];
+  const hand = [c(3,'♠'), c(9,'♠'), c(13,'♠')];
+  const ctx = { seat:0, handsLeft:[3,1,5], landlord:0, log:[{t:'play',seat:2,cards:played,ptype:'x'}] };
+  const h = AI.hints(hand, null, ctx);
+  ok(h[0] && h[0].length===1 && h[0][0].rank===13, '读牌·报单全单张: 首推 boss 单 K(对手压不过)');
+}
+
 console.log(`\n斗地主提示智能: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -291,16 +291,32 @@
     const finisher = plays.find(p => p.cards.length === hand.length);
     if (finisher) return finisher.cards;
 
-    // 对手报单: 收窄候选到多张牌型(憋死剩 1 张的对手); 只有单张时改甩最大单张
+    // 对手报单/报双: 用公开读牌收窄候选, 憋死低张真对手 —— 别把牌权/走脱机会送出去。
     const oppMin = ctx ? minOpponentCards(ctx) : 99;
+    const unseen = ctx ? unseenRankCounts(ctx) : null;
+    // 甩单张时: 有"对手压不过的 boss 单"就甩最小 boss(他只能过); 否则退甩最大单张。
+    const bestSingle = (list)=>{
+      const singles = list.filter(p => p.parse.type==='single');
+      if (!singles.length) return null;
+      if (unseen){
+        const boss = singles.filter(p => !hasHigherSingle(unseen, p.parse.key));
+        if (boss.length){ boss.sort((a,b)=> a.parse.key - b.parse.key); return boss[0].cards; }
+      }
+      singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards;
+    };
     let pool = plays;
     if (oppMin === 1){
+      // 剩 1 张: 任何 ≥2 张牌型他都跟不了 → 收窄到多张憋死; 只有单张才甩(优先 boss 单)。
       const multi = plays.filter(p => p.cards.length >= 2);
       if (multi.length){ pool = multi; }
-      else {
-        const singles = plays.filter(p => p.parse.type==='single');
-        if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
-      }
+      else { const s = bestSingle(plays); if (s) return s; }
+    } else if (oppMin === 2 && unseen){
+      // 剩 2 张(读牌生效时): 保留他跟不了的多张牌型 —— 但【去掉他能用更高对子压过的对子】,
+      //   这正是"我剩两张多半是对子, 灵魂别领个我压得过的对子送我走"的修法。
+      const squeeze = plays.filter(p =>
+        p.cards.length >= 2 && !(p.parse.type==='pair' && hasHigherPair(unseen, p.parse.key)));
+      if (squeeze.length){ pool = squeeze; }
+      else { const s = bestSingle(plays); if (s) return s; }   // 只剩能被压的对子/单张 → 甩 boss 单
     }
     // 优先长牌型(顺子/连对/飞机)清散牌,同类取点最小
     const rank = (p)=>{
@@ -348,14 +364,30 @@
         if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
         return a.parse.key-b.parse.key;
       });
-      // ④ 领出·真对手报单: 多张牌型提前(憋住剩1张的他), 全单张则大单优先; 稳定排序保多张间既有顺序。
-      if (ctx && minOpponentCards(ctx) === 1){
-        list.sort((a,b)=>{
-          const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
-          if (ma!==mb) return ma-mb;
-          if (ma===1) return b.parse.key-a.parse.key;   // 都是单张→大的优先(他压不过)
-          return 0;
-        });
+      // ④ 领出·真对手低张(报单/报双): 把"他压不过/跟不了的一手"提到最前憋死他。
+      //    报单(剩1张): 任何≥2张牌型他都跟不了 → 多张提前, 全单张则大单优先(他压不过)。
+      //    报双(剩2张·读牌生效时): 多张仍憋他, 但【他能用更高对子压过的对子】降级同单张 ——
+      //      正是"我剩两张多半是对子, 提示别再首推个我压得过的对子"的修法。仅用公开信息, 公平。
+      if (ctx){
+        const oppMin = minOpponentCards(ctx);
+        const unseen = unseenRankCounts(ctx);
+        if (oppMin === 1 || (oppMin === 2 && unseen)){
+          const held = (p)=>{   // 0=憋死他的一手(排前), 1=他能跟/能压(排后)
+            if (p.cards.length < 2) return 1;
+            if (oppMin === 2 && p.parse.type==='pair' && hasHigherPair(unseen, p.parse.key)) return 1;
+            return 0;
+          };
+          list.sort((a,b)=>{
+            const ha=held(a), hb=held(b);
+            if (ha!==hb) return ha-hb;
+            if (ha===1){                              // 都是"他能应对"的
+              const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
+              if (ma!==mb) return ma-mb;              // 能被压的对子仍优于单张(甩对逼他拆/压)
+              if (ma===1) return b.parse.key-a.parse.key;   // 单张→大的优先(他压不过)
+            }
+            return 0;
+          });
+        }
       }
     } else {
       list.sort((a,b)=>{
@@ -424,6 +456,43 @@
   // 是否值得动炸弹(非紧急时):手牌很少 or 炸弹多可以搏
   function shouldBomb(ctx){
     return ctx.hand.length <= 5;
+  }
+
+  // ── 公开读牌(card counting) ────────────────────────────────
+  // 铁律: 只用【公开信息】—— 我的手牌 + state.log 里所有已亮明打出的牌。
+  //   绝不读别家隐藏手牌。据此推断"还没露面的牌"的分布(散落在别家手里),
+  //   用来判断"我这手别人到底压不压得过"→ 面对报单/报双的真对手时精准憋死他,
+  //   治主人反馈"我剩两张(多半是对子), 灵魂还照样领对子送我走脱"。
+  function rankOfId(id){
+    if (id === 'jb') return 17;
+    if (id === 'js') return 16;
+    return parseInt(id.slice(1), 10);   // 花色键固定 1 字符, 其后即点数(3..15)
+  }
+  // 未露面牌的点数计数: 满副 54 张 − 我的手牌 − log 中打出的所有牌。
+  //   底牌【不减】: 我是农民时底牌在地主手里(仍是对手可持有的牌), 我是地主时底牌已并入我手牌(已减)。
+  //   缺 log 时返回 null → 上层退化为不读牌的既有行为(不破坏无 log 的既有测试/fuzz)。
+  function unseenRankCounts(ctx){
+    if (!ctx || !Array.isArray(ctx.log)) return null;
+    const m = new Map();
+    for (let r=3; r<=15; r++) m.set(r, 4);
+    m.set(16, 1); m.set(17, 1);
+    const dec = (r)=>{ if (m.has(r)) m.set(r, Math.max(0, m.get(r)-1)); };
+    for (const c of (ctx.hand||[])) dec(c.rank);
+    for (const e of ctx.log){
+      if (e && e.t==='play' && Array.isArray(e.cards)) for (const id of e.cards) dec(rankOfId(id));
+    }
+    return m;
+  }
+  function oppCanRocket(unseen){ return unseen.get(16)>0 && unseen.get(17)>0; }
+  // 是否还有比 key 更大的单张未露面(含王)→ 对手可能压过我这张单。
+  function hasHigherSingle(unseen, key){
+    for (let r=key+1; r<=17; r++) if ((unseen.get(r)||0) > 0) return true;
+    return false;
+  }
+  // 是否还有比 key 更大的对子未露面, 或对手可能握王炸 → 对手可能压过我这个对子。
+  function hasHigherPair(unseen, key){
+    for (let r=key+1; r<=15; r++) if ((unseen.get(r)||0) >= 2) return true;
+    return oppCanRocket(unseen);
   }
 
   return {
