@@ -253,9 +253,14 @@
     const delta = {};
     for (const pl of state.players) delta[pl.seat] = (pl.team===winnerTeam) ? +advance : -advance;
 
+    // 残局(对标腾讯亮残牌): 各家终局剩牌 id。掼蛋终局只有末游还捏着牌, 其余已出完为空数组。
+    // 只在 result 里出现 → 局中快照 result=null 不外泄; 下一副全新 seed, 亮末游残牌无害。
+    const reveal = {};
+    for (const pl of state.players) reveal[pl.seat] = (pl.hand||[]).map(c=>c.id);
+
     state.phase = 'over';
     state.result = {
-      finishOrder, winnerTeam, loserTeam: 1-winnerTeam, advance,
+      finishOrder, winnerTeam, loserTeam: 1-winnerTeam, advance, reveal,
       teamLevelsBefore: before, teamLevelsAfter: after,
       activeLevel: state.level, dealerTeam: state.dealerTeam,
       nextDealerTeam: winnerTeam, nextLevel: after[winnerTeam],

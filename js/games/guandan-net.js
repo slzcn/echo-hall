@@ -55,6 +55,8 @@
       doubleDown: !!res.doubleDown, bombs: res.bombs,
       delta: Object.assign({}, res.delta),
       tribute: sanitizeTribute(res.tribute),
+      // 残局:各家终局剩牌(id 数组, 掼蛋只末游非空)。仅终局 result 里才有 → 局中快照 result=null 不外泄; 下副全新 seed, 亮牌无害。
+      reveal: res.reveal ? Object.keys(res.reveal).reduce(function(m,k){ m[k]=(res.reveal[k]||[]).slice(); return m; }, {}) : undefined,
     };
     return out;
   }

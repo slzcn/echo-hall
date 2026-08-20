@@ -22,6 +22,8 @@ const path = require('path');
 const Engine = require('../js/games/guandan-engine.js');
 const AI = require('../js/games/guandan-ai.js');
 const Rules = require('../js/games/guandan-rules.js');
+const Net = require('../js/games/guandan-net.js');
+const Deck = require('../js/games/deck.js');
 
 function assert(ok, msg){ if(!ok) throw new Error('FAIL: '+msg); console.log('✓ '+msg); }
 
@@ -82,6 +84,7 @@ function playFull(seed, level, teamLevels, prevResult){
   return st;
 }
 
+const ALL = {}; Deck.doubleDeck().forEach(c=>ALL[c.id]=c);
 let recorded=0, winsForMe=0;
 for(let seed=100; seed<130; seed++){
   const st = playFull(seed, 2, [2,2]);
@@ -103,9 +106,36 @@ for(let seed=100; seed<130; seed++){
   if(rp.result.delta[0] !== row.my_delta) throw new Error('重放 my_delta 不一致 @'+seed);
   if(JSON.stringify(rp.result.finishOrder)!==JSON.stringify(st.result.finishOrder)) throw new Error('重放名次不一致 @'+seed);
   if(rp.result.advance!==st.result.advance) throw new Error('重放升级量不一致 @'+seed);
+
+  // ── 收局残局(对标腾讯"亮残牌"): result.reveal = 各家终局剩牌 id。掼蛋只末游非空, 头/二/三游已出完 ──
+  const rev = st.result.reveal;
+  if(!rev) throw new Error('result 缺 reveal(残局数据) @'+seed);
+  for(const p of st.players){
+    const ids = rev[p.seat]||[];
+    if(ids.length !== p.hand.length) throw new Error(`残局 reveal[${p.seat}] 张数(${ids.length})≠该家剩牌(${p.hand.length}) @`+seed);
+    if(ids.some(id=>!ALL[id])) throw new Error(`残局 reveal[${p.seat}] 含非法牌 id @`+seed);
+  }
+  const lastSeat = st.result.finishOrder[st.result.finishOrder.length-1];
+  if((rev[lastSeat]||[]).length === 0) throw new Error('末游残牌应非空(它是唯一没出完的一家) @'+seed);
+  for(const s of st.result.finishOrder.slice(0,3)){
+    if((rev[s]||[]).length !== 0) throw new Error(`头/二/三游(席${s})应已出完(残牌为空) @`+seed);
+  }
 }
 assert(recorded===30, `30 局旅程全部落库成行 (我方胜 ${winsForMe} 局)`);
 assert(winsForMe>0 && winsForMe<30, '胜负两种结局都出现过(战绩加减分双向都验到)');
+
+// ── 收局残局 · 联机脱敏命门: reveal 只在终局 result 里, 对局中快照永不下发 ──────────
+{
+  const st = playFull(100, 2, [2,2]);
+  const overSnap = Net.snapshot(st, 1);
+  assert(overSnap.result && overSnap.result.reveal, '终局脱敏快照 result 携带 reveal(guest 结算可见末游残牌)');
+  assert(Net.assertNoLeak(overSnap).ok, '终局快照仍不外泄 手牌/seed/log(reveal 在 result 内, 不触发泄漏门)');
+  const midSt = Engine.createGame({ seed:100, isAI:[false,true,true,true], names:['你','灵魂下','灵魂对','灵魂上'] });
+  const midSnap = Net.snapshot(midSt, 1);
+  assert(midSnap.result === null, '对局中快照 result=null(残牌绝不在牌局进行时下发)');
+  assert(Net.assertNoLeak(midSnap).ok, '对局中快照不外泄任何手牌(残牌命门守住)');
+}
+console.log('✓ 收局残局数据流 + 脱敏命门(reveal 仅终局可见, 局中零外泄)');
 
 // ── 步骤6: 再来一局延续对局(进贡/升级带入下一副) ───────────
 let sawTribute=false, sawLevelUp=false, chainGames=0;
@@ -207,6 +237,15 @@ assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 
 assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌各有音');
 assert(/iWon\)\{[\s\S]{0,200}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
 assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
+// (9b) 收局体验(对标腾讯): 结算亮末游残牌 + 丝滑接下一副(反回退"只显示名次""打下一副瞬拆硬切")
+assert(/gd-remains/.test(ui) && /res\.reveal/.test(ui), '结算面板渲染残局(读 result.reveal 亮末游剩牌)');
+assert(/\.gd-over\.out\{animation:gdOverOut/.test(ui) && /over\.classList\.add\('out'\)/.test(ui),
+  '打下一副先淡出下沉(.gd-over.out 过渡)再重建, 不瞬拆硬切');
+assert(/over\.addEventListener\('animationend'/.test(ui) && /setTimeout\(once,\s*\d+\)/.test(ui),
+  '过渡用 animationend 推进 + setTimeout 兜底(动画被打断也不卡在战报页)');
+assert(/if\s*\(over\._leaving\)\s*return/.test(ui), '打下一副按钮防连点(过渡中重复点被吞, 不重复开副)');
+assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..','js','games','guandan-net.js'),'utf8')),
+  'guandan-net.sanitizeResult 透传 reveal(联机 guest 结算可见残局)');
 
 // ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────
 // (10a) 手牌自适应: 每排动态叠放吃满一行、行内永不换行(治"27 张断裂"); 上下两排是玩家手动理牌所分, 非布局失控换行

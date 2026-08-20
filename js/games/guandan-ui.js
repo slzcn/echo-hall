@@ -219,6 +219,15 @@
 .gd-over .rank-row .r{font-weight:800;width:34px;text-align:right}
 .gd-over .rank-row.me{color:var(--ink)}
 .gd-over .lvlup{font-size:15px;font-weight:800;color:var(--amber)}
+.gd-over .gd-remains{display:flex;flex-direction:column;gap:5px;align-items:center;max-width:100%}
+.gd-over .gd-remains .rm-nm{font-size:11.5px;color:var(--sub);display:flex;align-items:center;gap:6px;letter-spacing:.02em}
+.gd-over .gd-remains .rm-n{font-size:11px;color:var(--amber);font-variant-numeric:tabular-nums}
+.gd-over .gd-remains .rm-cards{display:flex;padding-left:2px;max-width:100%}
+.gd-over .gd-remains .rm-cards .card{margin-left:-16px;box-shadow:0 2px 5px rgba(0,0,0,.45)}
+.gd-over .gd-remains .rm-cards.dense .card{margin-left:-20px}
+.gd-over .gd-remains .rm-cards .card:first-child{margin-left:0}
+.gd-over.out{animation:gdOverOut .32s cubic-bezier(.4,0,.9,.5) forwards;pointer-events:none}
+@keyframes gdOverOut{from{opacity:1}to{opacity:0;transform:scale(.94) translateY(12px)}}
 .gd-toast{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center;max-width:80%}
 .gd-toast.show{opacity:1}
 .gd-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
@@ -1095,22 +1104,49 @@
       over.innerHTML=`
         <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
         <div class="rank-list">${rows}</div>
+        <div class="gd-remains" id="gdRemains"></div>
         <div class="lvlup">${lvlLine}</div>
         <div class="gd-acts" style="margin-top:4px">
           <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
           <button class="gd-btn primary" id="gdDone">收工</button>
         </div>`;
       els.felt.appendChild(over);
+      // 残局(对标腾讯亮残牌): 掼蛋终局只有末游还捏着牌 → 亮它剩了哪些, 让人看清"卡在哪几张"。
+      const remainBox = over.querySelector('#gdRemains');
+      if (remainBox){
+        const reveal = res.reveal || {};
+        const lastSeat = res.finishOrder[res.finishOrder.length-1];
+        const lastIds = reveal[lastSeat] || [];
+        if (!lastIds.length){ remainBox.remove(); }
+        else {
+          const lp = st.players[lastSeat];
+          const meL = lastSeat===mySeat, mateL = Engine.partnerOf(mySeat)===lastSeat;
+          const nm = document.createElement('div'); nm.className='rm-nm';
+          nm.innerHTML = `末游 ${escapeHtml(lp.name)}${meL?'（你）':(mateL?'（队友）':'')} <span class="rm-n">剩${lastIds.length}</span>`;
+          const cards = document.createElement('div'); cards.className='rm-cards';
+          if (lastIds.length > 18) cards.classList.add('dense');
+          lastIds.map(findCardById).filter(Boolean).forEach(c=> cards.appendChild(cardEl(c, st.level, {mini:true})));
+          remainBox.appendChild(nm); remainBox.appendChild(cards);
+        }
+      }
       if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       if (!isGuest) over.querySelector('#gdAgain').addEventListener('click', ()=>{
-        over.remove();
+        if (over._leaving) return; over._leaving = true;   // 防连点: 过渡中重复点被吞, 不重复开副
+        // 先把下一副的升级/庄/进贡上下文捕获好(同步), 再走淡出 → 重建, 避免瞬拆硬切(对标腾讯"打下一副"衔接)。
         if (res.matchWon){ matchLevels=[2,2]; matchDealer=0; prevResult=null; }
         else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
           prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
-        st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
-        rows=null; if(arrangeMode) setArrange(false);
-        sfx('deal'); broadcast(); renderAll(); showTributeBanner();
+        over.classList.add('out');
+        const go = ()=>{
+          over.remove();
+          st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
+          rows=null; if(arrangeMode) setArrange(false);
+          sfx('deal'); broadcast(); renderAll(); showTributeBanner();
+        };
+        let done=false; const once=()=>{ if(done) return; done=true; go(); };
+        over.addEventListener('animationend', once, { once:true });
+        setTimeout(once, 400);   // 动画事件兜底(被打断/不触发也不卡在战报页)
       });
       over.querySelector('#gdDone').addEventListener('click', close);
       // F3 终局战报进聊天流(升级/双下/通关一并播报); 头游若是灵魂配一句收官台词
