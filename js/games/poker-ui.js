@@ -656,6 +656,7 @@
 
     // ── 操作区 ──
     let raiseTo = 0;
+    let awaitingHost = false;
     // 操作条禁用骨架: 与激活态【同高同结构】——三键禁用 + 滑杆/快捷占位隐藏。中键文案随状态变(等待/已弃牌/已全下/离线/已提交)。
     function actsSkeleton(callLbl){
       return `
@@ -670,11 +671,12 @@
     function renderActs(){
       const p=st.players[mySeat];
       const offline = isGuest && connState!=='online';
-      const mine = !offline && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
+      const mine = !offline && !awaitingHost && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
       // 非本人行动态: 渲染同高禁用骨架(而非清空塌陷), 三键常驻不跳版
       if (!mine){
         let callLbl='等待行动';
         if (offline) callLbl = (connState==='host_offline'?'房主离线':'连接中…');
+        else if(awaitingHost) callLbl='已提交 · 等待裁决';
         else if (st.phase==='seating') callLbl='等灵魂入座';
         else if (st.phase==='waiting') callLbl='等房主发牌';
         else if (st.phase==='showdown'||st.phase==='over') callLbl='本手结束';
@@ -721,8 +723,9 @@
     }
 
     function humanAct(action, amount){
-      if (st.toAct!==mySeat) return;
-      if (isGuest){                            // 客人: 动作发回 host 权威校验, 绝不本地改状态
+      if (st.toAct!==mySeat || awaitingHost) return;
+      if (isGuest){
+        awaitingHost=true;
         if(onAction){ try{ onAction({ action, amount }); }catch(_){} }
         els.acts.innerHTML=actsSkeleton('已提交'); els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
         return;
@@ -1044,6 +1047,7 @@
     }
     function applySnapshot(snap){
       if (!isGuest || !snap) return;
+      awaitingHost=false;
       const prevHand = handNo;
       lastSnap = snap; handNo = snap.handNo || 0;
       if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补

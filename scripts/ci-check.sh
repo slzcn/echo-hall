@@ -168,6 +168,13 @@ else
   fail "混合设备键盘旅程失败"
 fi
 
+section "1a9. 联机牌局动作 pending"
+if node scripts/journey-game-action-pending.js; then
+  pass "三桌 guest 防重复动作 / 快照解锁 / 旧实现反证通过"
+else
+  fail "联机牌局动作 pending 旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
