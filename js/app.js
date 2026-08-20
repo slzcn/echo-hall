@@ -1295,35 +1295,11 @@ const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防�
 // ============ 大厅渲染 ============
 const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
 const ROOM_KIND_C = EH_CONFIG.roomKindC || { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' };
-// 统一取房间强调色: 官方按名查表, 公开/私密按类型查 roomKindC
-// 取指定主题id 的 --accent(从themePalettes读, 不写死)
-function themeAccentById(themeId){
-  try{
-    const pal = (EH_CONFIG.themePalettes||{})[themeId];
-    if(pal && pal['--accent']) return pal['--accent'];
-  }catch(_){}
-  return null;
-}
-// 读官方房名对应主题的 accent(向后兼容旧呼叫点)
-function themeAccentOf(roomName){
-  const themeId = (EH_CONFIG.roomTheme||{})[roomName];
-  return themeAccentById(themeId);
-}
-const ROOM_NAME_C = EH_CONFIG.roomNameC || {};   // 按房名定制主色(任意房型), 优先于 kind/主题色
-function roomAccentC(r){
-  if(!r) return ROOM_KIND_C.official;
-  if(r.name && ROOM_NAME_C[r.name]) return ROOM_NAME_C[r.name];   // 房名定制色最高优先(如午夜聊天=莫兰迪玫瑰)
-  if(r.kind==='official'){
-    return themeAccentOf(r.name) || OFFICIAL_FALLBACK_C[r.name] || ROOM_KIND_C.official;
-  }
-  // 公开/私密: 卡片强调色 = 该房分配主题的 accent; 拿不到降级 roomKindC
-  try{
-    const tid = (typeof roomThemeFor==='function') ? roomThemeFor(r) : null;
-    const c = themeAccentById(tid);
-    if(c) return c;
-  }catch(_){}
-  return ROOM_KIND_C[r.kind] || ROOM_KIND_C.official;
-}
+// 统一房间强调色已迁入大厅模块；配置与 roomThemeFor 均在调用时读取，避免装配阶段捕获未就绪依赖。
+const roomAccentC = window.EH_LOBBY_MODULE.createRoomAccentC({
+  getConfig:()=>EH_CONFIG,
+  getRoomThemeFor:()=>roomThemeFor,
+});
 // 灵魂取色优先级: custom(灵魂 DB 色, 即 admin 灵魂工坊调色板设的, 合法非空 hex) > soulColors[name](JS专属色兜底) > 所在房间强调色 > fallback
 // ★2026-07: custom 提到最高优先——原来 soulColors 硬编码盖过 DB, 导致 admin 里改灵魂色不生效(如老K DB设了#4A5D7E却显硬编码色)。
 // name 参数按灵魂名匹配(私密房召唤副本 uid 变但名字不变), 支持字符串或含 .name 的对象

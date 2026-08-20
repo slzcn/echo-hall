@@ -144,6 +144,41 @@
     return { prefetchRoom: prefetchRoom, prefetchAll: prefetchAll };
   }
 
+  // 统一房间强调色：配置与房间主题解析器均通过 getter 延迟读取，兼容配置／运行时依赖晚于模块装配。
+  function createRoomAccentC(deps) {
+    deps = deps || {};
+    var getConfig = deps.getConfig;
+    var getRoomThemeFor = deps.getRoomThemeFor;
+    if (typeof getConfig !== 'function' || typeof getRoomThemeFor !== 'function') {
+      throw new TypeError('[EH_LOBBY] createRoomAccentC missing dependencies');
+    }
+    return function roomAccentC(room) {
+      var cfg = getConfig() || {};
+      var kindColors = cfg.roomKindC || { public: '#1DE9B6', private: '#B57EDC', official: '#0ABAB5' };
+      var officialFallback = cfg.officialFallbackC || {};
+      var nameColors = cfg.roomNameC || {};
+      var accentForTheme = function (themeId) {
+        try {
+          var palette = (cfg.themePalettes || {})[themeId];
+          return palette && palette['--accent'] || null;
+        } catch (e) { return null; }
+      };
+      if (!room) return kindColors.official;
+      if (room.name && nameColors[room.name]) return nameColors[room.name];
+      if (room.kind === 'official') {
+        var themeId = (cfg.roomTheme || {})[room.name];
+        return accentForTheme(themeId) || officialFallback[room.name] || kindColors.official;
+      }
+      try {
+        var roomThemeFor = getRoomThemeFor();
+        var resolvedTheme = typeof roomThemeFor === 'function' ? roomThemeFor(room) : null;
+        var accent = accentForTheme(resolvedTheme);
+        if (accent) return accent;
+      } catch (e) {}
+      return kindColors[room.kind] || kindColors.official;
+    };
+  }
+
   // 大厅房间查询超时包装：withTimeout 通过 getter 在调用时读取，避免模块装配阶段捕获尚未就绪的实现。
   function createRoomsQuery(deps) {
     deps = deps || {};
@@ -455,5 +490,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomAccentC: createRoomAccentC, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);

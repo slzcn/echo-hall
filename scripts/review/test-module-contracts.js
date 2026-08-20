@@ -69,6 +69,30 @@ const cntNull = context.window.EH_LOBBY_MODULE.optimisticCnt(null);
 if (!/连接中…/.test(cntNull)) throw new Error('lobby: optimisticCnt null-room fallback mismatch: ' + cntNull);
 console.log('PASS lobby: optimisticCnt pure helper is exported');
 
+// 回归：房间强调色工厂创建时配置与主题解析器尚未就绪，调用时必须读取最新依赖。
+(function testLateRuntimeForRoomAccent() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateConfig = null, lateRoomThemeFor = null;
+  const roomAccentC = lobby.createRoomAccentC({
+    getConfig: () => lateConfig,
+    getRoomThemeFor: () => lateRoomThemeFor,
+  });
+  if (roomAccentC(null) !== '#0ABAB5' || roomAccentC({ name: '迟到房', kind: 'public' }) !== '#1DE9B6') {
+    throw new Error('lobby: room accent before config ready must use safe defaults');
+  }
+  lateConfig = {
+    roomKindC: { official: '#111111', public: '#222222', private: '#333333' },
+    roomNameC: { 专属房: '#444444' },
+    roomTheme: { 官方房: 'official-theme' },
+    themePalettes: { 'official-theme': { '--accent': '#555555' }, 'public-theme': { '--accent': '#666666' } },
+  };
+  lateRoomThemeFor = room => room.name === '迟到房' ? 'public-theme' : null;
+  if (roomAccentC({ name: '专属房', kind: 'public' }) !== '#444444' || roomAccentC({ name: '官方房', kind: 'official' }) !== '#555555' || roomAccentC({ name: '迟到房', kind: 'public' }) !== '#666666') {
+    throw new Error('lobby: room accent did not resolve late config or theme dependency');
+  }
+  console.log('PASS lobby: room accent resolves late config and theme dependency');
+})();
+
 // 回归：查询超时实现可能晚于大厅模块装配；未就绪时安全失败，就绪后读取最新函数并保留超时兜底。
 (async function testLateRuntimeForRoomsQuery() {
   const lobby = context.window.EH_LOBBY_MODULE;
