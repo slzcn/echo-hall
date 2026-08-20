@@ -796,11 +796,14 @@
       turnDur = mine ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)));
       turnStart = Date.now();
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
+      // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
+      let lastDeg=-1, lastSec=-1;
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
-        if(seatEl) seatEl.style.setProperty('--p',(frac*360).toFixed(1));
-        if(mine && clk){ const sec=Math.ceil(remain/1000); clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
+        const deg=Math.round(frac*360);
+        if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
+        if(mine && clk){ const sec=Math.ceil(remain/1000); if(sec!==lastSec){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); lastSec=sec; } }
         if(remain<=0){ ringRAF=null; if(mine&&typeof onExpire==='function') onExpire(); return; }
         ringRAF=requestAnimationFrame(tick);
       };

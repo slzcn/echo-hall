@@ -78,24 +78,36 @@
     for (let r = 2; r <= 14; r++) for (const s of SU){
       if (!used.has(s + r)) deck.push({ rank:r, suit:s });
     }
+    // ── 复用缓冲, 削减每样本的数组分配(GC churn) ──
+    // 每样本都把 pool 重置回原始 deck 顺序再洗 → 抽到的牌与"逐次 deck.slice()"完全一致;
+    // rng 调用次数/顺序不变(仍是 need 次), 故 equity 结果零漂移(有 golden 值回归守着)。
+    // evaluate() 只读入参、从不改写(已核对 poker-eval), 因此 7 张成手用一个 scratch 反复回填是安全的。
+    const D = deck.length;
+    const need = nOpp * 2 + (5 - board.length);
+    const pool = deck.slice();
+    const fullBoard = new Array(5);
+    const mineCards = new Array(7);   // [底牌0, 底牌1, 公共5]
+    const oppCards  = new Array(7);
+    mineCards[0] = hole[0]; mineCards[1] = hole[1];
     let equity = 0;
     for (let it = 0; it < samples; it++){
+      for (let i = 0; i < D; i++) pool[i] = deck[i];   // 重置到原始顺序(等价于 deck.slice(), 但不再分配)
       // Fisher-Yates 抽样(用 rng, 只洗前面需要的张数)
-      const need = nOpp * 2 + (5 - board.length);
-      const pool = deck.slice();
       for (let i = 0; i < need; i++){
-        const j = i + Math.floor(rng() * (pool.length - i));
+        const j = i + Math.floor(rng() * (D - i));
         const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
       }
-      let k = 0;
-      const fullBoard = board.concat();
-      const oppHands = [];
-      for (let o = 0; o < nOpp; o++) oppHands.push([pool[k++], pool[k++]]);
-      while (fullBoard.length < 5) fullBoard.push(pool[k++]);
-      const mine = Eval.evaluate(hole.concat(fullBoard));
+      // 公共牌: 已知的照抄, 缺的从 opp 牌之后补(保持原实现"先取 opp 两张、再补 board"的抽牌顺序)
+      for (let i = 0; i < board.length; i++) fullBoard[i] = board[i];
+      let k = nOpp * 2;
+      for (let i = board.length; i < 5; i++) fullBoard[i] = pool[k++];
+      mineCards[2]=fullBoard[0]; mineCards[3]=fullBoard[1]; mineCards[4]=fullBoard[2]; mineCards[5]=fullBoard[3]; mineCards[6]=fullBoard[4];
+      const mine = Eval.evaluate(mineCards);
       let tied = 1, beaten = false;
-      for (const oh of oppHands){
-        const cmp = Eval.compare(mine, Eval.evaluate(oh.concat(fullBoard)));
+      for (let o = 0; o < nOpp; o++){
+        oppCards[0]=pool[o*2]; oppCards[1]=pool[o*2+1];
+        oppCards[2]=fullBoard[0]; oppCards[3]=fullBoard[1]; oppCards[4]=fullBoard[2]; oppCards[5]=fullBoard[3]; oppCards[6]=fullBoard[4];
+        const cmp = Eval.compare(mine, Eval.evaluate(oppCards));
         if (cmp < 0){ beaten = true; break; }
         if (cmp === 0) tied++;
       }

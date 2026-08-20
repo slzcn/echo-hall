@@ -784,15 +784,18 @@
 
       const seatEl = seatOf(seat);
       const clk = room.querySelector('#ddzClk');
+      // 降频: rAF 每帧(~60fps)只在【整度数变化】时才写 --p(conic 环步进 1° ≈ 亚像素, 视觉等价),
+      //   秒数也只在【整秒变化】时才写文本 —— 免掉每秒几十次无谓的 conic 重绘与 textContent 回流。
+      let lastDeg=-1, lastSec=-1;
       const tick = ()=>{
         const elapsed = Date.now() - turnStart;
         const remain = Math.max(0, turnDur - elapsed);
         const frac = turnDur ? (remain/turnDur) : 0;
-        if (seatEl) seatEl.style.setProperty('--p', (frac*360).toFixed(1));
+        const deg = Math.round(frac*360);
+        if (seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p', deg); lastDeg=deg; }
         if (mine && clk){
           const sec = Math.ceil(remain/1000);
-          clk.textContent = sec+'s';
-          clk.classList.toggle('urgent', sec<=5);
+          if (sec!==lastSec){ clk.textContent = sec+'s'; clk.classList.toggle('urgent', sec<=5); lastSec=sec; }
         }
         if (remain<=0){
           ringRAF = null;
