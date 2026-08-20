@@ -6836,6 +6836,7 @@ function ehRenderReplay(g){
     const st=document.createElement('style'); st.id='eh-replay-modal-css';
     st.textContent = '.eh-replay-modal{position:fixed;inset:0;z-index:2100;display:grid;place-items:center;background:rgba(4,10,16,.66);backdrop-filter:blur(6px);animation:rpIn .2s ease}'
       + '@keyframes rpIn{from{opacity:0}to{opacity:1}}'
+      + '@media (prefers-reduced-motion:reduce){.eh-replay-modal{animation:none!important}.eh-replay-modal *{scroll-behavior:auto!important}}'
       + '.eh-replay-modal .rp-card{width:min(90vw,420px);background:linear-gradient(160deg,var(--panel-solid,#0f1e2b),var(--bg2,#0a1220));border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;padding:14px 16px;color:var(--ink,#eaf6ff);box-shadow:0 20px 60px rgba(0,0,0,.6)}'
       + '.eh-replay-modal .rp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}'
       + '.eh-replay-modal .rp-head b{font-size:15px;letter-spacing:.03em}'
@@ -7455,9 +7456,10 @@ function ehConfirm(msg, title){
   return new Promise(res=>{
     $('#confirmTitle').textContent = title||'确认操作';
     $('#confirmMsg').textContent = msg;
-    $('#confirmMask').classList.add('on');
+    $('#confirmMask').classList.add('on'); $('#confirmMask').setAttribute('aria-hidden','false');
+    setTimeout(()=>{ try{ $('#confirmNo').focus(); }catch(_){} },0);
     try{ EhSfx.play('click'); }catch(e){}   // 弹层出现提示音
-    const done=(v)=>{ try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
+    const done=(v)=>{ try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmMask').setAttribute('aria-hidden','true'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
     $('#confirmYes').onclick=()=>done(true);
     $('#confirmNo').onclick=()=>done(false);
     $('#confirmMask').onclick=(e)=>{ if(e.target===$('#confirmMask')) done(false); };
@@ -8082,8 +8084,20 @@ window.addEventListener('popstate', ()=>{
 
 const ROOM_EMOJIS=['🔒','🌙','🎧','🍺','☕','🎮','💻','📚','🎨','🔥','🌈','🛸','🐋','🦊','🎭','🕹️'];
 let pickedEmoji='🌐', pickedKind='public', createdRoom=null;
+let _modalReturnFocus=null;
+function _focusables(root){ return [...root.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>el.offsetParent!==null); }
+function _trapModalKey(e){
+  const mask=$('#modalMask'); if(!mask.classList.contains('on')) return;
+  if(e.key==='Escape'){ e.preventDefault(); closeModal(); return; }
+  if(e.key!=='Tab') return;
+  const list=_focusables(mask); if(!list.length) return;
+  const first=list[0],last=list[list.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+}
 function openModal(which){
-  $('#modalMask').classList.add('on'); ehArm();
+  _modalReturnFocus=document.activeElement;
+  $('#modalMask').classList.add('on'); $('#modalMask').setAttribute('aria-hidden','false'); ehArm();
   ['mCreate','mCreated','mJoin','mReg','mReset','mProfile'].forEach(id=>{ const el=$('#'+id); if(el) el.style.display=(id===which?'block':'none'); });
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
@@ -8102,7 +8116,12 @@ function renderEmojiPick(){
   $('#roomEmojiPick').innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
   $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ pickedEmoji=b.textContent; $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 }
-function closeModal(){ try{ if($('#modalMask').classList.contains('on')) EhSfx.play('back'); }catch(e){} $('#modalMask').classList.remove('on'); }
+function closeModal(){
+  try{ if($('#modalMask').classList.contains('on')) EhSfx.play('back'); }catch(e){}
+  $('#modalMask').classList.remove('on'); $('#modalMask').setAttribute('aria-hidden','true');
+  try{ if(_modalReturnFocus&&document.contains(_modalReturnFocus)) _modalReturnFocus.focus(); }catch(_){}
+  _modalReturnFocus=null;
+}
 
 // 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
@@ -8569,6 +8588,7 @@ on('createRoomBtn','click',()=>openModal('mCreate'));
 on('joinRoomBtn','click',()=>openModal('mJoin'));
 on('modalX','click',()=>closeModal());
 on('modalMask','click',e=>{ if(e.target===$('#modalMask')) closeModal(); });
+document.onkeydown=(e)=>{ _trapModalKey(e); };
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
 on('doCreateBtn','click',()=>createRoom());
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };

@@ -174,7 +174,7 @@
      保留 :focus-visible(仅键盘 tab 导航触发, 触屏/鼠标点击不触发) 的主题色描边保无障碍。 */
   button,[role="button"],.song-play,.tool-btn,.me-btn,.plus-btn,.emoji-btn{outline:none}
   button:focus,[role="button"]:focus,.song-play:focus{outline:none}
-  button:focus-visible,.song-play:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:2px}
+  button:focus-visible,[role="button"]:focus-visible,.song-play:focus-visible,.tool-btn:focus-visible,.me-btn:focus-visible,.plus-btn:focus-visible,.emoji-btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--sc,var(--accent,var(--cyan)));outline-offset:3px}
   html,body{height:100%;overflow:hidden;overflow-x:hidden;overscroll-behavior:none}
   /* ★上下"黑边"根治 v3 (2026-07-26, 真机截图确认真凶):
      那两条"黑边"其实是【浏览器自己的系统条】——顶部状态栏带 + 底部导航/地址栏带, 颜色由 <meta theme-color>
@@ -2189,7 +2189,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   </div>
   <button class="tm-close" id="tarotClose">收下今日签</button>
 </div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-panel" id="recPanel">
     <div class="rec-wave" id="recWave"></div>
@@ -2198,11 +2198,11 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     <div class="rec-tip" id="recTip" data-txt="recordingHint">松开发送 · 上滑取消</div>
   </div>
 </div>
-<div class="modal-mask" id="modalMask">
+<div class="modal-mask" id="modalMask" role="dialog" aria-modal="true" aria-labelledby="activeModalTitle" aria-hidden="true">
   <div class="glass modal" id="modal">
-    <div class="modal-x" id="modalX">✕</div>
+    <button type="button" class="modal-x" id="modalX" aria-label="关闭">✕</button>
     <div class="modal-body" id="mCreate">
-      <h3 data-txt="createRoomTitle">创建房间</h3>
+      <h3 id="activeModalTitle" data-txt="createRoomTitle">创建房间</h3>
       <p class="modal-sub" data-txt="createRoomSub">选择房间类型，起个名字。</p>
       <div class="seg" id="kindSeg">
         <div class="opt on" data-kind="public"><div class="ot">🌐 公开</div><div class="od" data-txt="roomTypePublicDesc">大厅可见</div></div>
@@ -2275,7 +2275,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     </div>
   </div>
 </div>
-<div class="modal-mask" id="confirmMask">
+<div class="modal-mask" id="confirmMask" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-hidden="true">
   <div class="glass confirm-box">
     <div class="confirm-title" id="confirmTitle" data-txt="confirmTitle">确认操作</div>
     <div class="confirm-msg" id="confirmMsg"></div>

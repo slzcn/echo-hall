@@ -154,6 +154,13 @@ else
   fail "消息发送失败恢复旅程失败"
 fi
 
+section "1a7. 弹窗键盘与读屏无障碍"
+if node scripts/journey-dialog-a11y.js; then
+  pass "dialog / focus trap / Esc / 焦点恢复 / live region / reduce-motion / 旧实现反证通过"
+else
+  fail "弹窗无障碍旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
