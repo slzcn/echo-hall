@@ -4840,8 +4840,10 @@ async function send(){
   if(isEmojiOnly(text)) burst(text);
   const rt=replyTo; resetInput(); clearReply();
   // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
-  const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
-  _sendInFlight.delete(localId);
+  let data=null, error=null;
+  try{ ({data,error}=await sb.from('eh_messages').insert(payload).select('id').single()); }
+  catch(e){ error=e; }
+  finally{ _sendInFlight.delete(localId); }
   if(error){ console.warn('send',error); markSendFailed(el,payload); toast(EH_CONFIG.text.err_sendFail); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
   // 竞态兜底: 若 realtime 抢先用真实 id 渲染了同一条(另建了 DOM), 这里回填时先删掉重复

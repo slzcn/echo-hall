@@ -1095,6 +1095,11 @@
   .pm-item .pm-tx b{font-size:13px;font-weight:700}
   .pm-item .pm-tx i{font-size:11px;color:var(--dim);font-style:normal}
   .pm-item.on{background:color-mix(in srgb,var(--violet) 15%,transparent)}
+  /* 发送失败：乐观气泡保留原文并明确提供原地重试，不伪装成功 */
+  .msg.send-failed{opacity:.9;border-left:2px solid var(--magenta);padding-left:8px}
+  .send-failed-bar{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11px;color:var(--magenta)}
+  .send-failed-bar button{border:1px solid currentColor;border-radius:999px;background:transparent;color:inherit;padding:2px 9px;cursor:pointer}
+  .msg.send-retrying .send-failed-bar{opacity:.6}
   /* 虚空消息气泡: 无名/紫调/虚线/倒计时 */
   .msg.void .av{background:color-mix(in srgb,var(--violet) 12%,transparent)!important;color:var(--violet)!important;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--violet) 40%,transparent)!important}
 
