@@ -51,6 +51,8 @@
       delta: Object.assign({}, res.delta),
       winners: (res.winners||[]).slice(), losers: (res.losers||[]).slice(),
       bombs: res.bombs,
+      // 残局:各家终局剩牌(id 数组)。仅终局的 result 里才有 → 局中快照 result=null, 不外泄; 下一局全新 seed, 亮牌无害。
+      reveal: res.reveal ? Object.keys(res.reveal).reduce(function(m,k){ m[k]=(res.reveal[k]||[]).slice(); return m; }, {}) : undefined,
     };
   }
 

@@ -228,6 +228,21 @@
   padding:6px 22px;border-radius:14px;background:rgba(255,194,77,.1);border:1px solid rgba(255,194,77,.28)}
 .ddz-over .ddz-acts{margin-top:4px;width:100%}
 .ddz-over .ddz-acts .ddz-btn{max-width:none}
+/* 残局:亮输家剩牌(对标腾讯). 每行 名字+剩数 一行, 底下一把叠扇展开的 mini 牌; 逐行错峰浮入 */
+.ddz-over .ddz-remains{display:flex;flex-direction:column;gap:9px;width:100%;padding:11px 12px;box-sizing:border-box;
+  border-radius:14px;background:rgba(0,0,0,.24);border:1px solid var(--line,rgba(0,229,212,.24))}
+.ddz-over .rm-row{display:flex;flex-direction:column;gap:4px;opacity:0;animation:ddzRmIn .34s ease both;animation-delay:calc(.08s + var(--i,0)*.09s)}
+@keyframes ddzRmIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ddz-over .rm-nm{font-size:12px;color:var(--sub,#86cbc6);display:flex;align-items:center;gap:6px;letter-spacing:.02em}
+.ddz-over .rm-role{font-size:10.5px;padding:0 6px;border-radius:8px;background:rgba(0,229,212,.12);color:var(--accent,#00e5d4);border:1px solid rgba(0,229,212,.28)}
+.ddz-over .rm-n{margin-left:auto;font-size:11px;color:var(--amber,#ffc24d);font-variant-numeric:tabular-nums}
+.ddz-over .rm-cards{display:flex;padding-left:2px}
+.ddz-over .rm-cards .card{margin-left:-16px;box-shadow:0 2px 5px rgba(0,0,0,.45)}
+.ddz-over .rm-cards.dense .card{margin-left:-19px}   /* 19~20 张(反春天地主几乎没出牌)才收紧, 保证不溢出面板 */
+.ddz-over .rm-cards .card:first-child{margin-left:0}
+/* 丝滑收局:再来一局时结算面板淡出下沉, 让位给新一局的发牌入场(不再瞬拆硬切) */
+.ddz-over.out{animation:ddzOverOut .34s cubic-bezier(.4,0,.9,.5) forwards;pointer-events:none}
+@keyframes ddzOverOut{from{opacity:1}to{opacity:0;transform:scale(.94) translateY(12px)}}
 .ddz-toast{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);
   border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;
   opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center}
@@ -1066,6 +1081,7 @@
         <div class="ddz-over-card">
           <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
           <div class="sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''}<br>底分 ${res.base} × 倍数 ${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}</div>
+          <div class="ddz-remains" id="ddzRemains"></div>
           <div class="score">${(res.delta[mySeat]>=0?'+':'')}${res.delta[mySeat]} 分</div>
           <div class="ddz-acts">
             <button class="ddz-btn" id="ddzAgain">再来一局</button>
@@ -1073,14 +1089,39 @@
           </div>
         </div>`;
       room.appendChild(over);
+      // 残局:亮出仍有剩牌的席位(赢家已出完 → 不列)。对标腾讯斗地主终局亮残牌, 让人看清对手"卡"在什么牌上。
+      const remainBox = over.querySelector('#ddzRemains');
+      if (remainBox){
+        const reveal = res.reveal || {};
+        const seats = st.players.map(p=>p.seat).filter(s => (reveal[s]||[]).length > 0);
+        if (!seats.length){ remainBox.remove(); }
+        else seats.forEach((s, ri)=>{
+          const p = st.players[s];
+          const roleS = st.landlord==null ? '' : (st.landlord===s?'地主':'农民');
+          const row = document.createElement('div'); row.className='rm-row'; row.style.setProperty('--i', ri);
+          const nm = document.createElement('div'); nm.className='rm-nm';
+          nm.innerHTML = `${escapeHtml(p.name)}${s===mySeat?'（你）':''}${roleS?` <span class="rm-role">${roleS}</span>`:''} <span class="rm-n">剩${reveal[s].length}</span>`;
+          const cards = document.createElement('div'); cards.className='rm-cards';
+          const objs = (reveal[s]||[]).map(findCardById).filter(Boolean);
+          if (objs.length > 18) cards.classList.add('dense');
+          (Deck.sortHand ? Deck.sortHand(objs) : objs).forEach(c=> cards.appendChild(cardEl(c,{mini:true})));
+          row.appendChild(nm); row.appendChild(cards); remainBox.appendChild(row);
+        });
+      }
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
       // guest 无权开新一局: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报; 只留"收工"
       const againBtn = over.querySelector('#ddzAgain');
       if (isGuest){ againBtn.textContent='等房主开局…'; againBtn.disabled=true; }
       else againBtn.addEventListener('click', ()=>{
+        if (over._leaving) return; over._leaving = true;   // 防连点
+        // 丝滑过渡(对标腾讯): 结算面板先淡出下沉 ~.34s, 再拆掉重建新局 → 顺势接发牌入场动画, 不再"啪"地跳切。
         showOver._done=false;
-        over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll();
+        over.classList.add('out');
+        const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
+        let done=false; const once=()=>{ if(done) return; done=true; go(); };
+        over.addEventListener('animationend', once, { once:true });
+        setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
       });
       over.querySelector('#ddzDone').addEventListener('click', close);
       if (typeof opts.onResult === 'function'){

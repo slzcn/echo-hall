@@ -212,11 +212,15 @@
     }
     const winners = state.players.filter(p => landlordWon ? p.seat===lord : p.seat!==lord).map(p=>p.seat);
     const losers  = state.players.filter(p => landlordWon ? p.seat!==lord : p.seat===lord).map(p=>p.seat);
+    // 残局:终局时各家剩牌(赢家为空)。对标腾讯斗地主"亮残牌"。只在 result 里出现(局中永不下发) →
+    //   不破坏脱敏命门:下一局是全新 seed, 终局亮牌对后续零影响。以 id 数组存, UI 按整副牌还原牌面。
+    const reveal = {};
+    for (const pl of state.players) reveal[pl.seat] = (pl.hand||[]).map(c=>c.id);
     state.phase = 'over';
     state.result = {
       landlord: lord, landlordWon, winnerSeat,
       base: state.base, multiplier: state.multiplier, spring: springMult>1,
-      finalMultiplier: finalMult, score, delta, winners, losers, bombs: state.bombs,
+      finalMultiplier: finalMult, score, delta, winners, losers, bombs: state.bombs, reveal,
     };
     state.log.push({ t:'over', ...state.result });
     return { ok:true, over:true, result: state.result };

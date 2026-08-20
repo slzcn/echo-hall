@@ -19,6 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const Engine = require('../js/games/ddz-engine.js');
 const AI = require('../js/games/ddz-ai.js');
+const Net = require('../js/games/ddz-net.js');
+const Deck = require('../js/games/deck.js');
 
 function assert(ok, msg){ if(!ok) throw new Error('FAIL: '+msg); console.log('✓ '+msg); }
 
@@ -100,12 +102,38 @@ for(let seed=100; seed<120; seed++){
   if(rp.result.delta[0] !== row.my_delta) throw new Error('重放 my_delta 不一致 @'+seed);
   if(JSON.stringify(rp.result.winners)!==JSON.stringify(row.winner_seats)) throw new Error('重放胜者不一致 @'+seed);
   if(rp.result.finalMultiplier!==row.final_multiplier) throw new Error('重放倍数不一致 @'+seed);
+
+  // ── 收局残局(对标腾讯"亮残牌"): result.reveal = 各家终局剩牌 id; 赢家出完为空, 输家=其剩牌 ──
+  const rev = st.result.reveal;
+  if(!rev) throw new Error('result 缺 reveal(残局数据) @'+seed);
+  const ALL = {}; Deck.standardDeck().forEach(c=>ALL[c.id]=c);
+  for(const p of st.players){
+    const ids = rev[p.seat]||[];
+    if(ids.length !== p.hand.length) throw new Error(`残局 reveal[${p.seat}] 张数(${ids.length})≠该家剩牌(${p.hand.length}) @`+seed);
+    if(ids.some(id=>!ALL[id])) throw new Error(`残局 reveal[${p.seat}] 含非法牌 id @`+seed);
+  }
+  if((rev[st.result.winnerSeat]||[]).length !== 0) throw new Error('赢家残牌应为空(已出完) @'+seed);
 }
 assert(recorded===20, `20 局旅程全部落库成行 (我方胜 ${winsForMe} 局)`);
 assert(winsForMe>0 && winsForMe<20, '胜负两种结局都出现过(战绩加减分双向都验到)');
 
 // ── 反证: 若把 my_delta 记成恒正, 上面输局的断言会红 ──────────
 console.log('✓ 反证覆盖:输局 my_delta 必为负(记分方向不能写死)');
+
+// ── 收局残局 · 联机脱敏命门: reveal 只在终局的 result 里, 对局中快照永不下发 ──────────
+{
+  const st = playFull(100);
+  // 终局快照: sanitizeResult 透传 reveal(guest 也能在结算看残局)
+  const overSnap = Net.snapshot(st, 1);
+  assert(overSnap.result && overSnap.result.reveal, '终局脱敏快照 result 携带 reveal(guest 结算可见残局)');
+  assert(Net.assertNoLeak(overSnap).ok, '终局快照仍不外泄 手牌/seed/log(reveal 在 result 内, 不触发泄漏门)');
+  // 对局中快照(全新局, 未结算): result=null → 无残牌下发, 无从推别家手牌
+  const midSt = Engine.createGame({ seed:100, isAI:[false,true,true], names:['你','灵魂A','灵魂B'] });
+  const midSnap = Net.snapshot(midSt, 1);
+  assert(midSnap.result === null, '对局中快照 result=null(残牌绝不在牌局进行时下发)');
+  assert(Net.assertNoLeak(midSnap).ok, '对局中快照不外泄任何手牌(残牌命门守住)');
+}
+console.log('✓ 收局残局数据流 + 脱敏命门(reveal 仅终局可见, 局中零外泄)');
 
 // ── 步骤5: 牌桌 UX 契约(入室化 / 倒计时 / 动效 / 轮次感) ─────
 // 主人四点反馈对应四条不可回退的 UX 断言。UI 无 DOM 环境, 这里做源级契约锁,
@@ -132,6 +160,17 @@ assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn c
 
 // (5) AI 队友协作:game-ui 必须把 lastSeat 传给 AI.decide, 否则农民认不出队友会互相压牌
 assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 lastSeat(农民协作的判据)');
+
+// (6) 收局体验(对标腾讯斗地主): 结算亮残牌 + 丝滑接下一局(反回退"只显示剩N张""再来一局瞬拆硬切")
+assert(/ddz-remains/.test(ui) && /res\.reveal/.test(ui), '结算面板渲染残局(读 result.reveal 亮各家剩牌)');
+assert(/\.ddz-over\.out\{animation:ddzOverOut/.test(ui) && /over\.classList\.add\('out'\)/.test(ui),
+  '再来一局先淡出下沉(.ddz-over.out 过渡)再重建, 不瞬拆硬切');
+assert(/over\.addEventListener\('animationend'/.test(ui) && /setTimeout\(once,\s*\d+\)/.test(ui),
+  '过渡用 animationend 推进 + setTimeout 兜底(动画被打断也不卡在结算页)');
+assert(/if\s*\(over\._leaving\)\s*return/.test(ui), '再来一局按钮防连点(过渡中重复点被吞, 不重复建局)');
+// ddz-net 把 reveal 透传给 guest(联机结算也能看残局), 但只在 result 里 → 不破坏脱敏命门
+assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..','js','games','ddz-net.js'),'utf8')),
+  'ddz-net.sanitizeResult 透传 reveal(联机 guest 结算可见残局)');
 
 // ── 步骤6: 和聊天融合(主人反馈:游戏结束后聊天室什么都没留下) ─────
 // 三条不可回退断言, 对治"开局/结束都不触发聊天内容":
