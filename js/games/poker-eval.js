@@ -97,6 +97,53 @@
     return mk(CAT.HIGH, top5);
   }
 
+  // 返回构成最优成手的那 5 张【实际牌对象】(用于摊牌高亮)。分支与 evaluate 一一对应,
+  //   但选的是真牌(含 .id), 不是点数。核心组合选定后, 用全局最高的剩牌补足 kicker 到 5 张
+  //   (同花/顺子例外: 花只在本门取、顺按连号取, 不补全局 kicker)。
+  function bestFive(cards){
+    if (!cards || cards.length < 5) throw new Error('poker-eval: 至少需要 5 张');
+    const byRankCards = {}, bySuitCards = {};
+    for (const c of cards){
+      (byRankCards[c.rank] = byRankCards[c.rank] || []).push(c);
+      (bySuitCards[c.suit] = bySuitCards[c.suit] || []).push(c);
+    }
+    const rankCount = {}; Object.keys(byRankCards).forEach(r => rankCount[r] = byRankCards[r].length);
+    let flushSuit = null;
+    for (const s in bySuitCards){ if (bySuitCards[s].length >= 5){ flushSuit = s; break; } }
+    const allDesc = cards.slice().sort((a, b) => b.rank - a.rank);
+    const fill = (used) => { for (const c of allDesc){ if (used.length >= 5) break; if (!used.includes(c)) used.push(c); } return used.slice(0, 5); };
+    // 从牌池按连号选 5 张(轮抽 A-2-3-4-5 时点数 1 对应的实际牌是 A=14)
+    function straightCards(pool){
+      const hi = straightHigh(new Set(pool.map(c => c.rank)));
+      if (!hi) return null;
+      const used = [];
+      for (let i = 0; i < 5; i++){
+        const want = hi - i, cr = want === 1 ? 14 : want;
+        const c = pool.find(x => x.rank === cr && !used.includes(x));
+        if (!c) return null; used.push(c);
+      }
+      return used;
+    }
+
+    if (flushSuit){ const sc = straightCards(bySuitCards[flushSuit]); if (sc) return sc; }   // ① 同花顺
+    const ranks = Object.keys(rankCount).map(Number);
+    const groups = ranks.slice().sort((a, b) => (rankCount[b] - rankCount[a]) || (b - a));
+    const c0 = rankCount[groups[0]];
+    if (c0 === 4) return fill(byRankCards[groups[0]].slice(0, 4));                            // ② 四条 + kicker
+    if (c0 === 3){                                                                            // ③ 葫芦
+      for (let i = 1; i < groups.length; i++){
+        if (rankCount[groups[i]] >= 2) return byRankCards[groups[0]].slice(0, 3).concat(byRankCards[groups[i]].slice(0, 2));
+      }
+    }
+    if (flushSuit) return bySuitCards[flushSuit].slice().sort((a, b) => b.rank - a.rank).slice(0, 5); // ④ 同花: 本门最大 5
+    { const sc = straightCards(cards); if (sc) return sc; }                                   // ⑤ 顺子
+    if (c0 === 3) return fill(byRankCards[groups[0]].slice(0, 3));                            // ⑥ 三条 + 2 kicker
+    const pairs = ranks.filter(r => rankCount[r] === 2).sort((a, b) => b - a);
+    if (pairs.length >= 2) return fill(byRankCards[pairs[0]].slice(0, 2).concat(byRankCards[pairs[1]].slice(0, 2))); // ⑦ 两对 + kicker
+    if (pairs.length === 1) return fill(byRankCards[pairs[0]].slice(0, 2));                   // ⑧ 一对 + 3 kicker
+    return fill([]);                                                                          // ⑨ 高牌: 最大 5
+  }
+
   // 两个 evaluate() 结果比较: a<b→-1, a=b→0, a>b→1。
   function compare(a, b){
     if (a.cat !== b.cat) return a.cat < b.cat ? -1 : 1;
@@ -110,5 +157,5 @@
   // 便捷: 直接比两手牌(各 5~7 张)
   function compareCards(ca, cb){ return compare(evaluate(ca), evaluate(cb)); }
 
-  return { CAT, CAT_NAME, straightHigh, evaluate, compare, compareCards };
+  return { CAT, CAT_NAME, straightHigh, evaluate, bestFive, compare, compareCards };
 });

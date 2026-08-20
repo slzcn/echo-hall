@@ -141,6 +141,11 @@
   box-shadow:0 4px 18px rgba(0,0,0,.4);animation:gdRoomIn .25s}
 .gd-tribute .th{font-size:12px;font-weight:800;color:var(--amber);letter-spacing:.08em}
 .gd-tribute .tl{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:center}
+.gd-tribute .tb-back{opacity:.82}
+/* 接风横幅: 队友接出下一手时轻提示(比炸弹 boom 收敛, 不震屏) */
+.gd-jiefeng{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:24px;font-weight:800;letter-spacing:.08em;
+  color:var(--accent,#2fe0c8);text-shadow:0 0 14px rgba(47,224,200,.55);pointer-events:none;z-index:6;animation:gdJiefeng 1.5s ease-out forwards}
+@keyframes gdJiefeng{0%{transform:translate(-50%,-50%) scale(.6) translateX(-30px);opacity:0}18%{transform:translate(-50%,-50%) scale(1);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-50%) scale(1) translateX(24px);opacity:0}}
 /* 进贡飞牌: 贡牌从进贡席飞向收贡席(对标欢乐掼蛋的进贡桥段, 让"谁给谁"看得见) */
 .gd-fly-card{position:absolute;z-index:12;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.55);
   transition:transform .7s cubic-bezier(.4,.05,.2,1),opacity .7s ease-out;will-change:transform,opacity}
@@ -413,8 +418,13 @@
     function toast(msg, ms){ els.toast.textContent=msg; els.toast.classList.add('show');
       clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1200); }
     function say(seat, msg){
-      const b = room.querySelector(`.gd-seat[data-seat="${seat}"] .gd-say`);
-      if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1500);
+      // 延一帧再写气泡: 出牌/不出常在同步 afterMove→renderAll 之前调 say(), 而 renderSeats 会整段
+      // 重建 .gd-seat 节点, 直接写会被当帧重建吞掉(气泡从不显示)。rAF 到点时 renderAll 已完成,
+      // 查到的是新座位节点, 灵魂"不出/就剩一张咯"才真正上屏。(与斗地主/德州同源修法)
+      requestAnimationFrame(()=>{
+        const b = room.querySelector(`.gd-seat[data-seat="${seat}"] .gd-say`);
+        if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1500);
+      });
     }
     // ── F3 牌局直播: 高光瞬间(炸弹/报单/头游/终局升级)播报给聊天室(opts.onBeat 由 app.js 注入)。
     //   灵魂对手配即时入戏台词(quip): say() 气泡 + 随 beat 进聊天流, 模板化零延迟(不塞 LLM 到热路径)。
@@ -657,7 +667,9 @@
         els.played.innerHTML = st.phase==='play' ? `<div class="gd-passtag">新一圈 · 随意出</div>` : '';
         return;
       }
-      els.who.textContent = st.players[lp.seat].name + ' 出' + (Engine.partnerOf(mySeat)===lp.seat?'（队友）':'');
+      // 台面直接标出这手的牌型(顺子/连对/钢板/炸弹…), 免玩家自己数牌辨型
+      const tl = typeLabel(lp.parse);
+      els.who.textContent = st.players[lp.seat].name + ' 出' + (tl?(' · '+tl):'') + (Engine.partnerOf(mySeat)===lp.seat?'（队友）':'');
       els.played.className='gd-played'; els.played.innerHTML='';
       lp.cards.map(findCardById).forEach(c=> els.played.appendChild(cardEl(c, st.level)));
       if (changed){
@@ -931,9 +943,9 @@
         sfx('pass'); say(mySeat,'不出'); awaitingHost=true;
         setBanner(); renderCtrl(); renderHand(); return;
       }
-      try{ Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
+      try{ var rp=Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
       if(seat===mySeat) sfx('pass');
-      say(seat,'不出'); afterMove({});
+      say(seat,'不出'); afterMove(rp);
     }
     function doHint(){
       const hand=st.players[mySeat].hand;
@@ -952,7 +964,7 @@
     function applyMove(seat, move){
       if(!move || st.phase!=='play' || st.turn!==seat) return false;
       try{
-        if(move.action==='pass'){ Engine.applyPass(st, seat); say(seat,'不出'); afterMove({}); return true; }
+        if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); afterMove(rp); return true; }
         const hand=st.players[seat].hand;
         const cards=(move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
         const r=Engine.applyPlay(st, seat, cards);
@@ -967,9 +979,10 @@
         finished: st.finished ? st.finished.slice() : [],
         handsLeft: st.players.map(p=>p.hand.length), level: st.level });
       if(mv.action==='pass'){
-        try{ Engine.applyPass(st,seat); }
-        catch(e){ Engine.applyPlay(st,seat, AI.chooseLead(st.players[seat].hand, st.level)); }
-        say(seat,'不出'); afterMove({}); return;
+        let rp;
+        try{ rp=Engine.applyPass(st,seat); }
+        catch(e){ rp=Engine.applyPlay(st,seat, AI.chooseLead(st.players[seat].hand, st.level)); }
+        say(seat,'不出'); afterMove(rp); return;
       }
       try{ var r=Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ try{ Engine.applyPass(st,seat); }catch(_){ Engine.applyPlay(st,seat,AI.chooseLead(st.players[seat].hand,st.level)); } afterMove({}); return; }
@@ -996,7 +1009,15 @@
       }
       broadcast();          // host: 每次状态变更后广播脱敏公共快照 + 重写各远程席私牌行(掼蛋手牌动态)
       renderAll();
+      // 接风: 控制者打完、由队友接出下一手 —— 掼蛋特有规则, 新手常懵"怎么轮到队友领出", 明确播报一下。
+      // 放在 renderAll 之后(否则被整段重建吞掉), 且只在真·接风(jiefeng)时提示, 普通赢圈不打扰。
+      if (r && r.trickEnd && r.jiefeng && st.players[r.leader]) jiefengBanner(st.players[r.leader].name);
       if (r && r.over){ showOver(); }
+    }
+    // 接风提示: 居中轻横幅(比炸弹 boom 收敛, 不震屏), 自动消失
+    function jiefengBanner(name){
+      const b=document.createElement('div'); b.className='gd-jiefeng'; b.textContent='🌬️ '+escapeHtml(name)+' 接风';
+      els.felt.appendChild(b); setTimeout(()=>b.remove(),1500);
     }
 
     // ── host: 产出脱敏公共快照并交给 app.js 广播(顺带把各远程真人席【当前】手牌写回私牌表, 掼蛋出一张变一次) ──
@@ -1069,19 +1090,27 @@
       if (st.tribute.refused){
         box.innerHTML=`<div class="th">🛡️ 抗贡成功</div><div class="tl">输方手握双大王，免于进贡</div>`;
       } else {
+        const cardLab = c => c ? (c.joker?(c.joker==='big'?'大王':'小王'):(c.suit+c.label)) : '牌';
         const rows = (st.tribute.transfers||[]).map(t=>{
-          const gc = findCardById(t.give);
+          const gc = findCardById(t.give), bc = t.back!=null ? findCardById(t.back) : null;
           const nameF = escapeHtml(st.players[t.from].name), nameT = escapeHtml(st.players[t.to].name);
-          const lab = gc ? (gc.joker?(gc.joker==='big'?'大王':'小王'):(gc.suit+gc.label)) : '牌';
-          return `<span>${nameF} 进贡 <b style="color:var(--amber)">${lab}</b> → ${nameT}</span>`;
+          // 进贡(输家→赢家) + 还贡(赢家挑一张小牌还回), 两条都摆明, 让"贡了什么、还了什么"闭环可见
+          const give = `<span>${nameF} 进贡 <b style="color:var(--amber)">${cardLab(gc)}</b> → ${nameT}</span>`;
+          const back = bc ? `<span class="tb-back">${nameT} 还贡 <b style="color:var(--sub)">${cardLab(bc)}</b> → ${nameF}</span>` : '';
+          return give + back;
         }).join('');
         box.innerHTML=`<div class="th">🎁 进贡 · ${st.tribute.doubleDown?'双下双贡':'单贡'}</div><div class="tl">${rows}</div>`;
-        // 逐张让贡牌从进贡席飞到收贡席(错峰, 双贡不重叠)
-        (st.tribute.transfers||[]).forEach((t,i)=> flyTributeCard(t.from, t.to, findCardById(t.give), 360 + i*420));
+        // 逐张飞牌: 先进贡(输家→赢家), 再还贡(赢家→输家)错峰接续, 双贡不重叠
+        (st.tribute.transfers||[]).forEach((t,i)=>{
+          flyTributeCard(t.from, t.to, findCardById(t.give), 360 + i*420);
+          if (t.back!=null) flyTributeCard(t.to, t.from, findCardById(t.back), 1240 + i*420);
+        });
       }
       els.felt.appendChild(box);
       sfx('echo');
-      setTimeout(()=>{ box.style.transition='opacity .4s'; box.style.opacity='0'; setTimeout(()=>box.remove(),420); }, 2600);
+      // 有还贡飞牌时多留一会(让 1240+ 的还贡动画落地再淡出)
+      const hold = (!st.tribute.refused && (st.tribute.transfers||[]).some(t=>t.back!=null)) ? 3400 : 2600;
+      setTimeout(()=>{ box.style.transition='opacity .4s'; box.style.opacity='0'; setTimeout(()=>box.remove(),420); }, hold);
     }
 
     function showOver(){

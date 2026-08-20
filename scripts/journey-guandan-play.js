@@ -232,6 +232,23 @@ assert(/lv-now[^"]*">🎯 打 \$\{LVL_LABEL/.test(ui) && /gdLvlBump/.test(ui), '
 assert(/function showTributeBanner\(/.test(ui) && /gd-tribute/.test(ui), '开局进贡有横幅提示');
 assert(/抗贡成功/.test(ui) && /进贡 · /.test(ui), '横幅区分进贡/抗贡两态');
 assert(/function flyTributeCard\(/.test(ui) && /gd-fly-card/.test(ui), '进贡贡牌从进贡席飞向收贡席(对标欢乐掼蛋进贡桥段)');
+// (8b) 还贡可视化(Batch2): 横幅同摆进贡+还贡两条, 还贡牌飞回原主 —— 进贡→还贡闭环看得见
+assert(/还贡/.test(ui) && /t\.back/.test(ui), '进贡横幅含还贡行(t.back 存在则赢家还一张回输家)');
+assert(/flyTributeCard\(t\.to,\s*t\.from,\s*findCardById\(t\.back\)/.test(ui), '还贡牌从收贡席飞回进贡席(闭环动效)');
+assert(/back:\(x\.back==null\?null:x\.back\)/.test(fs.readFileSync(path.join(__dirname,'..','js','games','guandan-net.js'),'utf8')),
+  'guandan-net.sanitizeTribute 透传 back(联机 guest 也能看还贡)');
+// (8c) 接风提示(Batch2, 掼蛋特有规则): 引擎收圈带出 controller/jiefeng; UI 仅在队友接出时轻横幅"XX 接风"
+const gdEng = fs.readFileSync(path.join(__dirname,'..','js','games','guandan-engine.js'),'utf8');
+assert(/return \{ ok:true, trickEnd:true, leader, controller, jiefeng \}/.test(gdEng),
+  'applyPass 收圈返回带 controller/jiefeng(controller 走完时 lastPlay 已清, 随返回带出供 UI 播报)');
+assert(/function jiefengBanner\(/.test(ui) && /gd-jiefeng/.test(ui), '存在接风横幅(队友接出下一手时轻提示, 不震屏)');
+assert(/r\.trickEnd && r\.jiefeng[\s\S]{0,80}jiefengBanner/.test(ui),
+  'afterMove 仅真·接风(jiefeng)时提示且在 renderAll 之后(普通赢圈不打扰, 且不被整段重建吞掉)');
+// (8d) 台面牌型标注(Batch2): 落牌区直接标这手的牌型名(免玩家自己数牌辨型)
+assert(/typeLabel\(lp\.parse\)/.test(ui), '台面落牌标注牌型(renderTable 读 lp.parse → typeLabel)');
+// (8e) 在场气泡时序(Batch2): say() 延一帧写, 躲过 renderSeats 整段重建(与斗地主/德州同源修法)
+assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
+  'say() 延一帧写气泡(不出/报单气泡躲过 renderSeats 重建, 真正上屏)');
 // (9) 音效 + 特效
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
 assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌各有音');

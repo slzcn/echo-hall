@@ -145,6 +145,28 @@ assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80
 assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
   'say() 延一帧写气泡(躲过 renderAll 对 .pk-seat 的整段重建, 灵魂台词才真正上屏)');
 
+// ── 摊牌成手提示 + 赢家成手牌高亮(Batch2) ──
+// evaluate 只给档位不给"哪 5 张", 新增 bestFive 返回构成最优成手的实际 5 张牌对象(高亮依据)。
+const Eval = require('../js/games/poker-eval.js');
+assert(typeof Eval.bestFive==='function', 'poker-eval 导出 bestFive(返回最优成手的 5 张实牌)');
+{
+  // 抽样自测: bestFive 选出的 5 张, 其 evaluate 必与 7 张整体 evaluate 同档同破平序(选对了牌)
+  const suits=['♠','♥','♣','♦']; let mm=0;
+  for(let t=0;t<3000;t++){
+    const d=[]; for(const s of suits) for(let r=2;r<=14;r++) d.push({rank:r,suit:s,id:s+r});
+    for(let i=d.length-1;i>0;i--){ const j=((t*2654435761+i*40503)>>>0)%(i+1); [d[i],d[j]]=[d[j],d[i]]; }
+    const seven=d.slice(0,7), ev=Eval.evaluate(seven), b5=Eval.bestFive(seven), ev5=Eval.evaluate(b5);
+    if(b5.length!==5 || ev5.cat!==ev.cat || JSON.stringify(ev5.tie)!==JSON.stringify(ev.tie)) mm++;
+  }
+  assert(mm===0, 'bestFive 选牌与 evaluate 一致(3000 局零偏差, 高亮的正是构成成手的牌)');
+}
+// UI: 摊牌高亮只取自 result(公开 reveal+board), 不碰局中快照/别家底牌 —— 守脱敏命门
+assert(/function best5Set\(seat\)\{[\s\S]*?res\.wentToShowdown[\s\S]*?res\.reveal\[seat\]\.hole\.concat\(res\.board\)/.test(ui),
+  'best5Set 仅从 result.reveal+board 算高亮(不读局中快照, 守脱敏命门)');
+assert(/pk-win-card/.test(ui) && /Eval\.bestFive/.test(ui), '赢家成手 5 张镶金框高亮(pk-win-card, 复用 Eval.bestFive)');
+assert(/pk-mini-hn/.test(ui) && /rv\.hand/.test(ui), '摊牌台面直接标各家成手牌型(pk-mini-hn 读 reveal.hand)');
+assert(/poker-eval\.js\?v=/.test(html), 'index.html poker-eval 带 ?v= 指纹(bestFive 改动需刷新缓存)');
+
 // index.html 已挂 4 个扑克脚本 + 版本指纹
 assert(/poker-eval\.js\?v=/.test(html) && /poker-engine\.js\?v=/.test(html) && /poker-ai\.js\?v=/.test(html) && /poker-ui\.js\?v=/.test(html),
   'index.html 挂齐 poker-eval/engine/ai/ui 四脚本(带 ?v= 指纹)');

@@ -20,7 +20,7 @@
 // ============================================================
 (function(root){
   'use strict';
-  const Engine = root.EHPokerEngine, AI = root.EHPokerAI;
+  const Engine = root.EHPokerEngine, AI = root.EHPokerAI, Eval = root.EHPokerEval;
 
   const HUMAN_ACT_MS = 25000;
   const AI_MIN_MS = 900, AI_JIT_MS = 900;
@@ -211,6 +211,10 @@
 .pk-over .pk-showrows .cd{display:inline-flex;gap:3px;justify-self:center}
 .pk-over .pk-showrows .hn{justify-self:end;color:var(--amber);font-weight:700;font-size:11.5px}
 .pk-over .pk-showrows .pk-foldwin{grid-column:1/-1;text-align:center;color:var(--ink)}
+/* 成手高亮: 赢家最优 5 张(公共牌+底牌)镶金框, 一眼看清靠哪几张赢 */
+.card.pk-win-card{box-shadow:0 0 0 2px var(--amber,#f5c451),0 0 10px rgba(245,196,81,.7);z-index:2}
+/* 摊牌台面各家成手牌型小标 */
+.pk-mini-hn{font-size:9.5px;line-height:1;color:var(--amber,#f5c451);font-weight:700;text-align:center;margin-top:2px;white-space:nowrap}
 .pk-toast{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:10;pointer-events:none;text-align:center;max-width:80%}
 .pk-toast.show{opacity:1}
 .pk-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:11}
@@ -464,8 +468,10 @@
       const won = (st.phase==='over' && (st.result.winnersBySeat||[]).includes(seat));
       let hole='';
       if (showdown){
-        hole = st.result.reveal[seat].hole.map(id=>{ const c=idCard(id); return cardEl(c,{mini:false}).outerHTML; }).join('');
-        hole = `<div class="pk-mini-hole">${hole}</div>`;
+        const rv=st.result.reveal[seat]; const b5=best5Set(seat);
+        const cs = rv.hole.map(id=>{ const el=cardEl(idCard(id),{mini:false}); if(b5&&b5.has(id)) el.classList.add('pk-win-card'); return el.outerHTML; }).join('');
+        // 摊牌台面直接标各家成手牌型(同花顺/葫芦…), 不必等结算面板 —— 一眼看清谁靠什么赢
+        hole = `<div class="pk-mini-hole">${cs}</div><div class="pk-mini-hn">${escapeHtml(rv.hand||'')}</div>`;
       } else if (!p.folded){
         hole = `<div class="pk-mini-hole">${cardEl(null,{back:true,mini:true}).outerHTML}${cardEl(null,{back:true,mini:true}).outerHTML}</div>`;
       } else {
@@ -547,6 +553,11 @@
       // 未发的公共牌用暗牌背占位(共 5 张)
       for(let i=st.board.length;i<5;i++){ const b=cardEl(null,{back:true}); b.classList.add('dim'); els.board.appendChild(b); }
       if (grew){ sfx('cardplay'); lastBoardLen = st.board.length; }
+      // 摊牌: 金框高亮赢家成手用到的公共牌(含平分池的多个赢家取并集), "靠哪几张赢"一目了然
+      if (st.phase==='over' && st.result && st.result.wentToShowdown){
+        const hi=new Set(); (st.result.winnersBySeat||[]).forEach(s=>{ const b=best5Set(s); if(b) b.forEach(id=>hi.add(id)); });
+        if (hi.size) els.board.querySelectorAll('.card').forEach(el=>{ if(el.dataset.id && hi.has(el.dataset.id)) el.classList.add('pk-win-card'); });
+      }
     }
     function renderPot(){
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
@@ -838,6 +849,15 @@
       else { toast('超时 · 自动弃牌'); humanAct('fold'); }
     }
 
+    // 摊牌时该席最优 5 张成手牌的 id 集合(高亮用)。数据只取自 st.result(公开 reveal+board),
+    // 绝不读局中快照/别家底牌 —— 守脱敏命门。Eval 未加载或非摊牌局返回 null(静默不高亮)。
+    function best5Set(seat){
+      const res=st.result;
+      if(!res||!res.wentToShowdown||!res.reveal||!res.reveal[seat]||!res.board||!Eval||!Eval.bestFive) return null;
+      try { return new Set(Eval.bestFive(res.reveal[seat].hole.concat(res.board).map(idCard)).map(c=>c.id)); }
+      catch(_){ return null; }
+    }
+
     function showOver(){
       clearTimers();
       const res=st.result;
@@ -850,7 +870,8 @@
         const order = displayOrder();
         rowsHtml = order.filter(s=>res.reveal[s]).map(seat=>{
           const rv=res.reveal[seat]; const w=(res.winnersBySeat||[]).includes(seat);
-          const cards=rv.hole.map(id=>cardEl(idCard(id),{mini:false}).outerHTML).join('');
+          const b5=best5Set(seat);
+          const cards=rv.hole.map(id=>{ const el=cardEl(idCard(id),{mini:false}); if(b5&&b5.has(id)) el.classList.add('pk-win-card'); return el.outerHTML; }).join('');
           const nm=st.players[seat].name;
           return `<span class="mk">${w?'🏆':''}</span>`
             +`<span class="nm${w?' won':''}">${escapeHtml(nm)}${seat===mySeat&&nm!=='你'?'（你）':''}</span>`

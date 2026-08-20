@@ -214,14 +214,16 @@
     const respondents = state.players.filter(pl=>pl.hand.length>0 && pl.seat!==controller).length;
     if (table.passesInRow >= respondents){
       // 控制者赢圈; 若已走完 → 接风(对家接出)
-      let leader = controller;
+      let leader = controller, jiefeng = false;
       if (state.players[controller].hand.length === 0){
         const mate = partnerOf(controller);
-        leader = state.players[mate].hand.length>0 ? mate : nextActive(state, controller);
+        if (state.players[mate].hand.length>0){ leader = mate; jiefeng = true; }  // 队友接风
+        else leader = nextActive(state, controller);                              // 队友也走完 → 顺延
       }
       table.lastPlay = null; table.passesInRow = 0;
       state.turn = leader;
-      return { ok:true, trickEnd:true, leader };
+      // controller/jiefeng 供 UI 播报"XX 接风"(controller 已走完时 lastPlay 被清, UI 拿不到, 故随返回带出)
+      return { ok:true, trickEnd:true, leader, controller, jiefeng };
     }
     state.turn = nextActive(state, seat);
     return { ok:true };
