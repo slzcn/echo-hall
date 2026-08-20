@@ -133,6 +133,13 @@ else
   fail "登录与房间操作防重复提交旅程失败"
 fi
 
+section "1a4. 语音上传跨房与 Blob URL 生命周期"
+if node scripts/journey-voice-room-race.js; then
+  pass "切房拒绝旧语音 / 固定房间 ID / Blob URL 释放 / 旧实现反证通过"
+else
+  fail "语音上传跨房旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────

@@ -5073,24 +5073,29 @@ function startWave(stream){
 function stopWave(){ if(waveRAF) cancelAnimationFrame(waveRAF); waveRAF=null; recAnalyser=null; }
 async function sendVoice(blob, secs, tx){
   if(!curRoom || !myUid) return;
+  const voiceRoomId=curRoom.id;
+  const voiceEpoch=roomEpoch;
   if(blob.size>950*1024){ toast(EH_CONFIG.text.err_recTooLong); return; }
   const ext=REC_MIME.includes('mp4')?'m4a':'webm';
   const txTag = tx ? '&tx='+encodeURIComponent(tx) : '';   // 转写编进 text, 让 AI 灵魂听得懂
   // 乐观上屏：先用本地 blob 播放
   const localUrl=URL.createObjectURL(blob)+'#dur='+secs+txTag;
-  const optimistic={id:'local_'+Date.now(),room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:localUrl,kind:'voice',created_at:new Date().toISOString()};
+  const revokeLocal=()=>{ try{ URL.revokeObjectURL(localUrl.split('#')[0]); }catch(_){} };
+  const optimistic={id:'local_'+Date.now(),room_id:voiceRoomId,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:localUrl,kind:'voice',created_at:new Date().toISOString()};
   const el=buildMsgEl(optimistic); if(el){ $('#stream').appendChild(el); scrollStream(); }
-  const path=`${curRoom.id}/${myUid}-${Date.now()}.${ext}`;
+  const path=`${voiceRoomId}/${myUid}-${Date.now()}.${ext}`;
   const { error:upErr }=await sb.storage.from(VOICE_BUCKET).upload(path, blob, { contentType: blob.type||'audio/webm' });
+  if(voiceEpoch!==roomEpoch || !curRoom || curRoom.id!==voiceRoomId){ revokeLocal(); if(el) el.remove(); return; }
   if(upErr){ console.warn('voice upload',upErr);
     toast(/bucket|not.*found/i.test(upErr.message||'')?'语音存储未配置(缺 eh-voice 桶)':'语音上传失败');
-    if(el) el.remove(); return; }
+    revokeLocal(); if(el) el.remove(); return; }
   const { data:pub }=sb.storage.from(VOICE_BUCKET).getPublicUrl(path);
   const url=pub.publicUrl+'#dur='+secs+txTag;
-  const { data:row, error }=await sb.from('eh_messages').insert({room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:url,kind:'voice'}).select('id').single();
-  if(error){ console.warn('voice send',error); toast(EH_CONFIG.text.err_voiceSend); if(el) el.remove(); return; }
-  // 回填真实 id 与正式 URL(与文本消息同理)
+  const { data:row, error }=await sb.from('eh_messages').insert({room_id:voiceRoomId,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text:url,kind:'voice'}).select('id').single();
+  if(voiceEpoch!==roomEpoch || !curRoom || curRoom.id!==voiceRoomId){ revokeLocal(); if(el) el.remove(); return; }
+  if(error){ console.warn('voice send',error); toast(EH_CONFIG.text.err_voiceSend); revokeLocal(); if(el) el.remove(); return; }
   optimistic.id=row.id;
+  revokeLocal();
   if(el){ el.dataset.mid=row.id; const vp=el.querySelector('.vplay'); if(vp) vp.dataset.src=url; }
 }
 // 语音模式(统一走 setMode)
