@@ -104,6 +104,19 @@ PY
 fi
 
 # ─────────────────────────────────────────
+# 1a. Service Worker 版本脚本缓存生命周期
+# ─────────────────────────────────────────
+section "1a. Service Worker 版本脚本缓存生命周期"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node 未安装，无法运行 Service Worker 缓存行为测试"
+elif node scripts/test-sw-versioned-js-cache.js; then
+  pass "换版保留版本脚本缓存 / 单路径旧指纹收敛 / 旧实现反证通过"
+else
+  fail "Service Worker 版本脚本缓存生命周期回归失败"
+fi
+
+# ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
 section "1b. 主聊天输入法行为回归"

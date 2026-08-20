@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v350-20260820-benchmark2';
+const SW_VERSION = 'eh-sw-v352-20260820-game-parity';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
@@ -79,11 +79,12 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    // 清 shell/cdn 旧版本；同时清一次持久 JS 缓存，杜绝旧指纹自锁。
+    // 只清 shell/cdn 旧版本。JS_CACHE 的 URL 已带内容指纹，且新指纹落缓存后会按 pathname
+    // 删除旧指纹；整库删除会让每次发版后的下一次打开重下约 1.2 MB 本地脚本。
     const keys = await caches.keys();
     await Promise.all(
       keys
-        .filter((k) => ((k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE) || k === JS_CACHE)
+        .filter((k) => (k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE)
         .map((k) => caches.delete(k))
     );
     await self.clients.claim();
