@@ -103,7 +103,7 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260820-dup-scavenger', 'ver.txt=20260820-dup-scavenger');
+assert(buildVer === '20260820-attach-sweep', 'ver.txt=20260820-attach-sweep');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart)。招募卡两条路径讲清楚(主人反馈"招募卡不够好使"):
