@@ -196,6 +196,13 @@ else
   fail "主聊天输入框焦点轮廓旅程失败"
 fi
 
+section "1a6c. 聊天历史与实时消息重复显示竞态"
+if node scripts/journey-chat-duplicate-history-race.js; then
+  pass "历史 idle 批次当前 DOM 二次判重 / 批内去重 / 旧竞态实现反证通过"
+else
+  fail "聊天消息重复显示竞态旅程失败"
+fi
+
 section "1a7. 弹窗键盘与读屏无障碍"
 if node scripts/journey-dialog-a11y.js; then
   pass "dialog / focus trap / Esc / 焦点恢复 / live region / reduce-motion / 旧实现反证通过"

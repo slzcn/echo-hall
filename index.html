@@ -2068,7 +2068,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-input-focus-v2';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260820-chat-dedup';  window.__EH_BUILD_VER=BUILD_VER;
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;

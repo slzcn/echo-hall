@@ -1742,7 +1742,16 @@ async function prependMissingPublicHistory(room, rows){
     await idle(()=>{
       if(!curRoom || curRoom.id!==room.id) return;
       const frag=document.createDocumentFragment();
-      batch.forEach(m=>{ const el=buildMsgEl(m,true); if(el) frag.appendChild(el); });
+      // present 是任务启动时的快照；idle 等待期间 realtime / tail refresh 可能已经插入同一 mid。
+      // 真正写 DOM 前必须按当前 stream 二次判重，同时挡住服务端批次内的重复行。
+      const batchSeen=new Set();
+      batch.forEach(m=>{
+        if(!m || m.id==null) return;
+        const mid=String(m.id);
+        if(batchSeen.has(mid) || stream.querySelector(`[data-mid="${mid}"]`)) return;
+        batchSeen.add(mid);
+        const el=buildMsgEl(m,true); if(el) frag.appendChild(el);
+      });
       stream.insertBefore(frag,stream.firstChild);
       if(anchor){ const d=anchor.getBoundingClientRect().top-anchorTop; if(Math.abs(d)>1) stream.scrollTop+=d; }
       try{ resyncMsgOwnership(); }catch(_){ _ehCatch('refreshSnapshotTail',_); }
