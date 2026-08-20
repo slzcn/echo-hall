@@ -50,7 +50,7 @@
       '.gt-mini.kick{color:var(--dim,#498d88);border-color:transparent;padding:3px 5px}',
       '.gt-soulsel{font-size:11px;background:var(--panel-solid,#132a29);color:var(--ink,#eaf6ff);',
         'border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:8px;padding:3px 4px;max-width:98px}',
-      '.gt-foot{display:flex;gap:8px;align-items:center;margin-top:11px}',
+      '.gt-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:11px}',
       '.gt-foot .gt-tip{font-size:11px;color:var(--sub,#86cbc6);flex:1}',
       '.gt-btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:6px 14px;cursor:pointer;border:1px solid}',
       '.gt-btn.go{background:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);color:#04060c;box-shadow:var(--glow-cyan,0 0 12px rgba(0,229,212,.5))}',
@@ -154,13 +154,23 @@
     var foot=document.createElement('div'); foot.className='gt-foot';
     if(st==='lobby'){
       if(ctx.isHost){
+        var emptyN = seats.filter(function(s){return s.kind==='empty';}).length;
+        var hasSouls = !!(ctx.souls && ctx.souls.length);
         var tip=document.createElement('span'); tip.className='gt-tip';
-        // 点「开始」即用房里灵魂补满空位(灵魂来玩, 非匿名 AI); 想指定某灵魂坐某席可用每空位的「🤝灵魂」下拉。
-        tip.textContent = humans>1 ? (humans+' 位真人在座 · 空位由灵魂补齐') : '邀好友加入 · 点开始空位由灵魂补齐';
+        // 两条路径讲清楚: ⚡一键开始 = 空位召唤灵魂立即开打(想马上玩); 手动开房 = 邀真人点「加入」/用每空位🤝灵魂逐位召唤, 或先「🤝召唤灵魂」补满不开局, 满意再开始。
+        tip.textContent = humans>1
+          ? (humans+' 位真人在座 · 一键开始由灵魂补满空位')
+          : (emptyN>0 ? '一键开始召唤灵魂陪打 · 或邀好友「加入」、🤝召唤灵魂后再开始' : '座位已满 · 点开始开打');
         foot.appendChild(tip);
         var close=document.createElement('button'); close.className='gt-btn ghost'; close.textContent='散桌';
         close.onclick=function(){ ctx.actions.close(); }; foot.appendChild(close);
-        var go=document.createElement('button'); go.className='gt-btn go'; go.textContent='开始 ▶';
+        // 「🤝召唤灵魂」: 只把空位坐满灵魂、不开局 —— 手动开房时先召唤补位, 房主再等真人换座或径直开始。
+        if(emptyN>0 && hasSouls){
+          var fill=document.createElement('button'); fill.className='gt-btn ghost'; fill.textContent='🤝召唤灵魂';
+          fill.title='把空位坐满房里灵魂(不开局)';
+          fill.onclick=function(){ ctx.actions.fillSouls(); }; foot.appendChild(fill);
+        }
+        var go=document.createElement('button'); go.className='gt-btn go'; go.textContent='⚡一键开始';
         go.onclick=function(){ ctx.actions.start(); }; foot.appendChild(go);
       } else if(ctx.iAmPlaying){
         var t2=document.createElement('span'); t2.className='gt-tip'; t2.textContent='已入座 · 等房主开始…';

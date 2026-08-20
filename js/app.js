@@ -2337,7 +2337,7 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
-      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
+      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
 }
 function gtRenderInto(el,row){
   if(!window.EHTable){ console.warn('[gt] EHTable 未就绪, 牌桌卡暂无法渲染'); return; }
@@ -2391,6 +2391,16 @@ async function gtLeave(id){ await gtRpc('eh_gt_leave',{p_table:id}); }
 async function gtSeatSoul(id,seat,soul){ await gtRpc('eh_gt_seat_soul',{p_table:id,p_seat:seat,p_soul:soul}); }
 async function gtKick(id,seat){ await gtRpc('eh_gt_kick',{p_table:id,p_seat:seat}); }
 async function gtClose(id){ await gtRpc('eh_gt_close',{p_table:id}); }
+// 「🤝召唤灵魂」: 只把空位坐满房里灵魂、不开局 —— 手动开房路径。与 gtStart(召唤+开局) 分开:
+//   房主想先摆好阵型(召唤灵魂补位 + 等真人换座)再决定何时开打时用它; 满座后仍走「⚡一键开始」起局。
+async function gtFillSouls(id){
+  const row=_gtTables.get(id) || await gtEnsureRow(id);
+  if(!row){ toast('牌桌信息拿不到，稍后再试'); return; }
+  if(row.status!=='lobby'){ toast('牌局已开始'); return; }
+  const n=await gtSeatSoulsIntoEmpties(row);
+  try{ if(window.EhSfx&&window.EhSfx.play) EhSfx.play('click'); }catch(_){}
+  toast(n>0 ? ('已召唤 '+n+' 位灵魂入座 · 满意点⚡一键开始') : '没有空位，或房里暂无可召唤的灵魂');
+}
 async function gtStart(id){
   // 点「开始」即先用房里灵魂把空位补满(灵魂=真身份/头像/性格, 不再是匿名🤖机器人), 再开局。
   // 房里灵魂不够时剩余空位才落到本机 AI 代打。await 完成后 DB 座位已是灵魂, eh_gt_start 据此起局。

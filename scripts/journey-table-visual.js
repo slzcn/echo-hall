@@ -100,15 +100,16 @@ assert(/over\.classList\.add\('payout-in'\);\s*payoutChipsFx\(res\.winnersBySeat
 assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动 .pk-pot.bump');
 
 // D. 三处版本号保持一致(随功能推进升号): BUILD_VER == ver.txt, 且 SW_VERSION 含 BUILD_VER
-assert(/BUILD_VER='20260820-audit-fixes'/.test(HTML), 'index.html BUILD_VER=20260820-audit-fixes');
-assert(/eh-sw-v353-20260820-audit-fixes/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v353-audit-fixes)');
-assert(/^20260820-audit-fixes\s*$/.test(R('ver.txt')), 'ver.txt=20260820-audit-fixes');
+assert(/BUILD_VER='20260820-recruit-card'/.test(HTML), 'index.html BUILD_VER=20260820-recruit-card');
+assert(/eh-sw-v354-20260820-recruit-card/.test(R('sw.js')), 'sw.js SW_VERSION 含 BUILD_VER(升 v354-recruit-card)');
+assert(/^20260820-recruit-card\s*$/.test(R('ver.txt')), 'ver.txt=20260820-recruit-card');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
-//     不自动开局(launchTexas 不含 gtStart)。灵魂补位: 点【开始】即由 gtStart 先把空位坐满房里灵魂(灵魂来玩,
-//     非匿名 AI 机器人), 想指定某灵魂坐某席仍可用每空位「🤝灵魂」下拉。旧「一键请灵魂」按钮已去掉(开始即代劳)。
+//     不自动开局(launchTexas 不含 gtStart)。招募卡两条路径讲清楚(主人反馈"招募卡不够好使"):
+//     「⚡一键开始」= gtStart 先把空位坐满房里灵魂再开局(想马上玩); 「🤝召唤灵魂」= gtFillSouls 只召唤灵魂补位
+//     不开局(手动开房: 先补位/等真人换座, 满意再一键开始); 想指定某灵魂坐某席仍可用每空位「🤝灵魂」下拉。
 //     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 曾开桌即自动 gtStart 抢开局;
-//     反回退③(主人反馈): 曾点开始拿匿名机器人补位, 现必须用房里灵魂补位。
+//     反回退③: 曾点开始拿匿名机器人补位, 现必须用房里灵魂补位。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
@@ -118,12 +119,15 @@ assert(!/gtStart\s*\(/.test(LT), 'launchTexas 默认不自动开局(停在招募
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
 const GS = (APP.match(/async function gtStart\(id\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名 AI)');
-assert(!/gtFillSouls/.test(APP), '旧 gtFillSouls(一键请灵魂)已退休(并入 gtStart 的灵魂补位)');
-assert(!/一键请灵魂/.test(NET) && !/fillSouls/.test(NET), 'table-net 已去掉「一键请灵魂」按钮(点开始即代劳)');
+// 手动开房路径: gtFillSouls 重新引入为【只召唤灵魂、不开局】的独立动作(与 gtStart 分开), 内里绝不调 eh_gt_start
+const GF = (APP.match(/async function gtFillSouls\(id\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtSeatSoulsIntoEmpties/.test(GF) && !/eh_gt_start/.test(GF), 'gtFillSouls 只召唤灵魂补位、不开局(手动开房路径)');
+assert(/⚡一键开始/.test(NET) && /ctx\.actions\.start\(\)/.test(NET), 'table-net 招募卡有「⚡一键开始」→ start(召唤灵魂+开局)');
+assert(/🤝召唤灵魂/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 招募卡有「🤝召唤灵魂」→ fillSouls(只补位不开局)');
 assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(指定某灵魂坐某席)');
 assert(/async function launchTexasOnline\(\)\{\s*return launchTexas\(\);\s*\}/.test(APP),
   'launchTexasOnline 已退化成 launchTexas 别名(兼容旧命令/调用点)');
-assert(/table-net\.js\?v=20260819-swipe-souls/.test(HTML), 'index.html 挂 table-net.js?v=20260819-swipe-souls(随改动升号)');
+assert(/table-net\.js\?v=20260820-recruit-card/.test(HTML), 'index.html 挂 table-net.js?v=20260820-recruit-card(随改动升号)');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){
