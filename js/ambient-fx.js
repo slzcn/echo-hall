@@ -6,19 +6,26 @@
   // ---- 1. 光标/触摸赛博拖尾 ----
   (function cursorTrail(){
     if(coarse) return;  // 优化批A#3: 触屏无 hover,跳过整套 rAF 死循环
-    const N=6, dots=[]; let x=innerWidth/2,y=innerHeight/2, tx=x,ty=y, active=false, hideT=null;
+    const N=6, dots=[]; let x=innerWidth/2,y=innerHeight/2, tx=x,ty=y, active=false, hideT=null, raf=0;
     for(let i=0;i<N;i++){ const d=document.createElement('div'); d.className='cursor-trail'; d.style.opacity='0'; document.body.appendChild(d); dots.push({el:d,x,y}); }
-    const move=(px,py)=>{ tx=px; ty=py; active=true; clearTimeout(hideT); hideT=setTimeout(()=>active=false,600); };
-    window.addEventListener('mousemove',e=>move(e.clientX,e.clientY),{passive:true});
-    window.addEventListener('touchmove',e=>{ const t=e.touches[0]; if(t) move(t.clientX,t.clientY); },{passive:true});
-    (function loop(){
+    const frame=()=>{
+      raf=0;
+      if(document.hidden || !active) return;
       x+=(tx-x)*.35; y+=(ty-y)*.35;
       let px=x,py=y;
       dots.forEach((d,i)=>{ d.x+=(px-d.x)*.5; d.y+=(py-d.y)*.5; px=d.x; py=d.y;
         d.el.style.transform=`translate(${d.x-4}px,${d.y-4}px) scale(${1-i/N*0.7})`;
-        d.el.style.opacity=active?String((1-i/N)*0.55):'0'; });
-      requestAnimationFrame(loop);
-    })();
+        d.el.style.opacity=String((1-i/N)*0.55); });
+      raf=requestAnimationFrame(frame);
+    };
+    const stop=()=>{ active=false; if(raf){ cancelAnimationFrame(raf); raf=0; } dots.forEach(d=>{ d.el.style.opacity='0'; }); };
+    const move=(px,py)=>{
+      tx=px; ty=py; active=true; clearTimeout(hideT); hideT=setTimeout(stop,600);
+      if(!document.hidden && !raf) raf=requestAnimationFrame(frame);
+    };
+    window.addEventListener('mousemove',e=>move(e.clientX,e.clientY),{passive:true});
+    // coarse 触屏在函数入口已整体跳过，不再注册永远不会使用的 touchmove；把监听预算留给后台停帧。
+    document.addEventListener('visibilitychange',()=>{ if(document.hidden) stop(); },{passive:true});
   })();
 
   // ---- 2. 深夜氛围: 本地时间 0-5 点 → deep-night ----
