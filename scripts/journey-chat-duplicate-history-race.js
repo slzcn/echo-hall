@@ -66,6 +66,19 @@ ok(/dedupStreamByMid\(st\)[\s\S]*?st\.querySelectorAll\('\.msg'\)/.test(ps),
 ok(/innerHTML=_snapHtml;[\s\S]{0,160}dedupStreamByMid\(\$\('#stream'\)\)/.test(src),
   'snapHit 还原快照后立刻 dedupStreamByMid(keep-alive 回房烘焙的重复即时清掉)');
 
+// ── 实时触发层: persist 3s 节流 + idle 延后 → 若房间随后安静, 重复在活动会话里一直挂着不消 ──
+//   (实测: 闲聊广场"小绵羊"同一句冒三遍且不消)。故挂 MutationObserver 到 #stream, 任一路径新增/删除
+//   直接子节点即用 rAF 去抖跑一次 dedup, 一帧内清掉, 不再依赖 persist 节流窗口。
+ok(/function ensureStreamDedupObserver\(\)/.test(src), '存在 ensureStreamDedupObserver(实时清道夫, 补 persist 节流盲区)');
+ok(/new MutationObserver\(scheduleStreamDedup\)/.test(src), '观察器回调走 scheduleStreamDedup(rAF 去抖, 合并一帧内多次 append)');
+ok(/_streamDedupObs\.observe\(st,\s*\{\s*childList:true\s*\}\)/.test(src) && !/_streamDedupObs\.observe\([^)]*subtree/.test(src),
+  '观察器只挂 childList(不含 subtree): 打字机改后代 .txt 不触发, 密集聊天零额外开销');
+ok(/function scheduleStreamDedup\(\)\{[\s\S]*?if\(_streamDedupRAF\) return;/.test(src),
+  'scheduleStreamDedup 用 _streamDedupRAF flag 去抖(dedup 自身 remove 再触发观察时不递归空转)');
+ok(/ensureStreamDedupObserver\(\);/.test(src.slice(src.indexOf('async function enterRoom'), src.indexOf('async function enterRoom')+6000)) ||
+   /try\{ ensureStreamDedupObserver\(\); \}catch/.test(src),
+  'enterRoom 里挂载实时清道夫观察器(只挂一次, 由内部 flag 保证)');
+
 // 算法自证: 同 mid 只留内容最完整(文字最长)的一个; local_ 与嵌套元素不动
 function simDedup(nodes){                 // nodes: [{mid, len, top}] top=是否 stream 直接子
   const seen=new Map(); const kept=[];

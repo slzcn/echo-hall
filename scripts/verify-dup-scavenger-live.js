@@ -124,21 +124,71 @@ async function main(){
   await browser.close();
 
   const { before, after, removed } = result;
-  console.log('· before:', JSON.stringify(before));
-  console.log('· after :', JSON.stringify(after), 'removed=' + removed);
+  console.log('· [A] 一次性 dedup  before:', JSON.stringify(before));
+  console.log('· [A] 一次性 dedup  after :', JSON.stringify(after), 'removed=' + removed);
 
   const fails = [];
   const check = (cond, msg) => { if (cond) console.log('  ✓ ' + msg); else { console.log('  ✗ ' + msg); fails.push(msg); } };
 
-  check(before.top1418 === 2, '构造: 顶层确有 2 个重复的 1418(复刻 bug)');
-  check(after.top1418 === 1, '真 DOM: 顶层同 mid 双份 → 塌缩为 1');
-  check(after.nested1418 === 1, '真 DOM: 嵌套 .echo-bar[data-mid=1418] 未被误删(:scope> 只扫直接子)');
-  check(after.local === 2, '真 DOM: local_ 临时节点两条都保留(不参与去重)');
-  check(after.msg1500 === 1, '真 DOM: 正常消息 1500 完好');
-  check(removed === 1, '真 DOM: 恰好移除 1 个(不多删)');
-  check(after.survivorText === ALINE, '真 DOM: 存活的 1418 文字 = 阿夜原句(没删错内容)');
+  check(before.top1418 === 2, '[A] 构造: 顶层确有 2 个重复的 1418(复刻 bug)');
+  check(after.top1418 === 1, '[A] 真 DOM: 顶层同 mid 双份 → 塌缩为 1');
+  check(after.nested1418 === 1, '[A] 真 DOM: 嵌套 .echo-bar[data-mid=1418] 未被误删(:scope> 只扫直接子)');
+  check(after.local === 2, '[A] 真 DOM: local_ 临时节点两条都保留(不参与去重)');
+  check(after.msg1500 === 1, '[A] 真 DOM: 正常消息 1500 完好');
+  check(removed === 1, '[A] 真 DOM: 恰好移除 1 个(不多删)');
+  check(after.survivorText === ALINE, '[A] 真 DOM: 存活的 1418 文字 = 阿夜原句(没删错内容)');
 
-  if (fails.length){ console.log('\n❌ 线上清道夫真渲染验证失败: ' + fails.length + ' 项'); process.exit(1); }
-  console.log('\n✅ 线上发布的 dedupStreamByMid 在真 Chrome DOM 里成功塌缩深夜电台双份气泡(id 1418), 嵌套/临时/其他消息均无副作用');
+  // ── [B] 实时观察器: 复刻闲聊广场"同一句冒三遍且不消"(persist 节流窗口内 append 不触发清扫) ──
+  //   用【本地 js/app.js 即将发布的】dedupStreamByMid + 相同的 MutationObserver(childList)+rAF 去抖,
+  //   分三次(隔帧)append 同 mid 8604 —— 模拟竞态三渲染 + 房间随后安静(不再有 persist)。
+  //   断言: 每次 append 后一帧内被清成 1(不再依赖 persist 节流), 嵌套 echo-bar 不误删。
+  const localSrc = fs.readFileSync('js/app.js', 'utf8');
+  const localFn = extractFn(localSrc, 'dedupStreamByMid');
+  const obsChildListOnly = /_streamDedupObs\.observe\(st,\s*\{\s*childList:true\s*\}\)/.test(localSrc)
+    && !/_streamDedupObs\.observe\([^)]*subtree/.test(localSrc);
+  check(obsChildListOnly, '[B] 源码: 观察器只挂 childList(不含 subtree, 打字机不触发)');
+
+  const browser2 = await chromium.launch({ executablePath: exe });
+  const page2 = await browser2.newPage();
+  await page2.setContent('<!doctype html><html><body><div id="stream"></div></body></html>');
+  const live = await page2.evaluate(async ({ localFn, ALINE }) => {
+    const st = document.getElementById('stream');
+    const $ = sel => document.querySelector(sel);
+    const dedupStreamByMid = new Function('root', '$',
+      localFn.replace(/^function\s+dedupStreamByMid\s*\([^)]*\)\s*\{/, '').replace(/\}$/, ''));
+    // 复刻 scheduleStreamDedup + ensureStreamDedupObserver 的运行时行为
+    let raf = 0;
+    const run = () => { raf = 0; dedupStreamByMid(st, $); };
+    const schedule = () => { if (raf) return; raf = requestAnimationFrame(run); };
+    new MutationObserver(schedule).observe(st, { childList: true });
+
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const mk = (mid, txt) => { const w=document.createElement('div'); w.className='msg'; w.dataset.mid=String(mid);
+      const t=document.createElement('div'); t.className='txt'; t.textContent=txt; w.appendChild(t); return w; };
+    const topN = () => st.querySelectorAll(':scope > [data-mid="8604"]').length;
+
+    const trace = [];
+    st.appendChild(mk(8604, ALINE)); await frame(); trace.push(topN());   // copy1 → 1
+    st.appendChild(mk(8604, ALINE)); await frame(); trace.push(topN());   // copy2(竞态) → 观察器一帧内清回 1
+    st.appendChild(mk(8604, ALINE)); await frame(); trace.push(topN());   // copy3(竞态) → 仍 1
+    // 房间安静: 不再 append, 再等两帧, 确认不反弹(幂等)
+    await frame(); await frame(); trace.push(topN());
+    // 嵌套 echo-bar 挂到存活节点内部: 不该被清, 且(subtree 不观察)不触发额外清扫
+    const survivor = st.querySelector(':scope > [data-mid="8604"]');
+    const bar = document.createElement('div'); bar.className='echo-bar'; bar.dataset.mid='8604'; survivor.appendChild(bar);
+    await frame();
+    return { trace, finalTop: topN(), nested: st.querySelectorAll('.echo-bar[data-mid="8604"]').length,
+             survivorText: (st.querySelector(':scope > [data-mid="8604"] .txt')||{}).textContent||'' };
+  }, { localFn, ALINE });
+  await browser2.close();
+
+  console.log('· [B] 三次隔帧 append 后每步顶层计数 trace =', JSON.stringify(live.trace), '(期望每步都回到 1)');
+  check(live.trace.every(n => n === 1), '[B] 实时观察器: 每次竞态 append 后一帧内塌缩回 1(不靠 persist 节流)');
+  check(live.finalTop === 1, '[B] 房间安静后不反弹, 顶层仍 1(幂等)');
+  check(live.nested === 1, '[B] 嵌套 echo-bar 未被误删(subtree 不观察)');
+  check(live.survivorText === ALINE, '[B] 存活节点文字 = 原句');
+
+  if (fails.length){ console.log('\n❌ 重复气泡验证失败: ' + fails.length + ' 项'); process.exit(1); }
+  console.log('\n✅ [A]线上 dedupStreamByMid 真 Chrome DOM 塌缩双份 + [B]本地新增实时观察器在真浏览器里把"同句冒三遍且不消"一帧内清回一条, 嵌套/临时/其他消息均无副作用');
 }
 main().catch(e => { console.error('验证脚本异常:', e); process.exit(1); });

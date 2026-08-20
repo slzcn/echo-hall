@@ -1453,6 +1453,29 @@ function dedupStreamByMid(root){
   });
   return removed;
 }
+// ★清道夫的【实时触发】: 光靠 persistRoomSnap 里清扫不够——persist 有 3s 节流且 requestIdleCallback 延后,
+//   若某次竞态双/三渲染后房间恰好安静下来(灵魂不再说话), 下一次 persist 迟迟不来, 重复气泡就在【当前活动
+//   会话】里一直挂着直到离房/刷新(实测: 闲聊广场"小绵羊"同一句冒三遍且不消)。改为挂 MutationObserver 到
+//   #stream, 任一渲染路径新增/删除【直接子节点】(顶层气泡)时, 用 rAF 合并去抖跑一次 dedupStreamByMid,
+//   保证任何来源产生的同 mid 重复都在一帧内被移除, 不再依赖 persist 节流窗口。
+//   ★只观察 childList(不含 subtree): 打字机 typewriterInto 改的是后代 .txt 文本, 不触发直接子的 childList,
+//     故观察器只在真·消息 append/remove 时才醒, 密集聊天+打字机期间零额外开销。dedup 自身的 remove 会再触发
+//     一次观察, 但去抖 flag + 幂等(第二遍找不到重复)保证不递归空转。
+let _streamDedupObs=null, _streamDedupRAF=0;
+function _runScheduledDedup(){
+  _streamDedupRAF=0;
+  try{ dedupStreamByMid($('#stream')); }catch(_){}
+}
+function scheduleStreamDedup(){
+  if(_streamDedupRAF) return;
+  _streamDedupRAF = (window.requestAnimationFrame||window.setTimeout)(_runScheduledDedup, 0);
+}
+function ensureStreamDedupObserver(){
+  if(_streamDedupObs || typeof MutationObserver==='undefined') return;
+  const st=$('#stream'); if(!st) return;
+  _streamDedupObs=new MutationObserver(scheduleStreamDedup);
+  _streamDedupObs.observe(st, { childList:true });   // 仅顶层气泡增删, 不看 subtree/文本(打字机不触发)
+}
 // ============ 刷新停留原位 (scroll anchor) ============
 // 需求: "在哪刷新, 就停留在什么位置, 只刷新数据, 不改变停留位置"。默认刷新会跳回最新(底部),
 // 这里记录"翻历史时停留的锚点消息", 刷新后精准还原到那条; 想回最新用现成的 #toLatestBtn 一键到底。
@@ -1676,6 +1699,7 @@ async function enterRoom(room){
   if(_suppressAutoBottom){ _suppressAutoBottom=false; }   // 还原停留位置时不贴底(loadHistory 首屏已交给 restoreScrollAnchor)
   else ensureBottom();   // 进房后确保精准落到最后一条(覆盖分批渲染/头像字体/神曲卡片异步撑高导致的"停在中间")
   setTimeout(()=>{ try{ persistRoomSnap(); }catch(_){ _ehCatch('enterRoom',_); } }, 1200);   // 进房消息渲染稳定后存快照, 供下次刷新首帧回填
+  try{ ensureStreamDedupObserver(); }catch(_){ _ehCatch('enterRoom',_); }   // 挂重复气泡实时清道夫(观察 #stream 直接子增删, 一帧内清同 mid 重复; 只挂一次)
 }
 // 进房收尾: 分批渲染/图片/字体/神曲卡片会在首次 scroll 之后继续撑高 stream, 单次 scrollStream
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
