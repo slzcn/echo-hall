@@ -810,6 +810,8 @@
         b.addEventListener('click', ()=>doCall(mySeat, +b.dataset.bid));
       });
     }
+    // 提示用的残局上下文(报单意识): 只喂公开信息(座位/各家剩牌数/地主), 绝不含任何隐藏手牌 → 公平。
+    function hintCtx(){ return { seat: mySeat, handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord }; }
     function renderActBar(){
       const myTurn = st.turn === mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat !== mySeat;
@@ -817,7 +819,7 @@
       let plays = [];
       if (myTurn){
         const target = mustBeat ? st.table.lastPlay.parse : null;
-        plays = AI.hints(st.players[mySeat].hand, target);
+        plays = AI.hints(st.players[mySeat].hand, target, hintCtx());
       }
       const noBeat = myTurn && mustBeat && plays.length===0;
       els.ctrl.innerHTML = `<div class="ddz-acts">
@@ -1002,7 +1004,7 @@
       // 循环提示:多套可出方案轮着给, 再点一次换一套。best-first: 能一把走完排最前,
       // 领出走长牌型垫单张, 跟牌走最小代价、炸弹垫底(剩一对提示打整对而非拆单张)。
       if (!hintCycle.length){
-        hintCycle = AI.hints(hand, target);
+        hintCycle = AI.hints(hand, target, hintCtx());
         hintIdx = 0;
       }
       if (!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }

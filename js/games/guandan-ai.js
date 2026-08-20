@@ -249,6 +249,16 @@
       if (ca!==cb) return ca-cb;
       return a.cards.length-b.cards.length;
     });
+    // 残局/报单意识(领出·ctx 带 handsLeft 时): 真对手剩1张 → 多张牌型(他跟不了)提前憋他, 全单张则大单优先。
+    //   只吃公开的各家剩牌数, 不看隐藏手牌 → 公平。稳定排序保多张牌型间既有(清散牌)顺序。
+    if (!target && ctx.handsLeft && minOpponentCards(ctx) === 1){
+      combos.sort((a,b)=>{
+        const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
+        if (ma!==mb) return ma-mb;
+        if (ma===1) return b.parse.key-a.parse.key;
+        return 0;
+      });
+    }
     return combos.map(c=>c.cards);
   }
 
@@ -260,6 +270,8 @@
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
       if (have>=4 && rc[r]<have && rc[r]<4) cost += 120;  // 拆炸
+      else if (have===3 && rc[r]<3) cost += 15;           // 拆三条: 破坏可留的三带
+      else if (have===2 && rc[r]===1) cost += 6;          // 拆对子出单张: 有散张先出散张
     }
     for (const c of play.cards) if (c.joker) cost += 40;   // 拆王
     return cost;

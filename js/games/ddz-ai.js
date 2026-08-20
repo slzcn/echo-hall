@@ -175,14 +175,31 @@
     return { plays: bigger, bombs: b.bombs, rocket: b.rocket };
   }
 
-  // 最小的单张(排除某 rank),用作三带一的翼
+  // 挑一张最适合当「翼」的单张(排除某 rank), 用作三带一/飞机带单。
+  //   ★不拆对子/三条: 优先【真散张】(手里该 rank 只有 1 张); 都没有才退让拆最小的。
+  //   —— 治"手握三条5+一对3, 三带一却抠一张3把对子拆了"这类蠢选牌。
+  //   hand 已降序 → 从末尾(最小)向前找, 命中的散张自然最小。
   function leastSingle(hand, excludeRank){
-    for (let i = hand.length-1; i >= 0; i--) if (hand[i].rank !== excludeRank) return [hand[i]];
-    return null;
+    const m = groupByRank(hand);
+    let any = null;
+    for (let i = hand.length-1; i >= 0; i--){
+      const c = hand[i];
+      if (c.rank === excludeRank) continue;
+      if (any === null) any = [c];
+      if (m.get(c.rank).length === 1) return [c];   // 真散张(最小的)优先
+    }
+    return any;
   }
+  // 挑一个最适合当「翼」的对子(排除某 rank), 用作三带二/飞机带对。
+  //   ★优先【真散对】(该 rank 手里恰好 2 张), 不从三条/炸弹里抠对; b.pairs 已按点升序 → 命中即最小。
   function leastPair(b, excludeRank){
-    for (const p of b.pairs) if (p[0].rank !== excludeRank) return p;
-    return null;
+    let any = null;
+    for (const p of b.pairs){
+      if (p[0].rank === excludeRank) continue;
+      if (any === null) any = p;
+      if (b.m.get(p[0].rank).length === 2) return p;   // 真散对优先(非拆三/拆炸)
+    }
+    return any;
   }
   function pickSmallSingles(hand, usedRanks, n){
     const picks=[]; const seen=new Set();
@@ -306,7 +323,9 @@
   //   ① 能一把走完的牌型永远排最前(剩一对提示打整对, 而不是拆成单张一张张出);
   //   ② 领出先出长牌型清散牌、单张垫底、不首选甩 2/王大单张;
   //   ③ 跟牌走最小代价、炸弹/王炸垫底(除非炸弹恰好能一把走完)。
-  function hints(hand, target){
+  //   ④ 残局/报单意识(ctx 可选, 领出时生效): 真对手剩 1 张时, 多张牌型(他跟不了)提到最前憋死他,
+  //      全是单张则改大单张优先(他大概率压不过) —— 治"我剩1张, 提示还让我甩小单送对手走脱"。
+  function hints(hand, target, ctx){
     const { plays, bombs, rocket } = candidates(hand, target || null);
     const handN = hand.length;
     let bombItems = [
@@ -329,6 +348,15 @@
         if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
         return a.parse.key-b.parse.key;
       });
+      // ④ 领出·真对手报单: 多张牌型提前(憋住剩1张的他), 全单张则大单优先; 稳定排序保多张间既有顺序。
+      if (ctx && minOpponentCards(ctx) === 1){
+        list.sort((a,b)=>{
+          const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
+          if (ma!==mb) return ma-mb;
+          if (ma===1) return b.parse.key-a.parse.key;   // 都是单张→大的优先(他压不过)
+          return 0;
+        });
+      }
     } else {
       list.sort((a,b)=>{
         const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
@@ -342,17 +370,21 @@
     return [...goBombs, ...list.map(p=>p.cards), ...restBombs];
   }
 
-  // 出这手牌的「代价」:拆散了大牌/炸弹惩罚高;点数越大代价越高。
+  // 出这手牌的「代价」:拆散了成型的组合(炸/王/三条/对子)惩罚高;点数越大代价越高。
+  //   跟牌挑「代价最小」的一手时, 这个函数决定了智能程度 —— 治"为出一张单牌把好好的对子拆了"。
   function playCost(play, hand){
     let cost = play.parse.key;
-    // 拆炸弹:若该 rank 在手里有 4 张却只用了 <4 → 重罚
     const m = groupByRank(hand);
     const rankCount = {};
     for (const c of play.cards) rankCount[c.rank] = (rankCount[c.rank]||0)+1;
     for (const r in rankCount){
-      const have = m.get(Number(r)) ? m.get(Number(r)).length : 0;
-      if (have === 4 && rankCount[r] < 4) cost += 100; // 拆炸
-      if (Number(r) >= 16) cost += 50;                 // 拆王
+      const rn = Number(r);
+      const have = m.get(rn) ? m.get(rn).length : 0;
+      const used = rankCount[r];
+      if (have === 4 && used < 4) cost += 100; // 拆炸:重罚, 除非整炸出
+      if (rn >= 16) cost += 50;                // 拆王:留着王炸/控场
+      if (have === 3 && used < 3) cost += 15;  // 拆三条:破坏了可留的三带
+      if (have === 2 && used === 1) cost += 6;  // 拆对子出单张:有散张就先出散张(但低对子仍可为跟小单而拆)
     }
     return cost;
   }

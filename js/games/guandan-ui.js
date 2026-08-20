@@ -802,7 +802,7 @@
       let plays=[];
       if (myTurn){
         const target = mustBeat ? st.table.lastPlay.parse : null;
-        plays = AI.hints({ hand: st.players[mySeat].hand, tableParse:target, level:st.level });
+        plays = AI.hints({ hand: st.players[mySeat].hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) });
       }
       const noBeat = myTurn && mustBeat && plays.length===0;   // 要压却压不过 → 只能不出
       els.ctrl.innerHTML=`<div class="gd-acts">
@@ -931,7 +931,7 @@
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==mySeat)?st.table.lastPlay.parse:null;
       if(!hintCycle.length){
         // best-first: 能一把走完排最前(剩一对提示打对子而非拆单张), 领出走长牌型、跟牌走最小代价
-        hintCycle = AI.hints({ hand, tableParse:target, level:st.level }); hintIdx=0;
+        hintCycle = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) }); hintIdx=0;
       }
       if(!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
       const pick=hintCycle[hintIdx%hintCycle.length]; hintIdx++;

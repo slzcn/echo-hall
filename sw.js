@@ -6,12 +6,25 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v354-20260820-recruit-card';
+const SW_VERSION = 'eh-sw-v356-20260820-audit-round2';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
 // 一天升好几次版本号不该把几 MB 的曲子冲掉。放过一次即长期驻留, 秒开。
 const AUDIO_CACHE = 'eh-audio-v1';
+const AUDIO_CACHE_MAX_ENTRIES = 12; // 单曲常为数 MB；保留最近落盘的 12 首，避免持久缓存无限增长
+let audioCacheTrimChain = Promise.resolve();
+async function trimAudioCache(cache) {
+  const keys = await cache.keys();
+  while (keys.length > AUDIO_CACHE_MAX_ENTRIES) await cache.delete(keys.shift());
+}
+function cacheAudioResponse(cache, request, response) {
+  // Cache.put + keys/delete 串行，避免并发下载各自看见“未超限”而共同突破上限。
+  audioCacheTrimChain = audioCacheTrimChain
+    .catch(() => {})
+    .then(async () => { await cache.put(request, response); await trimAudioCache(cache); });
+  return audioCacheTrimChain;
+}
 // ★第三方库持久缓存【故意不带 SW_VERSION】: supabase-js 版本锁死在 URL 里(@2.45.4), 内容永不变。
 //   若跟着 CDN_CACHE 走 SW_VERSION, 每次升版本号(改 bug 常有)都会连它一起删 → 用户下次刷新在弱网
 //   重下 120KB UMD 库 = "刷新等很久"的真凶(实测 Slow3G 下库就绪要 14s)。放进独立持久缓存, 下一次
@@ -67,12 +80,59 @@ const SHELL_ASSETS = [
   './index.html',
 ];
 
+// Extract only executable same-origin dependencies needed by the offline shell.
+// HTML parsing is intentionally narrow because DOMParser is not available in every SW runtime.
+function extractShellAssets(html, documentUrl) {
+  const assets = new Set();
+  const tags = html.match(/<(?:script|link)\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const isScript = /^<script\b/i.test(tag);
+    const rel = (tag.match(/\brel\s*=\s*["']([^"']+)["']/i) || [])[1] || '';
+    if (!isScript && !/(?:^|\s)stylesheet(?:\s|$)/i.test(rel)) continue;
+    const attrMatch = isScript
+      ? tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)
+      : tag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+    const value = attrMatch && attrMatch[1];
+    if (!value) continue;
+    try {
+      const url = new URL(value, documentUrl);
+      if (url.origin === self.location.origin && /^https?:$/.test(url.protocol)) assets.add(url.href);
+    } catch (_) {}
+  }
+  return [...assets];
+}
+
+async function installOfflineShell() {
+  const shellCache = await caches.open(SHELL_CACHE);
+  const jsCache = await caches.open(JS_CACHE);
+  const indexUrl = new URL('./index.html', self.location.href);
+  const rootUrl = new URL('./', self.location.href);
+  let indexResponse;
+  try { indexResponse = await fetch(indexUrl.href); } catch (_) {}
+  if (!indexResponse || !indexResponse.ok) return;
+
+  const html = await indexResponse.clone().text();
+  await Promise.allSettled([
+    shellCache.put(indexUrl.href, indexResponse.clone()),
+    shellCache.put(rootUrl.href, indexResponse.clone()),
+    ...extractShellAssets(html, indexUrl.href).map(async (href) => {
+      try {
+        const request = new Request(href);
+        const response = await fetch(request);
+        if (!response || !response.ok) return;
+        const targetCache = isVersionedJs(new URL(href)) ? jsCache : shellCache;
+        await targetCache.put(request, response);
+      } catch (_) {}
+    }),
+  ]);
+}
+
 const NETWORK_ONLY_HOSTS = ['supabase.co', 'supabase.in'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((c) => c.addAll(SHELL_ASSETS).catch(() => {}))
+    installOfflineShell()
+      .catch(() => {})
       .then(() => self.skipWaiting())
   );
 });
@@ -216,54 +276,90 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// BGM 音频取用: 缓存优先, 缓存里始终存【完整 200】; 命中后若请求带 Range 则手工切片回 206。
-//   miss 时抓一份【不带 Range 的完整体】存缓存, 再据本次请求是否 Range 决定返回整体还是切片。
-//   任何网络失败都静默降级(BGM 非必需), 不 throw 以免打断 audio 元素。
+// Parse one RFC 7233 byte range against a known complete length.
+// Multiple ranges are deliberately unsupported; a 416 is safer than fabricating multipart data.
+function parseAudioRange(header, total) {
+  if (!header || !Number.isSafeInteger(total) || total < 0) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match || (!match[1] && !match[2])) return null;
+
+  let start;
+  let end;
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0 || total === 0) return null;
+    start = Math.max(total - suffixLength, 0);
+    end = total - 1;
+  } else {
+    start = Number(match[1]);
+    if (!Number.isSafeInteger(start) || start >= total) return null;
+    if (!match[2]) end = total - 1;
+    else {
+      end = Number(match[2]);
+      if (!Number.isSafeInteger(end) || start > end) return null;
+      end = Math.min(end, total - 1);
+    }
+  }
+  return { start, end };
+}
+
+function audioRangeNotSatisfiable(total) {
+  return new Response('', {
+    status: 416,
+    statusText: 'Range Not Satisfiable',
+    headers: {
+      'Content-Range': `bytes */${total}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': '0',
+    },
+  });
+}
+
+async function serveCachedAudioRange(full, rangeHeader) {
+  const blob = await full.clone().blob();
+  const total = blob.size;
+  const range = parseAudioRange(rangeHeader, total);
+  if (!range) return audioRangeNotSatisfiable(total);
+  const part = blob.slice(range.start, range.end + 1, full.headers.get('Content-Type') || 'audio/mpeg');
+  return new Response(part, {
+    status: 206,
+    statusText: 'Partial Content',
+    headers: {
+      'Content-Type': full.headers.get('Content-Type') || 'audio/mpeg',
+      'Content-Range': `bytes ${range.start}-${range.end}/${total}`,
+      'Content-Length': String(range.end - range.start + 1),
+      'Accept-Ranges': 'bytes',
+    },
+  });
+}
+
+// Range requests are network-first so the origin can stream only the requested bytes. A complete
+// cached response is used only after network failure; Blob.slice avoids an ArrayBuffer plus copy.
+// Non-Range playback remains complete-response cache-first and populates the persistent cache.
 async function serveAudio(req) {
   const cache = await caches.open(AUDIO_CACHE);
   const rangeHeader = req.headers.get('range');
-  // 用不带 Range/无 query 的规范 URL 做 key, 保证同一首只存一份完整体
-  const keyReq = new Request(new URL(req.url).origin + new URL(req.url).pathname);
+  const requestUrl = new URL(req.url);
+  const keyReq = new Request(requestUrl.origin + requestUrl.pathname);
 
-  let full = await cache.match(keyReq);
-  if (!full) {
-    try {
-      const res = await fetch(keyReq);           // 主动请求完整体(不透传 Range)
-      if (res && res.status === 200) {
-        cache.put(keyReq, res.clone()).catch(() => {});
-        full = res;
-      } else {
-        return fetch(req);                        // 拿不到完整体, 直接透传原请求
-      }
-    } catch (_) {
-      return fetch(req).catch(() => new Response('', { status: 504 }));
+  if (rangeHeader) {
+    try { return await fetch(req); }
+    catch (_) {
+      const full = await cache.match(keyReq);
+      if (!full) return new Response('', { status: 504 });
+      try { return await serveCachedAudioRange(full, rangeHeader); }
+      catch (_) { return full; }
     }
   }
-  if (!rangeHeader) return full;                  // 无 Range: 直接给完整 200
 
-  // 有 Range: 从完整体切片, 手工构造 206
+  const full = await cache.match(keyReq);
+  if (full) return full;
   try {
-    const buf = await full.clone().arrayBuffer();
-    const total = buf.byteLength;
-    const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
-    let start = m && m[1] ? parseInt(m[1], 10) : 0;
-    let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
-    if (isNaN(start) || start < 0) start = 0;
-    if (isNaN(end) || end >= total) end = total - 1;
-    if (start > end) { start = 0; end = total - 1; }
-    const slice = buf.slice(start, end + 1);
-    return new Response(slice, {
-      status: 206,
-      statusText: 'Partial Content',
-      headers: {
-        'Content-Type': full.headers.get('Content-Type') || 'audio/mpeg',
-        'Content-Range': `bytes ${start}-${end}/${total}`,
-        'Content-Length': String(end - start + 1),
-        'Accept-Ranges': 'bytes',
-      },
-    });
+    const response = await fetch(req);
+    if (response && response.status === 200) cacheAudioResponse(cache, keyReq, response.clone()).catch(() => {});
+    return response;
   } catch (_) {
-    return full;                                  // 切片失败退回完整体
+    return new Response('', { status: 504 });
   }
 }
 

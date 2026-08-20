@@ -10,6 +10,10 @@ assert(/k\.startsWith\('eh-shell-'\)/.test(activate[0]), 'activate 仍清理旧 
 assert(/k\.startsWith\('eh-cdn-'\)/.test(activate[0]), 'activate 仍清理旧 CDN 缓存');
 assert(/ku\.pathname\s*===\s*url\.pathname/.test(source), '单个脚本下载成功后仍清理同路径旧指纹');
 assert(/ku\.search\s*!==\s*url\.search/.test(source), '清理只针对不同版本指纹');
+assert(/installOfflineShell/.test(source), '安装阶段会从 HTML 发现离线依赖');
+assert(/isVersionedJs\(new URL\(href\)\)\s*\?\s*jsCache\s*:\s*shellCache/.test(source),
+  '安装阶段带指纹脚本写入持久 JS_CACHE，与运行时读取路径一致');
+assert(/Promise\.allSettled/.test(source), '安装阶段单资源失败不会拖垮整批缓存');
 const legacy = activate[0].replace(
   ".filter((k) => (k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE)",
   ".filter((k) => ((k.startsWith('eh-shell-') || k.startsWith('eh-cdn-')) && k !== SHELL_CACHE && k !== CDN_CACHE) || k === JS_CACHE)"
