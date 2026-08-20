@@ -1492,12 +1492,13 @@ function restoreScrollAnchor(rid){
   return true;
 }
 // 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
-function prefetchSouls(rid){
-  pruneSoulsCache();
-  const hit=soulsCache[rid];
-  if(hit && Date.now()-hit.at < PREFETCH_TTL()) return hit.p;
-  return putSoulsCache(rid, sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]).catch(()=>[]));
-}
+const prefetchSouls = window.EH_LOBBY_MODULE.createPrefetchSouls({
+  getSb:()=>sb,
+  getCache:()=>soulsCache,
+  putCache:putSoulsCache,
+  pruneCache:pruneSoulsCache,
+  getTtl:PREFETCH_TTL,
+});
 // prefetchRoom / prefetchAll 实现已迁入 js/modules/lobby.js，这里只做依赖注入。
 // prefetchCache 仍保留在 app.js 作用域内，因为 leaveRoom 会 delete 其中房间的预取项。
 const { prefetchRoom, prefetchAll } = window.EH_LOBBY_MODULE.createPrefetch({

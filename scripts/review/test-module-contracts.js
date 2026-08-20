@@ -242,6 +242,41 @@ for (const [name, globalName, factoryName, keys] of modules) {
   console.log('PASS lobby: late Supabase init is resolved at prefetch call time');
 })().catch(err => { console.error(err); process.exitCode = 1; });
 
+// 回归：灵魂预取创建时 sb 尚未 boot，调用时必须读取最新客户端，并复用缓存。
+(async function testLateSupabaseForPrefetchSouls() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateSb = null, pruneCalls = 0, putCalls = 0;
+  const cache = {};
+  const prefetch = lobby.createPrefetchSouls({
+    getSb: () => lateSb,
+    getCache: () => cache,
+    pruneCache: () => { pruneCalls += 1; },
+    getTtl: () => 60000,
+    putCache: (rid, promise) => {
+      putCalls += 1;
+      const entry = { at: Date.now(), p: promise };
+      cache[rid] = entry;
+      return promise;
+    },
+  });
+  const beforeBoot = await prefetch('late-room');
+  if (!Array.isArray(beforeBoot) || beforeBoot.length !== 0 || pruneCalls !== 1 || putCalls !== 0) {
+    throw new Error('lobby: soul prefetch before Supabase boot must safely return []');
+  }
+  let rpcCalls = 0;
+  lateSb = { rpc: async (name, args) => {
+    rpcCalls += 1;
+    if (name !== 'eh_room_souls' || args.rid !== 'late-room') throw new Error('lobby: soul prefetch RPC arguments mismatch');
+    return { data: [{ name: '迟到灵魂' }] };
+  } };
+  const afterBoot = await prefetch('late-room');
+  const cached = await prefetch('late-room');
+  if (afterBoot.length !== 1 || afterBoot[0].name !== '迟到灵魂' || cached !== afterBoot || rpcCalls !== 1 || putCalls !== 1 || pruneCalls !== 3) {
+    throw new Error('lobby: soul prefetch did not resolve late Supabase or reuse cache');
+  }
+  console.log('PASS lobby: prefetchSouls resolves late Supabase and reuses cache');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 // 回归：fillRoomStats 创建时 sb 尚未 boot，调用时才读取最新客户端。
 (async function testLateSupabaseForFillStats() {
   const lobby = context.window.EH_LOBBY_MODULE;

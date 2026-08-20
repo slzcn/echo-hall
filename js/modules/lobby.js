@@ -144,6 +144,30 @@
     return { prefetchRoom: prefetchRoom, prefetchAll: prefetchAll };
   }
 
+  // 预取房间灵魂列表：缓存生命周期仍由 app.js 管理，Supabase 通过 getter 延迟读取。
+  function createPrefetchSouls(deps) {
+    deps = deps || {};
+    var getSb = deps.getSb;
+    var getCache = deps.getCache;
+    var putCache = deps.putCache;
+    var pruneCache = deps.pruneCache;
+    var getTtl = deps.getTtl;
+    if (typeof getSb !== 'function' || typeof getCache !== 'function' || typeof putCache !== 'function' || typeof pruneCache !== 'function' || typeof getTtl !== 'function') {
+      throw new TypeError('[EH_LOBBY] createPrefetchSouls missing dependencies');
+    }
+    return function prefetchSouls(rid) {
+      pruneCache();
+      var cache = getCache();
+      var hit = cache && cache[rid];
+      if (hit && Date.now() - hit.at < getTtl()) return hit.p;
+      var sb = getSb();
+      if (!sb) return Promise.resolve([]);
+      return putCache(rid, sb.rpc('eh_room_souls', { rid: rid }).then(function (result) {
+        return result && result.data || [];
+      }).catch(function () { return []; }));
+    };
+  }
+
   // 统一房间强调色：配置与房间主题解析器均通过 getter 延迟读取，兼容配置／运行时依赖晚于模块装配。
   function createRoomAccentC(deps) {
     deps = deps || {};
@@ -520,5 +544,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);
