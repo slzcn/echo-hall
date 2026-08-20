@@ -544,5 +544,30 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  // 上次所在房间标记：纯 localStorage 存取，用工厂封装 storage getter，便于测试注入内存实现。
+  // 读：安全解析，任何异常都返回 null，避免刷新流程被存储损坏卡住。
+  // 清：登出／返回大厅／匿名进入等“主动离开房间场景”前同步调用，防刷新时首帧防闪把用户拉回旧房。
+  function createLastRoomStore(deps) {
+    deps = deps || {};
+    var getStorage = typeof deps.getStorage === 'function' ? deps.getStorage : function () { return root.localStorage; };
+    var key = typeof deps.key === 'string' && deps.key ? deps.key : 'eh_last_room';
+    function read() {
+      try {
+        var store = getStorage();
+        if (!store) return null;
+        var raw = store.getItem(key);
+        var parsed = raw && JSON.parse(raw);
+        return (parsed && parsed.id) ? parsed : null;
+      } catch (e) { return null; }
+    }
+    function clear() {
+      try {
+        var store = getStorage();
+        if (store) store.removeItem(key);
+      } catch (e) { /* 隐私模式/存储被禁：忽略 */ }
+    }
+    return Object.freeze({ read: read, clear: clear });
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore });
 })(window);

@@ -1541,11 +1541,18 @@ window.EH_AUTH = window.EH_AUTH_MODULE.createAuthController({
 
 // ============ 进入房间 ============
 const SNAP_TTL=30000;   // 快照有效期 30s
+// 上次所在房间存取：实现已迁入 js/modules/lobby.js，此处仅做依赖注入并保留两个薄封装以兼容既有调用点。
+// getStorage 用 getter 注入，避免在 app.js 解析阶段捕获 undefined 的 localStorage（隐私模式/沙箱）；
+// 每次调用现取，保证运行时切换 storage 也生效。
+const _lastRoomStore = window.EH_LOBBY_MODULE.createLastRoomStore({
+  getStorage:()=>window.localStorage,
+  key:'eh_last_room',
+});
 // 刷新页面后恢复上次所在房间(进大厅后调, 仅当有记录)
-function lastRoom(){ try{ const s=localStorage.getItem('eh_last_room'); const r=s&&JSON.parse(s); return (r&&r.id)?r:null; }catch(e){ return null; } }
+function lastRoom(){ return _lastRoomStore.read(); }
 // ★ 同步立即清除“上次所在房间”标记。用于所有“用户主动导航到非房间场景”的动作(返回大厅/登录/注册/匿名进入/登出)。
 // 必须同步、先于任何 await 执行: 防止“切场景后立即刷新”时 eh_last_room 未及时清除 → 首帧防闪又把用户拉回旧房间。
-function clearLastRoom(){ try{ localStorage.removeItem('eh_last_room'); }catch(e){} }
+function clearLastRoom(){ _lastRoomStore.clear(); }
 // 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
 function resumeAfterAuth(){
   const r=lastRoom();

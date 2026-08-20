@@ -193,6 +193,36 @@ console.log('PASS lobby: optimisticCnt pure helper is exported');
   console.log('PASS lobby: copyInvite resolves late clipboard dependency');
 })().catch(err => { console.error(err); process.exitCode = 1; });
 
+// 回归：上次房间存取工厂使用 storage getter，运行时切换 storage 也生效；解析异常返回 null。
+(function testLastRoomStoreLateStorage() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateStorage = null;
+  const store = lobby.createLastRoomStore({ getStorage: () => lateStorage, key: 'eh_last_room' });
+  if (store.read() !== null) throw new Error('lobby: last-room read before storage ready must return null');
+  store.clear(); // 未就绪时不得抛错
+  const backing = {};
+  lateStorage = {
+    getItem: k => (k in backing) ? backing[k] : null,
+    setItem: (k, v) => { backing[k] = v; },
+    removeItem: k => { delete backing[k]; },
+  };
+  backing['eh_last_room'] = JSON.stringify({ id: 'r-late', name: '迟到房', emoji: '◇' });
+  const got = store.read();
+  if (!got || got.id !== 'r-late' || got.name !== '迟到房') throw new Error('lobby: last-room read did not use late storage');
+  backing['eh_last_room'] = '{not-json';
+  if (store.read() !== null) throw new Error('lobby: last-room read must swallow parse errors');
+  backing['eh_last_room'] = JSON.stringify({ name: '缺 id' });
+  if (store.read() !== null) throw new Error('lobby: last-room read must reject rows without id');
+  backing['eh_last_room'] = JSON.stringify({ id: 'r-late', name: '迟到房' });
+  store.clear();
+  if ('eh_last_room' in backing) throw new Error('lobby: last-room clear did not remove key');
+  lateStorage = { getItem: () => { throw new Error('storage denied'); }, removeItem: () => { throw new Error('storage denied'); } };
+  if (store.read() !== null) throw new Error('lobby: last-room read must swallow storage exceptions');
+  store.clear(); // 抛错也不应冒泡
+  if (!Object.isFrozen(store)) throw new Error('lobby: last-room store must be frozen');
+  console.log('PASS lobby: lastRoomStore resolves late storage and swallows errors');
+})();
+
 for (const [name, globalName, factoryName, keys] of modules) {
   const file = path.join(root, 'js/modules', `${name}.js`);
   vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
