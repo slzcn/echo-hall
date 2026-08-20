@@ -13,6 +13,15 @@ const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 // 全站函数体内用 sb 都是"调用时"(那时早已就绪), 只有 createClient/onAuthStateChange/
 // getSession 这 3 处是解析期立即执行, 全收进 bootSupabase。
 let sb = null;
+let _pagehideAccessToken = '';
+let _pagehideAuthBound = false;
+function bindPagehideAuthToken(){
+  if(_pagehideAuthBound || !sb || !sb.auth) return;
+  _pagehideAuthBound=true;
+  sb.auth.onAuthStateChange((_event,session)=>{
+    _pagehideAccessToken=session?.access_token||'';
+  });
+}
 const EH_AUTH_FN = SB_URL + '/functions/v1/eh-auth';
 async function authApi(path, body){
   const r = await fetch(EH_AUTH_FN+path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
@@ -211,6 +220,7 @@ async function resolveSession(){
   if(!session?.user && everReg){
     try{ const rr = await withTimeout(sb.auth.getSession(), 5000, null); if(rr?.data?.session?.user) session=rr.data.session; }catch(_){ _ehCatch('ensureAuth',_); }
   }
+  if(session?.access_token) _pagehideAccessToken=session.access_token;
   return session;
 }
 async function ensureAuth(){
@@ -234,6 +244,7 @@ async function ensureAuth(){
     catch(e){ console.warn('anon signin 超时', e); toast(EH_CONFIG.text.err_initId); return null; }
     if(error || !data?.user){ console.warn('anon signin', error); toast(EH_CONFIG.text.err_initId); return null; }
     uid = data.user.id;
+    if(data.session?.access_token) _pagehideAccessToken=data.session.access_token;
     // ★ 防冒充: 仅当本地缓存残留着正式账号身份(registered/username/email)时才重掷随机名字,
     //   避免旧缓存的正式账号名字(如 yiran)被新匿名 uid 带入 DB 产生“临时 yiran”冲突。
     //   触发场景: admin 退出时未清 localStorage → me.name/emoji 残留。
@@ -670,8 +681,8 @@ function buildBgmMenu(m, soulOverride){
   //   自动 = 音乐开 + 随机官方曲；关闭 = 停播。手动选曲时「自动」暗化（可点回自动模式）
   const isManualPicked=on && !isAuto;
   html.push(`<div class="mode-row">
-    <div class="mode-opt${(on&&isAuto)?' active':(isManualPicked?' dimmed':'')}" data-action="auto" title="随机播放本房间官方曲目">自动</div>
-    <div class="mode-opt${on?'':' active'}" data-action="off" title="关闭背景音乐">关闭</div>
+    <div class="mode-opt${(on&&isAuto)?' active':(isManualPicked?' dimmed':'')}" data-action="auto" title="随机播放本房间官方曲目" role="button" tabindex="0" aria-label="自动播放背景音乐">自动</div>
+    <div class="mode-opt${on?'':' active'}" data-action="off" title="关闭背景音乐" role="button" tabindex="0" aria-label="关闭背景音乐">关闭</div>
   </div>`);
   m.classList.toggle('off-mode', !on);
   const isLobby=!room;   // 大厅(列表页)：无当前房间概念，不提供「请灵魂制作」
@@ -701,7 +712,7 @@ function buildBgmMenu(m, soulOverride){
       officialShown.forEach((c,i)=>{
         const dc=OFFICIAL_HUES[i%OFFICIAL_HUES.length];
         const pinned=!!playing && playing===c.url;
-        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" role="button" tabindex="0" aria-label="播放 ${esc(c.name)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(c.name)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
     // 【灵魂组缓存 07-28 03:08】key 加 _soulRoomKey 防长度巧合复用旧房间抽样（旧实现只看 _soulLen）
@@ -753,7 +764,7 @@ function buildBgmMenu(m, soulOverride){
         const dc=SOUL_HUES[i%SOUL_HUES.length];
         const pinned=!!playing && playing===c.url;
         const st=shortTitle(c.title);
-        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
+        html.push(`<div class="skin-opt${pinned?' active':''}" data-url="${esc(c.url)}" data-title="${esc(c.title||'')}" data-mine="1" role="button" tabindex="0" aria-label="播放 ${esc(st)}"><span class="dot" style="color:${dc};background:${dc}"></span><span class="bgm-flex">${esc(st)}</span><span class="ck" style="color:${dc}">✓</span></div>`);
       });
     }
     // ⑤ 灵魂现场生成（仅房间页；大厅无当前房间，不提供）
@@ -1084,8 +1095,8 @@ function applyRoomTheme(room){
 }
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
-  const modeRow = `<div class="mode-row"><div class="mode-opt" data-mode="auto">自动</div><div class="mode-opt" data-mode="day">日间</div><div class="mode-opt" data-mode="night">夜间</div></div>`;
-  const buildMenu = m => m.innerHTML=modeRow+THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck" style="color:${t.dot}">✓</span></div>`).join('');
+  const modeRow = `<div class="mode-row"><div class="mode-opt" data-mode="auto" role="button" tabindex="0" aria-label="自动外观">自动</div><div class="mode-opt" data-mode="day" role="button" tabindex="0" aria-label="日间外观">日间</div><div class="mode-opt" data-mode="night" role="button" tabindex="0" aria-label="夜间外观">夜间</div></div>`;
+  const buildMenu = m => m.innerHTML=modeRow+THEMES.map(t=>`<div class="skin-opt" data-theme="${t.id}" role="button" tabindex="0" aria-label="皮肤 ${t.name}"><span class="dot" style="color:${t.dot};background:${t.dot}"></span>${t.name}<span class="ck" style="color:${t.dot}">✓</span></div>`).join('');
   const bindMode = m => m.querySelectorAll('.mode-opt').forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); pickMode(el.dataset.mode); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) applyMode(currentMode()); });
   const bind = m => { m.querySelectorAll('.skin-opt').forEach(el=>el.onclick=()=>{ pickTheme(el.dataset.theme); m.classList.remove('on'); const other=(m.id==='skinMenu')?$('#skinMenuHall'):$('#skinMenu'); if(other) other.classList.remove('on'); syncSkinActive(); }); bindMode(m); };
   buildMenu(menu); bind(menu);
@@ -1138,7 +1149,7 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
@@ -1229,8 +1240,16 @@ function gtTickTurnAlert(){
     } }catch(_){ }
   }
 }
-// GT turn-alert 已折进上方的 visibilitychange handler(不新增 listener); 后台轮询并行兜底，避免遗漏
-setInterval(()=>{ try{ gtTickTurnAlert(); }catch(_){ } }, 2500);
+// GT turn-alert 已折进上方的 visibilitychange handler(不新增 listener)。2.5s 兜底轮询
+// 只属于活跃牌桌生命周期：开桌启动，收工／散桌／离房统一由 _gtCleanupPlay 停止。
+let _turnAlertT=null;
+function _gtStartTurnAlert(){
+  if(_turnAlertT) return;
+  _turnAlertT=setInterval(()=>{ try{ gtTickTurnAlert(); }catch(_){ } },2500);
+}
+function _gtStopTurnAlert(){
+  if(_turnAlertT){ clearInterval(_turnAlertT); _turnAlertT=null; }
+}
 
 let oldestId = null;       // 已加载最早消息 id(用于加载更多)
 let replyTo = null;        // 正在引用的消息 {id,name,text}
@@ -1419,7 +1438,29 @@ const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
 const _snapTailFlights=new Map(); // rid → {busy,pending}: 同房 single-flight；跨房互不阻塞
 const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(后台可配)
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
-const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
+const soulsCache={};           // rid → { at, p:Promise<souls[]>, pending } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
+const SOULS_CACHE_MAX=24;
+function pruneSoulsCache(now=Date.now()){
+  const currentRid=curRoom&&curRoom.id;
+  const candidates=[];
+  Object.entries(soulsCache).forEach(([rid,entry])=>{
+    if(!entry){ delete soulsCache[rid]; return; }
+    if(entry.pending || rid===currentRid) return; // 不打断在途请求，也不误删当前房
+    if(now-entry.at >= PREFETCH_TTL()) delete soulsCache[rid];
+    else candidates.push([rid,entry]);
+  });
+  const overflow=Object.keys(soulsCache).length-SOULS_CACHE_MAX;
+  if(overflow<=0) return;
+  candidates.sort((a,b)=>a[1].at-b[1].at);
+  candidates.slice(0,overflow).forEach(([rid])=>delete soulsCache[rid]);
+}
+function putSoulsCache(rid,p){
+  const entry={at:Date.now(),p:null,pending:true};
+  entry.p=Promise.resolve(p).finally(()=>{ entry.pending=false; pruneSoulsCache(); });
+  soulsCache[rid]=entry;
+  pruneSoulsCache(entry.at);
+  return entry.p;
+}
 let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
 // 把当前房消息 DOM 持久化到 localStorage → 下次【刷新】首帧静态回填(见页首防闪脚本读 eh_room_snap)。
 // 只留最近 ~30 条(localStorage 有 ~5MB 限, 且首帧只需铺满一屏), 太旧/太多截掉。节流调用。
@@ -1494,11 +1535,10 @@ function restoreScrollAnchor(rid){
 }
 // 预取某房灵魂列表(eh_room_souls RPC 只返回 enabled=true 的,故后台关掉的机器人不会出现)
 function prefetchSouls(rid){
+  pruneSoulsCache();
   const hit=soulsCache[rid];
   if(hit && Date.now()-hit.at < PREFETCH_TTL()) return hit.p;
-  const p = sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]).catch(()=>[]);
-  soulsCache[rid] = { at:Date.now(), p };
-  return p;
+  return putSoulsCache(rid, sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]).catch(()=>[]));
 }
 // prefetchRoom / prefetchAll 实现已迁入 js/modules/lobby.js，这里只做依赖注入。
 // prefetchCache 仍保留在 app.js 作用域内，因为 leaveRoom 会 delete 其中房间的预取项。
@@ -1759,19 +1799,20 @@ async function refreshSnapshotTail(room, fillOlder=false){
     let domMaxMid=0;
     // 扫所有带 mid 的行(含 .msg / .ixmsg 互动 / .actmsg / .recalled-tip), 别只扫 .msg——
     // 否则互动/act 行不计入 domMaxMid, 且下面判重也漏, 刷新补拉会把它们反复 append(重复bug真因)。
-    stream.querySelectorAll('[data-mid]').forEach(e=>{ const id=+e.dataset.mid; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
+    const domByMid=new Map();
+    stream.querySelectorAll('[data-mid]').forEach(e=>{ const key=String(e.dataset.mid||''); if(key) domByMid.set(key,e); const id=+key; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
       if(isSoulUser(m.user_id, m.name)) m.is_bot=true;
-      const exist=stream.querySelector(`[data-mid="${m.id}"]`);
+      const exist=domByMid.get(String(m.id));
       if(!exist){
         // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
         if(m.id>domMaxMid){
           // ★灵魂文字消息(msg/act)走渲染队列一条条节奏吐出, 不在此同步批量 append(否则又"一口气冒几条")。
           //   队列自带 pending 去重, 已排队/已渲染的不会重复。其余(真人/song/voice/proj/interact)仍即时 append。
           if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
-          const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); appended++; }
+          const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); domByMid.set(String(m.id),el); appended++; }
         }
         return;
       }
@@ -1788,7 +1829,7 @@ async function refreshSnapshotTail(room, fillOlder=false){
           if(card && card.classList.contains('pending') && parseSong(m.text).ready){
             const fresh=buildMsgEl(m, true);
             if(fresh){
-              exist.replaceWith(fresh);
+              exist.replaceWith(fresh); domByMid.set(String(m.id),fresh);
               const nc=fresh.querySelector('.song-card');
               if(nc && !nc.classList.contains('pending')){
                 nc.classList.add('arrived');
@@ -1806,7 +1847,7 @@ async function refreshSnapshotTail(room, fillOlder=false){
         const hasTxt = t && t.textContent.trim();
         if(!hasTxt && (m.text||'').trim()){
           const fresh=buildMsgEl(m, true);
-          if(fresh){ exist.replaceWith(fresh); }
+          if(fresh){ exist.replaceWith(fresh); domByMid.set(String(m.id),fresh); }
         }
       }catch(_){ _ehCatch('refreshSnapshotTail',_); }
     });
@@ -2261,7 +2302,19 @@ async function subscribeMessages(rid){
 //      因该项目 realtime.messages 广播通道鉴权不通，postgres_changes 才可靠) ----
 const ONLINE_WINDOW = ()=>TUNE('onlineWindowMs',35000);   // 在线判定窗口(后台可配)
 let heartbeatTimer = null;
+const _presencePollFlights = new Map();
+function pollPresence(room){
+  if(!room || !room.id || !curRoom || curRoom.id!==room.id) return Promise.resolve();
+  const rid=room.id, active=_presencePollFlights.get(rid);
+  if(active) return active;
+  const flight=Promise.allSettled([beat(), refreshPresence()]).finally(()=>{
+    if(_presencePollFlights.get(rid)===flight) _presencePollFlights.delete(rid);
+  });
+  _presencePollFlights.set(rid,flight);
+  return flight;
+}
 async function setupPresence(room){
+  bindPagehideAuthToken();
   const setupEpoch=roomEpoch;
   const oldPresChan=presChan, oldHeartbeat=heartbeatTimer;
   presChan=null; heartbeatTimer=null;
@@ -2281,7 +2334,7 @@ async function setupPresence(room){
   // 人数/光墙立即刷(不等心跳)。refreshPresence 自己兜底把"我"算进在线, 至少显示 1 人。
   await refreshPresence().catch(e=>console.warn('refreshPresence', e));
   if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
-  heartbeatTimer = setInterval(async()=>{ beat().catch(()=>{}); refreshPresence().catch(()=>{}); }, 15000);
+  heartbeatTimer = setInterval(()=>{ pollPresence(room); }, 15000);
 }
 
 // ───────── 真人联机牌桌(phase-1 轻联机): 座位大厅 + realtime 同步 ─────────
@@ -2494,6 +2547,7 @@ function gtLaunchPoker(row){
     // 房主收工 → 引擎权威消失, 必须散桌(置 closed 释放唯一活桌索引 + 通知在座 guest 清场)。
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },
   });
+  _gtStartTurnAlert();
 }
 // ── 德州联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己底牌; 出牌发回 host 权威校验。──
 function gtEnterPoker(row){
@@ -2524,6 +2578,7 @@ function gtEnterPoker(row){
     onBust:()=>{ gtLeave(row.id); },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可从卡片"进入牌桌"重进)
   });
+  _gtStartTurnAlert();
   setTimeout(pull, 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次底牌
 }
 
@@ -2578,6 +2633,7 @@ function gtLaunchGuandan(row){
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
+  _gtStartTurnAlert();
 }
 // ── 掼蛋联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 出牌发回 host 权威校验。──
 //   掼蛋手牌动态: 自己张数一变(发牌/我出牌/进贡) 就重拉; 因写库与广播存在竞态, 拉到的张数对不上时短延时自愈重拉。
@@ -2613,6 +2669,7 @@ function gtEnterGuandan(row){
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
+  _gtStartTurnAlert();
   setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
 }
 
@@ -2668,6 +2725,7 @@ function gtLaunchDdz(row){
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
+  _gtStartTurnAlert();
 }
 // ── 斗地主联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 叫分/出牌/不出发回 host 权威校验。──
 //   手牌动态: 自己张数一变(发牌 17 / 抢到地主 +3=20 / 我出牌减少) 就重拉; 写库与广播竞态时张数对不上短延时自愈重拉。
@@ -2702,6 +2760,7 @@ function gtEnterDdz(row){
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
+  _gtStartTurnAlert();
   setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
 }
 
@@ -4034,13 +4093,25 @@ function maybeLoadOlderOnScroll(stream){
     if(s._tlBound) return true; s._tlBound=true;
     let raf=0; const kick=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; updateToLatest(); recordScrollAnchor(); maybeLoadOlderOnScroll(s); }); };
     s.addEventListener('scroll', kick, {passive:true});
-    // ★偶发不显示的根因: 翻历史时消息到达打字机/图片加载/神曲卡/特效会"事后撑高" stream,
-    //   离底距离变大却不触发 scroll → updateToLatest 不跑 → 按钮该现不现。用 MutationObserver
-    //   监听内容变化(节流到 rAF), 内容一长就重判显隐, 补上纯靠 scroll 覆盖不到的场景。
+    // 结构变化由 MutationObserver 处理；逐字打字只改 characterData，不应触发布局扫描。
+    // 图片/卡片事后撑高由 ResizeObserver 低频补判，保住“回到最新”显隐。
     try{
       const mo=new MutationObserver(kick);
-      mo.observe(s, {childList:true, subtree:true, characterData:true});
+      mo.observe(s, {childList:true, subtree:true});
       s._tlMO=mo;
+    }catch(_){}
+    try{
+      const ro=new ResizeObserver(kick);
+      [...s.children].forEach(el=>ro.observe(el));
+      const watch=new MutationObserver(records=>{
+        records.forEach(r=>r.addedNodes.forEach(n=>{
+          if(n.nodeType!==1) return;
+          const row=n.parentElement===s?n:n.closest('.msg,.ixmsg,.actmsg,.recalled-tip');
+          if(row && row.parentElement===s) ro.observe(row);
+        }));
+      });
+      watch.observe(s,{childList:true,subtree:true});
+      s._tlRO=ro; s._tlResizeMO=watch;
     }catch(_){}
     b.addEventListener('click',()=>{ try{ s.scrollTo({top:s.scrollHeight,behavior:'smooth'}); }catch(_){ s.scrollTop=s.scrollHeight; } hideToLatest(); setTimeout(()=>{ s.scrollTop=s.scrollHeight; hideToLatest(); },420); });
     return true;
@@ -4126,14 +4197,14 @@ async function loadRoomSouls(rid){
     //   避免一次网络抖动把正确的灵魂列表清空。
     sb.rpc('eh_room_souls',{ rid }).then(({data,error})=>{
       if(error || !Array.isArray(data)) return;   // 抖动/失败 → 保留缓存,不覆盖
-      if(rid===(curRoom&&curRoom.id)){ soulsCache[rid]={at:Date.now(),p:Promise.resolve(data)}; applyData(data); }
+      if(rid===(curRoom&&curRoom.id)){ putSoulsCache(rid,Promise.resolve(data)); applyData(data); }
     }).catch(()=>{});
     return;
   }
   // 未预取: 走原路, 并回填缓存供二次进房复用
   try{
     const p = sb.rpc('eh_room_souls',{ rid }).then(({data})=>data||[]);
-    soulsCache[rid]={ at:Date.now(), p };
+    putSoulsCache(rid,p);
     applyData(await p);
   }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
 }
@@ -7480,14 +7551,28 @@ function toast(msg){ const t=$('#toast'); if(/失败|错误|不支持|请先|无
 // (unauthorized/forbidden/not_found 等)直接弹给用户(见截图)。
 function friendlyErr(raw, fallback){ return (raw && /[一-龥]/.test(String(raw))) ? String(raw) : (fallback||'操作失败，请重试'); }
 // 赛博风确认弹层，返回 Promise<boolean>，替代原生 confirm()
+let _confirmReturnFocus=null, _confirmDone=null;
+function _trapConfirmKey(e){
+  const mask=$('#confirmMask'); if(!mask.classList.contains('on')) return false;
+  if(e.key==='Escape'){ e.preventDefault(); if(_confirmDone) _confirmDone(false); return true; }
+  if(e.key!=='Tab') return false;
+  const list=_focusables(mask); if(!list.length){ e.preventDefault(); return true; }
+  const first=list[0], last=list[list.length-1];
+  if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
+  return true;
+}
 function ehConfirm(msg, title){
   return new Promise(res=>{
+    _confirmReturnFocus=document.activeElement;
     $('#confirmTitle').textContent = title||'确认操作';
     $('#confirmMsg').textContent = msg;
     $('#confirmMask').classList.add('on'); $('#confirmMask').setAttribute('aria-hidden','false');
     setTimeout(()=>{ try{ $('#confirmNo').focus(); }catch(_){} },0);
     try{ EhSfx.play('click'); }catch(e){}   // 弹层出现提示音
-    const done=(v)=>{ try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmMask').setAttribute('aria-hidden','true'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; res(v); };
+    let settled=false;
+    const done=(v)=>{ if(settled) return; settled=true; try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmMask').setAttribute('aria-hidden','true'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; $('#confirmMask').onclick=null; _confirmDone=null; try{ if(_confirmReturnFocus&&document.contains(_confirmReturnFocus)) _confirmReturnFocus.focus(); }catch(_){} _confirmReturnFocus=null; res(v); };
+    _confirmDone=done;
     $('#confirmYes').onclick=()=>done(true);
     $('#confirmNo').onclick=()=>done(false);
     $('#confirmMask').onclick=(e)=>{ if(e.target===$('#confirmMask')) done(false); };
@@ -7526,7 +7611,11 @@ async function leaveRoom(){
       _st.querySelectorAll('.msg[data-mid]').forEach(el=>{
         try{ const kind=el.dataset.kind||'msg'; if(kind==='voice'||kind==='song'||kind==='proj') return; const t=el.querySelector('.txt'); const raw=(el.dataset.text||'').trim(); if(t&&raw&&!t.textContent.trim()) t.textContent=raw; }catch(_){}
       });
-      roomSnap={ rid:leavingRoom.id, html:_st.innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() };
+      const tail=[..._st.querySelectorAll('.msg')].slice(-30);
+      const mids=new Set(tail.map(el=>String(el.dataset.mid||'')).filter(Boolean));
+      const slimEcho={}; mids.forEach(mid=>{ if(echoState&&echoState[mid]) slimEcho[mid]=echoState[mid]; });
+      const firstMid=tail[0]&&Number(tail[0].dataset.mid);
+      roomSnap={ rid:leavingRoom.id, html:tail.map(el=>el.outerHTML).join(''), oldestId:Number.isFinite(firstMid)?firstMid:oldestId, echoState:JSON.parse(JSON.stringify(slimEcho)), at:Date.now() };
       persistRoomSnap();
     }catch(e){ roomSnap=null; }
   }
@@ -7638,7 +7727,7 @@ async function openGear(){
       const cur=(curRoom.emoji||'💬');
       eb.dataset.emoji=cur;   // 当前选中值存 dataset, 保存时读它
       const list=[cur, ...ROOM_EMOJIS.filter(e=>e!==cur)];
-      pk.innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+      pk.innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}" role="button" tabindex="0" aria-label="房间图标 ${e}">${e}</b>`).join('');
       pk.querySelectorAll('b').forEach(b=>b.onclick=()=>{
         const val=b.textContent;
         eb.dataset.emoji=val;
@@ -8125,7 +8214,10 @@ function _trapModalKey(e){
 }
 function openModal(which){
   _modalReturnFocus=document.activeElement;
-  $('#modalMask').classList.add('on'); $('#modalMask').setAttribute('aria-hidden','false'); ehArm();
+  const mask=$('#modalMask');
+  const titleIds={mCreate:'activeModalTitle',mCreated:'createdModalTitle',mJoin:'joinModalTitle',mReg:'regModalTitle',mReset:'resetModalTitle',mProfile:'profileModalTitle'};
+  mask.setAttribute('aria-labelledby',titleIds[which]||'activeModalTitle');
+  mask.classList.add('on'); mask.setAttribute('aria-hidden','false'); ehArm();
   ['mCreate','mCreated','mJoin','mReg','mReset','mProfile'].forEach(id=>{ const el=$('#'+id); if(el) el.style.display=(id===which?'block':'none'); });
   if(which==='mCreate'){
     $('#roomNameIn').value=''; pickedKind='public'; pickedEmoji='🌐';
@@ -8141,7 +8233,7 @@ function openModal(which){
 function renderEmojiPick(){
   const first = pickedKind==='public'?'🌐':'🔒'; pickedEmoji=first;
   const list=[first,...ROOM_EMOJIS.filter(e=>e!==first)];
-  $('#roomEmojiPick').innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+  $('#roomEmojiPick').innerHTML=list.map((e,i)=>`<b class="${i===0?'on':''}" role="button" tabindex="0" aria-label="房间图标 ${e}">${e}</b>`).join('');
   $('#roomEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ pickedEmoji=b.textContent; $('#roomEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 }
 function closeModal(){
@@ -8175,11 +8267,12 @@ let _loginInFlight=false;
 async function createRoom(){
   if(_createRoomInFlight) return;
   _createRoomInFlight=true;
+  const btn=$('#doCreateBtn');
   try{
   const name=$('#roomNameIn').value.trim();
   if(!name){ toast(EH_CONFIG.text.warn_needRoomName); return; }
   await ensureAuth();
-  const btn=$('#doCreateBtn'); btn.disabled=true; btn.textContent='生成中…';
+  btn.disabled=true; btn.textContent='生成中…';
   let room=null;
   if(pickedKind==='public'){
     const topic=autoTopic(name);   // 公开房没填介绍→按房名自动生成一句(长度参考官方房)
@@ -8193,7 +8286,6 @@ async function createRoom(){
       if(!/duplicate|unique/i.test(error.message||'')){ console.warn(error); break; }
     }
   }
-  btn.disabled=false; btn.textContent='生 成 房 间';
   if(!room){ toast(EH_CONFIG.text.err_createRoom); return; }
   // 房主入成员表(upsert 防重复建房触发 409)
   await sb.from('eh_members').upsert({room_id:room.id,user_id:myUid,role:'owner',name:me.name,emoji:me.emoji,color:me.color}, { onConflict:'room_id,user_id', ignoreDuplicates:true });
@@ -8203,25 +8295,38 @@ async function createRoom(){
   if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfHint) wolfHint.style.display='block'; }
   else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; if(wolfHint) wolfHint.style.display='none'; }
   openModal('mCreated');
-  }finally{ _createRoomInFlight=false; }
+  }catch(e){
+    console.warn('[EH] createRoom failed', e);
+    toast('创建房间失败，请重试');
+  }finally{
+    _createRoomInFlight=false;
+    if(btn){ btn.disabled=false; btn.textContent='生 成 房 间'; }
+  }
 }
 async function joinByCode(){
   if(_joinCodeInFlight) return;
   _joinCodeInFlight=true;
+  const btn=$('#doJoinBtn');
   try{
   const code=$('#codeIn').value.trim().toUpperCase();
   if(!code){ $('#joinErr').textContent='请输入邀请码'; $('#codeIn').focus(); return; }
   await ensureAuth();
-  const btn=$('#doJoinBtn'); btn.disabled=true; btn.textContent='进入中…'; $('#joinErr').textContent='';
+  btn.disabled=true; btn.textContent='进入中…'; $('#joinErr').textContent='';
   const { data:rooms, error }=await sb.rpc('eh_find_room_by_code',{code});
   const room=Array.isArray(rooms)?rooms[0]:rooms;
-  btn.disabled=false; btn.textContent='进 入 房 间';
   if(error || !room){ $('#joinErr').textContent='邀请码无效或房间不存在'; return; }
   // 走带码校验的 SECURITY DEFINER RPC 代插成员(收紧后的 RLS 不允许私密房裸 insert, 必须经此函数验证邀请码)
   const { error:mErr }=await sb.rpc('eh_join_by_code',{p_code:code,p_name:me.name,p_emoji:me.emoji,p_color:me.color});
   if(mErr){ $('#joinErr').textContent='加入失败'; return; }
   closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
-  }finally{ _joinCodeInFlight=false; }
+  }catch(e){
+    console.warn('[EH] joinByCode failed', e);
+    $('#joinErr').textContent='加入失败，请检查网络后重试';
+    toast('加入房间失败，请重试');
+  }finally{
+    _joinCodeInFlight=false;
+    if(btn){ btn.disabled=false; btn.textContent='进 入 房 间'; }
+  }
 }
 // ============ 正式账号：注册 / 登录 / 找回 ============
 // 登录：账号(用户名或邮箱)+密码。先 resolve 出登录邮箱，再 signInWithPassword。
@@ -8234,11 +8339,12 @@ function unameToEmail(u){
 async function doLogin(){
   if(_loginInFlight) return;
   _loginInFlight=true;
+  const btn=$('#loginBtn');
   try{
   const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
   $('#loginErr').textContent='';
   if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
-  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='登录中…';
+  btn.disabled=true; btn.textContent='登录中…';
   // 用户名: 本地直接算内部邮箱, 省掉 resolve 往返(提速)。真邮箱: 走 resolve(可能绑过).
   let loginEmail;
   if(/^\S+@\S+\.\S+$/.test(account)){
@@ -8251,6 +8357,7 @@ async function doLogin(){
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:loginEmail, password });
   btn.disabled=false; btn.textContent='登 录';
   if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
+  if(sess.session?.access_token) _pagehideAccessToken=sess.session.access_token;
   myUid=sess.user.id; resyncMsgOwnership();
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
   me = prof && prof.name
@@ -8271,7 +8378,14 @@ async function doLogin(){
     }
   }catch(e){ console.warn('[EH] redirect-admin 检查异常', e&&e.message); }
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
-  }finally{ _loginInFlight=false; }
+  }catch(e){
+    console.warn('[EH] doLogin failed', e);
+    $('#loginErr').textContent='登录失败，请检查网络后重试';
+    toast('登录失败，请重试');
+  }finally{
+    _loginInFlight=false;
+    if(btn){ btn.disabled=false; btn.textContent='登 录'; }
+  }
 }
 // SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
 // 不依赖"提交后跳转"触发的自动保存气泡——本站登录后靠JS切场景、表单DOM不消失, 那种气泡常不弹。
@@ -8298,6 +8412,7 @@ async function doRegister(){
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
   btn.disabled=false; btn.textContent='注 册 并 进 入';
   if(error){ $('#regErr').textContent='注册成功但登录失败，请回登录页手动登录'; return; }
+  if(sess.session?.access_token) _pagehideAccessToken=sess.session.access_token;
   myUid=sess.user.id;
   // 用注册的用户名更新前台昵称 + 缓存 username/registered(个人空间首屏直显@用户名)
   me.name=username; me.id=myUid; me.username=username; me.registered=true; me.email=me.email||''; saveIdentity(); paintIdentity();
@@ -8392,11 +8507,11 @@ function openProfileEditor(){
   $('#profDice').onclick=()=>{ $('#profName').value=rand(ADJ)+rand(ANI); $('#profName').focus(); };
   // emoji 选择器(当前高亮在首位)
   const emos=[_profEmoji,...EMO_ALL.filter(e=>e!==_profEmoji)];
-  $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}">${e}</b>`).join('');
+  $('#profEmojiPick').innerHTML=emos.map((e,i)=>`<b class="${i===0?'on':''}" role="button" tabindex="0" aria-label="头像 ${e}">${e}</b>`).join('');
   $('#profEmojiPick').querySelectorAll('b').forEach(b=>b.onclick=()=>{ _profEmoji=b.textContent; $('#profEmojiPick').querySelectorAll('b').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
   // 颜色选择器
   const cols=COLORS.includes(_profColor)?COLORS:[_profColor,...COLORS];
-  $('#profColorPick').innerHTML=cols.map(c=>`<i class="${c===_profColor?'on':''}" data-c="${c}" style="background:${c}"></i>`).join('');
+  $('#profColorPick').innerHTML=cols.map(c=>`<i class="${c===_profColor?'on':''}" data-c="${c}" style="background:${c}" role="button" tabindex="0" aria-label="主题色 ${c}"></i>`).join('');
   $('#profColorPick').querySelectorAll('i').forEach(el=>el.onclick=()=>{ _profColor=el.dataset.c; $('#profColorPick').querySelectorAll('i').forEach(x=>x.classList.remove('on')); el.classList.add('on'); });
   // 邮箱区(并入编辑资料): 仅正式账号显示; 已有邮箱→显示当前+验证态, 新邮箱框留空(填了才改)
   const sec=$('#profEmailSec');
@@ -8616,7 +8731,14 @@ on('createRoomBtn','click',()=>openModal('mCreate'));
 on('joinRoomBtn','click',()=>openModal('mJoin'));
 on('modalX','click',()=>closeModal());
 on('modalMask','click',e=>{ if(e.target===$('#modalMask')) closeModal(); });
-document.onkeydown=(e)=>{ _trapModalKey(e); };
+document.onkeydown=(e)=>{ if(_trapConfirmKey(e)) return; _trapModalKey(e); _activateRoleButtonOnKey(e); };
+// 非原生 role=button 控件统一遵循原生按钮键盘契约；click 仍由原绑定处理鼠标/触控。
+function _activateRoleButtonOnKey(e){
+  const el=e.target.closest&&e.target.closest('[role="button"]');
+  if(!el || (e.key!=='Enter'&&e.key!==' ')) return false;
+  e.preventDefault(); el.click(); return true;
+}
+
 $('#kindSeg').querySelectorAll('.opt').forEach(o=>o.onclick=()=>{ pickedKind=o.dataset.kind; $('#kindSeg').querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x===o)); renderEmojiPick(); });
 on('doCreateBtn','click',()=>createRoom());
 $('#codeCopy').onclick=()=>{ navigator.clipboard?.writeText($('#codeVal').textContent).then(()=>toast(EH_CONFIG.text.ok_codeCopied),()=>toast(EH_CONFIG.text.err_copyFail)); };
@@ -8723,7 +8845,7 @@ document.addEventListener('click',closePlusMenu);
 
 // emoji 面板
 const TRAY=['😀','😂','🥹','😍','😎','🤔','😴','😭','🥳','😤','👍','👏','🙏','💪','🤝','❤️','🔥','✨️','🎉','💯','🚀','🌈','🌙','⭐️','🍺','☕️','👀','🤯','💥','🕳️','🦊','🐋','🦉','🪼','🐙','🦌','🦇','🎧️'];
-$('#emojiTray').innerHTML=TRAY.map(e=>`<b>${e}</b>`).join('');
+$('#emojiTray').innerHTML=TRAY.map(e=>`<b role="button" tabindex="0" aria-label="表情 ${e}">${e}</b>`).join('');
 // 表情按钮/托盘用 mousedown+preventDefault: 不让焦点转移到它们, 也不主动 focus 输入框,
 // 这样点表情不会顶起/唤起系统输入法(想打字再自己点输入框)
 // _echoTarget: 非空时托盘处于"给某条消息贴反应"模式(反应环点➕进入); 空则默认"插入输入框"模式
@@ -8747,10 +8869,17 @@ $('#emojiTray').querySelectorAll('b').forEach(b=>{
 });
 document.addEventListener('click',()=>{ $('#emojiTray').classList.remove('on'); _echoTarget=null; });
 
-window.addEventListener('beforeunload',()=>{
-  // 尽力删除自己的在线行(用 sendBeacon 式的同步兜底：直接 fire-and-forget)
-  if(curRoom && myUid){ try{ sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
-});
+function leavePresenceOnPageHide(){
+  if(!curRoom || !myUid || !_pagehideAccessToken) return;
+  const query='room_id=eq.'+encodeURIComponent(curRoom.id)+'&user_id=eq.'+encodeURIComponent(myUid);
+  try{
+    fetch(SB_URL+'/rest/v1/eh_presence?'+query,{
+      method:'DELETE', keepalive:true,
+      headers:{ apikey:SB_ANON, Authorization:'Bearer '+_pagehideAccessToken }
+    }).catch(()=>{});
+  }catch(_){}
+}
+window.addEventListener('pagehide',leavePresenceOnPageHide,{passive:true});
 
 // ★下拉刷新的"软刷新"入口(2026-08-03): pull-refresh.js 是独立 script, 拿不到本文件作用域内的
 //   curRoom/refreshSnapshotTail/renderLobby 等符号, 故在此封装成全局函数暴露。软刷新 = 不 location.reload
@@ -8768,8 +8897,8 @@ window.EH_SOFT_REFRESH = async function(){
       // ★下拉是"给我最新聊天记录"的明确手势 → 真正重载消息流(清空重拉重渲, 拿编辑/撤回/删除等全部最新态),
       //   不是只 append 增量(那样漏刷已有消息的状态变化)。presence 同步刷。不断 realtime、不重挂 BGM、不重演进场。
       await Promise.all([
-        reloadRoomMessages(_r).catch(e=>console.warn('[softRefresh] reload', e)),
-        refreshPresence().catch(e=>console.warn('[softRefresh] presence', e)),
+        reloadRoomMessages(_r),
+        refreshPresence(),
       ]);
       try{ resyncMsgOwnership(); }catch(_){}
       return { ok:true, scope:'room' };
@@ -8779,7 +8908,7 @@ window.EH_SOFT_REFRESH = async function(){
       //   不能用 soft=true: 那条路径(见 renderOfficial/renderPublic 的 `if(soft&&box.children.length)`)
       //   卡片已在时只刷在线数/预览、直接 return, 不重新查 eh_rooms → 新建的房/删掉的房下拉不出来。
       //   区别于"返回大厅"的 soft 刷新(避免闪烁): 那是被动回来, 这是用户主动要最新。
-      await renderLobby(false).catch(e=>console.warn('[softRefresh] lobby', e));
+      await renderLobby(false);
       return { ok:true, scope:'lobby' };
     }
     // 既不在房也不在大厅(入口/加载中等) → 交回 pull-refresh 让它走硬 reload 兜底

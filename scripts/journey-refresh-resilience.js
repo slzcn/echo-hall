@@ -8,7 +8,24 @@ const INDEX = read('index.html');
 const SWREG = read('js/sw-register.js');
 const PULL = read('js/pull-refresh.js');
 const SW = read('sw.js');
+const APP = read('js/app.js');
+const SOFT = APP.slice(APP.indexOf('window.EH_SOFT_REFRESH'), APP.indexOf('};', APP.indexOf('window.EH_SOFT_REFRESH')) + 2);
 function assert(ok, msg) { if (!ok) throw new Error(msg); console.log('✓ ' + msg); }
+
+async function refreshAggregate(tasks){
+  try{ await Promise.all(tasks); return {ok:true}; }
+  catch(e){ return {ok:false}; }
+}
+
+(async function(){
+  assert((await refreshAggregate([Promise.resolve(), Promise.resolve()])).ok===true, '全部关键刷新任务成功才返回 ok:true');
+  assert((await refreshAggregate([Promise.resolve(), Promise.reject(new Error('injected reject'))])).ok===false, '任一关键刷新任务 reject 返回 ok:false');
+  const legacy=await Promise.all([Promise.reject(new Error('injected reject')).catch(()=>{}), Promise.resolve()]).then(()=>({ok:true}));
+  assert(legacy.ok===true, '旧实现反证：局部吞错会错误返回 ok:true');
+  assert(/await Promise\.all\(\[/.test(SOFT), '生产刷新聚合关键任务结果');
+  assert(!/reloadRoomMessages\(_r\)\.catch\(/.test(SOFT) && !/refreshPresence\(\)\.catch\(/.test(SOFT), '关键刷新任务不得局部吞掉 reject');
+  assert(!/renderLobby\(false\)\.catch\(/.test(SOFT), '大厅刷新 reject 必须交给聚合器');
+})();
 
 // 当前实现契约：弱网不长等，SW 接管不二次整页刷新，导航快速缓存兜底。
 assert(/setTimeout\(function\(\)\{ if\(!done\)\{ done=true; try\{ctrl\.abort\(\)/.test(INDEX), '版本自愈有 AbortController 超时');

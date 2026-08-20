@@ -1,0 +1,11 @@
+const fs=require('fs'), assert=require('assert');
+const src=fs.readFileSync('js/app.js','utf8');
+const a=src.indexOf('async function refreshSnapshotTail');
+const b=src.indexOf('// 下拉刷新用',a);
+assert(a>=0&&b>a,'找到 refreshSnapshotTail');
+const fn=src.slice(a,b);
+assert(/const\s+domByMid\s*=\s*new Map\(\)/.test(fn),'一次构建 DOM mid Map');
+assert(/domByMid\.get\(String\(m\.id\)\)/.test(fn),'循环使用 O(1) Map 判重');
+assert(!/rows\.forEach\([\s\S]*?stream\.querySelector\(`\[data-mid="\$\{m\.id\}"\]`\)/.test(fn),'逐行 selector 扫描已移除');
+assert(/domByMid\.set\(String\(m\.id\),\s*el\)/.test(fn),'新增消息同步更新 Map');
+console.log('✓ 公共房尾刷新一次建 Map、逐行 O(1) 判重、追加同步更新；旧逐行 selector 反证通过');
