@@ -369,7 +369,9 @@ const EhSfx=(function(){
     pass(){ noise(0,.14,.24,1600,340); tone(420,0,.11,'sine',.06,240); },  // 过牌: 柔和下扫气声
     yourturn(){ tone(784,0,.1,'sine',.16); tone(1175,.07,.17,'triangle',.13); },  // 轮到你: 上行两音提示
     landlord(){ tone(392,0,.16,'sawtooth',.2,392); tone(587,.1,.18,'triangle',.18); tone(784,.22,.26,'sine',.16); tone(1046,.34,.3,'triangle',.13); },  // 地主揭晓: 上行号角式四连音
-    spring(){ tone(659,0,.16,'triangle',.2); tone(880,.1,.18,'sine',.18); tone(1175,.2,.2,'triangle',.16); tone(1568,.3,.24,'sine',.15); tone(2093,.42,.3,'triangle',.13); }  // 春天/双下: 更长的上行欢庆音阶
+    spring(){ tone(659,0,.16,'triangle',.2); tone(880,.1,.18,'sine',.18); tone(1175,.2,.2,'triangle',.16); tone(1568,.3,.24,'sine',.15); tone(2093,.42,.3,'triangle',.13); },  // 春天/双下: 更长的上行欢庆音阶
+    // ── 筹码专属(德州下注/跟注/加注/归池): 两三记清脆叠码声, 与出牌拍击(cardplay)区分开 ──
+    chip(){ noise(0,.045,.2,5600,1500); tone(2050,0,.035,'triangle',.1); tone(1580,.03,.045,'sine',.085); noise(.05,.04,.14,5000,1300); }
   };
   function unlock(){ ensure(); }
   function play(name){
@@ -1127,6 +1129,7 @@ function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList
 
 // ============ 全局状态 ============
 let curRoom = null;        // {id,name,emoji,kind,topic,role}
+let roomEpoch = 0;         // 房间生命周期代次：旧进房/离房异步流程不得碰新房资源
 let msgChan = null;        // Realtime postgres_changes 频道
 let _tailPollTimer = null; // 房内周期兜底轮询: 补住 realtime socket 僵死(切后台/弱网/降频)期间漏投的消息
 let presChan = null;       // Realtime presence 频道
@@ -1136,6 +1139,7 @@ let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
 function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
 //       (2) host 每 8s 发一次 host_ping; guest 15s 未收到 → 判定房主离线, 锁 UI 提醒;
@@ -1566,7 +1570,8 @@ function preRestoreScene(){
   return true;
 }
 async function enterRoom(room){
-  try{ _ehDbg('[enter] rid=', room&&room.id, 'name=', room&&room.name); }catch(_){ _ehCatch('enterRoom',_); }
+  const enterEpoch = ++roomEpoch;
+  try{ _ehDbg('[enter] rid=', room&&room.id, 'epoch=', enterEpoch, 'name=', room&&room.name); }catch(_){ _ehCatch('enterRoom',_); }
   try{ window.startMoodWeather && window.startMoodWeather(); }catch(_){ _ehCatch('enterRoom',_); }
   try{ window.ehLog && ehLog('room_enter',{room_id:room&&room.id,name:room&&room.name,kind:room&&room.kind}); }catch(_){ _ehCatch('enterRoom',_); }
   try{ EhSfx.play('enter'); }catch(e){ _ehCatch('enterRoom',e); }
@@ -1599,6 +1604,7 @@ async function enterRoom(room){
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
     roomSnap=null;
     await ensureAuth();
+    if(enterEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
     try{ entranceBanner(room); }catch(_){ _ehCatch('enterRoom',_); }   // 进场动效: keep-alive 回房也要演(否则快速回房看不到进场特效)
     if(await joinAsMember(room)===false) return;
@@ -1631,6 +1637,8 @@ async function enterRoom(room){
   goScene('hall'); setConn(false,'连接中'); applyRoomTheme(room); startRoomBGM(room);
 
   await ensureAuth();
+  // 认证等待期间可能已经返回大厅或进入了另一房；旧流程到此立即失效，不能再挂订阅/写成员。
+  if(enterEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
   subscribeMessages(room.id);   // 连接灯由其 subscribe 状态驱动
   const isPublic = room.kind==='official' || room.kind==='public';
   const histP = isPublic ? loadHistory(true) : null;
@@ -2901,9 +2909,12 @@ function schedulePresenceRefresh(){
 }
 // typing 独立轻量刷新: 复用最近一次 users 快照, 不查 DB 不重建头像
 let _typingLightTimer=null;
-async function leavePresence(){
-  clearInterval(heartbeatTimer); heartbeatTimer=null;
-  if(curRoom && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',curRoom.id).eq('user_id',myUid); }catch(e){} }
+async function leavePresence(roomOverride, timerOverride){
+  const room=roomOverride||curRoom;
+  const timer=timerOverride===undefined?heartbeatTimer:timerOverride;
+  if(timer) clearInterval(timer);
+  if(timer===heartbeatTimer) heartbeatTimer=null;
+  if(room && myUid){ try{ await sb.from('eh_presence').delete().eq('room_id',room.id).eq('user_id',myUid); }catch(e){} }
 }
 
 function setConn(live,txt){ const el=$('#cntLed'); if(el){ el.classList.toggle('live',live); el.title=live?'实时在线':(txt||'连接中'); } }
@@ -2913,6 +2924,27 @@ function setConn(live,txt){ const el=$('#cntLed'); if(el){ el.classList.toggle('
 let EMOJI_ONLY_RE=null;
 try{ EMOJI_ONLY_RE=new RegExp('^(\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F|\\s)+$','u'); }catch(e){}
 const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'').length<=12;
+const _sendInFlight = new Set();
+function markSendFailed(el, payload){
+  if(!el) return;
+  el.classList.add('send-failed');
+  el.dataset.retryPayload = JSON.stringify(payload);
+  const body=el.querySelector('.body');
+  if(body && !body.querySelector('.send-failed-bar')) body.insertAdjacentHTML('beforeend','<div class="send-failed-bar"><span>发送失败，内容未丢失</span><button type="button" data-retry-send="1">重试</button></div>');
+}
+async function retryFailedSend(el){
+  if(!el || !el.dataset.retryPayload || el.dataset.retrying==='1') return;
+  let payload; try{ payload=JSON.parse(el.dataset.retryPayload); }catch(_){ return; }
+  if(!curRoom || curRoom.id!==payload.room_id){ toast('已离开原房间，无法重试'); return; }
+  el.dataset.retrying='1'; el.classList.add('send-retrying');
+  try{
+    const {data,error}=await sb.from('eh_messages').insert(payload).select('id').single();
+    if(error) throw error;
+    el.classList.remove('send-failed','send-retrying'); delete el.dataset.retryPayload; delete el.dataset.retrying;
+    const bar=el.querySelector('.send-failed-bar'); if(bar) bar.remove();
+    if(data){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; }
+  }catch(e){ console.warn('retry send',e); el.dataset.retrying=''; el.classList.remove('send-retrying'); toast(EH_CONFIG.text.err_sendFail); }
+}
 function fmtTime(ts){
   const d=ts?new Date(ts):new Date();
   const hm=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -4740,6 +4772,11 @@ function pickAt(i){
 }
 
 
+document.addEventListener('click',e=>{
+  const retry=e.target.closest('[data-retry-send="1"]');
+  if(retry){ e.preventDefault(); retryFailedSend(retry.closest('.msg')); }
+});
+
 // ============ 发送 ============
 async function send(){
   try{ _ehDbg('[send] rid=', curRoom&&curRoom.id, 'len=', ($('#input')&&$('#input').value||'').length); }catch(_){}
@@ -4781,7 +4818,9 @@ async function send(){
     payload.color = EH_CONFIG.voidC;
   }
   // 乐观上屏
-  const localId='local_'+Date.now();
+  const localId='local_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  if(_sendInFlight.has(localId)) return;
+  _sendInFlight.add(localId);
   const optimistic={...payload, id:localId, created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
   const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream();
     // 键盘态下 DOM/布局稳定晚于插入, 单次滚动常滚不到底(最后一条被输入栏盖) → 多拍兜底确保完全可见
@@ -4792,13 +4831,15 @@ async function send(){
   const rt=replyTo; resetInput(); clearReply();
   // 虚空模式保持开启(顶部提示条常驻, 由用户手动"退出"), 连续说给虚空更顺
   const { data, error } = await sb.from('eh_messages').insert(payload).select('id').single();
-  if(error){ console.warn('send',error); toast(EH_CONFIG.text.err_sendFail); }
+  _sendInFlight.delete(localId);
+  if(error){ console.warn('send',error); markSendFailed(el,payload); toast(EH_CONFIG.text.err_sendFail); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
   // 竞态兜底: 若 realtime 抢先用真实 id 渲染了同一条(另建了 DOM), 这里回填时先删掉重复
   else if(data){
     const dup=document.querySelector(`.msg[data-mid="${data.id}"]`);
     if(dup && dup!==el) dup.remove();   // realtime 已渲染同条 → 删它, 保留乐观这条并回填
     optimistic.id=data.id; if(el){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; }
+    if(el){ el.classList.remove('send-failed'); delete el.dataset.retryPayload; const bar=el.querySelector('.send-failed-bar'); if(bar) bar.remove(); }
   }
 }
 // 虚空模式开关(统一走 setMode; 保留函数名兼容旧调用)
@@ -7408,47 +7449,55 @@ function ehConfirm(msg, title){
 
 // ============ 离开房间 ============
 async function leaveRoom(){
+  // 先捕获并从全局解绑旧房资源，再进行任何 await。这样快速 A→大厅→B 时，
+  // A 的异步清理只能操作自己的句柄，不会误删 B 的订阅、心跳或当前房间。
+  const leavingRoom=curRoom;
+  const leavingMsgChan=msgChan;
+  const leavingPresChan=presChan;
+  const leavingGtChan=gtChan;
+  const leavingHeartbeatTimer=heartbeatTimer;
+  const leavingTailPollTimer=_tailPollTimer;
+  const leavingGtReapTimer=gtReapTimer;
+  const leavingSongQueueTimer=_sqbTimer;
+  const leavingEpoch=roomEpoch;
+  roomEpoch++;
+  heartbeatTimer=null; _tailPollTimer=null; gtReapTimer=null; _sqbTimer=null;
+  try{ _gtCleanupPlay(); }catch(_){ }
   try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
   try{ _victim.clear(); _koCooldown.clear(); clearCounter(); _fuse.clear(); if(isStunned()) exitStun(); }catch(_){}   // 连击/合体/眩晕态随离房清零
   // 优化批A#6: 房外不空跑房间态 timer(_sqbTimer 歌曲队列条 2.5s 轮询)
   try{ if(_sqbTimer){ clearInterval(_sqbTimer); _sqbTimer=null; } }catch(_){}
-  try{ if(typeof curRoom!=='undefined' && curRoom) window.ehLog && ehLog('room_leave',{room_id:curRoom.id,name:curRoom.name,kind:curRoom.kind}); }catch(_){}
+  try{ if(leavingRoom) window.ehLog && ehLog('room_leave',{room_id:leavingRoom.id,name:leavingRoom.name,kind:leavingRoom.kind}); }catch(_){}
   stopVoice(); stopSong();
   if(recorder && recorder.state!=='inactive'){ recWanted=false; recorder.stop(); } // 录音中离房则丢弃
-  // keep-alive: 关订阅前存下已渲染的消息 DOM 快照，快速回同房可秒还原(只留最近1个)
-  if(curRoom){
+  if(leavingRoom){
     try{
-      // ★ 存快照前先修当前 DOM 里的空框(分批渲染未跑完/打字机中断留下的),
-      //   否则快照会把"渲染未完成态"存下来, 回房还原就是空框。用 dataset.text 就地回填。
       const _st=$('#stream');
       _st.querySelectorAll('.msg[data-mid]').forEach(el=>{
-        try{
-          const kind=el.dataset.kind||'msg';
-          if(kind==='voice'||kind==='song'||kind==='proj') return;
-          const t=el.querySelector('.txt'); const raw=(el.dataset.text||'').trim();
-          if(t && raw && !t.textContent.trim()){ t.textContent=raw; }
-        }catch(_){}
+        try{ const kind=el.dataset.kind||'msg'; if(kind==='voice'||kind==='song'||kind==='proj') return; const t=el.querySelector('.txt'); const raw=(el.dataset.text||'').trim(); if(t&&raw&&!t.textContent.trim()) t.textContent=raw; }catch(_){}
       });
-      roomSnap={ rid:curRoom.id, html:_st.innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() };
-      persistRoomSnap();   // 同时持久化到 localStorage, 供下次刷新首帧静态回填
+      roomSnap={ rid:leavingRoom.id, html:_st.innerHTML, oldestId, echoState:JSON.parse(JSON.stringify(echoState||{})), at:Date.now() };
+      persistRoomSnap();
     }catch(e){ roomSnap=null; }
   }
-  await leavePresence();
-  // 离房清理 presence 相关本地状态，避免旧房头像/typing 快照残留到下一房或长期占内存。
-  try{ if(_presDebounce){ clearTimeout(_presDebounce); _presDebounce=null; } }catch(_){ }
-  try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
-  try{ presenceMap.clear(); lastUsersSnapshot=[]; roomUserIdentity=new Map(); }catch(_){ }
-  if(msgChan){ sb.removeChannel(msgChan); msgChan=null; }
-  if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 离房停兜底轮询
-  if(presChan){ await sb.removeChannel(presChan); presChan=null; }
-  if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
-  if(gtReapTimer){ clearInterval(gtReapTimer); gtReapTimer=null; }
-  _gtTables.clear();
-  // 公开房：退出即调用归档函数(最后一人则归档)。私密房/官方房保留成员关系。
-  if(curRoom && curRoom.kind==='public'){ await sb.rpc('eh_leave_room',{rid:curRoom.id}); }
-  curRoom=null;
-  if(curMode!=='none') setMode('none');   // 离开房间退出所有发言模式(虚空/语音/神曲)
-  try{ localStorage.removeItem('eh_last_room'); }catch(e){}  // 主动离开→刷新回大厅
+  // 快照已保存后再解绑全局房间，避免 persistRoomSnap() 因 curRoom 为空而提前返回。
+  curRoom=null; msgChan=null; presChan=null; gtChan=null;
+  try{ if(leavingSongQueueTimer){ clearInterval(leavingSongQueueTimer); } }catch(_){ }
+  try{ if(leavingTailPollTimer){ clearInterval(leavingTailPollTimer); } }catch(_){ }
+  try{ if(leavingGtReapTimer){ clearInterval(leavingGtReapTimer); } }catch(_){ }
+  await leavePresence(leavingRoom, leavingHeartbeatTimer);
+  if(roomEpoch===leavingEpoch){
+    try{ if(_presDebounce){ clearTimeout(_presDebounce); _presDebounce=null; } }catch(_){ }
+    try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
+    try{ presenceMap.clear(); lastUsersSnapshot=[]; roomUserIdentity=new Map(); }catch(_){ }
+  }
+  if(leavingMsgChan){ try{ sb.removeChannel(leavingMsgChan); }catch(_){} }
+  if(leavingPresChan){ try{ await sb.removeChannel(leavingPresChan); }catch(_){} }
+  if(leavingGtChan){ try{ await sb.removeChannel(leavingGtChan); }catch(_){} }
+  if(roomEpoch===leavingEpoch+1) _gtTables.clear();
+  if(leavingRoom && leavingRoom.kind==='public'){ try{ await sb.rpc('eh_leave_room',{rid:leavingRoom.id}); }catch(_){} }
+  if(roomEpoch===leavingEpoch+1 && curMode!=='none') setMode('none');
+  if(roomEpoch===leavingEpoch+1) try{ localStorage.removeItem('eh_last_room'); }catch(e){}
 }
 
 // ============ 房主设置抽屉 ============
@@ -8053,7 +8102,13 @@ function autoTopic(name){
   let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
   return tpl[h%tpl.length];
 }
+let _createRoomInFlight=false;
+let _joinCodeInFlight=false;
+let _loginInFlight=false;
 async function createRoom(){
+  if(_createRoomInFlight) return;
+  _createRoomInFlight=true;
+  try{
   const name=$('#roomNameIn').value.trim();
   if(!name){ toast(EH_CONFIG.text.warn_needRoomName); return; }
   await ensureAuth();
@@ -8081,8 +8136,12 @@ async function createRoom(){
   if(pickedKind==='private'){ $('#codeVal').textContent=room.invite_code; $('#codeBoxWrap').style.display='flex'; $('#createdSub').textContent='把邀请码发给朋友，他们就能进来：'; if(wolfHint) wolfHint.style.display='block'; }
   else { $('#codeBoxWrap').style.display='none'; $('#createdSub').textContent='公开房已上架大厅，谁都能进来聊。'; if(wolfHint) wolfHint.style.display='none'; }
   openModal('mCreated');
+  }finally{ _createRoomInFlight=false; }
 }
 async function joinByCode(){
+  if(_joinCodeInFlight) return;
+  _joinCodeInFlight=true;
+  try{
   const code=$('#codeIn').value.trim().toUpperCase();
   if(!code){ $('#joinErr').textContent='请输入邀请码'; $('#codeIn').focus(); return; }
   await ensureAuth();
@@ -8095,6 +8154,7 @@ async function joinByCode(){
   const { error:mErr }=await sb.rpc('eh_join_by_code',{p_code:code,p_name:me.name,p_emoji:me.emoji,p_color:me.color});
   if(mErr){ $('#joinErr').textContent='加入失败'; return; }
   closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
+  }finally{ _joinCodeInFlight=false; }
 }
 // ============ 正式账号：注册 / 登录 / 找回 ============
 // 登录：账号(用户名或邮箱)+密码。先 resolve 出登录邮箱，再 signInWithPassword。
@@ -8105,6 +8165,9 @@ function unameToEmail(u){
   return 'u_'+hex+'@eh.local';
 }
 async function doLogin(){
+  if(_loginInFlight) return;
+  _loginInFlight=true;
+  try{
   const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
   $('#loginErr').textContent='';
   if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
@@ -8141,6 +8204,7 @@ async function doLogin(){
     }
   }catch(e){ console.warn('[EH] redirect-admin 检查异常', e&&e.message); }
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
+  }finally{ _loginInFlight=false; }
 }
 // SPA 登录成功后主动把凭据交给浏览器保存(Credential Management API)。
 // 不依赖"提交后跳转"触发的自动保存气泡——本站登录后靠JS切场景、表单DOM不消失, 那种气泡常不弹。

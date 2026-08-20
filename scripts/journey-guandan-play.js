@@ -196,10 +196,12 @@ assert(/@media \(min-width:600px\)[\s\S]{0,260}--cw:44px/.test(ui) && /@media \(
 // (7) 级牌/百搭全程可视(掼蛋特有)
 assert(/isWild\(card, level\)/.test(ui) && /wbadge">配/.test(ui), '红桃级牌逢人配标"配"(百搭可辨识)');
 assert(/naturalRank\(card\)===level/.test(ui) && /\.card\.lvl/.test(ui), '级牌描金边(级牌抬权可视)');
-assert(/gd-lvl/.test(ui) && /我方 \$\{LVL_LABEL/.test(ui), '顶栏显示本局级牌 + 双方队伍等级');
+assert(/gd-lvl/.test(ui) && /我方 <b>\$\{LVL_LABEL/.test(ui), '顶栏显示本局级牌 + 双方队伍等级');
+assert(/lv-now[^"]*">🎯 打 \$\{LVL_LABEL/.test(ui) && /gdLvlBump/.test(ui), '当前打几做成醒目金牌 + 升级跳动(对标大厂级牌位)');
 // (8) 进贡横幅(掼蛋特有)
 assert(/function showTributeBanner\(/.test(ui) && /gd-tribute/.test(ui), '开局进贡有横幅提示');
 assert(/抗贡成功/.test(ui) && /进贡 · /.test(ui), '横幅区分进贡/抗贡两态');
+assert(/function flyTributeCard\(/.test(ui) && /gd-fly-card/.test(ui), '进贡贡牌从进贡席飞向收贡席(对标欢乐掼蛋进贡桥段)');
 // (9) 音效 + 特效
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
 assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌各有音');

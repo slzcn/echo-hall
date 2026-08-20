@@ -91,6 +91,23 @@
 .pk-seat .stk{font-size:11px;color:var(--dim,#498d88);font-variant-numeric:tabular-nums}
 .pk-seat .stk b{color:var(--ink)}
 .pk-seat.allin .stk b{color:var(--magenta,#ff2d8e)}
+/* all-in 高亮: 头像描品红脉冲环 + 醒目 ALL IN 角标(对标德州扑克的全下标识) */
+.pk-seat.allin .pk-avr .av{border-color:var(--magenta,#ff2d8e);box-shadow:0 0 14px rgba(255,45,142,.6);animation:pkAllinRing 1.2s ease-in-out infinite}
+@keyframes pkAllinRing{0%,100%{box-shadow:0 0 10px rgba(255,45,142,.45)}50%{box-shadow:0 0 18px rgba(255,45,142,.85)}}
+.pk-allin-tag{position:absolute;left:50%;top:-10px;transform:translateX(-50%);font-size:9px;font-weight:900;letter-spacing:.08em;
+  color:#fff;background:linear-gradient(150deg,#ff4d6d,#e0263e);border:1px solid #ff96a8;border-radius:6px;padding:1px 5px;
+  white-space:nowrap;z-index:6;box-shadow:0 2px 8px rgba(255,45,142,.5);animation:pkAllinPulse 1.1s ease-in-out infinite}
+@keyframes pkAllinPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.12)}}
+/* 边池拆分: 主池 + 边池并排(有 all-in 分层时显示) */
+.pk-potpart{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:rgba(255,194,77,.1);
+  border:1px solid rgba(255,194,77,.26);white-space:nowrap;margin-left:4px}
+.pk-potpart.side{color:var(--sub,#8fb6b1);background:rgba(156,133,255,.1);border-color:rgba(156,133,255,.28)}
+/* 结算边池明细 */
+.pk-pots{display:flex;flex-direction:column;gap:3px;width:100%;margin:2px 0}
+.pk-potline{display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid var(--line,rgba(0,229,212,.14))}
+.pk-potline .pl-t{color:var(--sub,#8fb6b1);font-weight:700;min-width:44px}
+.pk-potline .pl-a{color:var(--amber,#ffc24d);font-weight:900;font-variant-numeric:tabular-nums}
+.pk-potline .pl-w{color:var(--ink,#eaf6ff);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 入座序列: 未到场的灵魂=虚位(虚线头像+呼吸); 刚落座=弹入 */
 .pk-seat.arriving{opacity:.5}
 .pk-seat.arriving .av{background:transparent;border:1.5px dashed var(--line2,rgba(0,229,212,.4));animation:pkSeatWait 1.2s ease-in-out infinite}
@@ -451,7 +468,7 @@
       }
       const dbtn = seat===st.button ? `<span class="pk-btn-d">D</span>` : '';
       return `<div class="pk-seat${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}" data-seat="${seat}" style="--p:360">
-        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}</div>
+        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}</div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
         ${hole}
@@ -527,8 +544,17 @@
       if (grew){ sfx('cardplay'); lastBoardLen = st.board.length; }
     }
     function renderPot(){
-      els.pot.innerHTML = `<span class="pc"></span>底池 ${st.pot}`;
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
+      // 有人 all-in 且投入分层 → 拆主池/边池展示(对标德州扑克); 否则单一底池
+      let pots = null;
+      try { pots = Engine.buildSidePots(st); } catch(_){}
+      const anyAllin = st.players.some(p=>p.allin && !p.folded);
+      if (pots && pots.length>1 && anyAllin){
+        const parts = pots.map((pt,i)=> `<span class="pk-potpart${i?' side':''}">${i===0?'主池':'边'+i} ${pt.amount}</span>`).join('');
+        els.pot.innerHTML = `<span class="pc"></span>${parts}`;
+      } else {
+        els.pot.innerHTML = `<span class="pc"></span>底池 ${st.pot}`;
+      }
       // 底池增额时数字跳动(与筹码归池同拍); 新一手底池清零不跳
       if (lastPotShown>=0 && st.pot>lastPotShown){
         els.pot.classList.remove('bump'); void els.pot.offsetWidth; els.pot.classList.add('bump');
@@ -559,6 +585,7 @@
     function collectChipsFx(){
       const chips = els.table.querySelectorAll('.pk-commit:not(.zero)');
       if (!chips.length) return;
+      sfx('chip');                       // 筹码扫入底池: 一记叠码声(与出牌拍击区分)
       const tr = tableRect(); const pot = potCenter(tr);
       chips.forEach((src,i)=>{
         const r = src.getBoundingClientRect();
@@ -730,10 +757,10 @@
       // 音效 + 台词
       if (action==='fold'){ if(seat!==mySeat){ sfx('pass'); beatQuip(seat,'fold'); } else sfx('pass'); }
       else if (action==='check'){ sfx('click'); }
-      else if (action==='call'){ sfx('cardplay'); if(seat!==mySeat) beatQuip(seat,'call'); }
+      else if (action==='call'){ sfx('chip'); if(seat!==mySeat) beatQuip(seat,'call'); }
       else if (action==='allin'){ sfx('boom'); boomFx(); const nm=st.players[seat].name;
         emitBeat({ type:'allin', actor:nm, big:true, text:`💥 ${nm} 全下！`, quip: beatQuip(seat,'allin') }); }
-      else { sfx('cardplay'); if(seat!==mySeat){ const nm=st.players[seat].name;
+      else { sfx('chip'); if(seat!==mySeat){ const nm=st.players[seat].name;
         emitBeat({ type:'raise', actor:nm, text:`↑ ${nm} ${action==='bet'?'下注':'加注'}到 ${amount}`, quip: beatQuip(seat,'raise') }); } }
 
       if (r && r.over){ renderAll(); setTimeout(()=>showOver(), r.result.wentToShowdown?450:200); return; }
@@ -827,6 +854,13 @@
         rowsHtml = `<span class="pk-foldwin">🏆 ${escapeHtml(st.players[w]?st.players[w].name:'赢家')} 收下底池（其余弃牌）</span>`;
       }
       const potWon = (res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0);
+      // 边池拆分明细(有 all-in 分层时): 逐池列 归属赢家 + 金额(对标德州扑克摊牌结算)
+      const potsHtml = (res.pots && res.pots.length>1)
+        ? `<div class="pk-pots">${res.pots.map((pt,i)=>{
+            const ws = (pt.winners||[]).map(s=>escapeHtml(st.players[s]?st.players[s].name:'')).join('、');
+            return `<div class="pk-potline"><span class="pl-t">${i===0?'主池':'边池'+i}</span><span class="pl-a">${pt.amount}</span><span class="pl-w">${ws?('→ '+ws):''}</span></div>`;
+          }).join('')}</div>`
+        : '';
 
       // ── 本场终结判定(仅单机): 真人输光=本场负; 灵魂全空=通吃(本场胜) ──
       const myStackNow = my.stack;
@@ -866,6 +900,7 @@
           <h2>${h2}</h2>
           ${subLine}
           <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
+          ${potsHtml}
           <div class="pk-row" style="margin-top:2px">${footer}</div>
         </div>`;
       // 推池动画: 底池飞向赢家席位(我方=底部), 浮层延后淡入让筹码在绒面上先跑完

@@ -141,6 +141,14 @@
   box-shadow:0 4px 18px rgba(0,0,0,.4);animation:gdRoomIn .25s}
 .gd-tribute .th{font-size:12px;font-weight:800;color:var(--amber);letter-spacing:.08em}
 .gd-tribute .tl{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:center}
+/* 进贡飞牌: 贡牌从进贡席飞向收贡席(对标欢乐掼蛋的进贡桥段, 让"谁给谁"看得见) */
+.gd-fly-card{position:absolute;z-index:12;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.55);
+  transition:transform .7s cubic-bezier(.4,.05,.2,1),opacity .7s ease-out;will-change:transform,opacity}
+/* 级牌徽标: 当前台面打几做成醒目金牌(对标大厂顶部级牌位) */
+.gd-lvl .lv-now{display:inline-flex;align-items:center;gap:3px;color:#3a2600;background:linear-gradient(150deg,#ffd76a,#ffb020);
+  border-radius:999px;padding:1px 8px;font-weight:900;margin-right:5px;box-shadow:0 1px 5px rgba(255,176,32,.4)}
+.gd-lvl .lv-now.bump{animation:gdLvlBump .5s ease-out}
+@keyframes gdLvlBump{0%{transform:scale(1)}40%{transform:scale(1.32)}100%{transform:scale(1)}}
 /* 卡牌 */
 .card{width:var(--cw,38px);height:var(--ch,54px);border-radius:6px;background:#fff;position:relative;flex:none;
   box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
@@ -624,10 +632,13 @@
       els.p3.innerHTML = seatHTML(SEAT_L);   // 上家(左)
       els.p1.innerHTML = seatHTML(SEAT_R);   // 下家(右)
       els.me.innerHTML = seatHTML(mySeat);
-      els.lvl.innerHTML = `打 <b>${LVL_LABEL(st.level)}</b> · 我方 ${LVL_LABEL(st.teamLevels[Engine.teamOf(mySeat)])} · 对方 ${LVL_LABEL(st.teamLevels[1-Engine.teamOf(mySeat)])}`;
+      const lvlChanged = (lastLevel!=null && lastLevel!==st.level);
+      els.lvl.innerHTML = `<span class="lv-now${lvlChanged?' bump':''}">🎯 打 ${LVL_LABEL(st.level)}</span>我方 <b>${LVL_LABEL(st.teamLevels[Engine.teamOf(mySeat)])}</b> · 对方 <b>${LVL_LABEL(st.teamLevels[1-Engine.teamOf(mySeat)])}</b>`;
+      lastLevel = st.level;
     }
 
     let lastShownKey='';
+    let lastLevel=null;          // 台面级(打几)变化上升沿 → 级牌徽标跳动
     function playKey(){ const lp=st.table.lastPlay; if(!lp) return st.table.passesInRow>0?('pass:'+st.turn):'empty'; return lp.seat+':'+lp.cards.join(','); }
     function renderTable(){
       const lp = st.table.lastPlay;
@@ -1019,7 +1030,30 @@
       toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay();
     }
 
-    // 进贡横幅(开局若有进贡, 展示 1 条并自动消失)
+    // 进贡飞牌: 贡牌从进贡席飞向收贡席(对标欢乐掼蛋)。坐标相对 room 算, 可跨 felt/me 两区。
+    function flyTributeCard(fromSeat, toSeat, card, delay){
+      const fromEl = room.querySelector(`.gd-seat[data-seat="${fromSeat}"] .gd-avr`);
+      const toEl   = room.querySelector(`.gd-seat[data-seat="${toSeat}"] .gd-avr`);
+      if (!fromEl || !toEl || !card) return;
+      const rr = room.getBoundingClientRect(), fr = fromEl.getBoundingClientRect(), tr = toEl.getBoundingClientRect();
+      const fly = cardEl(card, st.level); fly.classList.add('gd-fly-card');
+      room.appendChild(fly);
+      const fw = fly.offsetWidth || 40, fh = fly.offsetHeight || 56;
+      fly.style.left = (fr.left - rr.left + fr.width/2 - fw/2) + 'px';
+      fly.style.top  = (fr.top  - rr.top  + fr.height/2 - fh/2) + 'px';
+      fly.style.opacity = '0';
+      const dx = (tr.left - fr.left), dy = (tr.top - fr.top);
+      setTimeout(()=>{
+        fly.style.opacity = '1';
+        requestAnimationFrame(()=>{
+          fly.style.transform = `translate(${dx}px,${dy}px) scale(.66) rotate(6deg)`;
+          fly.style.opacity = '.2';
+        });
+        sfx('cardplay');
+        setTimeout(()=>fly.remove(), 760);
+      }, delay||0);
+    }
+    // 进贡横幅(开局若有进贡, 展示 1 条并自动消失; 非抗贡时贡牌飞一手)
     function showTributeBanner(){
       if (!st.tribute) return;
       const box=document.createElement('div'); box.className='gd-tribute';
@@ -1033,6 +1067,8 @@
           return `<span>${nameF} 进贡 <b style="color:var(--amber)">${lab}</b> → ${nameT}</span>`;
         }).join('');
         box.innerHTML=`<div class="th">🎁 进贡 · ${st.tribute.doubleDown?'双下双贡':'单贡'}</div><div class="tl">${rows}</div>`;
+        // 逐张让贡牌从进贡席飞到收贡席(错峰, 双贡不重叠)
+        (st.tribute.transfers||[]).forEach((t,i)=> flyTributeCard(t.from, t.to, findCardById(t.give), 360 + i*420));
       }
       els.felt.appendChild(box);
       sfx('echo');

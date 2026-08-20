@@ -108,6 +108,28 @@
 .ddz-say{position:absolute;top:56px;font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);
   border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
 .ddz-say.show{opacity:1}
+/* 叫/抢地主印章(对标腾讯: 头像上啪一枚醒目图章, 比气泡更有仪式感) */
+.ddz-stamp{position:absolute;top:30px;left:50%;font-size:14px;font-weight:900;letter-spacing:.06em;
+  padding:5px 12px;border-radius:11px;white-space:nowrap;z-index:7;pointer-events:none;opacity:0;
+  transform:translateX(-50%) scale(.2) rotate(-14deg);box-shadow:0 4px 14px rgba(0,0,0,.42)}
+.ddz-stamp.show{animation:ddzStamp 1.3s cubic-bezier(.2,1.4,.35,1) forwards}
+.ddz-stamp.call{background:linear-gradient(150deg,#ffb347,#ff8a3d);color:#3a1e00;border:1.5px solid #ffd18a}
+.ddz-stamp.rob{background:linear-gradient(150deg,#ff4d6d,#e0263e);color:#fff;border:1.5px solid #ff96a8}
+.ddz-stamp.pass{background:var(--panel-solid,#132a29);color:var(--dim,#7fb0ab);border:1.5px solid var(--line)}
+@keyframes ddzStamp{0%{transform:translateX(-50%) scale(.2) rotate(-14deg);opacity:0}
+  18%{transform:translateX(-50%) scale(1.2) rotate(-8deg);opacity:1}
+  30%{transform:translateX(-50%) scale(1) rotate(-8deg)}
+  80%{transform:translateX(-50%) scale(1) rotate(-8deg);opacity:1}
+  100%{transform:translateX(-50%) scale(.92) rotate(-8deg);opacity:0}}
+/* 定地主一刻: 皇冠砸落 + 底牌翻面亮出(对标腾讯揭晓桥段) */
+.ddz-seat.just-crowned .ddz-avr .av::after{animation:ddzCrownDrop .62s cubic-bezier(.3,1.5,.4,1) both}
+@keyframes ddzCrownDrop{0%{transform:translateX(-50%) translateY(-26px) rotate(-30deg) scale(.4);opacity:0}
+  55%{transform:translateX(-50%) translateY(2px) rotate(8deg) scale(1.25);opacity:1}
+  100%{transform:translateX(-50%) translateY(0) rotate(0) scale(1);opacity:1}}
+.ddz-bottom-cards.reveal .bc-row .card{animation:ddzBcFlip .5s ease-out both}
+.ddz-bottom-cards.reveal .bc-row .card:nth-child(2){animation-delay:.1s}
+.ddz-bottom-cards.reveal .bc-row .card:nth-child(3){animation-delay:.2s}
+@keyframes ddzBcFlip{0%{transform:rotateY(90deg) scale(.9);opacity:.2}100%{transform:rotateY(0) scale(1);opacity:1}}
 /* 中央出牌区 */
 .ddz-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:4px 16px;min-height:120px;position:relative;isolation:isolate}
 /* 中央绒面椭圆(对标掼蛋/德州: 三家统一有张"桌面"落牌, 不再是空黑 void)。
@@ -356,6 +378,7 @@
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     let dealAnim = true;          // 下一次 renderHand 播发牌错峰入场(开局/重发/再来一局各触发一次)
     let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
+    let justCrowned = false;      // 本次重绘是否播放"定地主"动画(皇冠砸落 + 底牌翻面)
     let lastMyTurn = false;       // "轮到我"上升沿: 只在刚轮到时提示音+震动, 不每帧响
     sfx('arrive'); if(!isGuest) sfx('deal');   // 开桌一声 + 洗牌发牌(guest 未拿到手牌前不响发牌音)
 
@@ -410,6 +433,19 @@
       if (!bubble) return;
       bubble.textContent = msg; bubble.classList.add('show');
       setTimeout(()=>bubble.classList.remove('show'), 1600);
+    }
+    // 叫/抢地主印章: 在座位头像上啪一枚图章。cls: 'call'(叫,橙)/'rob'(抢,红)/'pass'(不叫,灰)
+    function bidStamp(seat, cls, text){
+      const seatEl = els.felt.querySelector(`.ddz-seat[data-seat="${seat}"]`)
+                  || els.me.querySelector(`.ddz-seat[data-seat="${seat}"]`);
+      if (!seatEl) return;
+      let el = seatEl.querySelector('.ddz-stamp');
+      if (!el){ el = document.createElement('div'); el.className='ddz-stamp'; seatEl.appendChild(el); }
+      el.className = 'ddz-stamp ' + cls;
+      el.textContent = text;
+      void el.offsetWidth;              // 复位动画
+      el.classList.add('show');
+      clearTimeout(el._t); el._t = setTimeout(()=>{ el.classList.remove('show'); }, 1350);
     }
 
     // ── F3 牌局直播: 把高光瞬间(定地主/炸弹/报单/终局)播报给聊天室(opts.onBeat 由 app.js 注入)。
@@ -543,7 +579,7 @@
       const isLord = st.landlord === seat;
       const role = st.landlord==null ? '' : (isLord?'地主':'农民');
       const isWin = st.phase==='over' && st.result && st.result.winners.includes(seat);
-      return `<div class="ddz-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLord?' landlord':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
+      return `<div class="ddz-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLord?' landlord':''}${isLord&&justCrowned?' just-crowned':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="ddz-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
         <div class="meta">
           <div class="nm">${escapeHtml(p.name)}</div>
@@ -558,6 +594,7 @@
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
       if (st.bottom && st.bottom.length){
+        els.bottom.className = 'ddz-bottom-cards' + (justCrowned ? ' reveal' : '');
         const lbl = document.createElement('div'); lbl.className='bc-lbl'; lbl.textContent='底牌';
         const row = document.createElement('div'); row.className='bc-row';
         st.bottom.forEach(c=>{
@@ -912,18 +949,25 @@
     }
 
     // ── 动作 ──
+    // 叫分→印章参数: prevMax>0 时的正叫是"抢", 首个正叫是"叫", 0 分是"不叫/不抢"
+    function bidVisual(seat, val, prevMax){
+      if (val>0){ const rob = prevMax>0;
+        bidStamp(seat, rob?'rob':'call', (rob?'抢 ':'叫 ')+val+'分'); say(seat, val+'分！'); }
+      else { bidStamp(seat, 'pass', prevMax>0?'不抢':'不叫'); say(seat, prevMax>0?'不抢':'不叫'); }
+    }
     function doCall(seat, val){
+      const prevMax = (st.bid && st.bid.max) || 0;
       if (isGuest){   // guest 只能替自己叫分, 回传给 host 裁决
         if (seat!==mySeat || awaitingHost) return;
         if (onAction) onAction({ action:'call', val });
-        say(seat, val>0?val+'分！':'不叫'); awaitingHost=true;
+        bidVisual(seat, val, prevMax); awaitingHost=true;
         setBanner(); renderCtrl(); toast('已叫分…'); return;
       }
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
-      if (val>0) say(seat, val+'分！'); else say(seat,'不叫');
       if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
+      bidVisual(seat, val, prevMax);   // 印章画在重绘后的座位上, 不被 renderSeats 清掉
     }
     function doPlay(){
       const cards = [...selected].map(findCardById).filter(Boolean);
@@ -1053,10 +1097,13 @@
       if (lastLord===null && st.landlord!=null){
         sfx('landlord');   // 地主刚揭晓: 号角定音
         const nm = st.players[st.landlord].name;
+        justCrowned = true;   // 本次重绘给地主席加皇冠砸落 + 底牌翻面动画
+        toast(`👑 ${nm} 当地主 · ${st.multiplier} 倍`);
         emitBeat({ type:'landlord', actor:nm, big:true, text:`🎪 ${nm} 抢到地主 · ${st.multiplier} 倍起` });
       }
       lastLord = st.landlord;
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
+      justCrowned = false;
       // guest 无本地引擎(host 托管超时); 折叠期间也不催我的回合(离席看聊天不该被自动过牌)
       armTurn((isGuest || minimized) ? null : onHumanTimeout);
       broadcast();                                // host: 推送每席脱敏快照
