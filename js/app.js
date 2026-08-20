@@ -7459,9 +7459,12 @@ async function leaveRoom(){
   const leavingTailPollTimer=_tailPollTimer;
   const leavingGtReapTimer=gtReapTimer;
   const leavingSongQueueTimer=_sqbTimer;
+  const leavingPresDebounce=_presDebounce;
+  const leavingTypingLightTimer=_typingLightTimer;
   const leavingEpoch=roomEpoch;
   roomEpoch++;
   heartbeatTimer=null; _tailPollTimer=null; gtReapTimer=null; _sqbTimer=null;
+  _presDebounce=null; _typingLightTimer=null;
   try{ _gtCleanupPlay(); }catch(_){ }
   try{ window.stopMoodWeather && window.stopMoodWeather(); }catch(_){}
   try{ _victim.clear(); _koCooldown.clear(); clearCounter(); _fuse.clear(); if(isStunned()) exitStun(); }catch(_){}   // 连击/合体/眩晕态随离房清零
@@ -7485,10 +7488,10 @@ async function leaveRoom(){
   try{ if(leavingSongQueueTimer){ clearInterval(leavingSongQueueTimer); } }catch(_){ }
   try{ if(leavingTailPollTimer){ clearInterval(leavingTailPollTimer); } }catch(_){ }
   try{ if(leavingGtReapTimer){ clearInterval(leavingGtReapTimer); } }catch(_){ }
+  try{ if(leavingPresDebounce){ clearTimeout(leavingPresDebounce); } }catch(_){ }
+  try{ if(leavingTypingLightTimer){ clearTimeout(leavingTypingLightTimer); } }catch(_){ }
   await leavePresence(leavingRoom, leavingHeartbeatTimer);
-  if(roomEpoch===leavingEpoch){
-    try{ if(_presDebounce){ clearTimeout(_presDebounce); _presDebounce=null; } }catch(_){ }
-    try{ if(_typingLightTimer){ clearTimeout(_typingLightTimer); _typingLightTimer=null; } }catch(_){ }
+  if(roomEpoch===leavingEpoch+1){
     try{ presenceMap.clear(); lastUsersSnapshot=[]; roomUserIdentity=new Map(); }catch(_){ }
   }
   if(leavingMsgChan){ try{ sb.removeChannel(leavingMsgChan); }catch(_){} }
