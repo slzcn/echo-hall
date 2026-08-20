@@ -307,6 +307,38 @@ for (const [name, globalName, factoryName, keys] of modules) {
   console.log('PASS lobby: prefetchSouls resolves late Supabase and reuses cache');
 })().catch(err => { console.error(err); process.exitCode = 1; });
 
+// 回归：灵魂缓存创建时当前房间尚未恢复，清理时必须读取最新房间并保护其缓存项。
+(async function testLateCurrentRoomForSoulsCache() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateRoom = null;
+  const store = lobby.createSoulsCacheStore({
+    getCurrentRoom: () => lateRoom,
+    getTtl: () => 100,
+    maxEntries: 2,
+  });
+  store.cache.old = { at: 100, p: Promise.resolve([]), pending: false };
+  store.cache.active = { at: 100, p: Promise.resolve([]), pending: false };
+  lateRoom = { id: 'active' };
+  store.prune(500);
+  if ('old' in store.cache || !('active' in store.cache)) {
+    throw new Error('lobby: souls cache did not resolve late current room during prune');
+  }
+  let resolvePending;
+  const pending = new Promise(resolve => { resolvePending = resolve; });
+  const stored = store.put('pending', pending);
+  store.cache.fresh = { at: Date.now(), p: Promise.resolve([]), pending: false };
+  store.prune(Date.now());
+  if (!('pending' in store.cache) || Object.keys(store.cache).length > 2) {
+    throw new Error('lobby: souls cache evicted pending entry or exceeded max size');
+  }
+  resolvePending([{ name: '迟到灵魂' }]);
+  const rows = await stored;
+  if (rows.length !== 1 || rows[0].name !== '迟到灵魂' || store.cache.pending.pending !== false || !Object.isFrozen(store)) {
+    throw new Error('lobby: souls cache put lifecycle mismatch');
+  }
+  console.log('PASS lobby: souls cache resolves late current room and preserves pending entries');
+})().catch(err => { console.error(err); process.exitCode = 1; });
+
 // 回归：fillRoomStats 创建时 sb 尚未 boot，调用时才读取最新客户端。
 (async function testLateSupabaseForFillStats() {
   const lobby = context.window.EH_LOBBY_MODULE;

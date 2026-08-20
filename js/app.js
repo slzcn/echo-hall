@@ -1396,29 +1396,15 @@ const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
 const _snapTailFlights=new Map(); // rid → {busy,pending}: 同房 single-flight；跨房互不阻塞
 const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(后台可配)
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
-const soulsCache={};           // rid → { at, p:Promise<souls[]>, pending } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
-const SOULS_CACHE_MAX=24;
-function pruneSoulsCache(now=Date.now()){
-  const currentRid=curRoom&&curRoom.id;
-  const candidates=[];
-  Object.entries(soulsCache).forEach(([rid,entry])=>{
-    if(!entry){ delete soulsCache[rid]; return; }
-    if(entry.pending || rid===currentRid) return; // 不打断在途请求，也不误删当前房
-    if(now-entry.at >= PREFETCH_TTL()) delete soulsCache[rid];
-    else candidates.push([rid,entry]);
-  });
-  const overflow=Object.keys(soulsCache).length-SOULS_CACHE_MAX;
-  if(overflow<=0) return;
-  candidates.sort((a,b)=>a[1].at-b[1].at);
-  candidates.slice(0,overflow).forEach(([rid])=>delete soulsCache[rid]);
-}
-function putSoulsCache(rid,p){
-  const entry={at:Date.now(),p:null,pending:true};
-  entry.p=Promise.resolve(p).finally(()=>{ entry.pending=false; pruneSoulsCache(); });
-  soulsCache[rid]=entry;
-  pruneSoulsCache(entry.at);
-  return entry.p;
-}
+// 灵魂列表预取缓存生命周期已迁入大厅模块；当前房间与 TTL 在每次清理时读取最新值。
+const _soulsCacheStore = window.EH_LOBBY_MODULE.createSoulsCacheStore({
+  getCurrentRoom:()=>curRoom,
+  getTtl:PREFETCH_TTL,
+  maxEntries:24,
+});
+const soulsCache=_soulsCacheStore.cache; // rid → { at, p:Promise<souls[]>, pending }
+const pruneSoulsCache=_soulsCacheStore.prune;
+const putSoulsCache=_soulsCacheStore.put;
 let roomSnap=null;            // 最近离开房间的DOM快照: {rid,html,oldestId,echoState,at} —— keep-alive 快速回房秒显
 // 把当前房消息 DOM 持久化到 localStorage → 下次【刷新】首帧静态回填(见页首防闪脚本读 eh_room_snap)。
 // 只留最近 ~30 条(localStorage 有 ~5MB 限, 且首帧只需铺满一屏), 太旧/太多截掉。节流调用。

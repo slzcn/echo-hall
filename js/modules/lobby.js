@@ -168,6 +168,43 @@
     };
   }
 
+  // 灵魂列表预取缓存：当前房间与 TTL 均在清理时通过 getter 读取，避免模块装配阶段捕获未恢复状态。
+  function createSoulsCacheStore(deps) {
+    deps = deps || {};
+    var getCurrentRoom = deps.getCurrentRoom;
+    var getTtl = deps.getTtl;
+    var maxEntries = Number.isFinite(+deps.maxEntries) ? +deps.maxEntries : 24;
+    if (typeof getCurrentRoom !== 'function' || typeof getTtl !== 'function') {
+      throw new TypeError('[EH_LOBBY] createSoulsCacheStore missing dependencies');
+    }
+    var cache = {};
+    function prune(now) {
+      now = Number.isFinite(+now) ? +now : Date.now();
+      var currentRoom = getCurrentRoom();
+      var currentRid = currentRoom && currentRoom.id;
+      var candidates = [];
+      Object.entries(cache).forEach(function (pair) {
+        var rid = pair[0], entry = pair[1];
+        if (!entry) { delete cache[rid]; return; }
+        if (entry.pending || rid === currentRid) return;
+        if (now - entry.at >= getTtl()) delete cache[rid];
+        else candidates.push([rid, entry]);
+      });
+      var overflow = Object.keys(cache).length - maxEntries;
+      if (overflow <= 0) return;
+      candidates.sort(function (a, b) { return a[1].at - b[1].at; });
+      candidates.slice(0, overflow).forEach(function (pair) { delete cache[pair[0]]; });
+    }
+    function put(rid, promise) {
+      var entry = { at: Date.now(), p: null, pending: true };
+      entry.p = Promise.resolve(promise).finally(function () { entry.pending = false; prune(); });
+      cache[rid] = entry;
+      prune(entry.at);
+      return entry.p;
+    }
+    return Object.freeze({ cache: cache, prune: prune, put: put });
+  }
+
   // 统一房间强调色：配置与房间主题解析器均通过 getter 延迟读取，兼容配置／运行时依赖晚于模块装配。
   function createRoomAccentC(deps) {
     deps = deps || {};
@@ -569,5 +606,5 @@
     return Object.freeze({ read: read, clear: clear });
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore });
 })(window);
