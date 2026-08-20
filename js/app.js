@@ -1416,8 +1416,7 @@ const renderLobby = window.EH_LOBBY_MODULE.createRenderLobby({
   showRetry:lobbyShowRetry,
 });
 const PREFETCH_N = ()=>TUNE('prefetchN',48);      // 预取条数(后台可配)
-let _snapTailBusy=false;   // refreshSnapshotTail 并发锁: 多个补拉触发点(缓存/订阅就绪/keep-alive)会并发,
-                           // 各自在对方 append 前查"消息在DOM吗"都判否→重复append(实测同条×3)。串行化根治。
+const _snapTailFlights=new Map(); // rid → {busy,pending}: 同房 single-flight；跨房互不阻塞
 const PREFETCH_TTL = ()=>TUNE('prefetchTtlMs',60000);  // 预取缓存有效期(后台可配)
 const prefetchCache={};        // rid → { at, p:Promise<rows> }
 const soulsCache={};           // rid → { at, p:Promise<souls[]> } —— 房间灵魂列表(含"后台是否开启"),列表页预取,进房秒用
@@ -1738,8 +1737,10 @@ async function prependMissingPublicHistory(room, rows){
 
 // 快照命中后后台补拉最新一屏，比对已在 DOM 的 mid，只 append 空窗期新增的消息(不重渲染整屏)
 async function refreshSnapshotTail(room, fillOlder=false){
-  if(_snapTailBusy) return;   // 并发锁: 多触发点同时补拉会各自漏判→重复append, 串行化
-  _snapTailBusy=true;
+  const rid=room&&room.id; if(!rid) return;
+  let flight=_snapTailFlights.get(rid);
+  if(flight&&flight.busy){ flight.pending=true; flight.fillOlder=flight.fillOlder||fillOlder; return; }
+  flight={busy:true,pending:false,fillOlder}; _snapTailFlights.set(rid,flight);
   try{
     const isPublic = room.kind==='official' || room.kind==='public';
     let rows;
@@ -1811,7 +1812,11 @@ async function refreshSnapshotTail(room, fillOlder=false){
     });
     if(near && appended){ ensureBottom(); trimStreamHead(); }   // 有补进新消息且原本贴底 → 精准落底 + 修剪
   }catch(e){ console.warn('refreshSnapshotTail', e); }
-  finally{ _snapTailBusy=false; }
+  finally{
+    const rerun=flight.pending, rerunOlder=flight.fillOlder;
+    _snapTailFlights.delete(rid);
+    if(rerun && curRoom && curRoom.id===rid) queueMicrotask(()=>refreshSnapshotTail(room,rerunOlder));
+  }
 }
 
 // 下拉刷新用: 真正"重刷聊天记录"——清空消息流 + 重置分页游标 + 全量重拉重渲(同进房首屏),
@@ -1887,6 +1892,11 @@ function dedupProjInHistory(rows){
 }
 
 async function loadHistory(first){
+  const _busyStream=$('#stream'); if(_busyStream) _busyStream.setAttribute('aria-busy','true');
+  try{ return await loadHistoryCore(first); }
+  finally{ if(_busyStream) _busyStream.setAttribute('aria-busy','false'); }
+}
+async function loadHistoryCore(first){
   const _enterRid = curRoom && curRoom.id;   // 进房时的房id: 拉取(await)期间可能切房, 渲染前校验防串房
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows; let _usedCache=false;   // 本次首屏是否用了预取缓存(用了→进房后补拉最新, 覆盖预取到进房的空窗新消息)

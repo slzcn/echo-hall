@@ -86,7 +86,10 @@
      2. 版本一致(常态) → 调 app.js 暴露的 EH_SOFT_REFRESH 软刷新(只重拉数据, 不重建应用), 近乎瞬时。
      3. 软刷新不可用(函数缺失/返回 ok:false/抛错) → 兜底硬 reload, 保证下拉永远有效。
      这样既拿到"不 reload 的秒刷", 又不牺牲版本自愈(有新版仍会整页换新)。 */
+  var refreshing = false;
   function doRefresh(){
+    if(refreshing) return;
+    refreshing = true;
     var soft = window.EH_SOFT_REFRESH;
     if(typeof soft !== 'function'){ hardReload(); return; }   // app.js 还没就绪 → 硬刷兜底
     var settled = false;
@@ -106,7 +109,7 @@
       Promise.resolve().then(function(){ return soft(); }).then(function(res){
         if(res && res.ok){
           var wait = Math.max(0, 400 - (Date.now() - t0));
-          setTimeout(reset, wait);       // 软刷成功: 收起指示器, 页面已就地更新
+          setTimeout(function(){ refreshing=false; reset(); }, wait);       // 软刷成功: 收起指示器, 页面已就地更新
         } else { hardReload(); }         // 入口态/未知场景 → 硬刷兜底
       }).catch(function(){ hardReload(); });
     }

@@ -140,6 +140,13 @@ else
   fail "语音上传跨房旅程失败"
 fi
 
+section "1a5. 数据刷新协调与历史状态"
+if node scripts/journey-refresh-coordination.js; then
+  pass "下拉 single-flight / 按房补拉 pending / 历史 busy-live / 旧实现反证通过"
+else
+  fail "数据刷新协调旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
