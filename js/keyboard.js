@@ -28,9 +28,10 @@
   const chatInput = () => document.getElementById('cin');
   const inHall = () => document.body.classList.contains('hall-on');
   // 触屏能力决定是否监听软键盘几何；pointer:fine 不能硬否决（折叠屏/混合设备会这样上报）。
-  // 但无信号百分比估算只给 coarse 主触控设备，避免平板接硬件键盘时凭 focus 误缩 39%。
+  // 无信号百分比估算给“无悬停的触摸设备”：折叠屏混合指针可能上报 fine，不能因此丢掉 IME 兜底；
+  // 有 hover 的硬件键盘设备仍不估算，避免仅因 focus 误缩 39%。
   const hasTouch = () => (navigator.maxTouchPoints||0)>0 || window.matchMedia('(pointer:coarse)').matches;
-  const allowNoSignalEstimate = () => window.matchMedia('(hover:none) and (pointer:coarse)').matches;
+  const allowNoSignalEstimate = () => hasTouch() && window.matchMedia('(hover:none)').matches;
   const usesSoftKeyboardLayout = () => hasTouch();
 
   function visibleHeight() {
