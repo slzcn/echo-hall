@@ -49,4 +49,47 @@ ok(/function _soulMsgKnown\(mid\)\{[\s\S]*?_soulQPending\.has\(mid\)[\s\S]*?_sou
 const lhOld = lh.replace(/head\.forEach\(m=>\{ if\(m && m\.id!=null && _soulMsgKnown\(m\.id\)\) return; /, 'head.forEach(m=>{ ');
 ok(!/head\.forEach\(m=>\{ if\(m && m\.id!=null && _soulMsgKnown/.test(lhOld), '旧实现反证: 去掉守卫后首屏无 mid 判重(会重复渲染)');
 
-console.log('✅ 聊天消息重复显示旅程通过：快照补拉 + loadHistoryCore 首屏/idle 两路均按 mid 二次判重，旧竞态实现必红');
+// ── 治本层: 重复气泡"清道夫"(移除已材料化的重复, 而非只 prevent-add) ──────────────
+// prevent-add 的盲区: 各路径只在 append 前判重, 但没有任何一处能【移除】已落进 DOM 的重复。
+// 快照(keep-alive roomSnap / localStorage eh_room_snap)是"原样 innerHTML 回填", 一旦某次竞态
+// 双渲染, 重复被烘焙进快照并每轮 persistRoomSnap 自我复制→prevent-add 永远清不掉。dedupStreamByMid
+// 在【还原后】和【序列化前】各清扫一次: 既修当前屏可见双份, 又自愈已污染的 localStorage 快照。
+ok(/function dedupStreamByMid\(root\)\{/.test(src), '存在集中式重复气泡清道夫 dedupStreamByMid(移除已材料化的重复, 补 prevent-add 盲区)');
+ok(/:scope > \[data-mid\]/.test(src), 'dedupStreamByMid 只扫 stream 直接子节点(:scope>)——避免误删 .echo-bar 等嵌套同 mid 元素');
+ok(/mid\.startsWith\('local_'\)/.test(src), 'dedupStreamByMid 跳过乐观上屏的 local_ 临时 id(尚未回填真 id, 非重复)');
+// 序列化前清扫 = 停止把重复烘焙进快照 + 自愈已污染的 localStorage
+const psStart = src.indexOf('function persistRoomSnap');
+const ps = src.slice(psStart, psStart + 900);
+ok(/dedupStreamByMid\(st\)[\s\S]*?st\.querySelectorAll\('\.msg'\)/.test(ps),
+  'persistRoomSnap 序列化前先 dedupStreamByMid(不再把重复气泡写进快照, 自愈 localStorage)');
+// keep-alive 快照还原后立刻清扫
+ok(/innerHTML=_snapHtml;[\s\S]{0,160}dedupStreamByMid\(\$\('#stream'\)\)/.test(src),
+  'snapHit 还原快照后立刻 dedupStreamByMid(keep-alive 回房烘焙的重复即时清掉)');
+
+// 算法自证: 同 mid 只留内容最完整(文字最长)的一个; local_ 与嵌套元素不动
+function simDedup(nodes){                 // nodes: [{mid, len, top}] top=是否 stream 直接子
+  const seen=new Map(); const kept=[];
+  for(const n of nodes){
+    if(!n.top) { kept.push(n); continue; }              // 嵌套(:scope> 不命中)不参与
+    if(!n.mid || String(n.mid).startsWith('local_')){ kept.push(n); continue; }
+    const prev=seen.get(n.mid);
+    if(!prev){ seen.set(n.mid,n); kept.push(n); continue; }
+    if(n.len>prev.len){ kept.splice(kept.indexOf(prev),1); seen.set(n.mid,n); kept.push(n); }
+    // 否则丢弃 n(不 push)
+  }
+  return kept;
+}
+const after = simDedup([
+  {mid:'1418', len:42, top:true},   // 灵魂那条
+  {mid:'1418', len:42, top:true},   // 竞态双渲染的重复 → 应被移除
+  {mid:'1418', len:0,  top:false},  // .echo-bar 嵌套同 mid → 保留(非顶层)
+  {mid:'local_x', len:5, top:true}, // 乐观上屏临时 → 保留
+  {mid:'local_x', len:5, top:true}, // 临时 id 不判重 → 保留
+  {mid:'1500', len:10, top:true},
+]);
+ok(after.filter(n=>n.mid==='1418'&&n.top).length===1, '算法: 顶层同 mid 双份塌缩为一(留一条)');
+ok(after.filter(n=>n.mid==='1418'&&!n.top).length===1, '算法: 嵌套同 mid(.echo-bar)不受影响');
+ok(after.filter(n=>n.mid==='local_x').length===2, '算法: local_ 临时 id 不参与去重(两条都在)');
+ok(after.length===5, '算法: 6 节点仅移除 1 个真重复');
+
+console.log('✅ 聊天消息重复显示旅程通过：prevent-add(快照补拉 + loadHistoryCore 两路 mid 判重) + 治本清道夫(还原后/序列化前移除已材料化重复), 旧竞态实现必红');

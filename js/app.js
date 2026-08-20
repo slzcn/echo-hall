@@ -1420,6 +1420,7 @@ function persistRoomSnap(){
     try{
       if(!curRoom) return;
       const st=$('#stream'); if(!st) return;
+      try{ dedupStreamByMid(st); }catch(_){}   // 序列化前先清扫重复气泡: 既修当前屏可见的双份, 又杜绝把重复烘焙进快照(自愈 localStorage)
       const msgs=[...st.querySelectorAll('.msg')];
       const tail=msgs.slice(-30);
       const html=tail.map(m=>m.outerHTML).join('');
@@ -1429,6 +1430,28 @@ function persistRoomSnap(){
   };
   if(window.requestIdleCallback) requestIdleCallback(doWrite, { timeout:2000 });
   else setTimeout(doWrite, 0);
+}
+// ★重复气泡"清道夫"(治本, 修"同一条聊天记录冒两遍"): 各渲染路径都只在 append 前按 data-mid 防重
+//   (prevent-add), 但没有任何一处能【移除】已经落进 DOM 的重复节点。而快照回填是"原样注入 HTML"——
+//   keep-alive 的 roomSnap(内存)、刷新首帧的 localStorage eh_room_snap、页首防闪脚本, 都直接
+//   innerHTML=snap。一旦某次竞态双渲染, 重复就被烘焙进快照, 之后每次 persistRoomSnap 再把它
+//   序列化回去→自我复制, prevent-add 永远清不掉(它早在还原后的 DOM 里)。这里做一次幂等清扫:
+//   #stream 直接子节点中同 data-mid 只留一个(保内容最完整/文字最长的那个), 其余移除。
+function dedupStreamByMid(root){
+  const st = root || $('#stream'); if(!st) return 0;
+  const seen = new Map();   // mid -> 已保留的节点
+  let removed = 0;
+  // 只看 stream 直接子节点(顶层气泡): .echo-bar 等嵌套元素也带同一 data-mid, 用 parentElement 挡掉防误删
+  st.querySelectorAll(':scope > [data-mid]').forEach(el=>{
+    const mid = String(el.dataset.mid||'');
+    if(!mid || mid.startsWith('local_')) return;   // 乐观上屏的临时 id 尚未回填真 id, 不参与
+    const prev = seen.get(mid);
+    if(!prev){ seen.set(mid, el); return; }
+    const lenOf = n => ((n.querySelector('.txt')||n).textContent||'').trim().length;
+    if(lenOf(el) > lenOf(prev)){ prev.remove(); seen.set(mid, el); } else { el.remove(); }
+    removed++;
+  });
+  return removed;
 }
 // ============ 刷新停留原位 (scroll anchor) ============
 // 需求: "在哪刷新, 就停留在什么位置, 只刷新数据, 不改变停留位置"。默认刷新会跳回最新(底部),
@@ -1590,6 +1613,7 @@ async function enterRoom(room){
     let _snapHtml = roomSnap.html;
     try{ const _d=document.createElement('div'); _d.innerHTML=_snapHtml; _d.querySelectorAll('.entry-banner,.sysmsg').forEach(e=>e.remove()); _snapHtml=_d.innerHTML; }catch(_){ _ehCatch('enterRoom',_); }
     $('#stream').innerHTML=_snapHtml; oldestId=roomSnap.oldestId; echoState=roomSnap.echoState||{};
+    try{ dedupStreamByMid($('#stream')); }catch(_){}   // keep-alive 快照可能烘焙了重复气泡, 还原后立刻清扫一次
     $('#presence').innerHTML=presenceSkeleton((room.knownOnline!=null?room.knownOnline+1:3)); $('#hallCnt').innerHTML=optimisticCnt(room);
     renderPresenceSnapshot(room);   // 乐观铺光墙(命中快照则秒显旧头像, 不等后面的网络await)
     goScene('hall'); setConn(false,'连接中'); scrollStream(); applyRoomTheme(room); startRoomBGM(room);
