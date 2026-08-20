@@ -27,9 +27,11 @@
   const hall = () => document.getElementById('hall');
   const chatInput = () => document.getElementById('cin');
   const inHall = () => document.body.classList.contains('hall-on');
-  // 软键盘控制器只服务以触屏为主的设备。PC 聚焦输入框不会弹 IME，
-  // “视口无变化”是正常现象，不能误判为小米 WebView 键盘信号丢失。
-  const usesSoftKeyboardLayout = () => window.matchMedia('(hover:none) and (pointer:coarse)').matches;
+  // 触屏能力决定是否监听软键盘几何；pointer:fine 不能硬否决（折叠屏/混合设备会这样上报）。
+  // 但无信号百分比估算只给 coarse 主触控设备，避免平板接硬件键盘时凭 focus 误缩 39%。
+  const hasTouch = () => (navigator.maxTouchPoints||0)>0 || window.matchMedia('(pointer:coarse)').matches;
+  const allowNoSignalEstimate = () => window.matchMedia('(hover:none) and (pointer:coarse)').matches;
+  const usesSoftKeyboardLayout = () => hasTouch();
 
   function visibleHeight() {
     // ★V56（对齐私信稳定方案 dm.js._kbHeightRaw）：键盘上方可视高 = min(innerHeight, visualViewport.height)。
@@ -231,7 +233,7 @@
         const changed = (Math.abs(curVv - signalBaseline.vvH) > 1)
           || (vkGeomHits > signalBaseline.vkHits)
           || (Math.abs(window.innerHeight - signalBaseline.winH) > 1);
-        if (!changed) {
+        if (!changed && allowNoSignalEstimate()) {
           // ★V40：优先直读 VirtualKeyboard.boundingRect，拿不到再看 env(keyboard-inset-height)，都拿不到才落到 0.33 估算。
           let realKbH = 0;
           try {

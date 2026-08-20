@@ -161,6 +161,13 @@ else
   fail "弹窗无障碍旅程失败"
 fi
 
+section "1a8. 混合设备键盘判断"
+if node scripts/journey-kb-mixed-input.js; then
+  pass "fine-pointer 真实几何 / 硬件键盘免误估 / coarse fallback / 旧实现反证通过"
+else
+  fail "混合设备键盘旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────
