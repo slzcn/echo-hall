@@ -1681,18 +1681,23 @@ async function enterRoom(room){
 // 会停在中途(常卡在"你进入房间"提示上方)。用多帧 + 递增延迟反复贴底, 直到高度稳定。
 function ensureBottom(persistent){
   const s=$('#stream'); if(!s) return;
-  // persistent=true(软刷新用): 更久更稳地贴底——分批渲染/神曲卡/图片会中途暂时稳定再继续长高,
-  //   误判"稳定"就停会导致停在中间/回弹。改成"连续 stableNeed 次高度不变"才认定真稳, 且总时长更长。
-  const maxTries = persistent ? 30 : 8;
+  // 进房/刷新时必须硬定位，不使用 smooth：整个 #stream 的 scrollHeight 已包含
+  // 聊天气泡、系统行、互动行、游戏卡片和神曲卡片，不能只按 .msg 推算最新位置。
+  // 异步内容会继续撑高容器，连续稳定检查后才结束，避免先停在临时高度再跳一次。
+  const maxTries = persistent ? 36 : 18;
   const gap = persistent ? 100 : 120;
-  const stableNeed = persistent ? 4 : 1;   // 连续几次高度不变才算稳
+  const stableNeed = persistent ? 5 : 3;
   let lastH=-1, tries=0, stable=0;
   const kick=()=>{
-    s.scrollTop=s.scrollHeight; hideToLatest();
-    if(s.scrollHeight===lastH) stable++; else { stable=0; lastH=s.scrollHeight; }
+    if(!s.isConnected) return;
+    s.scrollTop=s.scrollHeight;
+    hideToLatest();
+    const h=s.scrollHeight;
+    if(h===lastH) stable++; else { stable=0; lastH=h; }
     if(stable<stableNeed && tries<maxTries){ tries++; setTimeout(kick, gap); }
   };
-  requestAnimationFrame(kick);
+  // 等本轮布局提交后再开始硬落底，避免首个中间态滚动暴露给用户。
+  requestAnimationFrame(()=>requestAnimationFrame(kick));
 }
 
 // 双击房间名 → 软刷新: 只重拉当前房消息数据 + 重渲染 + 回到最新, 不刷新整个页面。
