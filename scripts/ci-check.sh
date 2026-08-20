@@ -175,6 +175,13 @@ else
   fail "联机牌局动作 pending 旅程失败"
 fi
 
+section "1a10. 房间订阅代次"
+if node scripts/journey-subscription-generation.js; then
+  pass "消息 / presence / 牌桌旧调用失效 / 局部发布 / 旧实现反证通过"
+else
+  fail "房间订阅代次旅程失败"
+fi
+
 # ─────────────────────────────────────────
 # 1b. 主聊天输入法行为回归
 # ─────────────────────────────────────────

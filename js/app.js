@@ -2078,10 +2078,13 @@ function addLoadMore(top){
 
 // ---- Realtime 订阅新消息 + echo ----
 async function subscribeMessages(rid){
-  // 先 await 清旧 channel, 根治旧房推送串进新房的竞态
-  if(msgChan){ try{ await sb.removeChannel(msgChan); }catch(_){ _ehCatch('subscribeMessages',_); } msgChan=null; }
-  if(_tailPollTimer){ clearInterval(_tailPollTimer); _tailPollTimer=null; }   // 清旧房的兜底轮询
-  msgChan = sb.channel('room-msg:'+rid)
+  const setupEpoch=roomEpoch;
+  const oldMsgChan=msgChan, oldTailPoll=_tailPollTimer;
+  msgChan=null; _tailPollTimer=null;
+  if(oldMsgChan){ try{ await sb.removeChannel(oldMsgChan); }catch(_){ _ehCatch('subscribeMessages',_); } }
+  if(oldTailPoll) clearInterval(oldTailPoll);
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==rid) return;
+  const nextMsgChan = sb.channel('room-msg:'+rid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'eh_messages',filter:'room_id=eq.'+rid}, p=>{
       const m=p.new;
       // ★防串房: 双保险 — 既 await removeChannel 也已根治, 仍保留 rid 匹配 防奇奇怪怪注入
@@ -2227,6 +2230,7 @@ async function subscribeMessages(rid){
     // 连接指示灯由 realtime 通道真实状态驱动(而非"一批一次性查询有没有 resolve")。
     // SUBSCRIBED=真的连上了; 掉线/出错/超时→回落"连接中",Supabase 会自动重连,重连成功再置亮。
     .subscribe((status)=>{
+      if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==rid){ try{ sb.removeChannel(nextMsgChan); }catch(_){} return; }
       if(status==='SUBSCRIBED'){
         setConn(true);
         // ★关键: 订阅"真正就绪"后补拉一次最新, 兜住"loadHistory 拉完 → 订阅就绪"之间的空窗消息
@@ -2242,7 +2246,8 @@ async function subscribeMessages(rid){
   //   → 灵魂冷不丁发的消息落库但不上屏, 必须退出再进才看到(本次修的 bug)。
   //   refreshSnapshotTail 自带并发锁 + 只 append 比 DOM 更新的行 + 贴底才滚, 周期跑零副作用。
   //   页面 hidden 时跳过(省电; 回前台的 visibilitychange 已单独补一次)。
-  if(_tailPollTimer){ clearInterval(_tailPollTimer); }
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==rid){ try{ sb.removeChannel(nextMsgChan); }catch(_){} return; }
+  msgChan=nextMsgChan;
   _tailPollTimer = setInterval(()=>{
     try{
       if(document.hidden) return;
@@ -2257,19 +2262,25 @@ async function subscribeMessages(rid){
 const ONLINE_WINDOW = ()=>TUNE('onlineWindowMs',35000);   // 在线判定窗口(后台可配)
 let heartbeatTimer = null;
 async function setupPresence(room){
-  if(presChan){ await sb.removeChannel(presChan); presChan=null; }
-  clearInterval(heartbeatTimer);
+  const setupEpoch=roomEpoch;
+  const oldPresChan=presChan, oldHeartbeat=heartbeatTimer;
+  presChan=null; heartbeatTimer=null;
+  if(oldPresChan){ try{ await sb.removeChannel(oldPresChan); }catch(_){} }
+  if(oldHeartbeat) clearInterval(oldHeartbeat);
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
   // 写自己的心跳。★不要 await：beat 的 upsert 若卡住/超时会把后面的 refreshPresence 也堵死,
   //   导致"N 人在线"文字永远刷不出来、卡在"连接中…"(led 走另一条路已亮,故只文字卡)。
   //   心跳成功与否不该阻塞人数显示 → fire-and-forget,失败自己 warn。
   beat().catch(e=>console.warn('beat', e));
   // 订阅本房 presence 变化 → 刷新光墙
-  presChan = sb.channel('room-pres:'+room.id)
+  const nextPresChan = sb.channel('room-pres:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_presence',filter:'room_id=eq.'+room.id}, ()=>schedulePresenceRefresh())
     .subscribe();
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id){ try{ sb.removeChannel(nextPresChan); }catch(_){} return; }
+  presChan=nextPresChan;
   // 人数/光墙立即刷(不等心跳)。refreshPresence 自己兜底把"我"算进在线, 至少显示 1 人。
   await refreshPresence().catch(e=>console.warn('refreshPresence', e));
-  // 心跳 + 清理定时器
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
   heartbeatTimer = setInterval(async()=>{ beat().catch(()=>{}); refreshPresence().catch(()=>{}); }, 15000);
 }
 
@@ -2277,16 +2288,20 @@ async function setupPresence(room){
 // 座位/局态存 eh_game_tables, 一切写走 eh_gt_* RPC。牌桌卡是一条 kind:'game' 消息(text=game|gt|id|game),
 // 卡的座位按【实时 table 行】渲染: realtime 推 → gtRenderCard 找到 [data-gt-id] 就地重绘(不新增监听)。
 async function setupGameTables(room){
-  if(gtChan){ try{ await sb.removeChannel(gtChan); }catch(_){} gtChan=null; }
-  if(gtReapTimer){ clearInterval(gtReapTimer); gtReapTimer=null; }
+  const setupEpoch=roomEpoch;
+  const oldGtChan=gtChan, oldReapTimer=gtReapTimer;
+  gtChan=null; gtReapTimer=null;
+  if(oldGtChan){ try{ await sb.removeChannel(oldGtChan); }catch(_){} }
+  if(oldReapTimer) clearInterval(oldReapTimer);
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
   _gtCleanupPlay();
   _gtTables.clear();
   // 「5分钟没人玩自动解散」: 进房先回收一次本房陈旧桌, 再每 2min 扫一次。
   //   reap 只关 5min 无活动的僵尸桌(幂等安全), 关掉即经 realtime 把牌桌卡翻成"已散桌"。
   const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){} };
   reap();
-  gtReapTimer = setInterval(reap, 120000);
-  gtChan = sb.channel('room-gt:'+room.id)
+  const nextReapTimer = setInterval(reap, 120000);
+  const nextGtChan = sb.channel('room-gt:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_game_tables',filter:'room_id=eq.'+room.id}, p=>{
       const row=p.new; if(!row || !curRoom || curRoom.id!==room.id) return;
       const prev=_gtTables.get(row.id);
@@ -2311,7 +2326,10 @@ async function setupGameTables(room){
         try{ toast('房主已散桌'); }catch(_){}
       }
     }).subscribe();
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id){ clearInterval(nextReapTimer); try{ sb.removeChannel(nextGtChan); }catch(_){} return; }
+  gtReapTimer=nextReapTimer; gtChan=nextGtChan;
   try{ const {data}=await sb.from('eh_game_tables').select('*').eq('room_id',room.id).in('status',['lobby','playing']);
+    if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
     (data||[]).forEach(r=>{ _gtTables.set(r.id,r); gtRenderCard(r); }); }catch(_){}
 }
 function gtCtx(row){
