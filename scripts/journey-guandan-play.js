@@ -269,7 +269,10 @@ assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..
 assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌自适应)');
 assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutRow 按可用宽算步距(牌多自动收紧, 每排排满)');
 assert(/\.gd-hand-row\{[^}]*flex-wrap:nowrap/.test(ui), '每排 flex-wrap:nowrap(行内不换行, 杜绝布局失控断裂)');
-assert(/function renderHand\(\)[\s\S]{0,1500}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
+assert(/function renderHand\(\)[\s\S]{0,2200}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
+// (Batch3) 增量护栏: 手牌按签名重建 —— id序/选中/回合锁/理牌态/级牌/发牌帧未变即跳过, 免每秒重绘的回流与打断拖排
+assert(/const sig = \(myTurn\?1:0\)[\s\S]{0,240}\[\.\.\.selected\]\.sort\(\)\.join/.test(ui) && /if \(sig === lastHandSig\) return;/.test(ui),
+  'guandan renderHand 按签名跳过重建(手牌/选中/回合锁/理牌态/级牌/发牌帧 全未变则不重建)');
 assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
   'resize 时重排手牌且关桌时解绑(转屏/分屏自适应, 不泄漏监听)');
 // (10b) 划选: 指针涂抹式多选(治"不能划过连选")

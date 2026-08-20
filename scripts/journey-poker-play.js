@@ -167,6 +167,15 @@ assert(/pk-win-card/.test(ui) && /Eval\.bestFive/.test(ui), '赢家成手 5 张�
 assert(/pk-mini-hn/.test(ui) && /rv\.hand/.test(ui), '摊牌台面直接标各家成手牌型(pk-mini-hn 读 reveal.hand)');
 assert(/poker-eval\.js\?v=/.test(html), 'index.html poker-eval 带 ?v= 指纹(bestFive 改动需刷新缓存)');
 
+// ── (Batch3) 增量护栏: 公共牌区 / 我的底牌条 按签名跳过重建 ──
+// 街与街之间(等各家行动, 每秒一次重绘)公共牌与底牌都静止, 不必反复 innerHTML 重建; 发新牌/摊牌/需跟额变化才重建。
+assert(/if \(sig === lastBoardSig\) return;/.test(ui) && /const sig = st\.board\.map\(c=>c\.suit\+c\.rank\)/.test(ui),
+  'renderBoard 按签名跳过重建(公共牌 id 序 + 摊牌高亮态未变则不重建, 逐张翻牌/金框不受影响)');
+assert(/if \(meSig === lastMeSig\) return;/.test(ui) && /const meSig = st\.phase\+'\|'\+\(mine\?1:0\)/.test(ui),
+  'renderMe 按签名跳过重建(阶段/轮我/摊牌/弃全下/筹码/庄位/需跟额/发牌帧/底牌 全未变则不重建)');
+// 护栏不得越权: board 签名只读 result.winnersBySeat/board(公开), me 签名只读本人 hole —— 不碰别家底牌/局中快照, 守脱敏命门
+assert(!/lastBoardSig[\s\S]{0,400}reveal\[(?!seat)/.test(ui), 'renderBoard 签名不读别家 reveal(守脱敏命门)');
+
 // index.html 已挂 4 个扑克脚本 + 版本指纹
 assert(/poker-eval\.js\?v=/.test(html) && /poker-engine\.js\?v=/.test(html) && /poker-ai\.js\?v=/.test(html) && /poker-ui\.js\?v=/.test(html),
   'index.html 挂齐 poker-eval/engine/ai/ui 四脚本(带 ?v= 指纹)');

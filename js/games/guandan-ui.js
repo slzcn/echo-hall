@@ -729,15 +729,23 @@
       }
       return [[], Rules.sortHand(hand, st.level)];
     }
+    let lastHandSig = '';
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
+      const [top, bot] = orderedRows();
+      // 增量护栏(同斗地主): 手牌两排 id / 选中集 / 回合锁 / 理牌态 / 级牌 / 发牌帧 全未变 → 跳过重建。
+      //   免每秒一次重绘的 innerHTML churn + 两排 layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
+      //   任一变化改签名 → 照常整段重建, 与旧逻辑逐字节一致; resize 另走 layoutHand 兜底不受影响。
+      const sig = (myTurn?1:0)+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
+        + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',')+'|'+[...selected].sort().join(',');
+      if (sig === lastHandSig) return;
+      lastHandSig = sig;
       els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
       const rowTop = document.createElement('div'); rowTop.className='gd-hand-row top'; rowTop.dataset.row='0';
       const rowBot = document.createElement('div'); rowBot.className='gd-hand-row bot'; rowBot.dataset.row='1';
       els.hand.appendChild(rowTop); els.hand.appendChild(rowBot);
-      const [top, bot] = orderedRows();
       let idx = 0;   // 全局阅读序(上排先, 下排后): 供划选区间连选按 data-idx 补齐
       [[top, rowTop], [bot, rowBot]].forEach(([cards, container])=>{
         cards.forEach(card=>{

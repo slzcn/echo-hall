@@ -696,12 +696,21 @@
       const hand = st.players[mySeat].hand;
       return Deck.sortHand ? Deck.sortHand(hand) : hand;
     }
+    let lastHandSig = '';
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
+      const order = handOrder();
+      // 增量护栏: 手牌 id / 选中集 / 回合锁 / 发牌帧 全未变 → 跳过整段重建。
+      //   省掉对家/AI 回合(每秒一次)重绘里的 innerHTML churn + layoutHand 强制回流;
+      //   更关键的是: 我正涂抹选牌时若别家触发 renderAll, 不再把我脚下的手牌 DOM 拆了重建(打断连选)。
+      //   任一变化都会改签名 → 照常整段重建, 输出与旧逻辑逐字节一致。窗口 resize 另有 layoutHand 兜底, 不受影响。
+      const sig = (myTurn?1:0)+'|'+(dealAnim?1:0)+'|'+order.map(c=>c.id).join(',')+'|'+[...selected].sort().join(',');
+      if (sig === lastHandSig) return;
+      lastHandSig = sig;
       els.hand.className = 'ddz-hand' + (myTurn?'':' locked');
       els.hand.innerHTML = '';
       const deal = dealAnim; dealAnim = false;   // 只在发牌那一帧错峰入场, 之后普通重绘不动画
-      handOrder().forEach((card, idx)=>{
+      order.forEach((card, idx)=>{
         const el = cardEl(card);
         el.dataset.id = card.id;
         el.dataset.idx = idx;               // 划选连选按 idx 补齐整段(见 paintTo)

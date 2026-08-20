@@ -339,6 +339,7 @@
     let aiTimer=null, ringRAF=null, streetTimer=null, turnStart=0, turnDur=0;
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
+    let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
     const room = document.createElement('div'); room.className='pk-room';
@@ -538,6 +539,14 @@
     }
 
     function renderBoard(){
+      // 增量护栏: 公共牌 id 序 + 摊牌高亮态 全未变 → 跳过整段重建。
+      //   街与街之间(等各家行动, 每秒一次重绘)公共牌是静止的, 不必反复 innerHTML 重建 5 张 DOM。
+      //   发新牌(board 变长)/进入摊牌(highlight 态变)都会改签名 → 照常重建, 逐张翻牌与金框高亮不受影响。
+      const showHi = st.phase==='over' && st.result && st.result.wentToShowdown;
+      const sig = st.board.map(c=>c.suit+c.rank).join(',')+'|'+(showHi?'hi':'')+'|'
+        + (st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'');
+      if (sig === lastBoardSig) return;
+      lastBoardSig = sig;
       const grew = st.board.length > lastBoardLen;
       els.board.innerHTML='';
       st.board.forEach((c,i)=>{
@@ -644,6 +653,16 @@
       const mine = st.toAct===mySeat && st.phase!=='over';
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[mySeat]);
       const holeCards = (showdown ? st.result.reveal[mySeat].hole.map(idCard) : p.hole);
+      // 增量护栏: 底牌条只在 阶段/是否轮我/摊牌/弃全下/筹码/庄位/需跟额/发牌帧/底牌 变化时重建。
+      //   等别家行动时(每秒重绘)这些全不变 → 跳过, 免 innerHTML 重建 + 免每帧读牌算 hint。任一变化改签名照常重建。
+      let callAmt=-1;
+      if (mine){ try{ callAmt = Engine.legalActions(st, mySeat).callAmount; }catch(_){} }
+      const meSig = st.phase+'|'+(mine?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
+        +'|'+(st.button===mySeat?1:0)+'|'+callAmt+'|'+(dealAnim?1:0)
+        +'|'+holeCards.map(c=>c?(c.suit+''+c.rank):'x').join(',')
+        +'|'+(st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'');
+      if (meSig === lastMeSig) return;
+      lastMeSig = meSig;
       let hint='';
       if (st.phase==='seating'){ hint='🪑 等灵魂入座后开牌…'; }
       else if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
@@ -1005,7 +1024,7 @@
       button = (button+1)%n;
       handNo++;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
       if (aliveSeats().length<2){}   // newHand 已兜底重新带入
@@ -1017,7 +1036,7 @@
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -1047,7 +1066,7 @@
       if (!room.isConnected) return;
       introSeating = false; arrived = null; lastSeated = -1;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1;
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -1078,7 +1097,7 @@
       lastSnap = snap; handNo = snap.handNo || 0;
       if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补
         const ov=els.felt.querySelector('.pk-over'); if(ov) ov.remove();
-        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; myHole=[];
+        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       }
       rebuildFromSnap(snap);
       if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();
