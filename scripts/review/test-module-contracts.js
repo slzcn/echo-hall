@@ -93,6 +93,37 @@ console.log('PASS lobby: optimisticCnt pure helper is exported');
   console.log('PASS lobby: room accent resolves late config and theme dependency');
 })();
 
+// 回归：灵魂取色工厂创建时配置与当前房间尚未就绪，调用时必须读取最新依赖。
+(function testLateRuntimeForSoulThemeColor() {
+  const lobby = context.window.EH_LOBBY_MODULE;
+  let lateConfig = null, lateRoom = null;
+  const soulThemeColor = lobby.createSoulThemeColor({
+    getConfig: () => lateConfig,
+    getRoom: () => lateRoom,
+    roomAccentC: room => room && room.kind === 'public' ? '#667788' : '#112233',
+  });
+  if (soulThemeColor('', undefined, '迟到灵魂') !== '#0ABAB5') {
+    throw new Error('lobby: soul theme before config and room ready must use safe default');
+  }
+  lateConfig = { soulColors: { 迟到灵魂: '#445566' }, roomKindC: { official: '#102030' } };
+  if (soulThemeColor('', undefined, { name: '迟到灵魂' }) !== '#445566') {
+    throw new Error('lobby: soul theme did not resolve late soul color config');
+  }
+  lateConfig = { roomKindC: { official: '#102030' } };
+  lateRoom = { id: 'late-room', kind: 'public' };
+  if (soulThemeColor('', undefined, '无专属色') !== '#667788') {
+    throw new Error('lobby: soul theme did not resolve late current room');
+  }
+  if (soulThemeColor('#ABCDEF', '#010101', '无专属色') !== '#ABCDEF') {
+    throw new Error('lobby: soul theme custom color priority mismatch');
+  }
+  lateRoom = null;
+  if (soulThemeColor('', '#010101', '无专属色') !== '#010101') {
+    throw new Error('lobby: soul theme explicit fallback mismatch');
+  }
+  console.log('PASS lobby: soul theme resolves late config and current room dependencies');
+})();
+
 // 回归：查询超时实现可能晚于大厅模块装配；未就绪时安全失败，就绪后读取最新函数并保留超时兜底。
 (async function testLateRuntimeForRoomsQuery() {
   const lobby = context.window.EH_LOBBY_MODULE;

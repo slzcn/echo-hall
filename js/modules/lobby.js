@@ -179,6 +179,36 @@
     };
   }
 
+  // 灵魂取色：自定义色 > 配置中的灵魂专属色 > 当前房间强调色 > 官方色兜底。
+  // 配置和当前房间均通过 getter 延迟读取，兼容身份／房间状态晚于模块装配。
+  function createSoulThemeColor(deps) {
+    deps = deps || {};
+    var getConfig = deps.getConfig;
+    var getRoom = deps.getRoom;
+    var roomAccentC = deps.roomAccentC;
+    if (typeof getConfig !== 'function' || typeof getRoom !== 'function' || typeof roomAccentC !== 'function') {
+      throw new TypeError('[EH_LOBBY] createSoulThemeColor missing dependencies');
+    }
+    return function soulThemeColor(custom, fallback, name) {
+      if (typeof custom === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
+      var cfg = getConfig() || {};
+      try {
+        var soulName = typeof name === 'string' ? name : name && name.name || '';
+        var soulColors = cfg.soulColors || {};
+        if (soulName && soulColors[soulName] && /^#[0-9a-fA-F]{3,8}$/.test(soulColors[soulName])) return soulColors[soulName];
+      } catch (e) {}
+      try {
+        var room = getRoom();
+        if (room && room.kind) {
+          var accent = roomAccentC(room);
+          if (accent) return accent;
+        }
+      } catch (e) {}
+      var kindColors = cfg.roomKindC || { official: '#0ABAB5' };
+      return fallback || kindColors.official || '#0ABAB5';
+    };
+  }
+
   // 大厅房间查询超时包装：withTimeout 通过 getter 在调用时读取，避免模块装配阶段捕获尚未就绪的实现。
   function createRoomsQuery(deps) {
     deps = deps || {};
@@ -490,5 +520,5 @@
     };
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomAccentC: createRoomAccentC, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards });
 })(window);

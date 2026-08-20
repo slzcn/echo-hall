@@ -1293,35 +1293,17 @@ const RESONANCE_THRESHOLD = ()=>TUNE('resonanceThreshold',5);   // 共鸣触发�
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
 // ============ 大厅渲染 ============
-const OFFICIAL_FALLBACK_C = EH_CONFIG.officialFallbackC;
-const ROOM_KIND_C = EH_CONFIG.roomKindC || { public:'#1DE9B6', private:'#B57EDC', official:'#0ABAB5' };
 // 统一房间强调色已迁入大厅模块；配置与 roomThemeFor 均在调用时读取，避免装配阶段捕获未就绪依赖。
 const roomAccentC = window.EH_LOBBY_MODULE.createRoomAccentC({
   getConfig:()=>EH_CONFIG,
   getRoomThemeFor:()=>roomThemeFor,
 });
-// 灵魂取色优先级: custom(灵魂 DB 色, 即 admin 灵魂工坊调色板设的, 合法非空 hex) > soulColors[name](JS专属色兜底) > 所在房间强调色 > fallback
-// ★2026-07: custom 提到最高优先——原来 soulColors 硬编码盖过 DB, 导致 admin 里改灵魂色不生效(如老K DB设了#4A5D7E却显硬编码色)。
-// name 参数按灵魂名匹配(私密房召唤副本 uid 变但名字不变), 支持字符串或含 .name 的对象
-function soulThemeColor(custom, fallback, name){
-  // 0. 灵魂自身 custom 色(DB eh_souls.color, admin 可视化调色板直接编辑, 用户显式设置优先级最高)
-  if(typeof custom==='string' && /^#[0-9a-fA-F]{3,8}$/.test(custom)) return custom;
-  // 1. JS soulColors[name] 兜底专属色(DB 未设色的灵魂走这里, 从新十主题选)
-  try{
-    const nm = (typeof name==='string') ? name : (name && name.name) || '';
-    const sc = (EH_CONFIG && EH_CONFIG.soulColors) || {};
-    if(nm && sc[nm] && /^#[0-9a-fA-F]{3,8}$/.test(sc[nm])) return sc[nm];
-  }catch(e){}
-  // 2. 房间强调色
-  try{
-    if(curRoom && curRoom.kind){
-      const c=roomAccentC(curRoom);
-      if(c) return c;
-    }
-  }catch(e){}
-  // 3. fallback
-  return fallback || ROOM_KIND_C.official;
-}
+// 灵魂取色已迁入大厅模块；配置与当前房间均在调用时读取，避免装配阶段捕获未恢复状态。
+const soulThemeColor = window.EH_LOBBY_MODULE.createSoulThemeColor({
+  getConfig:()=>EH_CONFIG,
+  getRoom:()=>curRoom,
+  roomAccentC,
+});
 // 大厅房间查询带超时：实现已迁入 lobby 模块；withTimeout 在调用时通过 getter 读取。
 const roomsQuery = window.EH_LOBBY_MODULE.createRoomsQuery({
   getWithTimeout:()=>withTimeout,
