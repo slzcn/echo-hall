@@ -1969,7 +1969,11 @@ async function loadHistoryCore(first){
     const head = rows.length > FIRST_PAINT_N ? rows.slice(-FIRST_PAINT_N) : rows;
     const rest = rows.length > FIRST_PAINT_N ? rows.slice(0, rows.length - FIRST_PAINT_N) : [];
     const frag=document.createDocumentFragment();
-    head.forEach(m=>{ const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
+    // ★防重复("同一条聊天记录冒两遍"根因): 进房时 subscribeMessages 先于本次 loadHistory 开启,
+    //   拉取 await 期间 realtime 可能已把某条最新消息渲染进 DOM —— 尤其灵魂 msg/act 走 _soulQ 队列会延时上屏,
+    //   而它同样落在本次历史 rows 里。head.forEach 原来无脑 append, 就与队列/realtime 各画一遍 → 重复。
+    //   渲染前按 mid 剔除"已渲染 / 正排在灵魂队列里"的行(_soulMsgKnown 查 DOM+pending+队列; 真人消息靠其 DOM 分支同样生效)。
+    head.forEach(m=>{ if(m && m.id!=null && _soulMsgKnown(m.id)) return; const el=buildMsgEl(m, true); if(el) frag.appendChild(el); });
     stream.appendChild(frag);
     // 按本屏历史里出现过的真人 uid 批量拉权威身份表(含离场者), 拉完就地回补历史→改名跟随(见 loadRoomUserIdentity)
     loadRoomUserIdentity(rows);
@@ -2006,7 +2010,7 @@ async function loadHistoryCore(first){
         const batch = rest.splice(-IDLE_BATCH);  // 从尾部取(时间上更靠近首屏, 用户往上翻先看到)
         const prevH = stream.scrollHeight, prevTop = stream.scrollTop;
         const bfrag = document.createDocumentFragment();
-        batch.forEach(m=>{ const el=buildMsgEl(m, true); if(el) bfrag.appendChild(el); });
+        batch.forEach(m=>{ if(m && m.id!=null && _soulMsgKnown(m.id)) return; const el=buildMsgEl(m, true); if(el) bfrag.appendChild(el); });   // 同 head: 分批补渲染期间若有最新消息经 realtime/队列先上屏, 按 mid 跳过防重复
         stream.insertBefore(bfrag, stream.firstChild);
         // 保持视觉滚动位置不跳(往顶插入内容会顶高)
         stream.scrollTop = prevTop + (stream.scrollHeight - prevH);
