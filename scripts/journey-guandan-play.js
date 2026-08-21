@@ -210,7 +210,8 @@ assert(/function armTurn\(/.test(ui) && /onHumanTimeout/.test(ui), '每回合武
 assert(/超时 · 自动不出/.test(ui) && /超时 · 自动出牌/.test(ui), '到点自动过/自动出(不卡死)');
 assert(/requestAnimationFrame\(tick\)/.test(ui), '倒计时环用 rAF 平滑驱动');
 // (3) 动效 + (4) 轮次感
-assert(/fly-bot/.test(ui) && /fly-top/.test(ui), '出牌有方向性飞入动画');
+assert(/function flyPlayToCenter\(/.test(ui) && /gd-fly-card/.test(ui) && /\.land\{animation:gdLand/.test(ui),
+  '出牌从出牌人头像掷向桌心(幽灵牌飞入 + 牌堆 land 延后淡入)');
 assert(/gd-boom/.test(ui) && /function boom\(/.test(ui), '炸弹/天王炸有震屏+爆炸特效');
 assert(/轮到你/.test(ui), '中央横幅明确"轮到你出牌"');
 assert(/\.gd-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn class)');

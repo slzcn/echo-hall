@@ -153,7 +153,8 @@ assert(/超时 · 自动不出/.test(ui) && /超时 · 自动出牌/.test(ui), '
 assert(/requestAnimationFrame\(tick\)/.test(ui), '倒计时环用 rAF 平滑驱动(--p conic 环)');
 
 // (3) 落牌动效 + (4) 轮次感:飞入动画 + 活动席高亮环 + 中央横幅
-assert(/fly-bot/.test(ui) && /fly-top/.test(ui), '出牌有方向性飞入动画(自己下方/对手上方)');
+assert(/function flyPlayToCenter\(/.test(ui) && /ddz-fly-card/.test(ui) && /\.land\{animation:ddzLand/.test(ui),
+  '出牌从出牌人头像掷向桌心(幽灵牌飞入 + 牌堆 land 延后淡入)');
 assert(/ddzBoom|ddz-boom/.test(ui) && /function boom\(/.test(ui), '炸弹/王炸有震屏+爆炸特效');
 assert(/ddz-turnbanner/.test(ui) && /轮到你/.test(ui), '中央横幅明确"轮到谁"(轮到你出牌高亮)');
 assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn class)');

@@ -101,11 +101,18 @@
 /* 座位(对手 + 自己) 公共外观 */
 .ddz-seat{display:flex;flex-direction:column;align-items:center;gap:3px;width:var(--seatw,104px);position:relative}
 .ddz-avr{width:var(--av,52px);height:var(--av,52px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;
-  background:transparent;transition:background .15s}
+  background:transparent;transition:background .15s;position:relative}
 .ddz-seat.turn .ddz-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .ddz-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:var(--avf,23px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .ddz-seat.turn .ddz-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+/* 回合秒数徽标: 只在当前行动席(含对手)头像右下角亮, 让"轮到谁、还剩几秒"看得见 */
+.ddz-sec{position:absolute;right:-4px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;box-sizing:border-box;
+  border-radius:9px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);
+  color:var(--amber,#ffc24d);font-size:10px;font-weight:800;line-height:15px;text-align:center;
+  font-variant-numeric:tabular-nums;display:none;z-index:3}
+.ddz-seat.turn .ddz-sec{display:block}
+.ddz-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:ddzBlink .6s steps(2,start) infinite}
 .ddz-seat.win .ddz-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .ddz-seat.win .nm{color:var(--amber,#ffc24d);font-weight:700}
 .ddz-seat.landlord .ddz-avr .av::after{content:'👑';position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:15px}
@@ -154,14 +161,12 @@
 @keyframes ddzBlink{50%{opacity:.35}}
 .ddz-lastwho{font-size:11px;color:var(--sub);min-height:14px}
 .ddz-played{display:flex;min-height:70px;align-items:center;justify-content:center;width:100%;box-sizing:border-box}
-.ddz-played.fly-top{animation:ddzFlyTop .28s cubic-bezier(.2,.9,.3,1)}
-.ddz-played.fly-bot{animation:ddzFlyBot .28s cubic-bezier(.2,.9,.3,1)}
-.ddz-played.fly-tl{animation:ddzFlyTL .28s cubic-bezier(.2,.9,.3,1)}
-.ddz-played.fly-tr{animation:ddzFlyTR .28s cubic-bezier(.2,.9,.3,1)}
-@keyframes ddzFlyTop{from{transform:translateY(-50px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes ddzFlyBot{from{transform:translateY(52px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes ddzFlyTL{from{transform:translate(-52px,-42px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes ddzFlyTR{from{transform:translate(52px,-42px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+/* 出牌"掷向中央": 真牌堆先隐后现(land), 由 flyPlayToCenter 生成的幽灵牌从出牌人头像飞抵中央,
+   二者交叉淡入 —— 观感是牌从座位被扔到桌心, 而非凭空出现。 */
+.ddz-played.land{animation:ddzLand .44s cubic-bezier(.2,.85,.3,1)}
+@keyframes ddzLand{0%{opacity:0;transform:scale(.66)}52%{opacity:0}72%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none}}
+.ddz-fly-card{position:absolute;z-index:12;pointer-events:none;will-change:transform,opacity;
+  transition:transform .4s cubic-bezier(.22,.75,.3,1),opacity .4s ease}
 .ddz-passtag{color:var(--dim);font-size:14px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:6px 16px;animation:ddzFlyTop .22s}
 /* 底牌: 顶部居中(两对手之间), 对标腾讯——不再是右上角一堆看不懂的小背。带"底牌"标, 定地主后翻面亮出。 */
 .ddz-bottom-cards{position:absolute;top:2px;left:50%;transform:translateX(-50%) scale(.82);transform-origin:top center;
@@ -200,6 +205,9 @@
 .ddz-hand .card:first-child{margin-left:0}
 .ddz-hand.locked .card{cursor:default}
 .ddz-hand .card.sel{transform:translateY(-18px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent)}
+/* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
+@keyframes ddzHintPop{0%{transform:translateY(-18px) scale(1)}45%{transform:translateY(-30px) scale(1.07)}100%{transform:translateY(-18px) scale(1)}}
+.ddz-hand .card.sel.hintpop{animation:ddzHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 10px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent),0 0 16px var(--accent)}
 .ddz-hand:not(.locked) .card:hover{transform:translateY(-8px)}
 .ddz-hand:not(.locked) .card.sel:hover{transform:translateY(-18px)}
 .ddz-hand .card.justdealt{animation:ddzDeal .3s ease}
@@ -616,7 +624,7 @@
       const role = st.landlord==null ? '' : (isLord?'地主':'农民');
       const isWin = st.phase==='over' && st.result && st.result.winners.includes(seat);
       return `<div class="ddz-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLord?' landlord':''}${isLord&&justCrowned?' just-crowned':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
-        <div class="ddz-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
+        <div class="ddz-avr"><div class="av">${avatars[seat]||'🤖'}</div><span class="ddz-sec"></span></div>
         <div class="meta">
           <div class="nm">${escapeHtml(p.name)}</div>
           <div class="cnt">剩 <b>${p.hand.length}</b> 张${role?` · <span class="role">${role}</span>`:''}</div>
@@ -669,10 +677,8 @@
       layoutPlayed();                               // 大牌型(飞机带对/长顺~20 张)动态收紧, 免中央区横向溢出裁切
       if (changed){
         void els.played.offsetWidth;                // 强制回流, 让下一行的动画类重新触发
-        // 方向按出牌人座位: 自己从下方飞入, 两个对手分别从左上/右上飞入(对标他们在牌桌的方位)
-        els.played.classList.add(
-          lp.seat===mySeat ? 'fly-bot' :
-          lp.seat===OPP_SEATS[0] ? 'fly-tl' : 'fly-tr');
+        els.played.classList.add('land');           // 牌堆延后淡入(等幽灵牌飞抵)
+        flyPlayToCenter(lp.seat);                    // 从出牌人头像掷牌到桌心
         const nm = st.players[lp.seat].name;
         if (Rules.isBomb(lp.parse)){
           const rocket = lp.parse.type==='rocket';
@@ -810,15 +816,18 @@
       // 降频: rAF 每帧(~60fps)只在【整度数变化】时才写 --p(conic 环步进 1° ≈ 亚像素, 视觉等价),
       //   秒数也只在【整秒变化】时才写文本 —— 免掉每秒几十次无谓的 conic 重绘与 textContent 回流。
       let lastDeg=-1, lastSec=-1;
+      const secEl = seatEl && seatEl.querySelector('.ddz-sec');   // 当前行动席(含对手)头像上的秒数徽标
       const tick = ()=>{
         const elapsed = Date.now() - turnStart;
         const remain = Math.max(0, turnDur - elapsed);
         const frac = turnDur ? (remain/turnDur) : 0;
         const deg = Math.round(frac*360);
         if (seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p', deg); lastDeg=deg; }
-        if (mine && clk){
-          const sec = Math.ceil(remain/1000);
-          if (sec!==lastSec){ clk.textContent = sec+'s'; clk.classList.toggle('urgent', sec<=5); lastSec=sec; }
+        const sec = Math.ceil(remain/1000);
+        if (sec!==lastSec){
+          if (secEl){ secEl.textContent = sec; secEl.classList.toggle('urgent', sec<=5); }
+          if (mine && clk){ clk.textContent = sec+'s'; clk.classList.toggle('urgent', sec<=5); }
+          lastSec=sec;
         }
         if (remain<=0){
           ringRAF = null;
@@ -845,6 +854,34 @@
     function seatOf(seat){
       return els.opps.querySelector(`.ddz-seat[data-seat="${seat}"]`)
           || els.me.querySelector(`.ddz-seat[data-seat="${seat}"]`);
+    }
+    // 出牌掷向桌心: 从出牌人头像位置生成幽灵牌(最多 5 张扇形), 飞抵中央落牌区并淡出,
+    //   与 .ddz-played.land 的延后淡入交叉 —— 纯展示层, 坐标相对 room 算, 挂 room 上避开 overflow 裁切。
+    function flyPlayToCenter(seat){
+      const sEl = seatOf(seat); const avr = sEl && sEl.querySelector('.ddz-avr');
+      if (!room || !avr || !els.played) return;
+      const lp = st.table.lastPlay;
+      const cards = (lp && Array.isArray(lp.cards)) ? lp.cards.map(findCardById).filter(Boolean) : [];
+      if (!cards.length) return;
+      const rr = room.getBoundingClientRect(), fr = avr.getBoundingClientRect(), tr = els.played.getBoundingClientRect();
+      const tx = tr.left - rr.left + tr.width/2, ty = tr.top - rr.top + tr.height/2;
+      const n = Math.min(cards.length, 5);
+      for (let i=0;i<n;i++){
+        const g = cardEl(cards[i]); g.classList.add('ddz-fly-card');
+        room.appendChild(g);
+        const gw = g.offsetWidth||44, gh = g.offsetHeight||62;
+        const sx = fr.left - rr.left + fr.width/2 - gw/2, sy = fr.top - rr.top + fr.height/2 - gh/2;
+        g.style.left = sx+'px'; g.style.top = sy+'px'; g.style.opacity = '0';
+        const spread = (i-(n-1)/2);
+        const dx = tx - (sx+gw/2) + spread*11, dy = ty - (sy+gh/2), rot = spread*5;
+        (function(g,dx,dy,rot,i){
+          setTimeout(()=>{
+            g.style.opacity = '1';
+            requestAnimationFrame(()=>{ g.style.transform = `translate(${dx}px,${dy}px) scale(.94) rotate(${rot}deg)`; g.style.opacity = '.16'; });
+            setTimeout(()=>{ try{ g.remove(); }catch(_){} }, 440);
+          }, i*42);
+        })(g,dx,dy,rot,i);
+      }
     }
 
     // ── 控制区:叫地主 / 出牌 ──
@@ -959,7 +996,6 @@
       if (sel.length < 2) return false;                       // 单张意图不明, 不猜
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
       const curP = Rules.parse(sel);
-      if (curP && (!target || Rules.beats(curP, target))) return false;   // 已成型且够用
       // 选区同形校验
       const byR = new Map();
       for (const c of sel){ if(!byR.has(c.rank)) byR.set(c.rank,[]); byR.get(c.rank).push(c); }
@@ -969,13 +1005,16 @@
       if (per<1 || per>3) return false;
       if (ranks.some(r=>byR.get(r).length!==per)) return false;
       const lo = ranks[0], hi = ranks[ranks.length-1];
+      const multi = ranks.length >= 2;                        // 已跨≥2 点数 = 明显在建连张
+      // 已成型且够用就不动 —— 但"在建连张(multi)且领出"要继续贪心补全(治六张顺子只选五张)
+      if (curP && (target ? Rules.beats(curP, target) : !multi)) return false;
       // 手牌各点可用张数
       const handByR = new Map();
       for (const c of hand){ if(!handByR.has(c.rank)) handByR.set(c.rank,[]); handByR.get(c.rank).push(c); }
       const has = r => (r>=3 && r<=14 && handByR.has(r) && handByR.get(r).length>=per);
       for (let r=lo; r<=hi; r++) if(!has(r)) return false;    // 选区内空档手里得有牌
       // 目标长度(rank 段长)
-      let needLen, windows=[];
+      let needLen, windows=[], best=null;
       if (target){
         const tper = target.type==='straight'?1 : target.type==='pairs'?2
                    : (/^plane/.test(target.type)?3:0);
@@ -986,20 +1025,22 @@
         if (hi-lo+1 > needLen) return false;
         // 跟牌: 含[lo,hi]、末端>target.key 的最低窗口(s 升序取第一)
         for (let s=Math.max(3, hi-needLen+1); s<=lo; s++){ windows.push(s); }
+        for (const s of windows){
+          const e = s+needLen-1;
+          if (e>14 || e<hi || s>lo) continue;
+          let ok=true; for(let r=s;r<=e;r++) if(!has(r)){ ok=false; break; }
+          if(!ok) continue;
+          if (e<=target.key) continue;                        // 跟牌必须能压过
+          best={s,e}; break;
+        }
       } else {
-        needLen = per===1 ? 5 : per===2 ? 3 : 2;              // 顺子≥5 / 连对≥3 / 飞机≥2
-        needLen = Math.max(needLen, hi-lo+1);
-        // 领出: 优先选区当低端向上扩(s=lo 先试), 不成再向下挪
-        for (let s=lo; s>=Math.max(3, hi-needLen+1); s--){ windows.push(s); }
-      }
-      let best=null;
-      for (const s of windows){
-        const e = s+needLen-1;
-        if (e>14 || e<hi || s>lo) continue;
-        let ok=true; for(let r=s;r<=e;r++) if(!has(r)){ ok=false; break; }
-        if(!ok) continue;
-        if (target && e<=target.key) continue;               // 跟牌必须能压过
-        best={s,e}; break;
+        // 领出: 单点数(对/三)不擅自扩成连对; 已在建连张则向两端贪心扩到手里最长连续段
+        if (!multi) return false;
+        const minLen = per===1 ? 5 : per===2 ? 3 : 2;         // 顺子≥5 / 连对≥3 / 飞机·钢板≥2
+        let s=lo, e=hi;
+        while (has(s-1)) s--;                                 // 向低端吃满
+        while (has(e+1)) e++;                                 // 向高端吃满
+        if (e-s+1 >= minLen) best={s,e};                      // 连不成最短牌型就放弃
       }
       if (!best) return false;
       // 组装: 保留选区已选的具体牌, 缺的点从手里补 per 张
@@ -1079,7 +1120,15 @@
       if (!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
       const pick = hintCycle[hintIdx % hintCycle.length]; hintIdx++;
       selected = new Set(pick.map(c=>c.id));
-      renderHand(); updatePlayBtn();
+      renderHand(); updatePlayBtn(); popHint();
+    }
+    // 提示后让被选中的牌重放一次弹跳(即便 renderHand 因签名未变跳过重建也强制触发)
+    function popHint(){
+      requestAnimationFrame(()=>{
+        els.hand && els.hand.querySelectorAll('.card.sel').forEach(el=>{
+          el.classList.remove('hintpop'); void el.offsetWidth; el.classList.add('hintpop');
+        });
+      });
     }
 
     // ── AI 回合 ──

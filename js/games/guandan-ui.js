@@ -105,8 +105,12 @@
   border:1px solid rgba(0,229,212,.07);z-index:-1;pointer-events:none}
 /* 座位 */
 .gd-seat{display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,82px);position:relative}
-.gd-avr{width:var(--av,42px);height:var(--av,42px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;background:transparent;transition:background .15s}
+.gd-avr{width:var(--av,42px);height:var(--av,42px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;background:transparent;transition:background .15s;position:relative}
 .gd-seat.turn .gd-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
+/* 回合秒数徽标: 只在当前行动席(含对手)头像右下角亮, 让"轮到谁、还剩几秒"看得见 */
+.gd-sec{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);color:var(--amber,#ffc24d);font-size:9px;font-weight:800;line-height:14px;text-align:center;font-variant-numeric:tabular-nums;display:none;z-index:3}
+.gd-seat.turn .gd-sec{display:block}
+.gd-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:gdBlink .6s steps(2,start) infinite}
 .gd-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,19px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .gd-seat.turn .gd-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
 .gd-seat.win .gd-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
@@ -135,14 +139,10 @@
 @keyframes gdBlink{50%{opacity:.35}}
 .gd-who{font-size:11px;color:var(--sub);min-height:14px}
 .gd-played{display:flex;flex-wrap:wrap;gap:0;min-height:60px;align-items:center;justify-content:center;max-width:100%}
-.gd-played.fly-top{animation:gdFlyTop .28s cubic-bezier(.2,.9,.3,1)}
-.gd-played.fly-bot{animation:gdFlyBot .28s cubic-bezier(.2,.9,.3,1)}
-.gd-played.fly-left{animation:gdFlyLeft .28s cubic-bezier(.2,.9,.3,1)}
-.gd-played.fly-right{animation:gdFlyRight .28s cubic-bezier(.2,.9,.3,1)}
-@keyframes gdFlyTop{from{transform:translateY(-46px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes gdFlyBot{from{transform:translateY(48px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes gdFlyLeft{from{transform:translateX(-56px) scale(.78);opacity:0}to{transform:none;opacity:1}}
-@keyframes gdFlyRight{from{transform:translateX(56px) scale(.78);opacity:0}to{transform:none;opacity:1}}
+/* 出牌"掷向中央": 真牌堆延后淡入(land), 幽灵牌从出牌人头像飞抵桌心并淡出, 交叉出"扔牌"观感 */
+.gd-played.land{animation:gdLand .44s cubic-bezier(.2,.85,.3,1)}
+@keyframes gdLand{0%{opacity:0;transform:scale(.66)}52%{opacity:0}72%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none}}
+.gd-fly-card.toss{transition-duration:.4s;box-shadow:0 6px 16px rgba(0,0,0,.5)}
 .gd-played .card{margin-left:-18px}.gd-played .card:first-child{margin-left:0}
 .gd-passtag{color:var(--dim);font-size:13px;letter-spacing:.14em;border:1px dashed var(--line);border-radius:10px;padding:5px 14px;animation:gdFlyTop .22s}
 .gd-boom{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:38px;font-weight:900;letter-spacing:.05em;color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag);pointer-events:none;z-index:6;animation:gdBoom .7s ease-out forwards}
@@ -199,6 +199,9 @@
 .gd-hand-row .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
 .gd-hand .card.sel{transform:translateY(-16px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent);z-index:2}
+/* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
+@keyframes gdHintPop{0%{transform:translateY(-16px) scale(1)}45%{transform:translateY(-28px) scale(1.07)}100%{transform:translateY(-16px) scale(1)}}
+.gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 10px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent),0 0 16px var(--accent)}
 .gd-hand:not(.locked) .card:hover{transform:translateY(-7px)}
 .gd-hand:not(.locked) .card.sel:hover{transform:translateY(-16px)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
@@ -669,7 +672,7 @@
       if (alarm) tags.push(`<span class="gd-tag alarm">⚠ 报牌</span>`);
       const isWin = st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam;
       return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
-        <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div></div>
+        <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div><span class="gd-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
         <div class="gd-tags">${tags.join('')}</div>
@@ -704,11 +707,8 @@
       lp.cards.map(findCardById).forEach(c=> els.played.appendChild(cardEl(c, st.level)));
       if (changed){
         void els.played.offsetWidth;
-        // 落牌飞入方向按出牌人座位来(对标真实牌桌: 牌从谁那边推过来): 自己下家右/对家上/上家左
-        els.played.classList.add(
-          lp.seat===mySeat ? 'fly-bot' :
-          lp.seat===SEAT_R ? 'fly-right' :
-          lp.seat===SEAT_L ? 'fly-left' : 'fly-top');
+        els.played.classList.add('land');           // 牌堆延后淡入(等幽灵牌飞抵)
+        flyPlayToCenter(lp.seat);                    // 从出牌人头像掷牌到桌心
         const nm = st.players[lp.seat].name;
         if (Rules.isBomb(lp.parse)){
           const bn = bombName(lp.parse);
@@ -829,12 +829,18 @@
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
+      const secEl = seatEl && seatEl.querySelector('.gd-sec');   // 当前行动席(含对手)头像秒数徽标
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
         const deg=Math.round(frac*360);
         if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
-        if(mine && clk){ const sec=Math.ceil(remain/1000); if(sec!==lastSec){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); lastSec=sec; } }
+        const sec=Math.ceil(remain/1000);
+        if(sec!==lastSec){
+          if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); }
+          if(mine && clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
+          lastSec=sec;
+        }
         if(remain<=0){ ringRAF=null; if(mine&&typeof onExpire==='function') onExpire(); return; }
         ringRAF=requestAnimationFrame(tick);
       };
@@ -998,7 +1004,15 @@
       }
       if(!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
       const pick=hintCycle[hintIdx%hintCycle.length]; hintIdx++;
-      selected=new Set(pick.map(c=>c.id)); renderHand(); updatePlayBtn();
+      selected=new Set(pick.map(c=>c.id)); renderHand(); updatePlayBtn(); popHint();
+    }
+    // 提示后让被选中的牌重放一次弹跳(即便 renderHand 因签名未变跳过重建也强制触发)
+    function popHint(){
+      requestAnimationFrame(()=>{
+        els.hand && els.hand.querySelectorAll('.card.sel').forEach(el=>{
+          el.classList.remove('hintpop'); void el.offsetWidth; el.classList.add('hintpop');
+        });
+      });
     }
 
     // 供联机(host 权威应用远程真人动作)/测试驱动任意席一手, 与 aiStep 同源(掼蛋无叫分, 只 play/pass)。
@@ -1124,6 +1138,33 @@
         sfx('cardplay');
         setTimeout(()=>fly.remove(), 760);
       }, delay||0);
+    }
+    // 出牌掷向桌心: 从出牌人头像生成幽灵牌(最多 5 张扇形)飞抵中央落牌区并淡出,
+    //   与 .gd-played.land 的延后淡入交叉。复用 .gd-fly-card(进贡飞牌同款), 挂 room 避开 overflow 裁切。
+    function flyPlayToCenter(seat){
+      const avr = room.querySelector(`.gd-seat[data-seat="${seat}"] .gd-avr`);
+      const lp = st.table.lastPlay;
+      const cards = (lp && Array.isArray(lp.cards)) ? lp.cards.map(findCardById).filter(Boolean) : [];
+      if (!room || !avr || !els.played || !cards.length) return;
+      const rr = room.getBoundingClientRect(), fr = avr.getBoundingClientRect(), tr = els.played.getBoundingClientRect();
+      const tx = tr.left - rr.left + tr.width/2, ty = tr.top - rr.top + tr.height/2;
+      const n = Math.min(cards.length, 5);
+      for (let i=0;i<n;i++){
+        const g = cardEl(cards[i], st.level); g.classList.add('gd-fly-card','toss');
+        room.appendChild(g);
+        const gw = g.offsetWidth||40, gh = g.offsetHeight||56;
+        const sx = fr.left - rr.left + fr.width/2 - gw/2, sy = fr.top - rr.top + fr.height/2 - gh/2;
+        g.style.left = sx+'px'; g.style.top = sy+'px'; g.style.opacity = '0';
+        const spread = (i-(n-1)/2);
+        const dx = tx - (sx+gw/2) + spread*10, dy = ty - (sy+gh/2), rot = spread*5;
+        (function(g,dx,dy,rot,i){
+          setTimeout(()=>{
+            g.style.opacity = '1';
+            requestAnimationFrame(()=>{ g.style.transform = `translate(${dx}px,${dy}px) scale(.92) rotate(${rot}deg)`; g.style.opacity = '.16'; });
+            setTimeout(()=>{ try{ g.remove(); }catch(_){} }, 440);
+          }, i*42);
+        })(g,dx,dy,rot,i);
+      }
     }
     // 进贡横幅(开局若有进贡, 展示 1 条并自动消失; 非抗贡时贡牌飞一手)
     function showTributeBanner(){

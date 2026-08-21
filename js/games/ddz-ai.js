@@ -291,6 +291,64 @@
     return { action:'pass' };
   }
 
+  // ── 手数估计(estTricks): 把一手牌贪心拆成最少的"出牌手数" ──────────
+  //   越少越好。拆散一个顺子/连对会留下孤张 → 手数飙升, 领出评估里被自然淘汰。
+  //   顺序: 王炸/炸弹先摘 → 飞机(纯三连) → 连对 → 顺子 → 剩下三条(可白吃一翼)/对/单各 1 手。
+  function estTricks(cards){
+    if (!cards || !cards.length) return 0;
+    const m = groupByRank(cards);
+    const cnt = new Map();
+    for (const [r,cs] of m) cnt.set(r, cs.length);
+    let tricks = 0;
+    if ((cnt.get(16)||0)>=1 && (cnt.get(17)||0)>=1){ cnt.set(16,cnt.get(16)-1); cnt.set(17,cnt.get(17)-1); tricks++; }
+    for (const r of [...cnt.keys()]) if ((cnt.get(r)||0)===4){ cnt.set(r,0); tricks++; }
+    const extract = (per, minLen)=>{
+      while (true){
+        let bS=-1,bE=-1,bLen=0, r=3;
+        while (r<=14){
+          if ((cnt.get(r)||0)>=per){
+            let e=r; while (e+1<=14 && (cnt.get(e+1)||0)>=per) e++;
+            const len=e-r+1;
+            if (len>=minLen && len>bLen){ bLen=len; bS=r; bE=e; }
+            r=e+1;
+          } else r++;
+        }
+        if (bLen<minLen) break;
+        for (let x=bS;x<=bE;x++) cnt.set(x, cnt.get(x)-per);
+        tricks++;
+      }
+    };
+    extract(3,2);   // 飞机(纯三连)
+    extract(2,3);   // 连对
+    extract(1,5);   // 顺子
+    let trios=0, pairs=0, singles=0;
+    for (const r of cnt.keys()){
+      const c=cnt.get(r)||0;
+      if (c>=3) trios++; else if (c===2) pairs++; else if (c===1) singles++;
+    }
+    tricks += trios;
+    let wings = trios;                                  // 每个三条白吃一个翼(带单优先, 其次带对)不额外计手
+    while (wings>0 && singles>0){ singles--; wings--; }
+    while (wings>0 && pairs>0){ pairs--; wings--; }
+    tricks += pairs + singles;
+    return tricks;
+  }
+  function withoutCards(hand, cards){
+    const ids = new Set(cards.map(c=>c.id));
+    return hand.filter(c=>!ids.has(c.id));
+  }
+  // 领出候选打分(越小越好), chooseLead 与 hints 共用 → 灵魂选择与玩家提示同源。
+  //   剩余手数×100(主导) + 丢控代价×8(别过早花掉 2/王/A 这类回手权) − 本手清牌数(同分多清优先)。
+  function leadScore(hand, p){
+    const t = estTricks(withoutCards(hand, p.cards));
+    const k = p.parse.key, ty = p.parse.type;
+    let ctl = 0;
+    if (ty==='single' && k>=15) ctl += 3;        // 甩 2/王 单张 = 丢回手权
+    else if (ty==='single' && k>=14) ctl += 1;   // A 单张略惜
+    if (ty==='pair' && k>=14) ctl += 2;          // A/2 对 = 强控, 别早拆
+    return t*100 + ctl*8 - Math.min(p.cards.length, 9);
+  }
+
   // 首出策略:走小牌。顺子/连对/飞机 > 三带 > 对 > 单;排除炸弹/王炸/含2的顺。
   //   ★残局意识(ctx 可选): 若「真对手」已报单(剩 1 张), 领出别甩小单张送他走脱 ——
   //     剩 1 张者跟不了任何 ≥2 张的牌型, 优先领非单牌型把他憋住;
@@ -333,21 +391,15 @@
       if (squeeze.length){ pool = squeeze; }
       else { const s = bestSingle(plays); if (s) return s; }   // 只剩能被压的对子/单张 → 甩 boss 单
     }
-    // 优先长牌型(顺子/连对/飞机)清散牌,同类取点最小
-    const rank = (p)=>{
-      const order = { straight:0, pairs:0, plane:0, plane_single:0, plane_pair:1, trio_single:2, trio_pair:2, trio:3, pair:4, single:5 };
-      return (order[p.parse.type] ?? 9);
-    };
-    pool.sort((a,b)=>{
-      const ra=rank(a), rb=rank(b);
-      if (ra!==rb) return ra-rb;
-      // 同类:长的优先(清更多牌),再点小优先
-      if (b.parse.len !== a.parse.len) return b.parse.len - a.parse.len;
-      return a.parse.key - b.parse.key;
-    });
-    // 避免首出就甩 2/王的单张(留着控场):若最优是大单张且有别的选择,换
-    const nonBig = pool.filter(p=>!(p.parse.type==='single' && p.parse.key>=15));
-    return (nonBig[0] || pool[0]).cards;
+    // 领出择牌(治"先出成牌、最后剩一堆小碎单张"): 逐候选按 leadScore 评估——
+    //   出掉它后剩余手数最少、又不过早花控牌者胜出。拆散顺子/连对留孤张的选择手数飙升被淘汰;
+    //   小散单/小对趁早随手清掉, 2/王/A 等强控留到最后回手。
+    let best=null, bestScore=Infinity;
+    for (const p of pool){
+      const s = leadScore(hand, p);
+      if (s < bestScore){ bestScore = s; best = p; }
+    }
+    return (best || pool[0]).cards;
   }
 
   // 提示排序: 产出 best-first 的可出牌序列(每项 card[]), UI 的「提示」直接吃它。
@@ -367,17 +419,10 @@
 
     const list = plays.slice();
     if (!target){
-      const order = { straight:0, pairs:0, plane:0, plane_single:0, plane_pair:1, trio_single:2, trio_pair:2, trio:3, pair:4, single:5 };
       list.sort((a,b)=>{
         const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
         if (fa!==fb) return fa-fb;                                       // ① 走完优先
-        const ra=order[a.parse.type]??9, rb=order[b.parse.type]??9;
-        if (ra!==rb) return ra-rb;                                       // 长牌型优先
-        const bigA=(a.parse.type==='single'&&a.parse.key>=15)?1:0;
-        const bigB=(b.parse.type==='single'&&b.parse.key>=15)?1:0;
-        if (bigA!==bigB) return bigA-bigB;                               // 大单张(2/王)垫后
-        if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
-        return a.parse.key-b.parse.key;
+        return leadScore(hand,a) - leadScore(hand,b);                    // ② 与灵魂选择同源: 少留手数 + 惜控 + 多清牌
       });
       // ④ 领出·真对手低张(报单/报双): 把"他压不过/跟不了的一手"提到最前憋死他。
       //    报单(剩1张): 任何≥2张牌型他都跟不了 → 多张提前, 全单张则大单优先(他压不过)。

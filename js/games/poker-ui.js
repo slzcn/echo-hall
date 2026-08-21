@@ -94,6 +94,11 @@
 .pk-seat.turn .pk-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .pk-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,20px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .pk-seat.turn .pk-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+/* 回合秒数徽标: 只在当前行动席(含对手)头像右下角亮, 让"轮到谁、还剩几秒"看得见 */
+.pk-sec{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);color:var(--amber,#ffc24d);font-size:9px;font-weight:800;line-height:14px;text-align:center;font-variant-numeric:tabular-nums;display:none;z-index:5}
+.pk-seat.turn .pk-sec{display:block}
+.pk-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:pkBlink .6s steps(2,start) infinite}
+@keyframes pkBlink{50%{opacity:.35}}
 .pk-seat.win .pk-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .pk-btn-d{position:absolute;right:-6px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#fff;color:#111;font-size:10px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.5);z-index:5}
 .pk-seat .nm{font-size:11px;color:var(--sub);max-width:var(--seatw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -498,7 +503,7 @@
       }
       const dbtn = seat===st.button ? `<span class="pk-btn-d">D</span>` : '';
       return `<div class="pk-seat${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}" data-seat="${seat}" style="--p:360">
-        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}</div>
+        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
         ${hole}
@@ -861,6 +866,7 @@
       turnStart = Date.now();
       const seatEl = mine ? null : els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
       const clk = mine ? $('#pkClk') : null;
+      const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 对手行动席头像秒数徽标
       if (turnDur<=0) return;
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
@@ -869,7 +875,12 @@
         const frac=turnDur?(remain/turnDur):0;
         const deg=Math.round(frac*360);
         if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
-        if(mine && clk){ const sec=Math.ceil(remain/1000); if(sec!==lastSec){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); lastSec=sec; } }
+        const sec=Math.ceil(remain/1000);
+        if(sec!==lastSec){
+          if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); }
+          if(mine && clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
+          lastSec=sec;
+        }
         if(remain<=0){ ringRAF=null;
           if(mine){ if(typeof onExpire==='function') onExpire(); }
           else if(remote){ onRemoteTimeout(seat); }
