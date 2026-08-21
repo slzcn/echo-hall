@@ -2068,7 +2068,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260821-table-lobby';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260822-landscape-polish';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2557,34 +2557,34 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <link rel="stylesheet" href="./js/games/table-shared.css?v=20260821-table-lobby">
 <script defer src="./js/games/table-chat.js?v=20260815-tablechat"></script>
 <!-- 横竖屏切换(仍在聊天室内): 对牌桌浮层做 CSS rotate, 三款 UI 顶栏 ⟳ 钮调用 window.EHTableOrient -->
-<script defer src="./js/games/table-orient.js?v=20260821-game-polish"></script>
+<script defer src="./js/games/table-orient.js?v=20260822-landscape-polish"></script>
 <script defer src="./js/games/ddz-rules.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-engine.js?v=20260814-ddz2"></script>
 <script defer src="./js/games/ddz-ai.js?v=20260821-game-polish"></script>
 <!-- 斗地主真人联机传输层(脱敏快照 · 防作弊): 必须先于 game-ui 加载, UI 启动时读 window.EHDdzNet -->
 <script defer src="./js/games/ddz-net.js?v=20260817-ddz-online"></script>
-<script defer src="./js/games/game-ui.js?v=20260821-game-polish"></script>
+<script defer src="./js/games/game-ui.js?v=20260822-landscape-polish"></script>
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <script defer src="./js/games/guandan-rules.js?v=20260814-guandan"></script>
 <script defer src="./js/games/guandan-engine.js?v=20260820-jiefeng"></script>
 <script defer src="./js/games/guandan-ai.js?v=20260821-game-polish"></script>
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <script defer src="./js/games/guandan-net.js?v=20260816-exp1"></script>
-<script defer src="./js/games/guandan-ui.js?v=20260821-game-polish"></script>
+<script defer src="./js/games/guandan-ui.js?v=20260822-landscape-polish"></script>
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <script defer src="./js/games/poker-eval.js?v=20260820-best5"></script>
 <script defer src="./js/games/poker-engine.js?v=20260820-deal-bias"></script>
 <script defer src="./js/games/poker-ai.js?v=20260820-perf-mc"></script>
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
 <script defer src="./js/games/poker-net.js?v=20260816-exp1"></script>
-<script defer src="./js/games/poker-ui.js?v=20260821-game-polish"></script>
+<script defer src="./js/games/poker-ui.js?v=20260822-landscape-polish"></script>
 <script defer src="./js/games/table-net.js?v=20260820-recruit-card"></script>
 <script defer src="./js/modules/lobby.js?v=20260820-souls-cache-store"></script>
 <script defer src="./js/modules/auth.js?v=20260818-auth-contract"></script>
 <script defer src="./js/modules/bgm.js?v=20260818-bgm-contract"></script>
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
-<script defer src="./js/app.js?v=20260821-table-lobby"></script>
+<script defer src="./js/app.js?v=20260822-landscape-polish"></script>
 <script defer src="./js/keyboard.js?v=20260820-fold-ime-fallback"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>

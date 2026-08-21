@@ -32,8 +32,8 @@ assert(/js\/games\/table-shared\.css\?v=20260821-table-lobby/.test(HTML),
   'index.html 挂了 table-shared.css?v=20260821-table-lobby');
 
 // 横竖屏切换(功能3): index 挂了 table-orient.js, 三桌顶栏都有 ⟳ 钮且接了 EHTableOrient.toggle
-assert(/js\/games\/table-orient\.js\?v=20260821-game-polish/.test(HTML),
-  'index.html 挂了 table-orient.js?v=20260821-game-polish');
+assert(/js\/games\/table-orient\.js\?v=20260822-landscape-polish/.test(HTML),
+  'index.html 挂了 table-orient.js?v=20260822-landscape-polish');
 for(const [name, src, rid] of [['game-ui', DDZ, 'ddzRot'], ['guandan-ui', GD, 'gdRot'], ['poker-ui', PK, 'pkRot']]){
   assert(new RegExp('id="'+rid+'"').test(src) && /EHTableOrient\.toggle/.test(src),
     `${name}.js 顶栏有横竖屏钮 ${rid} 且接了 EHTableOrient.toggle`);
@@ -115,7 +115,7 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260821-table-lobby', 'ver.txt=20260821-table-lobby');
+assert(buildVer === '20260822-landscape-polish', 'ver.txt=20260822-landscape-polish');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
 //     不自动开局(launchTexas 不含 gtStart)。招募卡两条路径讲清楚(主人反馈"招募卡不够好使"):

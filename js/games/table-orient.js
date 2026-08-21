@@ -30,6 +30,19 @@
     room.style.transform = 'translateX(' + b.w + 'px) rotate(90deg)';
   }
   function isRot(room){ return !!(room && room.classList && room.classList.contains('eh-rot')); }
+  // 横屏态识别: 牌桌盒子"宽 > 高且矮"时挂 .is-land, 让各桌套用横屏专属布局。
+  //   —— 三桌响应式断点都要求 min-height≥620, 横屏(高 375)全落到竖屏基础布局→挤成一团。
+  //   物理横屏(视口即 812×375, 媒体查询能命中) 与 ⟳ 旋转态(transform 旋转, 视口仍竖 375×812
+  //   媒体查询看不到) 都只认"盒子实测宽高比": 用同一个 JS 信号统一覆盖两种横屏。
+  //   矮度门槛(h<560)排除平板横屏/桌面宽盒(它们有足够高度走既有大屏断点, 不该套手机横屏布局)。
+  //   .gd-room 等是 position:absolute;inset:0, 外框尺寸只由 #hall 决定, 与内部布局无关→不会回流打架。
+  function reflect(room){
+    if (!room || !room.classList) return false;
+    var w = room.clientWidth || 0, h = room.clientHeight || 0;
+    var land = w > 0 && h > 0 && (w / h) >= 1.35 && h < 560;
+    room.classList.toggle('is-land', land);
+    return land;
+  }
   function clear(room){
     if (!room) return;
     if (room.classList) room.classList.remove('eh-rot');
@@ -50,5 +63,5 @@
     try{ root.addEventListener('orientationchange', room._ehOrientResize); }catch(_){}
     return true;
   }
-  root.EHTableOrient = { toggle:toggle, clear:clear, isRot:isRot };
+  root.EHTableOrient = { toggle:toggle, clear:clear, isRot:isRot, reflect:reflect };
 })(typeof window !== 'undefined' ? window : this);

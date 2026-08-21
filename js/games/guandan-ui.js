@@ -64,6 +64,21 @@
   .gd-banner.mine{font-size:19px}
   .gd-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
   .gd-acts{gap:14px}}
+/* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮。原竖屏布局里三家绕中央、自己在底,
+   矮屏下侧席被压到与"我"这行撞字。横屏改成【三家一字排开贴顶(对家居中, 左右家上移到两侧顶角),
+   底部整条让给 我+手牌+操作区】—— 侧席 align-self:flex-start 上提, 中央椭圆压扁, 上下留白收紧。 */
+.gd-room.is-land{--av:34px;--avf:15px;--seatw:96px;--banner:12px;--hand-pad:5px;--hand-ov:-16px;--cw:36px;--ch:51px;--cn:12px;--cs:10px;--cc:20px}
+.gd-room.is-land .gd-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
+.gd-room.is-land .gd-partner{padding:2px 8px 0}
+.gd-room.is-land .gd-side{align-self:flex-start;justify-content:flex-start;padding-top:2px}  /* 左右家上提到两侧顶角(与对家一字排开贴顶), 整条底部让给"我"+手牌, 左下列彻底空出 */
+.gd-room.is-land .gd-center{min-height:0;padding:0 6px;justify-content:flex-start;gap:3px}  /* 出牌区上提贴对家, 让出中下段给"我"的居中头像, 不再互相压字 */
+.gd-room.is-land .gd-center::before{top:0;bottom:0}
+.gd-room.is-land .gd-played{min-height:36px}
+.gd-room.is-land .gd-me{padding:2px 14px 0 118px}  /* 自己落在"左侧家与中央出牌区之间"的空档(左家在最左顶角、出牌区在正中), 三者互不压字 */
+.gd-room.is-land .gd-hand{padding:5px 0 2px}
+.gd-room.is-land .gd-hand-head{min-height:0;padding-top:0;padding-bottom:1px}
+.gd-room.is-land .gd-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+.gd-room.is-land .gd-say{top:40px}
 @keyframes gdRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .gd-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
@@ -788,7 +803,7 @@
       const ov = (step - cw).toFixed(2);         // 负外边距(叠放量)
       for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
     }
-    function layoutHand(){ for (const row of els.hand.children) layoutRow(row); }
+    function layoutHand(){ if (root.EHTableOrient) root.EHTableOrient.reflect(room); for (const row of els.hand.children) layoutRow(row); }
 
     function setBanner(){
       const b=els.banner; const cp=connPill();

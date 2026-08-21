@@ -46,6 +46,16 @@
   .pk-room{--cw:52px;--ch:73px;--cn:18px;--cs:13px;--cc:29px;--bcw:58px;--bch:82px;
     --av:74px;--avf:34px;--seatw:140px;--chip:14px;--maxw:860px}
   .pk-felt{justify-content:center}}
+/* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮, 收紧上下留白, 操作区压扁不再顶出屏 —— 座位弧另在 positionSeats 里放宽横向半径 */
+.pk-room.is-land{--av:38px;--avf:18px;--seatw:74px;--cw:32px;--ch:45px;--cn:11px;--cs:9px;--cc:17px;--bcw:36px;--bch:51px}
+.pk-room.is-land .pk-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
+.pk-room.is-land .pk-felt{overflow:visible}
+.pk-room.is-land .pk-table{top:4px;bottom:4px}
+.pk-room.is-land .pk-me{padding:2px 16px 0;gap:12px}
+.pk-room.is-land .pk-acts{gap:5px;padding:5px 14px calc(6px + env(safe-area-inset-bottom,0px))}
+.pk-room.is-land .pk-raise input[type=range]{height:18px}
+.pk-room.is-land .pk-b{padding:9px 0;font-size:14px}
+.pk-room.is-land .pk-qbtn{padding:4px 0}
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
@@ -525,22 +535,25 @@
       positionSeats();
     }
     function positionSeats(){
+      const land = root.EHTableOrient ? root.EHTableOrient.reflect(room) : false;  // 横屏态标记(open/resize/旋转都会过这里)
       const order = displayOrder();
       const m = order.length - 1;                 // 对手数(我固定坐底, 不占上弧)
       // 对手沿【上弧】分布(而非绕整椭圆): 免得侧位落到 3/9 点钟中线上, 既撞中央公共牌又戳出屏外。
       // 角度域 158°(左上)→90°(正上)→22°(右上); 横半径 40%/竖半径 34% 收在牌桌内(seat 宽 78px 时两侧不溢出)。
       const TMAX=158, TMIN=22;
+      // 横屏: 桌面又宽又矮 → 横向半径放大(铺开占满宽度不挤中央), 竖向半径压扁 + 中心上移(上弧别顶出矮felt)。
+      const RX = land ? 46 : 40, RY = land ? 30 : 34, CY = land ? 42 : 46;
       for (let d=1; d<order.length; d++){
         const seat=order[d];
         const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
         const commitEl = els.table.querySelector(`.pk-commit[data-seat="${seat}"]`);
         if(!seatEl) continue;
         const t = (m===1 ? 90 : TMAX - (TMAX-TMIN)*(d-1)/(m-1)) * Math.PI/180;
-        const cx = 50 + 40*Math.cos(t);
-        const cy = 46 - 34*Math.sin(t);
+        const cx = 50 + RX*Math.cos(t);
+        const cy = CY - RY*Math.sin(t);
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
         if (commitEl){   // 投入筹码摆在座位与中心之间(朝中心方向 ~55% 处)
-          const ccx = 50 + (cx-50)*0.5, ccy = 46 + (cy-46)*0.5;
+          const ccx = 50 + (cx-50)*0.5, ccy = CY + (cy-CY)*0.5;
           commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
         }
       }
@@ -948,7 +961,8 @@
       if (iLeaveNow){
         footer = `<button class="pk-b call" id="pkLeave">离桌</button>`;
       } else if (isGuest){
-        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>等房主发下一手…</button>`;
+        // 客人: 下一手由房主引擎自动连发(非手动门), 文案讲清"自动即将开始"别让人以为要等房主点操作。
+        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>下一手自动开始…</button>`;
       } else if (matchOver){
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
       } else {
@@ -974,7 +988,8 @@
       let autoT=null;
       function stopAuto(){ if(autoT){ clearInterval(autoT); autoT=null; } }
       if (!isGuest && !matchOver){
-        let left = (remoteSeats.length>0) ? 5 : 3;
+        // 多局连打提速: 结算只停够看清赢家(联机 3s 让多名真人读摊牌 / 单机 2s), 到点即自动发下一手。
+        let left = (remoteSeats.length>0) ? 3 : 2;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         autoT=setInterval(()=>{
           left--;

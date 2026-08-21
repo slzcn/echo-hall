@@ -70,6 +70,16 @@
   .ddz-seat .cnt{font-size:13px}
   .ddz-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
   .ddz-acts{gap:14px}}
+/* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮, 收紧上下留白, 出牌区不再撑空, 消除"叫分条贴手牌"的挤压 */
+.ddz-room.is-land{--av:38px;--avf:17px;--seatw:130px;--banner:12px;--hand-pad:8px;--cw:40px;--ch:56px;--cn:14px;--cs:11px;--cc:22px;--cmw:26px;--cmh:37px}
+.ddz-room.is-land .ddz-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
+.ddz-room.is-land .ddz-opps{padding:4px 12px 0}
+.ddz-room.is-land .ddz-center{min-height:0;gap:4px}
+.ddz-room.is-land .ddz-played{min-height:50px}
+.ddz-room.is-land .ddz-me{padding:0 14px}
+.ddz-room.is-land .ddz-hand{min-height:74px}
+.ddz-room.is-land .ddz-hand-wrap{padding-bottom:2px}
+.ddz-room.is-land .ddz-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ddz-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
@@ -736,6 +746,7 @@
     // 手牌单排自适应: 牌多时(开局 17~20 张)动态收紧叠放, 永远吃满一行不换行不溢出屏幕。
     // 治斗地主原 CSS 固定 --hand-ov 叠放, 17 张在 390px 上两侧溢出、首尾牌跑到屏外点不到。
     function layoutHand(){
+      if (root.EHTableOrient) root.EHTableOrient.reflect(room);  // 横屏态标记(open/resize/旋转都会过这里)
       const cards = els.hand.children;
       const n = cards.length; if (!n) return;
       const W = els.hand.clientWidth; if (!W) return;

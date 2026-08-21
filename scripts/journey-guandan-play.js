@@ -335,7 +335,7 @@ assert(/if \(rows\)\{/.test(ui), '手动理牌后按玩家排定的两排 {top,b
 // 两排渲染: gd-hand 竖排容器内两个 gd-hand-row(上/下), 卡片带全局阅读序 data-idx 供划选连选
 assert(/gd-hand-row top/.test(ui) && /gd-hand-row bot/.test(ui), 'renderHand 建上/下两个 gd-hand-row 排');
 assert(/\.gd-hand\{[^}]*flex-direction:column/.test(ui), '.gd-hand 竖排布局(容纳上下两排)');
-assert(/function layoutRow\(/.test(ui) && /function layoutHand\(\)\{ for \(const row of els\.hand\.children\) layoutRow/.test(ui),
+assert(/function layoutRow\(/.test(ui) && /function layoutHand\(\)\{[\s\S]*?for \(const row of els\.hand\.children\) layoutRow/.test(ui),
   '每排各自 layoutRow 动态收紧叠放(两排独立排满不溢出)');
 assert(/if\(arrangeMode\)\{ startReorder\(e\); return; \}/.test(ui), '手动模式下 pointerdown 走拖排而非划选(共用手牌指针管道)');
 assert(/function startReorder\(/.test(ui) && /function moveReorder\(/.test(ui) && /function endReorder\(/.test(ui),
