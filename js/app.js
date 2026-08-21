@@ -1,3 +1,9 @@
+// ★app.js 自报内容版本(治"仅主脚本字节漂移"锁死): index.html 用 ?v= 指纹请求本文件, 但 SW 的
+//   serveVersionedJs 走持久 cache-first —— 若某次 CDN 传播延迟把旧字节缓存在了【新】?v= URL 下,
+//   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
+//   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
+//   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
+window.__EH_APP_VER = '20260821-cache-unlock';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [

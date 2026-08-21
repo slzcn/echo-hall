@@ -779,6 +779,33 @@ else
 fi
 
 # ─────────────────────────────────────────
+# 3b. app.js 自报版本 (__EH_APP_VER) == BUILD_VER == index.html 的 app.js?v=
+#     治"仅主脚本字节漂移"：壳(BUILD_VER)与 ver.txt 都最新，但 app.js 若是旧字节，
+#     ver.txt 比对发现不了。三处必须同步，版本自愈才能靠 __EH_APP_VER 交叉验出旧 app.js。
+# ─────────────────────────────────────────
+section "3b. app.js 自报版本 (__EH_APP_VER) 与 BUILD_VER / app.js?v= 一致"
+
+if [ ! -f js/app.js ]; then
+  warn "js/app.js 不存在，跳过"
+elif [ -z "${BUILD_VER:-}" ]; then
+  warn "BUILD_VER 未知，跳过对比"
+else
+  APP_VER="$(grep -oE '__EH_APP_VER *= *["'\'']([^"'\'']+)' js/app.js | head -1 | sed -E 's/.*["'\'']//')"
+  APP_QV="$(grep -oE 'js/app\.js\?v=([^"'\'' ]+)' index.html | head -1 | sed -E 's/.*\?v=//')"
+  if [ -z "$APP_VER" ]; then
+    fail "js/app.js 里没找到 window.__EH_APP_VER 自报版本（版本自愈将漏掉'仅 app.js 字节漂移'）"
+  elif [ "$APP_VER" != "$BUILD_VER" ]; then
+    fail "__EH_APP_VER=$APP_VER 与 BUILD_VER=$BUILD_VER 不一致（改了 app.js 忘了同步自报版本 → 用户可能永远卡旧脚本）"
+  elif [ -z "$APP_QV" ]; then
+    warn "index.html 未找到 js/app.js?v= 引用，跳过指纹对比"
+  elif [ "$APP_QV" != "$BUILD_VER" ]; then
+    fail "index.html 的 app.js?v=$APP_QV 与 BUILD_VER=$BUILD_VER 不一致（SW 按 URL 指纹缓存 → 指纹没变则永久命中旧 app.js）"
+  else
+    pass "__EH_APP_VER=$APP_VER == BUILD_VER == app.js?v= 三处一致"
+  fi
+fi
+
+# ─────────────────────────────────────────
 # 4. 重复 DOM ID 数量回归监控
 # ─────────────────────────────────────────
 section "4. 重复 DOM ID 数量（回归监控）"

@@ -2068,7 +2068,28 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260820-attach-sweep';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260821-cache-unlock';  window.__EH_BUILD_VER=BUILD_VER;
+  // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
+  //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
+  //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
+  //   这里注销全部 SW + 清全部 caches 后强刷, 让下一次加载直连网络拿最新字节。sessionStorage 记一次,
+  //   清完仍旧(疑似源端 ver.txt 与壳真不一致)就停手, 不无限刷。
+  function hardRecover(latest){
+    var guard='eh_hardrecover_'+latest, did=false;
+    try{ did=sessionStorage.getItem(guard)==='1'; }catch(e){}
+    if(did){ console.warn('[EH自愈] 硬恢复后仍非最新, 停止自动重试(疑似源端不一致); 请手动强刷'); return; }
+    try{ sessionStorage.setItem(guard,'1'); }catch(e){}
+    console.warn('[EH自愈] 二次仍旧→硬恢复: 注销 SW + 清缓存 + 强刷');
+    var settled=false;
+    var fin=function(){ if(settled) return; settled=true;
+      try{ var u=new URL(location.href); u.searchParams.set('v',latest); u.searchParams.set('_hr',Date.now()); location.replace(u.toString()); }
+      catch(e){ location.reload(); } };
+    var jobs=[];
+    try{ if('serviceWorker' in navigator){ jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); }).catch(function(){})); } }catch(e){}
+    try{ if(window.caches && caches.keys){ jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); }).catch(function(){})); } }catch(e){}
+    Promise.all(jobs).then(fin).catch(fin);
+    setTimeout(fin, 1500);   // 弱网下清理别挂住, 到点必刷
+  }
   function check(reason){
     var to=null; var done=false;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2083,9 +2104,12 @@
       var latest=(t||'').trim();
       console.info('[EH自愈]',reason,'内嵌='+BUILD_VER,'线上='+latest);
       if(!latest) return;
-      if(latest===BUILD_VER) return;   // 已是最新
+      // ★仅主脚本字节漂移: 壳(BUILD_VER)与 ver.txt 都可能是最新, 但已加载的 app.js 若是旧字节
+      //   (被 SW 持久缓存在新 ?v= URL 下), 这里也要察觉并硬恢复。app.js 启动即写 __EH_APP_VER。
+      try{ var av=window.__EH_APP_VER; if(av && av!==latest){ console.warn('[EH自愈] app.js('+av+')≠线上('+latest+')→硬恢复'); hardRecover(latest); return; } }catch(e){}
+      if(latest===BUILD_VER) return;   // 壳已最新且主脚本一致
       var last=null; try{ last=localStorage.getItem('eh_ver_last'); }catch(e){}
-      if(last===latest){ console.warn('[EH自愈] 已重载过 '+latest+' 仍非最新, 疑似CDN/缓存卡住; 请手动强刷'); return; }
+      if(last===latest){ hardRecover(latest); return; }   // 普通重载后仍旧 = 缓存层锁死, 升级为硬恢复(注销SW+清缓存)
       try{ localStorage.setItem('eh_ver_last',latest); }catch(e){}
       try{ window.__ehJustReloaded=1; }catch(e){}   // 告知 SW controllerchange: 本次重载已处理
       var u=new URL(location.href); u.searchParams.set('v',latest); u.searchParams.set('_r',Date.now());
@@ -2558,7 +2582,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/bgm.js?v=20260818-bgm-contract"></script>
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
-<script defer src="./js/app.js?v=20260820-attach-sweep"></script>
+<script defer src="./js/app.js?v=20260821-cache-unlock"></script>
 <script defer src="./js/keyboard.js?v=20260820-fold-ime-fallback"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
