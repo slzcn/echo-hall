@@ -3,7 +3,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260821-cache-unlock';
+window.__EH_APP_VER = '20260821-nest-heal';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1447,7 +1447,14 @@ function dedupStreamByMid(root){
   const st = root || $('#stream'); if(!st) return 0;
   const seen = new Map();   // mid -> 已保留的节点
   let removed = 0;
-  // 只看 stream 直接子节点(顶层气泡): .echo-bar 等嵌套元素也带同一 data-mid, 用 parentElement 挡掉防误删
+  // ★先清"消息套消息"的嵌套重复(修"同一句冒三遍"真凶之一): 正常一条 .msg 内部只有 .meta/.txt/.echo-bar,
+  //   绝不会嵌另一条完整 .msg。历史上 refreshSnapshotTail 的空框修复曾把整条 msg replaceWith 进 .body(echo-bar
+  //   原位), 且这份坏 DOM 会被 persistRoomSnap 烘焙进快照反复复现。这类嵌套 .msg 顶层 dedup 看不见(它不是 #stream
+  //   直接子), 故先无条件摘除——一条 .msg 只要落在另一条 .msg 内部就是错的, 直接 remove。
+  st.querySelectorAll('.msg .msg[data-mid]').forEach(nested=>{
+    try{ nested.remove(); removed++; }catch(_){}
+  });
+  // 再看 stream 直接子节点(顶层气泡): .echo-bar 等嵌套元素也带同一 data-mid, 用 parentElement 挡掉防误删
   st.querySelectorAll(':scope > [data-mid]').forEach(el=>{
     const mid = String(el.dataset.mid||'');
     if(!mid || mid.startsWith('local_')) return;   // 乐观上屏的临时 id 尚未回填真 id, 不参与
@@ -1828,7 +1835,14 @@ async function refreshSnapshotTail(room, fillOlder=false){
     // 扫所有带 mid 的行(含 .msg / .ixmsg 互动 / .actmsg / .recalled-tip), 别只扫 .msg——
     // 否则互动/act 行不计入 domMaxMid, 且下面判重也漏, 刷新补拉会把它们反复 append(重复bug真因)。
     const domByMid=new Map();
-    stream.querySelectorAll('[data-mid]').forEach(e=>{ const key=String(e.dataset.mid||''); if(key) domByMid.set(key,e); const id=+key; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id; });
+    stream.querySelectorAll('[data-mid]').forEach(e=>{
+      // ★铁律(修"同一句冒三遍"真凶): 只认【消息行本身】, 跳过嵌在消息体内的同 mid 元素(.echo-bar 也带 data-mid)。
+      //   否则 echo-bar 在 DOM 里排在 .msg 之后 → domByMid.set 把同 mid 的映射覆盖成 echo-bar → 下面"空框修复"
+      //   见 echo-bar 无 .txt 误判为空框 → exist.replaceWith(整条msg) → 把一整条 .msg 塞进 .body(echo-bar 原位)
+      //   = 消息里套消息, 而 dedupStreamByMid 只扫 #stream 直接子节点看不见这层嵌套 → 永远不自愈。
+      if(e.parentElement && e.parentElement.closest('[data-mid]')) return;   // 有 [data-mid] 祖先 = 嵌套元素, 不是消息行
+      const key=String(e.dataset.mid||''); if(key) domByMid.set(key,e); const id=+key; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id;
+    });
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
