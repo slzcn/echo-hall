@@ -134,6 +134,17 @@
       const all = genCombos(hand, level, g.wilds.length);
       const fin = all.find(c=>c.cards.length===hand.length && Rules.beats(c.parse, target, level));
       if (fin) return { action:'play', cards: fin.cards };
+      // ★队友垫牌助攻(治"队友灵魂总不出牌"): 对家领出的是小牌、我手里还多时, 用一手「小而不拆大牌、
+      //   不用百搭/炸」的牌接管这一轮 —— 逼下家对手拿更大的牌来压(帮队友给对手制造难度)+ 清自己散张。
+      //   严设限: 对家快走完(≤2)就让他; 只甩点数不高(≤10)、代价低的天然牌; 自己手牌够多(>4)才垫。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (ctx.coop!==false && hand.length > 4 && leaderLeft >= 3){
+        const cheap = genCombos(hand, level, 0)
+          .filter(c=> !Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level)
+                      && c.parse.key <= 10 && playCost(c,hand,level) < 15)
+          .sort((a,b)=> playCost(a,hand,level)-playCost(b,hand,level) || a.parse.key-b.parse.key)[0];
+        if (cheap) return { action:'play', cards: cheap.cards };
+      }
       // 对家出的大牌基本稳赢, 让
       return { action:'pass' };
     }
@@ -158,7 +169,9 @@
       const best = follow[0];
       // ★压制对手(协作): 走到这里桌面必是对手领出(对家领出已在上面让牌)。别为保 A/级大单张
       //   而放对手过牌滚雪球 —— 主动接管牌权打断对手节奏。故协作开启时取消对手领出的保牌 pass。
-      if (!urgent && !coopMe && best.parse.type==='single' && best.parse.key>=14 && hand.length>4)
+      // ★卡对手: 领出这手的真对手快走完(≤4)时别为保 A/级大单而 pass, 主动卡住他。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (!urgent && !coopMe && leaderLeft>4 && best.parse.type==='single' && best.parse.key>=14 && hand.length>4)
         return { action:'pass' };
       return { action:'play', cards: best.cards };
     }

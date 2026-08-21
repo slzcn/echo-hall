@@ -292,6 +292,13 @@
     }
   }
   const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
+  // 语音报牌型(主人要求): 只报显著牌型(炸弹/天王炸/三带二/钢板/顺子…), 单张/对子/三张不絮叨。
+  const VOICE_SKIP = new Set(['single','pair','trio']);
+  function sayPlay(p){
+    if(!p || VOICE_SKIP.has(p.type)) return;
+    const lab = typeLabel(p);
+    if(lab && root.EhSfx && root.EhSfx.say) root.EhSfx.say(lab);
+  }
 
   function cardEl(card, level, opts){
     opts = opts || {};
@@ -685,6 +692,7 @@
           boom(bn);
           emitBeat({ type:'bomb', actor:nm, big:true, text:`💥 ${nm} 甩出${bn.replace(/ /g,'')}！`, quip: beatQuip(lp.seat, 'bomb') });
         } else if (lp.seat!==mySeat) sfx('cardplay');
+        sayPlay(lp.parse);                                // 语音报牌型
         // 报单: 出完只剩最后一张(solo 有真实手牌; guest 脱敏跳过)
         const rest = st.players[lp.seat].hand;
         if (Array.isArray(rest) && rest.length === 1)
@@ -1171,24 +1179,44 @@
       }
       if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
-      if (!isGuest) over.querySelector('#gdAgain').addEventListener('click', ()=>{
-        if (over._leaving) return; over._leaving = true;   // 防连点: 过渡中重复点被吞, 不重复开副
-        // 先把下一副的升级/庄/进贡上下文捕获好(同步), 再走淡出 → 重建, 避免瞬拆硬切(对标腾讯"打下一副"衔接)。
-        if (res.matchWon){ matchLevels=[2,2]; matchDealer=0; prevResult=null; }
-        else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
-          prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
-        over.classList.add('out');
-        const go = ()=>{
-          over.remove();
-          st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
-          rows=null; if(arrangeMode) setArrange(false);
-          sfx('deal'); broadcast(); renderAll(); showTributeBanner();
+      const againBtn = over.querySelector('#gdAgain');
+      const clearAgainTimer = ()=>{ if (over._againTimer){ clearInterval(over._againTimer); over._againTimer=null; } };
+      if (!isGuest){
+        const startRematch = ()=>{
+          if (over._leaving) return; over._leaving = true;   // 防连点: 过渡中重复点被吞, 不重复开副
+          clearAgainTimer();
+          // 先把下一副的升级/庄/进贡上下文捕获好(同步), 再走淡出 → 重建, 避免瞬拆硬切(对标腾讯"打下一副"衔接)。
+          if (res.matchWon){ matchLevels=[2,2]; matchDealer=0; prevResult=null; }
+          else { matchLevels=res.teamLevelsAfter.slice(); matchDealer=res.nextDealerTeam;
+            prevResult={ finishOrder:res.finishOrder.slice(), winnerTeam:res.winnerTeam }; }
+          over.classList.add('out');
+          const go = ()=>{
+            over.remove();
+            st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
+            rows=null; if(arrangeMode) setArrange(false);
+            sfx('deal'); broadcast(); renderAll(); showTributeBanner();
+          };
+          let done=false; const once=()=>{ if(done) return; done=true; go(); };
+          over.addEventListener('animationend', once, { once:true });
+          setTimeout(once, 400);   // 动画事件兜底(被打断/不触发也不卡在战报页)
         };
-        let done=false; const once=()=>{ if(done) return; done=true; go(); };
-        over.addEventListener('animationend', once, { once:true });
-        setTimeout(once, 400);   // 动画事件兜底(被打断/不触发也不卡在战报页)
-      });
-      over.querySelector('#gdDone').addEventListener('click', close);
+        againBtn.addEventListener('click', startRematch);
+        // ★默认再来一局(主人要求): 收局后自动倒计时开下一副, 期间按钮读秒; 点它立刻开、点"收工"取消。
+        //   通关(matchWon)是整场终点, 不自动续 —— 让人看清通关战报再决定新对局。折叠期间暂停读秒。
+        if (!res.matchWon){
+          let left = 5;
+          const baseLbl = '打下一副';
+          againBtn.textContent = `${baseLbl} (${left})`;
+          over._againTimer = setInterval(()=>{
+            if (!over.isConnected){ clearAgainTimer(); return; }
+            if (minimized) return;
+            left--;
+            if (left <= 0){ clearAgainTimer(); startRematch(); return; }
+            if (!over._leaving) againBtn.textContent = `${baseLbl} (${left})`;
+          }, 1000);
+        }
+      }
+      over.querySelector('#gdDone').addEventListener('click', ()=>{ clearAgainTimer(); close(); });
       // F3 终局战报进聊天流(升级/双下/通关一并播报); 头游若是灵魂配一句收官台词
       const champSeat = res.finishOrder[0];
       emitBeat({ type:'over', actor:st.players[champSeat]?st.players[champSeat].name:winSide, big:true,

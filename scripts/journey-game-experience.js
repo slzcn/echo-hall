@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * journey-game-experience.js — 联机状态、后台提醒、战报回看升级旅程
+ * journey-game-experience.js — 联机状态、后台提醒升级旅程
  *
  * 覆盖本次用户可见行为：
  * 1. 德州/掼蛋 guest 牌桌真实渲染连接状态，并在重连/房主离线时锁住操作；
  * 2. 恢复 online 后状态提示消失、操作链恢复；
  * 3. 非 0 座位通过 mySeat() 暴露给后台“轮到我”判断；
  * 4. app.js 含 host_ping 8s 心跳、15s 离线判定、后台 title/通知提醒；
- * 5. 三类战绩卡都有回看入口，ehShowReplay 必须调用对应引擎 replay()；
- * 6. 三个引擎使用真实完整 log 重建终局，防“只有摘要、没有 replay”回退。
+ * 5. 回看(前端弹层)已按用户要求下线；引擎级 replay 仍由 test/journey-*-play 守护。
  */
 const fs = require('fs');
 const path = require('path');
@@ -26,17 +25,11 @@ assert(/gap>15000/.test(APP) && /setConn\('host_offline'\)/.test(APP), 'guest 15
 assert(/CHANNEL_ERROR'\|\|status==='TIMED_OUT'\|\|status==='CLOSED/.test(APP) && /setConn\('reconnecting'\)/.test(APP), 'Realtime 错误/超时/关闭进入重连中');
 assert(/document\.hidden[\s\S]{0,220}_isMyTurnInGame/.test(APP) && /new Notification\('🫵 轮到你出牌/.test(APP), '后台轮到我触发标题与已授权桌面通知');
 assert(!/Notification\.requestPermission/.test(APP), '不主动弹通知授权框，只在用户已授权时渐进增强');
-assert((APP.match(/data-eh-replay="1"/g)||[]).length===3, '斗地主/掼蛋/德州三张战绩卡都有回看按钮');
-assert(/window\.EHDdzEngine[\s\S]{0,160}window\.EHGuandanEngine[\s\S]{0,160}window\.EHPokerEngine/.test(APP), '回看按游戏选择正确引擎');
-assert(/engine\.replay\(g\.log\)/.test(APP) && /replayed\.phase!==['"]over['"]/.test(APP), '回看先调用 replay(log) 并校验终局，不以摘要冒充回看');
-// 「三家都看不了」真修: 内存 __ehLastGame 是 host-only + 刷新即丢 + 每局覆盖, 大多数点击落空。
-// 现按游戏类型传参, 内存缺失/不匹配时回落战绩库最近一局(eh_game_results.moves)重建, 访客/刷新后也能看。
-assert(/ehShowReplay\('ddz'\)/.test(APP) && /ehShowReplay\('gd'\)/.test(APP) && /ehShowReplay\('nlhe'\)/.test(APP),
-  '三张战绩卡按游戏类型调 ehShowReplay(DB 回落时按 game 精准取那一局)');
-assert(/async function ehLoadReplayFromDb\([\s\S]*?from\('eh_game_results'\)[\s\S]*?order\('ended_at'/.test(APP),
-  '内存没有时回落战绩库(eh_game_results)拉最近一局 moves 重建回看');
-assert(/const R = g\.res \|\| replayed\.result/.test(APP),
-  '结算摘要内存 res 优先, 缺失(访客/DB回看)取引擎重建终局 result —— 无 res 也能出结算行');
+// 回看(前端弹层)已按用户要求下线: 战绩卡不再有 📖 回看按钮, 也无 ehShowReplay/ehLoadReplayFromDb UI。
+// 注意: 引擎级 replay(seed+log 重建校验)仍保留(见 test-ddz/guandan-engine + journey-*-play), 那是结算复核命门, 不受影响。
+assert(!/data-eh-replay/.test(APP), '战绩卡已移除回看按钮(data-eh-replay 不复存在)');
+assert(!/ehShowReplay/.test(APP) && !/ehLoadReplayFromDb/.test(APP) && !/eh-replay-modal/.test(APP),
+  '回看弹层 UI 全部下线(无 ehShowReplay / ehLoadReplayFromDb / eh-replay-modal)');
 
 function findChrome(){
   const cands=['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/Applications/Chromium.app/Contents/MacOS/Chromium',process.env.CHROME_PATH].filter(Boolean);
@@ -98,6 +91,6 @@ async function main(){
   if(!chromium||!exe){ console.log('⏭ 跳过连接状态真实渲染：'+(!chromium?'playwright 未安装':'未找到 Chrome')); }
   else { const browser=await chromium.launch({executablePath:exe}); await pokerTrip(browser); await guandanTrip(browser); await browser.close(); }
   if(failed){ console.error(`\n❌ 游戏体验旅程 ${step} 步有失败`); process.exit(1); }
-  console.log(`\n✅ 游戏体验旅程 ${step} 步全通过：连接可见/断线锁操作/房主离线/非0座位/后台提醒/回看重建`);
+  console.log(`\n✅ 游戏体验旅程 ${step} 步全通过：连接可见/断线锁操作/房主离线/非0座位/后台提醒/回看已下线`);
 }
 main().catch(e=>{console.error(e);process.exit(1);});

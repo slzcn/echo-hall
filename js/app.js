@@ -3,7 +3,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260821-nest-heal';
+window.__EH_APP_VER = '20260821-game-polish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -403,12 +403,37 @@ const EhSfx=(function(){
     try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error','back'].includes(name)) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
   }
   function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
+  // ── 语音报牌型(斗地主/掼蛋: "炸弹""三带二""顺子"…) ──
+  //   系统 TTS(speechSynthesis), 复用 sfx 的 enabled 开关; 抢占式(打断上一句只报最新这手), 由调用方筛显著牌型不絮叨。
+  let _voice=null, _voiceTried=false;
+  function pickVoice(){
+    try{
+      const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
+      if(!vs.length) return null;
+      return vs.find(v=>/zh[-_]?CN/i.test(v.lang)&&/China|普通话|Tingting|Mandarin|Yaoyao|Kangkang/i.test(v.name))
+          || vs.find(v=>/zh[-_]?(CN|Hans)/i.test(v.lang))
+          || vs.find(v=>/^zh/i.test(v.lang)) || null;
+    }catch(e){ return null; }
+  }
+  function say(text){
+    if(!enabled||!text) return;
+    try{
+      if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
+      if(!_voiceTried){ _voice=pickVoice(); _voiceTried=true;
+        try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); }; }catch(e){} }
+      const u=new SpeechSynthesisUtterance(String(text));
+      u.lang='zh-CN'; u.rate=1.12; u.pitch=1.0; u.volume=.9;
+      if(_voice) u.voice=_voice;
+      try{ speechSynthesis.cancel(); }catch(e){}   // 抢占: 打断上一句, 只报最新这手牌型
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
   try{
     // ★补: 使用 { once:true } — 首次手势后自动解绑，避免长生命周期里每次点击都跑 ensure
     ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true,once:true}));
     document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ctx&&ctx.state!=='running') ctx.resume(); },{passive:true});
   }catch(e){}
-  return {play,playClick,setEnabled(v){enabled=!!v},isEnabled(){return enabled},unlock};
+  return {play,playClick,setEnabled(v){enabled=!!v; if(!enabled){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }},isEnabled(){return enabled},unlock,say};
 })();
 window.EhSfx=EhSfx;
 function ehFx(el, cls, ms){ if(!el) return; try{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(()=>el.classList.remove(cls),ms||650); }catch(e){} }
@@ -2584,7 +2609,6 @@ function gtLaunchPoker(row){
       if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
-      ehStashLastGame('nlhe', res, log, A.names, meta);
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       postTexasResult(res,A.names,meta).catch(()=>{});
       // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
@@ -2670,7 +2694,6 @@ function gtLaunchGuandan(row){
       try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
     },
     onResult:(res,log,meta)=>{
-      ehStashLastGame('gd', res, log, A.names, meta);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
@@ -2764,7 +2787,6 @@ function gtLaunchDdz(row){
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       postDdzResult(res, A.names).catch(()=>{});
-      ehStashLastGame('ddz', res, log, A.names, meta);
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
       // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
@@ -3174,12 +3196,10 @@ function buildGameEl(m){
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🃏</span><span class="gc-kind">斗地主 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
       +`<div class="ddz-scoreline"><span class="ddz-role">${role}</span><span class="ddz-score-r"><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">分</span></span></div>`
       +`<div class="ddz-detail">${lordName?('👑 '+lordName+' 坐庄 · '):''}${lordWon?'地主赢':'农民赢'} · 底分 ${base} ×${mult}${bombs?(' · '+bombs+'炸'):''}${spring?' · 🌸春天':''}</div>`
-      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-ddz-again="1">🃏 再来一局</button><span class="gc-tip">或发 <b>/斗地主</b></span></div>`;
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-ddz-again="1">🃏 再来一局</button><span class="gc-tip">或发 <b>/斗地主</b></span></div>`;
     // "再来一局"直接开新局(每张卡各自 onclick, 历史重渲也各自绑定, 不叠监听——避免 #stream 委托增开 addEventListener)
     const again=el.querySelector('[data-ddz-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchDoudizhu(); }catch(_){} };
-    const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('ddz'); }catch(_){} };
     return el;
   }
   // 🎴 掼蛋战绩卡: game|gd|<win|lose>|<advance>|<fromLvl>|<toLvl>|<doubleDown 0/1>|<matchWon 0/1>|<myRankIdx 0-3>|<bombs>|<队友名…>
@@ -3203,11 +3223,9 @@ function buildGameEl(m){
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎴</span><span class="gc-kind">掼蛋 · ${win?'胜':'负'}</span><span class="gc-host">${host}</span></div>`
       +`<div class="ddz-scoreline"><span class="ddz-role">${RANKN[myRankIdx]||'—'}</span><span class="ddz-score-r"><b class="ddz-delta">${lvlName(fromLvl)}→${lvlName(toLvl)}</b><span class="ddz-unit">${matchWon?'🏆':'级'}</span></span></div>`
       +`<div class="ddz-detail">${headline} · ${doubleDown?'双下 +3 级':'单下 +'+advance+' 级'}${mateName?(' · 队友 '+mateName):''}${bombs?(' · '+bombs+'炸'):''}</div>`
-      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-gd-again="1">🎴 再来一局</button><span class="gc-tip">或发 <b>/掼蛋</b></span></div>`;
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-gd-again="1">🎴 再来一局</button><span class="gc-tip">或发 <b>/掼蛋</b></span></div>`;
     const again=el.querySelector('[data-gd-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchGuandan(); }catch(_){} };
-    const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('gd'); }catch(_){} };
     return el;
   }
   // 🎰 德州扑克战绩卡: game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
@@ -3226,11 +3244,9 @@ function buildGameEl(m){
     el.innerHTML=`<div class="gc-head"><span class="gc-emoji">🎰</span><span class="gc-kind">德州扑克 · ${title}</span><span class="gc-host">${host}</span></div>`
       +`<div class="ddz-scoreline"><span class="ddz-role">这手</span><span class="ddz-score-r"><b class="ddz-delta">${delta>=0?'+':''}${delta}</b><span class="ddz-unit">筹码</span></span></div>`
       +`<div class="ddz-detail">${champName?('🏆 '+champName+' 赢下 '+pot+' 底池'):('赢下 '+pot+' 底池')}${hand&&hand!=='-'?(' · '+hand):''}</div>`
-      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-eh-replay="1">📖 回看</button><button class="ddz-again-btn" data-nlhe-again="1">🎰 下一局</button><span class="gc-tip">或发 <b>/德州</b></span></div>`;
+      +`<div class="ddz-again-row"><button class="ddz-again-btn" data-nlhe-again="1">🎰 下一局</button><span class="gc-tip">或发 <b>/德州</b></span></div>`;
     const again=el.querySelector('[data-nlhe-again]');
     if(again) again.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ launchTexas(); }catch(_){} };
-    const rp=el.querySelector('[data-eh-replay]');
-    if(rp) rp.onclick=()=>{ try{ if(window.EhSfx&&window.EhSfx.play) window.EhSfx.play('click'); }catch(_){}; try{ ehShowReplay('nlhe'); }catch(_){} };
     return el;
   }
   return null;
@@ -6883,119 +6899,6 @@ async function gtSeatSoulsIntoEmpties(row){
 // 兼容旧命令 /德州联机 与既有调用点: 已与 /德州 合并为同一张真牌桌
 async function launchTexasOnline(){ return launchTexas(); }
 // 结束后往聊天室发一张德州战绩卡(kind:'game', nlhe 事件): game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
-// ─────────── 战报回看: 内存缓存最近一局(seed+log+meta), 弹层展示重要节点 ───────────
-// 数据源: 引擎 replay(log) 已存在(poker/ddz/guandan 三家 engine 都有), 回看 = 前端跑 replay 拿关键节点渲染。
-// 存活周期: 一局结束缓存一份, 下局开始被覆盖。不落库不加接口 —— 最小改动能立刻用起来的方案。
-window.__ehLastGame = null;   // { game:'ddz|gd|nlhe', log, res, names, meta, at }
-function ehStashLastGame(game, res, log, names, meta){
-  try{ window.__ehLastGame = { game, log:(log||[]).slice(), res:res||null, names:(names||[]).slice(), meta:meta||null, at:Date.now() }; }catch(_){ }
-}
-// 回看入口: 内存(host 刚打完那局)优先; 访客/刷新过/被下一局覆盖/点的是旧卡 →
-// 回落到战绩库拉最近一局(可按游戏类型精准取)重建。这是"三家都看不了"的真修: 旧版只认
-// 内存 window.__ehLastGame(host-only + 刷新即丢 + 每局覆盖), 绝大多数点击都落空成"没有可回看的记录"。
-function ehShowReplay(preferGame){
-  const mem = window.__ehLastGame;
-  if(mem && mem.log && mem.log.length && (!preferGame || mem.game===preferGame)){ ehRenderReplay(mem); return; }
-  ehLoadReplayFromDb(preferGame).then(g=>{
-    if(!g || !g.log || !g.log.length){ try{ toast('没有可回看的记录 · 打完一局再来'); }catch(_){ } return; }
-    ehRenderReplay(g);
-  }).catch(()=>{ try{ toast('回看加载失败 · 稍后再试'); }catch(_){ } });
-}
-// 从战绩库拉当前房最近一局(可按 game 过滤)重建。res 留空交给引擎 replay 的终局 result 补齐,
-// 故访客(从不跑引擎、手里没有 res)也能出结算摘要。只取重建必需的 moves(权威 log)+ players(席位名)。
-async function ehLoadReplayFromDb(preferGame){
-  if(!sb || !curRoom) return null;
-  let q = sb.from('eh_game_results').select('game,players,moves,ended_at')
-    .eq('room_id', curRoom.id).order('ended_at',{ascending:false}).limit(1);
-  if(preferGame) q = q.eq('game', preferGame);
-  const { data, error } = await q;
-  if(error || !data || !data.length) return null;
-  const row = data[0];
-  if(!row.moves || !row.moves.length) return null;
-  const names=[]; (row.players||[]).forEach(pl=>{ if(pl && typeof pl.seat==='number') names[pl.seat]=pl.name||('席'+pl.seat); });
-  return { game: row.game, log: row.moves, res: null, names, meta:null, at:0 };
-}
-function ehRenderReplay(g){
-  if(!g || !g.log || !g.log.length){ try{ toast('没有可回看的记录 · 打完一局再来'); }catch(_){ } return; }
-  // 移除旧层
-  const prev = document.querySelector('.eh-replay-modal'); if(prev) prev.remove();
-  // 先调用引擎 replay() 完整重建并校验终局；重建失败不伪装成可回看。
-  let replayed = null;
-  try{
-    const engine = g.game==='ddz' ? window.EHDdzEngine : (g.game==='gd' ? window.EHGuandanEngine : window.EHPokerEngine);
-    if(!engine || typeof engine.replay!=='function') throw new Error('回看引擎未加载');
-    replayed = engine.replay(g.log);
-    if(!replayed || replayed.phase!=='over') throw new Error('日志未收敛到终局');
-  }catch(e){ try{ toast('回看重建失败 · '+(e&&e.message?e.message:'日志不完整')); }catch(_){ } return; }
-  // 结算摘要: 内存 res 优先, 缺失(DB/访客回看)则取引擎重建的权威终局 result —— 两条路都能出结算行
-  const R = g.res || replayed.result || {};
-  const names = g.names || [];
-  // 生成关键节点摘要
-  let lines = [];
-  try{
-    if(g.game==='ddz'){
-      const bids = g.log.filter(e=>e.t==='call').map(e=>({seat:e.seat, val:e.val}));
-      const plays = g.log.filter(e=>e.t==='play' || e.t==='pass');
-      const bombs = g.log.filter(e=>e.t==='play' && e.cards && e.cards.length===4).length;   // 粗估
-      const dealE = g.log.find(e=>e.t==='deal');
-      lines.push(`🃏 斗地主 · seed=${dealE?dealE.seed:'?'}`);
-      if(bids.length){ lines.push('叫分: ' + bids.map(b=>(names[b.seat]||('席'+b.seat))+'='+b.val).join(' → ')); }
-      lines.push('总动作: ' + plays.length + ' 步' + (bombs?(' · 疑似炸弹 '+bombs):''));
-      if(R.landlord!=null){ lines.push('结算: 地主=' + (names[R.landlord]||'?') + ' · 得分=' + (R.score||0) + ' ×' + (R.finalMultiplier||1)); }
-    } else if(g.game==='gd'){
-      const plays = g.log.filter(e=>e.t==='play');
-      const passes = g.log.filter(e=>e.t==='pass');
-      const bombs = g.log.filter(e=>e.t==='play' && e.parse && (e.parse.kind==='bomb'||e.parse.kind==='joker_bomb'||e.parse.kind==='straight_flush')).length;
-      const dealE = g.log.find(e=>e.t==='deal');
-      lines.push(`🎴 掼蛋 · 打 ${dealE?dealE.level:'?'} · seed=${dealE?dealE.seed:'?'}`);
-      lines.push('出牌 ' + plays.length + ' 次 · 过牌 ' + passes.length + ' 次' + (bombs?(' · 炸弹 '+bombs):''));
-      if(R.winnerTeam!=null){ lines.push('结算: 胜方=' + (R.winnerTeam===0?'我方':'对方') + ' · 升级=' + (R.advance||0)); }
-    } else if(g.game==='nlhe'){
-      const acts = g.log.filter(e=>e.t==='action');
-      const streetCounts = {};
-      acts.forEach(a=>{ streetCounts[a.street||'?'] = (streetCounts[a.street||'?']||0)+1; });
-      const dealE = g.log.find(e=>e.t==='deal');
-      lines.push(`🎰 德州扑克 · seed=${dealE?dealE.seed:'?'}`);
-      lines.push('总动作: ' + acts.length + ' 步 · 街分布: ' + Object.entries(streetCounts).map(([k,v])=>k+'='+v).join(' / '));
-      if(R.pots || R.winnersBySeat){
-        const pot = (R.pots||[]).reduce((a,pt)=>a+pt.amount,0);
-        const champ = (R.winnersBySeat||[]).map(x=>names[x]||('席'+x)).join('、');
-        lines.push('结算: 底池=' + pot + (champ?(' · 赢家=' + champ):'') + (R.wentToShowdown?' · 摊牌':' · 未摊牌'));
-      }
-    }
-  }catch(e){ lines.push('(摘要解析失败: '+e.message+')'); }
-  // 弹层
-  const bg = document.createElement('div');
-  bg.className='eh-replay-modal';
-  bg.innerHTML = '<div class="rp-card">'
-    + '<div class="rp-head"><b>📖 上一手回看</b><button class="rp-x" aria-label="关闭">×</button></div>'
-    + '<div class="rp-body">' + lines.map(l=>'<div class="rp-line">'+String(l).replace(/</g,'&lt;')+'</div>').join('') + '</div>'
-    + '<div class="rp-tip">已用引擎 replay() 从本局 seed + 权威 log 完整重建并校验终局</div>'
-    + '</div>';
-  document.body.appendChild(bg);
-  const close=()=>{ bg.remove(); };
-  bg.onclick = (e)=>{ if(e.target===bg) close(); };   // onclick 属性赋值不算 addEventListener 计数
-  bg.querySelector('.rp-x').onclick=close;
-  // 一次性注入 CSS(全局唯一)
-  if(!document.getElementById('eh-replay-modal-css')){
-    const st=document.createElement('style'); st.id='eh-replay-modal-css';
-    st.textContent = '.eh-replay-modal{position:fixed;inset:0;z-index:2100;display:grid;place-items:center;background:rgba(4,10,16,.66);backdrop-filter:blur(6px);animation:rpIn .2s ease}'
-      + '@keyframes rpIn{from{opacity:0}to{opacity:1}}'
-      + '@media (prefers-reduced-motion:reduce){.eh-replay-modal{animation:none!important}.eh-replay-modal *{scroll-behavior:auto!important}}'
-      + '.eh-replay-modal .rp-card{width:min(90vw,420px);background:linear-gradient(160deg,var(--panel-solid,#0f1e2b),var(--bg2,#0a1220));border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;padding:14px 16px;color:var(--ink,#eaf6ff);box-shadow:0 20px 60px rgba(0,0,0,.6)}'
-      + '.eh-replay-modal .rp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}'
-      + '.eh-replay-modal .rp-head b{font-size:15px;letter-spacing:.03em}'
-      + '.eh-replay-modal .rp-x{background:transparent;border:none;color:var(--sub,#86cbc6);font-size:22px;line-height:1;cursor:pointer;padding:0 4px}'
-      + '.eh-replay-modal .rp-body{font-size:13px;line-height:1.7;color:var(--sub,#c6e0dc);white-space:pre-wrap;word-break:break-word}'
-      + '.eh-replay-modal .rp-line{padding:3px 0;border-bottom:1px dashed rgba(0,229,212,.08)}'
-      + '.eh-replay-modal .rp-line:last-child{border-bottom:none}'
-      + '.eh-replay-modal .rp-tip{margin-top:8px;font-size:11px;color:var(--sub,#86cbc6);opacity:.7}';
-    document.head.appendChild(st);
-  }
-}
-// 兼容不同 postXxxResult 签名: 挂给 window 便于战绩卡按钮点击调用
-window.ehShowReplay = ehShowReplay;
-
 async function postTexasResult(res, names, meta){
   if(!myUid || !curRoom) return;
   const delta=(meta&&meta.delta)||0;

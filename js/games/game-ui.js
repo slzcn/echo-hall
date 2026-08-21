@@ -660,6 +660,7 @@
             text: `💥 ${nm} ${rocket?'放了王炸':'扔出炸弹'}！倍数 ×${st.multiplier}`,
             quip: beatQuip(lp.seat, rocket?'rocket':'bomb') });
         } else if (lp.seat!==mySeat) sfx('cardplay');   // 对手落牌拍击音(我自己出牌的音在 doPlay)
+        sayPlay(lp.parse);                                // 语音报牌型(炸弹已含在报里, 顶替不了拍击音)
         // 报单: 这手出完只剩最后一张(solo 才有真实手牌; guest 手牌脱敏跳过)
         const rest = st.players[lp.seat].hand;
         if (Array.isArray(rest) && rest.length === 1)
@@ -896,6 +897,13 @@
       }
     }
     const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='rocket');
+    // 语音报牌型(主人要求): 只报显著牌型(炸弹/火箭/三带二/顺子/飞机…), 单张/对子/三张不絮叨。
+    const VOICE_SKIP = new Set(['single','pair','trio']);
+    function sayPlay(p){
+      if(!p || VOICE_SKIP.has(p.type)) return;
+      const lab = typeLabel(p);
+      if(lab && root.EhSfx && root.EhSfx.say) root.EhSfx.say(lab);
+    }
     function updatePlayBtn(){
       const btn = $('#ddzPlay'); if (!btn) return;
       const cards = [...selected].map(findCardById);
@@ -1136,18 +1144,34 @@
       else { sfx('void'); vibrate(120); }
       // guest 无权开新一局: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报; 只留"收工"
       const againBtn = over.querySelector('#ddzAgain');
+      const clearAgainTimer = ()=>{ if (over._againTimer){ clearInterval(over._againTimer); over._againTimer=null; } };
       if (isGuest){ againBtn.textContent='等房主开局…'; againBtn.disabled=true; }
-      else againBtn.addEventListener('click', ()=>{
-        if (over._leaving) return; over._leaving = true;   // 防连点
-        // 丝滑过渡(对标腾讯): 结算面板先淡出下沉 ~.34s, 再拆掉重建新局 → 顺势接发牌入场动画, 不再"啪"地跳切。
-        showOver._done=false;
-        over.classList.add('out');
-        const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
-        let done=false; const once=()=>{ if(done) return; done=true; go(); };
-        over.addEventListener('animationend', once, { once:true });
-        setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
-      });
-      over.querySelector('#ddzDone').addEventListener('click', close);
+      else {
+        const startRematch = ()=>{
+          if (over._leaving) return; over._leaving = true;   // 防连点
+          clearAgainTimer();
+          // 丝滑过渡(对标腾讯): 结算面板先淡出下沉 ~.34s, 再拆掉重建新局 → 顺势接发牌入场动画, 不再"啪"地跳切。
+          showOver._done=false;
+          over.classList.add('out');
+          const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
+          let done=false; const once=()=>{ if(done) return; done=true; go(); };
+          over.addEventListener('animationend', once, { once:true });
+          setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
+        };
+        againBtn.addEventListener('click', startRematch);
+        // ★默认再来一局(主人要求): 收局后自动倒计时开新局, 期间"再来一局"按钮读秒; 点它立刻开、点"收工"取消。
+        //   折叠(离席看聊天)期间暂停读秒不打扰; 战报被拆掉(!isConnected)即停表, 防 close 后仍偷偷开局。
+        let left = 5;
+        againBtn.textContent = `再来一局 (${left})`;
+        over._againTimer = setInterval(()=>{
+          if (!over.isConnected){ clearAgainTimer(); return; }
+          if (minimized) return;                    // 折叠中暂停读秒
+          left--;
+          if (left <= 0){ clearAgainTimer(); startRematch(); return; }
+          if (!over._leaving) againBtn.textContent = `再来一局 (${left})`;
+        }, 1000);
+      }
+      over.querySelector('#ddzDone').addEventListener('click', ()=>{ clearAgainTimer(); close(); });
       if (typeof opts.onResult === 'function'){
         try { opts.onResult(res, st.log, { mySeat, roleTxt }); } catch(_){}
       }

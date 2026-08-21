@@ -245,6 +245,17 @@
     if (isTeammateLead(ctx)){
       const finisher = plays.find(p => p.cards.length === hand.length);
       if (finisher) return { action:'play', cards: finisher.cards };
+      // ★队友垫牌助攻(治主人反馈"队友灵魂总不出牌"): 队友领出的是小牌、我手里还多且有便宜散牌可甩时,
+      //   用一手「小而不拆大牌」的牌接管这一轮 —— 逼下家对手拿出更大的牌来压(帮队友给对手制造难度),
+      //   顺带清掉自己的散张。严设限防搅局: 绝不用炸/王压队友; 队友快走完(≤2 张)就让他赢这轮;
+      //   只甩点数不高(≤J)、代价低(不拆炸/三条/王)的牌; 自己手牌够多(>4)才值得垫。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (ctx.coop!==false && plays.length && hand.length > 4 && leaderLeft >= 3){
+        const cheap = plays
+          .filter(p => p.parse.key <= 11 && playCost(p,hand) < 15)   // 小牌型且不拆大牌
+          .sort((a,b)=> playCost(a,hand)-playCost(b,hand) || a.parse.key-b.parse.key)[0];
+        if (cheap) return { action:'play', cards: cheap.cards };
+      }
       return { action:'pass' };
     }
 
@@ -260,7 +271,11 @@
       // ★压制地主(队友协作): 我是农民、桌面这手正是地主领出的 → 别为"保 2/A 大单张"而放地主过牌。
       //   地主一旦顺出散牌就滚雪球; 农民该主动接管牌权把地主的节奏打断。故面对地主领出时取消保牌 pass。
       const suppressLandlord = ctx.coop!==false && isPeasantSeat(ctx, ctx.seat) && ctx.lastSeat===ctx.landlord;
-      if (!urgent && !suppressLandlord && best.parse.type==='single' && best.parse.key >= 14 && hand.length > 4){
+      // ★卡对手(治"灵魂对手总放我过牌"): 领出这手的真对手快走完(≤4 张)时别再为保 2/A 大单而 pass,
+      //   主动接管把他卡住 —— 他一旦顺出散牌就赢了。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      const blockLowOpp = leaderLeft <= 4;
+      if (!urgent && !suppressLandlord && !blockLowOpp && best.parse.type==='single' && best.parse.key >= 14 && hand.length > 4){
         // 手里还有更小的可跟吗?没有就 pass
         return { action:'pass' };
       }

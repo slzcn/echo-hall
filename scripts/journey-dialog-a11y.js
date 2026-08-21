@@ -38,7 +38,6 @@ assert(trapConfirm.includes('last.focus()')&&trapConfirm.includes('first.focus()
 assert(confirm.includes('_confirmReturnFocus=document.activeElement'));
 assert(confirm.includes('_confirmReturnFocus.focus()'));
 assert(s.includes("if(_trapConfirmKey(e)) return; _trapModalKey(e)"));
-assert(s.includes('@media (prefers-reduced-motion:reduce){.eh-replay-modal{animation:none!important}'));
 
 // Behaviour: confirm Tab/Shift+Tab wraps and Esc invokes the active close callback.
 function el(id){return {id,focused:0,offsetParent:{},focus(){this.focused++;document.activeElement=this;}};}
