@@ -326,3 +326,42 @@ html.pwa-standalone .pk-bar{
   color: var(--accent, #00e5d4); border-color: var(--accent, #00e5d4);
   box-shadow: 0 0 10px rgba(0,229,212,.4);
 }
+
+/* ── M. 功能2 牌桌招募页(#hall 浮层): 房主开桌直接落这, 页上招募真人/一键灵魂/开始, 更丝滑。
+   聊天里仍有牌桌卡供他人加入 & 房主返回后重开页; 页体复用 gt-card 招募 UI, 只套铺满 #hall 的壳。 */
+.gt-lobby-room{
+  position: absolute; inset: 0; z-index: 21;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, rgba(0,229,212,.10), transparent 60%),
+    linear-gradient(180deg, #0b1524 0%, #070d18 100%);
+  overflow: hidden;
+  animation: gt-lobby-in .22s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes gt-lobby-in{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+.gt-lobby-bar{
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
+  border-bottom: 1px solid rgba(0,229,212,.14);
+  background: linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.04));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+html.pwa-standalone .gt-lobby-bar{ padding-top: max(calc(10px + env(safe-area-inset-top, 0px)), 42px); }
+.gt-lobby-title{
+  font-size: 14px; font-weight: 800; letter-spacing: .05em; color: var(--ink, #eaf6ff);
+  padding: 4px 12px 4px 10px; border-radius: 999px;
+  background: rgba(0,229,212,.10); border: 1px solid rgba(0,229,212,.28);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.gt-lobby-title .dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #00e5d4); box-shadow: 0 0 8px var(--accent, #00e5d4); }
+.gt-lobby-x{
+  margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--line, rgba(0,229,212,.24)); background: transparent;
+  color: var(--sub, #86cbc6); font-size: 12.5px; cursor: pointer; transition: all .14s;
+}
+.gt-lobby-x:hover{ color: var(--ink, #eaf6ff); background: rgba(0,229,212,.08); }
+.gt-lobby-body{ flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 18px 14px; }
+.gt-lobby-body .gt-card{ width: 100%; max-width: 460px; }
+/* 招募页里的牌桌卡去掉聊天流里的外边距/入场动画包裹感 */
+.gt-lobby-body .gt-card{ margin: 0 !important; }
+.gt-card-openable{ cursor: pointer; }
