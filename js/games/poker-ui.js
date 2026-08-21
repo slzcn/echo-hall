@@ -348,6 +348,7 @@
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
         <div class="pk-blinds" id="pkBlinds"></div>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">🎵</button>
+        <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="pk-x" id="pkX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="pk-felt" id="pkFelt">
@@ -410,7 +411,7 @@
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} }
     const onResize = ()=>positionSeats();
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── 折叠 / 展开(返回聊天但牌局继续) ──
@@ -433,6 +434,7 @@
     }
     function minimize(){
       if (minimized) return; minimized=true;
+      if (root.EHTableOrient) root.EHTableOrient.clear(room); if (rotBtn) rotBtn.classList.remove('on');
       room.classList.remove('pk-expanding'); room.classList.add('pk-collapsing');
       setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
       if (!chip){
@@ -452,6 +454,12 @@
       renderAll(); positionSeats(); sfx('click');
     }
     $('#pkX').addEventListener('click', minimize);
+    const rotBtn = $('#pkRot');
+    if (rotBtn) rotBtn.addEventListener('click', ()=>{
+      const on = root.EHTableOrient ? root.EHTableOrient.toggle(room) : false;
+      rotBtn.classList.toggle('on', on); sfx('click');
+      if (!minimized) positionSeats();
+    });
     // 牌桌内背景音乐开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里复用同一套 BGM 控制(EH_BGM)让打牌时也能开关
     const musBtn = $('#pkMus');
     function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }

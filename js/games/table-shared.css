@@ -307,3 +307,22 @@ html.pwa-standalone .pk-bar{
       rgba(0, 0, 0, .28) 100%) !important;
   border-top: 1px solid rgba(0, 229, 212, .18) !important;
 }
+
+/* ── L. 横竖屏切换(table-orient.js): 施加 .eh-rot 时牌桌 transform:rotate 成横向,
+   尺寸/位移走内联 px(按 #hall 盒子算), 这里只钉定位与裁剪; 旋转后仍被 #hall 裁在聊天室内。 */
+.ddz-room.eh-rot, .gd-room.eh-rot, .pk-room.eh-rot{
+  position: absolute; top: 0; left: 0;
+  overflow: hidden;
+}
+/* 顶栏「⟳ 横屏」切换钮: 与音乐钮同款圆钮, 横屏态高亮 accent */
+.ddz-rot, .gd-rot, .pk-rot{
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line, rgba(0,229,212,.24)); background: transparent;
+  color: var(--sub, #86cbc6); font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ddz-rot:hover, .gd-rot:hover, .pk-rot:hover{ color: var(--ink, #eaf6ff); border-color: var(--line2, rgba(0,229,212,.4)); }
+.ddz-rot.on, .gd-rot.on, .pk-rot.on{
+  color: var(--accent, #00e5d4); border-color: var(--accent, #00e5d4);
+  box-shadow: 0 0 10px rgba(0,229,212,.4);
+}

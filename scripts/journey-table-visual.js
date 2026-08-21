@@ -28,8 +28,20 @@ const DDZ    = R('js/games/game-ui.js');
 const GD     = R('js/games/guandan-ui.js');
 const PK     = R('js/games/poker-ui.js');
 
-assert(/js\/games\/table-shared\.css\?v=20260819-ddz-settle/.test(HTML),
-  'index.html 挂了 table-shared.css?v=20260819-ddz-settle');
+assert(/js\/games\/table-shared\.css\?v=20260821-game-polish/.test(HTML),
+  'index.html 挂了 table-shared.css?v=20260821-game-polish');
+
+// 横竖屏切换(功能3): index 挂了 table-orient.js, 三桌顶栏都有 ⟳ 钮且接了 EHTableOrient.toggle
+assert(/js\/games\/table-orient\.js\?v=20260821-game-polish/.test(HTML),
+  'index.html 挂了 table-orient.js?v=20260821-game-polish');
+for(const [name, src, rid] of [['game-ui', DDZ, 'ddzRot'], ['guandan-ui', GD, 'gdRot'], ['poker-ui', PK, 'pkRot']]){
+  assert(new RegExp('id="'+rid+'"').test(src) && /EHTableOrient\.toggle/.test(src),
+    `${name}.js 顶栏有横竖屏钮 ${rid} 且接了 EHTableOrient.toggle`);
+  assert(/EHTableOrient\.clear\(room\)/.test(src),
+    `${name}.js 在 close/minimize 里 EHTableOrient.clear(room) 复位`);
+}
+assert(/\.ddz-rot,\s*\.gd-rot,\s*\.pk-rot\{/.test(SHARED), 'table-shared.css 定义了三桌横竖屏钮 .ddz-rot/.gd-rot/.pk-rot');
+assert(/\.ddz-room\.eh-rot,\s*\.gd-room\.eh-rot,\s*\.pk-room\.eh-rot\{/.test(SHARED), 'table-shared.css 定义了 .eh-rot 旋转态定位/裁剪');
 
 // A. 三款 UI 不能再出现 'Arial Narrow'（连回退都不允许，字体链已换成 SF Pro Rounded）
 for(const [name, src] of [['game-ui', DDZ], ['guandan-ui', GD], ['poker-ui', PK]]){

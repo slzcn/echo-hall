@@ -393,6 +393,7 @@
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
         <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">🎵</button>
+        <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="gd-x" id="gdX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="gd-felt" id="gdFelt">
@@ -451,7 +452,7 @@
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
     const onResize = ()=>layoutHand();
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
@@ -475,6 +476,7 @@
     }
     function minimize(){
       if (minimized) return; minimized=true;
+      if (root.EHTableOrient) root.EHTableOrient.clear(room); if (rotBtn) rotBtn.classList.remove('on');
       room.classList.remove('gd-expanding'); room.classList.add('gd-collapsing');
       setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
       if (!chip){
@@ -494,6 +496,12 @@
       renderAll(); sfx('click');
     }
     $('#gdX').addEventListener('click', minimize);
+    const rotBtn = $('#gdRot');
+    if (rotBtn) rotBtn.addEventListener('click', ()=>{
+      const on = root.EHTableOrient ? root.EHTableOrient.toggle(room) : false;
+      rotBtn.classList.toggle('on', on); sfx('click');
+      if (!minimized) layoutHand();
+    });
     // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#gdMus');
     function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }

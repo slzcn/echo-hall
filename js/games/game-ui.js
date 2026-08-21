@@ -411,6 +411,7 @@
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
         <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
+        <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="ddz-felt" id="ddzFelt">
@@ -487,7 +488,7 @@
     }
     const onResize = ()=>layoutHand();
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
     window.addEventListener('resize', onResize);
 
@@ -557,6 +558,9 @@
     }
     function minimize(){
       if (minimized) return; minimized=true;
+      // 折叠动画自带 transform, 先复位横屏内联 transform 免打架
+      if (root.EHTableOrient) root.EHTableOrient.clear(room);
+      if (rotBtn) rotBtn.classList.remove('on');
       room.classList.remove('ddz-expanding'); room.classList.add('ddz-collapsing');
       setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
       if (!chip){
@@ -578,6 +582,13 @@
       sfx('click');
     }
     $('#ddzX').addEventListener('click', minimize);
+    // ⟳ 横竖屏切换(仍在聊天室内): 竖持手机想要横屏视图时点它, 再点复位
+    const rotBtn = $('#ddzRot');
+    if (rotBtn) rotBtn.addEventListener('click', ()=>{
+      const on = root.EHTableOrient ? root.EHTableOrient.toggle(room) : false;
+      rotBtn.classList.toggle('on', on); sfx('click');
+      if (!minimized) layoutHand();   // 旋转后按新宽度重排手牌
+    });
     // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#ddzMus');
     function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
