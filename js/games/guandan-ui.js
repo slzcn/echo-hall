@@ -103,6 +103,15 @@
 .gd-center::before{content:'';position:absolute;left:2%;right:2%;top:8%;bottom:8%;border-radius:50%/42%;
   background:radial-gradient(ellipse at center,rgba(0,229,212,.07),rgba(0,229,212,.02) 55%,transparent 72%);
   border:1px solid rgba(0,229,212,.07);z-index:-1;pointer-events:none}
+/* 本桌记分条: 两队当前等级 + 已赢副数(按队着色), 常驻牌桌顶部——按"队"展示不每席重复堆信息 */
+.gd-score{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:5px 10px 0;flex-shrink:0}
+.gd-team{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
+  padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel,rgba(0,0,0,.2));white-space:nowrap}
+.gd-team .tw{font-variant-numeric:tabular-nums}
+.gd-team .tl{font-weight:900;color:#fff}
+.gd-team.mine{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4)}
+.gd-team.foe{color:var(--magenta,#ff2d8e);border-color:rgba(255,45,142,.5)}
+.gd-room.is-land .gd-score{display:none}   /* 横屏矮, 记分条让位(级牌已在顶栏 gd-lvl 显示), 不占竖向 */
 /* 座位 */
 .gd-seat{display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,82px);position:relative}
 .gd-avr{width:var(--av,42px);height:var(--av,42px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;background:transparent;transition:background .15s;position:relative}
@@ -286,6 +295,24 @@
 .gd-conn.host_offline{background:rgba(255,93,108,.16);color:#ff5d6c;border:1px solid rgba(255,93,108,.45)}
 @keyframes gdConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
 .gd-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
+/* 结算面板"本桌累计": 单局结果下再补两队当前等级 + 累计副数 */
+.gd-over .gd-cum{font-size:12px;color:var(--sub);display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:1px}
+.gd-over .gd-cum .cm{display:inline-flex;align-items:center;gap:4px}
+.gd-over .gd-cum .cm.mine{color:var(--accent,#00e5d4)}
+.gd-over .gd-cum .cm.foe{color:var(--magenta,#ff2d8e)}
+.gd-over .gd-cum b{color:var(--ink,#eaf6ff);font-weight:800}
+/* ── 竖屏手机(<600 宽; 横屏 .is-land 宽>599 不命中): 中央收紧不空旷, 提示稳定不跳动, 操作区整齐 ──
+   放在样式表末尾, 源序在 base 之后方能覆盖 base 的 flex/min-height。大屏(min-width) 与横屏(.is-land) 断点不受影响。 */
+@media (max-width:599px){
+  .gd-felt{justify-content:center}          /* 牌桌整体在竖向余量里居中, 上下留白对称, 不头重脚轻 */
+  .gd-mid{flex:none}                          /* 中段不再无限撑高: 空椭圆收成贴合座位的小圈, 减少中间大片空 */
+  .gd-center{min-height:92px;gap:4px}
+  .gd-center::before{top:4%;bottom:4%}        /* 绒面椭圆贴合收紧后的中段, 不再空撑 */
+  .gd-partner{padding-top:6px}
+  .gd-banner{min-height:22px}                 /* 回合提示恒定高度: 轮到/思考中/等待裁决切换不跳动 */
+  .gd-who{min-height:16px}
+  .gd-played{min-height:56px}                 /* 出牌区预留恒定高度, 有无牌都不抖 */
+}
 
 `;
     document.head.appendChild(s);
@@ -312,10 +339,17 @@
   const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
   // 语音报牌型(主人要求): 只报显著牌型(炸弹/天王炸/三带二/钢板/顺子…), 单张/对子/三张不絮叨。
   const VOICE_SKIP = new Set(['single','pair','trio']);
-  function sayPlay(p){
+  function sayPlay(p, seat){
     if(!p || VOICE_SKIP.has(p.type)) return;
     const lab = typeLabel(p);
-    if(lab && root.EhSfx && root.EhSfx.say) root.EhSfx.say(lab);
+    if(!(lab && root.EhSfx && root.EhSfx.say)) return;
+    // 按发言人区分音色: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
+    let who = null;
+    if(typeof seat==='number' && st.players[seat]){
+      const ai = !!(gameIsAI && gameIsAI[seat]);
+      who = { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
+    }
+    root.EhSfx.say(lab, who);
   }
 
   function cardEl(card, level, opts){
@@ -362,6 +396,9 @@
     let matchLevels = (opts.match && opts.match.teamLevels) ? opts.match.teamLevels.slice() : [2,2];
     let matchDealer = (opts.match && typeof opts.match.dealerTeam==='number') ? opts.match.dealerTeam : 0;
     let prevResult = (opts.match && opts.match.prevResult) || null;
+    // 本桌累计记分(按队): teamWins[team] = 该队至今赢下的副数; 队伍当前等级从 st.teamLevels/res.teamLevelsAfter 取。
+    // 结算时每手只计一次(showOver 里以 res._scored 守卫), guest 连收多张 over 快照也不重复计。
+    const teamWins = [0,0];
 
     // ── 联机(host 权威)双模式: guest 只渲染 host 广播的脱敏公共快照 + 回传自己动作, 不建局/不跑引擎 ──
     //   单机路径(isGuest=false)完全走原逻辑, 零改动; 所有 guest 行为一律走 isGuest 分支旁路。
@@ -415,6 +452,7 @@
         <button class="gd-x" id="gdX" aria-label="返回聊天">✕ 返回</button>
       </div>
       <div class="gd-felt" id="gdFelt">
+        <div class="gd-score" id="gdScore"></div>
         <div class="gd-partner" id="gdP2"></div>
         <div class="gd-mid">
           <div class="gd-side left" id="gdP3"></div>
@@ -439,7 +477,7 @@
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#gdFelt'), p1:$('#gdP1'), p2:$('#gdP2'), p3:$('#gdP3'),
       banner:$('#gdBanner'), who:$('#gdWho'), played:$('#gdPlayed'), me:$('#gdMe'),
-      hand:$('#gdHand'), ctrl:$('#gdCtrl'), lvl:$('#gdLvl'), toast:$('#gdToast') };
+      hand:$('#gdHand'), ctrl:$('#gdCtrl'), lvl:$('#gdLvl'), score:$('#gdScore'), toast:$('#gdToast') };
 
     function toast(msg, ms){ els.toast.textContent=msg; els.toast.classList.add('show');
       clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1200); }
@@ -688,6 +726,15 @@
       els.lvl.innerHTML = `<span class="lv-now${lvlChanged?' bump':''}">🎯 打 ${LVL_LABEL(st.level)}</span>我方 <b>${LVL_LABEL(st.teamLevels[Engine.teamOf(mySeat)])}</b> · 对方 <b>${LVL_LABEL(st.teamLevels[1-Engine.teamOf(mySeat)])}</b>`;
       lastLevel = st.level;
     }
+    // 本桌记分条(常驻): 两队当前等级 + 已赢副数, 按队着色。等级取 st.teamLevels(当前副), 副数取累计 teamWins。
+    function renderScore(){
+      if (!els.score) return;
+      const myT = Engine.teamOf(mySeat), foeT = 1-myT;
+      const lv = st.teamLevels || [2,2];
+      els.score.innerHTML =
+        `<span class="gd-team mine">我方 · 打<span class="tl">${LVL_LABEL(lv[myT])}</span> · <span class="tw">胜${teamWins[myT]}副</span></span>`
+      + `<span class="gd-team foe">对方 · 打<span class="tl">${LVL_LABEL(lv[foeT])}</span> · <span class="tw">胜${teamWins[foeT]}副</span></span>`;
+    }
 
     let lastShownKey='';
     let lastLevel=null;          // 台面级(打几)变化上升沿 → 级牌徽标跳动
@@ -715,7 +762,7 @@
           boom(bn);
           emitBeat({ type:'bomb', actor:nm, big:true, text:`💥 ${nm} 甩出${bn.replace(/ /g,'')}！`, quip: beatQuip(lp.seat, 'bomb') });
         } else if (lp.seat!==mySeat) sfx('cardplay');
-        sayPlay(lp.parse);                                // 语音报牌型
+        sayPlay(lp.parse, lp.seat);                       // 语音报牌型
         // 报单: 出完只剩最后一张(solo 有真实手牌; guest 脱敏跳过)
         const rest = st.players[lp.seat].hand;
         if (Array.isArray(rest) && rest.length === 1)
@@ -1199,6 +1246,8 @@
     function showOver(){
       clearTimers();
       const res=st.result;
+      // 本桌累计: 每手只计一次(res._scored 守卫)。单机一副一次; guest 只在 phase 转入 over 时进本函数, 双重不重复。
+      if (res && !res._scored){ res._scored=true; if(typeof res.winnerTeam==='number') teamWins[res.winnerTeam]++; }
       const iWon = Engine.teamOf(mySeat)===res.winnerTeam;
       const over=document.createElement('div'); over.className='gd-over '+(iWon?'win':'lose');
       const rankNames=['头游','二游','三游','末游'];
@@ -1213,11 +1262,16 @@
         : `${winSide}升级：${lvlFrom} → <b>${lvlTo}</b>（+${res.advance}，${res.doubleDown?'双下':'单下'}）`;
       // guest 无权开新一副: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报。只留"收工"。
       const againLabel = isGuest ? '等房主开局…' : (res.matchWon?'新对局':'打下一副');
+      // 本桌累计: 两队当前等级(取本手后 teamLevelsAfter) + 累计副数(teamWins, 上方守卫已计过本手)
+      const myT=Engine.teamOf(mySeat), foeT=1-myT;
+      const lvA = res.teamLevelsAfter || st.teamLevels || [2,2];
+      const cumLine = `本桌累计 · <span class="cm mine">我方 打<b>${LVL_LABEL(lvA[myT])}</b> · 胜${teamWins[myT]}副</span><span class="cm foe">对方 打<b>${LVL_LABEL(lvA[foeT])}</b> · 胜${teamWins[foeT]}副</span>`;
       over.innerHTML=`
         <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
         <div class="rank-list">${rows}</div>
         <div class="gd-remains" id="gdRemains"></div>
         <div class="lvlup">${lvlLine}</div>
+        <div class="gd-cum">${cumLine}</div>
         <div class="gd-acts" style="margin-top:4px">
           <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
           <button class="gd-btn primary" id="gdDone">收工</button>
@@ -1292,7 +1346,7 @@
     }
 
     function renderAll(){
-      renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
+      renderSeats(); renderScore(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(minimized ? null : onHumanTimeout);   // 折叠期间不催我的回合(离席看聊天不该被自动过牌)
       if (minimized) updateChip();
     }

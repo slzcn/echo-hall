@@ -115,20 +115,22 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260822-play-polish', 'ver.txt=20260822-play-polish');
+assert(buildVer === '20260822-score-voice', 'ver.txt=20260822-score-voice');
 
-// C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。默认停在招募中等真人,
-//     不自动开局(launchTexas 不含 gtStart)。招募卡两条路径讲清楚(主人反馈"招募卡不够好使"):
-//     「⚡一键开始」= gtStart 先把空位坐满房里灵魂再开局(想马上玩); 「🤝召唤灵魂」= gtFillSouls 只召唤灵魂补位
-//     不开局(手动开房: 先补位/等真人换座, 满意再一键开始); 想指定某灵魂坐某席仍可用每空位「🤝灵魂」下拉。
-//     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 曾开桌即自动 gtStart 抢开局;
-//     反回退③: 曾点开始拿匿名机器人补位, 现必须用房里灵魂补位。
+// C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。
+//     功能2(主人 msg1「发牌自动、不需房主干预」+ msg6「开桌进打牌页、在那页招募、不要单独招募页」):
+//     开桌即自动坐灵魂+发牌(gtStart), 直接落打牌页; 不再弹单独招募页(gtOpenLobby 已不再被调用, 仅留定义)。
+//     招募改走聊天里的牌桌卡: 德州 eh_gt_join 放行 playing 中途加入(下一手把该席从 AI 换成真人);
+//     斗地主/掼蛋固定角色+叫分, 开局后不可中途加入是引擎限制(auto-deal=灵魂满座陪玩)。
+//     覆盖旧设计「停在招募中等真人手动点开始」—— 那是本次主人明确要改掉的。
+//     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 点开始/开桌须用房里灵魂补位, 非匿名机器人。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
 const LT = (APP.match(/async function launchTexas\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌桌: eh_gt_open 开桌 + 贴牌桌卡');
-assert(!/gtStart\s*\(/.test(LT), 'launchTexas 默认不自动开局(停在招募中等真人手动点开始)');
+assert(/gtStart\s*\(/.test(LT), '功能2: launchTexas 开桌即自动开局(gtStart 补灵魂+发牌, 直接落打牌页)');
+assert(!/gtOpenLobby\s*\(/.test(APP), '功能2: 不再调用 gtOpenLobby(单独招募页已退休, 开桌直接进打牌页)');
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
 const GS = (APP.match(/async function gtStart\(id\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名 AI)');

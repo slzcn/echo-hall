@@ -80,6 +80,21 @@
 .ddz-room.is-land .ddz-hand{min-height:74px}
 .ddz-room.is-land .ddz-hand-wrap{padding-bottom:2px}
 .ddz-room.is-land .ddz-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+/* ── 竖屏(手机, <600px)专属美化: 只动竖屏, 横屏(.is-land)与各大屏断点不受影响(用 :not(.is-land) + 窄屏 query 双重隔离) ── */
+@media (max-width:599px){
+  /* 中央区收紧: 绒面椭圆缩成贴合牌堆的"落牌盘"(insets 拉大→椭圆变小)+ 微增辉光, 不再是撑满半屏的空圈; 上下留白削薄 */
+  .ddz-room:not(.is-land) .ddz-center{min-height:96px;padding:2px 16px;gap:5px}
+  .ddz-room:not(.is-land) .ddz-center::before{left:13%;right:13%;top:15%;bottom:15%;
+    background:radial-gradient(ellipse at center,rgba(0,229,212,.12),rgba(0,120,104,.06) 52%,transparent 74%);
+    border-color:rgba(0,229,212,.12);box-shadow:inset 0 0 42px rgba(0,0,0,.32)}
+  .ddz-room:not(.is-land) .ddz-opps{padding:10px 12px 0}
+  /* 回合提示分层清晰、占位稳定不跳动: 轮次横幅醒目, 上一手信息压一档但恒留位 */
+  .ddz-room:not(.is-land) .ddz-turnbanner{min-height:22px}
+  .ddz-room:not(.is-land) .ddz-lastwho{min-height:16px;opacity:.92}
+  /* 操作区: 按钮等宽整齐, 底部留足 safe-area */
+  .ddz-room:not(.is-land) .ddz-acts{gap:12px;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+  .ddz-room:not(.is-land) .ddz-acts .ddz-btn{flex:1 1 0;max-width:150px}
+}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ddz-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
@@ -122,6 +137,13 @@
 .ddz-seat .cnt b{color:var(--ink)}
 .ddz-seat .role{font-size:9px;letter-spacing:.08em;padding:0 5px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
 .ddz-seat.landlord .role{color:var(--amber);border-color:var(--amber)}
+/* 本桌累计比分徽标(常驻座位): 正分暖色亮起, 负分品红压暗, 0 分中性 —— 与结算面板 .ddz-cumbox 同一套语言 */
+.ddz-cum{margin-top:2px;font-size:10px;font-weight:800;line-height:15px;padding:0 6px;border-radius:8px;
+  font-variant-numeric:tabular-nums;border:1px solid var(--line);display:inline-block}
+.ddz-cum.pos{color:var(--amber,#ffc24d);border-color:rgba(255,194,77,.4);background:rgba(255,194,77,.1)}
+.ddz-cum.neg{color:var(--magenta,#ff2d8e);border-color:rgba(255,45,142,.35);background:rgba(255,45,142,.08)}
+.ddz-cum.zero{color:var(--dim,#498d88);border-color:var(--line)}
+.ddz-me .ddz-cum{margin-top:0}
 .ddz-say{position:absolute;top:56px;font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);
   border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
 .ddz-say.show{opacity:1}
@@ -246,6 +268,17 @@
   padding:6px 22px;border-radius:14px;background:rgba(255,194,77,.1);border:1px solid rgba(255,194,77,.28)}
 .ddz-over .ddz-acts{margin-top:4px;width:100%}
 .ddz-over .ddz-acts .ddz-btn{max-width:none}
+/* 本桌累计(结算面板): 逐席列名字 + 累计分, 与残牌盒同底色语言, 让"这桌打了几局谁领先"一眼看清 */
+.ddz-over .ddz-cumbox{display:flex;flex-direction:column;gap:5px;width:100%;box-sizing:border-box;padding:10px 14px;
+  border-radius:14px;background:rgba(0,0,0,.24);border:1px solid var(--line,rgba(0,229,212,.24))}
+.ddz-over .cum-ttl{font-size:11px;letter-spacing:.16em;color:var(--dim,#498d88);text-align:center;text-indent:.16em}
+.ddz-over .cum-row{display:flex;align-items:center;font-size:13px}
+.ddz-over .cum-nm{color:var(--sub,#86cbc6);display:flex;align-items:center;gap:6px}
+.ddz-over .cum-role{font-size:10px;padding:0 6px;border-radius:8px;background:rgba(255,194,77,.12);color:var(--amber,#ffc24d);border:1px solid rgba(255,194,77,.3)}
+.ddz-over .cum-v{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.ddz-over .cum-v.pos{color:var(--amber,#ffc24d)}
+.ddz-over .cum-v.neg{color:var(--magenta,#ff2d8e)}
+.ddz-over .cum-v.zero{color:var(--dim,#498d88)}
 /* 残局:亮输家剩牌(对标腾讯). 每行 名字+剩数 一行, 底下一把叠扇展开的 mini 牌; 逐行错峰浮入 */
 .ddz-over .ddz-remains{display:flex;flex-direction:column;gap:9px;width:100%;padding:11px 12px;box-sizing:border-box;
   border-radius:14px;background:rgba(0,0,0,.24);border:1px solid var(--line,rgba(0,229,212,.24))}
@@ -403,6 +436,7 @@
     }
     let st = isGuest ? waitingState() : newGame();
     let selected = new Set();     // 选中的 card id
+    const cumScore = [0,0,0];     // 本桌累计比分(按座位号, 跨"再来一局"累加; showOver 里每手计一次)
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
 
@@ -618,6 +652,12 @@
     function findCardById(id){ return ALL[id]; }
 
     // ── 座位 DOM(对手区 + 我的座位标) ──
+    // 本桌累计比分徽标: 正分暖色 / 负分品红 / 0 分中性; renderSeats 每次重绘即刷新最新累计
+    function cumPill(seat){
+      const v = cumScore[seat] || 0;
+      const cls = v>0 ? 'pos' : (v<0 ? 'neg' : 'zero');
+      return `<div class="ddz-cum ${cls}">${v>0?'+':''}${v} 分</div>`;
+    }
     function seatHTML(seat){
       const p = st.players[seat];
       const isLord = st.landlord === seat;
@@ -628,6 +668,7 @@
         <div class="meta">
           <div class="nm">${escapeHtml(p.name)}</div>
           <div class="cnt">剩 <b>${p.hand.length}</b> 张${role?` · <span class="role">${role}</span>`:''}</div>
+          ${cumPill(seat)}
         </div>
         <div class="ddz-say"></div>
       </div>`;
@@ -687,7 +728,7 @@
             text: `💥 ${nm} ${rocket?'放了王炸':'扔出炸弹'}！倍数 ×${st.multiplier}`,
             quip: beatQuip(lp.seat, rocket?'rocket':'bomb') });
         } else if (lp.seat!==mySeat) sfx('cardplay');   // 对手落牌拍击音(我自己出牌的音在 doPlay)
-        sayPlay(lp.parse);                                // 语音报牌型(炸弹已含在报里, 顶替不了拍击音)
+        sayPlay(lp.parse, lp.seat);                       // 语音报牌型(炸弹已含在报里, 顶替不了拍击音)
         // 报单: 这手出完只剩最后一张(solo 才有真实手牌; guest 手牌脱敏跳过)
         const rest = st.players[lp.seat].hand;
         if (Array.isArray(rest) && rest.length === 1)
@@ -958,10 +999,17 @@
     const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='rocket');
     // 语音报牌型(主人要求): 只报显著牌型(炸弹/火箭/三带二/顺子/飞机…), 单张/对子/三张不絮叨。
     const VOICE_SKIP = new Set(['single','pair','trio']);
-    function sayPlay(p){
+    function sayPlay(p, seat){
       if(!p || VOICE_SKIP.has(p.type)) return;
       const lab = typeLabel(p);
-      if(lab && root.EhSfx && root.EhSfx.say) root.EhSfx.say(lab);
+      if(!(lab && root.EhSfx && root.EhSfx.say)) return;
+      // 按发言人区分音色: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
+      let who = null;
+      if(typeof seat==='number' && st.players[seat]){
+        const ai = !!(gameIsAI && gameIsAI[seat]);
+        who = { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
+      }
+      root.EhSfx.say(lab, who);
     }
     function updatePlayBtn(){
       const btn = $('#ddzPlay'); if (!btn) return;
@@ -1176,16 +1224,29 @@
       clearTimers();
       const res = st.result;
       if (!res) { showOver._done = false; return; }
+      // 本桌累计: 每手只计一次(res._scored 守卫, guest 连收多张 over 快照也只加一次); 放在幂等 _done 通过之后
+      if (res && !res._scored){ res._scored = true; st.players.forEach(p=>{ cumScore[p.seat] += (res.delta[p.seat]||0); }); }   // delta 是 {seat→分} 对象非数组, 按座位号累加
+      try{ renderSeats(); }catch(_){}   // 累计刷新: 结算面板揭起前先更新底层座位徽标(下一局 renderAll 也会再刷)
       const iWon = res.winners.includes(mySeat);
       const over = document.createElement('div');
       over.className = 'ddz-over ' + (iWon?'win':'lose');
       const roleTxt = st.landlord===mySeat ? '地主' : '农民';
+      // 本桌累计块: 逐席列名字(含地主标)+ 累计分, 正分暖色 / 负分品红
+      const cumBox = `<div class="ddz-cumbox"><div class="cum-ttl">本桌累计</div>${
+        st.players.map(p=>{
+          const v = cumScore[p.seat]||0;
+          const cls = v>0?'pos':(v<0?'neg':'zero');
+          const isL = st.landlord===p.seat;
+          return `<div class="cum-row"><span class="cum-nm">${escapeHtml(p.name)}${p.seat===mySeat?'（你）':''}${isL?' <span class="cum-role">地主</span>':''}</span><span class="cum-v ${cls}">${v>0?'+':''}${v} 分</span></div>`;
+        }).join('')
+      }</div>`;
       over.innerHTML = `
         <div class="ddz-over-card">
           <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
           <div class="sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''}<br>底分 ${res.base} × 倍数 ${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}</div>
           <div class="ddz-remains" id="ddzRemains"></div>
           <div class="score">${(res.delta[mySeat]>=0?'+':'')}${res.delta[mySeat]} 分</div>
+          ${cumBox}
           <div class="ddz-acts">
             <button class="ddz-btn" id="ddzAgain">再来一局</button>
             <button class="ddz-btn primary" id="ddzDone">收工</button>

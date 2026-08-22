@@ -260,6 +260,21 @@
 .pk-conn.host_offline{background:rgba(255,93,108,.16);color:#ff5d6c;border:1px solid rgba(255,93,108,.45)}
 @keyframes pkConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
 .pk-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
+/* ── 本桌累计净盈亏(相对买入 buy-in 的净额): 座位小徽标 + 我的座位条 + 结算逐席列 ── */
+.pk-seat .pk-net{font-size:9.5px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin-top:1px;letter-spacing:.02em}
+.pk-net.up{color:var(--accent,#00e5d4)}
+.pk-net.down{color:var(--magenta,#ff2d8e)}
+.pk-net.zero{color:var(--dim,#498d88)}
+.pk-me .pk-net{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;margin-left:1px}
+/* 结算面板: 本桌累计净盈亏逐席一行(名字左, 净额右) */
+.pk-nets{width:100%;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line,rgba(0,229,212,.24));padding-top:12px;margin-top:2px}
+.pk-nets-t{font-size:11px;color:var(--sub,#8fb6b1);font-weight:700;letter-spacing:.04em;margin-bottom:3px}
+.pk-netline{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;padding:1px 4px}
+.pk-netline .nl-n{color:var(--sub,#8fb6b1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk-netline .nl-v{font-weight:900;font-variant-numeric:tabular-nums;flex:none}
+.pk-netline .nl-v.up{color:var(--accent,#00e5d4)}
+.pk-netline .nl-v.down{color:var(--magenta,#ff2d8e)}
+.pk-netline .nl-v.zero{color:var(--dim,#498d88)}
 
 `;
     document.head.appendChild(s);
@@ -317,6 +332,10 @@
     const sb = opts.sb || 5, bb = opts.bb || 10;
     const START = opts.startStack || 1000;
     let stacks = names.map(() => START);
+    // 本桌累计净盈亏(相对买入): buyin[seat]=该席至今累计买入(每破产补带一次 +START); netSettled=上一手结算后的净额(stack-buyin)。
+    // 净额只在 showOver 结算时刷新, 故座位徽标不随手内下注抖动(展示"进本手时的本桌战绩")。
+    const buyin = names.map(() => START);
+    let netSettled = names.map(() => 0);
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
@@ -326,8 +345,9 @@
       //   联机模式沿用旧的"全员补带"语义(在线对局不因一人破产而终止, 由房主掌控)。
       stacks = stacks.map((v, seat) => {
         if (v > 0) return v;
-        if (seat !== mySeat) return START;          // 灵魂/对手
-        return isLocalSolo ? v : START;             // 真人
+        const rebought = (seat !== mySeat) ? START : (isLocalSolo ? v : START);
+        if (rebought > 0) buyin[seat] += START;     // 破产补带一次 = 追加一次买入(计入净盈亏基准)
+        return rebought;
       });
       while (stacks[button] <= 0) button = (button+1)%n;   // 庄家落在有筹码的人身上
       let seed; try{ seed = crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed = Math.floor(Math.random()*4294967296); }
@@ -486,6 +506,13 @@
     function displayOrder(){                // 从我起, 顺时针一圈的座位号
       const out=[]; for(let i=0;i<n;i++) out.push((mySeat+i)%n); return out;
     }
+    // 本桌净盈亏徽标(常驻座位): 取上一手结算后的净额, 手内不抖动。首手结算前(handNo===0)不显, 避免开局一排"±0"。
+    function netPill(seat){
+      if (handNo===0) return '';
+      const v = netSettled[seat]||0;
+      const cls = v>0?'up':(v<0?'down':'zero');
+      return `<div class="pk-net ${cls}">本桌 ${v>=0?'+':''}${v}</div>`;
+    }
     function seatHTML(seat){
       const p=st.players[seat];
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[seat]);
@@ -506,6 +533,7 @@
         <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
+        ${netPill(seat)}
         ${hole}
         <div class="pk-say"></div>
       </div>`;
@@ -915,6 +943,8 @@
     function showOver(){
       clearTimers();
       const res=st.result;
+      // 本桌累计净盈亏: 结算刷新各席净额(此刻 p.stack 已是收池后的最终筹码)。座位徽标下一手起读它。
+      st.players.forEach(p=> netSettled[p.seat] = p.stack - (buyin[p.seat]||START));
       const won=(res.winnersBySeat||[]).includes(mySeat);
       const my=st.players[mySeat];
       const delta = my.stack - my.start;
@@ -985,6 +1015,13 @@
           ${subLine}
           <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
           ${potsHtml}
+          <div class="pk-nets"><div class="pk-nets-t">本桌净盈亏（相对买入）</div>${
+            displayOrder().map(seat=>{
+              const v=netSettled[seat]||0; const cls=v>0?'up':(v<0?'down':'zero');
+              const nm=st.players[seat].name;
+              return `<div class="pk-netline"><span class="nl-n">${escapeHtml(nm)}${seat===mySeat&&nm!=='你'?'（你）':''}</span><span class="nl-v ${cls}">${v>=0?'+':''}${v}</span></div>`;
+            }).join('')
+          }</div>
           <div class="pk-row" style="margin-top:2px">${footer}</div>
         </div>`;
       // 推池动画: 底池飞向赢家席位(我方=底部), 浮层延后淡入让筹码在绒面上先跑完
@@ -1048,7 +1085,7 @@
         isAI[s]    = A.isAI[s];
         if (ids) ids[s] = A.ids[s] || null;
         if (A.souls) souls[s] = A.souls[s];
-        if (!wasHuman && nowHuman) stacks[s] = START;   // 新真人坐下: 全新买入
+        if (!wasHuman && nowHuman){ stacks[s] = START; buyin[s] = START; netSettled[s] = 0; }   // 新真人坐下: 全新买入, 净盈亏归零重算
       }
       personaBySeat = names.map((_, seat) => personaFor(seat));
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
@@ -1070,6 +1107,7 @@
     // 单机: 本场结束(真人输光)后从头再来 —— 全员重新带入 START, 从第一手开始
     function resetMatch(){
       stacks = names.map(()=>START);
+      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; }   // 本场重来: 买入基准 + 净盈亏全部归零
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();

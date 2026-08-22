@@ -3,7 +3,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260822-play-polish';
+window.__EH_APP_VER = '20260822-score-voice';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -405,7 +405,12 @@ const EhSfx=(function(){
   function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
   // ── 语音报牌型(斗地主/掼蛋: "炸弹""三带二""顺子"…) ──
   //   系统 TTS(speechSynthesis), 复用 sfx 的 enabled 开关; 抢占式(打断上一句只报最新这手), 由调用方筛显著牌型不絮叨。
-  let _voice=null, _voiceTried=false;
+  //   ★按发言人区分音色(主人反馈"读牌声音都一样,想用各自音色"):
+  //     · 灵魂 = 角色专属设计音色(SOUL_VOICE 按名映射, 与 config.soulColors 同一套人设), 一人一个稳定音高/语速。
+  //     · 真人 = 无性别字段可依(且不从姓名臆测性别→会误判真人), 故按 uid/名字 哈希稳定分配一把嗓子,
+  //       设备有多把中文嗓时自然落到不同男女声, 但不谎称这是其真实性别 —— 只求"各人听着不一样"。
+  //     · 不传发言人(who) → 退回单一全局嗓(向后兼容旧 say(text) 调用)。
+  let _voice=null, _voiceTried=false, _voicePool=null;
   function pickVoice(){
     try{
       const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
@@ -415,15 +420,50 @@ const EhSfx=(function(){
           || vs.find(v=>/^zh/i.test(v.lang)) || null;
     }catch(e){ return null; }
   }
-  function say(text){
+  // 全部中文嗓分堆(按【嗓子名】猜男女, 这是给 TTS voice 分类, 不是给人贴性别)。多数设备只有 1 把中文嗓,
+  // 那时男女堆会空 → 退回 all, 全靠 pitch/rate 拉开差异, 故下面 profile 的音高差给得够大。
+  function buildVoicePool(){
+    let vs=[]; try{ vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[]; }catch(e){ vs=[]; }
+    const zh=vs.filter(v=>/^zh|zh[-_]?(CN|Hans|TW|HK)/i.test(v.lang));
+    const all=zh.length?zh:vs;
+    const F=/Tingting|Ting-?Ting|Sinji|Meijia|Mei-?Jia|Yaoyao|Yao-?Yao|Huihui|Hui-?Hui|Female|婷婷|美佳|女/i;
+    const M=/Kangkang|Kang-?Kang|Yunyang|Yun-?Yang|Liang|Yunye|Male|康康|云扬|男/i;
+    return { all, female:all.filter(v=>F.test(v.name)), male:all.filter(v=>M.test(v.name)) };
+  }
+  // 灵魂角色专属音色(名字→性别倾向 + 音高/语速), 与 config.js soulColors 同一批人设名。灵魂是虚构角色,
+  // 给它设计一把嗓子属于角色塑造(和给它配色一样), 不涉及真人性别。找不到映射的 AI 席退回哈希分配。
+  const SOUL_VOICE={
+    '狼姐':{g:'f',pitch:0.96,rate:1.14}, '老K':{g:'m',pitch:0.80,rate:1.02}, '阿夜':{g:'m',pitch:0.90,rate:1.06},
+    '回音':{g:'f',pitch:1.14,rate:1.08}, '图灵':{g:'m',pitch:0.94,rate:1.20}, '小暖':{g:'f',pitch:1.16,rate:1.00},
+    '小绵羊':{g:'f',pitch:1.24,rate:1.10}
+  };
+  function _hash(s){ let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31 + s.charCodeAt(i))>>>0; return h; }
+  // who: 省略→全局嗓; 或 { name, key/uid, isSoul, isHuman }。返回 {voice, pitch, rate}。
+  function voiceProfile(who){
+    if(!_voicePool) _voicePool=buildVoicePool();
+    if(!who) return { voice:_voice, pitch:1.0, rate:1.12 };
+    const name=String(who.name||who.key||'').replace(/·[0-9a-f]{4,}$/i,'').trim();   // 剥灵魂内部名后缀
+    const sv=who.isSoul ? SOUL_VOICE[name] : null;
+    const h=_hash(who.key||who.uid||name||'x');
+    const g = sv ? sv.g : ((h&1)?'f':'m');
+    const bucket = g==='f' ? _voicePool.female : _voicePool.male;
+    const use = (bucket&&bucket.length) ? bucket : (_voicePool.all||[]);
+    const voice = use.length ? use[h%use.length] : _voice;
+    // 单嗓设备靠 pitch/rate 拉开: 女声偏高、男声偏低, 再叠每人微抖 → 同性别的人也听着不同。
+    const pitch = sv ? sv.pitch : (g==='f' ? 1.10 : 0.82) + ((h>>3)%7)*0.03;
+    const rate  = sv ? sv.rate  : 1.04 + ((h>>6)%6)*0.035;
+    return { voice, pitch, rate };
+  }
+  function say(text, who){
     if(!enabled||!text) return;
     try{
       if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
-      if(!_voiceTried){ _voice=pickVoice(); _voiceTried=true;
-        try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); }; }catch(e){} }
+      if(!_voiceTried){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;
+        try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); _voicePool=buildVoicePool(); }; }catch(e){} }
+      const p=voiceProfile(who);
       const u=new SpeechSynthesisUtterance(String(text));
-      u.lang='zh-CN'; u.rate=1.12; u.pitch=1.0; u.volume=.9;
-      if(_voice) u.voice=_voice;
+      u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.9;
+      if(p.voice) u.voice=p.voice;
       try{ speechSynthesis.cancel(); }catch(e){}   // 抢占: 打断上一句, 只报最新这手牌型
       speechSynthesis.speak(u);
     }catch(e){}
@@ -1180,7 +1220,7 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ if(typeof gtCloseLobby==='function') gtCloseLobby(); }catch(_){ } try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
@@ -2430,11 +2470,8 @@ async function setupGameTables(room){
       const row=p.new; if(!row || !curRoom || curRoom.id!==room.id) return;
       const prev=_gtTables.get(row.id);
       _gtTables.set(row.id,row); gtRenderCard(row);
-      // 功能2: 招募页开着且正是这桌 → lobby 就地重绘(真人上桌/离座即时反映); playing/closed 拆页
-      //   (开局由 gtLaunchLocal 挂真牌桌接手; 散桌则退回聊天)。
-      if(_gtLobby && _gtLobby.id===row.id){
-        if(row.status==='lobby') gtRenderLobbyPage(row); else gtCloseLobby();
-      }
+      // 功能2: 招募全在聊天牌桌卡上完成, 无单独招募页(msg6)。开桌即 gtStart 落打牌页,
+      //   桌变化由 gtLaunchLocal 挂真牌桌接手; 散桌退回聊天。
       // host 侧德州: 座位名册变了(有人中途坐下空位/离座) → 喂给正在跑的引擎, 下一手重组牌手
       //   (真人上桌换掉 AI 顶位 / 走人的席回落 AI)。引擎逐手 newHand 时读最新名册, 座号固定不错位。
       if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host && row.game==='nlhe'
@@ -2494,46 +2531,16 @@ function gtRenderCard(row){
   // Realtime 更新只改牌桌内容，不让已存在的卡片重播入场动画。
   el.classList.add('no-anim');
   gtRenderInto(el,row);
-  // 功能2: 房主点自己的招募卡(非按钮区) → 重开"牌桌大厅"页(返回后想回页面用)。
-  if(row.host_uid===myUid && row.status==='lobby'){
+  // 功能2: 房主点自己的桌卡(非按钮区) → 直接(重)进打牌页; 还在招募中(lobby)则顺手开局。不再弹单独招募页。
+  if(row.host_uid===myUid && (row.status==='lobby'||row.status==='playing')){
     el.classList.add('gt-card-openable');
-    el.onclick=(e)=>{ if(e.target.closest('button')) return; gtOpenLobby(row); };
+    el.onclick=(e)=>{ if(e.target.closest('button')) return;
+      if(row.status==='lobby') gtStart(row.id); else gtEnter(row.id); };
   } else { el.onclick=null; el.classList.remove('gt-card-openable'); }
 }
 
-// ── 功能2: 房主开局直接进"牌桌大厅"页(#hall 浮层), 页上招募真人/一键灵魂/开始, 比只贴聊天卡更丝滑。
-//   聊天卡仍在(供全房加入 & 房主返回后点卡重开页); 页体复用 EHTable.renderLobby(同一套招募 UI/动作),
-//   只套一个铺满 #hall 的壳 + 顶栏返回。realtime 桌变化: lobby→重绘页; playing/closed→拆页
-//   (开局由 gtLaunchLocal 接手挂真牌桌 / 散桌退回聊天)。仅房主用; 客人仍走聊天卡加入、开局自动进桌。
-let _gtLobby = null;   // { id, root, body } 当前打开的招募页, 无则 null
-function gtCloseLobby(){ if(_gtLobby){ try{ _gtLobby.root.remove(); }catch(_){} _gtLobby=null; } }
-function gtOpenLobby(row){
-  if(!row || !window.EHTable) return;
-  if(_gtLobby && _gtLobby.id===row.id) return;   // 已开着这桌的页, 不重复叠
-  const hall=document.getElementById('hall')||document.body;
-  gtCloseLobby();
-  const meta={ddz:{e:'🃏',l:'斗地主'},guandan:{e:'🀄',l:'掼蛋'},nlhe:{e:'🎰',l:'德州扑克'}}[row.game]||{e:'🎴',l:'牌桌'};
-  const root=document.createElement('div'); root.className='gt-lobby-room'; root.dataset.gtLobbyId=row.id;
-  root.innerHTML =
-    '<div class="gt-lobby-bar">'
-    +   '<div class="gt-lobby-title"><span class="dot"></span>'+meta.e+' '+meta.l+' · 招募</div>'
-    +   '<button class="gt-lobby-x" aria-label="返回聊天">✕ 返回</button>'
-    + '</div>'
-    + '<div class="gt-lobby-body"><div class="gt-lobby-card"></div></div>';
-  hall.appendChild(root);
-  const body=root.querySelector('.gt-lobby-card');
-  _gtLobby={ id:row.id, root, body };
-  root.querySelector('.gt-lobby-x').onclick=()=>{
-    try{ if(window.EhSfx&&EhSfx.play) EhSfx.play('click'); }catch(_){}
-    gtCloseLobby();
-  };
-  gtRenderLobbyPage(row);
-}
-function gtRenderLobbyPage(row){
-  if(!_gtLobby || _gtLobby.id!==row.id || !window.EHTable) return;
-  try{ EHTable.renderLobby(_gtLobby.body, row, gtCtx(row)); }
-  catch(e){ console.warn('[gt] 招募页渲染失败', e); }
-}
+// 功能2(msg6): 已退休单独招募页(gtOpenLobby/gtRenderLobbyPage/_gtLobby)。招募全在聊天牌桌卡上完成,
+//   房主开桌即 gtStart(补灵魂+发牌)直接落打牌页; 客人走聊天卡加入、开局自动进桌。
 async function gtEnsureRow(id){
   if(_gtTables.has(id)) return _gtTables.get(id);
   try{ const {data,error}=await sb.from('eh_game_tables').select('*').eq('id',id).maybeSingle();
@@ -6888,7 +6895,7 @@ async function launchDoudizhu(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenLobby(row);   // 功能2: 房主开桌直接进招募页
+  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
 //    这是默认: 先等真人, 房主看座位满意了手动点【开始 ▶】才开局(不自动开)。
@@ -6910,7 +6917,8 @@ async function launchTexas(){
     const card=document.querySelector(`[data-gt-id="${row.id}"]`);
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
-    if(row.host_uid===myUid && row.status==='lobby') gtOpenLobby(row);   // 功能2: 房主重开招募页
+    if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 我的桌还在招募中 → 直接开局落打牌页
+    else if(row.host_uid===myUid && row.status==='playing') gtEnter(row.id);   // 已在打 → 重新进桌
     return;
   }
   // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用每空位「🤝灵魂」下拉指定补位, 满意再点「开始 ▶」(空位自动补灵魂)
@@ -6921,7 +6929,7 @@ async function launchTexas(){
   try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenLobby(row);   // 功能2: 房主开桌直接进招募页
+  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐上房里灵魂(排除已坐的), 灵魂不够则坐到用完为止。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像/性格)填满, 不再是匿名 AI 机器人。
@@ -7051,7 +7059,7 @@ async function launchGuandan(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenLobby(row);   // 功能2: 房主开桌直接进招募页
+  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
 async function postGuandanResult(res, log, names, meta){
