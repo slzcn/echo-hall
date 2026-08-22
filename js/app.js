@@ -3,7 +3,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260822-score-voice';
+window.__EH_APP_VER = '20260822-table-focus';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2503,7 +2503,8 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
-      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id) } };
+      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtEnter(row.id),
+      inviteHumans:()=>gtInviteHumans(row.id) } };
 }
 function gtRenderInto(el,row){
   if(!window.EHTable){ console.warn('[gt] EHTable 未就绪, 牌桌卡暂无法渲染'); return; }
@@ -2526,16 +2527,17 @@ async function gtHydrateCard(el, id){
   if(btn) btn.onclick=()=>{ el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--sub,#86cbc6)">牌桌加载中…</span></div>'; gtHydrateCard(el, id); };
 }
 function gtRenderCard(row){
+  gtRefreshSeatingPage(row);   // 座位页(牌桌大厅)开着就同步刷新: 灵魂/真人入座、开局、散桌 都即时反映(本地 gtRpc + 远端 realtime 共此一路)
   const el=document.querySelector(`[data-gt-id="${row.id}"]`);
   if(!el) return;
   // Realtime 更新只改牌桌内容，不让已存在的卡片重播入场动画。
   el.classList.add('no-anim');
   gtRenderInto(el,row);
-  // 功能2: 房主点自己的桌卡(非按钮区) → 直接(重)进打牌页; 还在招募中(lobby)则顺手开局。不再弹单独招募页。
+  // 房主点自己的桌卡(非按钮区): 招募中(lobby) → 打开座位页(牌桌大厅)摆阵/邀人, 满意再发牌; 已开局(playing) → 直接(重)进打牌页。
   if(row.host_uid===myUid && (row.status==='lobby'||row.status==='playing')){
     el.classList.add('gt-card-openable');
     el.onclick=(e)=>{ if(e.target.closest('button')) return;
-      if(row.status==='lobby') gtStart(row.id); else gtEnter(row.id); };
+      if(row.status==='lobby') gtOpenSeatingPage(row.id); else gtEnter(row.id); };
   } else { el.onclick=null; el.classList.remove('gt-card-openable'); }
 }
 
@@ -2565,7 +2567,8 @@ async function gtJoin(id,seat){ await gtRpc('eh_gt_join',{p_table:id,p_seat:seat
 async function gtLeave(id){ await gtRpc('eh_gt_leave',{p_table:id}); }
 async function gtSeatSoul(id,seat,soul){ await gtRpc('eh_gt_seat_soul',{p_table:id,p_seat:seat,p_soul:soul}); }
 async function gtKick(id,seat){ await gtRpc('eh_gt_kick',{p_table:id,p_seat:seat}); }
-async function gtClose(id){ await gtRpc('eh_gt_close',{p_table:id}); }
+async function gtClose(id){ try{ localStorage.removeItem('gtsc:'+id); }catch(_){ }   // 桌散了清掉本桌累计记分, 不留脏键
+  await gtRpc('eh_gt_close',{p_table:id}); }
 // 「🤝召唤灵魂」: 只把空位坐满房里灵魂、不开局 —— 手动开房路径。与 gtStart(召唤+开局) 分开:
 //   房主想先摆好阵型(召唤灵魂补位 + 等真人换座)再决定何时开打时用它; 满座后仍走「⚡一键开始」起局。
 async function gtFillSouls(id){
@@ -2576,7 +2579,83 @@ async function gtFillSouls(id){
   try{ if(window.EhSfx&&window.EhSfx.play) EhSfx.play('click'); }catch(_){}
   toast(n>0 ? ('已召唤 '+n+' 位灵魂入座 · 满意点⚡一键开始') : '没有空位，或房里暂无可召唤的灵魂');
 }
+// ── 座位页(牌桌大厅): 开桌后先落到这张"牌桌页面"摆阵 —— 每空位手动邀灵魂/真人, 或一键补灵魂/邀真人, 满意再「开始发牌」──
+//   复用聊天卡同一套 EHTable.renderLobby(座位 chip + 加入/🤝灵魂/召唤/开始), 只是撑成一张全屏牌桌页。
+//   发牌前没有任何牌 → 不涉及脱敏快照/底牌命门, 纯 UI + 既有座位 RPC, 风险收敛。
+let _gtSeatPage=null;   // { id, card } 当前打开的座位页
+function gtSeatPageCSS(){
+  if(document.getElementById('gtSeatPageCSS')) return;
+  const s=document.createElement('style'); s.id='gtSeatPageCSS';
+  s.textContent=[
+    '.gt-seatpage{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;',
+      'padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(18px + env(safe-area-inset-bottom,0px));',
+      'background:radial-gradient(120% 90% at 50% 12%,rgba(0,40,38,.96),rgba(4,10,14,.98));backdrop-filter:blur(4px);animation:gtspIn .22s ease}',
+    '@keyframes gtspIn{from{opacity:0}to{opacity:1}}',
+    '.gt-seatpage .gtsp-wrap{width:100%;max-width:440px;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}',
+    '.gt-seatpage .gtsp-bar{display:flex;align-items:center;gap:10px}',
+    '.gt-seatpage .gtsp-ttl{font-size:15px;font-weight:800;color:var(--ink,#eaf6ff);letter-spacing:.02em;flex:1}',
+    '.gt-seatpage .gtsp-x{font-size:13px;font-weight:700;color:var(--sub,#86cbc6);background:transparent;border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:9px;padding:5px 12px;cursor:pointer}',
+    // 撑大复用卡: 座位 chip 更高更好点, 底部按钮更大
+    '.gt-seatpage .gt-card{background:rgba(10,26,25,.72);border:1px solid var(--line2,rgba(0,229,212,.35));border-radius:16px;padding:14px}',
+    '.gt-seatpage .gt-seat{padding:9px 11px}',
+    '.gt-seatpage .gt-av{width:30px;height:30px;font-size:16px}',
+    '.gt-seatpage .gt-nm{font-size:14px}',
+    '.gt-seatpage .gt-foot{margin-top:14px}',
+    '.gt-seatpage .gt-btn{padding:9px 16px;font-size:13.5px}',
+    '.gt-seatpage .gt-soulsel{max-width:120px;padding:5px 6px;font-size:12px}',
+    '.gt-seatpage .gt-mini{padding:5px 11px;font-size:12px}'
+  ].join('');
+  document.head.appendChild(s);
+}
+function gtOpenSeatingPage(id){
+  const row=_gtTables.get(id); if(!row) return;
+  if(row.status==='playing'){ gtEnter(id); return; }   // 已经开局 → 直接进桌, 不再摆阵
+  if(row.status!=='lobby') return;
+  if(_restoreActiveGameIfAny && _gtActiveTable){ /* 已有活牌桌: 交给恢复逻辑 */ }
+  gtCloseSeatingPage();
+  gtSeatPageCSS();
+  const meta={nlhe:'德州扑克',guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'牌桌';
+  const wrap=document.createElement('div'); wrap.className='gt-seatpage'; wrap.dataset.gtId=id;
+  wrap.innerHTML='<div class="gtsp-wrap"><div class="gtsp-bar"><div class="gtsp-ttl">🪑 '+meta+' · 入座</div>'
+    +'<button class="gtsp-x">返回</button></div><div class="gtsp-card"></div></div>';
+  const card=wrap.querySelector('.gtsp-card');
+  wrap.querySelector('.gtsp-x').onclick=()=>gtCloseSeatingPage();   // 返回聊天(牌桌卡仍在, 桌不散, 可再点开)
+  wrap.addEventListener('click',(e)=>{ if(e.target===wrap) gtCloseSeatingPage(); });   // 点遮罩空白处也退回
+  (document.getElementById('hall')||document.body).appendChild(wrap);
+  _gtSeatPage={ id, card, wrap };
+  gtRefreshSeatingPage(row);
+}
+function gtRefreshSeatingPage(row){
+  if(!_gtSeatPage || !row || _gtSeatPage.id!==row.id) return;
+  if(row.status!=='lobby'){ gtCloseSeatingPage(); return; }   // 开局/散桌 → 关页(开局由 gtLaunchLocal 接手落打牌页)
+  if(!window.EHTable){ return; }
+  try{ EHTable.renderLobby(_gtSeatPage.card, row, gtCtx(row)); }
+  catch(e){ console.warn('[gt] 座位页渲染失败', e); }
+}
+function gtCloseSeatingPage(){
+  if(!_gtSeatPage) return;
+  try{ _gtSeatPage.wrap.remove(); }catch(_){}
+  _gtSeatPage=null;
+}
+// 「👥邀请真人」: 把牌桌招呼发到聊天区, 房里真人点牌桌卡「加入」即上桌。限流免刷屏。
+let _gtLastInvite=0;
+async function gtInviteHumans(id){
+  const row=_gtTables.get(id) || await gtEnsureRow(id);
+  if(!row || !curRoom){ toast('牌桌信息拿不到，稍后再试'); return; }
+  const now=Date.now();
+  if(now-_gtLastInvite<8000){ toast('刚邀请过了，稍等一下'); return; }
+  _gtLastInvite=now;
+  const meta={nlhe:'德州',guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'牌局';
+  const text=`${me.name} 开了一桌${meta}，往上翻找牌桌卡点「加入」一起玩 🎴`;
+  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'msg'};
+  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+  if(el){ $('#stream').appendChild(el); scrollStream(); }
+  try{ const {data}=await sb.from('eh_messages').insert(payload).select('id').single(); if(data && el) el.dataset.mid=data.id; }
+  catch(e){ console.warn('[gt] invite humans failed', e); }
+  toast('已邀请房里真人 · 他们点牌桌卡即可加入');
+}
 async function gtStart(id){
+  gtCloseSeatingPage();   // 开始发牌: 关座位页, 下面 gtLaunchLocal 落打牌页
   // 点「开始」即先用房里灵魂把空位补满(灵魂=真身份/头像/性格, 不再是匿名🤖机器人), 再开局。
   // 房里灵魂不够时剩余空位才落到本机 AI 代打。await 完成后 DB 座位已是灵魂, eh_gt_start 据此起局。
   try{ const row=_gtTables.get(id); if(row) await gtSeatSoulsIntoEmpties(row); }catch(_){}
@@ -2586,12 +2665,14 @@ async function gtStart(id){
 }
 // host 开局: 在本机跑引擎当权威。按 row.game 分派到对应牌桌 UI。
 function gtLaunchLocal(row){
+  gtCloseSeatingPage();   // 落打牌页前收掉座位页(host 走完摆阵/发牌)
   if(_restoreActiveGameIfAny()) return;
   if(row.game==='nlhe') return gtLaunchPoker(row);
   if(row.game==='guandan') return gtLaunchGuandan(row);
   if(row.game==='ddz') return gtLaunchDdz(row);
 }
 function gtEnter(id){
+  gtCloseSeatingPage();
   const row=_gtTables.get(id); if(!row) return;
   if(row.host_uid===myUid){ gtLaunchLocal(row); return; }
   if(row.game==='nlhe'){ gtEnterPoker(row); return; }
@@ -2652,6 +2733,7 @@ function gtLaunchPoker(row){
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHPokerGame.open({
+    scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
@@ -2692,6 +2774,7 @@ function gtEnterPoker(row){
   gtWatchHostPing(chan, row.host_uid);
   _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHPokerGame.open({
+    scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
@@ -2737,6 +2820,7 @@ function gtLaunchGuandan(row){
   gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
+    scoreKey:'gtsc:'+row.id,
     names:A.names, avatars:A.avatars, isAI:A.isAI,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
@@ -2784,6 +2868,7 @@ function gtEnterGuandan(row){
   gtWatchHostPing(chan, row.host_uid);
   _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHGuandanGame.open({
+    scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
@@ -2828,6 +2913,7 @@ function gtLaunchDdz(row){
   gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
+    scoreKey:'gtsc:'+row.id,
     names:A.names, avatars:A.avatars, isAI:A.isAI,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
@@ -2874,6 +2960,7 @@ function gtEnterDdz(row){
   gtWatchHostPing(chan, row.host_uid);
   _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHDdzGame.open({
+    scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
@@ -6895,7 +6982,7 @@ async function launchDoudizhu(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
+  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
 //    这是默认: 先等真人, 房主看座位满意了手动点【开始 ▶】才开局(不自动开)。
@@ -6917,7 +7004,7 @@ async function launchTexas(){
     const card=document.querySelector(`[data-gt-id="${row.id}"]`);
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
-    if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 我的桌还在招募中 → 直接开局落打牌页
+    if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 我的桌还在招募中 → 打开座位页摆阵, 不直接发牌
     else if(row.host_uid===myUid && row.status==='playing') gtEnter(row.id);   // 已在打 → 重新进桌
     return;
   }
@@ -6929,7 +7016,7 @@ async function launchTexas(){
   try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
-  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
+  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐上房里灵魂(排除已坐的), 灵魂不够则坐到用完为止。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像/性格)填满, 不再是匿名 AI 机器人。
@@ -7059,7 +7146,7 @@ async function launchGuandan(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtStart(row.id);   // 功能2: 开桌即自动坐灵魂+发牌, 直接落打牌页(不再单开招募页); 招募靠聊天卡(德州可中途加入, 见 eh_gt_join 放行 playing)
+  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
 async function postGuandanResult(res, log, names, meta){

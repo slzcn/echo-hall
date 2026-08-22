@@ -132,10 +132,10 @@ assert(/root\.EHPokerGame\s*=\s*\{ open \}/.test(ui), 'poker-ui 导出 EHPokerGa
 assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席地基)');
 assert(/AI\.personaForSoul\(soul\)\.key/.test(ui), '灵魂原型→打法性格映射(personaForSoul)');
 assert(/function applyMove\(seat, move\)/.test(ui), 'applyMove 就位(供 host 权威应用远程真人动作/测试驱动)');
-// 反回退: 对手须落在【上弧】收在桌内(曾因 ±43% 侧位戳出屏外点不到)
-assert(/const RX = land \? 46 : 40, RY = land \? 30 : 34, CY = land \? 42 : 46/.test(ui) &&
+// 反回退: 对手须落在【上弧】收在桌内(曾因 ±43% 侧位戳出屏外点不到; 竖屏 felt 收矮后 CY 46→48 让上弧座位下移不戳顶)
+assert(/const RX = land \? 46 : 40, RY = land \? 30 : 34, CY = land \? 42 : 48/.test(ui) &&
   /const cx = 50 \+ RX\*Math\.cos\(t\)/.test(ui) && /const cy = CY - RY\*Math\.sin\(t\)/.test(ui),
-  '对手沿上弧分布(竖屏横40%/纵34%收桌内, 横屏收进46/30弧)——防侧位溢出屏外');
+  '对手沿上弧分布(竖屏横40%/纵34%收桌内, 中心 48% 下移防顶边, 横屏收进46/30弧)——防侧位溢出屏外');
 assert(/for\(let i=st\.board\.length;i<5;i\+\+\)/.test(ui), '公共牌区恒 5 槽(已发+暗背占位)');
 assert(/function onHumanTimeout\(/.test(ui) && /HUMAN_ACT_MS/.test(ui), '到我行动亮倒计时, 超时自动过牌/弃牌');
 assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80}opts\.onResult\(res, st\.log/.test(ui),

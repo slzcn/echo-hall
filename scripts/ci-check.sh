@@ -843,7 +843,7 @@ import re, pathlib, sys
 baselines = {
     r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
     r'\bsetTimeout\s*\(': ('setTimeout', 127, 15),
-    r'\baddEventListener\s*\(': ('addEventListener', 108, 10),
+    r'\baddEventListener\s*\(': ('addEventListener', 119, 10),
     r'\.style\.\w+\s*=': ('element.style=', 131, 15),
 }
 sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]

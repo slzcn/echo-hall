@@ -56,6 +56,13 @@
 .pk-room.is-land .pk-raise input[type=range]{height:18px}
 .pk-room.is-land .pk-b{padding:9px 0;font-size:14px}
 .pk-room.is-land .pk-qbtn{padding:4px 0}
+/* 竖屏美化(手机窄屏): 原 .pk-table 用 top/bottom:9px 撑满整列高度, 椭圆被抻成长蛋——
+   上弧座位+公共牌全堆在顶部, 下半个绿肚皮空(因"我"坐在 felt 下方的 pk-me 条, 桌底本无人)。
+   这里把桌面收成一个比例匀称的椭圆并竖直居中(操作钮仍钉底、"我"贴其上), 座位/公共牌走 %
+   定位随桌高等比缩放, 不再被拉长。.pk-room 前缀提特异性以压过后面定义的基础 .pk-table 规则。 */
+@media (max-width:599px){
+  .pk-room .pk-table{top:48%;bottom:auto;height:clamp(340px,50vh,430px);transform:translateY(-50%)}
+}
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
@@ -86,7 +93,9 @@
 .pk-board .card.flip-in{animation:pkFlip .34s cubic-bezier(.2,.9,.3,1) both}
 @keyframes pkFlip{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
 .pk-msg{font-size:12px;color:var(--sub);min-height:14px;text-align:center}
-.pk-msg.mine{color:var(--accent);font-weight:800}
+.pk-msg.mine{color:var(--ink);font-weight:800;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:pkTurnPulse 1.05s ease-in-out infinite}
+/* 轮到自己行动: 提示条化作发光脉冲胶囊(halo+微缩放, 纯 box-shadow/transform 不改盒模型→不引入跳动) */
+@keyframes pkTurnPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.35),0 0 6px rgba(0,229,212,.3);transform:scale(1)}50%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.7),0 0 16px 3px rgba(0,229,212,.55);transform:scale(1.04)}}
 /* 座位(对手, 绝对定位于上弧) */
 .pk-seat{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,78px);z-index:4}
 .pk-seat.folded{opacity:.4;filter:grayscale(.7)}
@@ -334,8 +343,13 @@
     let stacks = names.map(() => START);
     // 本桌累计净盈亏(相对买入): buyin[seat]=该席至今累计买入(每破产补带一次 +START); netSettled=上一手结算后的净额(stack-buyin)。
     // 净额只在 showOver 结算时刷新, 故座位徽标不随手内下注抖动(展示"进本手时的本桌战绩")。
-    const buyin = names.map(() => START);
-    let netSettled = names.map(() => 0);
+    // 持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
+    const SCOREKEY = opts.scoreKey || null;
+    const _psav = (()=>{ if(!SCOREKEY) return null; try{ return JSON.parse(localStorage.getItem(SCOREKEY)||'null'); }catch(_){ return null; } })();
+    const _okArr = a => Array.isArray(a) && a.length===names.length && a.every(x=>typeof x==='number');
+    const buyin = (_psav && _okArr(_psav.buyin)) ? _psav.buyin.slice() : names.map(() => START);
+    let netSettled = (_psav && _okArr(_psav.net)) ? _psav.net.slice() : names.map(() => 0);
+    function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify({buyin, net:netSettled})); }catch(_){ } }
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
@@ -371,7 +385,7 @@
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     sfx('arrive'); sfx('deal');
 
-    let aiTimer=null, ringRAF=null, streetTimer=null, turnStart=0, turnDur=0;
+    let aiTimer=null, ringRAF=null, streetTimer=null, turnStart=0, turnDur=0, turnSeatActive=-1, turnStreetActive='';
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
     let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
@@ -400,8 +414,8 @@
       <div class="pk-toast" id="pkToast"></div>`;
     mountEl.appendChild(room);
 
-    const dock = (opts.chat && root.EHTableChat)
-      ? root.EHTableChat.mount(room, { send: opts.chat.send, me: opts.chat.me }) : null;
+    // 游戏内聊天已下线: 牌桌不再挂聊天坞/弹幕, 点"✕ 返回"回聊天室看消息(减少牌桌干扰、专注对局)
+    const dock = null;
 
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#pkFelt'), table:$('#pkTable'), board:$('#pkBoard'), pot:$('#pkPot'),
@@ -575,7 +589,8 @@
       // 角度域 158°(左上)→90°(正上)→22°(右上); 横半径 40%/竖半径 34% 收在牌桌内(seat 宽 78px 时两侧不溢出)。
       const TMAX=158, TMIN=22;
       // 横屏: 桌面又宽又矮 → 横向半径放大(铺开占满宽度不挤中央), 竖向半径压扁 + 中心上移(上弧别顶出矮felt)。
-      const RX = land ? 46 : 40, RY = land ? 30 : 34, CY = land ? 42 : 46;
+      // 竖屏 felt 收成比例椭圆后变矮(见上方 @media 注释), 上弧中心随之下移(CY 46→48), 免得高约 110px 的座位卡顶边戳出矮 felt。
+      const RX = land ? 46 : 40, RY = land ? 30 : 34, CY = land ? 42 : 48;
       for (let d=1; d<order.length; d++){
         const seat=order[d];
         const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
@@ -877,21 +892,27 @@
     // ── 回合驱动: 亮环倒计时 + AI/自动 ──
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase==='over' || st.phase==='waiting' || st.phase==='seating') return;
+      if (st.phase==='over' || st.phase==='waiting' || st.phase==='seating') { turnSeatActive=-1; turnStreetActive=''; return; }
       // 摊牌/结算之外, 无人需行动的中间态不该发生(引擎自动跑完); 安全兜底
       const seat=st.toAct;
-      if (seat<0 || !st.players[seat]) return;
+      if (seat<0 || !st.players[seat]) { turnSeatActive=-1; return; }
       const mine = seat===mySeat;
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
       // 谁来推进这一步: 我(本地/relay) · AI(本机决策) · 远程真人(等回传, host 侧兜底代打) · guest 观战他人(静态)
       const remote = isRemote(seat);
       const aiSeat = !mine && !remote && !isGuest && isAI[seat];
-      turnDur = mine     ? HUMAN_ACT_MS
-              : aiSeat   ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))
-              : remote   ? (HUMAN_ACT_MS + 6000)   // host 兜底比对端 25s 稍长, 留网络冗余; 久不动就代打
-              : 0;                                 // guest 看别人回合: 不 tick, 静态高亮即可
-      turnStart = Date.now();
+      // 倒计时只在【回合真正切换】(座位或街变)时重置起点; 同回合重渲(收快照/每帧重绘)保持原起点继续走, 否则对手环被打回满格→"倒计时乱跳"。
+      const turnChanged = (seat!==turnSeatActive) || (st.street!==turnStreetActive);
+      turnSeatActive = seat; turnStreetActive = st.street;
+      if (turnChanged){
+        turnDur = mine     ? HUMAN_ACT_MS
+                : isGuest  ? HUMAN_ACT_MS          // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
+                : aiSeat   ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))
+                : remote   ? (HUMAN_ACT_MS + 6000)   // host 兜底比对端 25s 稍长, 留网络冗余; 久不动就代打
+                : 0;
+        turnStart = Date.now();
+      }
       const seatEl = mine ? null : els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
       const clk = mine ? $('#pkClk') : null;
       const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 对手行动席头像秒数徽标
@@ -916,7 +937,7 @@
         ringRAF=requestAnimationFrame(tick);
       };
       tick();
-      if(aiSeat) aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+      if(aiSeat){ const remainMs=Math.max(0,turnDur-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }   // 同回合重渲用剩余时间, 否则 AI 行动被反复推迟
     }
     // host 侧: 远程真人久不响应 → 用引擎权威替其过牌/弃牌, 防一人掉线卡死全桌
     function onRemoteTimeout(seat){
@@ -945,6 +966,7 @@
       const res=st.result;
       // 本桌累计净盈亏: 结算刷新各席净额(此刻 p.stack 已是收池后的最终筹码)。座位徽标下一手起读它。
       st.players.forEach(p=> netSettled[p.seat] = p.stack - (buyin[p.seat]||START));
+      saveScore();   // 存本桌累计净盈亏防重进清零
       const won=(res.winnersBySeat||[]).includes(mySeat);
       const my=st.players[mySeat];
       const delta = my.stack - my.start;
@@ -1085,7 +1107,7 @@
         isAI[s]    = A.isAI[s];
         if (ids) ids[s] = A.ids[s] || null;
         if (A.souls) souls[s] = A.souls[s];
-        if (!wasHuman && nowHuman){ stacks[s] = START; buyin[s] = START; netSettled[s] = 0; }   // 新真人坐下: 全新买入, 净盈亏归零重算
+        if (!wasHuman && nowHuman){ stacks[s] = START; buyin[s] = START; netSettled[s] = 0; saveScore(); }   // 新真人坐下: 全新买入, 净盈亏归零重算
       }
       personaBySeat = names.map((_, seat) => personaFor(seat));
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
@@ -1108,6 +1130,7 @@
     function resetMatch(){
       stacks = names.map(()=>START);
       for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; }   // 本场重来: 买入基准 + 净盈亏全部归零
+      saveScore();
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();

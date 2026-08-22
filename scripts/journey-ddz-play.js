@@ -246,9 +246,11 @@ assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌单排自适�
 assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutHand 按可用宽算步距(牌多自动收紧, 永不溢出)');
 assert(/\.ddz-hand\{[^}]*flex-wrap:nowrap/.test(ui), '手牌 flex-wrap:nowrap(不换行, 单排)');
 assert(/els\.hand\.appendChild\(el\);\s*\}\);\s*layoutHand\(\);/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
-// (Batch3) 增量护栏: 手牌 id序/选中集/回合锁/发牌帧 未变即跳过重建, 免每秒重绘的强制回流与打断涂抹选牌
-assert(/const sig = \(myTurn\?1:0\)[\s\S]{0,200}\[\.\.\.selected\]\.sort\(\)\.join/.test(ui) && /if \(sig === lastHandSig\) return;/.test(ui),
-  'ddz renderHand 按签名跳过重建(手牌/选中/回合锁/发牌帧 全未变则不重建)');
+// (Batch3) 增量护栏: 手牌结构(id序/回合锁/发牌帧)未变即不重建; 结构未变仅选牌变 → 只切 .sel 类(升降走 transform 过渡, 不整段重建 = 点牌丝滑)
+assert(/const structSig = \(myTurn\?1:0\)[\s\S]{0,200}order\.map\(c=>c\.id\)\.join/.test(ui) && /if \(structSig === lastHandSig\)/.test(ui),
+  'ddz renderHand 按结构签名跳过整段重建(手牌/回合锁/发牌帧 未变则不重建)');
+assert(/if \(selSig !== lastSelSig\)[\s\S]{0,220}classList\.toggle\('sel'/.test(ui),
+  'ddz 选牌变化只切 .sel 类不整段重建(点牌升降走 CSS transform 丝滑)');
 assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
   'resize 重排手牌且关桌解绑(转屏自适应, 不泄漏监听)');
 

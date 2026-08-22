@@ -115,34 +115,44 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260822-score-voice', 'ver.txt=20260822-score-voice');
+assert(buildVer === '20260822-table-focus', 'ver.txt=20260822-table-focus');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。
-//     功能2(主人 msg1「发牌自动、不需房主干预」+ msg6「开桌进打牌页、在那页招募、不要单独招募页」):
-//     开桌即自动坐灵魂+发牌(gtStart), 直接落打牌页; 不再弹单独招募页(gtOpenLobby 已不再被调用, 仅留定义)。
-//     招募改走聊天里的牌桌卡: 德州 eh_gt_join 放行 playing 中途加入(下一手把该席从 AI 换成真人);
-//     斗地主/掼蛋固定角色+叫分, 开局后不可中途加入是引擎限制(auto-deal=灵魂满座陪玩)。
-//     覆盖旧设计「停在招募中等真人手动点开始」—— 那是本次主人明确要改掉的。
-//     反回退①: 曾同时存在 /德州 与 /德州联机 两条并存命令; 反回退②: 点开始/开桌须用房里灵魂补位, 非匿名机器人。
+//     第1条(主人:「开局后直接进入牌桌这个页面, 每个座位手动邀灵魂或真人, 也支持一键邀请, 之后再发牌」):
+//     开桌【不再自动发牌】, 先落到座位页(牌桌大厅 gtOpenSeatingPage) —— 复用 EHTable.renderLobby 撑成全屏牌桌页,
+//     每空位手动「加入」(真人自坐)/「🤝灵魂」下拉(指定灵魂坐某席), 或底部「🤝一键灵魂」「👥邀请真人」一键补位,
+//     房主满意点「开始发牌 ▶」(=gtStart 空位补灵魂后发牌)才落打牌页。不再弹旧 gtOpenLobby 单独招募页。
+//     反回退: 开桌不得直接 gtStart 自动发牌(那是"功能2"旧行为, 本次第1条明确改回"先摆阵再发牌")。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
 const LT = (APP.match(/async function launchTexas\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌桌: eh_gt_open 开桌 + 贴牌桌卡');
-assert(/gtStart\s*\(/.test(LT), '功能2: launchTexas 开桌即自动开局(gtStart 补灵魂+发牌, 直接落打牌页)');
-assert(!/gtOpenLobby\s*\(/.test(APP), '功能2: 不再调用 gtOpenLobby(单独招募页已退休, 开桌直接进打牌页)');
+assert(/gtOpenSeatingPage\s*\(/.test(LT) && !/\bgtStart\s*\(/.test(LT),
+  '第1条: launchTexas 开桌先落座位页(gtOpenSeatingPage), 不再自动 gtStart 发牌');
+assert(!/gtOpenLobby\s*\(/.test(APP), '不再调用 gtOpenLobby(旧单独招募页已退休)');
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
+// 座位页: gtOpenSeatingPage 复用 renderLobby 渲染, 开局/散桌自动关页; gtStart(开始发牌)仍先灵魂补位再发牌
+const SP = (APP.match(/function gtOpenSeatingPage\(id\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/renderLobby|gtRefreshSeatingPage/.test(APP) && /function gtOpenSeatingPage/.test(APP),
+  '第1条: 有 gtOpenSeatingPage 座位页(复用 EHTable.renderLobby 撑成全屏牌桌页)');
+assert(/gtRefreshSeatingPage\(row\)/.test(APP.match(/function gtRenderCard\(row\)\{[\s\S]*?\n\}/)[0]),
+  '座位页随牌桌行更新即时刷新(本地 gtRpc + 远端 realtime 共 gtRenderCard 一路)');
 const GS = (APP.match(/async function gtStart\(id\)\{[\s\S]*?\n\}/) || [''])[0];
-assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名 AI)');
-// 手动开房路径: gtFillSouls 重新引入为【只召唤灵魂、不开局】的独立动作(与 gtStart 分开), 内里绝不调 eh_gt_start
+assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart(开始发牌)前先灵魂补位(空位=灵魂来玩, 非匿名 AI)');
+assert(/gtCloseSeatingPage/.test(GS), 'gtStart 发牌时收掉座位页');
+// 手动开房路径: gtFillSouls 为【只召唤灵魂、不开局】的独立动作(与 gtStart 分开), 内里绝不调 eh_gt_start
 const GF = (APP.match(/async function gtFillSouls\(id\)\{[\s\S]*?\n\}/) || [''])[0];
-assert(/gtSeatSoulsIntoEmpties/.test(GF) && !/eh_gt_start/.test(GF), 'gtFillSouls 只召唤灵魂补位、不开局(手动开房路径)');
-assert(/⚡一键开始/.test(NET) && /ctx\.actions\.start\(\)/.test(NET), 'table-net 招募卡有「⚡一键开始」→ start(召唤灵魂+开局)');
-assert(/🤝召唤灵魂/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 招募卡有「🤝召唤灵魂」→ fillSouls(只补位不开局)');
-assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(指定某灵魂坐某席)');
+assert(/gtSeatSoulsIntoEmpties/.test(GF) && !/eh_gt_start/.test(GF), 'gtFillSouls 只召唤灵魂补位、不开局');
+assert(/async function gtInviteHumans\(id\)/.test(APP) && /eh_messages/.test(APP.match(/async function gtInviteHumans\(id\)\{[\s\S]*?\n\}/)[0]),
+  '第1条: 有 gtInviteHumans 一键邀真人(往聊天区发招呼, 房里真人点卡加入)');
+assert(/开始发牌 ▶/.test(NET) && /ctx\.actions\.start\(\)/.test(NET), 'table-net 座位卡有「开始发牌 ▶」→ start(补灵魂+发牌)');
+assert(/🤝一键灵魂/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 座位卡有「🤝一键灵魂」→ fillSouls(只补位不发牌)');
+assert(/👥邀请真人/.test(NET) && /ctx\.actions\.inviteHumans\(\)/.test(NET), 'table-net 座位卡有「👥邀请真人」→ inviteHumans(一键邀真人)');
+assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(手动指定某灵魂坐某席)');
 assert(/async function launchTexasOnline\(\)\{\s*return launchTexas\(\);\s*\}/.test(APP),
   'launchTexasOnline 已退化成 launchTexas 别名(兼容旧命令/调用点)');
-assert(/table-net\.js\?v=20260820-recruit-card/.test(HTML), 'index.html 挂 table-net.js?v=20260820-recruit-card(随改动升号)');
+assert(/table-net\.js\?v=20260822-table-focus/.test(HTML), 'index.html 挂 table-net.js?v=20260822-table-focus(随改动升号)');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){

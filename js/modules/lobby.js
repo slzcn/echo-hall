@@ -347,17 +347,20 @@
     var roomsQuery = deps.roomsQuery;
     var getBox = deps.getBox;
     var chSkel = deps.chSkel;
-    var fillRoomStats = deps.fillRoomStats;
-    var prefetchAll = deps.prefetchAll;
+    var getFillRoomStats = deps.getFillRoomStats;
+    var getPrefetchAll = deps.getPrefetchAll;
     var getConfig = deps.getConfig;
     var roomAccentC = deps.roomAccentC;
     var esc = deps.esc;
     var safeEmoji = deps.safeEmoji;
     var bindRoomCards = deps.bindRoomCards;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof bindRoomCards !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof chSkel !== 'function' || typeof getFillRoomStats !== 'function' || typeof getPrefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof bindRoomCards !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderOfficial missing dependencies');
     }
     return async function renderOfficial(soft) {
+      var fillRoomStats = getFillRoomStats();
+      var prefetchAll = getPrefetchAll();
+      if (typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function') return { failed: true };
       var box = getBox();
       if (!box) return { failed: true };
       if (soft && box.querySelector('.ch[data-rid]')) {
@@ -398,18 +401,21 @@
     var getBox = deps.getBox;
     var getEmpty = deps.getEmpty;
     var chSkel = deps.chSkel;
-    var fillRoomStats = deps.fillRoomStats;
-    var prefetchAll = deps.prefetchAll;
+    var getFillRoomStats = deps.getFillRoomStats;
+    var getPrefetchAll = deps.getPrefetchAll;
     var getConfig = deps.getConfig;
     var roomAccentC = deps.roomAccentC;
     var esc = deps.esc;
     var safeEmoji = deps.safeEmoji;
     var autoTopic = deps.autoTopic;
     var bindRoomCards = deps.bindRoomCards;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof autoTopic !== 'function' || typeof bindRoomCards !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof chSkel !== 'function' || typeof getFillRoomStats !== 'function' || typeof getPrefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof autoTopic !== 'function' || typeof bindRoomCards !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderPublic missing dependencies');
     }
     return async function renderPublic(soft) {
+      var fillRoomStats = getFillRoomStats();
+      var prefetchAll = getPrefetchAll();
+      if (typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function') return { failed: true };
       var box = getBox();
       var empty = getEmpty();
       if (!box || !empty) return { failed: true };
@@ -446,13 +452,15 @@
     deps = deps || {};
     var getSb = deps.getSb, roomsQuery = deps.roomsQuery, getMyUid = deps.getMyUid;
     var getBox = deps.getBox, getEmpty = deps.getEmpty, rmSkel = deps.rmSkel;
-    var prefetchAll = deps.prefetchAll, getConfig = deps.getConfig;
+    var getPrefetchAll = deps.getPrefetchAll, getConfig = deps.getConfig;
     var esc = deps.esc, safeEmoji = deps.safeEmoji, readKnownOnline = deps.readKnownOnline;
     var enterRoom = deps.enterRoom, copyInvite = deps.copyInvite;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getMyUid !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof rmSkel !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof readKnownOnline !== 'function' || typeof enterRoom !== 'function' || typeof copyInvite !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getMyUid !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof rmSkel !== 'function' || typeof getPrefetchAll !== 'function' || typeof getConfig !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof readKnownOnline !== 'function' || typeof enterRoom !== 'function' || typeof copyInvite !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderMyRooms missing dependencies');
     }
     return async function renderMyRooms(soft) {
+      var prefetchAll = getPrefetchAll();
+      if (typeof prefetchAll !== 'function') return { failed: true };
       var myUid = getMyUid(), box = getBox();
       if (!box) return { failed: true };
       if (!myUid) { box.innerHTML = ''; return; }

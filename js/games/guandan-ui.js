@@ -142,10 +142,12 @@
 .gd-mini-hand .card.mini{margin-left:-16px}.gd-mini-hand .card.mini:first-child{margin-left:0}
 /* 中央 */
 .gd-banner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s;text-align:center}
-.gd-banner.mine{color:var(--accent);font-weight:800;font-size:15px;text-shadow:var(--glow-cyan)}
+.gd-banner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:gdTurnPulse 1.05s ease-in-out infinite}
 .gd-banner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
 .gd-banner .clk.urgent{color:var(--magenta,#ff2d8e);animation:gdBlink .6s steps(2,start) infinite}
 @keyframes gdBlink{50%{opacity:.35}}
+/* 轮到自己出牌: 横幅化作发光脉冲胶囊(halo+微缩放, 纯 box-shadow/transform 不改盒模型→不引入跳动) */
+@keyframes gdTurnPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.35),0 0 6px rgba(0,229,212,.3);transform:scale(1)}50%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.7),0 0 16px 3px rgba(0,229,212,.55);transform:scale(1.04)}}
 .gd-who{font-size:11px;color:var(--sub);min-height:14px}
 .gd-played{display:flex;flex-wrap:wrap;gap:0;min-height:60px;align-items:center;justify-content:center;max-width:100%}
 /* 出牌"掷向中央": 真牌堆延后淡入(land), 幽灵牌从出牌人头像飞抵桌心并淡出, 交叉出"扔牌"观感 */
@@ -171,7 +173,9 @@
   color:var(--accent,#2fe0c8);text-shadow:0 0 14px rgba(47,224,200,.55);pointer-events:none;z-index:6;animation:gdJiefeng 1.5s ease-out forwards}
 @keyframes gdJiefeng{0%{transform:translate(-50%,-50%) scale(.6) translateX(-30px);opacity:0}18%{transform:translate(-50%,-50%) scale(1);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-50%) scale(1) translateX(24px);opacity:0}}
 /* 进贡飞牌: 贡牌从进贡席飞向收贡席(对标欢乐掼蛋的进贡桥段, 让"谁给谁"看得见) */
-.gd-fly-card{position:absolute;z-index:12;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.55);
+/* ★双类提权 .card.gd-fly-card: 否则被后面 .card{position:relative} 平特异性覆盖, 幽灵牌落回文档流把
+   felt 挤矮→每次出牌整个下半场上下弹(与斗地主同源跳动 bug)。 */
+.card.gd-fly-card{position:absolute;z-index:12;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.55);
   transition:transform .7s cubic-bezier(.4,.05,.2,1),opacity .7s ease-out;will-change:transform,opacity}
 /* 级牌徽标: 当前台面打几做成醒目金牌(对标大厂顶部级牌位) */
 .gd-lvl .lv-now{display:inline-flex;align-items:center;gap:3px;color:#3a2600;background:linear-gradient(150deg,#ffd76a,#ffb020);
@@ -231,6 +235,9 @@
 .gd-hand.arranging .card{cursor:grab}
 .gd-hand.arranging .card.dragging{cursor:grabbing;transition:none;box-shadow:0 12px 24px rgba(0,0,0,.55),0 0 0 2px var(--amber);z-index:50}
 /* 操作条 */
+/* 发牌/结算态会清空 #gdCtrl, 给它钉个覆盖出牌条的地板并底对齐, 免得发牌→出牌绒面一缩一涨 */
+#gdCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(60px + env(safe-area-inset-bottom,0px))}
+.gd-room.is-land #gdCtrl{min-height:calc(48px + env(safe-area-inset-bottom,0px))}
 .gd-acts{display:flex;gap:9px;justify-content:center;padding:8px 14px calc(11px + env(safe-area-inset-bottom,0px))}
 .gd-btn{flex:1;max-width:120px;padding:11px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.05em;transition:.14s}
@@ -398,7 +405,11 @@
     let prevResult = (opts.match && opts.match.prevResult) || null;
     // 本桌累计记分(按队): teamWins[team] = 该队至今赢下的副数; 队伍当前等级从 st.teamLevels/res.teamLevelsAfter 取。
     // 结算时每手只计一次(showOver 里以 res._scored 守卫), guest 连收多张 over 快照也不重复计。
-    const teamWins = [0,0];
+    // 持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
+    const SCOREKEY = opts.scoreKey || null;
+    function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify(teamWins)); }catch(_){ } }
+    function loadScore(){ if(!SCOREKEY) return null; try{ const v=JSON.parse(localStorage.getItem(SCOREKEY)||'null'); return (Array.isArray(v)&&v.length===2&&v.every(x=>typeof x==='number'))?v:null; }catch(_){ return null; } }
+    const teamWins = loadScore() || [0,0];
 
     // ── 联机(host 权威)双模式: guest 只渲染 host 广播的脱敏公共快照 + 回传自己动作, 不建局/不跑引擎 ──
     //   单机路径(isGuest=false)完全走原逻辑, 零改动; 所有 guest 行为一律走 isGuest 分支旁路。
@@ -439,7 +450,7 @@
     let lastSelTick = 0;
     sfx('arrive'); if(!isGuest) sfx('deal');   // guest 未拿到手牌前不响发牌音
 
-    let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0;
+    let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0, turnSeatActive=-1;
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
     const room = document.createElement('div'); room.className='gd-room';
@@ -471,8 +482,8 @@
     mountEl.appendChild(room);
 
     // F2 边打边聊: 牌桌内嵌聊天坞 + 弹幕(复用 app 注入的房间发送通道/身份; 未注入则不挂)
-    const dock = (opts.chat && root.EHTableChat)
-      ? root.EHTableChat.mount(room, { send: opts.chat.send, me: opts.chat.me }) : null;
+    // 游戏内聊天已下线: 牌桌不再挂聊天坞/弹幕, 点"✕ 返回"回聊天室看消息(减少牌桌干扰、专注出牌)
+    const dock = null;
 
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#gdFelt'), p1:$('#gdP1'), p2:$('#gdP2'), p3:$('#gdP3'),
@@ -807,17 +818,24 @@
       }
       return [[], Rules.sortHand(hand, st.level)];
     }
-    let lastHandSig = '';
+    let lastHandSig = '', lastSelSig = '';
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const [top, bot] = orderedRows();
-      // 增量护栏(同斗地主): 手牌两排 id / 选中集 / 回合锁 / 理牌态 / 级牌 / 发牌帧 全未变 → 跳过重建。
+      // 增量护栏(同斗地主): 手牌结构(两排 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
       //   免每秒一次重绘的 innerHTML churn + 两排 layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
-      //   任一变化改签名 → 照常整段重建, 与旧逻辑逐字节一致; resize 另走 layoutHand 兜底不受影响。
-      const sig = (myTurn?1:0)+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
-        + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',')+'|'+[...selected].sort().join(',');
-      if (sig === lastHandSig) return;
-      lastHandSig = sig;
+      const structSig = (myTurn?1:0)+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
+        + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
+      const selSig = [...selected].sort().join(',');
+      if (structSig === lastHandSig){
+        // 结构没变、只是选牌变了 → 只在既有牌上切 .sel, 升降走 CSS transform 过渡(丝滑), 不整段重建
+        if (selSig !== lastSelSig){
+          lastSelSig = selSig;
+          els.hand.querySelectorAll('.card').forEach(el=>{ el.classList.toggle('sel', selected.has(el.dataset.id)); });
+        }
+        return;
+      }
+      lastHandSig = structSig; lastSelSig = selSig;
       els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
@@ -864,15 +882,21 @@
     function seatOf(seat){ return room.querySelector(`.gd-seat[data-seat="${seat}"]`); }
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase!=='play' || st.turn<0) return;
+      if (st.phase!=='play' || st.turn<0) { turnSeatActive=-1; return; }
       const seat=st.turn, mine=seat===mySeat;
       if (isGuest && awaitingHost) return;   // guest 回传后等裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
       // host 视角: 远程真人席只等其回传(宽限 REMOTE_TIMEOUT_MS 后托管); 本机 AI 席走 AI 节奏。
       const remote = !isGuest && isRemote(seat);
-      turnDur = mine ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)));
-      turnStart = Date.now();
+      // 倒计时只在【回合真正切换】时重置起点; 同回合重渲(收快照/说话/每帧重绘)保持原起点继续走, 否则对手环被打回满格→"倒计时不动/乱跳"。
+      const turnChanged = (seat!==turnSeatActive);
+      turnSeatActive = seat;
+      if (turnChanged){
+        // guest 端 remoteSeats 恒空, 对手会落到 AI 短时长→"1 秒卡 0"; guest 不裁判, 对手倒计时纯展示 → 给足人类时长视觉正常走。
+        turnDur = mine ? HUMAN_PLAY_MS : (isGuest ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))));
+        turnStart = Date.now();
+      }
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
@@ -895,8 +919,9 @@
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程席(超时托管)/host 本机 AI 席。
       if (mine) return;
       if (isGuest) return;                                             // guest 只渲染, host 是唯一裁判
-      if (remote) aiTimer=setTimeout(()=>onRemoteTimeout(seat), turnDur);
-      else aiTimer=setTimeout(()=>aiStep(seat), turnDur);
+      const remainMs = Math.max(0, turnDur - (Date.now()-turnStart));   // 同回合重渲用剩余时间, 否则 AI/远程行动被反复推迟
+      if (remote) aiTimer=setTimeout(()=>onRemoteTimeout(seat), remainMs);
+      else aiTimer=setTimeout(()=>aiStep(seat), remainMs);
     }
     // host: 远程真人超时未回传 → host 托管代打(与 aiStep 同源, 出完即随 afterMove 广播)。
     function onRemoteTimeout(seat){
@@ -1036,10 +1061,11 @@
         if (awaitingHost) return;
         if (onAction) onAction({ action:'pass' });
         sfx('pass'); say(mySeat,'不出'); awaitingHost=true;
+        selected.clear(); hintCycle=[];   // 不出即把选中的牌收回(放下高亮), 与 doPlay 一致
         setBanner(); renderCtrl(); renderHand(); return;
       }
       try{ var rp=Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
-      if(seat===mySeat) sfx('pass');
+      if(seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
       say(seat,'不出'); afterMove(rp);
     }
     function doHint(){
@@ -1247,7 +1273,7 @@
       clearTimers();
       const res=st.result;
       // 本桌累计: 每手只计一次(res._scored 守卫)。单机一副一次; guest 只在 phase 转入 over 时进本函数, 双重不重复。
-      if (res && !res._scored){ res._scored=true; if(typeof res.winnerTeam==='number') teamWins[res.winnerTeam]++; }
+      if (res && !res._scored){ res._scored=true; if(typeof res.winnerTeam==='number'){ teamWins[res.winnerTeam]++; saveScore(); } }   // 存本桌累计防重进清零
       const iWon = Engine.teamOf(mySeat)===res.winnerTeam;
       const over=document.createElement('div'); over.className='gd-over '+(iWon?'win':'lose');
       const rankNames=['头游','二游','三游','末游'];
