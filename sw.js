@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v375-20260822-seat-lobby';
+const SW_VERSION = 'eh-sw-v376-20260822-ddz-center';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),

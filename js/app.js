@@ -3,7 +3,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260822-seat-lobby';
+window.__EH_APP_VER = '20260822-ddz-center';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -7002,7 +7002,20 @@ async function ehTableChatSend(text){
 // 传给牌桌 open() 的聊天桥: 发送通道 + 我的身份(判定"这条是不是我发的")
 function ehGameChatBridge(){ return { send: ehTableChatSend, me: { uid:myUid, name:me.name, emoji:me.emoji, color:me.color } }; }
 // 把一条房间消息喂给当前活跃牌局(弹幕 + 坞列表); 无活跃牌局或不支持则忽略。
-function feedGameRoomMsg(m){ try{ if(_ehGame && _ehGame.onRoomMsg) _ehGame.onRoomMsg(m); }catch(_){} }
+function feedGameRoomMsg(m){
+  try{
+    if(!_ehGame || !_ehGame.onRoomMsg) return;
+    if(!m || !m.room_id) return;
+    // ★房间隔离铁律(8/22 修): 只有 m.room_id == curRoom.id == _ehGame._roomId 三者一致才喂。
+    //   旧 bug: 无校验时切房后 _ehGame 未及时销毁, 旧房(如海龟汤)realtime 消息会灌进
+    //   新房(如斗地主)牙桌聊天坤 → 现象: 斗地主房显示海龟汤的聊天记录。
+    var rid = m.room_id;
+    if(!curRoom || curRoom.id !== rid) return;
+    // 当前牙桌所属房(_gtActiveTable.id)与消息房不符 → 旧房残留消息, 丢弃
+    if(typeof _gtActiveTable!=='undefined' && _gtActiveTable && _gtActiveTable.id && _gtActiveTable.id !== rid) return;
+    _ehGame.onRoomMsg(m);
+  }catch(_){}
+}
 // F3 牌局直播: 把牌桌高光瞬间(定地主/炸弹/报单/头游/终局升级)以【本地临时行】播到聊天流 ——
 //   折叠牌桌回聊天时也能追牌局进展。AI 对手的入戏台词(quip)另起一行以灵魂身份呈现。
 //   刻意只本地渲染(不落 eh_messages、不广播): solo 战报是"直播解说"而非聊天记录, 且 .sysmsg 类

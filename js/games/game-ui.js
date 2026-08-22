@@ -84,6 +84,8 @@
 @media (max-width:599px){
   /* 中央区收紧: 绒面椭圆缩成贴合牌堆的"落牌盘"(insets 拉大→椭圆变小)+ 微增辉光, 不再是撑满半屏的空圈; 上下留白削薄 */
   .ddz-room:not(.is-land) .ddz-center{min-height:96px;padding:2px 16px;gap:5px}
+  /* 手机竖屏上面用了 padding 简写会把顶部空档吃回 2px, 这里高特异性补回底牌空档(仅有底牌态) */
+  .ddz-room:not(.is-land) .ddz-center.has-bottom{padding-top:56px}
   .ddz-room:not(.is-land) .ddz-center::before{left:13%;right:13%;top:15%;bottom:15%;
     background:radial-gradient(ellipse at center,rgba(0,229,212,.12),rgba(0,120,104,.06) 52%,transparent 74%);
     border-color:rgba(0,229,212,.12);box-shadow:inset 0 0 42px rgba(0,0,0,.32)}
@@ -179,6 +181,9 @@
 @keyframes ddzBcFlip{0%{transform:rotateY(90deg) scale(.9);opacity:.2}100%{transform:rotateY(0) scale(1);opacity:1}}
 /* 中央出牌区 */
 .ddz-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:4px 16px;min-height:120px;position:relative;isolation:isolate}
+/* 底牌钉在中央区顶部(absolute), 脱离文档流 → 定地主后给中央区留出顶部空档, 让居中的横幅/落牌坐在底牌下面而非叠上去。
+   safe center: 空间够时纵向居中(高屏好看), 空间不够时退成 flex-start(不再向上溢出压到底牌)。仅"有底牌"态启用, 招募/无底牌态不占空档。 */
+.ddz-center.has-bottom{padding-top:58px;justify-content:safe center}
 /* 中央绒面椭圆(对标掼蛋/德州: 三家统一有张"桌面"落牌, 不再是空黑 void)。
    落牌/横幅/passtag 都坐在这张绒面上; 椭圆自身发微光 + 内阴影拉出纵深, z-index:-1 沉底不吃点击。 */
 .ddz-center::before{content:'';position:absolute;left:7%;right:7%;top:9%;bottom:9%;border-radius:50%/44%;
@@ -764,6 +769,8 @@
       if (st.phase==='lobby') bindLobbySeats();
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
+      const center = els.bottom.parentElement;
+      if (center) center.classList.toggle('has-bottom', !!(st.bottom && st.bottom.length));
       if (st.bottom && st.bottom.length){
         els.bottom.className = 'ddz-bottom-cards' + (justCrowned ? ' reveal' : '');
         const lbl = document.createElement('div'); lbl.className='bc-lbl'; lbl.textContent='底牌';
