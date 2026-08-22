@@ -2528,16 +2528,20 @@ async function gtHydrateCard(el, id){
 }
 function gtRenderCard(row){
   gtRefreshSeatingPage(row);   // 座位页(牌桌大厅)开着就同步刷新: 灵魂/真人入座、开局、散桌 都即时反映(本地 gtRpc + 远端 realtime 共此一路)
+  // 就地招募态(ddz): 若本桌招募态牌桌 UI 已挂起, 座位随 realtime 变(灵魂入座/真人换座/请离)即时重绘 + 刷新邀请上下文。
+  try{ if(_ehGame && _ehGame.isLobby && _ehGame.isLobby() && _gtActiveTable && _gtActiveTable.id===row.id && _ehGame.setLobby){
+    if(row.status==='lobby') _ehGame.setLobby(row.seats, gtCtx(row));
+  } }catch(_){}
   const el=document.querySelector(`[data-gt-id="${row.id}"]`);
   if(!el) return;
   // Realtime 更新只改牌桌内容，不让已存在的卡片重播入场动画。
   el.classList.add('no-anim');
   gtRenderInto(el,row);
-  // 房主点自己的桌卡(非按钮区): 招募中(lobby) → 打开座位页(牌桌大厅)摆阵/邀人, 满意再发牌; 已开局(playing) → 直接(重)进打牌页。
+  // 房主点自己的桌卡(非按钮区): 招募中(lobby) → 就地落真牌桌招募态(ddz)/座位页(掼蛋·德州)摆阵邀人; 已开局(playing) → 直接(重)进打牌页。
   if(row.host_uid===myUid && (row.status==='lobby'||row.status==='playing')){
     el.classList.add('gt-card-openable');
     el.onclick=(e)=>{ if(e.target.closest('button')) return;
-      if(row.status==='lobby') gtOpenSeatingPage(row.id); else gtEnter(row.id); };
+      if(row.status==='lobby') gtLaunchLobbyLocal(row); else gtEnter(row.id); };
   } else { el.onclick=null; el.classList.remove('gt-card-openable'); }
 }
 
@@ -2661,7 +2665,16 @@ async function gtStart(id){
   try{ const row=_gtTables.get(id); if(row) await gtSeatSoulsIntoEmpties(row); }catch(_){}
   let seed=0; try{ seed=crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed=Math.floor(Math.random()*4294967296); }
   const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
-  if(row) gtLaunchLocal(row);
+  if(!row) return;
+  // 就地发牌(deal-in-place): 若本桌招募态真牌桌 UI 已挂起(gtLaunchLobbyLocal), 换最新名册直接转正局 —— 同一 room 不重挂、不新增页。
+  //   通道已在招募态接好, startDeal 首帧广播脱敏快照; guest 端由桌 status→playing 的 realtime 触发 gtEnter 进场。
+  if(_ehGame && _ehGame.isLobby && _ehGame.isLobby() && _gtActiveTable && _gtActiveTable.id===id && _ehGame.startDeal){
+    const A=gtSeatArrays(row);
+    _ehGame.startDeal(A, row.seed||seed);
+    _gtStartTurnAlert();
+    return;
+  }
+  gtLaunchLocal(row);   // 兜底: 没有已挂起的招募桌(掼蛋/德州座位页, 或重进) → 老路径整开
 }
 // host 开局: 在本机跑引擎当权威。按 row.game 分派到对应牌桌 UI。
 function gtLaunchLocal(row){
@@ -2679,6 +2692,70 @@ function gtEnter(id){
   if(row.game==='guandan'){ gtEnterGuandan(row); return; }
   if(row.game==='ddz'){ gtEnterDdz(row); return; }
   toast('房主已开局 · 该游戏联机对战暂未接入');
+}
+// ── 招募态就地落牌桌(第1条·主人): 开桌不再弹独立座位页, 直接把【真牌桌 UI】以招募态挂起来 ——
+//   每空位可点邀灵魂/真人, 操作按钮区有「一键邀请/邀真人/开始」; 满意点开始 → startDeal 就地转正局(不重挂)。
+//   host 权威通道(gt-play:<id>)在此即接好: 招募态不广播(游戏内 broadcast 对 lobby/wait 早退), 发牌一刻才推首帧。
+function gtLaunchLobbyLocal(row){
+  if(!row) return;
+  if(row.status==='playing'){ gtEnter(row.id); return; }   // 已开局 → 直接进桌
+  if(row.status!=='lobby') return;
+  // 本桌招募态 UI 已挂起 → 别重挂(会叠出第二个 .ddz-room + 断掉旧通道): 折叠了就拉回, 否则维持现状刷新一次。
+  if(_ehGame && _ehGame.isLobby && _ehGame.isLobby() && _gtActiveTable && _gtActiveTable.id===row.id){
+    if(_ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
+    if(_ehGame.setLobby) _ehGame.setLobby(row.seats, gtCtx(row));
+    return;
+  }
+  // 别的牌局正开着(自家或别桌) → 交给恢复逻辑(折叠的拉回 / 提示先收工), 不硬叠。
+  if(document.querySelector('.ddz-room, .gd-room, .pk-room')){ _restoreActiveGameIfAny(); return; }
+  if(row.game==='ddz'){ gtLaunchDdzLobby(row); return; }
+  // 掼蛋/德州暂未接入就地招募态 → 沿用座位页(牌桌大厅)摆阵, 满意点开始发牌走 gtLaunchLocal。
+  gtOpenSeatingPage(row.id);
+}
+// host 侧 gt-play 通道接线(招募态即接; 发牌后复用同一通道): act 只认远程真人席(实时从 DB 座位推 remoteSeats, 不受 payload 摆布),
+//   hello → 重播当前快照给新上线的客人。座位越权加固见 #61。
+function gtWireHostChannel(tableId){
+  const chan=sb.channel('gt-play:'+tableId); _gtPlayChan=chan;
+  chan.on('broadcast',{event:'act'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
+      const r=_gtTables.get(tableId); const A=r?gtSeatArrays(r):null;
+      if(!A||!Array.isArray(A.remoteSeats)||A.remoteSeats.indexOf(payload.seat)<0) return;   // 只放行远程真人席动作
+      const ok=_ehGame.applyMove(payload.seat, payload.move);
+      if(!ok && _ehGame.resync) _ehGame.resync();
+    })
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });
+  gtBindConnStatus(chan);
+  gtStartHostPing(chan, tableId);
+  return chan;
+}
+// ── 斗地主 · 招募态就地挂真牌桌(host): 通道先接好, UI 以 lobby 态渲染; onSync/onResult/act 里的名册【实时从 DB 座位重算】,
+//   故发牌前后座位变动(灵魂入座/真人换座)都自动生效, 无需重挂或固化名册。──
+function gtLaunchDdzLobby(row){
+  if(!window.EHDdzGame || !window.EHDdzNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  _gtCleanupPlay();
+  const chan=gtWireHostChannel(row.id);
+  const A0=gtSeatArrays(row);
+  _gtActiveTable={id:row.id,host:true};
+  _ehGame = window.EHDdzGame.open({
+    scoreKey:'gtsc:'+row.id,
+    lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
+    names:A0.names, avatars:A0.avatars, isAI:A0.isAI,
+    mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats, seed:row.seed||undefined,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onSync:(snap,state)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
+      gtWriteDdzHands(row.id, state, A);
+      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+    },
+    onResult:(res,log,meta)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);
+      const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+      recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
+      postDdzResult(res, A.names).catch(()=>{});
+    },
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
+  });
+  _gtStartTurnAlert();
 }
 
 // 从 table 行抽出【按座位号索引】的入座数组; 空位/AI/灵魂 → host 本机 AI 驱动, 真人(非我)→ 远程席。
@@ -6982,7 +7059,7 @@ async function launchDoudizhu(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
+  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 开桌→就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
 //    这是默认: 先等真人, 房主看座位满意了手动点【开始 ▶】才开局(不自动开)。
@@ -7004,7 +7081,7 @@ async function launchTexas(){
     const card=document.querySelector(`[data-gt-id="${row.id}"]`);
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
-    if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 我的桌还在招募中 → 打开座位页摆阵, 不直接发牌
+    if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 我的桌还在招募中 → 就地落招募态牌桌摆阵, 不直接发牌
     else if(row.host_uid===myUid && row.status==='playing') gtEnter(row.id);   // 已在打 → 重新进桌
     return;
   }
@@ -7016,7 +7093,7 @@ async function launchTexas(){
   try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
+  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 开桌→就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐上房里灵魂(排除已坐的), 灵魂不够则坐到用完为止。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像/性格)填满, 不再是匿名 AI 机器人。
@@ -7146,7 +7223,7 @@ async function launchGuandan(){
     if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
     else toast('本房已有一桌，往上翻找牌桌卡加入');
   }
-  if(row.host_uid===myUid && row.status==='lobby') gtOpenSeatingPage(row.id);   // 第1条: 开桌不再自动发牌, 先落座位页(牌桌大厅)手动/一键邀灵魂或真人, 满意点「开始发牌」才发牌
+  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 开桌→就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
 async function postGuandanResult(res, log, names, meta){

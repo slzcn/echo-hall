@@ -115,7 +115,7 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260822-table-focus', 'ver.txt=20260822-table-focus');
+assert(buildVer === '20260822-seat-lobby', 'ver.txt=20260822-seat-lobby');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。
 //     第1条(主人:「开局后直接进入牌桌这个页面, 每个座位手动邀灵魂或真人, 也支持一键邀请, 之后再发牌」):

@@ -366,10 +366,37 @@
   function cardBack(mini){ const el=document.createElement('div'); el.className='card back'+(mini?' mini':''); return el; }
 
   // ── 主控 ───────────────────────────────────────────────────
+  // 招募态样式(空位可点邀请 + 邀请浮层): 独立注入, 不动主 CSS 串
+  function injectLobbyCSS(){
+    if (document.getElementById('ddzLobbyCSS')) return;
+    const s = document.createElement('style'); s.id='ddzLobbyCSS';
+    s.textContent = `
+.ddz-seat.ddz-lobby-empty{cursor:pointer}
+.ddz-seat.ddz-lobby-empty .ddz-avr{border:1.5px dashed var(--line2,rgba(0,229,212,.4));border-radius:50%}
+.ddz-seat.ddz-lobby-empty .ddz-avr .av{background:transparent;border-style:dashed;color:var(--accent,#00e5d4);font-weight:700}
+.ddz-seat.ddz-lobby-empty:hover .ddz-avr .av{box-shadow:0 0 12px var(--accent,rgba(0,229,212,.5))}
+.ddz-seat .cnt.lob{color:var(--accent,#00e5d4)}
+.ddz-seat.ddz-lobby-empty .cnt.lob{color:var(--sub,#86cbc6)}
+.ddz-lob-kick{position:absolute;top:-4px;right:6px;width:18px;height:18px;line-height:16px;text-align:center;
+  border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
+  font-size:11px;cursor:pointer;padding:0;z-index:5}
+.ddz-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
+.ddz-acts.ddz-lobacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+.ddz-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
+  background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);animation:ddzRoomIn .16s ease}
+.ddz-invite-menu .im-ttl{font-size:11px;font-weight:800;color:var(--accent,#00e5d4);padding:4px 8px 6px;letter-spacing:.04em}
+.ddz-invite-menu .im-sep{font-size:10px;color:var(--dim,#498d88);padding:6px 8px 2px}
+.ddz-invite-menu .im-empty{font-size:11px;color:var(--dim,#498d88);padding:6px 8px}
+.ddz-invite-menu .im-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;
+  padding:8px 10px;color:var(--ink,#eaf6ff);font-size:13px;cursor:pointer}
+.ddz-invite-menu .im-item:hover{background:rgba(0,229,212,.12)}`;
+    document.head.appendChild(s);
+  }
   function open(opts){
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
-    injectCSS();
+    injectCSS(); injectLobbyCSS();
 
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
     let connState = 'online';
@@ -381,9 +408,10 @@
       if(kind==='host_offline'){ try{ vibrate([40,80,40]); }catch(_){ } }
     }
     function connPill(){ return connState==='online' ? '' : ('<span class="ddz-conn '+connState+'">'+connLabel(connState)+'</span>'); }
-    const names = opts.names || ['你', '灵魂·左', '灵魂·右'];
-    const avatars = opts.avatars || ['🙂','🤖','👾'];
-    const gameIsAI = opts.isAI || [false,true,true];                    // 联机: host 按座位实况标人/机
+    // 招募态(lobby)→ 发牌: startDeal 会就地换名册, 故三者必须可重赋值(deal-in-place, 不重挂 room)
+    let names = opts.names || ['你', '灵魂·左', '灵魂·右'];
+    let avatars = opts.avatars || ['🙂','🤖','👾'];
+    let gameIsAI = opts.isAI || [false,true,true];                    // 联机: host 按座位实况标人/机
     // 对手 DOM 槽位: 以 mySeat 为基, 顺位 (me+1)/(me+2)(单机 mySeat=0 时恰为 1/2)
     const OPP_SEATS = [(mySeat+1)%3, (mySeat+2)%3];
     // ── 联机(host 权威)双模式: guest 只渲染 host 广播的脱敏公共快照 + 回传自己动作, 不建局/不跑引擎 ──
@@ -392,8 +420,13 @@
     //   由 host 每次广播时重写各远程席私牌行 —— 快照永不带 seed/log/别家手牌/定地主前的底牌。
     const mode = opts.mode || 'local';
     const isGuest = mode === 'guest';
-    const remoteSeats = opts.remoteSeats || [];          // host 视角: 哪些席是远程真人(等其回传, 超时代打)
+    let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
+    const lobbyMode = !!opts.lobby;                      // 首帧以招募态开桌(仅 host 走此路)
+    const isHostLobby = !!opts.isHost;
+    let lobbyCtx = opts.lobbyCtx || null;                // { myUid, hostName, souls:[{auth_uid,name,emoji}], actions:{seatSoul,kick,fillSouls,inviteHumans,start,close} }
+    let lobbySeats = Array.isArray(opts.lobbySeats) ? opts.lobbySeats : [];
     const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
     const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
     const GNet = root.EHDdzNet;
@@ -411,9 +444,22 @@
         players:[0,1,2].map(s=>({ id:'p'+s, seat:s, name:(names[s]||('席'+s)),
           isAI: !!(gameIsAI && gameIsAI[s]), hand:[] })) };
     }
+    // 招募占位局: 未发牌, 座位按 lobbySeats 显示占用/空位; host 点空位邀灵魂/真人, 满意 startDeal 就地转正局。
+    function lobbyState(seats){
+      const arr = (Array.isArray(seats)?seats:[]).slice().sort((a,b)=>a.seat-b.seat);
+      const players=[0,1,2].map(i=>{
+        const s = arr[i] || { seat:i, kind:'empty' };
+        const kind = s.kind || 'empty';
+        return { id:'p'+i, seat:i, dbSeat:(typeof s.seat==='number'?s.seat:i), kind,
+          name: kind==='empty' ? '' : (s.name||names[i]||('席'+i)), emoji: s.emoji||null,
+          isAI: kind!=='human', hand:[] };
+      });
+      return { phase:'lobby', seed:undefined, turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
+        bid:null, result:null, bottom:[], table:{ lastPlay:null, passesInRow:0 }, players };
+    }
     // ── host: 产出脱敏公共快照交给 app.js 广播(顺带把各远程真人席【当前】手牌写回私牌表: 定地主 +3 / 出一张少一张) ──
     function broadcast(){
-      if (isGuest || !onSync || !GNet) return;
+      if (isGuest || !onSync || !GNet || st.phase==='lobby' || st.phase==='wait') return;   // 招募/占位态无局可播
       try{ onSync(GNet.snapshot(st, dealNo), st); }catch(_){}
     }
     // 供联机(host 权威应用远程真人动作)/超时托管驱动任意席一手。含叫分阶段。
@@ -442,7 +488,7 @@
       } catch(e){ return false; }
       return false;
     }
-    let st = isGuest ? waitingState() : newGame();
+    let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : newGame());
     let selected = new Set();     // 选中的 card id
     // 本桌累计比分持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
     const SCOREKEY = opts.scoreKey || null;
@@ -459,7 +505,7 @@
     let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
     let justCrowned = false;      // 本次重绘是否播放"定地主"动画(皇冠砸落 + 底牌翻面)
     let lastMyTurn = false;       // "轮到我"上升沿: 只在刚轮到时提示音+震动, 不每帧响
-    sfx('arrive'); if(!isGuest) sfx('deal');   // 开桌一声 + 洗牌发牌(guest 未拿到手牌前不响发牌音)
+    sfx('arrive'); if(!isGuest && !lobbyMode) sfx('deal');   // 开桌一声 + 洗牌发牌(guest/招募态未真发牌前不响发牌音)
 
     // 定时器:AI 行动 + 回合倒计时(环 + 到点兜底)
     let aiTimer = null;
@@ -669,7 +715,27 @@
       const cls = v>0 ? 'pos' : (v<0 ? 'neg' : 'zero');
       return `<div class="ddz-cum ${cls}">${v>0?'+':''}${v} 分</div>`;
     }
+    // 招募态座位: 空位 → 「＋ 点击邀请」, 占用 → 头像/名/角色 + host 可请离(非 0 席)
+    function lobbySeatHTML(seat){
+      const p = st.players[seat];
+      if (p.kind==='empty'){
+        return `<div class="ddz-seat ddz-lobby-empty" data-seat="${seat}" data-invite="${p.dbSeat}">
+          <div class="ddz-avr"><div class="av">＋</div></div>
+          <div class="meta"><div class="nm">空位</div><div class="cnt lob">点击邀请</div></div>
+        </div>`;
+      }
+      const isMe = seat===mySeat;
+      const roleTxt = p.kind==='soul' ? '灵魂' : (isMe ? '你' : '玩家');
+      const canKick = isHostLobby && !isMe && p.dbSeat!==0;
+      return `<div class="ddz-seat ddz-lobby-filled" data-seat="${seat}">
+        <div class="ddz-avr"><div class="av">${p.emoji||'🙂'}</div></div>
+        <div class="meta"><div class="nm">${escapeHtml(p.name||'—')}</div>
+          <div class="cnt lob"><span class="role">${roleTxt}</span></div></div>
+        ${canKick?`<button class="ddz-lob-kick" data-kick="${p.dbSeat}" title="请离">✕</button>`:''}
+      </div>`;
+    }
     function seatHTML(seat){
+      if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p = st.players[seat];
       const isLord = st.landlord === seat;
       const role = st.landlord==null ? '' : (isLord?'地主':'农民');
@@ -687,6 +753,7 @@
     function renderSeats(){
       els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
       els.me.innerHTML = seatHTML(mySeat);
+      if (st.phase==='lobby') bindLobbySeats();
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
       if (st.bottom && st.bottom.length){
@@ -698,6 +765,39 @@
         });
         els.bottom.appendChild(lbl); els.bottom.appendChild(row);
       }
+    }
+    // ── 招募态: 空位点击邀请 / host 请离 ──
+    function bindLobbySeats(){
+      room.querySelectorAll('.ddz-lobby-empty[data-invite]').forEach(el=>{
+        el.onclick=()=>openInviteMenu(+el.dataset.invite, el);
+      });
+      room.querySelectorAll('.ddz-lob-kick[data-kick]').forEach(b=>{
+        b.onclick=(e)=>{ e.stopPropagation(); if(lobbyCtx&&lobbyCtx.actions&&lobbyCtx.actions.kick) lobbyCtx.actions.kick(+b.dataset.kick); };
+      });
+    }
+    function _imAway(e){
+      const m=room.querySelector('.ddz-invite-menu');
+      if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.ddz-lobby-empty'))) closeInviteMenu();
+    }
+    function closeInviteMenu(){ const m=room.querySelector('.ddz-invite-menu'); if(m) m.remove(); document.removeEventListener('click', _imAway, true); }
+    function openInviteMenu(dbSeat, anchorEl){
+      closeInviteMenu();
+      if(!lobbyCtx || !lobbyCtx.actions){ return; }
+      const souls = (lobbyCtx.souls||[]).filter(s=>s&&s.auth_uid);
+      const menu=document.createElement('div'); menu.className='ddz-invite-menu';
+      let html='<div class="im-ttl">邀请入座</div>';
+      if(lobbyCtx.actions.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
+      html += souls.length ? '<div class="im-sep">灵魂</div>' : '<div class="im-empty">房里暂无灵魂</div>';
+      souls.forEach(s=>{ html+=`<button class="im-item" data-soul="${escapeHtml(s.auth_uid)}">${escapeHtml((s.emoji||'👤')+s.name)}</button>`; });
+      menu.innerHTML=html;
+      room.appendChild(menu);
+      const rr=room.getBoundingClientRect(), ar=anchorEl.getBoundingClientRect();
+      menu.style.left=Math.min(Math.max(8, ar.left-rr.left+ar.width/2-90), Math.max(8, rr.width-188))+'px';
+      menu.style.top=Math.min(ar.bottom-rr.top+6, rr.height-60)+'px';
+      menu.querySelectorAll('[data-soul]').forEach(b=> b.onclick=()=>{ lobbyCtx.actions.seatSoul(dbSeat, b.dataset.soul); closeInviteMenu(); });
+      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ lobbyCtx.actions.inviteHumans(); closeInviteMenu(); };
+      sfx('click');
+      setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
     }
 
     // ── 中央桌面:最后一手 + 落牌动画 + 轮次横幅 ──
@@ -841,6 +941,7 @@
     function setBanner(){
       const b = els.banner; const cp = connPill();
       if (st.phase==='over'){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
+      if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀请，满意点「开始」'; return; }
       if (st.phase!=='bid' && st.phase!=='play'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
       if (isGuest && awaitingHost){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 已提交 · 等待裁决…'; return; }
       const seat = st.phase==='bid' ? st.bid.turn : st.turn;
@@ -955,7 +1056,22 @@
     }
 
     // ── 控制区:叫地主 / 出牌 ──
+    // 招募态操作区: 一键邀请(灵魂补位) / 邀真人 / 开始 ▶ —— 就在打牌页的操作按钮位置(主人要求)
+    function renderLobbyCtrl(){
+      if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
+      const a = lobbyCtx.actions;
+      const empties = st.players.filter(p=>p.kind==='empty').length;
+      const hasSouls = ((lobbyCtx.souls||[]).length>0);
+      const btns=[];
+      if (empties>0 && hasSouls && a.fillSouls) btns.push('<button class="ddz-btn ghost" data-lob="fill">🤝 一键邀请</button>');
+      if (empties>0 && a.inviteHumans) btns.push('<button class="ddz-btn ghost" data-lob="invite">👥 邀真人</button>');
+      btns.push('<button class="ddz-btn primary" data-lob="start">开始 ▶</button>');
+      els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts">${btns.join('')}</div>`;
+      const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
+      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } });
+    }
     function renderCtrl(){
+      if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'bid'){
         // 别人叫分时也渲染按钮行(下面 renderBidBar 用 visibility:hidden 占位), 免得轮到我时凭空多一行→整桌上下跳
         const waiting = (isGuest && awaitingHost) ? '⏳ 已叫分 · 等待裁决…'
@@ -1391,12 +1507,38 @@
       renderHand(); renderCtrl(); if(minimized) updateChip();
     }
 
+    // ── 招募态实时刷新: 座位随 realtime 变(灵魂入座/真人加入/请离) → 重建 lobby 局面重绘 ──
+    function setLobby(seats, ctx){
+      if (st.phase!=='lobby') return;
+      if (ctx) lobbyCtx = ctx;
+      if (Array.isArray(seats)) lobbySeats = seats;
+      st = lobbyState(lobbySeats);
+      renderSeats(); setBanner(); renderCtrl();
+      if (minimized) updateChip();
+    }
+    // ── 开始发牌(deal-in-place): 招募态 → 用最新名册就地建真局, 同一个 room 不重挂(免二次入场淡入) ──
+    function startDeal(A, seed){
+      if (A){
+        if (Array.isArray(A.names)) names = A.names;
+        if (Array.isArray(A.avatars)) avatars = A.avatars;
+        if (Array.isArray(A.isAI)) gameIsAI = A.isAI;
+        if (Array.isArray(A.remoteSeats)) remoteSeats = A.remoteSeats;
+      }
+      closeInviteMenu();
+      selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
+      lastLord=null; lastMyTurn=false; justCrowned=false; showOver._done=false;
+      st = Engine.createGame({ isAI: gameIsAI, names, seed: (typeof seed!=='undefined' ? seed : opts.seed) });
+      sfx('deal');
+      renderAll();
+      broadcast();   // 首帧脱敏快照(此刻 hostChan 已接好, 见 app.gtStart)
+    }
     // 开局
     renderAll();
-    if (!isGuest) broadcast();   // host: 开局首帧即广播脱敏快照(顺带写各远程席初始手牌)
+    if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播脱敏快照(招募态无局可播)
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
+      isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 

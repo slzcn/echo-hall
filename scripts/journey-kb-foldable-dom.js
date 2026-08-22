@@ -13,8 +13,10 @@ const ROOT = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 function assert(ok, msg) { if (!ok) throw new Error('FAIL: ' + msg); console.log('✓ ' + msg); }
 
-const mediaRule = /@media \(max-width:640px\), \(hover:none\) and \(pointer:coarse\)\s*\{[\s\S]*?#hall\s*\{left:0;top:0;[\s\S]*?max-height:none/;
-assert(mediaRule.test(HTML), '折叠屏粗指针展开态进入 #hall 全屏坐标系');
+const mediaRule = /@media \(max-width:640px\), \(hover:none\)\s*\{[\s\S]*?#hall\s*\{left:0;top:0;[\s\S]*?max-height:none/;
+assert(mediaRule.test(HTML), '折叠屏 hover:none 展开态进入 #hall 全屏坐标系(不用 pointer:coarse 门控)');
+// 反证守卫: 一旦 CSS 又被改回带 (pointer:coarse), 真机折叠屏(报 fine)会漏命中 → 立即报红。
+assert(!/@media \(max-width:640px\), \(hover:none\) and \(pointer:coarse\)\s*\{[\s\S]*?#hall\s*\{left:0;top:0/.test(HTML), '折叠屏全屏门控禁止再带 and (pointer:coarse)(真机 Fold 报 pointer:fine 会漏)');
 
 let chromium;
 try { ({ chromium } = require('playwright')); }
@@ -80,7 +82,7 @@ async function measure(browser, isTouch, cssText, widths = [690]) {
     assert(!desktop.coarse, '同宽桌面细指针不命中折叠屏规则');
     assert(desktop.hallTop >= 11, `同宽桌面仍保留卡片顶部留白（实际 ${desktop.hallTop}px）`);
 
-    const oldCss = css.replace('@media (max-width:640px), (hover:none) and (pointer:coarse){', '@media (max-width:640px){');
+    const oldCss = css.replace('@media (max-width:640px), (hover:none){', '@media (max-width:640px){');
     const oldTouch = await measure(browser, true, oldCss);
     assert(oldTouch.hallBottom > keyboardTop + 1,
       `反证：旧 ≤640px 单宽度门使 #hall 越过键盘顶沿（超出 ${(oldTouch.hallBottom-keyboardTop).toFixed(1)}px）`);
