@@ -68,7 +68,7 @@
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
 .pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-.pk-blinds{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
+.pk-blinds{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .pk-mus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .pk-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -76,6 +76,14 @@
 .pk-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
 .pk-x:hover{color:var(--ink);border-color:var(--line2)}
+/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给盲注 chip 让位, 杜绝返回钮被挤出屏 */
+@media (max-width:379px){
+  .pk-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  .pk-title{font-size:14px}
+  .pk-blinds{font-size:11px}
+  .pk-x{padding:0 9px}
+  .pk-x .pk-xlbl{display:none}
+}
 /* 牌桌绒面 */
 .pk-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;max-width:var(--maxw,none);width:100%;margin:0 auto;box-sizing:border-box;overflow:hidden}
 .pk-felt.shake{animation:pkShake .42s cubic-bezier(.36,.07,.19,.97)}
@@ -398,7 +406,7 @@
         <div class="pk-blinds" id="pkBlinds"></div>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">🎵</button>
         <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
-        <button class="pk-x" id="pkX" aria-label="返回聊天">✕ 返回</button>
+        <button class="pk-x" id="pkX" aria-label="返回聊天">✕<span class="pk-xlbl"> 返回</span></button>
       </div>
       <div class="pk-felt" id="pkFelt">
         <div class="pk-table" id="pkTable">

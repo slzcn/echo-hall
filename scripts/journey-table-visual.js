@@ -118,29 +118,44 @@ assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\
 assert(buildVer === '20260822-seat-lobby', 'ver.txt=20260822-seat-lobby');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。
-//     第1条(主人:「开局后直接进入牌桌这个页面, 每个座位手动邀灵魂或真人, 也支持一键邀请, 之后再发牌」):
-//     开桌【不再自动发牌】, 先落到座位页(牌桌大厅 gtOpenSeatingPage) —— 复用 EHTable.renderLobby 撑成全屏牌桌页,
-//     每空位手动「加入」(真人自坐)/「🤝灵魂」下拉(指定灵魂坐某席), 或底部「🤝一键灵魂」「👥邀请真人」一键补位,
-//     房主满意点「开始发牌 ▶」(=gtStart 空位补灵魂后发牌)才落打牌页。不再弹旧 gtOpenLobby 单独招募页。
-//     反回退: 开桌不得直接 gtStart 自动发牌(那是"功能2"旧行为, 本次第1条明确改回"先摆阵再发牌")。
+//     第1条(主人:「游戏开局直接进入牌桌这一页, 在座位上手动邀灵魂/真人, 操作按钮位置有一键邀请, 之后再发牌」):
+//     开桌【不再自动发牌】, 也【不再弹独立座位页】—— 直接把真牌桌 UI 以【招募态(lobby)】挂起来(deal-in-place):
+//       · 斗地主(ddz): gtLaunchLobbyLocal → gtLaunchDdzLobby, EHDdzGame.open({lobby:true,isHost:true}) 就地渲染空位可点邀请 +
+//         操作区「🤝一键邀请/👥邀真人/开始 ▶」; 点开始 → 引擎 startDeal 就地换名册转正局(同一 room 不重挂、不新增页)。
+//       · 掼蛋/德州暂未接入就地招募态 → gtLaunchLobbyLocal 回退到座位页(gtOpenSeatingPage) 摆阵, 满意 gtStart 发牌。
+//     反回退: 开桌不得直接 gtStart 自动发牌; ddz 不得再走全屏座位页(应就地招募态)。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
 const LT = (APP.match(/async function launchTexas\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌桌: eh_gt_open 开桌 + 贴牌桌卡');
-assert(/gtOpenSeatingPage\s*\(/.test(LT) && !/\bgtStart\s*\(/.test(LT),
-  '第1条: launchTexas 开桌先落座位页(gtOpenSeatingPage), 不再自动 gtStart 发牌');
+assert(/gtLaunchLobbyLocal\s*\(/.test(LT) && !/\bgtStart\s*\(/.test(LT),
+  '第1条: launchTexas 开桌走 gtLaunchLobbyLocal(招募态), 不再自动 gtStart 发牌');
 assert(!/gtOpenLobby\s*\(/.test(APP), '不再调用 gtOpenLobby(旧单独招募页已退休)');
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
-// 座位页: gtOpenSeatingPage 复用 renderLobby 渲染, 开局/散桌自动关页; gtStart(开始发牌)仍先灵魂补位再发牌
-const SP = (APP.match(/function gtOpenSeatingPage\(id\)\{[\s\S]*?\n\}/) || [''])[0];
-assert(/renderLobby|gtRefreshSeatingPage/.test(APP) && /function gtOpenSeatingPage/.test(APP),
-  '第1条: 有 gtOpenSeatingPage 座位页(复用 EHTable.renderLobby 撑成全屏牌桌页)');
-assert(/gtRefreshSeatingPage\(row\)/.test(APP.match(/function gtRenderCard\(row\)\{[\s\S]*?\n\}/)[0]),
-  '座位页随牌桌行更新即时刷新(本地 gtRpc + 远端 realtime 共 gtRenderCard 一路)');
+// gtLaunchLobbyLocal: 招募态就地落牌桌的统一入口 —— ddz 走就地招募态; 掼蛋/德州回退座位页。
+const LL = (APP.match(/function gtLaunchLobbyLocal\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/game===.ddz.[\s\S]*?gtLaunchDdzLobby\(row\)/.test(LL), '第1条: gtLaunchLobbyLocal 对 ddz 走就地招募态(gtLaunchDdzLobby)');
+assert(/gtOpenSeatingPage\(row\.id\)/.test(LL), 'gtLaunchLobbyLocal 对掼蛋/德州回退座位页(gtOpenSeatingPage)');
+// gtLaunchDdzLobby: 就地挂真牌桌招募态 + 先接好 host 权威通道(招募态不广播, 发牌一刻才推首帧)。
+const DL = (APP.match(/function gtLaunchDdzLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/EHDdzGame\.open\(/.test(DL) && /lobby:true/.test(DL) && /isHost:true/.test(DL), '第1条: gtLaunchDdzLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
+assert(/gtWireHostChannel\(row\.id\)/.test(DL), 'gtLaunchDdzLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+assert(/function gtWireHostChannel\(tableId\)\{[\s\S]*?gt-play:/.test(APP), '有 gtWireHostChannel: host 侧 gt-play 通道接线(act 只认远程真人席)');
+// DDZ 引擎: 招募态占位局 + 就地发牌 + 座位实时刷新, 供 app 的 deal-in-place 驱动。
+assert(/function lobbyState\(seats\)/.test(DDZ) && /phase:'lobby'/.test(DDZ), 'game-ui: 有 lobbyState 招募占位局(phase:lobby)');
+assert(/function startDeal\(A, seed\)[\s\S]*?Engine\.createGame/.test(DDZ), 'game-ui: 有 startDeal 就地发牌(换名册建真局, 不重挂 room)');
+assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(DDZ), 'game-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
+assert(/🤝 一键邀请/.test(DDZ) && /data-lob="fill"/.test(DDZ), '第1条: 招募态操作按钮区有「🤝 一键邀请」(在打牌页出牌键位置)');
+assert(/ddz-lobby-empty[\s\S]*?点击邀请/.test(DDZ) && /function openInviteMenu\(dbSeat/.test(DDZ), '第1条: 空位「点击邀请」弹菜单(单人/灵魂逐位邀请)');
+// gtRenderCard: 招募态桌行实时变(灵魂入座/真人换座) → 就地招募态 UI 用 setLobby 刷新; 座位页也随行刷新(掼蛋/德州回退路径)。
+const RC = (APP.match(/function gtRenderCard\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtRefreshSeatingPage\(row\)/.test(RC), '座位页随牌桌行更新即时刷新(掼蛋/德州回退路径, gtRenderCard 一路)');
+assert(/isLobby\(\)[\s\S]*?setLobby\(row\.seats/.test(RC), '第1条: 就地招募态 UI 随桌行实时刷新座位(setLobby)');
 const GS = (APP.match(/async function gtStart\(id\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtSeatSoulsIntoEmpties/.test(GS), 'gtStart(开始发牌)前先灵魂补位(空位=灵魂来玩, 非匿名 AI)');
-assert(/gtCloseSeatingPage/.test(GS), 'gtStart 发牌时收掉座位页');
+assert(/isLobby\(\)[\s\S]*?startDeal\(A/.test(GS), '第1条: gtStart 就地发牌(招募态已挂起 → startDeal 转正局, 不重挂)');
+assert(/gtLaunchLocal\(row\)/.test(GS), 'gtStart 兜底: 没有已挂起的招募桌 → 老路径整开(gtLaunchLocal)');
 // 手动开房路径: gtFillSouls 为【只召唤灵魂、不开局】的独立动作(与 gtStart 分开), 内里绝不调 eh_gt_start
 const GF = (APP.match(/async function gtFillSouls\(id\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtSeatSoulsIntoEmpties/.test(GF) && !/eh_gt_start/.test(GF), 'gtFillSouls 只召唤灵魂补位、不开局');

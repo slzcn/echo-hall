@@ -100,7 +100,7 @@
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-.ddz-mult{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 8px;border:1px solid var(--line);border-radius:999px}
+.ddz-mult{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 8px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .ddz-mus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -108,6 +108,14 @@
 .ddz-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
 .ddz-x:hover{color:var(--ink);border-color:var(--line2)}
+/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给倍数 chip 让位, 杜绝返回钮被挤出屏 */
+@media (max-width:379px){
+  .ddz-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  .ddz-title{font-size:14px}
+  .ddz-mult{font-size:11px}
+  .ddz-x{padding:0 9px}
+  .ddz-x .ddz-xlbl{display:none}
+}
 /* 牌桌绒面 */
 .ddz-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0}
 .ddz-felt.shake{animation:ddzShake .42s cubic-bezier(.36,.07,.19,.97)}
@@ -522,7 +530,7 @@
         <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
         <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
-        <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕ 返回</button>
+        <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕<span class="ddz-xlbl"> 返回</span></button>
       </div>
       <div class="ddz-felt" id="ddzFelt">
         <div class="ddz-opps" id="ddzOpps"></div>
