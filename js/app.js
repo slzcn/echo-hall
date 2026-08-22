@@ -1115,48 +1115,11 @@ function sceneOrDefaultTheme(){
   if(themeLocked()) return currentTheme();
   return sceneTheme() || currentTheme();
 }
-// 房间名稳定哈希: djb2 变种(charCodeAt 累加*31), 同名永远同结果
-function roomThemeHash(name){
-  const s = String(name||'');
-  let h = 5381;
-  for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) | 0; }
-  return Math.abs(h);
-}
-// 主题池兼容入口: 池为空/非数组/含非法主题id → 降级到所有 THEMES
-// 主题id必须在 EH_CONFIG.themes 里存在, 否则无意义
-function sanitizeThemePool(pool){
-  const valid = new Set((EH_CONFIG.themes||[]).map(t=>t.id));
-  const out = (Array.isArray(pool)?pool:[]).filter(id=>valid.has(id));
-  if(out.length) return out;
-  // 兼容降级: 用 THEMES 全集, 避免后台误清空后计算断开
-  return (EH_CONFIG.themes||[]).map(t=>t.id);
-}
-// 房间 → 主题id: 官方房查 ROOM_THEME; 公开/私密先查 override, 再按名哈希分配池
-function roomThemeFor(room){
-  if(!room) return null;
-  const name = room.name;
-  const kind = room.kind;
-  // 0. 任意房手动覆盖(后台可配) — 优先级最高
-  try{
-    const ov = (EH_CONFIG.roomThemeOverride)||{};
-    if(name && ov[name]){
-      const valid = new Set((EH_CONFIG.themes||[]).map(t=>t.id));
-      if(valid.has(ov[name])) return ov[name];
-    }
-  }catch(_){}
-  // 1. 官方房: ROOM_THEME[name]
-  if(kind==='official' && ROOM_THEME && ROOM_THEME[name]) return ROOM_THEME[name];
-  // 2. 公开/私密: 池[hash(name)%len]
-  if(kind==='public' || kind==='private'){
-    const raw = (kind==='public') ? EH_CONFIG.publicThemePool : EH_CONFIG.privateThemePool;
-    const pool = sanitizeThemePool(raw);
-    if(pool.length){
-      const idx = roomThemeHash(name) % pool.length;
-      return pool[idx];
-    }
-  }
-  return null;
-}
+// 房间主题分配已迁入大厅模块(createRoomThemeFor)；配置与 ROOM_THEME 均在调用时读取，避免装配阶段捕获未就绪依赖。
+const { roomThemeFor } = window.EH_LOBBY_MODULE.createRoomThemeFor({
+  getConfig:()=>EH_CONFIG,
+  getRoomTheme:()=>ROOM_THEME,
+});
 // 进房间: 用户没手动锁定 → 自动套该房所属主题(官方/公开/私密统一取 roomThemeFor); 不写 localStorage, 离房还原
 function applyRoomTheme(room){
   if(themeLocked()){ applyTheme(currentTheme()); return; }

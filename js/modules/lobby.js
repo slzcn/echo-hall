@@ -606,5 +606,61 @@
     return Object.freeze({ read: read, clear: clear });
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore });
+  // 房间主题分配：哈希 + 池 + 官方映射。三函数原为 app.js 内联纯函数，
+  // 仅在调用时读取 EH_CONFIG / ROOM_THEME，不捕获装配期 null。迁移后由 app.js
+  // 注入 getConfig / getRoomTheme，保持零隐式全局耦合。
+  function createRoomThemeFor(deps) {
+    deps = deps || {};
+    var getConfig = typeof deps.getConfig === 'function' ? deps.getConfig : function () { return {}; };
+    var getRoomTheme = typeof deps.getRoomTheme === 'function' ? deps.getRoomTheme : function () { return {}; };
+
+    function roomThemeHash(name) {
+      var s = String(name || '');
+      var h = 5381;
+      for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    }
+
+    // 主题池兼容入口: 池为空/非数组/含非法主题id → 降级到所有 THEMES
+    function sanitizeThemePool(pool) {
+      var cfg = getConfig() || {};
+      var valid = new Set((cfg.themes || []).map(function (t) { return t.id; }));
+      var out = (Array.isArray(pool) ? pool : []).filter(function (id) { return valid.has(id); });
+      if (out.length) return out;
+      return (cfg.themes || []).map(function (t) { return t.id; });
+    }
+
+    // 房间 → 主题id: 官方房查 ROOM_THEME; 公开/私密先查 override, 再按名哈希分配池
+    function roomThemeFor(room) {
+      if (!room) return null;
+      var cfg = getConfig() || {};
+      var name = room.name;
+      var kind = room.kind;
+      // 0. 任意房手动覆盖(后台可配) — 优先级最高
+      try {
+        var ov = cfg.roomThemeOverride || {};
+        if (name && ov[name]) {
+          var validIds = new Set((cfg.themes || []).map(function (t) { return t.id; }));
+          if (validIds.has(ov[name])) return ov[name];
+        }
+      } catch (e) { /* 忽略配置解析异常 */ }
+      // 1. 官方房: ROOM_THEME[name]
+      var roomTheme = getRoomTheme();
+      if (kind === 'official' && roomTheme && roomTheme[name]) return roomTheme[name];
+      // 2. 公开/私密: 池[hash(name)%len]
+      if (kind === 'public' || kind === 'private') {
+        var raw = (kind === 'public') ? cfg.publicThemePool : cfg.privateThemePool;
+        var pool = sanitizeThemePool(raw);
+        if (pool.length) {
+          var idx = roomThemeHash(name) % pool.length;
+          return pool[idx];
+        }
+      }
+      return null;
+    }
+
+    return Object.freeze({ roomThemeFor: roomThemeFor, sanitizeThemePool: sanitizeThemePool, roomThemeHash: roomThemeHash });
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor });
 })(window);
