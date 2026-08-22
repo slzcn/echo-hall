@@ -1846,11 +1846,11 @@
        ★但 max-width:1366 也命中【PC 窗口收窄到 861~1366】(1366 本就是笔记本宽度): 那里 #hall 若满宽贴边,
        而首页(#lobby)仍是 860 居中卡片 → 同一 PC 窗口下"首页居中卡片、聊天室却贴屏满宽"的突兀断层
        (设计本意见上方 616-619: 桌面态 #hall = 居中卡片, 满屏是"移动端"专属)。故普通细指针 PC 仍只在
-       ≤640px 时进满屏；但折叠屏展开态 CSS 宽可达 690px，且它仍是 hover:none 的触屏设备（可能报 pointer:fine），
+       ≤640px 时进满屏；但折叠屏展开态 CSS 宽可达 690px，且它仍是 hover:none + pointer:coarse 的触屏设备，
        也必须清掉桌面 top:12px / 92dvh 坐标系，否则 keyboard.js 按键盘顶沿写入高度后，#hall 还会整体下移 12px，
        composer 越过 IME 顶沿。 */
     #hall{--hall-px:14px}
-    @media (max-width:640px), (hover:none){
+    @media (max-width:640px), (hover:none) and (pointer:coarse){
       #hall{left:0;top:0;right:auto;bottom:auto;width:100%;height:100svh;max-height:none;margin:0;border-radius:0;border:none;align-items:stretch}
       @supports not (height:100svh){
         #hall{height:-webkit-fill-available}
