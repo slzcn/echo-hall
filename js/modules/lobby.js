@@ -33,6 +33,16 @@
   }
 
   // 已迁入本模块的纯函数（零外部依赖，不需注入）。
+  // HTML 转义：零外部依赖，大厅模块内所有工厂共享。
+  function esc(s) {
+    return (s || '').replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  // 安全 emoji：截断+转义，防注入。
+  function safeEmoji(e) {
+    return esc((e || '').slice(0, 8));
+  }
   // 房间卡片骨架 HTML 占位：慢网先占位不留空白。
   function chSkel(n) {
     var s = '';
@@ -293,10 +303,8 @@
     var prefetchRoom = deps.prefetchRoom;
     var msgPreview = deps.msgPreview;
     var roomAccentC = deps.roomAccentC;
-    var esc = deps.esc;
-    var fmtAgo = deps.fmtAgo;
     var onError = deps.onError || function () {};
-    if (typeof getSb !== 'function' || typeof prefetchRoom !== 'function' || typeof msgPreview !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof fmtAgo !== 'function') {
+    if (typeof getSb !== 'function' || typeof prefetchRoom !== 'function' || typeof msgPreview !== 'function' || typeof roomAccentC !== 'function') {
       throw new TypeError('[EH_LOBBY] createFillRoomStats missing dependencies');
     }
     return async function fillRoomStats(box, rid) {
@@ -351,10 +359,8 @@
     var prefetchAll = deps.prefetchAll;
     var getConfig = deps.getConfig;
     var roomAccentC = deps.roomAccentC;
-    var esc = deps.esc;
-    var safeEmoji = deps.safeEmoji;
     var bindRoomCards = deps.bindRoomCards;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof bindRoomCards !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof bindRoomCards !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderOfficial missing dependencies');
     }
     return async function renderOfficial(soft) {
@@ -402,11 +408,9 @@
     var prefetchAll = deps.prefetchAll;
     var getConfig = deps.getConfig;
     var roomAccentC = deps.roomAccentC;
-    var esc = deps.esc;
-    var safeEmoji = deps.safeEmoji;
     var autoTopic = deps.autoTopic;
     var bindRoomCards = deps.bindRoomCards;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof autoTopic !== 'function' || typeof bindRoomCards !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof chSkel !== 'function' || typeof fillRoomStats !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof roomAccentC !== 'function' || typeof autoTopic !== 'function' || typeof bindRoomCards !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderPublic missing dependencies');
     }
     return async function renderPublic(soft) {
@@ -447,9 +451,9 @@
     var getSb = deps.getSb, roomsQuery = deps.roomsQuery, getMyUid = deps.getMyUid;
     var getBox = deps.getBox, getEmpty = deps.getEmpty, rmSkel = deps.rmSkel;
     var prefetchAll = deps.prefetchAll, getConfig = deps.getConfig;
-    var esc = deps.esc, safeEmoji = deps.safeEmoji, readKnownOnline = deps.readKnownOnline;
+    var readKnownOnline = deps.readKnownOnline;
     var enterRoom = deps.enterRoom, copyInvite = deps.copyInvite;
-    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getMyUid !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof rmSkel !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof esc !== 'function' || typeof safeEmoji !== 'function' || typeof readKnownOnline !== 'function' || typeof enterRoom !== 'function' || typeof copyInvite !== 'function') {
+    if (typeof getSb !== 'function' || typeof roomsQuery !== 'function' || typeof getMyUid !== 'function' || typeof getBox !== 'function' || typeof getEmpty !== 'function' || typeof rmSkel !== 'function' || typeof prefetchAll !== 'function' || typeof getConfig !== 'function' || typeof readKnownOnline !== 'function' || typeof enterRoom !== 'function' || typeof copyInvite !== 'function') {
       throw new TypeError('[EH_LOBBY] createRenderMyRooms missing dependencies');
     }
     return async function renderMyRooms(soft) {
@@ -666,8 +670,7 @@
   function createTypeSub(deps) {
     var getConfig = deps && deps.getConfig;
     var getSubLine = deps && deps.getSubLine;
-    var esc = deps && deps.esc;
-    if (typeof getConfig !== 'function' || typeof getSubLine !== 'function' || typeof esc !== 'function') {
+    if (typeof getConfig !== 'function' || typeof getSubLine !== 'function') {
       throw new TypeError('[EH_LOBBY] createTypeSub missing dependencies');
     }
     var idx = 0;
@@ -738,5 +741,5 @@
       echoQuickList: echoQuickList,
     });
   }
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, esc: esc, safeEmoji: safeEmoji, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
 })(window);

@@ -1369,8 +1369,6 @@ const renderOfficial = window.EH_LOBBY_MODULE.createRenderOfficial({
   prefetchAll: (...args)=>prefetchAll(...args),
   getConfig:()=>EH_CONFIG,
   roomAccentC,
-  esc,
-  safeEmoji,
   bindRoomCards,
 });
 const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
@@ -1383,13 +1381,10 @@ const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
   prefetchAll: (...args)=>prefetchAll(...args),
   getConfig:()=>EH_CONFIG,
   roomAccentC,
-  esc,
-  safeEmoji,
   autoTopic: window.EH_LOBBY_MODULE.autoTopic,
   bindRoomCards,
 });
 // 相对时间格式化已迁入大厅模块，保留本地引用以兼容现有调用点。
-const fmtAgo = window.EH_LOBBY_MODULE.fmtAgo;
 // 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
 // 进房瞬间的乐观在线数文案已迁入大厅模块：保留本地引用以兼容现有调用点。
 const autoTopic = window.EH_LOBBY_MODULE.autoTopic;
@@ -1410,8 +1405,6 @@ const renderMyRooms = window.EH_LOBBY_MODULE.createRenderMyRooms({
   rmSkel,
   prefetchAll: (...args)=>prefetchAll(...args),
   getConfig:()=>EH_CONFIG,
-  esc,
-  safeEmoji,
   readKnownOnline,
   enterRoom,
   copyInvite,
@@ -1591,8 +1584,6 @@ const fillRoomStats = window.EH_LOBBY_MODULE.createFillRoomStats({
   prefetchRoom,
   msgPreview,
   roomAccentC,
-  esc,
-  fmtAgo,
   onError: _ehCatch,
 });
 // 大厅边界层：迁移期由独立模块校验依赖并冻结接口；业务实现暂在本文件。
