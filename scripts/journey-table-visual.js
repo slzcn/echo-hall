@@ -115,15 +115,16 @@ assert(/\.pk-pot\.bump\{animation:pkPotBump/.test(PK), '底池增额数字跳动
 const buildVer = R('ver.txt').trim();
 assert(buildVer && new RegExp(`BUILD_VER='${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`).test(HTML), `index.html BUILD_VER=${buildVer}`);
 assert(new RegExp(`SW_VERSION.*${buildVer.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`).test(R('sw.js')), `sw.js SW_VERSION 含 BUILD_VER（${buildVer}）`);
-assert(buildVer === '20260823-table-touch', 'ver.txt=20260823-table-touch');
+assert(buildVer === '20260823-lobby-align', 'ver.txt=20260823-lobby-align');
 
 // C6. /德州 单人/联机合一: 只保留一条 /德州 命令(退休 /德州联机 面板项)。
 //     第1条(主人:「游戏开局直接进入牌桌这一页, 在座位上手动邀灵魂/真人, 操作按钮位置有一键邀请, 之后再发牌」):
 //     开桌【不再自动发牌】, 也【不再弹独立座位页】—— 直接把真牌桌 UI 以【招募态(lobby)】挂起来(deal-in-place):
-//       · 斗地主(ddz): gtLaunchLobbyLocal → gtLaunchDdzLobby, EHDdzGame.open({lobby:true,isHost:true}) 就地渲染空位可点邀请 +
+//       · 三种玩法(ddz/nlhe/guandan)一律走就地招募态: gtLaunchLobbyLocal → gtLaunch{Ddz,Poker,Guandan}Lobby,
+//         EH{Ddz,Poker,Guandan}Game.open({lobby:true,isHost:true}) 就地渲染空位可点邀请 +
 //         操作区「🤝一键邀请/👥邀真人/开始 ▶」; 点开始 → 引擎 startDeal 就地换名册转正局(同一 room 不重挂、不新增页)。
-//       · 掼蛋/德州暂未接入就地招募态 → gtLaunchLobbyLocal 回退到座位页(gtOpenSeatingPage) 摆阵, 满意 gtStart 发牌。
-//     反回退: 开桌不得直接 gtStart 自动发牌; ddz 不得再走全屏座位页(应就地招募态)。
+//       · gtOpenSeatingPage 仅作未接入玩法的兜底(当前三种主玩法都不再走它)。
+//     反回退: 开桌不得直接 gtStart 自动发牌; ddz/nlhe/guandan 都不得再走全屏座位页(应就地招募态)。
 const APP = R('js/app.js');
 const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
@@ -133,14 +134,21 @@ assert(/gtLaunchLobbyLocal\s*\(/.test(LT) && !/\bgtStart\s*\(/.test(LT),
   '第1条: launchTexas 开桌走 gtLaunchLobbyLocal(招募态), 不再自动 gtStart 发牌');
 assert(!/gtOpenLobby\s*\(/.test(APP), '不再调用 gtOpenLobby(旧单独招募页已退休)');
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
-// gtLaunchLobbyLocal: 招募态就地落牌桌的统一入口 —— ddz 走就地招募态; 掼蛋/德州回退座位页。
+// gtLaunchLobbyLocal: 招募态就地落牌桌的统一入口 —— ddz/nlhe/guandan 三种玩法一律就地招募态; gtOpenSeatingPage 仅兜底。
 const LL = (APP.match(/function gtLaunchLobbyLocal\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/game===.ddz.[\s\S]*?gtLaunchDdzLobby\(row\)/.test(LL), '第1条: gtLaunchLobbyLocal 对 ddz 走就地招募态(gtLaunchDdzLobby)');
-assert(/gtOpenSeatingPage\(row\.id\)/.test(LL), 'gtLaunchLobbyLocal 对掼蛋/德州回退座位页(gtOpenSeatingPage)');
-// gtLaunchDdzLobby: 就地挂真牌桌招募态 + 先接好 host 权威通道(招募态不广播, 发牌一刻才推首帧)。
+assert(/game===.nlhe.[\s\S]*?gtLaunchPokerLobby\(row\)/.test(LL), '第1条: gtLaunchLobbyLocal 对德州走就地招募态(gtLaunchPokerLobby)');
+assert(/game===.guandan.[\s\S]*?gtLaunchGuandanLobby\(row\)/.test(LL), '第1条: gtLaunchLobbyLocal 对掼蛋走就地招募态(gtLaunchGuandanLobby)');
+// gtLaunch{Ddz,Poker,Guandan}Lobby: 就地挂真牌桌招募态 + 先接好 host 权威通道(招募态不广播, 发牌一刻才推首帧)。
 const DL = (APP.match(/function gtLaunchDdzLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/EHDdzGame\.open\(/.test(DL) && /lobby:true/.test(DL) && /isHost:true/.test(DL), '第1条: gtLaunchDdzLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
 assert(/gtWireHostChannel\(row\.id\)/.test(DL), 'gtLaunchDdzLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+const PL = (APP.match(/function gtLaunchPokerLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/EHPokerGame\.open\(/.test(PL) && /lobby:true/.test(PL) && /isHost:true/.test(PL), '第1条: gtLaunchPokerLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
+assert(/gtWireHostChannel\(row\.id\)/.test(PL), 'gtLaunchPokerLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+const GL = (APP.match(/function gtLaunchGuandanLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/EHGuandanGame\.open\(/.test(GL) && /lobby:true/.test(GL) && /isHost:true/.test(GL), '第1条: gtLaunchGuandanLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
+assert(/gtWireHostChannel\(row\.id\)/.test(GL), 'gtLaunchGuandanLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
 assert(/function gtWireHostChannel\(tableId\)\{[\s\S]*?gt-play:/.test(APP), '有 gtWireHostChannel: host 侧 gt-play 通道接线(act 只认远程真人席)');
 // DDZ 引擎: 招募态占位局 + 就地发牌 + 座位实时刷新, 供 app 的 deal-in-place 驱动。
 assert(/function lobbyState\(seats\)/.test(DDZ) && /phase:'lobby'/.test(DDZ), 'game-ui: 有 lobbyState 招募占位局(phase:lobby)');
@@ -148,6 +156,16 @@ assert(/function startDeal\(A, seed\)[\s\S]*?Engine\.createGame/.test(DDZ), 'gam
 assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(DDZ), 'game-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
 assert(/🤝 一键邀请/.test(DDZ) && /data-lob="fill"/.test(DDZ), '第1条: 招募态操作按钮区有「🤝 一键邀请」(在打牌页出牌键位置)');
 assert(/ddz-lobby-empty[\s\S]*?点击邀请/.test(DDZ) && /function openInviteMenu\(dbSeat/.test(DDZ), '第1条: 空位「点击邀请」弹菜单(单人/灵魂逐位邀请)');
+// 德州(poker)引擎: 招募态占位局 + 就地发牌 + 对外导出, 供 deal-in-place 驱动。
+assert(/function lobbyState\(seats\)/.test(PK) && /phase:'lobby'/.test(PK), 'poker-ui: 有 lobbyState 招募占位局(phase:lobby)');
+assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(PK), 'poker-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
+assert(/data-lob="fill"/.test(PK) && /pk-lobby-empty|lobby-empty/.test(PK), '第1条: poker 招募态操作区有一键邀请 + 空位可点邀请');
+// 掼蛋(guandan)引擎: 招募态占位局 + 就地发牌(走 newDeal 保赛制) + 对外导出。
+assert(/function lobbyState\(seats\)/.test(GD) && /phase:'lobby'/.test(GD), 'guandan-ui: 有 lobbyState 招募占位局(phase:lobby)');
+assert(/function startDeal\(A, seed\)[\s\S]*?st = newDeal\(\)/.test(GD), 'guandan-ui: 有 startDeal 就地发牌(走 newDeal 保 teamLevels/dealerTeam 赛制)');
+assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(GD), 'guandan-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
+assert(/🤝 一键邀请/.test(GD) && /data-lob="fill"/.test(GD), '第1条: guandan 招募态操作区有「🤝 一键邀请」');
+assert(/gd-lobby-empty[\s\S]*?点击邀请/.test(GD) && /function openInviteMenu\(dbSeat/.test(GD), '第1条: guandan 空位「点击邀请」弹菜单');
 // gtRenderCard: 招募态桌行实时变(灵魂入座/真人换座) → 就地招募态 UI 用 setLobby 刷新; 座位页也随行刷新(掼蛋/德州回退路径)。
 const RC = (APP.match(/function gtRenderCard\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtRefreshSeatingPage\(row\)/.test(RC), '座位页随牌桌行更新即时刷新(掼蛋/德州回退路径, gtRenderCard 一路)');

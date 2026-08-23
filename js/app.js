@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260823-table-touch';
+window.__EH_APP_VER = '20260823-lobby-align';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2663,8 +2663,9 @@ function gtLaunchLobbyLocal(row){
   // 别的牌局正开着(自家或别桌) → 交给恢复逻辑(折叠的拉回 / 提示先收工), 不硬叠。
   if(document.querySelector('.ddz-room, .gd-room, .pk-room')){ _restoreActiveGameIfAny(); return; }
   if(row.game==='ddz'){ gtLaunchDdzLobby(row); return; }
-  // 掼蛋/德州暂未接入就地招募态 → 沿用座位页(牌桌大厅)摆阵, 满意点开始发牌走 gtLaunchLocal。
-  gtOpenSeatingPage(row.id);
+  if(row.game==='nlhe'){ gtLaunchPokerLobby(row); return; }
+  if(row.game==='guandan'){ gtLaunchGuandanLobby(row); return; }
+  gtOpenSeatingPage(row.id);   // 兜底: 未接入就地招募态的玩法 → 沿用座位页摆阵
 }
 // host 侧 gt-play 通道接线(招募态即接; 发牌后复用同一通道): act 只认远程真人席(实时从 DB 座位推 remoteSeats, 不受 payload 摆布),
 //   hello → 重播当前快照给新上线的客人。座位越权加固见 #61。
@@ -2706,6 +2707,70 @@ function gtLaunchDdzLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       postDdzResult(res, A.names).catch(()=>{});
+    },
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
+  });
+  _gtStartTurnAlert();
+}
+
+// ── 德州 · 招募态就地挂真牌桌(host): 与斗地主同构 —— 通道先接好(gtWireHostChannel 每次 act 实时从 DB 重算 remoteSeats),
+//   UI 以 lobby 态渲染; 招募态不产快照(poker-ui onSync 守卫 phase!=='lobby'), 发牌一刻才推首帧;
+//   host 点开始 → startDeal 就地转正局(同一 room 不重挂)。名册在 onSync/onResult 里实时从 DB 重算, 中途换座自动生效。
+function gtLaunchPokerLobby(row){
+  if(!window.EHPokerGame || !window.EHPokerNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  _gtCleanupPlay();
+  const chan=gtWireHostChannel(row.id);
+  const A0=gtSeatArrays(row);
+  let lastHandWritten=-1;
+  _gtActiveTable={id:row.id,host:true};
+  _ehGame = window.EHPokerGame.open({
+    scoreKey:'gtsc:'+row.id,
+    lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
+    names:A0.names, avatars:A0.avatars, isAI:A0.isAI, souls:A0.souls, ids:A0.ids,
+    mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats,
+    sb:5, bb:10, startStack:1000,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onSync:(state,hno)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
+      try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}
+      if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
+    },
+    onResult:(res,log,meta)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);
+      const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+      recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
+      postTexasResult(res,A.names,meta).catch(()=>{});
+    },
+    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },
+  });
+  _gtStartTurnAlert();
+}
+
+// ── 掼蛋 · 招募态就地挂真牌桌(host): 与斗地主/德州同构 —— 通道先接好(act 实时从 DB 重算 remoteSeats),
+//   UI 以 lobby 态渲染(招募态 broadcast 早退不发牌不写手牌); host 点开始 → gtStart 补满灵魂后 startDeal 就地转正局(同一 room 不重挂)。
+//   名册在 onSync/onResult 里实时从 DB 重算, 中途换座自动生效。
+function gtLaunchGuandanLobby(row){
+  if(!window.EHGuandanGame || !window.EHGuandanNet){ toast('游戏还没加载好，稍等刷新一下'); return; }
+  _gtCleanupPlay();
+  const chan=gtWireHostChannel(row.id);
+  const A0=gtSeatArrays(row);
+  _gtActiveTable={id:row.id,host:true};
+  _ehGame = window.EHGuandanGame.open({
+    scoreKey:'gtsc:'+row.id,
+    lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
+    names:A0.names, avatars:A0.avatars, isAI:A0.isAI,
+    mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats, seed:row.seed||undefined,
+    chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onSync:(snap,state)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人手牌也会自动落库
+      gtWriteGuandanHands(row.id, state, A);
+      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+    },
+    onResult:(res,log,meta)=>{
+      const A=gtSeatArrays(_gtTables.get(row.id)||row);
+      const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
+      recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
+      postGuandanResult(res,log,A.names,meta).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });

@@ -326,7 +326,9 @@ assert(/SEAT_R\s*=\s*\(mySeat\+1\)%4/.test(ui) && /SEAT_T\s*=\s*\(mySeat\+2\)%4/
   '座位槽位绕 mySeat 相对旋转(右+1/上+2(队友)/左+3)');
 assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHTML\(SEAT_R\)/.test(ui),
   'renderSeats 用旋转后槽位(非写死 1/2/3)');
-assert(/isAI:\s*opts\.isAI/.test(ui), 'newDeal 吃 opts.isAI(host 按座位实况标人/机)');
+// newDeal 读可变的 seatIsAI(初值 = opts.isAI.slice()); 招募态 startDeal 就地改 seatIsAI 元素 → 换名册后重发牌仍按座位实况标人/机(与斗地主 gameIsAI 同构)。
+assert(/let seatIsAI\s*=\s*\(opts\.isAI/.test(ui), 'seatIsAI 初值取自 opts.isAI(host 按座位实况标人/机)');
+assert(/isAI:\s*seatIsAI/.test(ui), 'newDeal 吃 seatIsAI(可变副本, startDeal 就地换座后重发牌一致)');
 
 // ── 步骤13: 理牌(一键自动 + 手动拖排 + 上下两排码牌) — 提示体验不输腾讯 ──
 // #gdSort 一个按钮: 短按=一键理牌(按级牌大小), 长按=进手动拖排模式自由码牌。
