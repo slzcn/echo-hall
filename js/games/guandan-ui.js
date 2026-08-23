@@ -86,7 +86,7 @@
 .gd-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .gd-lvl{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .gd-lvl b{color:#fff}
-.gd-mus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;
+.gd-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .gd-mus:hover{color:var(--ink);border-color:var(--line2)}
 .gd-mus.muted{color:var(--dim,#498d88);opacity:.75}
@@ -247,7 +247,7 @@
 #gdCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(60px + env(safe-area-inset-bottom,0px))}
 .gd-room.is-land #gdCtrl{min-height:calc(48px + env(safe-area-inset-bottom,0px))}
 .gd-acts{display:flex;gap:9px;justify-content:center;padding:8px 14px calc(11px + env(safe-area-inset-bottom,0px))}
-.gd-btn{flex:1;max-width:120px;padding:11px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
+.gd-btn{flex:1;max-width:120px;padding:13px 8px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.05em;transition:.14s}
 .gd-btn:active{transform:scale(.96)}
 .gd-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
@@ -256,7 +256,8 @@
 .gd-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
 .gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
 /* 结算 */
-.gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+.gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:12px;
+  overflow-y:auto;overscroll-behavior:contain;
   background:rgba(4,6,12,.86);backdrop-filter:blur(3px);animation:gdRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
 .gd-over h2{font-size:28px;margin:0;letter-spacing:.08em;font-weight:900}
 .gd-over.win h2{color:var(--accent);text-shadow:var(--glow-cyan)}
@@ -525,9 +526,11 @@
       say(seat, q); return q;
     }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
-    const onResize = ()=>layoutHand();
+    // resize rAF 节流: 旋转/移动端地址栏收放连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
+    let _rzRAF=0;
+    const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
@@ -923,7 +926,9 @@
         if(remain<=0){ ringRAF=null; if(mine&&typeof onExpire==='function') onExpire(); return; }
         ringRAF=requestAnimationFrame(tick);
       };
-      tick();
+      // 折叠(minimized)态房 display:none, 环不可见 —— 不起 rAF 每帧对隐藏节点写 --p 空转耗电。
+      //   我方超时 onExpire 折叠时本就为 null(离席不自动过牌); AI/远程席由下方 setTimeout 独立推进。
+      if(!minimized) tick();
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程席(超时托管)/host 本机 AI 席。
       if (mine) return;
       if (isGuest) return;                                             // guest 只渲染, host 是唯一裁判
@@ -1051,6 +1056,7 @@
     }
 
     function doPlay(){
+      if (st.phase!=='play' || st.turn!==mySeat) return;   // 防重复提交/非我回合空点(双击时第二发不再弹"非法牌型"toast)
       const cards=[...selected].map(findCardById).filter(Boolean);
       if (isGuest){
         // guest: 本地已用 updatePlayBtn 校验合法, 只回传动作(id 数组), 由 host 引擎权威裁决 + 广播新快照
