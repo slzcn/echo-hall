@@ -1296,32 +1296,8 @@ let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情�
 const HISTORY_PAGE = ()=>TUNE('historyPage',60);   // 私密房每页条数
 // 五种回声情绪: 共鸣/动容/脑电/困惑/观测
 // 消息反应: 用全球通用款(点赞/爱心/笑/举手同意/观望), 一眼懂, 类似 +1/yes 语义
-const ECHO_KINDS = [
-  {e:'👍', label:'赞'},
-  {e:'❤️', label:'爱了'},
-  {e:'😂', label:'哈哈'},
-  {e:'🙌', label:'+1'},
-  {e:'👀', label:'关注'},
-];
-const ECHO_EMOJIS = ECHO_KINDS.map(k=>k.e);
-// 反应环最近使用: 贴过的表情记进 localStorage(最新在前、去重), 渲染反应环时优先显示,
-// 不足 5 个用默认款补齐 → 常用表情自动沉淀到快捷位。
-const LS_ECHO_MRU='eh_echo_mru';
-function loadEchoMru(){ try{ const a=JSON.parse(localStorage.getItem(LS_ECHO_MRU)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
-function pushEchoMru(emoji){
-  if(!emoji) return;
-  let a=loadEchoMru().filter(e=>e!==emoji); a.unshift(emoji); a=a.slice(0,4);
-  try{ localStorage.setItem(LS_ECHO_MRU, JSON.stringify(a)); }catch(e){}
-}
-// 反应环当前要显示的 5 个: 最近用过的在前, 用默认款补足到 5(去重)
-function echoQuickList(){
-  const mru=loadEchoMru();
-  const seen=new Set(), out=[];
-  const push=(e,label)=>{ if(e&&!seen.has(e)){ seen.add(e); out.push({e,label:label||''}); } };
-  mru.forEach(e=>push(e, (ECHO_KINDS.find(k=>k.e===e)||{}).label));
-  ECHO_KINDS.forEach(k=>push(k.e,k.label));
-  return out.slice(0, arguments[0]||4);   // 可传数量: 让上方表情行(表情+➕)与下方操作行数量对齐
-}
+// 反应环情绪列表 / 最近使用 / 快捷环：已迁入大厅模块(createEchoMru)。
+// ECHO_KINDS, ECHO_EMOJIS, loadEchoMru, pushEchoMru, echoQuickList 由模块提供。
 const RESONANCE_THRESHOLD = ()=>TUNE('resonanceThreshold',5);   // 共鸣触发阈值(后台可配)
 const resonatedMsgs = new Set(); // 已触发过涟漪的 message_id+emoji, 防重复轰炸
 
@@ -1586,6 +1562,12 @@ const fillRoomStats = window.EH_LOBBY_MODULE.createFillRoomStats({
   roomAccentC,
   onError: _ehCatch,
 });
+const echoMru = window.EH_LOBBY_MODULE.createEchoMru();
+const ECHO_KINDS = echoMru.ECHO_KINDS;
+const ECHO_EMOJIS = echoMru.ECHO_EMOJIS;
+const loadEchoMru = echoMru.loadEchoMru;
+const pushEchoMru = echoMru.pushEchoMru;
+const echoQuickList = echoMru.echoQuickList;
 // 大厅边界层：迁移期由独立模块校验依赖并冻结接口；业务实现暂在本文件。
 // 后续把实现迁入 js/modules/lobby.js 时，只需替换这里的依赖注入，不改调用方。
 window.EH_LOBBY = window.EH_LOBBY_MODULE.createLobbyController({
