@@ -297,14 +297,12 @@ async function ensureAuth(){
 }
 
 // ---- 打字机副标题 ----
-// SUBTEXT 动态取配置(loadRemoteConfig 后能用到新值)
-function getSubtext(){ return EH_CONFIG.text.officialDesc; }
-let subI=0;
-function typeSub(){
-  const el=$('#subLine'); if(!el) return;
-  if(subI<=getSubtext().length){ el.innerHTML=esc(getSubtext().slice(0,subI))+'<span class="cursor">&nbsp;</span>'; subI++; setTimeout(typeSub,55); }
-  else el.innerHTML=esc(getSubtext())+'<span class="cursor">&nbsp;</span>';
-}
+// SUBTEXT 动态取配置(loadRemoteConfig 后能用到新值) → 已迁入大厅模块(createTypeSub)
+const typeSub = window.EH_LOBBY_MODULE.createTypeSub({
+  getConfig:()=>EH_CONFIG,
+  getSubLine:()=>$('#subLine'),
+  esc,
+});
 
 // ============ 场景切换 ============
 // ============ 皮肤/主题引擎 ============

@@ -662,5 +662,28 @@
     return Object.freeze({ roomThemeFor: roomThemeFor, sanitizeThemePool: sanitizeThemePool, roomThemeHash: roomThemeHash });
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor });
+  // ---- 打字机副标题 ----
+  function createTypeSub(deps) {
+    var getConfig = deps && deps.getConfig;
+    var getSubLine = deps && deps.getSubLine;
+    var esc = deps && deps.esc;
+    if (typeof getConfig !== 'function' || typeof getSubLine !== 'function' || typeof esc !== 'function') {
+      throw new TypeError('[EH_LOBBY] createTypeSub missing dependencies');
+    }
+    var idx = 0;
+    function typeSub() {
+      var el = getSubLine(); if (!el) return;
+      var text = (getConfig().text || {}).officialDesc || '';
+      if (idx <= text.length) {
+        el.innerHTML = esc(text.slice(0, idx)) + '<span class="cursor">&nbsp;</span>';
+        idx++;
+        setTimeout(typeSub, 55);
+      } else {
+        el.innerHTML = esc(text) + '<span class="cursor">&nbsp;</span>';
+      }
+    }
+    return typeSub;
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub });
 })(window);
