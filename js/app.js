@@ -1031,101 +1031,19 @@ function initBgmUI(){
 }
 
 
-const LS_THEME='eh_theme', LS_THEME_LOCK='eh_theme_lock';
-const LS_MODE='eh_mode';   // 外观模式: auto(跟随系统)/day/night
-function currentMode(){ try{ return localStorage.getItem(LS_MODE)||'auto'; }catch(e){ return 'auto'; } }
-function resolveDay(mode){
-  mode=mode||currentMode();
-  if(mode==='day') return true;
-  if(mode==='night') return false;
-  // auto: 按本地时间自动切日/夜——白天 7:00-18:59 日间, 其余时间夜间(符合"自动日间/夜间"字面直觉)
-  try{ const h=new Date().getHours(); return h>=7 && h<19; }catch(e){ return false; }
-}
-// ★全屏无黑边(浏览器+PWA, 上+下): 参考 vc 的思路——不去精确算高度, 而是让"任何露出的区域"都是主题色。
-//   根因: <meta theme-color> 原来硬编码 #070a12, 而页面 --bg 随主题/日夜变(如日间是浅色 #eff8f8);
-//   → 浏览器顶部地址栏带 + 底部工具栏带 保持深色, 与页面割裂 = 上下黑边。PWA(black-translucent)则靠 html/body 铺色。
-//   对策: 每次换肤/切日夜后, 读实时生效的 --bg, 同步写进 ① theme-color meta(浏览器状态栏/工具栏带 + PWA状态栏)
-//   ② html/body 的 backgroundColor(iOS 橡皮筋回弹区/安全区/键盘残留露出的兜底色)。任何缝隙露出的都成主题色。
-function syncThemeColor(){
-  try{
-    // 读真正生效的背景色(injectThemeCSS 注入的 --bg, 已含 data-theme×data-mode 的最终值)
-    var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    if(!bg) return;
-    var mc=document.querySelector('meta[name="theme-color"]');
-    if(!mc){ mc=document.createElement('meta'); mc.name='theme-color'; document.head.appendChild(mc); }
-    if(mc.content!==bg) mc.content=bg;
-    // html 显式刷底色(它是铺满整屏含安全区的层, 且叠着底部氛围光渐变作兜底)。
-    // ★不要动 body: body 背景故意透明, 好让 html 那层氛围光透上来铺满整屏(含安全区)消除底部硬缝;
-    //   若这里给 body 钉 backgroundColor 会盖住 html 的光 → 内容区变纯色、安全区仍带光 = 缝又出现。
-    document.documentElement.style.backgroundColor=bg;
-  }catch(e){}
-}
-function applyMode(mode){
-  const day=resolveDay(mode);
-  document.documentElement.setAttribute('data-mode', day?'day':'night');
-  document.querySelectorAll('.mode-opt').forEach(el=>el.classList.toggle('active', el.dataset.mode===(mode||currentMode())));
-  syncThemeColor();
-}
-function pickMode(mode){
-  try{ EhSfx.playClick(); }catch(e){}
-  try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
-  applyMode(mode);
-}
-// auto 模式按时间切日/夜: 定时检查, 跨过 7点/19点边界自动切换(当前 data-mode 与应为值不一致才重新 apply, 避免频繁无意义重绘)
-setInterval(()=>{
-  if(currentMode()!=='auto') return;
-  const shouldDay=resolveDay('auto');
-  const isDay=document.documentElement.getAttribute('data-mode')==='day';
-  if(shouldDay!==isDay) applyMode('auto');
-}, 60*1000);
-function applyTheme(id){
-  if(!THEMES.some(t=>t.id===id)) id='cyber';
-  if(id==='cyber') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme',id);
-  document.querySelectorAll('.skin-opt').forEach(el=>el.classList.toggle('active', el.dataset.theme===id));
-  syncThemeColor();
-}
-// 用户手动选皮肤 → 全站生效 + 锁定(进官方房不再自动覆盖)
-function pickTheme(id){
-  try{ EhSfx.playClick(); }catch(e){}
-  try{ localStorage.setItem(LS_THEME,id); localStorage.setItem(LS_THEME_LOCK,'1'); }catch(e){}
-  applyTheme(id);
-}
-function currentTheme(){ try{ return localStorage.getItem(LS_THEME)||'cyber'; }catch(e){ return 'cyber'; } }
-function themeLocked(){ try{ return localStorage.getItem(LS_THEME_LOCK)==='1'; }catch(e){ return false; } }
-// ---- 主题随场景: 未锁主题时, 深夜/节日给个应景皮肤建议(手动锁了则完全不干预) ----
-// 节日按 月-日 匹配(可扩展); 深夜(23:00-05:00)偏暗色系。返回皮肤 id 或 null(用默认)。
-const FESTIVAL_THEME = {
-  '1-1':'sunset', '2-14':'rose', '12-24':'klein', '12-25':'klein', '12-31':'sunset',
-  '10-31':'mono',   // 万圣: 暗金
-};
-function sceneTheme(){
-  try{
-    const d=new Date();
-    const fk=(d.getMonth()+1)+'-'+d.getDate();
-    if(FESTIVAL_THEME[fk]) return FESTIVAL_THEME[fk];   // 节日优先
-    const h=d.getHours();
-    if(h>=23 || h<5) return 'mono';   // 深夜 → 暗夜奢华(暗金, 护眼有格调)
-  }catch(e){}
-  return null;
-}
-// 大厅/无房主题(未锁时叠加场景建议; 锁了或场景无建议则用用户默认)
-function sceneOrDefaultTheme(){
-  if(themeLocked()) return currentTheme();
-  return sceneTheme() || currentTheme();
-}
 // 房间主题分配已迁入大厅模块(createRoomThemeFor)；配置与 ROOM_THEME 均在调用时读取，避免装配阶段捕获未就绪依赖。
 const { roomThemeFor } = window.EH_LOBBY_MODULE.createRoomThemeFor({
   getConfig:()=>EH_CONFIG,
   getRoomTheme:()=>ROOM_THEME,
 });
-// 进房间: 用户没手动锁定 → 自动套该房所属主题(官方/公开/私密统一取 roomThemeFor); 不写 localStorage, 离房还原
-function applyRoomTheme(room){
-  if(themeLocked()){ applyTheme(currentTheme()); return; }
-  const tid = roomThemeFor(room);
-  if(tid) applyTheme(tid);
-  else applyTheme(currentTheme());
-}
+// 主题控制器已迁入大厅模块(createThemeController)；THEMES/roomThemeFor/EhSfx 均通过 getter 延迟读取，
+// 避免 app.js 解析阶段捕获尚未就绪的依赖。
+const _themeCtrl = window.EH_LOBBY_MODULE.createThemeController({
+  getThemes:()=>THEMES,
+  getRoomThemeFor:()=>roomThemeFor,
+  getEhSfx:()=>EhSfx,
+});
+const { currentMode, resolveDay, syncThemeColor, applyMode, pickMode, applyTheme, pickTheme, currentTheme, themeLocked, sceneTheme, sceneOrDefaultTheme, applyRoomTheme } = _themeCtrl;
 function initThemeUI(){
   const menu=$('#skinMenu'); if(!menu) return;
   const modeRow = `<div class="mode-row"><div class="mode-opt" data-mode="auto" role="button" tabindex="0" aria-label="自动外观">自动</div><div class="mode-opt" data-mode="day" role="button" tabindex="0" aria-label="日间外观">日间</div><div class="mode-opt" data-mode="night" role="button" tabindex="0" aria-label="夜间外观">夜间</div></div>`;

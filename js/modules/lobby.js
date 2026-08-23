@@ -741,5 +741,100 @@
       echoQuickList: echoQuickList,
     });
   }
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, esc: esc, safeEmoji: safeEmoji, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
+
+  // ─── 主题控制器：日夜模式 + 皮肤切换 + 场景主题 ───
+  // 常量在工厂内部定义；THEMES/EhSfx/roomThemeFor 通过 getter 延迟读取，
+  // 避免 app.js 解析阶段捕获尚未就绪的依赖。
+  var LS_THEME = 'eh_theme', LS_THEME_LOCK = 'eh_theme_lock', LS_MODE = 'eh_mode';
+  var FESTIVAL_THEME = {
+    '1-1': 'sunset', '2-14': 'rose', '12-24': 'klein', '12-25': 'klein', '12-31': 'sunset',
+    '10-31': 'mono',
+  };
+  function createThemeController(deps) {
+    deps = deps || {};
+    var getThemes = required('getThemes', deps.getThemes);
+    var getRoomThemeFor = required('getRoomThemeFor', deps.getRoomThemeFor);
+    var getEhSfx = deps.getEhSfx;
+
+    function currentMode() { try { return localStorage.getItem(LS_MODE) || 'auto'; } catch (e) { return 'auto'; } }
+    function resolveDay(mode) {
+      mode = mode || currentMode();
+      if (mode === 'day') return true;
+      if (mode === 'night') return false;
+      try { var h = new Date().getHours(); return h >= 7 && h < 19; } catch (e) { return false; }
+    }
+    function syncThemeColor() {
+      try {
+        var bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+        if (!bg) return;
+        var mc = document.querySelector('meta[name="theme-color"]');
+        if (!mc) { mc = document.createElement('meta'); mc.name = 'theme-color'; document.head.appendChild(mc); }
+        if (mc.content !== bg) mc.content = bg;
+        document.documentElement.style.backgroundColor = bg;
+      } catch (e) {}
+    }
+    function applyMode(mode) {
+      var day = resolveDay(mode);
+      document.documentElement.setAttribute('data-mode', day ? 'day' : 'night');
+      document.querySelectorAll('.mode-opt').forEach(function (el) { el.classList.toggle('active', el.dataset.mode === (mode || currentMode())); });
+      syncThemeColor();
+    }
+    function pickMode(mode) {
+      try { if (typeof getEhSfx === 'function' && getEhSfx()) getEhSfx().playClick(); } catch (e) {}
+      try { localStorage.setItem(LS_MODE, mode); } catch (e) {}
+      applyMode(mode);
+    }
+    function applyTheme(id) {
+      var themes = getThemes();
+      if (!themes || !themes.some(function (t) { return t.id === id; })) id = 'cyber';
+      if (id === 'cyber') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', id);
+      document.querySelectorAll('.skin-opt').forEach(function (el) { el.classList.toggle('active', el.dataset.theme === id); });
+      syncThemeColor();
+    }
+    function pickTheme(id) {
+      try { if (typeof getEhSfx === 'function' && getEhSfx()) getEhSfx().playClick(); } catch (e) {}
+      try { localStorage.setItem(LS_THEME, id); localStorage.setItem(LS_THEME_LOCK, '1'); } catch (e) {}
+      applyTheme(id);
+    }
+    function currentTheme() { try { return localStorage.getItem(LS_THEME) || 'cyber'; } catch (e) { return 'cyber'; } }
+    function themeLocked() { try { return localStorage.getItem(LS_THEME_LOCK) === '1'; } catch (e) { return false; } }
+    function sceneTheme() {
+      try {
+        var d = new Date();
+        var fk = (d.getMonth() + 1) + '-' + d.getDate();
+        if (FESTIVAL_THEME[fk]) return FESTIVAL_THEME[fk];
+        var h = d.getHours();
+        if (h >= 23 || h < 5) return 'mono';
+      } catch (e) {}
+      return null;
+    }
+    function sceneOrDefaultTheme() {
+      if (themeLocked()) return currentTheme();
+      return sceneTheme() || currentTheme();
+    }
+    function applyRoomTheme(room) {
+      if (themeLocked()) { applyTheme(currentTheme()); return; }
+      var roomThemeFor = getRoomThemeFor();
+      var tid = typeof roomThemeFor === 'function' ? roomThemeFor(room) : null;
+      if (tid) applyTheme(tid);
+      else applyTheme(currentTheme());
+    }
+    // auto 模式定时切换
+    setInterval(function () {
+      if (currentMode() !== 'auto') return;
+      var shouldDay = resolveDay('auto');
+      var isDay = document.documentElement.getAttribute('data-mode') === 'day';
+      if (shouldDay !== isDay) applyMode('auto');
+    }, 60 * 1000);
+
+    return Object.freeze({
+      currentMode: currentMode, resolveDay: resolveDay, syncThemeColor: syncThemeColor,
+      applyMode: applyMode, pickMode: pickMode, applyTheme: applyTheme, pickTheme: pickTheme,
+      currentTheme: currentTheme, themeLocked: themeLocked, sceneTheme: sceneTheme,
+      sceneOrDefaultTheme: sceneOrDefaultTheme, applyRoomTheme: applyRoomTheme,
+    });
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, esc: esc, safeEmoji: safeEmoji, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru, createThemeController: createThemeController });
 })(window);
