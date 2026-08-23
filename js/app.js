@@ -1385,13 +1385,14 @@ const renderPublic = window.EH_LOBBY_MODULE.createRenderPublic({
   roomAccentC,
   esc,
   safeEmoji,
-  autoTopic,
+  autoTopic: window.EH_LOBBY_MODULE.autoTopic,
   bindRoomCards,
 });
 // 相对时间格式化已迁入大厅模块，保留本地引用以兼容现有调用点。
 const fmtAgo = window.EH_LOBBY_MODULE.fmtAgo;
 // 进房瞬间的乐观在线数文案: 已知数(你自己刚进 +1)先顶上，真实 presence 回来再精确覆盖
 // 进房瞬间的乐观在线数文案已迁入大厅模块：保留本地引用以兼容现有调用点。
+const autoTopic = window.EH_LOBBY_MODULE.autoTopic;
 const optimisticCnt = window.EH_LOBBY_MODULE.optimisticCnt;
 const copyInvite = window.EH_LOBBY_MODULE.createCopyInvite({
   getNavigator:()=>navigator,
@@ -8390,22 +8391,7 @@ function closeModal(){
 
 // 邀请码 10 位 · 31 字符集 ≈ 50bit 熵，抗枚举暴破(6位仅~30bit不够)
 function genCode(){ const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<10;i++) s+=CH[Math.floor(secureRand()*CH.length)]; return s; }
-// 公开房自动介绍: 按房名套一句(长度对齐官方房~10-16字)。房名做哈希选模板, 同名恒定同句, 显得像特意写的。
-function autoTopic(name){
-  const n=(name||'').trim().slice(0,10);
-  const tpl=[
-    `关于「${n}」，想说的都能说`,
-    `聊聊${n}，看谁懂你`,
-    `${n}爱好者的聚集地`,
-    `为${n}而来的人，都在这`,
-    `${n}，此刻正热闹`,
-    `喜欢${n}？进来唠两句`,
-    `${n}的一切，都可以聊`,
-    `围绕${n}，随便扯`,
-  ];
-  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
-  return tpl[h%tpl.length];
-}
+// autoTopic 已迁入大厅模块(js/modules/lobby.js)，保留本地引用以兼容 createRoom 等调用点。
 let _createRoomInFlight=false;
 let _joinCodeInFlight=false;
 let _loginInFlight=false;

@@ -712,6 +712,23 @@
     ECHO_KINDS.forEach(function (k) { add(k.e, k.label); });
     return out.slice(0, n || 4);
   }
+  // 自动生成房间话题语：纯函数，仅依赖入参，无外部运行时耦合。
+  function autoTopic(name) {
+    var n = (name || '').trim().slice(0, 10);
+    var tpl = [
+      '关于「' + n + '」，想说的都能说',
+      '聊聊' + n + '，看谁懂你',
+      n + '爱好者的聚集地',
+      '为' + n + '而来的人，都在这',
+      n + '，此刻正热闹',
+      '喜欢' + n + '？进来唠两句',
+      n + '的一切，都可以聊',
+      '围绕' + n + '，随便扯',
+    ];
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return tpl[h % tpl.length];
+  }
   function createEchoMru() {
     return Object.freeze({
       ECHO_KINDS: ECHO_KINDS,
@@ -721,5 +738,5 @@
       echoQuickList: echoQuickList,
     });
   }
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
 })(window);
