@@ -204,10 +204,10 @@
 .pk-raise.hidden{display:none}
 /* ★.reserved: 隐藏但【保留高度】(visibility 非 display) —— 操作条骨架恒定, 滑杆/快捷不显示时也占位, 按钮行不上下跳(主人反馈"按钮别跳来跳去") */
 .pk-raise.reserved,.pk-quick.reserved{visibility:hidden}
-.pk-raise input[type=range]{flex:1;accent-color:var(--accent,#00e5d4);height:22px}
+.pk-raise input[type=range]{flex:1;accent-color:var(--accent,#00e5d4);height:32px}
 .pk-raise .pk-amt{min-width:58px;text-align:center;font-size:14px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .pk-quick{display:flex;gap:6px}
-.pk-qbtn{flex:1;padding:5px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
+.pk-qbtn{flex:1;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-row{display:flex;gap:9px;justify-content:center}
 .pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;line-height:18px;cursor:pointer;white-space:nowrap;
@@ -393,7 +393,7 @@
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     sfx('arrive'); sfx('deal');
 
-    let aiTimer=null, ringRAF=null, streetTimer=null, turnStart=0, turnDur=0, turnSeatActive=-1, turnStreetActive='';
+    let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnSeatActive=-1, turnStreetActive='';
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
     let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
@@ -465,7 +465,7 @@
       const q = rand(QUIP[kind]||[]); if(!q) return null; say(seat, q); return q;
     }
 
-    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} }
+    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearInterval(overTimer);overTimer=null;} }
     const onResize = ()=>positionSeats();
     let _exited=false;
     function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
@@ -806,7 +806,7 @@
       const isAllinAmt = raiseTo>=max;
       els.acts.innerHTML = `
         <div class="pk-raise${canRaiseLike?'':' reserved'}">
-          <input type="range" id="pkSlider" min="${min}" max="${max}" step="${Math.max(1,Math.round(bb/2))}" value="${raiseTo}">
+          <input type="range" id="pkSlider" min="${min}" max="${max}" step="1" value="${raiseTo}">
           <span class="pk-amt" id="pkAmt">${raiseTo}</span>
         </div>
         <div class="pk-quick${canRaiseLike?'':' reserved'}">
@@ -816,14 +816,28 @@
           <button class="pk-qbtn" data-q="allin">全下</button>
         </div>
         <div class="pk-row">
-          <button class="pk-b fold" id="pkFold" ${la.canFold?'':'disabled'}>弃牌<span class="bt">&nbsp;</span></button>
+          <button class="pk-b fold" id="pkFold" ${(la.canFold && !la.canCheck)?'':'disabled'}>弃牌<span class="bt">&nbsp;</span></button>
           <button class="pk-b call" id="pkCall">${callTxt}</button>
           <button class="pk-b raise ${isAllinAmt?'allin':''}" id="pkRaise" ${canRaiseLike?'':'disabled'}>${isAllinAmt?'全下':raiseLabel} <span class="bt">${isAllinAmt?raiseTo:('至 '+raiseTo)}</span></button>
         </div>`;
       const slider=$('#pkSlider'), amt=$('#pkAmt'), rb=$('#pkRaise');
-      function syncAmt(){ if(amt) amt.textContent=raiseTo; if(rb){ const ai=raiseTo>=max; rb.classList.toggle('allin',ai);
-        rb.innerHTML = `${ai?'全下':raiseLabel} <span class="bt">${ai?raiseTo:('至 '+raiseTo)}</span>`; } }
-      if(slider) slider.addEventListener('input', ()=>{ raiseTo=parseInt(slider.value,10)||min; syncAmt(); sfx('cardsel'); });
+      // syncAmt 只做廉价 textContent 写(拖动每秒触发数十次): 不再每 tick 整段重建 rb.innerHTML,
+      //   只在"是否全下"真正翻转时改前导词 + .allin 类; 金额走 .bt 子节点 textContent。拖动丝滑不掉帧。
+      let lastAllin = isAllinAmt;
+      function syncAmt(){
+        if(amt) amt.textContent=raiseTo;
+        if(rb){
+          const ai=raiseTo>=max;
+          const bt=rb.querySelector('.bt'); if(bt) bt.textContent = ai? String(raiseTo) : ('至 '+raiseTo);
+          if(ai!==lastAllin){ lastAllin=ai; rb.classList.toggle('allin',ai);
+            if(rb.firstChild && rb.firstChild.nodeType===3) rb.firstChild.nodeValue = (ai?'全下':raiseLabel)+' '; }
+        }
+      }
+      // 音效只在拖动结束(change)响一次, 不再每个 input tick 打一发("机关枪"音)。
+      if(slider){
+        slider.addEventListener('input', ()=>{ raiseTo=parseInt(slider.value,10)||min; syncAmt(); });
+        slider.addEventListener('change', ()=>{ sfx('cardsel'); });
+      }
       room.querySelectorAll('.pk-qbtn').forEach(b=> b.addEventListener('click', ()=>{
         const q=b.dataset.q; const pot=Math.max(st.pot,bb);
         let to = q==='half'? st.currentBet+Math.round(pot*0.5) : q==='pot'? st.currentBet+pot : q==='2x'? st.currentBet+pot*2 : max;
@@ -925,6 +939,20 @@
       const clk = mine ? $('#pkClk') : null;
       const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 对手行动席头像秒数徽标
       if (turnDur<=0) return;
+      // ★折叠(minimized)态: 房 display:none, 环不可见 —— 不再起 rAF 每帧对隐藏节点写 --p(后台自动连打时
+      //   会一直空转耗电)。只挂一个到点定时器: host 兜底代打远程超时 / 我方超时(onExpire, 折叠时为 null 即不动)。
+      //   AI 席由下方 aiTimer 独立推进, 与可见与否无关。streetTimer 是空闲的已跟踪定时器, 借它承载, close 时随 clearTimers 清。
+      if (minimized){
+        if (mine || remote){
+          const remainMs=Math.max(0,turnDur-(Date.now()-turnStart));
+          streetTimer=setTimeout(()=>{ streetTimer=null;
+            if(mine){ if(typeof onExpire==='function') onExpire(); }
+            else if(remote){ onRemoteTimeout(seat); }
+          }, remainMs);
+        }
+        if(aiSeat){ const remainMs=Math.max(0,turnDur-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }
+        return;
+      }
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
       const tick=()=>{
@@ -1063,13 +1091,15 @@
 
       // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
       //   联机有其他真人时给多一点时间读结算(5s), 纯单机 3s。破产离桌不自动进下一手。
-      let autoT=null;
-      function stopAuto(){ if(autoT){ clearInterval(autoT); autoT=null; } }
+      // autoT 提升为 room 级 overTimer(见 clearTimers): 若 close() 在结算倒计时中被外部调用(app.js gtClose),
+      //   本地 autoT 曾残留继续 nextHand() 打到已 detach 的 DOM 上、永远重排 —— 现在 clearTimers 会一并清掉。
+      function stopAuto(){ if(overTimer){ clearInterval(overTimer); overTimer=null; } }
+      stopAuto();
       if (!isGuest && !matchOver){
         // 多局连打提速: 结算只停够看清赢家(联机 3s 让多名真人读摊牌 / 单机 2s), 到点即自动发下一手。
         let left = (remoteSeats.length>0) ? 3 : 2;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
-        autoT=setInterval(()=>{
+        overTimer=setInterval(()=>{
           left--;
           if(left<=0){ stopAuto(); if(over.parentNode){ over.remove(); nextHand(); } return; }
           const c=over.querySelector('#pkCd'); if(c) c.textContent='('+left+'s)';

@@ -685,5 +685,41 @@
     return typeSub;
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub });
+  // 反应环最近使用（MRU）管理：纯 localStorage 存取 + 回声种类常量，零外部依赖。
+  // ECHO_KINDS 是表情种类白名单；loadEchoMru / pushEchoMru 管理"最近用过"列表；
+  // echoQuickList 合并两者为反应环渲染所需的 {e,label} 列表。
+  var ECHO_KINDS = [
+    {e:'👍', label:'赞'},
+    {e:'❤️', label:'爱了'},
+    {e:'😂', label:'哈哈'},
+    {e:'🙌', label:'+1'},
+    {e:'👀', label:'关注'},
+  ];
+  var LS_ECHO_MRU = 'eh_echo_mru';
+  function loadEchoMru() {
+    try { var a = JSON.parse(localStorage.getItem(LS_ECHO_MRU) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function pushEchoMru(emoji) {
+    if (!emoji) return;
+    var a = loadEchoMru().filter(function (e) { return e !== emoji; }); a.unshift(emoji); a = a.slice(0, 4);
+    try { localStorage.setItem(LS_ECHO_MRU, JSON.stringify(a)); } catch (e) {}
+  }
+  function echoQuickList(n) {
+    var mru = loadEchoMru();
+    var seen = new Set(), out = [];
+    var add = function (e, label) { if (e && !seen.has(e)) { seen.add(e); out.push({e:e, label:label||''}); } };
+    mru.forEach(function (e) { add(e, (ECHO_KINDS.find(function (k) { return k.e === e; }) || {}).label); });
+    ECHO_KINDS.forEach(function (k) { add(k.e, k.label); });
+    return out.slice(0, n || 4);
+  }
+  function createEchoMru() {
+    return Object.freeze({
+      ECHO_KINDS: ECHO_KINDS,
+      ECHO_EMOJIS: ECHO_KINDS.map(function (k) { return k.e; }),
+      loadEchoMru: loadEchoMru,
+      pushEchoMru: pushEchoMru,
+      echoQuickList: echoQuickList,
+    });
+  }
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru });
 })(window);

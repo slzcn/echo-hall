@@ -261,8 +261,8 @@ assert(/touch-action:none/.test(ui) && /\.ddz-hand\{[^}]*touch-action:none/.test
 assert(/function paintTo\(/.test(ui) && /applyPaintIdx/.test(ui), '涂抹选牌: 按索引区间填充(拖过整段连选, 快拖不漏牌)');
 assert(/els\.hand\.addEventListener\('pointerdown'/.test(ui) && /els\.hand\.addEventListener\('pointermove'/.test(ui), '手牌区绑 pointerdown/move 划选(挂容器一次, 不逐张)');
 assert(!/el\.addEventListener\('click'[\s\S]{0,120}selected\.(add|delete)/.test(ui), '旧逐张 click 单选写法已移除(改指针涂抹, 治划不动)');
-assert(/function handCardAt\([\s\S]{0,200}getBoundingClientRect/.test(ui) && !/function handCardAt\([\s\S]{0,80}elementFromPoint/.test(ui),
-  'handCardAt 按 x 命中露出的那张(不用 elementFromPoint, 治叠放漏掉最左那张)');
+assert(!/function handCardAt\([\s\S]{0,80}elementFromPoint/.test(ui) && (/function handCardAt\([\s\S]{0,200}getBoundingClientRect/.test(ui) || /function buildPaintGeo[\s\S]{0,200}getBoundingClientRect/.test(ui)),
+  'handCardAt 按 x 命中露出的那张(不用 elementFromPoint, 治叠放漏掉最左那张; 允许几何缓存 buildPaintGeo 预量)');
 assert(/el\.dataset\.idx = idx/.test(ui), '每张牌带 data-idx(划选连选补齐整段的依据)');
 
 // ── #61 三家一致: 一副打完 onResult 不再标 done ──────────────

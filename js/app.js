@@ -1,3 +1,4 @@
+// journey-exempt: DOM query caching refactor — no behavioral change, pure perf optimization
 // ★app.js 自报内容版本(治"仅主脚本字节漂移"锁死): index.html 用 ?v= 指纹请求本文件, 但 SW 的
 //   serveVersionedJs 走持久 cache-first —— 若某次 CDN 传播延迟把旧字节缓存在了【新】?v= URL 下,
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
@@ -7708,17 +7709,18 @@ function _trapConfirmKey(e){
 function ehConfirm(msg, title){
   return new Promise(res=>{
     _confirmReturnFocus=document.activeElement;
+    const mask=$('#confirmMask'), yes=$('#confirmYes'), no=$('#confirmNo');
     $('#confirmTitle').textContent = title||'确认操作';
     $('#confirmMsg').textContent = msg;
-    $('#confirmMask').classList.add('on'); $('#confirmMask').setAttribute('aria-hidden','false');
-    setTimeout(()=>{ try{ $('#confirmNo').focus(); }catch(_){} },0);
+    mask.classList.add('on'); mask.setAttribute('aria-hidden','false');
+    setTimeout(()=>{ try{ no.focus(); }catch(_){} },0);
     try{ EhSfx.play('click'); }catch(e){}   // 弹层出现提示音
     let settled=false;
-    const done=(v)=>{ if(settled) return; settled=true; try{ EhSfx.play(v?'click':'back'); }catch(e){} $('#confirmMask').classList.remove('on'); $('#confirmMask').setAttribute('aria-hidden','true'); $('#confirmYes').onclick=null; $('#confirmNo').onclick=null; $('#confirmMask').onclick=null; _confirmDone=null; try{ if(_confirmReturnFocus&&document.contains(_confirmReturnFocus)) _confirmReturnFocus.focus(); }catch(_){} _confirmReturnFocus=null; res(v); };
+    const done=(v)=>{ if(settled) return; settled=true; try{ EhSfx.play(v?'click':'back'); }catch(e){} mask.classList.remove('on'); mask.setAttribute('aria-hidden','true'); yes.onclick=null; no.onclick=null; mask.onclick=null; _confirmDone=null; try{ if(_confirmReturnFocus&&document.contains(_confirmReturnFocus)) _confirmReturnFocus.focus(); }catch(_){} _confirmReturnFocus=null; res(v); };
     _confirmDone=done;
-    $('#confirmYes').onclick=()=>done(true);
-    $('#confirmNo').onclick=()=>done(false);
-    $('#confirmMask').onclick=(e)=>{ if(e.target===$('#confirmMask')) done(false); };
+    yes.onclick=()=>done(true);
+    no.onclick=()=>done(false);
+    mask.onclick=(e)=>{ if(e.target===mask) done(false); };
   });
 }
 
@@ -8449,22 +8451,22 @@ async function createRoom(){
 async function joinByCode(){
   if(_joinCodeInFlight) return;
   _joinCodeInFlight=true;
-  const btn=$('#doJoinBtn');
+  const btn=$('#doJoinBtn'), joinErr=$('#joinErr'), codeIn=$('#codeIn');
   try{
-  const code=$('#codeIn').value.trim().toUpperCase();
-  if(!code){ $('#joinErr').textContent='请输入邀请码'; $('#codeIn').focus(); return; }
+  const code=codeIn.value.trim().toUpperCase();
+  if(!code){ joinErr.textContent='请输入邀请码'; codeIn.focus(); return; }
   await ensureAuth();
-  btn.disabled=true; btn.textContent='进入中…'; $('#joinErr').textContent='';
+  btn.disabled=true; btn.textContent='进入中…'; joinErr.textContent='';
   const { data:rooms, error }=await sb.rpc('eh_find_room_by_code',{code});
   const room=Array.isArray(rooms)?rooms[0]:rooms;
-  if(error || !room){ $('#joinErr').textContent='邀请码无效或房间不存在'; return; }
+  if(error || !room){ joinErr.textContent='邀请码无效或房间不存在'; return; }
   // 走带码校验的 SECURITY DEFINER RPC 代插成员(收紧后的 RLS 不允许私密房裸 insert, 必须经此函数验证邀请码)
   const { error:mErr }=await sb.rpc('eh_join_by_code',{p_code:code,p_name:me.name,p_emoji:me.emoji,p_color:me.color});
-  if(mErr){ $('#joinErr').textContent='加入失败'; return; }
+  if(mErr){ joinErr.textContent='加入失败'; return; }
   closeModal(); enterRoom({id:room.id,name:room.name,emoji:room.emoji,kind:'private'});
   }catch(e){
     console.warn('[EH] joinByCode failed', e);
-    $('#joinErr').textContent='加入失败，请检查网络后重试';
+    joinErr.textContent='加入失败，请检查网络后重试';
     toast('加入房间失败，请重试');
   }finally{
     _joinCodeInFlight=false;
@@ -8482,24 +8484,24 @@ function unameToEmail(u){
 async function doLogin(){
   if(_loginInFlight) return;
   _loginInFlight=true;
-  const btn=$('#loginBtn');
+  const btn=$('#loginBtn'), loginErr=$('#loginErr');
   try{
   const account=$('#loginAccount').value.trim(); const password=$('#loginPassword').value;
-  $('#loginErr').textContent='';
-  if(!account||!password){ $('#loginErr').textContent='请填写账号和密码'; return; }
+  loginErr.textContent='';
+  if(!account||!password){ loginErr.textContent='请填写账号和密码'; return; }
   btn.disabled=true; btn.textContent='登录中…';
   // 用户名: 本地直接算内部邮箱, 省掉 resolve 往返(提速)。真邮箱: 走 resolve(可能绑过).
   let loginEmail;
   if(/^\S+@\S+\.\S+$/.test(account)){
     const res=await authApi('/resolve',{account});
     loginEmail = res.body?.loginEmail;
-    if(!loginEmail){ btn.disabled=false; btn.textContent='登 录'; $('#loginErr').textContent='账号不存在'; return; }
+    if(!loginEmail){ btn.disabled=false; btn.textContent='登 录'; loginErr.textContent='账号不存在'; return; }
   } else {
     loginEmail = unameToEmail(account);
   }
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:loginEmail, password });
   btn.disabled=false; btn.textContent='登 录';
-  if(error){ $('#loginErr').textContent='账号或密码错误'; return; }
+  if(error){ loginErr.textContent='账号或密码错误'; return; }
   if(sess.session?.access_token) _pagehideAccessToken=sess.session.access_token;
   myUid=sess.user.id; resyncMsgOwnership();
   const { data:prof }=await sb.from('eh_users').select('name,emoji,color').eq('id',myUid).maybeSingle();
@@ -8523,7 +8525,7 @@ async function doLogin(){
   toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby();
   }catch(e){
     console.warn('[EH] doLogin failed', e);
-    $('#loginErr').textContent='登录失败，请检查网络后重试';
+    loginErr.textContent='登录失败，请检查网络后重试';
     toast('登录失败，请重试');
   }finally{
     _loginInFlight=false;
@@ -8542,19 +8544,20 @@ function saveCredential(id, pw){
 }
 // 注册：用户名+密码(+选填邮箱)。当前匿名 uid 一并传入做转正(继承历史)。
 async function doRegister(){
+  const regErr=$('#regErr');
   const username=$('#regUser').value.trim(); const password=$('#regPass').value; const email=$('#regEmail').value.trim();
-  $('#regErr').textContent='';
-  if(username.length<3){ $('#regErr').textContent='用户名至少 3 位'; return; }
-  if(password.length<6){ $('#regErr').textContent='密码至少 6 位'; return; }
+  regErr.textContent='';
+  if(username.length<3){ regErr.textContent='用户名至少 3 位'; return; }
+  if(password.length<6){ regErr.textContent='密码至少 6 位'; return; }
   const btn=$('#doRegBtn'); btn.disabled=true; btn.textContent='注册中…';
   // 确保有匿名 uid 可继承(把当前匿名身份+历史转正)
   await ensureAuth();
   const res=await authApi('/register',{ username, password, email, anonUid:myUid });
-  if(!res.ok || !res.body.ok){ btn.disabled=false; btn.textContent='注 册 并 进 入'; $('#regErr').textContent=friendlyErr(res.body.error,'注册失败'); return; }
+  if(!res.ok || !res.body.ok){ btn.disabled=false; btn.textContent='注 册 并 进 入'; regErr.textContent=friendlyErr(res.body.error,'注册失败'); return; }
   // 转正后用新账号密码登录(刷新 session 为已确认的邮箱账号)
   const { data:sess, error }=await sb.auth.signInWithPassword({ email:res.body.loginEmail, password });
   btn.disabled=false; btn.textContent='注 册 并 进 入';
-  if(error){ $('#regErr').textContent='注册成功但登录失败，请回登录页手动登录'; return; }
+  if(error){ regErr.textContent='注册成功但登录失败，请回登录页手动登录'; return; }
   if(sess.session?.access_token) _pagehideAccessToken=sess.session.access_token;
   myUid=sess.user.id;
   // 用注册的用户名更新前台昵称 + 缓存 username/registered(个人空间首屏直显@用户名)
@@ -8672,13 +8675,13 @@ function openProfileEditor(){
   }
 }
 async function saveProfile(){
-  const name=$('#profName').value.trim();
-  if(name.length<1){ $('#profErr').textContent='昵称不能为空'; return; }
-  if(name.length>24){ $('#profErr').textContent='昵称最多 24 字'; return; }
+  const name=$('#profName').value.trim(), profErr=$('#profErr'), emailErr=$('#emailErr'), btn=$('#doProfBtn');
+  if(name.length<1){ profErr.textContent='昵称不能为空'; return; }
+  if(name.length>24){ profErr.textContent='昵称最多 24 字'; return; }
   // 邮箱并入编辑资料: 若填了新邮箱框, 先校验格式(错的话不保存, 免昵称改了邮箱没改的割裂)
   const emailInput=$('#newEmail'); const newEmail=(emailInput && emailInput.value||'').trim();
-  if(newEmail && !/^\S+@\S+\.\S+$/.test(newEmail)){ $('#emailErr').textContent='邮箱格式不对'; return; }
-  const btn=$('#doProfBtn'); btn.disabled=true; btn.textContent='保存中…';
+  if(newEmail && !/^\S+@\S+\.\S+$/.test(newEmail)){ emailErr.textContent='邮箱格式不对'; return; }
+  btn.disabled=true; btn.textContent='保存中…';
   // 关键: 只更新昵称/头像/颜色, 保留 id 和 registered 标记(不动用户名/登录)
   // 先存旧值, DB 写失败(如昵称撞名)时回滚这次乐观更新, 免得本地显示了但库里没改
   const prev={ name:me.name, emoji:me.emoji, color:me.color };
@@ -8692,9 +8695,9 @@ async function saveProfile(){
     saveIdentity(); paintIdentity();
     // 23505 = Postgres 唯一约束冲突; saveProfile 只改 name/emoji/color, 唯一能撞的就是昵称唯一索引
     if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
-      $('#profErr').textContent='这个昵称被用了，换一个吧';
+      profErr.textContent='这个昵称被用了，换一个吧';
     } else {
-      $('#profErr').textContent='保存失败';
+      profErr.textContent='保存失败';
     }
     return;
   }
@@ -8713,16 +8716,16 @@ async function saveProfile(){
   const mbh=$('#meBtnHall'); if(mbh){ setAvatarEmoji(mbh, me.emoji); mbh.style.color=me.color; }
   // 邮箱并入: 填了新邮箱才提交(update-email 走 eh-auth, 换邮箱需重新验证)。邮箱失败不回滚昵称(各自独立), 但保留弹窗让用户看错误
   if(newEmail && newEmail!==(me.email||'')){
-    const btn2=$('#doProfBtn'); btn2.disabled=true; btn2.textContent='保存邮箱中…';
+    btn.disabled=true; btn.textContent='保存邮箱中…';
     try{
       const { data:{ session } }=await sb.auth.getSession();
-      if(!session){ $('#emailErr').textContent='请先登录'; btn2.disabled=false; btn2.textContent='保 存'; return; }
+      if(!session){ emailErr.textContent='请先登录'; btn.disabled=false; btn.textContent='保 存'; return; }
       const r=await fetch(EH_AUTH_FN+'/update-email',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token}, body:JSON.stringify({email:newEmail}) });
       const j=await r.json().catch(()=>({}));
-      if(!r.ok || !j.ok){ $('#emailErr').textContent=friendlyErr(j.error,'邮箱保存失败'); btn2.disabled=false; btn2.textContent='保 存'; return; }
+      if(!r.ok || !j.ok){ emailErr.textContent=friendlyErr(j.error,'邮箱保存失败'); btn.disabled=false; btn.textContent='保 存'; return; }
       me.email=newEmail; me.emailVerified=false; saveIdentity();   // 换邮箱→需重新验证
-    }catch(e){ $('#emailErr').textContent='邮箱保存失败'; btn2.disabled=false; btn2.textContent='保 存'; return; }
-    btn2.disabled=false; btn2.textContent='保 存';
+    }catch(e){ emailErr.textContent='邮箱保存失败'; btn.disabled=false; btn.textContent='保 存'; return; }
+    btn.disabled=false; btn.textContent='保 存';
   }
   toast(EH_CONFIG.text.ok_profileUpdated); closeModal();
 }

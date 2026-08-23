@@ -258,7 +258,7 @@
 #ddzCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(92px + env(safe-area-inset-bottom,0px))}
 .ddz-room.is-land #ddzCtrl{min-height:calc(70px + env(safe-area-inset-bottom,0px))}
 .ddz-acts{display:flex;gap:10px;justify-content:center;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
-.ddz-btn{flex:1;max-width:130px;padding:11px 0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;
+.ddz-btn{flex:1;max-width:130px;padding:13px 8px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.05em;transition:.14s}
 .ddz-btn:active{transform:scale(.96)}
 .ddz-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
@@ -608,9 +608,11 @@
       if (actionTimer){ clearTimeout(actionTimer); actionTimer = null; }
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
     }
-    const onResize = ()=>layoutHand();
+    // resize rAF 节流: 旋转/移动端地址栏收放会连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
+    let _rzRAF=0;
+    const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } closeInviteMenu(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
     window.addEventListener('resize', onResize);
 
@@ -618,8 +620,23 @@
     // 只绑一次(挂在手牌容器上, 手牌重绘不重复绑)。手牌左→右叠放, 后牌盖前牌右半,
     // 故 handCardAt 不用 elementFromPoint(会在牌中心命中右邻牌漏掉最左那张), 改按 x 命中"露出的那张"。
     let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, lastSelTick=0;
+    // 划选期几何缓存: pointerdown 时一次性量好手牌带上沿/下沿 + 每张左沿(选中只上移不横移, 左沿在一次拖动内恒定)。
+    //   免得每个 pointermove 都对全部牌 getBoundingClientRect —— 那紧跟 .sel 的 class 写会强制同步重排, 拖动掉帧。
+    let paintGeo=null;
+    function buildPaintGeo(){
+      const kids=els.hand.children, hr=els.hand.getBoundingClientRect();
+      const lefts=new Array(kids.length);
+      for(let i=0;i<kids.length;i++) lefts[i]=kids[i].getBoundingClientRect().left;
+      paintGeo={ top:hr.top, bottom:hr.bottom, lefts };
+    }
     function handCardAt(x,y){
       const kids=els.hand.children, n=kids.length; if(!n) return null;
+      if(paintGeo && paintGeo.lefts.length===n){          // 拖动中: 走缓存, 零重排
+        if(y < paintGeo.top-40 || y > paintGeo.bottom+40) return null;
+        let pick=kids[0];
+        for(let i=0;i<n;i++){ if(x >= paintGeo.lefts[i]-0.5) pick=kids[i]; else break; }
+        return pick;
+      }
       const hr=els.hand.getBoundingClientRect();
       if(y < hr.top-40 || y > hr.bottom+40) return null;   // 垂直离手牌带太远不算(拖向出牌钮时不误选)
       let pick=kids[0];                                     // x 在首牌左沿之前 → 归首牌
@@ -641,11 +658,12 @@
     }
     function endPaint(){
       const wasSelect = painting && paintMode==='select';
-      painting=false; paintSeen=null; paintLastIdx=null;
+      painting=false; paintSeen=null; paintLastIdx=null; paintGeo=null;
       if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
     }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase!=='play' || st.turn!==mySeat || (isGuest && awaitingHost)) return;
+      buildPaintGeo();                                     // 先量好几何缓存, 本次拖动全程复用
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
@@ -1126,7 +1144,7 @@
       }
       const noBeat = myTurn && mustBeat && plays.length===0;
       els.ctrl.innerHTML = `<div class="ddz-acts">
-        <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'压不过 · 不出':'不出'}</button>
+        <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'要不起':'不出'}</button>
         <button class="ddz-btn ghost" id="ddzHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
