@@ -364,7 +364,7 @@
     const _okArr = a => Array.isArray(a) && a.length===names.length && a.every(x=>typeof x==='number');
     const buyin = (_psav && _okArr(_psav.buyin)) ? _psav.buyin.slice() : names.map(() => START);
     let netSettled = (_psav && _okArr(_psav.net)) ? _psav.net.slice() : names.map(() => 0);
-    function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify({buyin, net:netSettled})); }catch(_){ } }
+    function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify({buyin, net:netSettled})); }catch(e){ _ehCatch('poker.saveScore', e); } }
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
@@ -743,7 +743,7 @@
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
       // 有人 all-in 且投入分层 → 拆主池/边池展示(对标德州扑克); 否则单一底池
       let pots = null;
-      try { pots = Engine.buildSidePots(st); } catch(_){}
+      try { pots = Engine.buildSidePots(st); } catch(e){ _ehCatch('poker.buildSidePots', e); }
       const anyAllin = st.players.some(p=>p.allin && !p.folded);
       if (pots && pots.length>1 && anyAllin){
         const parts = pots.map((pt,i)=> `<span class="pk-potpart${i?' side':''}">${i===0?'主池':'边'+i} ${pt.amount}</span>`).join('');
@@ -838,7 +838,7 @@
       // 增量护栏: 底牌条只在 阶段/是否轮我/摊牌/弃全下/筹码/庄位/需跟额/发牌帧/底牌 变化时重建。
       //   等别家行动时(每秒重绘)这些全不变 → 跳过, 免 innerHTML 重建 + 免每帧读牌算 hint。任一变化改签名照常重建。
       let callAmt=-1;
-      if (mine){ try{ callAmt = Engine.legalActions(st, mySeat).callAmount; }catch(_){} }
+      if (mine){ try{ callAmt = Engine.legalActions(st, mySeat).callAmount; }catch(e){ _ehCatch('poker.legalActions', e); } }
       const meSig = st.phase+'|'+(mine?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
         +'|'+(st.button===mySeat?1:0)+'|'+callAmt+'|'+(dealAnim?1:0)
         +'|'+holeCards.map(c=>c?(c.suit+''+c.rank):'x').join(',')
@@ -978,8 +978,11 @@
     function humanAct(action, amount){
       if (st.toAct!==mySeat || awaitingHost) return;
       if (isGuest){
+        if(onAction){
+          try{ onAction({ action, amount }); }
+          catch(e){ _ehCatch('poker.humanAct.onAction', e); toast('提交失败 · 请重试'); return; }
+        }
         awaitingHost=true;
-        if(onAction){ try{ onAction({ action, amount }); }catch(_){} }
         els.acts.innerHTML=actsSkeleton('已提交'); els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
         return;
       }
@@ -1237,7 +1240,7 @@
       // 破产离桌: 通知 app.js 把我的席位腾空(gtLeave), 再拆本地牌桌。
       const leaveBtn = over.querySelector('#pkLeave');
       if (leaveBtn) leaveBtn.addEventListener('click', ()=>{ stopAuto();
-        if(typeof opts.onBust==='function'){ try{ opts.onBust(); }catch(_){} } close(); });
+        if(typeof opts.onBust==='function'){ try{ opts.onBust(); }catch(e){ _ehCatch('poker.onBust', e); } } close(); });
       const doneBtn = over.querySelector('#pkDone');
       if (doneBtn) doneBtn.addEventListener('click', ()=>{ stopAuto(); close(); });
 
@@ -1249,7 +1252,7 @@
       emitBeat({ type:'over', actor:champName, big:true,
         text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
         quip: beatQuip(champSeat, 'win') });
-      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName }); }catch(_){} }
+      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName }); }catch(e){ _ehCatch('poker.onResult', e); } }
       if (minimized) updateChip();
     }
 
@@ -1372,7 +1375,7 @@
       armTurn(minimized ? null : onHumanTimeout);
       if (minimized) updateChip();
       // 招募态不产快照(无牌可发/可泄, 与斗地主/掼蛋同构: lobby 不广播, startDeal 转正局后才走 onSync)
-      if (onSync && !isGuest && st.phase!=='lobby'){ try{ onSync(st, handNo); }catch(_){} }   // host: 每次状态变更 → 产快照广播 + 写底牌
+      if (onSync && !isGuest && st.phase!=='lobby'){ try{ onSync(st, handNo); }catch(e){ _ehCatch('poker.onSync', e); } }   // host: 每次状态变更 → 产快照广播 + 写底牌
     }
 
     // ── guest 端: 收公共快照 / 收自己底牌 → 组伪状态渲染(全程不碰引擎权威) ──
@@ -1398,7 +1401,7 @@
       rebuildFromSnap(snap);
       if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();
     }
-    function resync(){ if (onSync && !isGuest){ try{ onSync(st, handNo); }catch(_){} } }  // host: 应新客人之请重播当前态
+    function resync(){ if (onSync && !isGuest){ try{ onSync(st, handNo); }catch(e){ _ehCatch('poker.resync', e); } } }  // host: 应新客人之请重播当前态
 
     // id → card (供摊牌/对手明牌重建)
     const SUIT_OF = { s:'♠', h:'♥', c:'♣', d:'♦' };
