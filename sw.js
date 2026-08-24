@@ -1,4 +1,4 @@
-/* 回声厅 Echo Hall — Service Worker v2 (重写)
+/* 回声厅 Echo Hall — Service Worker v380 (重写)
  * 策略:
  *   1. 导航请求(index.html / ver.txt): network-first, 有网必最新, 断网用缓存兜底
  *   2. Supabase 域名(实时/API/存储): network-only, 绝不缓存聊天/身份/配置
