@@ -836,5 +836,24 @@
     });
   }
 
-  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, esc: esc, safeEmoji: safeEmoji, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru, createThemeController: createThemeController });
+  // BGM 模式记忆：纯 localStorage 读写，零运行时依赖
+  function createBgmModeStore(cfg) {
+    var LS_BGM_MODE = cfg.lsBgmMode;
+    var LS_BGM_MANUAL = cfg.lsBgmManual;
+    function bgmModeStore() { try { return JSON.parse(localStorage.getItem(LS_BGM_MODE) || '{}') || {}; } catch (_) { return {}; } }
+    function bgmModeGet(roomKey) { try { var m = bgmModeStore()[roomKey]; return (m && m.mode) ? m : { mode: 'auto', url: '' }; } catch (_) { return { mode: 'auto', url: '' }; } }
+    function bgmModeSave(roomKey, mode, url) { try { var m = bgmModeStore(); m[roomKey] = { mode: mode || 'auto', url: (mode === 'manual' ? (url || '') : '') }; localStorage.setItem(LS_BGM_MODE, JSON.stringify(m)); } catch (_) {} }
+    function bgmModeSaveGlobal(mode, url) { bgmModeSave('__global__', mode, url); }
+    function bgmModeGetGlobal() { return bgmModeGet('__global__'); }
+    function bgmRoomKey(room) { return room ? room.name : '__lobby__'; }
+    function bgmManualStore() { try { return JSON.parse(localStorage.getItem(LS_BGM_MANUAL) || '{}') || {}; } catch (_) { return {}; } }
+    function bgmManualUrl(roomKey) { try { return bgmModeGet(roomKey).mode === 'manual' ? (bgmModeGet(roomKey).url || '') : ''; } catch (_) { return ''; } }
+    return Object.freeze({
+      bgmModeStore: bgmModeStore, bgmModeGet: bgmModeGet, bgmModeSave: bgmModeSave,
+      bgmModeSaveGlobal: bgmModeSaveGlobal, bgmModeGetGlobal: bgmModeGetGlobal,
+      bgmRoomKey: bgmRoomKey, bgmManualStore: bgmManualStore, bgmManualUrl: bgmManualUrl
+    });
+  }
+
+  root.EH_LOBBY_MODULE = Object.freeze({ createLobbyController: createLobbyController, chSkel: chSkel, rmSkel: rmSkel, fmtAgo: fmtAgo, optimisticCnt: optimisticCnt, readKnownOnline: readKnownOnline, autoTopic: autoTopic, esc: esc, safeEmoji: safeEmoji, createLobbyShowRetry: createLobbyShowRetry, createPrefetch: createPrefetch, createPrefetchSouls: createPrefetchSouls, createSoulsCacheStore: createSoulsCacheStore, createRoomAccentC: createRoomAccentC, createSoulThemeColor: createSoulThemeColor, createRoomsQuery: createRoomsQuery, createFillRoomStats: createFillRoomStats, createRenderOfficial: createRenderOfficial, createRenderPublic: createRenderPublic, createRenderMyRooms: createRenderMyRooms, createRenderLobby: createRenderLobby, createCopyInvite: createCopyInvite, createBindRoomCards: createBindRoomCards, createLastRoomStore: createLastRoomStore, createRoomThemeFor: createRoomThemeFor, createTypeSub: createTypeSub, createEchoMru: createEchoMru, createThemeController: createThemeController, createBgmModeStore: createBgmModeStore });
 })(window);

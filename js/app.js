@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260823-lobby-align';
+window.__EH_APP_VER = '20260824-bgm-mode';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -634,15 +634,19 @@ function startRoomBGM(room){
 const LS_BGM_MANUAL='eh_bgm_manual_v1';   // { [roomKey]: url }  按房间名维度记住最后一次手动选择
 // 新版记忆：每房间记住模式(auto=随机官方 / manual=钉某首)。auto 时不钉 url，进房重新随机。
 const LS_BGM_MODE='eh_bgm_mode_v1';       // { [roomKey]: {mode:'auto'|'manual', url:''} }
-function bgmModeStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MODE)||'{}')||{}; }catch(_){ return {}; } }
-function bgmModeGet(roomKey){ try{ const m=bgmModeStore()[roomKey]; return (m&&m.mode)?m:{mode:'auto',url:''}; }catch(_){ return {mode:'auto',url:''}; } }
-function bgmModeSave(roomKey,mode,url){ try{ const m=bgmModeStore(); m[roomKey]={mode:mode||'auto',url:(mode==='manual'?(url||''):'')}; localStorage.setItem(LS_BGM_MODE, JSON.stringify(m)); }catch(_){} }
-function bgmModeSaveGlobal(mode,url){ bgmModeSave('__global__', mode, url); }
-function bgmModeGetGlobal(){ return bgmModeGet('__global__'); }
-// roomKey：进房用房间名，大厅用 __lobby__
-function bgmRoomKey(room){ return room? room.name : '__lobby__'; }
-function bgmManualStore(){ try{ return JSON.parse(localStorage.getItem(LS_BGM_MANUAL)||'{}')||{}; }catch(_){ return {}; } }
-function bgmManualUrl(roomKey){ try{ return bgmModeGet(roomKey).mode==='manual'? (bgmModeGet(roomKey).url||'') : ''; }catch(_){ return ''; } }
+// BGM 模式记忆已迁入大厅模块，保留本地引用以兼容现有调用点。
+const _bgmModeStore = window.EH_LOBBY_MODULE.createBgmModeStore({
+  lsBgmMode: LS_BGM_MODE,
+  lsBgmManual: LS_BGM_MANUAL,
+});
+const bgmModeStore = _bgmModeStore.bgmModeStore;
+const bgmModeGet = _bgmModeStore.bgmModeGet;
+const bgmModeSave = _bgmModeStore.bgmModeSave;
+const bgmModeSaveGlobal = _bgmModeStore.bgmModeSaveGlobal;
+const bgmModeGetGlobal = _bgmModeStore.bgmModeGetGlobal;
+const bgmRoomKey = _bgmModeStore.bgmRoomKey;
+const bgmManualStore = _bgmModeStore.bgmManualStore;
+const bgmManualUrl = _bgmModeStore.bgmManualUrl;
 // 收集给用户看的曲目候选（默认曲、当前房 variants、我的灵魂曲库）
 function bgmCandidatesForRoom(room){
   const out=[]; const seen=new Set();
