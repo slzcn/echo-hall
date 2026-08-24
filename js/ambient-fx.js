@@ -32,7 +32,7 @@
   (function deepNight(){
     const check=()=>{ let h; try{ h=new Date().getHours(); }catch(_){ return; }
       document.body.classList.toggle('deep-night', h>=0 && h<5); };
-    check(); setInterval(check, 5*60*1000);
+    check(); _dnT=setInterval(check, 5*60*1000);
   })();
 
   // ---- 3. 灵魂心情天气: 轮询 roomSouls 主导情绪, 染 mood-aura + 微调全房氛围色 ----
@@ -70,6 +70,9 @@
     }
     window.startMoodWeather = function(){ if(_moodT) return; _moodT=setInterval(tick, 3000); tick(); };
     window.stopMoodWeather  = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; } if(aura) aura.className='mood-aura'; clearMoodTint(); _lastDom=null; };
+    window.destroyMoodWeather = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; } };
+    // deep-night 定时器清理
+    let _dnT=null; const dnOrig=check; window._ehDeepNight={ stop(){ if(_dnT){clearInterval(_dnT);_dnT=null;} } };
   })();
 
   // ---- 供主脚本调用的钩子 ----

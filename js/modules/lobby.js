@@ -821,18 +821,19 @@
       else applyTheme(currentTheme());
     }
     // auto 模式定时切换
-    setInterval(function () {
+    var _autoModeTid = setInterval(function () {
       if (currentMode() !== 'auto') return;
       var shouldDay = resolveDay('auto');
       var isDay = document.documentElement.getAttribute('data-mode') === 'day';
       if (shouldDay !== isDay) applyMode('auto');
     }, 60 * 1000);
+    function destroy() { clearInterval(_autoModeTid); }
 
     return Object.freeze({
       currentMode: currentMode, resolveDay: resolveDay, syncThemeColor: syncThemeColor,
       applyMode: applyMode, pickMode: pickMode, applyTheme: applyTheme, pickTheme: pickTheme,
       currentTheme: currentTheme, themeLocked: themeLocked, sceneTheme: sceneTheme,
-      sceneOrDefaultTheme: sceneOrDefaultTheme, applyRoomTheme: applyRoomTheme,
+      sceneOrDefaultTheme: sceneOrDefaultTheme, applyRoomTheme: applyRoomTheme, destroy: destroy,
     });
   }
 

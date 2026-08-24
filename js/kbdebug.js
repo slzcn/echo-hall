@@ -287,6 +287,7 @@
     setTimeout(snapshot, 250);
   }, { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(snapshot, 300), { passive: true });
-  setInterval(snapshot, 300);
+  var _kbTid = setInterval(snapshot, 300);
+  window._ehKbDebug = { stop: function(){ clearInterval(_kbTid); } };
   snapshot();
 })();
