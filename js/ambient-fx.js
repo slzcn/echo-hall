@@ -73,8 +73,9 @@
     window.startMoodWeather = function(){ if(_moodT) return; _moodT=setInterval(tick, 3000); tick(); };
     window.stopMoodWeather  = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; } if(aura) aura.className='mood-aura'; clearMoodTint(); _lastDom=null; };
     window.destroyMoodWeather = function(){ if(_moodT){ clearInterval(_moodT); _moodT=null; } };
-    // deep-night 定时器清理
-    let _dnT=null; const dnOrig=check; window._ehDeepNight={ stop(){ if(_dnT){clearInterval(_dnT);_dnT=null;} } };
+    // deep-night 定时器清理已在上面的 deepNight 闭包内就地处理(var _dnT + window._ehDeepNight);
+    // 此处不再重复挂载——旧的 `const dnOrig=check` 引用了 deepNight 闭包内的 check(此作用域不可见),
+    // 会抛 ReferenceError: check is not defined, 直接崩掉整个 ambient-fx.js → 进厅链路断(点哪都进不去)。
   })();
 
   // ---- 供主脚本调用的钩子 ----
