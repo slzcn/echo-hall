@@ -30,9 +30,11 @@
 
   // ---- 2. 深夜氛围: 本地时间 0-5 点 → deep-night ----
   (function deepNight(){
+    var _dnT=null;
     const check=()=>{ let h; try{ h=new Date().getHours(); }catch(_){ return; }
       document.body.classList.toggle('deep-night', h>=0 && h<5); };
     check(); _dnT=setInterval(check, 5*60*1000);
+    window._ehDeepNight = { stop: function(){ if(_dnT){ clearInterval(_dnT); _dnT=null; } } };
   })();
 
   // ---- 3. 灵魂心情天气: 轮询 roomSouls 主导情绪, 染 mood-aura + 微调全房氛围色 ----
