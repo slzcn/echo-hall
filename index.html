@@ -597,6 +597,21 @@
   .ch .tagk{position:absolute;top:12px;right:12px;font-size:9px;padding:2px 7px;border-radius:6px;letter-spacing:1px;
     background:var(--hover);color:var(--dim)}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+  /* 活跃度忠实分级: 有人在线的房间"醒着"(圆点呼吸), 无人的"沉睡"(灰点静止·整卡降饱和), 一眼分清此刻哪里真热闹 */
+  .ch.alive .live .pulse{background:var(--ch-c);box-shadow:0 0 8px var(--ch-c);animation:pulse 1.6s infinite}
+  .ch.dormant .live{color:var(--dim)}
+  .ch.dormant .live .pulse{background:var(--dim);box-shadow:none;animation:none;opacity:.5}
+  .ch.dormant{opacity:.7;filter:saturate(.5)}
+  .ch.dormant .icon{filter:grayscale(.4)}
+  .ch.dormant::after{opacity:.28}
+  .ch.dormant:hover{opacity:1;filter:none}
+  .ch.dormant:hover .icon{filter:none}
+  /* 首屏"回声": 陌生人的话在上方虚空里缓缓浮起又淡去, 呼应"回声厅"内核 */
+  .echo-drift{position:fixed;left:0;right:0;top:0;height:42vh;z-index:1;pointer-events:none;overflow:hidden}
+  .echo-drift .ec{position:absolute;left:50%;bottom:6%;max-width:88%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-size:12.5px;letter-spacing:.5px;color:var(--sub);opacity:0;
+    text-shadow:0 0 14px color-mix(in srgb,var(--cyan) 32%,transparent);animation:echoRise 9s ease-out forwards}
+  @keyframes echoRise{0%{opacity:0;transform:translate(-50%,22px)}18%{opacity:.5}70%{opacity:.32}100%{opacity:0;transform:translate(-50%,-36vh)}}
   .empty-hint{width:100%;max-width:var(--content-max);text-align:center;color:var(--dim);font-size:12px;padding:8px}
 
   /* 私密房操作区: 独立一行大按钮(恢复精简前版本, 不再挤进分隔线) */
@@ -2070,7 +2085,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260824-bgm-mode';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260824-live-lobby';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2356,6 +2371,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 
   <!-- ===== 场景1：入场 ===== -->
   <div class="scene on" id="enter">
+    <div class="echo-drift" id="echoDrift" aria-hidden="true"></div>
     <div class="glass enter-card">
       <div class="logo-wrap"><span class="logo">◢◤ Realtime ◢◤</span></div>
       <div class="title" data-t="回声厅">回声厅</div>
@@ -2567,12 +2583,12 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
 <script defer src="./js/games/table-net.js?v=20260822-table-focus"></script>
 <script defer src="./js/game-loader.js?v=20260824-lazy-games-v2"></script>
-<script defer src="./js/modules/lobby.js?v=20260823-theme-ctrl"></script>
+<script defer src="./js/modules/lobby.js?v=20260824-live-lobby"></script>
 <script defer src="./js/modules/auth.js?v=20260818-auth-contract"></script>
 <script defer src="./js/modules/bgm.js?v=20260818-bgm-contract"></script>
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
-<script defer src="./js/app.js?v=20260824-bgm-mode"></script>
+<script defer src="./js/app.js?v=20260824-live-lobby"></script>
 <script defer src="./js/keyboard.js?v=20260820-fold-ime-fallback"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
@@ -2631,6 +2647,30 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
     }
     paint();
     setInterval(paint, 250);   // 纯轮询刷新(250ms), 不新增事件监听 → 免顶 CI addEventListener 密度上限; 键盘起落中间态也能刷到
+  }catch(e){}
+})();
+</script>
+<script>
+/* 首屏"回声"氛围: 只在入场场景亮着且未开启 reduced-motion 时, 让匿名话语碎片从上方虚空缓缓浮起淡去 */
+(function echoDrift(){
+  try{
+    if(window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    var box=document.getElementById('echoDrift'); if(!box) return;
+    var LINES=['有人在深夜问, 还有人醒着吗','这句话, 会被谁听见','陌生人, 你也睡不着吗','说出来, 就有了回声',
+      '我把心事留在这里了','晚安, 不认识的你','今天也想找人说说话','世界很吵, 这里刚好'];
+    var i=0, timer=null;
+    function alive(){ var e=document.getElementById('enter'); return e && e.classList.contains('on'); }
+    function stop(){ if(timer){ clearInterval(timer); timer=null; } box.style.display='none'; }
+    function spawn(){
+      if(!alive()){ stop(); return; }
+      var s=document.createElement('div'); s.className='ec';
+      s.textContent=LINES[(i++)%LINES.length];
+      s.style.fontSize=(11.5+Math.random()*2.5).toFixed(1)+'px';
+      box.appendChild(s);
+      setTimeout(function(){ if(s&&s.parentNode) s.remove(); }, 9200);
+    }
+    // 首条稍延迟, 让入场卡片先落位; 之后每 ~3.2s 起一条
+    setTimeout(function(){ if(alive()){ spawn(); timer=setInterval(spawn, 3200); } }, 900);
   }catch(e){}
 })();
 </script>

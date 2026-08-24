@@ -320,6 +320,9 @@
       var count = result[0] && result[0].count;
       var recent = result[1];
       var online = count || 0;
+      // 活跃度忠实分级: 有人在线=醒着(圆点呼吸), 无人=沉睡(灰点静·整卡降饱和) —— UI 忠实映射房间此刻状态
+      card.classList.toggle('alive', online > 0);
+      card.classList.toggle('dormant', online === 0);
       var cnt = card.querySelector('.cnt');
       if (cnt) cnt.textContent = online > 0 ? online + ' 人在线' : '暂无人在线';
       var last = (Array.isArray(recent) ? recent.find(function (m) { return m && m.kind !== 'enter'; }) : null) || null;
