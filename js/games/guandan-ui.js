@@ -374,20 +374,22 @@
     }
   }
   const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
-  // 语音报牌型(主人要求): 只报显著牌型(炸弹/天王炸/三带二/钢板/顺子…), 单张/对子/三张不絮叨。
-  const VOICE_SKIP = new Set(['single','pair','trio']);
+  // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/钢板/炸弹等一致。
+  const VOICE_SKIP = new Set();
+  // 取某席"发言人"音色档: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
+  function whoOf(seat){
+    if(typeof seat!=='number' || !st.players[seat]) return null;
+    const ai = !!(gameIsAI && gameIsAI[seat]);
+    return { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
+  }
   function sayPlay(p, seat){
     if(!p || VOICE_SKIP.has(p.type)) return;
     const lab = typeLabel(p);
     if(!(lab && root.EhSfx && root.EhSfx.say)) return;
-    // 按发言人区分音色: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
-    let who = null;
-    if(typeof seat==='number' && st.players[seat]){
-      const ai = !!(gameIsAI && gameIsAI[seat]);
-      who = { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
-    }
-    root.EhSfx.say(lab, who);
+    root.EhSfx.say(lab, whoOf(seat));
   }
+  // 操作语音(不出/进贡等): 与报牌型同音色, 让每一步动作都出声。
+  function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
 
   function cardEl(card, level, opts){
     opts = opts || {};
@@ -414,6 +416,7 @@
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[gd] engine not loaded'); return null; }
     injectCSS();
+    try{ if(root.EhGameBgm) root.EhGameBgm.enter('guandan'); }catch(_){}   // 进桌切掼蛋 BGM
 
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
     let connState = 'online';
@@ -573,7 +576,7 @@
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
     let _exited=false;
-    function close(){ minimized=false; try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
@@ -1196,13 +1199,13 @@
       if (isGuest){   // guest 只能替自己不出, 回传给 host
         if (awaitingHost) return;
         if (onAction) onAction({ action:'pass' });
-        sfx('pass'); say(mySeat,'不出'); awaitingHost=true;
+        sfx('pass'); say(mySeat,'不出'); sayOp(mySeat,'不出'); awaitingHost=true;
         selected.clear(); hintCycle=[];   // 不出即把选中的牌收回(放下高亮), 与 doPlay 一致
         setBanner(); renderCtrl(); renderHand(); return;
       }
       try{ var rp=Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
       if(seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
-      say(seat,'不出'); afterMove(rp);
+      say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp);
     }
     function doHint(){
       const hand=st.players[mySeat].hand;
@@ -1229,7 +1232,7 @@
     function applyMove(seat, move){
       if(!move || st.phase!=='play' || st.turn!==seat) return false;
       try{
-        if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); afterMove(rp); return true; }
+        if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp); return true; }
         const hand=st.players[seat].hand;
         const cards=(move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
         const r=Engine.applyPlay(st, seat, cards);
@@ -1247,7 +1250,7 @@
         let rp;
         try{ rp=Engine.applyPass(st,seat); }
         catch(e){ rp=Engine.applyPlay(st,seat, AI.chooseLead(st.players[seat].hand, st.level)); }
-        say(seat,'不出'); afterMove(rp); return;
+        say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp); return;
       }
       try{ var r=Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ try{ Engine.applyPass(st,seat); }catch(_){ Engine.applyPlay(st,seat,AI.chooseLead(st.players[seat].hand,st.level)); } afterMove({}); return; }
@@ -1401,6 +1404,9 @@
       }
       els.felt.appendChild(box);
       sfx('echo');
+      // 进贡/还贡语音: 抗贡一声宣告; 否则贡家先喊"进贡", 收家隔拍喊"还贡"(错峰避开 speechSynthesis.cancel 互切)
+      if (st.tribute.refused){ try{ if(root.EhSfx&&root.EhSfx.say) root.EhSfx.say('抗贡成功'); }catch(_){} }
+      else { const tr=(st.tribute.transfers||[]); if(tr.length){ sayOp(tr[0].from,'进贡'); if(tr[0].back!=null) setTimeout(()=>sayOp(tr[0].to,'还贡'), 1400); } }
       // 有还贡飞牌时多留一会(让 1240+ 的还贡动画落地再淡出)
       const hold = (!st.tribute.refused && (st.tribute.transfers||[]).some(t=>t.back!=null)) ? 3400 : 2600;
       setTimeout(()=>{ box.style.transition='opacity .4s'; box.style.opacity='0'; setTimeout(()=>box.remove(),420); }, hold);

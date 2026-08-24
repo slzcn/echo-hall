@@ -314,6 +314,7 @@
     opts = opts || {};
     if (!Engine || !AI){ console.warn('[pk] engine not loaded'); return null; }
     injectCSS();
+    try{ if(root.EhGameBgm) root.EhGameBgm.enter('poker'); }catch(_){}   // 进桌切德州 BGM
 
     const names   = opts.names   || ['你','阿岩','小凶','疯哥'];
     const avatars = opts.avatars || ['🙂','🗿','🔥','🤪'];
@@ -411,6 +412,10 @@
     let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : (introSeating ? waitingState('seating') : newHand()));
 
     function sfx(nm){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(nm); }catch(_){} }
+    // 操作语音: 每席按名/机分配稳定音色, 让弃牌/过/跟/加注/全下都出声(对标腾讯德州报牌)
+    function whoOf(seat){ if(typeof seat!=='number' || !st || !st.players || !st.players[seat]) return null;
+      const ai=!!isAI[seat], nm=st.players[seat].name; return { name:nm, key:nm, isSoul:ai, isHuman:!ai }; }
+    function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     sfx('arrive'); if(!lobbyMode) sfx('deal');
 
@@ -491,7 +496,7 @@
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; positionSeats(); }); };
     let _exited=false;
-    function close(){ minimized=false; try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── 折叠 / 展开(返回聊天但牌局继续) ──
@@ -1014,6 +1019,7 @@
 
     function afterAction(seat, action, amount, r){
       // 音效 + 台词
+      sayOp(seat, ({ fold:'弃牌', check:'过', call:'跟注', bet:'下注', raise:'加注', allin:'全下' })[action] || '');
       if (action==='fold'){ if(seat!==mySeat){ sfx('pass'); beatQuip(seat,'fold'); } else sfx('pass'); }
       else if (action==='check'){ sfx('click'); }
       else if (action==='call'){ sfx('chip'); if(seat!==mySeat) beatQuip(seat,'call'); }

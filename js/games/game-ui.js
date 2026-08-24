@@ -410,6 +410,7 @@
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
     injectCSS(); injectLobbyCSS();
+    try{ if(root.EhGameBgm) root.EhGameBgm.enter('ddz'); }catch(_){}   // 进桌切斗地主 BGM
 
     const mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // 联机: 真人可坐非 0 席
     let connState = 'online';
@@ -612,7 +613,7 @@
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
     let _exited=false;
-    function close(){ minimized=false; clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } closeInviteMenu(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } closeInviteMenu(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
     window.addEventListener('resize', onResize);
 
@@ -1180,20 +1181,22 @@
       }
     }
     const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='rocket');
-    // 语音报牌型(主人要求): 只报显著牌型(炸弹/火箭/三带二/顺子/飞机…), 单张/对子/三张不絮叨。
-    const VOICE_SKIP = new Set(['single','pair','trio']);
+    // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/炸弹等一致。
+    const VOICE_SKIP = new Set();
+    // 取某席"发言人"音色档: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
+    function whoOf(seat){
+      if(typeof seat!=='number' || !st.players[seat]) return null;
+      const ai = !!(gameIsAI && gameIsAI[seat]);
+      return { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
+    }
     function sayPlay(p, seat){
       if(!p || VOICE_SKIP.has(p.type)) return;
       const lab = typeLabel(p);
       if(!(lab && root.EhSfx && root.EhSfx.say)) return;
-      // 按发言人区分音色: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
-      let who = null;
-      if(typeof seat==='number' && st.players[seat]){
-        const ai = !!(gameIsAI && gameIsAI[seat]);
-        who = { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
-      }
-      root.EhSfx.say(lab, who);
+      root.EhSfx.say(lab, whoOf(seat));
     }
+    // 操作语音(叫分/不出等): 与报牌型同音色, 让每一步动作都出声。
+    function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
     function updatePlayBtn(){
       const btn = $('#ddzPlay'); if (!btn) return;
       const cards = [...selected].map(findCardById);
@@ -1295,8 +1298,8 @@
     // 叫分→印章参数: prevMax>0 时的正叫是"抢", 首个正叫是"叫", 0 分是"不叫/不抢"
     function bidVisual(seat, val, prevMax){
       if (val>0){ const rob = prevMax>0;
-        bidStamp(seat, rob?'rob':'call', (rob?'抢 ':'叫 ')+val+'分'); say(seat, val+'分！'); }
-      else { bidStamp(seat, 'pass', prevMax>0?'不抢':'不叫'); say(seat, prevMax>0?'不抢':'不叫'); }
+        bidStamp(seat, rob?'rob':'call', (rob?'抢 ':'叫 ')+val+'分'); say(seat, val+'分！'); sayOp(seat, (rob?'抢':'叫')+val+'分'); }
+      else { const t=prevMax>0?'不抢':'不叫'; bidStamp(seat, 'pass', t); say(seat, t); sayOp(seat, t); }
     }
     function doCall(seat, val){
       const prevMax = (st.bid && st.bid.max) || 0;
@@ -1331,13 +1334,13 @@
       if (isGuest){   // guest 只能替自己不出, 回传给 host
         if (seat!==mySeat || awaitingHost) return;
         if (onAction) onAction({ action:'pass' });
-        sfx('pass'); say(seat,'不出'); awaitingHost=true;
+        sfx('pass'); say(seat,'不出'); sayOp(seat,'不出'); awaitingHost=true;
         selected.clear(); hintCycle=[];   // 不出即把选中的牌收回(放下高亮), 与 doPlay 一致
         setBanner(); renderCtrl(); renderHand(); return;
       }
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
       if (seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
-      say(seat,'不出');
+      say(seat,'不出'); sayOp(seat,'不出');
       renderAll();
     }
     function doHint(){

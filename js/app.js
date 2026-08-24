@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260824-live-lobby';
+window.__EH_APP_VER = '20260824-game-audio';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -359,7 +359,7 @@ function detachBgmGestureUnlock(){
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
 function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on) AudioEngine.stop(); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on) AudioEngine.stop(); else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
     // 换房触发时先清过期 override（同房再进不清，续播用户生成曲）
@@ -384,6 +384,22 @@ function startRoomBGM(room){
     if(cfg) AudioEngine.start(cfg); else AudioEngine.stop();
   }catch(e){ console.warn('startRoomBGM', e); }   // BGM 非必需, 出错绝不阻断进房
 }
+// ── 牌桌 BGM: 进桌切游戏专属曲, 离桌恢复房间/大厅曲(与 startRoomBGM 同源, 尊重静音开关) ──
+let _gameBgmActive=false, _gameBgmKind='';
+function startGameBGM(kind){
+  try{
+    const cfg=(EH_CONFIG.gameBgm||{})[kind];
+    _gameBgmActive=true; _gameBgmKind=kind;
+    if(!bgmOn() || !cfg || !cfg.url) return;   // 静音时只记状态, 解除静音再补播
+    AudioEngine.start(cfg);
+  }catch(e){ _ehCatch('startGameBGM',e); }
+}
+function stopGameBGM(){
+  if(!_gameBgmActive) return;
+  _gameBgmActive=false; _gameBgmKind='';
+  try{ if(!bgmOn()) return; if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }catch(e){ _ehCatch('stopGameBGM',e); }
+}
+window.EhGameBgm = { enter:startGameBGM, exit:stopGameBGM };
 // 手动选曲：允许用户从下拉菜单直接挑本房 BGM
 const LS_BGM_MANUAL='eh_bgm_manual_v1';   // { [roomKey]: url }  按房间名维度记住最后一次手动选择
 // 新版记忆：每房间记住模式(auto=随机官方 / manual=钉某首)。auto 时不钉 url，进房重新随机。

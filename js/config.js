@@ -111,6 +111,13 @@ const EH_CONFIG_DEFAULT = {
       generated:{ name:'当场召唤', url:'' },
     },
   },
+  // 牌桌专属 BGM(腾讯游戏风向): 进桌切游戏曲, 离桌恢复房间/大厅曲。MiniMax 音乐 API 已停用,
+  //   暂从既有器乐库精选贴合风格的一首/游戏 —— 斗地主用热闹街机、掼蛋用脉冲竞技、德州用深夜爵士 lo-fi。
+  gameBgm: {
+    ddz:     { name:'欢乐斗地主', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/hall_arcade.mp3' },
+    guandan: { name:'掼蛋竞技场', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/tech_pulsegrid.mp3' },
+    poker:   { name:'德州不眠夜', url:'https://cddkniwbhvcbfgkgomtl.supabase.co/storage/v1/object/public/eh-song/bgm/radio.mp3' },
+  },
   // 身份随机池(昵称形容词/动物, 虚空匿名名字)
   identityPool: {
     adjectives:['量子','霓虹','午夜','像素','赛博','游离','镜像','脉冲','银河','深海','极光','熵增','折跃','暗物质','超导','游牧'],
