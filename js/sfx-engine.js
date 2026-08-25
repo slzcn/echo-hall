@@ -126,8 +126,15 @@
       const rate  = sv ? sv.rate  : 1.04 + ((h>>6)%6)*0.035;
       return { voice, pitch, rate };
     }
+    let _lastSayText='', _lastSayAt=0;
     function say(text, who){
       if(!enabled||!text) return;
+      // 丝滑: 极短窗内相同文本重复(如一圈里两三席连续"不出", 或同牌型齐发)只念一次。
+      //   否则后一句会 speechSynthesis.cancel() 把前一句拦腰砍断 → 听感是"不出—不"的结巴。
+      //   纯时间比较、不排队、不依赖 onend, 绝不会卡死后续语音(某些浏览器 onend 会丢失)。
+      const _now=Date.now();
+      if(String(text)===_lastSayText && _now-_lastSayAt<900) return;
+      _lastSayText=String(text); _lastSayAt=_now;
       try{
         if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
         if(!_voiceTried){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;

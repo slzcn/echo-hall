@@ -374,22 +374,6 @@
     }
   }
   const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
-  // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/钢板/炸弹等一致。
-  const VOICE_SKIP = new Set();
-  // 取某席"发言人"音色档: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
-  function whoOf(seat){
-    if(typeof seat!=='number' || !st.players[seat]) return null;
-    const ai = !!(gameIsAI && gameIsAI[seat]);
-    return { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
-  }
-  function sayPlay(p, seat){
-    if(!p || VOICE_SKIP.has(p.type)) return;
-    const lab = typeLabel(p);
-    if(!(lab && root.EhSfx && root.EhSfx.say)) return;
-    root.EhSfx.say(lab, whoOf(seat));
-  }
-  // 操作语音(不出/进贡等): 与报牌型同音色, 让每一步动作都出声。
-  function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
 
   function cardEl(card, level, opts){
     opts = opts || {};
@@ -571,6 +555,22 @@
       const q = rand(QUIP[kind]||[]); if(!q) return null;
       say(seat, q); return q;
     }
+    // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/钢板/炸弹等一致。
+    const VOICE_SKIP = new Set();
+    // 取某席"发言人"音色档: 灵魂用角色专属嗓(按名), 真人按名哈希稳定分配; 省略则退全局嗓
+    function whoOf(seat){
+      if(typeof seat!=='number' || !st.players[seat]) return null;
+      const ai = !!(gameIsAI && gameIsAI[seat]);
+      return { name: st.players[seat].name, key: st.players[seat].name, isSoul: ai, isHuman: !ai };
+    }
+    function sayPlay(p, seat){
+      if(!p || VOICE_SKIP.has(p.type)) return;
+      const lab = typeLabel(p);
+      if(!(lab && root.EhSfx && root.EhSfx.say)) return;
+      root.EhSfx.say(lab, whoOf(seat));
+    }
+    // 操作语音(不出/进贡等): 与报牌型同音色, 让每一步动作都出声。
+    function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
     // resize rAF 节流: 旋转/移动端地址栏收放连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
     let _rzRAF=0;
@@ -1420,7 +1420,10 @@
       const iWon = Engine.teamOf(mySeat)===res.winnerTeam;
       const over=document.createElement('div'); over.className='gd-over '+(iWon?'win':'lose');
       const rankNames=['头游','二游','三游','末游'];
-      const rows = res.finishOrder.map((seat,i)=>{
+      // ★注意: 此处不能叫 rows —— go()(再来一局闭包)会 rows=null 复位手牌理牌态, 若这里 const rows 会遮蔽
+      //   外层 let rows(697) 导致 go() 里赋值命中本 const → "Assignment to constant variable" 崩溃、
+      //   再来一局后续 renderAll/showTributeBanner 全不执行。改名 rankRows 消除遮蔽。
+      const rankRows = res.finishOrder.map((seat,i)=>{
         const mate=Engine.partnerOf(mySeat)===seat, me=seat===mySeat;
         return `<div class="rank-row${me?' me':''}"><span class="r">${rankNames[i]}</span><span>${escapeHtml(st.players[seat].name)}${me?'（你）':(mate?'（队友）':'')}</span></div>`;
       }).join('');
@@ -1437,7 +1440,7 @@
       const cumLine = `本桌累计 · <span class="cm mine">我方 打<b>${LVL_LABEL(lvA[myT])}</b> · 胜${teamWins[myT]}副</span><span class="cm foe">对方 打<b>${LVL_LABEL(lvA[foeT])}</b> · 胜${teamWins[foeT]}副</span>`;
       over.innerHTML=`
         <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
-        <div class="rank-list">${rows}</div>
+        <div class="rank-list">${rankRows}</div>
         <div class="gd-remains" id="gdRemains"></div>
         <div class="lvlup">${lvlLine}</div>
         <div class="gd-cum">${cumLine}</div>
