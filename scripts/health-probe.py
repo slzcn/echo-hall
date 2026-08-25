@@ -8,6 +8,7 @@ Echo Hall 线上健康探测（双层）。
 本脚本只负责产出可信探测结果；异常闭环由定时巡检 agent 按「归因→修复→门禁→部署→复测」执行。
 """
 import sys, json, time, urllib.request, urllib.error, ssl, re, os
+import socket
 
 BASE = "https://slzcn.github.io/echo-hall"
 JS_ASSETS = ["js/app.js", "js/keyboard.js", "js/dm.js"]
@@ -121,6 +122,9 @@ def _sb_request(path, key, body=None, method=None, timeout=TIMEOUT):
             raw = r.read(); return r.status, raw, time.time()-t0
     except urllib.error.HTTPError as e:
         raw = e.read(); return e.code, raw, time.time()-t0
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as e:
+        # 网络层瞬时抖动（SSL握手超时、DNS失败、TCP RST等）：返回哨兵 st=0，不抛
+        return 0, b"", time.time()-t0
 
 def probe_business_readonly():
     """只读合成探针：公开房、历史、灵魂、登录/生成 Edge 鉴权、母版与音频资源。无生产写入。"""
@@ -143,6 +147,10 @@ def probe_business_readonly():
     # 历史与灵魂两个关键 RPC。
     for name, payload in (("eh_public_recent", {"rid":rid,"lim":2,"hide_recalled":True}), ("eh_room_souls", {"rid":rid})):
         st, raw, dt = _sb_request(f"/rest/v1/rpc/{name}", key, payload, "POST")
+        # 网络层瞬时抖动（st==0）：等 1s 后即时重试一次，避免单点 SSL 握手超时误报
+        if st == 0:
+            time.sleep(1)
+            st, raw, dt = _sb_request(f"/rest/v1/rpc/{name}", key, payload, "POST")
         count = None
         try:
             obj=json.loads(raw.decode("utf-8")); count=len(obj) if isinstance(obj,list) else None
