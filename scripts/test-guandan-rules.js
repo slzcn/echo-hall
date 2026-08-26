@@ -52,7 +52,8 @@ const pairLevel = R.parse([c('s',5),c('c',5)], L5);   // 一对级牌
 const pairA = R.parse([c('s',14),c('c',14)], L5);
 ok(pairLevel.key===15 && pairA.key===14, '级牌对 key=15 > A 对 key=14');
 ok(R.beats(pairLevel, pairA, L5), '级牌对 > A 对');
-ok(!R.beats(pairLevel, R.parse([jk('small'),jk('small','x')], L5), L5), '级牌对 < 双小王对');
+ok(R.parse([jk('small'),jk('small','x')], L5)===null, '双小王不成对(王只作单张/四大天王)');
+ok(R.parse([jk('big'),jk('big','x')], L5)===null, '双大王不成对');
 // 顺子里级牌按自然点(不抬权): 34567 里含级牌5, 仍是普通顺子, key=7
 const stWithLevel = R.parse([c('s',3),c('h',4),c('c',5),c('s',6),c('d',7)], L5);
 ok(stWithLevel && stWithLevel.type==='straight' && stWithLevel.key===7, '顺子里级牌按自然点(key=7)');

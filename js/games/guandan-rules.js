@@ -158,11 +158,7 @@
 
     // 对子
     if (n === 2){
-      if (dc.jokers.length === 2){
-        if (dc.bigJ === 2) return { type:'pair', key:17, len:2 };
-        if (dc.smallJ === 2) return { type:'pair', key:16, len:2 };
-        return null; // 一大一小 不成对
-      }
+      // 王不成对: 双大王/双小王/一大一小都不是对子(主流掼蛋里王只作单张或四大天王)。
       if (dc.jokers.length) return null;
       const ranks = [...dc.natMap.keys()];
       if (ranks.length > 1) return null;
