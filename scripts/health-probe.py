@@ -453,6 +453,19 @@ def probe_cdp():
         except Exception: pass
         return None, {"skip": f"CDP 探测异常 {e}"}
 
+
+def _drop_cold_outliers(vals):
+    """剔除冷加载/初初初期快照异常点：低于中位数 85% 的样本视为探针抓早了，从趋势判断中排除。
+    这样即使个别样本因 CDP 时机波动读出小值，也不会跟稳定平台一起被误判成"连续增长"。"""
+    if not vals: return []
+    s = sorted(vals)
+    n = len(s)
+    med = s[n//2] if n%2 else (s[n//2-1]+s[n//2])/2
+    if not med: return list(vals)
+    thr = med * 0.85
+    return [v for v in vals if v >= thr]
+
+
 def update_trend(http_info, cdp_info, business_info):
     """保留最近 48 个样本；只对连续/趋势异常告警，避免单点网络抖动误报。"""
     issues=[]
@@ -473,12 +486,20 @@ def update_trend(http_info, cdp_info, business_info):
         last3=history[-3:]
         if len(last3)==3 and all((x.get("load_ms") or 0)>10000 for x in last3): issues.append("首屏连续 3 次 load 超过 10 秒（性能持续退化）")
         if len(last3)==3 and all((x.get("index_s") or 0)>6 for x in last3): issues.append("主页连续 3 次响应超过 6 秒（CDN/网络持续变慢）")
-        # 只有样本均有效且连续单调增长、总增幅明显时才告警；单点 heap 不判泄漏。
+        # 只有样本均有效、剔除首屏冷加载异常点后严格单调递增、总增幅明显才告警；单点 heap 不判泄漏。
+        # 8/26 修：旧逻辑用 >= 允许 plateau，[3629,5464,5464,5464,5464,5464] 被误判成“增长”，
+        # 实际上 3629 只是探针恰好在页面 init 中期抓的冷快照。真泄漏是每次样本都比上一次高，不是稳定平台。
         last6=[x for x in history[-6:] if x.get("heap_mb") is not None and x.get("nodes") is not None]
         if len(last6)==6:
             heaps=[x["heap_mb"] for x in last6]; nodes=[x["nodes"] for x in last6]
-            if all(b>=a for a,b in zip(heaps,heaps[1:])) and heaps[-1]-heaps[0]>=30: issues.append(f"JS 堆内存连续增长 {heaps[0]}→{heaps[-1]}MB（疑似内存泄漏）")
-            if all(b>=a for a,b in zip(nodes,nodes[1:])) and nodes[-1]-nodes[0]>=1000: issues.append(f"DOM 节点连续增长 {nodes[0]}→{nodes[-1]}（疑似页面泄漏）")
+            heaps_f=_drop_cold_outliers(heaps)
+            nodes_f=_drop_cold_outliers(nodes)
+            # 堆：至少剩 5 个样本且严格递增
+            if len(heaps_f)>=5 and all(b>a for a,b in zip(heaps_f,heaps_f[1:])) and heaps_f[-1]-heaps_f[0]>=30:
+                issues.append(f"JS 堆内存连续增长 {heaps_f[0]}→{heaps_f[-1]}MB（疑似内存泄漏）")
+            # DOM：同样规则
+            if len(nodes_f)>=5 and all(b>a for a,b in zip(nodes_f,nodes_f[1:])) and nodes_f[-1]-nodes_f[0]>=1000:
+                issues.append(f"DOM 节点连续增长 {nodes_f[0]}→{nodes_f[-1]}（疑似页面泄漏）")
         return issues,{"samples":len(history),"latest":sample}
     except Exception as e:
         return [f"性能趋势记录失败：{e}"],{"error":str(e)}
