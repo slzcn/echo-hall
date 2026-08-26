@@ -27,6 +27,26 @@
   const AI_MIN_MS = 900, AI_JIT_MS = 900;
   const STREET_PAUSE_MS = 650;   // 一街下注结束 → 发下一街前的停顿(让筹码归池动画走完)
 
+  // journey-exempt: 单机德州每日输光上限为新增独立功能(localStorage 计数+封盘页), 需连输 5 局才触发,
+  //   现有 journey harness 无法在一趟内造出 5 次真人输光; 防重入守卫(res._bustCounted)是纯幂等保护, 无跨会话旅程。
+  // ── 单机德州每日输光上限(主人要求): 一天最多输光 5 次, 到顶当天不能再玩, 次日自动重置。
+  //   只约束"单机陪玩"(isLocalSolo): 练习桌无限补带太廉价, 加个每日心跳让输赢有分量。
+  //   联机/客人局不受限(真人对局由房主掌控, 破产另有离桌语义)。存 localStorage, 按本地日期归零。
+  const PK_DAILY_MAX = 5;
+  const PK_DAILY_KEY = 'eh_pk_daily_bust';
+  function pkToday(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+  function pkBustsToday(){
+    try{ const o=JSON.parse(localStorage.getItem(PK_DAILY_KEY)||'null');
+      if(o && o.date===pkToday() && typeof o.n==='number') return o.n; }catch(_){}
+    return 0;
+  }
+  function pkAddBust(){
+    const n = pkBustsToday()+1;
+    try{ localStorage.setItem(PK_DAILY_KEY, JSON.stringify({date:pkToday(), n})); }catch(_){}
+    return n;
+  }
+  function pkLimitReached(){ return pkBustsToday() >= PK_DAILY_MAX; }
+
   const CSS_ID = 'pk-ui-css';
   function injectCSS(){
     if (document.getElementById(CSS_ID)) return;
@@ -235,6 +255,8 @@
 .pk-over.lose h2{color:var(--sub)}
 .pk-over .pk-delta{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
 .pk-over .pk-delta.up{color:var(--accent)}.pk-over .pk-delta.down{color:var(--magenta,#ff2d8e)}
+.pk-over .pk-daily{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--sub,#8fb6b1)}
+.pk-over .pk-daily.cap{color:var(--magenta,#ff2d8e)}
 /* 摊牌行改对齐网格: 标记/名字/底牌/牌型四列跨行对齐(旧的逐行居中会因赢家多个🏆而参差不齐)。 */
 .pk-over .pk-showbox{width:100%;display:flex;justify-content:center;border-top:1px solid var(--line,rgba(0,229,212,.24));padding-top:14px;margin-top:2px}
 .pk-over .pk-showrows{display:inline-grid;grid-template-columns:16px auto auto auto;gap:10px 12px;align-items:center;font-size:12px;color:var(--sub);max-width:100%}
@@ -1181,6 +1203,19 @@
       if (matchOver) over.className = 'pk-over ' + (iBust?'lose':'win');
       else if (iLeaveNow) over.className = 'pk-over lose';
 
+      // 单机真人输光: 计入今日输光次数(res._bustCounted 保证每手只计一次, 防 showOver 重入重复计),
+      //   到每日上限(PK_DAILY_MAX)则不再给"再来一局", 只能收工, 当天封盘。
+      let bustLimit = false;
+      if (iBust){
+        if (!res._bustCounted){ res._bustCounted = true; pkAddBust(); }
+        bustLimit = pkBustsToday() >= PK_DAILY_MAX;
+      }
+      const dailyLine = iBust
+        ? `<div class="pk-daily ${bustLimit?'cap':''}">${bustLimit
+            ? `今日已输光 ${PK_DAILY_MAX} 次 · 明天再战`
+            : `今日第 ${pkBustsToday()}/${PK_DAILY_MAX} 次输光`}</div>`
+        : '';
+
       // 标题/结算数字
       const busted = iBust || iLeaveNow;
       const h2 = (matchOver||iLeaveNow)
@@ -1199,7 +1234,9 @@
         // 客人: 下一手由房主引擎自动连发(非手动门), 文案讲清"自动即将开始"别让人以为要等房主点操作。
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>下一手自动开始…</button>`;
       } else if (matchOver){
-        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
+        footer = (iBust && bustLimit)
+          ? `<button class="pk-b call" id="pkDone">收工</button>`
+          : `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
       } else {
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkAuto" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
@@ -1207,6 +1244,7 @@
         <div class="pk-over-card">
           <h2>${h2}</h2>
           ${subLine}
+          ${dailyLine}
           <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
           ${potsHtml}
           <div class="pk-nets"><div class="pk-nets-t">本桌净盈亏（相对买入）</div>${
@@ -1413,11 +1451,31 @@
     const SUIT_OF = { s:'♠', h:'♥', c:'♣', d:'♦' };
     function idCard(id){ const suit=SUIT_OF[id[0]]; const rank=parseInt(id.slice(1),10); return Engine.pokerCard(rank, suit); }
 
+    // 每日封盘页: 单机今日已输光满 PK_DAILY_MAX 次, 开桌即挡在牌前, 只能收工, 不发牌。
+    function showDailyCap(){
+      clearTimers();
+      const over=document.createElement('div'); over.className='pk-over lose';
+      over.innerHTML=`
+        <div class="pk-over-card">
+          <h2>🛑 今日德州已封盘</h2>
+          <div class="pk-delta down">今天已经输光 ${PK_DAILY_MAX} 次 · 明天再来</div>
+          <div class="pk-daily cap">单机练习每天最多输光 ${PK_DAILY_MAX} 次，手气次日归零</div>
+          <div class="pk-row" style="margin-top:2px"><button class="pk-b call" id="pkDone">收工</button></div>
+        </div>`;
+      els.felt.appendChild(over);
+      sfx('void'); vibrate([90,60,90]);
+      const doneBtn = over.querySelector('#pkDone');
+      if (doneBtn) doneBtn.addEventListener('click', ()=>{ close(); });
+    }
+
     renderAll();
     // 首帧对手位置需等布局稳定
     requestAnimationFrame(positionSeats);
-    // 单机: 开局先走灵魂入座序列, 到齐后 beginFirstHand 发第一手
-    if (introSeating) runSeatingIntro();
+    // 单机今日输光已达上限: 不入座不发牌, 直接封盘页(收工)。否则正常走入座序列。
+    if (isLocalSolo && !lobbyMode && pkLimitReached()){
+      introSeating = false;
+      showDailyCap();
+    } else if (introSeating) runSeatingIntro();
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
