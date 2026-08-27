@@ -21,6 +21,8 @@ const cmp = (a, b) => E.compare(ev(a), ev(b));
 // ── ① 九档牌型识别 ──
 ok(ev('As Ks Qs Js Ts').cat === E.CAT.SF, '皇家同花顺 → 同花顺档');
 ok(ev('As Ks Qs Js Ts').tie[0] === 14, '皇家同花顺 → 高牌 A(14)');
+ok(ev('As Ks Qs Js Ts').name === '皇家同花顺', 'A 高同花顺单独命名为皇家同花顺');
+ok(ev('9s 8s 7s 6s 5s').name === '同花顺', '非 A 高同花顺仍叫同花顺');
 ok(ev('5h 4h 3h 2h Ah').cat === E.CAT.SF && ev('5h 4h 3h 2h Ah').tie[0] === 5, '钢轮 A-2-3-4-5 同花顺 → 高牌 5');
 ok(ev('Ac Ad Ah As Kd').cat === E.CAT.QUADS, '四条识别');
 ok(ev('Ac Ad Ah Ks Kd').cat === E.CAT.FULL, '葫芦识别');

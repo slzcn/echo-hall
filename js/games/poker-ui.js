@@ -139,6 +139,13 @@
 @keyframes pkBlink{50%{opacity:.35}}
 .pk-seat.win .pk-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .pk-btn-d{position:absolute;right:-6px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#fff;color:#111;font-size:10px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.5);z-index:5}
+/* 小盲/大盲席位角标(对标腾讯: 盲位一眼看清)。摆头像左下, 与右下的 D 标错开。SB 蓝、BB 橙。 */
+.pk-btn-bl{position:absolute;left:-6px;bottom:-4px;min-width:18px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:7px;font-size:9px;font-weight:900;letter-spacing:.02em;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.45);z-index:5;white-space:nowrap}
+.pk-btn-bl.sb{background:#4aa3ff;color:#06233f}
+.pk-btn-bl.bb{background:var(--amber,#ffc24d);color:#3a2600}
+.pk-btn-bl.inline{position:static;box-shadow:none}
+/* 翻后实时成手 chip(对标腾讯牌力提示): 我的底牌+公共牌当前最佳成手名, 常驻名字行 */
+.pk-made{font-size:11px;font-weight:800;letter-spacing:.02em;color:var(--accent,#00e5d4);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.28);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .pk-seat .nm{font-size:11px;color:var(--sub);max-width:var(--seatw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-seat.turn .nm{color:var(--accent);font-weight:700}
 .pk-seat .stk{font-size:11px;color:var(--dim,#498d88);font-variant-numeric:tabular-nums}
@@ -587,6 +594,19 @@
       const cls = v>0?'up':(v<0?'down':'zero');
       return `<div class="pk-net ${cls}">本桌 ${v>=0?'+':''}${v}</div>`;
     }
+    // 小盲/大盲席位(与 poker-engine deal 同口径: 2 人时庄=小盲/对家=大盲; 3+ 人时庄+1=小盲、庄+2=大盲)。
+    //   lobby/入座态不显; 结算态仍显(便于回看本手盲位)。返回角标 HTML。
+    function blindSeats(){
+      if (typeof st.button!=='number' || st.phase==='lobby') return {};
+      const b=st.button;
+      return n===2 ? { sb:b, bb:(b+1)%n } : { sb:(b+1)%n, bb:(b+2)%n };
+    }
+    function blindBadge(seat){
+      const bl=blindSeats();
+      if (seat===bl.sb) return '<span class="pk-btn-bl sb">SB</span>';
+      if (seat===bl.bb) return '<span class="pk-btn-bl bb">BB</span>';
+      return '';
+    }
     // ── 招募态座位(椭圆上弧, 与打牌态同 .pk-seat 结构故 positionSeats 直接复用): 空位→「＋ 点击邀请」, 占用→头像/名/角色 + host 可请离(非 0 席) ──
     function lobbySeatHTML(seat){
       const p = st.players[seat];
@@ -655,8 +675,9 @@
         hole = `<div class="pk-mini-hole"></div>`;
       }
       const dbtn = seat===st.button ? `<span class="pk-btn-d">D</span>` : '';
+      const blbtn = blindBadge(seat);
       return `<div class="pk-seat${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}" data-seat="${seat}" style="--p:360">
-        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
+        <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
         ${netPill(seat)}
@@ -866,8 +887,17 @@
       //   等别家行动时(每秒重绘)这些全不变 → 跳过, 免 innerHTML 重建 + 免每帧读牌算 hint。任一变化改签名照常重建。
       let callAmt=-1;
       if (mine){ try{ callAmt = Engine.legalActions(st, mySeat).callAmount; }catch(e){ _ehCatch('poker.legalActions', e); } }
+      const myBlind = blindBadge(mySeat);
+      // 翻后实时成手(对标腾讯"你现在是: 两对"): 公共牌≥3 张且未弃牌时, 用我的底牌+公共牌算当前最佳成手名。
+      let madeStr='';
+      if (!p.folded && Eval && Eval.evaluate && Array.isArray(st.board) && st.board.length>=3
+          && holeCards.length===2 && holeCards[0] && holeCards[1]){
+        try { madeStr = Eval.evaluate(holeCards.concat(st.board)).name; }
+        catch(e){ _ehCatch('poker.madeHand', e); }
+      }
+      const boardSig = Array.isArray(st.board) ? st.board.map(c=>c.id).join('') : '';
       const meSig = st.phase+'|'+(mine?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
-        +'|'+(st.button===mySeat?1:0)+'|'+callAmt+'|'+(dealAnim?1:0)
+        +'|'+(st.button===mySeat?1:0)+'|'+myBlind+'|'+callAmt+'|'+(dealAnim?1:0)+'|'+boardSig+'|'+madeStr
         +'|'+holeCards.map(c=>c?(c.suit+''+c.rank):'x').join(',')
         +'|'+(st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'');
       if (meSig === lastMeSig) return;
@@ -892,7 +922,7 @@
       els.me.innerHTML = `
         <div class="pk-hole">${holeHtml}</div>
         <div class="pk-info">
-          <div class="pk-nmrow"><span class="pk-nm${mine?' turn':''}">${escapeHtml(p.name)}</span><span class="pk-stk">💰 ${p.stack}</span>${st.button===mySeat?'<span class="pk-btn-d" style="position:static;width:16px;height:16px">D</span>':''}<span class="pk-clk" id="pkClk"></span></div>
+          <div class="pk-nmrow"><span class="pk-nm${mine?' turn':''}">${escapeHtml(p.name)}</span><span class="pk-stk">💰 ${p.stack}</span>${st.button===mySeat?'<span class="pk-btn-d" style="position:static;width:16px;height:16px">D</span>':''}${myBlind?myBlind.replace('class="pk-btn-bl','class="pk-btn-bl inline'):''}${madeStr?`<span class="pk-made">${madeStr}</span>`:''}<span class="pk-clk" id="pkClk"></span></div>
           <div class="pk-hint">${hint}</div>
         </div>`;
       dealAnim=false;

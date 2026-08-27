@@ -31,7 +31,7 @@
     return 0;
   }
 
-  function mk(cat, tie){ return { cat, tie, name: CAT_NAME[cat] }; }
+  function mk(cat, tie, name){ return { cat, tie, name: name || CAT_NAME[cat] }; }
 
   // 评估 5~7 张, 返回最优成手牌的 {cat, tie, name}。
   function evaluate(cards){
@@ -48,7 +48,7 @@
     // ① 同花顺: 只在同花那门里找顺
     if (flushSuit){
       const sf = straightHigh(new Set(bySuit[flushSuit]));
-      if (sf) return mk(CAT.SF, [sf]);
+      if (sf) return mk(CAT.SF, [sf], sf === 14 ? '皇家同花顺' : '同花顺');
     }
 
     const ranks = Object.keys(byRank).map(Number);

@@ -1,4 +1,4 @@
-/* 回声厅 Echo Hall — Service Worker v384 (重写)
+/* 回声厅 Echo Hall — Service Worker v385 (重写)
  * 策略:
  *   1. 导航请求(index.html / ver.txt): network-first, 有网必最新, 断网用缓存兜底
  *   2. Supabase 域名(实时/API/存储): network-only, 绝不缓存聊天/身份/配置
@@ -6,7 +6,7 @@
  *   4. 其余同源静态(图标等): stale-while-revalidate
  * 新缓存名 → 换版自动清旧缓存。
  */
-const SW_VERSION = 'eh-sw-v384-20260826-guandan-jokerpair';
+const SW_VERSION = 'eh-sw-v385-20260826-poker-parity';
 const SHELL_CACHE = 'eh-shell-' + SW_VERSION;
 const CDN_CACHE   = 'eh-cdn-' + SW_VERSION;
 // BGM 音频专用持久缓存: 【故意不带 SW_VERSION】—— 音频文件不可变(URL 即内容),
