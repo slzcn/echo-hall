@@ -219,7 +219,20 @@ def probe_business_readonly():
                     if sst not in (200,206) or len(sbytes)<1000 or "audio" not in sctype:
                         issues.append(f"历史生成歌曲不可播放 HTTP={sst} sample={len(sbytes)} type={sctype}")
                 except Exception as e:
-                    info["user_song_audio"]={"error":str(e)}; issues.append(f"历史生成歌曲抽样异常：{e}")
+                    # SSL/TCP握手偶发超时，单次重试：成功则记录抖动，不告警
+                    info["user_song_audio"]={"error":str(e)}
+                    try:
+                        time.sleep(1.5)
+                        sreq2=urllib.request.Request(full+"&retry=1",headers={"Range":"bytes=0-4095","User-Agent":"echo-health/1.0"})
+                        st0=time.time()
+                        with urllib.request.urlopen(sreq2,timeout=TIMEOUT,context=CTX) as sr2:
+                            sst2=sr2.status; sbytes2=sr2.read(4096); sctype2=sr2.headers.get("Content-Type",""); sdt2=time.time()-st0
+                        if sst2 in (200,206) and len(sbytes2)>=1000 and "audio" in sctype2:
+                            info["user_song_audio"]={"http":sst2,"time":round(sdt2,3),"sample_bytes":len(sbytes2),"content_type":sctype2,"recovered":True}
+                        else:
+                            issues.append(f"历史生成歌曲不可播放(retry) HTTP={sst2} sample={len(sbytes2)} type={sctype2}")
+                    except Exception as e2:
+                        issues.append(f"历史生成歌曲抽样异常：{e} | retry: {e2}")
     except Exception as e:
         info["user_songs"]={"error":str(e)}  # 无公开歌曲不告警（空站初期属正常）
     return issues, info
