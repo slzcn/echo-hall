@@ -247,6 +247,13 @@
 .pk-b.raise{background:var(--amber,#ffc24d);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
 .pk-b.raise.allin{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);color:#fff;box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6))}
 .pk-b .bt{font-size:11px;line-height:14px;font-weight:700;opacity:.85;display:block}
+/* 预选(pre-action)条: 提示行 + 三键(默认暗态, 选中 .on 高亮) */
+.pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;min-height:14px}
+.pk-preb{font-size:13px;padding:10px 0}
+.pk-preb:not(.on){background:var(--panel);color:var(--sub);border-color:var(--line2);box-shadow:none}
+.pk-preb.on.fold{background:rgba(255,255,255,.06);color:var(--ink);border-color:var(--line2);box-shadow:inset 0 0 0 1.5px var(--sub)}
+.pk-preb.on:not(.fold):not(.call){background:rgba(0,229,212,.14);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px rgba(0,229,212,.3)}
+.pk-preb.on.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 /* 结算 */
 .pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
@@ -931,6 +938,10 @@
     // ── 操作区 ──
     let raiseTo = 0;
     let awaitingHost = false;
+    // 预选(pre-action): 不是我回合时先勾好意向, 轮到我自动执行并按实况复核。
+    //   仅单机陪玩(isLocalSolo)开放 —— 联机需回传同步, 不在本批范围。
+    //   'checkfold'=过牌/弃牌(总执行) · 'check'=只过牌(有人下注则作废) · 'callany'=跟任意注(无注则过牌)。
+    let preAct = null;   // null | 'checkfold' | 'check' | 'callany'
     // 操作条禁用骨架: 与激活态【同高同结构】——三键禁用 + 滑杆/快捷占位隐藏。中键文案随状态变(等待/已弃牌/已全下/离线/已提交)。
     function actsSkeleton(callLbl){
       return `
@@ -964,6 +975,17 @@
       const mine = !offline && !awaitingHost && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
       // 非本人行动态: 渲染同高禁用骨架(而非清空塌陷), 三键常驻不跳版
       if (!mine){
+        // 预选条: 单机陪玩, 我还在这一手(未弃/未全下)且当前轮到别家 → 让我先勾意向, 到点自动执行。
+        const canPre = isLocalSolo && !offline && !awaitingHost && p && !p.folded && !p.allin
+          && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river')
+          && st.toAct>=0 && st.toAct!==mySeat && p.stack>0;
+        if (canPre){
+          const sig='pre:'+(preAct||'-');
+          if(!force && sig===_lastActsSig) return;
+          _lastActsSig=sig;
+          renderPreActBar();
+          return;
+        }
         let callLbl='等待行动';
         if (offline) callLbl = (connState==='host_offline'?'房主离线':'连接中…');
         else if(awaitingHost) callLbl='已提交 · 等待裁决';
@@ -1030,6 +1052,38 @@
       $('#pkFold').addEventListener('click', ()=>humanAct('fold'));
       $('#pkCall').addEventListener('click', ()=>humanAct(la.canCheck?'check':'call'));
       if(rb) rb.addEventListener('click', ()=>humanAct(la.canBet?'bet':'raise', raiseTo));
+    }
+
+    // 预选条: 与骨架同高(占位滑杆行 + 提示行 + 三键行), 三键为可点开关(再点取消)。
+    function renderPreActBar(){
+      const on = preAct;
+      const btn = (key,label,cls)=>`<button class="pk-b pk-preb${on===key?' on':''}${cls?' '+cls:''}" data-pre="${key}">${label}</button>`;
+      els.acts.innerHTML = `
+        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
+        <div class="pk-prehint">🕒 预选 · 轮到你自动执行</div>
+        <div class="pk-row pk-prerow">
+          ${btn('checkfold','过牌/弃牌','fold')}
+          ${btn('check','过牌')}
+          ${btn('callany','跟任意注','call')}
+        </div>`;
+      els.acts.querySelectorAll('[data-pre]').forEach(b=> b.addEventListener('click', ()=>{
+        const k=b.dataset.pre;
+        preAct = (preAct===k) ? null : k;   // 再点同一个 = 取消预选
+        sfx('cardsel');
+        renderActs(true);
+      }));
+    }
+    // 轮到我: 按【当前】合法动作复核已勾预选并执行, 或因实况变化作废。返回 true=已代打(状态已推进)。
+    function consumePreAction(){
+      const pa = preAct; preAct = null;
+      if (!pa) return false;
+      if (st.toAct!==mySeat || awaitingHost) return false;
+      const la = Engine.legalActions(st, mySeat);
+      if (!la || la.toAct!==mySeat) return false;
+      if (pa==='checkfold'){ humanAct(la.canCheck?'check':'fold'); return true; }
+      if (pa==='check'){ if (la.canCheck){ humanAct('check'); return true; } toast('有人下注 · 预选「过牌」已取消'); return false; }
+      if (pa==='callany'){ humanAct(la.canCheck?'check':'call'); return true; }
+      return false;
     }
 
     function humanAct(action, amount){
@@ -1107,6 +1161,8 @@
       const seat=st.toAct;
       if (seat<0 || !st.players[seat]) { turnSeatActive=-1; return; }
       const mine = seat===mySeat;
+      // 轮到我且有预选: 先按实况复核执行/作废。执行成功则状态已推进(afterAction→renderAll→armTurn 重入), 中止本次。
+      if (mine && preAct){ if (consumePreAction()) return; }
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
       // 谁来推进这一步: 我(本地/relay) · AI(本机决策) · 远程真人(等回传, host 侧兜底代打) · guest 观战他人(静态)
@@ -1362,7 +1418,7 @@
       button = (button+1)%n;
       handNo++;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
       if (aliveSeats().length<2){}   // newHand 已兜底重新带入
@@ -1376,7 +1432,7 @@
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -1407,7 +1463,7 @@
       stacks = names.map(()=>START);
       for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; }
       handNo = 0; button = 0; pendingRoster = null;
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       st = newHand(seed);
       sfx('deal');
       renderAll(); positionSeats();
@@ -1438,7 +1494,7 @@
       if (!room.isConnected) return;
       introSeating = false; arrived = null; lastSeated = -1;
       st = newHand();
-      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
+      lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -1470,7 +1526,7 @@
       lastSnap = snap; handNo = snap.handNo || 0;
       if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补
         const ov=els.felt.querySelector('.pk-over'); if(ov) ov.remove();
-        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
+        lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       }
       rebuildFromSnap(snap);
       if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();
