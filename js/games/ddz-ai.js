@@ -54,6 +54,16 @@
     return want;
   }
 
+  // ── 加倍决策(仅本地单机加倍局) ──────────────────────────────
+  // 返回加倍系数 ∈ {1(不加倍),2(加倍)}。AI 只保守到 2 倍(不玩超级加倍 4), 避免 AI 无脑放大波动。
+  // 判据: 手牌强度过阈值才加倍。地主此刻已并入底牌(20 张)故阈值抬高; 农民 17 张阈值低些。
+  //   isLandlord: 该家是不是地主。
+  function chooseDouble(hand, isLandlord){
+    const s = scoreHand(hand);
+    const gate = isLandlord ? 13 : 8;
+    return s >= gate ? 2 : 1;
+  }
+
   // ── 候选牌型枚举 ────────────────────────────────────────────
   // 找出手牌里所有「单/对/三/炸/王炸」的基础组,按点从小到大。
   function enumBasics(hand){
@@ -556,7 +566,7 @@
   }
 
   return {
-    scoreHand, chooseBid, decide,
+    scoreHand, chooseBid, chooseDouble, decide,
     // 暴露供单测
     candidates, enumBasics, findChains, chooseLead, hints,
   };

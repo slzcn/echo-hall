@@ -53,7 +53,10 @@
       multiplier: 1,
       bombs: 0,
       base: opts.base || 1,       // 底分
-      log: [{ t:'deal', seed: deal.seed, firstBid }],
+      // 加倍系统: 仅本地单机(对标欢乐斗地主)开启。默认关 → 联机/引擎测试/回看旅程全走经典流程不受影响。
+      doubling: !!opts.doubling,
+      dbl: null,                  // {turn, order:[seat...], choices:{seat:factor}} —— 仅 doubling 局在 double 阶段有值
+      log: [{ t:'deal', seed: deal.seed, firstBid, doubling: !!opts.doubling }],
       result: null,
     };
   }
@@ -111,12 +114,44 @@
     const lord = state.players[seat];
     lord.hand = Deck.sortHand(lord.hand.concat(state.bottom));
     state.multiplier = Math.max(1, state.bid.max) ; // 叫分即初始倍数
-    state.phase = 'play';
-    state.turn = seat;                 // 地主先出
     state.table.lastPlay = null;
     state.table.passesInRow = 0;
     state.log.push({ t:'landlord', seat, bottom: state.bottom.map(c=>c.id), multiplier: state.multiplier });
+    if (state.doubling){
+      // 加倍轮(对标欢乐斗地主定地主后那一屏): 地主先决定, 再两农民按座位轮转; 全选完才进 play。
+      state.phase = 'double';
+      state.dbl = { turn: seat, order: [seat, nextSeat(seat), nextSeat(nextSeat(seat))], choices: {} };
+      state.turn = seat;
+    } else {
+      state.phase = 'play';
+      state.turn = seat;                 // 地主先出
+    }
     return { ok:true, landlord: seat };
+  }
+
+  // ── 加倍(仅 doubling 局有此阶段, 定地主后出牌前) ─────────────
+  // factor ∈ {1(不加倍),2(加倍),4(超级加倍)}。各家独立决定, 按 dbl.order 轮转; 全选完进 play。
+  // 结算时每个农民与地主这一对的赌注各自乘上双方系数(见 _settle), 零和不破。
+  function applyDouble(state, seat, factor){
+    if (state.phase !== 'double') throw new Error('not_double_phase');
+    if (!state.dbl) throw new Error('no_double_state');
+    if (seat !== state.dbl.turn) throw new Error('not_your_double_turn');
+    if (![1,2,4].includes(factor)) throw new Error('bad_double');
+    if (state.dbl.choices[seat] != null) throw new Error('already_doubled');
+    state.dbl.choices[seat] = factor;
+    state.log.push({ t:'double', seat, factor });
+    const order = state.dbl.order;
+    const idx = order.indexOf(seat);
+    if (idx < order.length - 1){
+      state.dbl.turn = order[idx + 1];
+      state.turn = state.dbl.turn;
+      return { ok:true };
+    }
+    // 三家都定了 → 进入出牌, 地主先出
+    state.phase = 'play';
+    state.turn = state.landlord;
+    state.dbl.turn = null;
+    return { ok:true, doubleDone:true };
   }
 
   // ── 出牌 / 过 ──────────────────────────────────────────────
@@ -204,12 +239,20 @@
     const finalMult = state.multiplier * springMult;
     const score = state.base * finalMult;
 
-    // 地主赢:地主 +2*score,两农民各 -score;地主输反之。
+    // 加倍系数(仅本地 doubling 局有值; 无加倍时各家=1, 退化为经典 ±2s/∓s):
+    //   每个农民与地主【这一对】的赌注 = score × 地主系数 × 该农民系数 (双方各自加倍独立相乘)。
+    //   地主账变 = 各农民对的输赢之和; 每农民账变 = 自己那一对。 → 恒零和, 与无加倍不变式兼容。
+    const dbl = (state.dbl && state.dbl.choices) ? state.dbl.choices : {};
+    const dL = dbl[lord] || 1;
     const delta = {}; // seat → 分
+    let lordDelta = 0;
     for (const pl of state.players){
-      if (pl.seat === lord) delta[pl.seat] = landlordWon ? +2*score : -2*score;
-      else delta[pl.seat] = landlordWon ? -score : +score;
+      if (pl.seat === lord) continue;
+      const amt = score * dL * (dbl[pl.seat] || 1);   // 该农民与地主这一对的赌注
+      delta[pl.seat] = landlordWon ? -amt : +amt;
+      lordDelta += landlordWon ? +amt : -amt;
     }
+    delta[lord] = lordDelta;
     const winners = state.players.filter(p => landlordWon ? p.seat===lord : p.seat!==lord).map(p=>p.seat);
     const losers  = state.players.filter(p => landlordWon ? p.seat!==lord : p.seat===lord).map(p=>p.seat);
     // 残局:终局时各家剩牌(赢家为空)。对标腾讯斗地主"亮残牌"。只在 result 里出现(局中永不下发) →
@@ -221,6 +264,7 @@
       landlord: lord, landlordWon, winnerSeat,
       base: state.base, multiplier: state.multiplier, spring: springMult>1,
       finalMultiplier: finalMult, score, delta, winners, losers, bombs: state.bombs, reveal,
+      doubles: Object.assign({}, dbl),   // 各家加倍系数(展示用; 无加倍局为空对象)
     };
     state.log.push({ t:'over', ...state.result });
     return { ok:true, over:true, result: state.result };
@@ -231,11 +275,12 @@
   function replay(log, opts){
     const dealE = log.find(e=>e.t==='deal');
     if (!dealE) throw new Error('no_deal');
-    const st = createGame(Object.assign({ seed: dealE.seed, firstBidSeat: dealE.firstBid }, opts||{}));
+    const st = createGame(Object.assign({ seed: dealE.seed, firstBidSeat: dealE.firstBid, doubling: !!dealE.doubling }, opts||{}));
     // 重放时不再走随机,严格按 log
     for (const e of log){
       if (e.t === 'call') applyCall(st, e.seat, e.val);
       else if (e.t === 'landlord') { /* 由 applyCall 内部触发,无需重放 */ }
+      else if (e.t === 'double') applyDouble(st, e.seat, e.factor);
       else if (e.t === 'play') {
         const hand = handOf(st, e.seat);
         const cards = e.cards.map(id => hand.find(h=>h.id===id)).filter(Boolean);
@@ -247,7 +292,7 @@
   }
 
   return {
-    createGame, applyCall, applyPlay, applyPass, replay,
+    createGame, applyCall, applyDouble, applyPlay, applyPass, replay,
     // 工具
     nextSeat, handOf,
   };

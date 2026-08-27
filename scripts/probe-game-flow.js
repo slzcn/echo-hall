@@ -74,13 +74,17 @@ async function runGame(page, ids, maxMs){
 
         // 驱动我的座位 (德州用 toAct, 斗地主/掼蛋用 turn/bid.turn)
         const pokerTurn = st.toAct===0 && ['preflop','flop','turn','river'].includes(ph);
-        const mine = (ph==='bid' && st.bid && st.bid.turn===0) || (ph==='play' && st.turn===0) || pokerTurn;
+        const myDouble = ph==='double' && st.dbl && st.dbl.turn===0;   // 斗地主本地加倍轮轮到我
+        const mine = (ph==='bid' && st.bid && st.bid.turn===0) || (ph==='play' && st.turn===0) || myDouble || pokerTurn;
         if(mine){
           if(!myStuckSince) myStuckSince=performance.now();
           if(ph==='bid'){
             // 叫最高可用分(抢地主, 快速定庄)
             let did=false;
             for(const v of [3,2,1,0]){ if(click(`[data-bid="${v}"]`)){ did=true; break; } }
+          } else if(myDouble){
+            // 加倍轮: 快速点"不加倍"推进(探针只验流程不卡在加倍屏)
+            if(!click('[data-dbl="1"]')) click('[data-dbl="2"]');
           } else if(pokerTurn){
             // 德州: 一律 check/call 快速推进(#pkCall = check 或 call)
             if(!click(ids.play)) click(ids.pass);

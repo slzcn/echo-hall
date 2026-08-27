@@ -266,6 +266,7 @@
 .ddz-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .ddz-btn.ghost{background:transparent;color:var(--sub)}
 .ddz-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
+.ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
 .ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
 /* 叫地主浮条 */
 .ddz-bidbar{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -434,6 +435,9 @@
     //   由 host 每次广播时重写各远程席私牌行 —— 快照永不带 seed/log/别家手牌/定地主前的底牌。
     const mode = opts.mode || 'local';
     const isGuest = mode === 'guest';
+    // 加倍系统只在本地单机(对标欢乐斗地主)开启: 定地主后插一屏加倍轮。联机(host/guest)不启用,
+    // 引擎默认关 → 联机快照/结算完全走经典路径, ddz-net 一行不动(见 ddz-engine.js opts.doubling)。
+    const DOUBLING = (mode === 'local');
     let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
     // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
@@ -450,7 +454,7 @@
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打
 
-    function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed }); }
+    function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed, doubling: DOUBLING }); }
     // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
     function waitingState(){
       return { phase:'wait', seed:undefined, turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
@@ -842,7 +846,11 @@
       return lp.seat + ':' + lp.cards.join(',');
     }
     function renderTable(){
-      els.mult.textContent = `底分 ${st.base||1} · ×${st.multiplier}`;
+      // 倍数条: 底分×桌面倍数(叫分×炸弹); 本地加倍局若我已选加倍, 追加"我×N"(加倍是按家独立系数, 无全局单一倍数)
+      let multTxt = `底分 ${st.base||1} · ×${st.multiplier}`;
+      const myF = (st.dbl && st.dbl.choices && st.dbl.choices[mySeat]) || 1;
+      if (myF > 1) multTxt += ` · 我×${myF}`;
+      els.mult.textContent = multTxt;
       const lp = st.table.lastPlay;
       const key = playKey();
       const changed = key !== lastShownKey;
@@ -976,24 +984,25 @@
       const b = els.banner; const cp = connPill();
       if (st.phase==='over'){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
       if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀请，满意点「开始」'; return; }
-      if (st.phase!=='bid' && st.phase!=='play'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
+      if (st.phase!=='bid' && st.phase!=='play' && st.phase!=='double'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
       if (isGuest && awaitingHost){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 已提交 · 等待裁决…'; return; }
-      const seat = st.phase==='bid' ? st.bid.turn : st.turn;
+      const seat = st.phase==='bid' ? st.bid.turn : (st.phase==='double' ? (st.dbl&&st.dbl.turn) : st.turn);
       const mine = seat===mySeat;
-      const verb = st.phase==='bid' ? '叫分' : '出牌';
+      const verb = st.phase==='bid' ? '叫分' : (st.phase==='double' ? '加倍' : '出牌');
       if (mine){
         b.className = 'ddz-turnbanner mine';
         b.innerHTML = cp + `🫵 轮到你${verb} <span class="clk" id="ddzClk"></span>`;
       } else {
+        const thinking = st.phase==='bid'?'思考叫分':(st.phase==='double'?'斟酌加倍':'思考出牌');
         b.className = 'ddz-turnbanner';
-        b.innerHTML = cp + `${escapeHtml(st.players[seat].name)} ${st.phase==='bid'?'思考叫分':'思考出牌'}中… <span class="clk" id="ddzClk"></span>`;
+        b.innerHTML = cp + `${escapeHtml(st.players[seat].name)} ${thinking}中… <span class="clk" id="ddzClk"></span>`;
       }
     }
     // 倒计时环:驱动当前活动座位的 conic 环 + 横幅秒数; 到点跑 onExpire(仅人类)
     function armTurn(onExpire){
       clearTimers();
-      if (st.phase!=='bid' && st.phase!=='play') { turnSeatActive=-1; turnPhaseActive=''; return; }   // over/wait: 不武装倒计时
-      const seat = st.phase==='bid' ? st.bid.turn : st.turn;
+      if (st.phase!=='bid' && st.phase!=='play' && st.phase!=='double') { turnSeatActive=-1; turnPhaseActive=''; return; }   // over/wait/lobby: 不武装倒计时
+      const seat = st.phase==='bid' ? st.bid.turn : (st.phase==='double' ? (st.dbl&&st.dbl.turn) : st.turn);
       if (seat==null || seat<0) { turnSeatActive=-1; return; }
       const mine = seat===mySeat;
       if (isGuest && awaitingHost) return;   // guest 回传后等 host 裁决, 不跑倒计时
@@ -1008,7 +1017,7 @@
       if (turnChanged){
         // guest 端 remoteSeats 恒空(host-only), 对手会落到 AI-思考短时长→"1 秒跑完卡 0"; guest 无裁判职责,
         //   对手倒计时纯展示 → 给足人类时长, 视觉上正常走(真实超时判定在 host)。
-        turnDur = mine ? (st.phase==='bid'?HUMAN_BID_MS:HUMAN_PLAY_MS)
+        turnDur = mine ? ((st.phase==='bid'||st.phase==='double')?HUMAN_BID_MS:HUMAN_PLAY_MS)
                 : isGuest ? HUMAN_PLAY_MS
                 : remote ? REMOTE_TIMEOUT_MS
                 : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
@@ -1114,12 +1123,28 @@
                       : (st.bid.turn !== mySeat) ? ('等待 ' + escapeHtml(st.players[st.bid.turn].name) + ' 叫分…')
                       : null;
         renderBidBar(waiting);
+      } else if (st.phase === 'double'){
+        renderDoubleBar();
       } else if (st.phase === 'play'){
         if (isGuest && awaitingHost){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>⏳ 等待裁决…</button></div>`; return; }
         renderActBar();
       } else {
         els.ctrl.innerHTML = '';
       }
+    }
+    // ── 加倍轮(仅本地单机): 不加倍 ×1 / 加倍 ×2 / 超级加倍 ×4。轮到别家时占位不空行(与叫分同构, 防整桌上下跳) ──
+    function renderDoubleBar(){
+      const myTurn = st.dbl && st.dbl.turn === mySeat;
+      const iAmLord = mySeat === st.landlord;
+      const opts2 = [ {f:1,t:'不加倍',c:''}, {f:2,t:'加倍 ×2',c:'primary'}, {f:4,t:'超级加倍 ×4',c:'danger'} ]
+        .map(o=>`<button class="ddz-btn ${o.c}" data-dbl="${o.f}">${o.t}</button>`).join('');
+      const who = (st.dbl && st.dbl.turn!=null && st.players[st.dbl.turn]) ? st.players[st.dbl.turn].name : '';
+      const q = myTurn ? (iAmLord?'你是地主，要不要加倍下注？':'要不要给地主加点彩头？')
+                       : ('等待 ' + escapeHtml(who) + ' 加倍…');
+      els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div><div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
+      if (myTurn) els.ctrl.querySelectorAll('[data-dbl]').forEach(b=>{
+        b.addEventListener('click', ()=>doDouble(mySeat, +b.dataset.dbl));
+      });
     }
     function renderBidBar(waitingMsg){
       const max = st.bid.max;
@@ -1311,9 +1336,21 @@
       }
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names,doubling:DOUBLING}); dealNo++; selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
       bidVisual(seat, val, prevMax);   // 印章画在重绘后的座位上, 不被 renderSeats 清掉
+    }
+    // ── 加倍(仅本地单机: 定地主后 double 阶段, 各家 不加倍×1 / 加倍×2 / 超级加倍×4) ──
+    function doDouble(seat, factor){
+      try { var r = Engine.applyDouble(st, seat, factor); }
+      catch(e){ toast('现在不能加倍'); return; }
+      // 印章 + 台词: 复用叫分那套视觉锚点(印章画在重绘后的座位上)
+      renderAll();
+      const lbl = factor===4 ? '超级加倍' : (factor===2 ? '加倍' : '不加倍');
+      bidStamp(seat, factor>1?'rob':'pass', lbl);
+      say(seat, lbl+'！'); sayOp(seat, lbl);
+      if (factor>1) sfx('landlord'); else sfx('pass');
+      if (r && r.doubleDone){ sfx('deal'); }   // 加倍轮收尾, 进入出牌
     }
     function doPlay(){
       const cards = [...selected].map(findCardById).filter(Boolean);
@@ -1373,6 +1410,11 @@
         doCall(seat, AI.chooseBid(st.players[seat].hand, st.bid.max));
         return;
       }
+      if (st.phase === 'double'){
+        if (!st.dbl || st.dbl.turn !== seat) return;
+        doDouble(seat, AI.chooseDouble(st.players[seat].hand, seat===st.landlord));
+        return;
+      }
       if (st.phase !== 'play' || st.turn !== seat) return;
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==seat) ? st.table.lastPlay.parse : null;
       const mv = AI.decide({ seat, hand: st.players[seat].hand, tableParse: target,
@@ -1395,6 +1437,7 @@
     // ── 人类超时兜底(与断线托管同一逻辑) ──
     function onHumanTimeout(){
       if (st.phase==='bid' && st.bid.turn===mySeat){ toast('超时 · 自动不叫'); doCall(mySeat, 0); return; }
+      if (st.phase==='double' && st.dbl && st.dbl.turn===mySeat){ toast('超时 · 自动不加倍'); doDouble(mySeat, 1); return; }
       if (st.phase==='play' && st.turn===mySeat){
         const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
         if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); return; }
@@ -1418,6 +1461,12 @@
       const over = document.createElement('div');
       over.className = 'ddz-over ' + (iWon?'win':'lose');
       const roleTxt = st.landlord===mySeat ? '地主' : '农民';
+      // 加倍摘要(仅本地加倍局有 doubles 且有人 >1): 列出各家加倍系数, 让玩家看懂账变为何被放大
+      const dbls = res.doubles || {};
+      const anyDbl = Object.keys(dbls).some(k=>dbls[k]>1);
+      const dblTxt = anyDbl ? ('<br>加倍 · ' + st.players.map(p=>{
+        const f = dbls[p.seat]||1; return `${escapeHtml(p.name)}${p.seat===st.landlord?'(地主)':''}×${f}`;
+      }).join(' ')) : '';
       // 本桌累计块: 逐席列名字(含地主标)+ 累计分, 正分暖色 / 负分品红
       const cumBox = `<div class="ddz-cumbox"><div class="cum-ttl">本桌累计</div>${
         st.players.map(p=>{
@@ -1430,7 +1479,7 @@
       over.innerHTML = `
         <div class="ddz-over-card">
           <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
-          <div class="sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''}<br>底分 ${res.base} × 倍数 ${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}</div>
+          <div class="sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''}<br>底分 ${res.base} × 倍数 ${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}${dblTxt}</div>
           <div class="ddz-remains" id="ddzRemains"></div>
           <div class="score">${(res.delta[mySeat]>=0?'+':'')}${res.delta[mySeat]} 分</div>
           ${cumBox}
@@ -1472,7 +1521,7 @@
           // 丝滑过渡(对标腾讯): 结算面板先淡出下沉 ~.34s, 再拆掉重建新局 → 顺势接发牌入场动画, 不再"啪"地跳切。
           showOver._done=false;
           over.classList.add('out');
-          const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
+          const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names,doubling:DOUBLING}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
           let done=false; const once=()=>{ if(done) return; done=true; go(); };
           over.addEventListener('animationend', once, { once:true });
           setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
