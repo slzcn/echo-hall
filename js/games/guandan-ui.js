@@ -1036,7 +1036,12 @@
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
         return [top, bot];
       }
-      return [[], Rules.sortHand(hand, st.level)];
+      // 完全参考腾讯欢乐掼蛋: 逢人配(百搭=♥级牌)单拎到手牌最前醒目单列, 其余仍按点力降序。
+      //   (cardEl 已给百搭 .wild 品红光晕 + "配"角标; 此处只补它在腾讯里被单列到一端的【位置】。)
+      const sorted = Rules.sortHand(hand, st.level);
+      const wild = [], rest = [];
+      for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
+      return [[], wild.concat(rest)];
     }
     let lastHandSig = '', lastSelSig = '';
     function renderHand(){
