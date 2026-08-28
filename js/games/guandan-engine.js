@@ -62,7 +62,10 @@
     // 首出席: 首局默认 0(人先手); 有上局结果则走进贡流程定首出
     let leadSeat = (typeof opts.firstLead === 'number') ? opts.firstLead : 0;
     if (opts.prevResult && !opts.skipTribute){
-      leadSeat = _resolveTribute(state, opts.prevResult);
+      // manualTribute(仅单机陪玩开): 进入 tribute 阶段逐张选牌; 否则(联机/测试)一次性自动结算
+      leadSeat = opts.manualTribute
+        ? _setupManualTribute(state, opts.prevResult)
+        : _resolveTribute(state, opts.prevResult);
     }
     state.turn = leadSeat;
     return state;
@@ -115,6 +118,83 @@
     state.tribute = { refused:false, doubleDown, transfers };
     // 首出: 双下时贡给头游那家(4th)先出; 单下时 loserLow 先出
     return doubleDown ? order[3] : loserLow;
+  }
+
+  // ── 手动进贡/还贡(仅单机陪玩): 建待办任务, 逐张由 applyTribute 推进(人/AI 共用) ──
+  //   任务顺序: 先所有【进贡】(输家→赢家, 必为最大牌), 再所有【还贡】(赢家→输家, ≤10 点)。
+  //   抗贡(输方双大王)与自动路径同判, 直接开打不进 tribute 阶段。
+  function _setupManualTribute(state, prev){
+    const order = prev.finishOrder;
+    const first = order[0], second = order[1];
+    const winnerTeam = teamOf(first);
+    const doubleDown = teamOf(second) === winnerTeam;
+    const losers = order.filter(s => teamOf(s) !== winnerTeam);
+    const loserLow = losers.slice(-1)[0];
+    const bigJokersInLosers = losers.reduce((n,s)=> n + state.players[s].hand.filter(c=>c.joker==='big').length, 0);
+    if (bigJokersInLosers >= 2){
+      state.tribute = { refused:true, doubleDown, pairs:[] };
+      state.log.push({ t:'antigong', losers });
+      state.phase = 'play';
+      return first;
+    }
+    const pairs = doubleDown
+      ? [{ from: order[3], to: first }, { from: order[2], to: second }]
+      : [{ from: loserLow, to: first }];
+    const tasks = [];
+    for (const pr of pairs) tasks.push({ kind:'give',   from: pr.from, to: pr.to });
+    for (const pr of pairs) tasks.push({ kind:'return', from: pr.to,   to: pr.from });
+    const lead = doubleDown ? order[3] : loserLow;
+    state.tributePending = { tasks, idx:0, lead, doubleDown, transfers:[] };
+    state.phase = 'tribute';
+    return tasks[0].from;
+  }
+  // 当前进贡任务的合法候选牌 id: 进贡=powerOf 最大的非百搭牌(常 1 张, 顶点成对则多张任选);
+  //   还贡=自然点 ≤10 的非百搭牌(无则退化为任意非百搭)。
+  function tributeCandidates(state, seat){
+    if (state.phase !== 'tribute' || !state.tributePending) return [];
+    const tp = state.tributePending;
+    const task = tp.tasks[tp.idx];
+    if (!task || task.from !== seat) return [];
+    const hand = state.players[seat].hand;
+    if (task.kind === 'give'){
+      let maxp = -1;
+      for (const c of hand){ if (Rules.isWild(c, state.level)) continue; const p = Rules.powerOf(c, state.level); if (p > maxp) maxp = p; }
+      const out = hand.filter(c => !Rules.isWild(c, state.level) && Rules.powerOf(c, state.level) === maxp).map(c=>c.id);
+      return out.length ? out : hand.map(c=>c.id);
+    }
+    const legal = hand.filter(c => !c.joker && !Rules.isWild(c, state.level) && Rules.naturalRank(c) <= 10);
+    const pool = legal.length ? legal : hand.filter(c => !Rules.isWild(c, state.level));
+    return (pool.length ? pool : hand).map(c=>c.id);
+  }
+  // 执行一步进贡/还贡。校验座位与候选合法性; 全部完成 → 落 state.tribute + 转 play + 定首出。
+  function applyTribute(state, seat, cardId){
+    if (state.phase !== 'tribute') throw new Error('not_tribute_phase');
+    const tp = state.tributePending;
+    if (!tp) throw new Error('no_tribute_state');
+    const task = tp.tasks[tp.idx];
+    if (!task) throw new Error('tribute_done');
+    if (seat !== task.from) throw new Error('not_your_tribute_turn');
+    const cands = tributeCandidates(state, seat);
+    if (!cands.includes(cardId)) throw new Error('illegal_tribute_card');
+    _move(state, task.from, task.to, cardId);
+    if (task.kind === 'give'){
+      tp.transfers.push({ from: task.from, to: task.to, give: cardId, back: null });
+      state.log.push({ t:'tribute', from: task.from, to: task.to, give: cardId });
+    } else {
+      const tr = tp.transfers.find(t => t.from === task.to && t.to === task.from);
+      if (tr) tr.back = cardId;
+      state.log.push({ t:'return', from: task.from, to: task.to, card: cardId });
+    }
+    tp.idx++;
+    if (tp.idx >= tp.tasks.length){
+      state.tribute = { refused:false, doubleDown: tp.doubleDown, transfers: tp.transfers };
+      state.phase = 'play';
+      state.turn = tp.lead;
+      state.tributePending = null;
+      return { ok:true, tributeDone:true, lead: tp.lead };
+    }
+    state.turn = tp.tasks[tp.idx].from;
+    return { ok:true, turn: state.turn, next: tp.tasks[tp.idx] };
   }
   function _biggestCard(hand, level){
     let best = null, bp = -1;
@@ -300,7 +380,8 @@
 
   return {
     createGame, applyPlay, applyPass, replay,
+    applyTribute, tributeCandidates,
     teamOf, partnerOf, nextActive, activeCount,
-    _resolveTribute, _move,   // 供单测
+    _resolveTribute, _setupManualTribute, _move,   // 供单测
   };
 });

@@ -176,6 +176,12 @@
 .gd-tribute .th{font-size:12px;font-weight:800;color:var(--amber);letter-spacing:.08em}
 .gd-tribute .tl{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:center}
 .gd-tribute .tb-back{opacity:.82}
+/* 手动进贡/还贡: 操作条提示 + 手牌候选高亮 */
+.gd-trib-hint{text-align:center;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:6px 14px 0}
+.gd-hand.tribute .card{transition:opacity .18s,transform .18s}
+.gd-hand.tribute .card.tribute-dim{opacity:.34;filter:grayscale(.5)}
+.gd-hand.tribute .card.tribute-cand{box-shadow:0 0 0 2px var(--amber,#ffc24d),0 0 12px rgba(255,194,77,.5)}
+.gd-hand.tribute .card.tribute-cand.sel{transform:translateY(-16px);box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 2px var(--amber,#ffc24d),0 0 18px rgba(255,194,77,.7);z-index:2}
 /* 接风横幅: 队友接出下一手时轻提示(比炸弹 boom 收敛, 不震屏) */
 .gd-jiefeng{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:24px;font-weight:800;letter-spacing:.08em;
   color:var(--accent,#2fe0c8);text-shadow:0 0 14px rgba(47,224,200,.55);pointer-events:none;z-index:6;animation:gdJiefeng 1.5s ease-out forwards}
@@ -443,6 +449,13 @@
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复出牌
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打(不出/领出)
 
+    // ── 手动进贡/还贡(仅纯单机陪玩开): 无任何联网(非 guest、无 onSync 广播、无远程真人席)时,
+    //   进贡/还贡由玩家逐张选牌(对标欢乐掼蛋"选牌进贡"); 一旦联机(host/guest)则走引擎一次性自动
+    //   结算(state.phase 恒为 play), 避免 host↔guest 因多一个 tribute 阶段而失步。remoteSeats 在
+    //   lobby 转正时才 push, 故用函数每次求值(construction 时可能还空)。
+    function manualTribute(){ return !isGuest && !onSync && remoteSeats.length === 0; }
+    let tributeSel = null;   // 手动进贡: 当前选中待提交的候选牌 id(单选)
+
     // ── 招募态(就地牌桌 lobby): host 开桌先挂真牌桌的招募占位局, 点空位邀灵魂/真人, 满意点开始 → startDeal 就地转正局 ──
     const lobbyMode = !!opts.lobby;
     const isHostLobby = !!opts.isHost;
@@ -454,7 +467,7 @@
     function newDeal(){
       return Engine.createGame({ isAI: seatIsAI, names,
         teamLevels: matchLevels, dealerTeam: matchDealer,
-        level: matchLevels[matchDealer], prevResult,
+        level: matchLevels[matchDealer], prevResult, manualTribute: manualTribute(),
         seed: (prevResult ? undefined : opts.seed) });
     }
     // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
@@ -489,7 +502,7 @@
     let lastSelTick = 0;
     sfx('arrive'); if(!isGuest && !lobbyMode) sfx('deal');   // guest 未拿到手牌前不响发牌音; 招募态未发牌不响
 
-    let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0, turnSeatActive=-1;
+    let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0, turnSeatActive=-1, tributeTimer=null;
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
     const room = document.createElement('div'); room.className='gd-room';
@@ -571,7 +584,7 @@
     }
     // 操作语音(不出/进贡等): 与报牌型同音色, 让每一步动作都出声。
     function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
-    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} }
+    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(tributeTimer){clearTimeout(tributeTimer);tributeTimer=null;} }
     // resize rAF 节流: 旋转/移动端地址栏收放连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
@@ -675,6 +688,7 @@
       if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
     }
     els.hand.addEventListener('pointerdown', (e)=>{
+      if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
       if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
       if(st.phase!=='play' || st.turn!==mySeat) return;
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
@@ -955,10 +969,11 @@
     function renderHand(){
       if (st.phase==='lobby'){ els.hand.innerHTML=''; return; }
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
+      const myTribute = myTributeTurn();   // 进贡阶段: 候选牌高亮(build 后 markTribute 补类)
       const [top, bot] = orderedRows();
       // 增量护栏(同斗地主): 手牌结构(两排 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
       //   免每秒一次重绘的 innerHTML churn + 两排 layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
-      const structSig = (myTurn?1:0)+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
+      const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
         + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
       if (structSig === lastHandSig){
@@ -970,7 +985,7 @@
         return;
       }
       lastHandSig = structSig; lastSelSig = selSig;
-      els.hand.className='gd-hand'+(myTurn||arrangeMode?'':' locked')+(arrangeMode?' arranging':'');
+      els.hand.className='gd-hand'+(myTurn||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
       const rowTop = document.createElement('div'); rowTop.className='gd-hand-row top'; rowTop.dataset.row='0';
@@ -986,7 +1001,17 @@
           container.appendChild(el);
         });
       });
+      if (myTribute) markTribute();
       layoutHand();
+    }
+    // 进贡阶段: 给手牌标候选(可选高亮)/非候选(置暗)/当前选中, 供 tributeTap 单选。放在 build 后单独一趟, 免撑大 renderHand 主体。
+    function markTribute(){
+      const cands = myTribCands();
+      els.hand.querySelectorAll('.card').forEach(el=>{
+        const id = el.dataset.id;
+        el.classList.add(cands.has(id) ? 'tribute-cand' : 'tribute-dim');
+        el.classList.toggle('sel', tributeSel===id);
+      });
     }
     // 手牌自适应: 每排各自动态收紧叠放, 永远吃满一行不换行(对标大厂手牌扇)。两排各自算步距。
     function layoutRow(container){
@@ -1008,6 +1033,12 @@
       const b=els.banner; const cp=connPill();
       if (st.phase==='lobby'){ b.className='gd-banner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂或真人入座'; return; }
       if (st.phase==='over'){ b.className='gd-banner'; b.innerHTML=cp; return; }
+      if (st.phase==='tribute'){
+        const seat=st.turn, lbl=tributeTaskKind()==='return'?'还贡':'进贡';
+        if (seat===mySeat && manualTribute()){ b.className='gd-banner mine'; b.innerHTML=cp+`🎁 轮到你${lbl} <span class="clk" id="gdClk"></span>`; }
+        else { b.className='gd-banner'; b.innerHTML=cp+(st.players[seat]?escapeHtml(st.players[seat].name):'对手')+` ${lbl}中… <span class="clk" id="gdClk"></span>`; }
+        return;
+      }
       if (st.phase!=='play' || st.turn<0){ b.className='gd-banner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
       if (isGuest && awaitingHost){ b.className='gd-banner'; b.innerHTML=cp+'⏳ 已出牌 · 等待裁决…'; return; }
       const seat=st.turn, mine=seat===mySeat;
@@ -1017,6 +1048,7 @@
     function seatOf(seat){ return room.querySelector(`.gd-seat[data-seat="${seat}"]`); }
     function armTurn(onExpire){
       clearTimers();
+      if (st.phase==='tribute'){ armTribute(); return; }   // 手动进贡阶段: 走进贡回合驱动
       if (st.phase!=='play' || st.turn<0) { turnSeatActive=-1; return; }
       const seat=st.turn, mine=seat===mySeat;
       if (isGuest && awaitingHost) return;   // guest 回传后等裁决, 不跑倒计时
@@ -1069,6 +1101,7 @@
 
     function renderCtrl(){
       if (st.phase==='lobby'){ renderLobbyCtrl(); return; }
+      if (st.phase==='tribute'){ renderTributeCtrl(); return; }
       if (isGuest && connState!=='online'){
         const label=connState==='host_offline'?'房主离线 · 等待恢复':'连接恢复中…';
         els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ ${label}</button></div>`; return; }
@@ -1097,6 +1130,25 @@
         selected = new Set(plays[0].map(c=>c.id)); renderHand();
       }
       updatePlayBtn();
+    }
+    // 进贡/还贡操作条: 我的回合给"确认"按钮(未选牌置灰); 别家回合显示"等 XX 进贡/还贡"。
+    function renderTributeCtrl(){
+      const kind = tributeTaskKind();
+      const myTribute = st.turn===mySeat && manualTribute();
+      if (!myTribute){
+        const who = st.players[st.turn] ? escapeHtml(st.players[st.turn].name) : '对手';
+        els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ 等 ${who} ${kind==='return'?'还贡':'进贡'}…</button></div>`;
+        return;
+      }
+      let cands=[]; try{ cands=Engine.tributeCandidates(st, mySeat); }catch(_){ }
+      // 进贡为强制最大牌: 唯一候选直接替玩家选好(省一次点), 只需确认
+      if (kind==='give' && !tributeSel && cands.length===1){ tributeSel=cands[0]; renderHand(); }
+      if (tributeSel && cands.indexOf(tributeSel)<0) tributeSel=null;   // 候选变动清失效选择
+      const lbl  = kind==='return' ? '还贡' : '进贡';
+      const hint = kind==='return' ? '挑一张点数≤10 的小牌还回' : '规则要求进贡手里最大的牌';
+      els.ctrl.innerHTML=`<div class="gd-trib-hint">🎁 轮到你${lbl} · ${hint}</div>
+        <div class="gd-acts"><button class="gd-btn primary" id="gdTribOk" ${tributeSel?'':'disabled'}>确认${lbl}</button></div>`;
+      const ok=$('#gdTribOk'); if(ok) ok.addEventListener('click', ()=>{ if(tributeSel) doTribute(mySeat, tributeSel); });
     }
     function updatePlayBtn(){
       const btn=$('#gdPlay'); if(!btn) return;
@@ -1329,6 +1381,82 @@
       toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay();
     }
 
+    // ── 手动进贡/还贡(仅纯单机): 当前任务的种类 give/return ─────────────
+    function tributeTaskKind(){
+      const tp = st.tributePending; if (!tp) return null;
+      const t = tp.tasks[tp.idx]; return t ? t.kind : null;
+    }
+    function myTributeTurn(){ return st.phase==='tribute' && st.turn===mySeat && manualTribute(); }
+    function myTribCands(){ try{ return new Set(Engine.tributeCandidates(st, mySeat)); }catch(_){ return new Set(); } }
+    // 点候选牌单选(非候选给出规则提示); 再点同一张取消。
+    function tributeTap(e){
+      if (st.turn!==mySeat || !manualTribute()) return;
+      const el = handCardAt(e.clientX, e.clientY); if(!el) return;
+      const id = el.dataset.id;
+      let cands=[]; try{ cands = Engine.tributeCandidates(st, mySeat); }catch(_){ }
+      if (cands.indexOf(id) < 0){
+        toast(tributeTaskKind()==='return' ? '还贡只能给点数≤10 的小牌' : '进贡必须给最大的牌');
+        return;
+      }
+      tributeSel = (tributeSel===id) ? null : id;
+      sfx('cardsel'); vibrate(8);
+      renderHand(); renderCtrl();
+      e.preventDefault();
+    }
+    // arm tribute 回合: 复用座位环倒计时(与出牌回合同视觉); AI 席节奏落子, 人席超时兜底自动提交。
+    function armTribute(){
+      clearTimers();
+      const seat = st.turn;
+      if (seat<0 || !manualTribute()){ turnSeatActive=-1; return; }
+      const mine = seat===mySeat;
+      const turnChanged = (seat!==turnSeatActive); turnSeatActive=seat;
+      if (turnChanged){ turnDur = mine ? HUMAN_PLAY_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)); turnStart=Date.now(); }
+      const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
+      let lastDeg=-1, lastSec=-1;
+      const secEl = seatEl && seatEl.querySelector('.gd-sec');
+      const tick=()=>{
+        const remain=Math.max(0,turnDur-(Date.now()-turnStart));
+        const frac=turnDur?(remain/turnDur):0; const deg=Math.round(frac*360);
+        if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
+        const sec=Math.ceil(remain/1000);
+        if(sec!==lastSec){ if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5);} if(mine&&clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5);} lastSec=sec; }
+        if(remain<=0){ ringRAF=null; if(mine) onTributeTimeout(); return; }
+        ringRAF=requestAnimationFrame(tick);
+      };
+      if(!minimized) tick();
+      if(mine) return;                              // 人席靠 tick→onTributeTimeout 兜底
+      const remainMs=Math.max(0,turnDur-(Date.now()-turnStart));
+      aiTimer=setTimeout(()=>aiTribute(seat), remainMs);
+    }
+    // AI(含超时代人)自动进/还贡: 进贡取最大候选(强制), 还贡取 power 最小(不白送大牌)。
+    function aiTribute(seat){
+      if (st.phase!=='tribute' || st.turn!==seat) return;
+      const kind = tributeTaskKind();
+      let cands=[]; try{ cands = Engine.tributeCandidates(st, seat); }catch(_){ }
+      if (!cands.length) return;
+      let pick = cands[0];
+      if (kind==='return'){
+        let mp=Infinity;
+        for(const id of cands){ const c=st.players[seat].hand.find(x=>x.id===id); if(!c)continue; const p=Rules.powerOf(c,st.level); if(p<mp){ mp=p; pick=id; } }
+      }
+      doTribute(seat, pick);
+    }
+    function onTributeTimeout(){
+      if (st.phase!=='tribute' || st.turn!==mySeat) return;
+      toast('超时 · 自动'+(tributeTaskKind()==='return'?'还贡':'进贡'));
+      aiTribute(mySeat);
+    }
+    // 落一步进贡/还贡(人/AI 共用引擎裁决)。全部完成 → 引擎转 play + 定首出, 弹进贡摘要(与自动路径同视觉)。
+    function doTribute(seat, cardId){
+      if (st.phase!=='tribute') return;
+      const kind = tributeTaskKind();
+      let r; try{ r=Engine.applyTribute(st, seat, cardId); }
+      catch(e){ if(seat===mySeat) toast('这张牌不符合'+(kind==='return'?'还贡':'进贡')+'规则'); return; }
+      tributeSel=null; sfx('cardplay'); vibrate(10);
+      renderAll();
+      if (r && r.tributeDone) showTributeBanner();   // 进/还贡闭环 → 弹摘要 + 飞牌
+    }
+
     // 进贡飞牌: 贡牌从进贡席飞向收贡席(对标欢乐掼蛋)。坐标相对 room 算, 可跨 felt/me 两区。
     function flyTributeCard(fromSeat, toSeat, card, delay){
       const fromEl = room.querySelector(`.gd-seat[data-seat="${fromSeat}"] .gd-avr`);
@@ -1483,7 +1611,7 @@
           const go = ()=>{
             over.remove();
             st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
-            rows=null; if(arrangeMode) setArrange(false);
+            tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
             sfx('deal'); broadcast(); renderAll(); showTributeBanner();
           };
           let done=false; const once=()=>{ if(done) return; done=true; go(); };
@@ -1546,7 +1674,7 @@
       if (seed!=null) opts.seed = seed;
       st = newDeal();
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
-      lastMyTurn=false; lastFinishedN=0; rows=null; if(arrangeMode) setArrange(false);
+      lastMyTurn=false; lastFinishedN=0; tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
       sfx('deal');
       renderAll(); showTributeBanner(); broadcast();
     }
