@@ -154,7 +154,7 @@
     const powOfRank = (r)=> r === null ? 15 : (r === level ? 15 : r); // 级牌炸 r=null→力15
 
     // 单张
-    if (n === 1){ return { type:'single', key: powerOf(cards[0], level), len:1 }; }
+    if (n === 1){ return { type:'single', key: powerOf(cards[0], level), len:1, deckRank: cards[0].rank }; }
 
     // 对子
     if (n === 2){
@@ -163,7 +163,7 @@
       const ranks = [...dc.natMap.keys()];
       if (ranks.length > 1) return null;
       const r = ranks.length ? ranks[0] : level;   // 全百搭 → 级对
-      return { type:'pair', key: powOfRank(r), len:2 };
+      return { type:'pair', key: powOfRank(r), len:2, nat: r };
     }
 
     // 三张
@@ -172,7 +172,7 @@
       const ranks = [...dc.natMap.keys()];
       if (ranks.length > 1) return null;
       const r = ranks.length ? ranks[0] : level;
-      return { type:'trio', key: powOfRank(r), len:3 };
+      return { type:'trio', key: powOfRank(r), len:3, nat: r };
     }
 
     // 四大天王
@@ -182,24 +182,24 @@
     // 炸弹(n≥4 全同点)
     if (n >= 4){
       const b = fitBomb(dc, n);
-      if (b){ return { type:'bomb', size:n, key: powOfRank(b.rank), len:n }; }
+      if (b){ return { type:'bomb', size:n, key: powOfRank(b.rank), len:n, nat: (b.rank==null?level:b.rank) }; }
     }
 
     if (n === 5){
       const sf = fitStraightFlush(cards, dc, level);
-      if (sf.ok) return { type:'straightflush', key: sf.top, len:5, suit:'flush' };
+      if (sf.ok) return { type:'straightflush', key: sf.top, len:5, suit:'flush', topRank: sf.top, botRank: sf.top-4 };
       const fh = fitFullhouse(dc, level);
-      if (fh) return { type:'fullhouse', key: powOfRank(fh.trio), len:5 };
+      if (fh) return { type:'fullhouse', key: powOfRank(fh.trio), len:5, trioRank: fh.trio, pairRank: fh.pair };
       const st = fitRun(dc, 1, 5, 5, level);
-      if (st.ok) return { type:'straight', key: st.top, len:5 };
+      if (st.ok) return { type:'straight', key: st.top, len:5, topRank: st.top, botRank: st.top-4 };
       return null;
     }
 
     if (n === 6){
       const tl = fitRun(dc, 3, 2, 6, level);          // 钢板(2 连三)
-      if (tl.ok) return { type:'trioline', key: tl.top, len:6 };
+      if (tl.ok) return { type:'trioline', key: tl.top, len:6, topRank: tl.top, botRank: tl.top-1 };
       const pl = fitRun(dc, 2, 3, 6, level);          // 连对(3 连对)
-      if (pl.ok) return { type:'pairline', key: pl.top, len:6 };
+      if (pl.ok) return { type:'pairline', key: pl.top, len:6, topRank: pl.top, botRank: pl.top-2 };
       return null;
     }
 

@@ -274,7 +274,10 @@
     if (hand.length === 0){
       state.finished.push(seat);
       justFinished = true;
-      if (state.finished.length >= 3) return _settle(state);
+      const fin = state.finished;
+      // 双下即终局(对标腾讯欢乐掼蛋): 头游+二游同队, 升级已锁死(该队封顶 +3), 自家无须再打完。
+      const doubleDown = fin.length === 2 && teamOf(fin[0]) === teamOf(fin[1]);
+      if (fin.length >= 3 || doubleDown) return _settle(state);
     }
     state.turn = nextActive(state, seat);
     return { ok:true, played:p, justFinished };
@@ -312,9 +315,10 @@
   // ── 结算: 名次 → 升级 ──────────────────────────────────────
   function _settle(state){
     const finishOrder = state.finished.slice();
-    // 补末游(唯一还有牌的)
-    const last = state.players.find(p=>p.hand.length>0);
-    if (last) finishOrder.push(last.seat);
+    // 补齐未出完的: 常规终局剩 1 家(末游); 双下即终局剩 2 家(败方两人, 内部先后不影响升级)。
+    for (const p of state.players){
+      if (p.hand.length > 0 && finishOrder.indexOf(p.seat) < 0) finishOrder.push(p.seat);
+    }
     const first = finishOrder[0];
     const winnerTeam = teamOf(first);
     const mate = partnerOf(first);

@@ -115,11 +115,15 @@ for(let seed=100; seed<130; seed++){
     if(ids.length !== p.hand.length) throw new Error(`残局 reveal[${p.seat}] 张数(${ids.length})≠该家剩牌(${p.hand.length}) @`+seed);
     if(ids.some(id=>!ALL[id])) throw new Error(`残局 reveal[${p.seat}] 含非法牌 id @`+seed);
   }
-  const lastSeat = st.result.finishOrder[st.result.finishOrder.length-1];
-  if((rev[lastSeat]||[]).length === 0) throw new Error('末游残牌应非空(它是唯一没出完的一家) @'+seed);
-  for(const s of st.result.finishOrder.slice(0,3)){
-    if((rev[s]||[]).length !== 0) throw new Error(`头/二/三游(席${s})应已出完(残牌为空) @`+seed);
-  }
+  // 出完的家残牌空, 未出完的非空。双下即终局 → 前2名(同队)出完、后2名(败方)留牌; 常规 → 前3名出完、末游留牌。
+  const expectEmpty = st.result.doubleDown ? 2 : 3;
+  const emptied = st.players.filter(p=>(rev[p.seat]||[]).length===0).length;
+  if(emptied !== expectEmpty) throw new Error(`出完家数(${emptied})≠终局期望(${expectEmpty}, dd=${st.result.doubleDown}) @`+seed);
+  st.result.finishOrder.forEach((s,i)=>{
+    const empty=(rev[s]||[]).length===0;
+    if(i<expectEmpty && !empty) throw new Error(`第${i+1}名(席${s})应已出完(残牌为空) @`+seed);
+    if(i>=expectEmpty && empty) throw new Error(`第${i+1}名(席${s})应未出完(留牌) @`+seed);
+  });
 }
 assert(recorded===30, `30 局旅程全部落库成行 (我方胜 ${winsForMe} 局)`);
 assert(winsForMe>0 && winsForMe<30, '胜负两种结局都出现过(战绩加减分双向都验到)');
@@ -329,8 +333,8 @@ assert(/removeChannel\((?:gtChan|leavingGtChan)\)/.test(src) && /_gtTables\.clea
 // ── 步骤12: 座位参数化(联机地基: 真人可坐非 0 席, DOM 槽位绕 mySeat 旋转) ──
 // 治"联机把别人座位画在我的位置/队友判断错位"。单机 mySeat=0 时旋转恰为 1/2/3, 行为不变。
 assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席)');
-assert(/SEAT_R\s*=\s*\(mySeat\+1\)%4/.test(ui) && /SEAT_T\s*=\s*\(mySeat\+2\)%4/.test(ui) && /SEAT_L\s*=\s*\(mySeat\+3\)%4/.test(ui),
-  '座位槽位绕 mySeat 相对旋转(右+1/上+2(队友)/左+3)');
+assert(/SEAT_L\s*=\s*\(mySeat\+1\)%4/.test(ui) && /SEAT_T\s*=\s*\(mySeat\+2\)%4/.test(ui) && /SEAT_R\s*=\s*\(mySeat\+3\)%4/.test(ui),
+  '座位槽位绕 mySeat 相对旋转·顺时针(下家+1 落左/队友+2 上/上家+3 落右)');
 assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHTML\(SEAT_R\)/.test(ui),
   'renderSeats 用旋转后槽位(非写死 1/2/3)');
 // newDeal 读可变的 seatIsAI(初值 = opts.isAI.slice()); 招募态 startDeal 就地改 seatIsAI 元素 → 换名册后重发牌仍按座位实况标人/机(与斗地主 gameIsAI 同构)。

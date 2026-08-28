@@ -57,7 +57,8 @@ function kernelCheck(){
     const old=document.querySelector('.gd-room'); if(old) old.remove();
     window.__g = window.EHGuandanGame.open({ names:['我','AI甲','AI乙','AI丙'], avatars:['🙂','🤖','👾','🐱'], isAI:[false,true,true,true], mySeat:0 });
     const sleep=ms=>new Promise(res=>setTimeout(res,ms));
-    const botCards=()=>[...document.querySelectorAll('.gd-hand-row.bot .card')];
+    // 手牌可能分上下两排(牌多≥15张时对标腾讯双排显示) → 数两排全部牌, 而非只数 .bot 行。
+    const botCards=()=>[...document.querySelectorAll('.gd-hand-row .card')];
     return (async()=>{
       await sleep(700);   // 等发牌
       const n0 = botCards().length;

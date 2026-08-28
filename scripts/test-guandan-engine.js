@@ -69,9 +69,10 @@ for (let seed=1; seed<=60; seed++){
   if (wt===0) teamAwins++;
   if (res.doubleDown) doubleDowns++;
 
-  // 所有出牌手都合法且守恒: 每家最终手牌 0? (3家出完+末游剩牌)
+  // 出完家数与终局类型一致: 双下即终局 → 恰 2 家出完(自家提前锁胜, 败方两人都留牌);
+  //   否则常规打到 3 家出完(末游 1 家剩牌)。
   const emptied = st.players.filter(p=>p.hand.length===0).length;
-  if (emptied<3) throw new Error('不足3家出完 @'+seed);
+  if (res.doubleDown ? emptied!==2 : emptied<3) throw new Error('出完家数与终局类型不符 @'+seed+' emptied='+emptied+' dd='+res.doubleDown);
 }
 ok(games===60, '60 局自对弈全部打到分出名次');
 ok(teamAwins>0 && teamAwins<60, '两队都赢过(名次结算双向都验到)');

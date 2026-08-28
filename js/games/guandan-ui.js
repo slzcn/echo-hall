@@ -409,6 +409,34 @@
       default: return '';
     }
   }
+  // ── 读牌口语(主人要求"直接读出具体牌"): 牌型 + 点数 → "一张六 / 一对五 / 三个七带一对三 / 三到七顺子"。
+  //   点数来自 rules.parse 导出的只读字段(single.deckRank / pair·trio·bomb.nat / fullhouse.trioRank·pairRank
+  //   / 顺子连对钢板.topRank·botRank); 字段缺失(老快照)则回退简短牌型 typeLabel。
+  const NAT_LABEL = {1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
+  const CN_NUM = {4:'四',5:'五',6:'六',7:'七',8:'八',9:'九',10:'十'};
+  const natName = (r)=> (r==null ? '' : (NAT_LABEL[r] || String(r)));
+  function spokenLabel(p){
+    if(!p) return '';
+    switch(p.type){
+      case 'single': {
+        const dr = p.deckRank;
+        if(dr===17) return '一张大王';
+        if(dr===16) return '一张小王';
+        if(dr==null) return typeLabel(p);
+        return '一张'+natName(dr===15?2:dr);
+      }
+      case 'pair':  return p.nat!=null ? '一对'+natName(p.nat) : typeLabel(p);
+      case 'trio':  return p.nat!=null ? '三个'+natName(p.nat) : typeLabel(p);
+      case 'fullhouse': return (p.trioRank!=null&&p.pairRank!=null) ? '三个'+natName(p.trioRank)+'带一对'+natName(p.pairRank) : typeLabel(p);
+      case 'straight':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'顺子' : typeLabel(p);
+      case 'straightflush': return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'同花顺' : typeLabel(p);
+      case 'pairline':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'连对' : typeLabel(p);
+      case 'trioline':      return p.topRank!=null ? natName(p.botRank)+natName(p.topRank)+'钢板' : typeLabel(p);
+      case 'bomb':  return p.nat!=null ? (CN_NUM[p.size]||p.size)+'个'+natName(p.nat)+'炸' : typeLabel(p);
+      case 'jokerbomb': return '四大天王';
+      default: return typeLabel(p);
+    }
+  }
   const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='straightflush'||p.type==='jokerbomb');
 
   function cardEl(card, level, opts){
@@ -450,8 +478,9 @@
     function connPill(){ return connState==='online' ? '' : ('<span class="gd-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     const names = opts.names || ['你','下家','对家','上家'];
     const avatars = opts.avatars || ['🙂','🤖','🤝','👾'];
-    // 座位→DOM 槽位: 以 mySeat 为底, 顺时针 下家(右)/对家(上)/上家(左) 相对旋转(单机 mySeat=0 时恰为 1/2/3)
-    const SEAT_R = (mySeat+1)%4, SEAT_T = (mySeat+2)%4, SEAT_L = (mySeat+3)%4;
+    // 座位→DOM 槽位: 以 mySeat 为底, 出牌【顺时针】流转 —— 我(底)→下家(左)→对家(上)→上家(右)。
+    //   故 下家(mySeat+1) 落左槽、上家(mySeat+3) 落右槽(与真实顺时针围坐一致; 旧版下家在右=逆时针已修)。
+    const SEAT_L = (mySeat+1)%4, SEAT_T = (mySeat+2)%4, SEAT_R = (mySeat+3)%4;
     // 对局延续态(再来一局用): 队等级 + 上局结果(触发进贡)
     let matchLevels = (opts.match && opts.match.teamLevels) ? opts.match.teamLevels.slice() : [2,2];
     let matchDealer = (opts.match && typeof opts.match.dealerTeam==='number') ? opts.match.dealerTeam : 0;
@@ -619,7 +648,7 @@
     }
     function sayPlay(p, seat){
       if(!p || VOICE_SKIP.has(p.type)) return;
-      const lab = typeLabel(p);
+      const lab = spokenLabel(p) || typeLabel(p);   // 读具体牌(一对五/三个七带一对三), 无点数字段则退简短牌型
       if(!(lab && root.EhSfx && root.EhSfx.say)) return;
       root.EhSfx.say(lab, whoOf(seat));
     }
@@ -952,8 +981,8 @@
     }
     function renderSeats(){
       els.p2.innerHTML = seatHTML(SEAT_T);   // 对家/队友(上)
-      els.p3.innerHTML = seatHTML(SEAT_L);   // 上家(左)
-      els.p1.innerHTML = seatHTML(SEAT_R);   // 下家(右)
+      els.p3.innerHTML = seatHTML(SEAT_L);   // 下家(左) —— 顺时针我的下一手落左侧
+      els.p1.innerHTML = seatHTML(SEAT_R);   // 上家(右)
       els.me.innerHTML = seatHTML(mySeat);
       if (st.phase==='lobby'){
         const nn = st.players.filter(p=>p.kind!=='empty').length;
@@ -1048,20 +1077,39 @@
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
         return [top, bot];
       }
-      // 智能组牌(对标腾讯欢乐掼蛋分组显示): 把手牌拆成成型牌型分堆, 组间留白, 一眼看清现成组合。
-      if (sortMode === 'combo' && canCombo()){
-        const groups = root.EHGuandanAI.arrangeGroups(hand, st.level);
-        const bot = [];
-        groups.forEach(g=>{ if (g.length && bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
-        if (bot.length) return [[], bot];
-        // 兜底: 组牌异常空 → 退回大小排
-      }
-      // 按大小: 逢人配(百搭=♥级牌)单拎到手牌最前醒目单列, 其余按点力降序。
-      //   (cardEl 已给百搭 .wild 品红光晕 + "配"角标; 此处只补它被单列到一端的【位置】。)
+      // 大小序(百搭=♥级牌前置醒目单列, cardEl 已给 .wild 光晕+"配"角标), 作兜底 / rank 模式用。
       const sorted = Rules.sortHand(hand, st.level);
       const wild = [], rest = [];
       for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
-      return [[], wild.concat(rest)];
+      const rankSeq = wild.concat(rest);
+      // 上下两排(对标腾讯欢乐掼蛋): 手牌多(≥15 张)才分两排, 残局少牌收一排更清爽。
+      const TWO = hand.length >= 15;
+
+      // 智能组牌: 把手牌拆成成型牌型分堆(炸/顺/连对/三张/对子…), 组间留白, 一眼看清现成组合。
+      if (sortMode === 'combo' && canCombo()){
+        const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
+        if (groups.length){
+          if (!TWO){   // 单排: 各组依次排开, 组间留白
+            const bot = [];
+            groups.forEach(g=>{ if (bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
+            return [[], bot];
+          }
+          // 双排: 组按张数平衡分到上/下排, 组不拆散, 每排组间留白
+          const target = Math.ceil(hand.length / 2);
+          const top = [], bot = []; let topN = 0;
+          for (const g of groups){
+            const toTop = topN < target, row = toTop ? top : bot;
+            if (row.length) groupStartIds.add(g[0].id);
+            g.forEach(c=>row.push(c));
+            if (toTop) topN += g.length;
+          }
+          return [top, bot];
+        }
+        // 组牌异常空 → 落大小排
+      }
+      if (!TWO) return [[], rankSeq];
+      const half = Math.ceil(rankSeq.length / 2);   // 大小序按张数对半分两排(上排大牌, 下排小牌)
+      return [rankSeq.slice(0, half), rankSeq.slice(half)];
     }
     let lastHandSig = '', lastSelSig = '';
     function renderHand(){
