@@ -286,8 +286,11 @@ assert(/\.gd-hand-row\{[^}]*flex-wrap:nowrap/.test(ui), '每排 flex-wrap:nowrap
 assert(/\.gd-hand\.combo\{[^}]*flex-direction:row/.test(ui), '.gd-hand.combo 横排底对齐容器(竖列分组)');
 assert(/const comboView = !!comboGroups/.test(ui) && /col\.className='gd-col'/.test(ui),
   'renderHand 组牌态建 gd-col 竖列(每牌型一列)');
-assert(/gd-col-label/.test(ui) && /typeLabel\(Rules\.parse\(group/.test(ui),
-  '每列(组≥2)底部标牌型名 gd-col-label(typeLabel 命名)');
+assert(/gd-col-label/.test(ui) && /comboGroups\.forEach/.test(ui) && /Rules\.parse\(g, st\.level\)/.test(ui) && /typeLabel\(p\)/.test(ui),
+  '每列(组≥2)底部标牌型名 gd-col-label(逐组 Rules.parse→typeLabel 命名)');
+// 炸弹/同花顺列烫金标签 + 散牌列隐形占位使牌底齐平(理牌后美化)
+assert(/Rules\.isBomb\(p\)/.test(ui) && /gd-col-label\.bomb/.test(ui), '炸弹列 gd-col-label.bomb 烫金标记');
+assert(/gd-col-label\.ph\{visibility:hidden/.test(ui), '散牌列隐形占位标签 .ph(全列牌底齐平)');
 assert(/function layoutCombo\(/.test(ui) && /els\.hand\.classList\.contains\('combo'\)\)\{ layoutCombo\(\)/.test(ui),
   'layoutHand 组牌态派发 layoutCombo(竖向叠放 + 列间距自适应)');
 assert(/function handCardAt\(x,y\)\{[\s\S]{0,220}classList\.contains\('combo'\)/.test(ui),

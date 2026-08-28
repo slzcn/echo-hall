@@ -197,8 +197,8 @@
 .gd-lvl .lv-now.bump{animation:gdLvlBump .5s ease-out}
 @keyframes gdLvlBump{0%{transform:scale(1)}40%{transform:scale(1.32)}100%{transform:scale(1)}}
 /* 卡牌 */
-.card{width:var(--cw,38px);height:var(--ch,54px);border-radius:6px;background:#fff;position:relative;flex:none;
-  box-shadow:0 2px 5px rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
+.card{width:var(--cw,38px);height:var(--ch,54px);border-radius:7px;background:linear-gradient(158deg,#ffffff 0%,#eef2f8 100%);position:relative;flex:none;
+  box-shadow:0 2px 5px rgba(0,0,0,.35),inset 0 1.5px 0 rgba(255,255,255,.85);border:1px solid rgba(15,25,45,.16);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
 .card.red{color:#e0263e}.card.blk{color:#1a1e28}
 .card .cn{position:absolute;top:2px;left:3px;font-size:var(--cn,13px);font-weight:800;line-height:1}
 .card .cs{position:absolute;top:16px;left:4px;font-size:var(--cs,11px);line-height:1}
@@ -238,18 +238,29 @@
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
 /* ── 智能组牌·竖列分组(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型竖直叠成一列,
    组内牌上下叠(露顶角点数花色, 底牌露大花色), 多列横向排开底对齐, 列底标牌型名 ── */
-.gd-hand.combo{flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 2px 2px;overflow:visible}
+.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
+  background:linear-gradient(180deg,rgba(0,229,212,.055),rgba(8,14,26,.36));border:1px solid rgba(0,229,212,.15);border-radius:16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 10px 24px rgba(0,0,0,.26)}
 .gd-col{display:flex;flex-direction:column;align-items:center;flex:none}
 .gd-col .card{margin-top:-34px;cursor:pointer;transition:transform .14s ease,box-shadow .14s;transform-origin:center}
 .gd-col .card:first-child{margin-top:0}
 .gd-hand.combo.locked .card{cursor:default}
 /* 竖列里选中: 往左错开+上抬+高层级冒头(直接抬会被下一张压住), 一眼看清选了哪张 */
-.gd-hand.combo .card.sel{transform:translate(-7px,-12px) scale(1.05);box-shadow:0 6px 14px rgba(0,0,0,.42),0 0 0 2px var(--accent);z-index:6}
+.gd-hand.combo .card.sel{transform:translate(-7px,-12px) scale(1.06);box-shadow:0 8px 16px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 16px var(--accent);z-index:6}
 .gd-hand.combo:not(.locked) .card:hover{transform:translateX(-5px)}
-.gd-col-label{margin-top:3px;font-size:10px;font-weight:800;color:var(--sub);background:var(--panel);
-  border:1px solid var(--line2);border-radius:6px;padding:1px 3px;white-space:nowrap;letter-spacing:0;line-height:1.25}
+.gd-col-label{margin-top:5px;font-size:10px;font-weight:900;color:var(--accent,#00e5d4);
+  background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.42);border-radius:999px;
+  padding:1.5px 7px;white-space:nowrap;letter-spacing:.02em;line-height:1.3;
+  box-shadow:0 0 8px rgba(0,229,212,.16),0 1px 3px rgba(0,0,0,.35)}
+/* 炸弹/同花顺列: 烫金胶囊(呼应顶部级牌徽标), 让"手里有炸"一眼扎眼 */
+.gd-col-label.bomb{color:#3a1500;background:linear-gradient(150deg,#ffd76a,#ff8f3a);
+  border-color:rgba(255,143,58,.6);box-shadow:0 0 12px rgba(255,143,58,.5),0 1px 3px rgba(0,0,0,.35)}
+/* 散牌单列的隐形占位: 撑出与成型列同高的标签行, 使全部列的"牌底"齐平(对标腾讯) */
+.gd-col-label.ph{visibility:hidden;box-shadow:none}
 .gd-room.is-land .gd-col .card{margin-top:-30px}
-.gd-room.is-land .gd-col-label{font-size:9px;padding:0 4px}
+/* 横屏矮且手牌本就上抬贴中央出牌区: 去掉托盘面板框(否则与横幅/座位叠成两层), 以牌桌为背景 */
+.gd-room.is-land .gd-hand.combo{padding:7px 5px 6px;background:none;border:none;border-radius:0;box-shadow:none}
+.gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:3px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
    放进独立表头条(in-flow, 右对齐), 不再 position:absolute 浮在牌面上——
    旧版按钮压住最右几张牌的角标(rank 在 top:3px), 满手 27 张时最右牌像"缺角/被裁";
@@ -1156,7 +1167,7 @@
         comboGroups.forEach(g=>{
           const p = g.length >= 2 ? Rules.parse(g, st.level) : null;
           const lab = p ? (typeLabel(p) || '') : '';
-          if (g.length >= 2 && lab) renderCols.push({ cards:g, label:lab });
+          if (g.length >= 2 && lab) renderCols.push({ cards:g, label:lab, bomb: Rules.isBomb(p) });
           else g.forEach(c=>renderCols.push({ cards:[c], label:'' }));
         });
         let idx = 0;   // 全局阅读序(列 by 列, 组内上→下): 供划选区间连选按 data-idx 补齐
@@ -1169,7 +1180,11 @@
             if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
             col.appendChild(el);
           });
-          if (rc.label){ const lab = document.createElement('div'); lab.className='gd-col-label'; lab.textContent = rc.label; col.appendChild(lab); }
+          // 每列都挂标签行: 成型列标牌型(炸弹烫金), 散牌列挂隐形占位 → 全列牌底齐平
+          const lab = document.createElement('div');
+          lab.className = 'gd-col-label' + (rc.label ? (rc.bomb ? ' bomb' : '') : ' ph');
+          lab.textContent = rc.label || '·';
+          col.appendChild(lab);
           els.hand.appendChild(col);
         });
         layoutHand();
