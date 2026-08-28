@@ -15,15 +15,15 @@
   // 每个游戏依赖的文件(按加载顺序,前提依赖在前)
   var MANIFEST = {
     poker:   ['./js/games/poker-eval.js',     './js/games/poker-engine.js',   './js/games/poker-ai.js',   './js/games/poker-net.js',   './js/games/poker-ui.js'],
-    guandan: ['./js/games/guandan-rules.js',  './js/games/guandan-engine.js', './js/games/guandan-ai.js', './js/games/guandan-net.js', './js/games/guandan-ui.js'],
-    ddz:     ['./js/games/ddz-rules.js',      './js/games/ddz-engine.js',     './js/games/ddz-ai.js',     './js/games/ddz-net.js',     './js/games/game-ui.js']
+    guandan: ['./js/games/guandan-rules.js',  './js/games/guandan-engine.js', './js/games/guandan-ai.js', './js/games/guandan-net.js', './js/games/card-counter.js', './js/games/guandan-ui.js'],
+    ddz:     ['./js/games/ddz-rules.js',      './js/games/ddz-engine.js',     './js/games/ddz-ai.js',     './js/games/ddz-net.js',     './js/games/card-counter.js', './js/games/game-ui.js']
   };
 
   // 加载完成后必须存在的全局(用来判断加载是否真成功,防脚本 200 但内容空)
   var READY_MARK = {
     poker:   ['EHPokerEval', 'EHPokerEngine', 'EHPokerAI', 'EHPokerNet', 'EHPokerGame'],
-    guandan: ['EHGuandanRules', 'EHGuandanEngine', 'EHGuandanAI', 'EHGuandanNet', 'EHGuandanGame'],
-    ddz:     ['EHDdzRules', 'EHDdzEngine', 'EHDdzAI', 'EHDdzNet', 'EHDdzGame']
+    guandan: ['EHGuandanRules', 'EHGuandanEngine', 'EHGuandanAI', 'EHGuandanNet', 'EHCardCounter', 'EHGuandanGame'],
+    ddz:     ['EHDdzRules', 'EHDdzEngine', 'EHDdzAI', 'EHDdzNet', 'EHCardCounter', 'EHDdzGame']
   };
 
   function loadScript(src) {

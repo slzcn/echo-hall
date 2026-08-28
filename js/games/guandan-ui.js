@@ -357,6 +357,36 @@
   padding:8px 10px;color:var(--ink,#eaf6ff);font-size:13px;cursor:pointer}
 .gd-invite-menu .im-item:hover{background:rgba(0,229,212,.12)}
 
+/* ── 记牌器/出牌历史(仅纯单机信息辅助): 顶栏切换钮 + 悬浮面板 ─────────── */
+.gd-cnt{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gd-cnt:hover{color:var(--ink);border-color:var(--line2)}
+.gd-cnt.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);box-shadow:0 0 12px rgba(0,229,212,.4)}
+.gd-cntp{position:absolute;top:50px;right:max(12px,env(safe-area-inset-right,0px));z-index:60;width:min(340px,calc(100% - 24px));
+  background:rgba(9,14,22,.96);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;padding:12px 12px 10px;
+  box-shadow:0 18px 46px rgba(0,0,0,.6);backdrop-filter:blur(8px);animation:gdRoomIn .16s ease}
+.gd-cntp[hidden]{display:none}
+.gd-cntp .cp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.gd-cntp .cp-hd b{font-size:13px;letter-spacing:.04em;color:var(--ink,#eaf6ff)}
+.gd-cntp .cp-x{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--sub);cursor:pointer;font-size:12px}
+.gd-cnt-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.gd-cnt-cell{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border-radius:9px;
+  border:1px solid var(--line,rgba(0,229,212,.2));background:rgba(255,255,255,.03)}
+.gd-cnt-cell .cc-r{font-size:12px;font-weight:800;color:var(--ink,#eaf6ff);line-height:1}
+.gd-cnt-cell .cc-n{font-size:14px;font-weight:800;color:var(--accent,#00e5d4);line-height:1}
+.gd-cnt-cell.lvl{border-color:var(--amber,#ffc24d);box-shadow:0 0 8px rgba(255,194,77,.28)}
+.gd-cnt-cell.joker .cc-r{color:var(--amber,#ffc24d)}
+.gd-cnt-cell.low .cc-n{color:var(--amber,#ffc24d)}
+.gd-cnt-cell.zero{opacity:.34}
+.gd-cnt-cell.zero .cc-n{color:var(--dim,#498d88)}
+.gd-cnt-hist{margin-top:9px;border-top:1px solid var(--line,rgba(0,229,212,.16));padding-top:8px}
+.gd-cnt-hist .ch-t{font-size:11px;color:var(--sub,#86cbc6);margin-bottom:5px;letter-spacing:.04em}
+.gd-cnt-hist .ch-row{display:flex;align-items:baseline;gap:6px;font-size:12px;line-height:1.5;color:var(--ink,#eaf6ff)}
+.gd-cnt-hist .ch-nm{color:var(--sub,#86cbc6);flex:none;min-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gd-cnt-hist .ch-cd{font-weight:700;letter-spacing:.06em}
+.gd-cnt-hist .ch-row.pass .ch-cd{color:var(--dim,#498d88);font-weight:500}
+.gd-cnt-hist .ch-empty{font-size:12px;color:var(--dim,#498d88)}
+
 `;
     document.head.appendChild(s);
   }
@@ -456,6 +486,11 @@
     function manualTribute(){ return !isGuest && !onSync && remoteSeats.length === 0; }
     let tributeSel = null;   // 手动进贡: 当前选中待提交的候选牌 id(单选)
 
+    // 记牌器/出牌历史(对标欢乐掼蛋信息辅助): 只用【已出牌】(公共)算未出张数, 绝不读手牌。
+    //   仅纯单机开(联机 guest 快照剥离 log, 无从计数), 与手动进贡同口径。掼蛋两副牌 → decks=2。
+    const COUNTER = (mode === 'local') && !!(root.EHCardCounter);
+    let counterOn = false;
+
     // ── 招募态(就地牌桌 lobby): host 开桌先挂真牌桌的招募占位局, 点空位邀灵魂/真人, 满意点开始 → startDeal 就地转正局 ──
     const lobbyMode = !!opts.lobby;
     const isHostLobby = !!opts.isHost;
@@ -511,9 +546,15 @@
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
         <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">🎵</button>
+        ${COUNTER?`<button class="gd-cnt" id="gdCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="gd-x" id="gdX" aria-label="返回聊天">✕<span class="gd-xlbl"> 返回</span></button>
       </div>
+      ${COUNTER?`<div class="gd-cntp" id="gdCntPanel" hidden>
+        <div class="cp-hd"><b>🃏 记牌器</b><button class="cp-x" id="gdCntX" aria-label="关闭">✕</button></div>
+        <div class="gd-cnt-grid" id="gdCntGrid"></div>
+        <div class="gd-cnt-hist"><div class="ch-t">最近出牌</div><div id="gdCntHist"></div></div>
+      </div>`:''}
       <div class="gd-felt" id="gdFelt">
         <div class="gd-score" id="gdScore"></div>
         <div class="gd-partner" id="gdP2"></div>
@@ -646,6 +687,37 @@
     function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
     paintMus();
+
+    // 🃏 记牌器/出牌历史(仅纯单机): 掼蛋两副牌 decks=2; 高亮当前级牌所在 rank(打2→牌面 rank 15)。
+    const cntBtn = $('#gdCnt'), cntPanel = $('#gdCntPanel');
+    function renderCounter(){
+      if (!COUNTER || !counterOn || !cntPanel || !root.EHCardCounter) return;
+      const log = (st && st.log) || [];
+      const lvlRank = (st && st.level===2) ? 15 : (st && st.level);
+      const rows = root.EHCardCounter.remaining(log, 2);
+      const grid = cntPanel.querySelector('#gdCntGrid');
+      if (grid) grid.innerHTML = rows.map(x=>{
+        const cls = (x.rank>=16?'joker ':'') + (x.rank===lvlRank?'lvl ':'') + (x.remain===0?'zero':(x.remain<=1?'low':''));
+        return `<div class="gd-cnt-cell ${cls}"><span class="cc-r">${x.label}</span><span class="cc-n">${x.remain}</span></div>`;
+      }).join('');
+      const hist = root.EHCardCounter.history(log, (names||[]), 6);
+      const hbox = cntPanel.querySelector('#gdCntHist');
+      if (hbox) hbox.innerHTML = hist.length
+        ? hist.map(h=> h.kind==='pass'
+            ? `<div class="ch-row pass"><span class="ch-nm">${escapeHtml(h.name)}</span><span class="ch-cd">不出</span></div>`
+            : `<div class="ch-row"><span class="ch-nm">${escapeHtml(h.name)}</span><span class="ch-cd">${h.labels.join(' ')}</span></div>`).join('')
+        : '<div class="ch-empty">还没有人出牌</div>';
+    }
+    function toggleCounter(){
+      counterOn = !counterOn;
+      if (cntBtn) cntBtn.classList.toggle('on', counterOn);
+      if (cntPanel) cntPanel.hidden = !counterOn;
+      if (counterOn) renderCounter();
+      sfx('click');
+    }
+    if (cntBtn) cntBtn.addEventListener('click', toggleCounter);
+    if (cntPanel){ const cx=cntPanel.querySelector('#gdCntX'); if(cx) cx.addEventListener('click', toggleCounter); }
+
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
@@ -897,6 +969,7 @@
     let lastLevel=null;          // 台面级(打几)变化上升沿 → 级牌徽标跳动
     function playKey(){ const lp=st.table.lastPlay; if(!lp) return st.table.passesInRow>0?('pass:'+st.turn):'empty'; return lp.seat+':'+lp.cards.join(','); }
     function renderTable(){
+      if (counterOn) renderCounter();               // 记牌器开着时随桌面刷新未出张数/出牌历史
       if (st.phase==='lobby'){ els.who.textContent=''; els.played.className='gd-played'; els.played.innerHTML=''; return; }
       const lp = st.table.lastPlay;
       const key = playKey(); const changed = key!==lastShownKey; lastShownKey=key;

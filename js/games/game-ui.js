@@ -356,6 +356,35 @@
 @keyframes ddzConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
 .ddz-chip.hidden-alert{border-color:#ff5d6c!important;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 20px rgba(255,93,108,.7)!important;filter:brightness(1.12)}
 
+/* ── 记牌器/出牌历史(仅纯单机信息辅助): 顶栏切换钮 + 悬浮面板 ─────────── */
+.ddz-cnt{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
+  color:var(--sub,#86cbc6);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ddz-cnt:hover{color:var(--ink);border-color:var(--line2)}
+.ddz-cnt.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);box-shadow:0 0 12px rgba(0,229,212,.4)}
+.ddz-cntp{position:absolute;top:52px;right:max(12px,env(safe-area-inset-right,0px));z-index:60;width:min(320px,calc(100% - 24px));
+  background:rgba(9,14,22,.96);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:16px;padding:12px 12px 10px;
+  box-shadow:0 18px 46px rgba(0,0,0,.6);backdrop-filter:blur(8px);animation:ddzRoomIn .16s ease-out}
+.ddz-cntp[hidden]{display:none}
+.ddz-cntp .cp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ddz-cntp .cp-hd b{font-size:13px;letter-spacing:.04em;color:var(--ink,#eaf6ff)}
+.ddz-cntp .cp-x{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--sub);cursor:pointer;font-size:12px}
+.ddz-cnt-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.ddz-cnt-cell{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border-radius:9px;
+  border:1px solid var(--line,rgba(0,229,212,.2));background:rgba(255,255,255,.03)}
+.ddz-cnt-cell .cc-r{font-size:12px;font-weight:800;color:var(--ink,#eaf6ff);line-height:1}
+.ddz-cnt-cell .cc-n{font-size:14px;font-weight:800;color:var(--accent,#00e5d4);line-height:1}
+.ddz-cnt-cell.joker .cc-r{color:var(--amber,#ffc24d)}
+.ddz-cnt-cell.low .cc-n{color:var(--amber,#ffc24d)}
+.ddz-cnt-cell.zero{opacity:.34}
+.ddz-cnt-cell.zero .cc-n{color:var(--dim,#498d88)}
+.ddz-cnt-hist{margin-top:9px;border-top:1px solid var(--line,rgba(0,229,212,.16));padding-top:8px}
+.ddz-cnt-hist .ch-t{font-size:11px;color:var(--sub,#86cbc6);margin-bottom:5px;letter-spacing:.04em}
+.ddz-cnt-hist .ch-row{display:flex;align-items:baseline;gap:6px;font-size:12px;line-height:1.5;color:var(--ink,#eaf6ff)}
+.ddz-cnt-hist .ch-nm{color:var(--sub,#86cbc6);flex:none;min-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ddz-cnt-hist .ch-cd{font-weight:700;letter-spacing:.06em}
+.ddz-cnt-hist .ch-row.pass .ch-cd{color:var(--dim,#498d88);font-weight:500}
+.ddz-cnt-hist .ch-empty{font-size:12px;color:var(--dim,#498d88)}
+
 `;
     document.head.appendChild(s);
   }
@@ -438,6 +467,10 @@
     // 加倍系统只在本地单机(对标欢乐斗地主)开启: 定地主后插一屏加倍轮。联机(host/guest)不启用,
     // 引擎默认关 → 联机快照/结算完全走经典路径, ddz-net 一行不动(见 ddz-engine.js opts.doubling)。
     const DOUBLING = (mode === 'local');
+    // 记牌器/出牌历史(对标欢乐斗地主的信息辅助): 只用【已出牌】(公共信息, 全场可见)算未出张数, 绝不读手牌。
+    //   仅纯单机开: 联机 guest 快照按命门剥离了 log(见 ddz-net), 无从计数 → 只在 local 挂, 与加倍同口径。
+    const COUNTER = (mode === 'local') && !!(root.EHCardCounter);
+    let counterOn = false;
     let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
     // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
@@ -539,9 +572,15 @@
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
         <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
+        ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕<span class="ddz-xlbl"> 返回</span></button>
       </div>
+      ${COUNTER?`<div class="ddz-cntp" id="ddzCntPanel" hidden>
+        <div class="cp-hd"><b>🃏 记牌器</b><button class="cp-x" id="ddzCntX" aria-label="关闭">✕</button></div>
+        <div class="ddz-cnt-grid" id="ddzCntGrid"></div>
+        <div class="ddz-cnt-hist"><div class="ch-t">最近出牌</div><div id="ddzCntHist"></div></div>
+      </div>`:''}
       <div class="ddz-felt" id="ddzFelt">
         <div class="ddz-opps" id="ddzOpps"></div>
         <div class="ddz-center">
@@ -740,6 +779,35 @@
     if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
     paintMus();
 
+    // 🃏 记牌器/出牌历史(仅纯单机): 切换悬浮面板, 开着时每次出牌后随 renderTable 自动刷新。
+    const cntBtn = $('#ddzCnt'), cntPanel = $('#ddzCntPanel');
+    function renderCounter(){
+      if (!COUNTER || !counterOn || !cntPanel || !root.EHCardCounter) return;
+      const log = (st && st.log) || [];
+      const rows = root.EHCardCounter.remaining(log, 1);   // 斗地主单副
+      const grid = cntPanel.querySelector('#ddzCntGrid');
+      if (grid) grid.innerHTML = rows.map(x=>{
+        const cls = (x.rank>=16?'joker ':'') + (x.remain===0?'zero':(x.remain===1?'low':''));
+        return `<div class="ddz-cnt-cell ${cls}"><span class="cc-r">${x.label}</span><span class="cc-n">${x.remain}</span></div>`;
+      }).join('');
+      const hist = root.EHCardCounter.history(log, (names||[]), 6);
+      const hbox = cntPanel.querySelector('#ddzCntHist');
+      if (hbox) hbox.innerHTML = hist.length
+        ? hist.map(h=> h.kind==='pass'
+            ? `<div class="ch-row pass"><span class="ch-nm">${escapeHtml(h.name)}</span><span class="ch-cd">不出</span></div>`
+            : `<div class="ch-row"><span class="ch-nm">${escapeHtml(h.name)}</span><span class="ch-cd">${h.labels.join(' ')}</span></div>`).join('')
+        : '<div class="ch-empty">还没有人出牌</div>';
+    }
+    function toggleCounter(){
+      counterOn = !counterOn;
+      if (cntBtn) cntBtn.classList.toggle('on', counterOn);
+      if (cntPanel) cntPanel.hidden = !counterOn;
+      if (counterOn) renderCounter();
+      sfx('click');
+    }
+    if (cntBtn) cntBtn.addEventListener('click', toggleCounter);
+    if (cntPanel){ const cx=cntPanel.querySelector('#ddzCntX'); if(cx) cx.addEventListener('click', toggleCounter); }
+
     // lastPlay 只存 id,需要一张 id→card 表(用整副牌重建)
     const ALL = {}; Deck.standardDeck().forEach(c=>ALL[c.id]=c);
     function findCardById(id){ return ALL[id]; }
@@ -851,6 +919,7 @@
       const myF = (st.dbl && st.dbl.choices && st.dbl.choices[mySeat]) || 1;
       if (myF > 1) multTxt += ` · 我×${myF}`;
       els.mult.textContent = multTxt;
+      if (counterOn) renderCounter();               // 记牌器开着时随桌面刷新未出张数/出牌历史
       const lp = st.table.lastPlay;
       const key = playKey();
       const changed = key !== lastShownKey;
