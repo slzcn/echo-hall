@@ -18,7 +18,10 @@
   const Deck = root.EHDeck, Rules = root.EHGuandanRules, Engine = root.EHGuandanEngine, AI = root.EHGuandanAI;
 
   const HUMAN_PLAY_MS = 22000;
-  const AI_MIN_MS = 750, AI_JIT_MS = 600;
+  // AI 每步思考时长 = 对手头像上的倒计时时长。旧值 750~1350ms 太短, ceil(remain/1000) 基本恒为 1,
+  // 对手座位徽标"每次都显示 1、看不出在倒数"(对标腾讯机器人想 2~3 秒才看得到数字往下跳)。
+  // 抬到 1.8~3.4s: 起始至少 2, 可见地 3→2→1 往下走; 仍够利落(三家 AI 一轮≈7~9s)。
+  const AI_MIN_MS = 1800, AI_JIT_MS = 1600;
 
   const CSS_ID = 'gd-ui-css';
   function injectCSS(){
