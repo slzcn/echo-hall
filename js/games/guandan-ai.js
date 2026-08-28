@@ -115,6 +115,40 @@
     return genCombos(hand, level, groups(hand,level).wilds.length).filter(c=>Rules.isBomb(c.parse));
   }
 
+  // ── 理牌·智能组牌(对标腾讯欢乐掼蛋分组显示) ─────────────────────
+  // 把整手牌贪心拆成若干【成型牌型组】(炸/同花顺/顺子/连对/钢板/三张/对子), 供 UI 分组分堆显示,
+  //   一眼看清手里有哪些现成组合。纯展示用: 不影响出牌自由点选, 不看别家牌。
+  //   贪心顺序 = 炸弹最先抽(护炸不被顺子拆散) → 长牌型清散牌 → 三张 → 对子; 单张不成组。
+  //   三带二【不】自动合并(留三张/对子各自成组, 玩家自选如何带), 少用百搭优先(留逢人配灵活)。
+  //   返回 card[][](每组一手成型牌; 末组=剩余散牌, 按大小排; 无散牌则不含末组)。
+  function arrangeGroups(hand, level){
+    if (typeof level !== 'number') level = 2;
+    const KEEP = { jokerbomb:0, bomb:1, straightflush:2, straight:3, pairline:3, trioline:4, trio:6, pair:7 };
+    let pool = hand.slice();
+    const out = [];
+    let guard = 0;
+    while (pool.length && guard++ < 60){
+      const wildBudget = pool.filter(c=>Rules.isWild(c, level)).length;
+      const combos = genCombos(pool, level, wildBudget)
+        .filter(c => c.cards.length >= 2 && KEEP[c.parse.type] !== undefined);
+      if (!combos.length) break;
+      combos.sort((a,b)=>{
+        const pa = KEEP[a.parse.type], pb = KEEP[b.parse.type];
+        if (pa !== pb) return pa - pb;                                   // 炸→长牌型→三张→对子
+        if (b.cards.length !== a.cards.length) return b.cards.length - a.cards.length; // 张多优先(清更多散牌)
+        const wa = a.cards.filter(c=>Rules.isWild(c,level)).length, wb = b.cards.filter(c=>Rules.isWild(c,level)).length;
+        if (wa !== wb) return wa - wb;                                   // 少用百搭优先(留逢人配灵活)
+        return b.parse.key - a.parse.key;                               // 点力大的组靠前
+      });
+      const pick = combos[0];
+      out.push(Rules.sortHand(pick.cards, level));                      // 组内点力降序(级牌/王在左)
+      const used = new Set(pick.cards.map(c=>c.id));
+      pool = pool.filter(c=>!used.has(c.id));
+    }
+    if (pool.length) out.push(Rules.sortHand(pool, level));             // 剩余散牌垫最后一组
+    return out;
+  }
+
   // ── 决策 ────────────────────────────────────────────────────
   // ctx: { seat, hand, tableParse, lastSeat, handsLeft:[4], level }
   function decide(ctx){
@@ -300,6 +334,6 @@
   }
 
   return {
-    decide, chooseLead, hints, genCombos, allBombs, groups, findLines,
+    decide, chooseLead, hints, genCombos, allBombs, groups, findLines, arrangeGroups,
   };
 });

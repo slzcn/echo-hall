@@ -781,6 +781,10 @@
     // rows=null 时 renderHand 走 Rules.sortHand 自动理牌(全在下排); 非空则按 {top,bot} 两排的 id 顺序摆。
     // 掼蛋手牌多(27 张), 允许上下两排码牌: 拖一张到上方虚线区=分到上排, 拖回下方=下排, 排内按 x 定位插入。
     let rows = null, arrangeMode = false;
+    // 自动理牌模式: 'rank'=按大小一条线(百搭前置) / 'combo'=智能组牌分组分堆(对标腾讯欢乐掼蛋)。
+    //   短按 #gdSort 在两种模式间循环切换; groupStartIds=每组首张 id, 供渲染在组间留白。
+    let sortMode = 'rank';
+    let groupStartIds = new Set();
     let dragCard = null, dragId = null, dragStartX = 0, dragStartY = 0;
     function setArrange(on){
       arrangeMode = on;
@@ -789,7 +793,14 @@
       if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排'); }
       else renderHand();
     }
-    function autoSort(){ rows = null; renderHand(); sfx('cardsel'); toast('已按大小理牌'); }
+    const canCombo = ()=> !!(root.EHGuandanAI && typeof root.EHGuandanAI.arrangeGroups === 'function');
+    // 短按理牌: 退出手动排后回自动; 自动态则在 大小↔智能组牌 间循环。组牌不可用时只保留大小。
+    function autoSort(){
+      rows = null;
+      if (canCombo()) sortMode = sortMode === 'rank' ? 'combo' : 'rank';
+      renderHand(); sfx('cardsel');
+      toast(sortMode === 'combo' ? '已智能组牌 · 按牌型分堆' : '已按大小理牌');
+    }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
       const [topEl, botEl] = els.hand.children;
@@ -1027,6 +1038,7 @@
     function orderedRows(){
       const hand = st.players[mySeat].hand;
       const byId = new Map(hand.map(c=>[c.id,c]));
+      groupStartIds = new Set();   // 每趟重算; 手动排/大小排都无分组留白, 防组牌模式的旧边界残留
       if (rows){
         const placed = new Set();
         const pick = (ids)=> ids.filter(id=>byId.has(id) && !placed.has(id)).map(id=>{ placed.add(id); return byId.get(id); });
@@ -1036,8 +1048,16 @@
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
         return [top, bot];
       }
-      // 完全参考腾讯欢乐掼蛋: 逢人配(百搭=♥级牌)单拎到手牌最前醒目单列, 其余仍按点力降序。
-      //   (cardEl 已给百搭 .wild 品红光晕 + "配"角标; 此处只补它在腾讯里被单列到一端的【位置】。)
+      // 智能组牌(对标腾讯欢乐掼蛋分组显示): 把手牌拆成成型牌型分堆, 组间留白, 一眼看清现成组合。
+      if (sortMode === 'combo' && canCombo()){
+        const groups = root.EHGuandanAI.arrangeGroups(hand, st.level);
+        const bot = [];
+        groups.forEach(g=>{ if (g.length && bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
+        if (bot.length) return [[], bot];
+        // 兜底: 组牌异常空 → 退回大小排
+      }
+      // 按大小: 逢人配(百搭=♥级牌)单拎到手牌最前醒目单列, 其余按点力降序。
+      //   (cardEl 已给百搭 .wild 品红光晕 + "配"角标; 此处只补它被单列到一端的【位置】。)
       const sorted = Rules.sortHand(hand, st.level);
       const wild = [], rest = [];
       for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
@@ -1051,7 +1071,7 @@
       const [top, bot] = orderedRows();
       // 增量护栏(同斗地主): 手牌结构(两排 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
       //   免每秒一次重绘的 innerHTML churn + 两排 layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
-      const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'
+      const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'+sortMode+'|'
         + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
       if (structSig === lastHandSig){
@@ -1074,6 +1094,7 @@
         cards.forEach(card=>{
           const el = cardEl(card, st.level);
           el.dataset.idx = idx++;
+          if (groupStartIds.has(card.id)) el.classList.add('grp-start');   // 智能组牌: 每组首张左侧留白
           if (selected.has(card.id)) el.classList.add('sel');
           if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
           container.appendChild(el);
@@ -1097,13 +1118,21 @@
       const n = cards.length; if (!n) return;
       const W = els.hand.clientWidth; if (!W) return;
       const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 38;
-      // 排满: 步距 step 使 cw + (n-1)*step ≤ W; 牌少时封顶给自然扇形叠放
-      let step = n>1 ? (W - cw) / (n - 1) : 0;
+      // 智能组牌: 每组首张(除第一张)左侧额外留白 GAP, 让分堆可见。先扣掉总留白再算步距, 保证整排仍吃满不溢。
+      let nGap = 0; for (let i=1;i<n;i++) if (cards[i].classList.contains('grp-start')) nGap++;
+      let GAP = cw * 0.34;
+      // 组多导致留白吃掉过多宽度时按比例收窄 GAP, 给牌留足叠放空间(最挤时每张至少露 ~22%)
+      if (nGap > 0){ const maxGapTotal = W - cw - (n - 1) * (cw * -0.78); if (nGap * GAP > maxGapTotal) GAP = Math.max(0, maxGapTotal / nGap); }
+      // 排满: 步距 step 使 cw + (n-1)*step + nGap*GAP ≤ W; 牌少时封顶给自然扇形叠放
+      let step = n>1 ? (W - cw - nGap * GAP) / (n - 1) : 0;
       step = Math.min(step, cw * 0.64);         // 上限: 不过度分散
       // 亚像素外边距, 不 Math.round —— 取整会让每张多漂 ~0.15px, 满手 27 张累积溢出 ~10px
       // (最右一张右沿越出手牌带自身宽度)。精确到两位小数使 cw+(n-1)*step 恰好吃满 W, 严丝合缝不溢。
-      const ov = (step - cw).toFixed(2);         // 负外边距(叠放量)
-      for (let i=0;i<n;i++){ cards[i].style.marginLeft = i===0 ? '0px' : ov+'px'; }
+      const ov = (step - cw);                    // 负外边距(叠放量)
+      for (let i=0;i<n;i++){
+        const extra = (i>0 && cards[i].classList.contains('grp-start')) ? GAP : 0;
+        cards[i].style.marginLeft = i===0 ? '0px' : (ov + extra).toFixed(2)+'px';
+      }
     }
     function layoutHand(){ if (root.EHTableOrient) root.EHTableOrient.reflect(room); for (const row of els.hand.children) layoutRow(row); }
 

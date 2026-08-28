@@ -268,7 +268,14 @@ assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..
 // ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────
 // (10a) 手牌自适应: 每排动态叠放吃满一行、行内永不换行(治"27 张断裂"); 上下两排是玩家手动理牌所分, 非布局失控换行
 assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌自适应)');
-assert(/\(W - cw\) \/ \(n - 1\)/.test(ui), 'layoutRow 按可用宽算步距(牌多自动收紧, 每排排满)');
+assert(/\(W - cw - nGap \* GAP\) \/ \(n - 1\)/.test(ui), 'layoutRow 按可用宽算步距(扣掉组间留白后牌多自动收紧, 每排排满)');
+// (10a+) 智能组牌理牌(对标腾讯欢乐掼蛋分组显示): 短按 #gdSort 在 大小↔组牌 循环; 组间留白让分堆可见
+assert(/arrangeGroups/.test(fs.readFileSync(path.join(__dirname,'..','js','games','guandan-ai.js'),'utf8')),
+  'guandan-ai 有 arrangeGroups(整手贪心拆成成型牌型组, 纯展示用)');
+assert(/sortMode\s*===?\s*'combo'/.test(ui) && /EHGuandanAI\.arrangeGroups/.test(ui),
+  'orderedRows 组牌模式走 AI.arrangeGroups 分堆(否则回退大小排)');
+assert(/grp-start/.test(ui) && /GAP/.test(ui),
+  'layoutRow 给每组首张额外留白 GAP(分堆可见)');
 assert(/\.gd-hand-row\{[^}]*flex-wrap:nowrap/.test(ui), '每排 flex-wrap:nowrap(行内不换行, 杜绝布局失控断裂)');
 assert(/function renderHand\(\)[\s\S]{0,2200}layoutHand\(\);\s*\}/.test(ui), 'renderHand 末尾调用 layoutHand(渲染即排版)');
 // (Batch3) 增量护栏: 手牌结构(id序/回合锁/理牌态/级牌/发牌帧)未变即不重建; 仅选牌变 → 只切 .sel 类(升降走 transform 丝滑)
