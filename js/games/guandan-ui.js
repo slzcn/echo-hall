@@ -236,6 +236,20 @@
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
 .gd-hand.arranging .gd-hand-row.top:empty::before{content:'⬆ 拖到此处分成上排';color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.03em}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
+/* ── 智能组牌·竖列分组(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型竖直叠成一列,
+   组内牌上下叠(露顶角点数花色, 底牌露大花色), 多列横向排开底对齐, 列底标牌型名 ── */
+.gd-hand.combo{flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 2px 2px;overflow:visible}
+.gd-col{display:flex;flex-direction:column;align-items:center;flex:none}
+.gd-col .card{margin-top:-34px;cursor:pointer;transition:transform .14s ease,box-shadow .14s;transform-origin:center}
+.gd-col .card:first-child{margin-top:0}
+.gd-hand.combo.locked .card{cursor:default}
+/* 竖列里选中: 往左错开+上抬+高层级冒头(直接抬会被下一张压住), 一眼看清选了哪张 */
+.gd-hand.combo .card.sel{transform:translate(-7px,-12px) scale(1.05);box-shadow:0 6px 14px rgba(0,0,0,.42),0 0 0 2px var(--accent);z-index:6}
+.gd-hand.combo:not(.locked) .card:hover{transform:translateX(-5px)}
+.gd-col-label{margin-top:3px;font-size:10px;font-weight:800;color:var(--sub);background:var(--panel);
+  border:1px solid var(--line2);border-radius:6px;padding:1px 3px;white-space:nowrap;letter-spacing:0;line-height:1.25}
+.gd-room.is-land .gd-col .card{margin-top:-30px}
+.gd-room.is-land .gd-col-label{font-size:9px;padding:0 4px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
    放进独立表头条(in-flow, 右对齐), 不再 position:absolute 浮在牌面上——
    旧版按钮压住最右几张牌的角标(rank 在 top:3px), 满手 27 张时最右牌像"缺角/被裁";
@@ -763,6 +777,16 @@
       return best;
     }
     function handCardAt(x,y){
+      if(els.hand.classList.contains('combo')){
+        // 竖列分组: 先按 x 取列(取 left≤x 的最右列, 与横排 x 扫同构), 列内按 y 取牌(top≤y 的最下张)
+        const cols=[...els.hand.querySelectorAll('.gd-col')]; if(!cols.length) return null;
+        let col=cols[0];
+        for(const c of cols){ if(x >= c.getBoundingClientRect().left-0.5) col=c; else break; }
+        const kids=[...col.querySelectorAll('.card')]; if(!kids.length) return null;
+        let pick=kids[0];
+        for(const k of kids){ if(y >= k.getBoundingClientRect().top-0.5) pick=k; else break; }
+        return pick;
+      }
       const row=rowAt(y); if(!row) return null;
       const kids=row.children, n=kids.length; if(!n) return null;
       let pick=kids[0];
@@ -828,7 +852,7 @@
       rows = null;
       if (canCombo()) sortMode = sortMode === 'rank' ? 'combo' : 'rank';
       renderHand(); sfx('cardsel');
-      toast(sortMode === 'combo' ? '已智能组牌 · 按牌型分堆' : '已按大小理牌');
+      toast(sortMode === 'combo' ? '已智能组牌 · 按牌型竖列分组' : '已按大小理牌');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1082,45 +1106,37 @@
       const wild = [], rest = [];
       for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
       const rankSeq = wild.concat(rest);
-      // 上下两排(对标腾讯欢乐掼蛋): 手牌多(≥15 张)才分两排, 残局少牌收一排更清爽。
-      const TWO = hand.length >= 15;
-
-      // 智能组牌: 把手牌拆成成型牌型分堆(炸/顺/连对/三张/对子…), 组间留白, 一眼看清现成组合。
+      // 智能组牌(此单排分堆仅作 fallback: 手动排/进贡态下用; 正常组牌态走 renderHand 的竖列分组视图)。
       if (sortMode === 'combo' && canCombo()){
         const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
         if (groups.length){
-          if (!TWO){   // 单排: 各组依次排开, 组间留白
-            const bot = [];
-            groups.forEach(g=>{ if (bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
-            return [[], bot];
-          }
-          // 双排: 组按张数平衡分到上/下排, 组不拆散, 每排组间留白
-          const target = Math.ceil(hand.length / 2);
-          const top = [], bot = []; let topN = 0;
-          for (const g of groups){
-            const toTop = topN < target, row = toTop ? top : bot;
-            if (row.length) groupStartIds.add(g[0].id);
-            g.forEach(c=>row.push(c));
-            if (toTop) topN += g.length;
-          }
-          return [top, bot];
+          const bot = [];
+          groups.forEach(g=>{ if (bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
+          return [[], bot];
         }
         // 组牌异常空 → 落大小排
       }
-      if (!TWO) return [[], rankSeq];
-      const half = Math.ceil(rankSeq.length / 2);   // 大小序按张数对半分两排(上排大牌, 下排小牌)
-      return [rankSeq.slice(0, half), rankSeq.slice(half)];
+      return [[], rankSeq];   // 大小/兜底: 单排码牌(百搭前置), layoutRow 自适应叠放吃满不溢
     }
     let lastHandSig = '', lastSelSig = '';
     function renderHand(){
       if (st.phase==='lobby'){ els.hand.innerHTML=''; return; }
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const myTribute = myTributeTurn();   // 进贡阶段: 候选牌高亮(build 后 markTribute 补类)
-      const [top, bot] = orderedRows();
-      // 增量护栏(同斗地主): 手牌结构(两排 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
-      //   免每秒一次重绘的 innerHTML churn + 两排 layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
+      // 组牌竖列视图(对标腾讯一键理牌): 仅自动组牌态且非手动排/非进贡时启用; 每组竖直叠成一列。
+      let comboGroups = null;
+      if (sortMode==='combo' && !arrangeMode && !rows && !myTribute && canCombo()){
+        comboGroups = root.EHGuandanAI.arrangeGroups(st.players[mySeat].hand, st.level).filter(g=>g.length);
+        if (!comboGroups.length) comboGroups = null;
+      }
+      const comboView = !!comboGroups;
+      let top = [], bot = [];
+      if (!comboView){ const r = orderedRows(); top = r[0]; bot = r[1]; }
+      // 增量护栏(同斗地主): 手牌结构(排/列 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
+      //   免每秒一次重绘的 innerHTML churn + layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
       const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'+sortMode+'|'
-        + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
+        + (comboView ? 'C'+comboGroups.map(g=>g.map(c=>c.id).join('-')).join('_')
+                     : top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(','));
       const selSig = [...selected].sort().join(',');
       if (structSig === lastHandSig){
         // 结构没变、只是选牌变了 → 只在既有牌上切 .sel, 升降走 CSS transform 过渡(丝滑), 不整段重建
@@ -1131,9 +1147,34 @@
         return;
       }
       lastHandSig = structSig; lastSelSig = selSig;
-      els.hand.className='gd-hand'+(myTurn||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
+      els.hand.className='gd-hand'+(comboView?' combo':'')+(myTurn||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
+      if (comboView){
+        // 每组→渲染列: 成型牌型(能命名)聚成一竖列并标名; 散牌/单张各自单列(同腾讯, 不堆成无名列)。
+        const renderCols = [];
+        comboGroups.forEach(g=>{
+          const p = g.length >= 2 ? Rules.parse(g, st.level) : null;
+          const lab = p ? (typeLabel(p) || '') : '';
+          if (g.length >= 2 && lab) renderCols.push({ cards:g, label:lab });
+          else g.forEach(c=>renderCols.push({ cards:[c], label:'' }));
+        });
+        let idx = 0;   // 全局阅读序(列 by 列, 组内上→下): 供划选区间连选按 data-idx 补齐
+        renderCols.forEach(rc=>{
+          const col = document.createElement('div'); col.className='gd-col';
+          rc.cards.forEach(card=>{
+            const el = cardEl(card, st.level);
+            el.dataset.idx = idx++;
+            if (selected.has(card.id)) el.classList.add('sel');
+            if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
+            col.appendChild(el);
+          });
+          if (rc.label){ const lab = document.createElement('div'); lab.className='gd-col-label'; lab.textContent = rc.label; col.appendChild(lab); }
+          els.hand.appendChild(col);
+        });
+        layoutHand();
+        return;
+      }
       const rowTop = document.createElement('div'); rowTop.className='gd-hand-row top'; rowTop.dataset.row='0';
       const rowBot = document.createElement('div'); rowBot.className='gd-hand-row bot'; rowBot.dataset.row='1';
       els.hand.appendChild(rowTop); els.hand.appendChild(rowBot);
@@ -1182,7 +1223,35 @@
         cards[i].style.marginLeft = i===0 ? '0px' : (ov + extra).toFixed(2)+'px';
       }
     }
-    function layoutHand(){ if (root.EHTableOrient) root.EHTableOrient.reflect(room); for (const row of els.hand.children) layoutRow(row); }
+    // 竖列分组落位: 组内竖向叠放(定比露顶, 保证点数花色可读), 列间距按手牌宽度自适应(列多超宽收成负间距略叠)。
+    function layoutCombo(){
+      const cols=[...els.hand.querySelectorAll('.gd-col')]; if(!cols.length) return;
+      const W=els.hand.clientWidth; if(!W) return;
+      const c0=els.hand.querySelector('.card'); if(!c0) return;
+      const cw=c0.offsetWidth||36, ch=c0.offsetHeight||51;
+      // 竖向: 露顶 ~34% (够露 cn@top2 点数 + cs@top16 花色); 定比不随容器高变(容器高随内容自适应, 会循环)
+      const vstep=Math.max(Math.round(ch*0.34), 15);
+      const vov=(vstep-ch);
+      cols.forEach(c=>{ const ks=c.querySelectorAll('.card'); ks.forEach((k,i)=>{ k.style.marginTop = i===0?'0px':vov.toFixed(2)+'px'; }); });
+      // 横向: 按各列实际宽(标签可能比牌宽)均摊剩余宽度, 封顶 12px; 列多超宽则收成负间距(列略叠),
+      //   底限叠掉最窄列半宽, 保证整簇不横向溢出手牌带。用内容区宽度(clientWidth 扣左右 padding)。
+      const nCol=cols.length;
+      const cs=getComputedStyle(els.hand);
+      const avail=(els.hand.clientWidth||W) - (parseFloat(cs.paddingLeft)||0) - (parseFloat(cs.paddingRight)||0);
+      cols.forEach(c=>{ c.style.marginLeft='0px'; });        // 先清零再量自然宽
+      const widths=cols.map(c=>c.getBoundingClientRect().width);
+      const totalCol=widths.reduce((a,b)=>a+b,0);
+      // 列间距只落在 cols[1..](首列 margin=0): 总占用 = totalCol + (nCol-1)*gap。
+      //   gap ≤ (avail-totalCol)/(nCol-1) 时总宽 ≤ avail; 封顶 12px。首列不给负 margin(否则被拽出左沿),
+      //   justify-center 下: 总宽<avail 居中留白, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
+      const gap = nCol>1 ? Math.min(12, (avail - totalCol)/(nCol-1)) : 0;
+      cols.forEach((c,i)=>{ c.style.marginLeft = (i===0 ? 0 : gap).toFixed(2)+'px'; });
+    }
+    function layoutHand(){
+      if (root.EHTableOrient) root.EHTableOrient.reflect(room);
+      if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
+      for (const row of els.hand.children) layoutRow(row);
+    }
 
     function setBanner(){
       const b=els.banner; const cp=connPill();
