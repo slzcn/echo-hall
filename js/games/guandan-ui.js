@@ -67,21 +67,24 @@
   .gd-banner.mine{font-size:19px}
   .gd-btn{padding:14px 0;font-size:17px;max-width:150px;border-radius:14px}
   .gd-acts{gap:14px}}
-/* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮。原竖屏布局里三家绕中央、自己在底,
-   矮屏下侧席被压到与"我"这行撞字。横屏改成【三家一字排开贴顶(对家居中, 左右家上移到两侧顶角),
-   底部整条让给 我+手牌+操作区】—— 侧席 align-self:flex-start 上提, 中央椭圆压扁, 上下留白收紧。 */
-.gd-room.is-land{--av:34px;--avf:15px;--seatw:96px;--banner:12px;--hand-pad:5px;--hand-ov:-16px;--cw:36px;--ch:51px;--cn:12px;--cs:10px;--cc:20px}
-.gd-room.is-land .gd-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
+/* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮。此前用"侧席贴顶角 + 我的座位 padding-left:118px
+   硬塞进空档"的方案在真机上互相压字(理牌钮压右家、我的座位压回合横幅、手牌盖中央提示)——那是乱版根因。
+   现在改回【与竖屏同构的自然列布局】: 对家居中贴顶, 左右家在中段两侧垂直居中夹住中央出牌区, 底部整条留给
+   我+手牌+操作区。靠整体压缩(头像/卡牌/间距变小)吃进矮屏, 不再做位移 hack, 各区天然不重叠。 */
+.gd-room.is-land{--av:32px;--avf:15px;--seatw:92px;--banner:12px;--hand-pad:3px;--hand-ov:-22px;--cw:34px;--ch:48px;--cn:12px;--cs:9px;--cc:19px;--cmw:22px;--cmh:31px}
+.gd-room.is-land .gd-bar{padding-top:calc(3px + env(safe-area-inset-top,0px));padding-bottom:3px}
 .gd-room.is-land .gd-partner{padding:2px 8px 0}
-.gd-room.is-land .gd-side{align-self:flex-start;justify-content:flex-start;padding-top:2px}  /* 左右家上提到两侧顶角(与对家一字排开贴顶), 整条底部让给"我"+手牌, 左下列彻底空出 */
-.gd-room.is-land .gd-center{min-height:0;padding:0 6px;justify-content:flex-start;gap:3px}  /* 出牌区上提贴对家, 让出中下段给"我"的居中头像, 不再互相压字 */
-.gd-room.is-land .gd-center::before{top:0;bottom:0}
-.gd-room.is-land .gd-played{min-height:36px}
-.gd-room.is-land .gd-me{padding:2px 14px 0 118px}  /* 自己落在"左侧家与中央出牌区之间"的空档(左家在最左顶角、出牌区在正中), 三者互不压字 */
-.gd-room.is-land .gd-hand{padding:5px 0 2px}
+.gd-room.is-land #gdP2 .gd-tags{display:none}                 /* 横屏矮: 对家(顶部=必为队友)的标签行会压到中央横幅, 隐掉——顶部位置+名字着色已表意, 左右家的对手标签保留 */
+.gd-room.is-land .gd-mid{align-items:center}                 /* 左右家垂直居中于中段, 与中央出牌区一排, 不再上提到顶角撞手牌头 */
+.gd-room.is-land .gd-side{padding:0 2px}
+.gd-room.is-land .gd-center{min-height:0;padding:0 6px;gap:2px}
+.gd-room.is-land .gd-center::before{top:2%;bottom:2%}
+.gd-room.is-land .gd-played{min-height:28px}
+.gd-room.is-land .gd-me{padding:1px 14px 0;justify-content:center}   /* 我的座位条底部居中(矮屏左对齐会贴到左家 灵魂下), 居中避开侧席 */
+.gd-room.is-land .gd-hand{padding:3px 0 2px;gap:3px}
 .gd-room.is-land .gd-hand-head{min-height:0;padding-top:0;padding-bottom:1px}
-.gd-room.is-land .gd-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
-.gd-room.is-land .gd-say{top:40px}
+.gd-room.is-land .gd-acts{padding-top:3px;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))}
+.gd-room.is-land .gd-say{top:34px}
 @keyframes gdRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .gd-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
@@ -112,8 +115,8 @@
 .gd-side{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 4px;flex:none}
 .gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative;isolation:isolate}
 .gd-center::before{content:'';position:absolute;left:2%;right:2%;top:8%;bottom:8%;border-radius:50%/42%;
-  background:radial-gradient(ellipse at center,rgba(0,229,212,.07),rgba(0,229,212,.02) 55%,transparent 72%);
-  border:1px solid rgba(0,229,212,.07);z-index:-1;pointer-events:none}
+  background:radial-gradient(ellipse at center,rgba(0,229,212,.13),rgba(0,229,212,.045) 52%,rgba(0,229,212,.015) 72%,transparent 82%);
+  border:1px solid rgba(0,229,212,.14);box-shadow:inset 0 0 40px rgba(0,229,212,.06),0 0 24px rgba(0,229,212,.04);z-index:-1;pointer-events:none}
 /* 本桌记分条: 两队当前等级 + 已赢副数(按队着色), 常驻牌桌顶部——按"队"展示不每席重复堆信息 */
 .gd-score{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:5px 10px 0;flex-shrink:0}
 .gd-team{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
@@ -290,9 +293,18 @@
 .gd-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
 .gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
 /* 结算 */
-.gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:12px;
+.gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:safe center;
   overflow-y:auto;overscroll-behavior:contain;
-  background:rgba(4,6,12,.86);backdrop-filter:blur(3px);animation:gdRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
+  background:radial-gradient(ellipse at 50% 34%,rgba(0,229,212,.09),transparent 62%),rgba(4,6,12,.9);backdrop-filter:blur(4px);animation:gdRoomIn .2s;padding:18px;box-sizing:border-box;text-align:center}
+/* 战报玻璃卡片: 内容收进赛博卡片(圆角+青边+内投影), 不再是浮在牌桌上的散落文字(治"结算页也乱") */
+.gd-over-panel{width:min(94%,400px);display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:22px 20px calc(22px + env(safe-area-inset-bottom,0px));box-sizing:border-box;
+  background:linear-gradient(158deg,rgba(19,42,41,.96),rgba(9,15,26,.96));
+  border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),0 0 40px rgba(0,229,212,.12)}
+.gd-over.win .gd-over-panel{border-color:rgba(0,229,212,.55)}
+.gd-over.lose .gd-over-panel{border-color:rgba(255,45,142,.5);box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),0 0 40px rgba(255,45,142,.12)}
+.gd-over-panel .gd-acts{padding:0;gap:10px;width:100%}
 .gd-over h2{font-size:28px;margin:0;letter-spacing:.08em;font-weight:900}
 .gd-over.win h2{color:var(--accent);text-shadow:var(--glow-cyan)}
 .gd-over.lose h2{color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag)}
@@ -354,17 +366,21 @@
 /* ── 竖屏手机(<600 宽; 横屏 .is-land 宽>599 不命中): 中央收紧不空旷, 提示稳定不跳动, 操作区整齐 ──
    放在样式表末尾, 源序在 base 之后方能覆盖 base 的 flex/min-height。大屏(min-width) 与横屏(.is-land) 断点不受影响。 */
 @media (max-width:599px){
-  .gd-felt{justify-content:center}          /* 牌桌整体在竖向余量里居中, 上下留白对称, 不头重脚轻 */
-  .gd-mid{flex:none}                          /* 中段不再无限撑高: 空椭圆收成贴合座位的小圈, 减少中间大片空 */
-  .gd-center{min-height:92px;gap:4px}
-  .gd-center::before{top:4%;bottom:4%}        /* 绒面椭圆贴合收紧后的中段, 不再空撑 */
-  .gd-partner{padding-top:6px}
+  /* 此前把中段收成 flex:none 小圈 → 牌桌挤在中上、上下留大片空(主人说"不美观")。改为让中段填满竖向余量:
+     对家贴顶、左右家分到牌桌两侧、中央出牌区居中, 整块牌桌撑开吃满(对标腾讯的大牌桌观感), 不再头重脚轻。 */
+  .gd-felt{justify-content:flex-start}
+  .gd-mid{flex:1;min-height:0}                /* 中段撑满剩余竖向空间: 侧席被推到牌桌两侧, 消除中部空洞 */
+  .gd-center{min-height:0;gap:6px}
+  .gd-center::before{top:6%;bottom:6%;left:1%;right:1%}   /* 绒面椭圆随撑开的中段放大成真牌桌, 不再是小圈 */
+  .gd-partner{padding-top:10px}
   .gd-banner{min-height:22px}                 /* 回合提示恒定高度: 轮到/思考中/等待裁决切换不跳动 */
   .gd-who{min-height:16px}
-  .gd-played{min-height:56px}                 /* 出牌区预留恒定高度, 有无牌都不抖 */
+  .gd-played{min-height:60px}                 /* 出牌区预留恒定高度, 有无牌都不抖 */
 }
 
 /* ── 就地招募态: 空位虚线可点, 占用实心, host 请离按钮; 邀请菜单同 ddz 语汇 ── */
+/* 招募态无手牌 → 藏掉手牌条(含🔀理牌钮): 空牌条+"理牌"钮在无牌的招募页毫无意义(治"招募页乱") */
+.gd-room[data-phase="lobby"] .gd-hand-wrap{display:none}
 .gd-seat.gd-lobby-empty{cursor:pointer}
 .gd-seat.gd-lobby-empty .gd-avr .av{background:transparent;border-style:dashed;color:var(--accent,#00e5d4);font-weight:700}
 .gd-seat.gd-lobby-empty:hover .gd-avr .av{box-shadow:0 0 12px var(--accent,rgba(0,229,212,.5))}
@@ -1018,6 +1034,7 @@
       </div>`;
     }
     function renderSeats(){
+      room.dataset.phase = st.phase;   // 阶段驱动版面(招募态藏手牌区/理牌钮; CSS 按此响应)
       els.p2.innerHTML = seatHTML(SEAT_T);   // 对家/队友(上)
       els.p3.innerHTML = seatHTML(SEAT_L);   // 下家(左) —— 顺时针我的下一手落左侧
       els.p1.innerHTML = seatHTML(SEAT_R);   // 上家(右)
@@ -1132,15 +1149,20 @@
       }
       // 大小模式: 手牌多时上下分两排(对标腾讯欢乐掼蛋 27 张双排 —— 单排挤 27 张每张只露一条看不清点数);
       //   残局少牌(<15)收一排更紧凑。百搭已在 rankSeq 最前 → 自然落上排头保持醒目。
-      if (rankSeq.length >= 15){
+      //   ★横屏(.is-land)例外: 又宽又矮, 两排手牌(~116px)把牌桌 felt 挤到溢出压座位; 横屏宽度足够(~800px)
+      //     单排码 27 张仍清晰, 故横屏一律收单排, 省出竖向空间让牌桌各区不再重叠。
+      const landscape = room.classList.contains('is-land');
+      if (rankSeq.length >= 15 && !landscape){
         const half = Math.ceil(rankSeq.length / 2);
         return [rankSeq.slice(0, half), rankSeq.slice(half)];
       }
-      return [[], rankSeq];   // 残局少牌: 单排码牌(百搭前置), layoutRow 自适应叠放吃满不溢
+      return [[], rankSeq];   // 残局少牌 / 横屏: 单排码牌(百搭前置), layoutRow 自适应叠放吃满不溢
     }
-    let lastHandSig = '', lastSelSig = '';
+    let lastHandSig = '', lastSelSig = '', _lastLand = null;
     function renderHand(){
       if (st.phase==='lobby'){ els.hand.innerHTML=''; return; }
+      // 先定横竖屏(orderedRows/structSig 要按此决定单排/两排), 免旋转后隔一帧才收拢
+      if (root.EHTableOrient) root.EHTableOrient.reflect(room);
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const myTribute = myTributeTurn();   // 进贡阶段: 候选牌高亮(build 后 markTribute 补类)
       // 组牌竖列视图(对标腾讯一键理牌): 仅自动组牌态且非手动排/非进贡时启用; 每组竖直叠成一列。
@@ -1273,6 +1295,10 @@
     }
     function layoutHand(){
       if (root.EHTableOrient) root.EHTableOrient.reflect(room);
+      // 横竖屏切换(⟳/侧持)时手牌排数变(横屏单排/竖屏两排)→ 需整段重建而非只重排; 首次(_lastLand=null)不触发。
+      const land = room.classList.contains('is-land');
+      if (_lastLand !== null && land !== _lastLand){ _lastLand = land; renderHand(); return; }
+      _lastLand = land;
       if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
       for (const row of els.hand.children) layoutRow(row);
     }
@@ -1603,7 +1629,7 @@
         dealAnim=true; selected.clear(); hintCycle=[]; rows=null;
         lastShownKey=''; lastFinishedN=0; lastMyTurn=false;
         if (arrangeMode) setArrange(false);
-        const ov=els.felt.querySelector('.gd-over'); if(ov) ov.remove();
+        const ov=room.querySelector('.gd-over'); if(ov) ov.remove();
       }
       awaitingHost=false;                 // 快照到达即解锁(host 已裁决)
       dealNo = (typeof snap.dealNo==='number') ? snap.dealNo : dealNo;
@@ -1815,16 +1841,18 @@
       const lvA = res.teamLevelsAfter || st.teamLevels || [2,2];
       const cumLine = `本桌累计 · <span class="cm mine">我方 打<b>${LVL_LABEL(lvA[myT])}</b> · 胜${teamWins[myT]}副</span><span class="cm foe">对方 打<b>${LVL_LABEL(lvA[foeT])}</b> · 胜${teamWins[foeT]}副</span>`;
       over.innerHTML=`
-        <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
-        <div class="rank-list">${rankRows}</div>
-        <div class="gd-remains" id="gdRemains"></div>
-        <div class="lvlup">${lvlLine}</div>
-        <div class="gd-cum">${cumLine}</div>
-        <div class="gd-acts" style="margin-top:4px">
-          <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
-          <button class="gd-btn primary" id="gdDone">收工</button>
+        <div class="gd-over-panel">
+          <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
+          <div class="rank-list">${rankRows}</div>
+          <div class="gd-remains" id="gdRemains"></div>
+          <div class="lvlup">${lvlLine}</div>
+          <div class="gd-cum">${cumLine}</div>
+          <div class="gd-acts" style="margin-top:4px">
+            <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
+            <button class="gd-btn primary" id="gdDone">收工</button>
+          </div>
         </div>`;
-      els.felt.appendChild(over);
+      room.appendChild(over);   // ★挂到整个房间(非 felt): 盖满全屏, 不再让底部"我的座位/理牌钮/手牌条"漏在战报下方(治"结算页也乱")
       // 残局(对标腾讯亮残牌): 掼蛋终局只有末游还捏着牌 → 亮它剩了哪些, 让人看清"卡在哪几张"。
       const remainBox = over.querySelector('#gdRemains');
       if (remainBox){
