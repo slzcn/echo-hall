@@ -205,6 +205,23 @@
       const all = genCombos(hand, level, g.wilds.length);
       const fin = all.find(c=>c.cards.length===hand.length && Rules.beats(c.parse, target, level));
       if (fin) return { action:'play', cards: fin.cards };
+      // ★残局推进(治"队友能走掉却不出"): 我已进残局(≤3 张)且不比对家更远 → 别再干让,
+      //   出一手非炸的推进牌把自己往走完推(而不是干让, 迟迟推进不了名次)。选"出后剩余手数最少"一手,
+      //   平局挑代价最小; 只压非炸(不拿炸压自己人)。对家比我更近时不触发, 仍让他先走。
+      {
+        const leaderLeft0 = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+        if (hand.length <= 3 && hand.length <= leaderLeft0){
+          let beats = genCombos(hand, level, 0).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+          if (!beats.length && g.wilds.length)
+            beats = genCombos(hand, level, g.wilds.length).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+          if (beats.length){
+            beats.sort((a,b)=>
+              (estTricks(withoutCards(hand,a.cards),level) - estTricks(withoutCards(hand,b.cards),level))
+              || (playCost(a,hand,level) - playCost(b,hand,level)));
+            return { action:'play', cards: beats[0].cards };
+          }
+        }
+      }
       // ★队友垫牌助攻(治"队友灵魂总不出牌"): 对家领出的是小牌、我手里还多时, 用一手「小而不拆大牌、
       //   不用百搭/炸」的牌接管这一轮 —— 逼下家对手拿更大的牌来压(帮队友给对手制造难度)+ 清自己散张。
       //   严设限: 对家快走完(≤2)就让他; 只甩点数不高(≤10)、代价低的天然牌; 自己手牌够多(>4)才垫。

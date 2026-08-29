@@ -255,11 +255,21 @@
     if (isTeammateLead(ctx)){
       const finisher = plays.find(p => p.cards.length === hand.length);
       if (finisher) return { action:'play', cards: finisher.cards };
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      // ★残局推进(治"队友能走掉却不出"): 我已进残局(≤3 张)且不比队友更远 → 别再干让,
+      //   出一手非炸的推进牌把自己往"走掉"推(农民任一家清空即赢, 近门该抢着走, 而不是傻让给队友)。
+      //   选"出后剩余手数最少"的一手(estTricks), 平局挑代价最小; plays 已不含炸/王 → 不会拿炸压队友。
+      //   队友比我更近(leaderLeft < 我) 时不触发, 仍让他赢。
+      if (plays.length && hand.length <= 3 && hand.length <= leaderLeft){
+        const adv = plays.slice().sort((a,b)=>
+          (estTricks(withoutCards(hand,a.cards)) - estTricks(withoutCards(hand,b.cards)))
+          || (playCost(a,hand) - playCost(b,hand)));
+        return { action:'play', cards: adv[0].cards };
+      }
       // ★队友垫牌助攻(治主人反馈"队友灵魂总不出牌"): 队友领出的是小牌、我手里还多且有便宜散牌可甩时,
       //   用一手「小而不拆大牌」的牌接管这一轮 —— 逼下家对手拿出更大的牌来压(帮队友给对手制造难度),
       //   顺带清掉自己的散张。严设限防搅局: 绝不用炸/王压队友; 队友快走完(≤2 张)就让他赢这轮;
       //   只甩点数不高(≤J)、代价低(不拆炸/三条/王)的牌; 自己手牌够多(>4)才值得垫。
-      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
       if (ctx.coop!==false && plays.length && hand.length > 4 && leaderLeft >= 3){
         const cheap = plays
           .filter(p => p.parse.key <= 11 && playCost(p,hand) < 15)   // 小牌型且不拆大牌
