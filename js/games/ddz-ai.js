@@ -237,6 +237,21 @@
     const target = ctx.tableParse || null;
     const { plays, bombs, rocket } = candidates(hand, target);
 
+    // ★立即走完(治"手握能一把清空的牌却不打"): 任何一手能【清空整手】且(跟牌时)压得过桌面的出牌——
+    //   含普通牌型 + 炸弹 + 王炸 —— 一律立刻打出。走完 = 名次到手(农民任一家清空即赢), 无条件最优,
+    //   优先于让牌/保牌/垫牌。旧 finisher 只在非炸 plays 里找 → 漏了"整手就是一个炸/王炸能一把赢"这洞。
+    {
+      const goCand = [
+        ...plays,
+        ...bombs.map(cards=>({cards, parse:Rules.parse(cards)})),
+        ...(rocket ? [{cards:rocket, parse:Rules.parse(rocket)}] : []),
+      ].filter(x=>x.parse && x.cards.length===hand.length && (!target || Rules.beats(x.parse, target)));
+      if (goCand.length){
+        goCand.sort((a,b)=> playCost(a,hand) - playCost(b,hand));   // 多种走完法取代价最小
+        return { action:'play', cards: goCand[0].cards };
+      }
+    }
+
     // 对手是否即将赢(报单/报双):只看「真对手」的剩牌数(队友快赢不算威胁)
     const oppMin = minOpponentCards(ctx);
     // ★农民协作: 地主进入残局(≤3 张)就该视为紧迫, 提前动炸弹/大牌拦截, 别等报单才反应 ——
@@ -253,8 +268,7 @@
     // 队友协作:桌面这手是我队友(同为农民)出的 → 一般让牌不压自己人,
     //   除非能「一把出完」直接终结本方胜(农民任一家清空即赢)。
     if (isTeammateLead(ctx)){
-      const finisher = plays.find(p => p.cards.length === hand.length);
-      if (finisher) return { action:'play', cards: finisher.cards };
+      // (能一把走完已在上面「立即走完」处理, 含炸/王炸)
       const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
       // ★残局推进(治"队友能走掉却不出"): 我已进残局(≤3 张)且不比队友更远 → 别再干让,
       //   出一手非炸的推进牌把自己往"走掉"推(农民任一家清空即赢, 近门该抢着走, 而不是傻让给队友)。
@@ -281,10 +295,8 @@
 
     // 跟牌:有能压的普通牌 → 出最小的那手(保守),除非能一把走完
     if (plays.length){
-      // 若某手出完后手牌清空(接近赢) → 优先
-      const finisher = plays.find(p => p.cards.length === hand.length);
-      if (finisher) return { action:'play', cards: finisher.cards };
-      // 否则挑「代价最小」的一手:优先不拆大牌、点数最小; 同代价则出后剩余手数少者优先(别拆散自己结构)
+      // (能一把走完已在上面「立即走完」处理) 挑「代价最小」的一手:优先不拆大牌、点数最小;
+      //   同代价则出后剩余手数少者优先(别拆散自己结构)
       plays.sort((a,b)=> (playCost(a,hand) - playCost(b,hand))
         || (estTricks(withoutCards(hand,a.cards)) - estTricks(withoutCards(hand,b.cards))));
       // 若对手不紧急,且要出的牌点很大(≥2/A)又是单张,倾向 pass 保牌
@@ -381,9 +393,11 @@
       if (rocket) return rocket;
       return [hand[hand.length-1]]; // 兜底最小单张
     }
-    // 若能一把走完(手牌全出) → 直接出
+    // 若能一把走完(手牌全出) → 直接出。plays 不含炸/王炸, 故整手恰好是一个炸/王炸的走完法要单独查。
     const finisher = plays.find(p => p.cards.length === hand.length);
     if (finisher) return finisher.cards;
+    if (bombs.length){ const gb = bombs.find(b=>b.length===hand.length); if (gb) return gb; }
+    if (rocket && rocket.length===hand.length) return rocket;
 
     // 对手报单/报双: 用公开读牌收窄候选, 憋死低张真对手 —— 别把牌权/走脱机会送出去。
     const oppMin = ctx ? minOpponentCards(ctx) : 99;

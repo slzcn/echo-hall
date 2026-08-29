@@ -196,15 +196,23 @@
     const target = ctx.tableParse || null;
     const g = groups(hand, level);
 
+    // ★立即走完(与斗地主同源): 任何一手能【清空整手】且(跟牌时)压得过桌面的出牌(含炸/王炸)一律立刻打出。
+    //   走完 = 名次到手(头游/双下最高分), 无条件最优, 优先于让牌/保牌/垫牌。genCombos 含炸 → 不漏"整手一炸赢"。
+    {
+      const goCand = genCombos(hand, level, g.wilds.length)
+        .filter(c=>c.cards.length===hand.length && (!target || Rules.beats(c.parse, target, level)));
+      if (goCand.length){
+        goCand.sort((a,b)=> playCost(a,hand,level) - playCost(b,hand,level));
+        return { action:'play', cards: goCand[0].cards };
+      }
+    }
+
     if (!target){
       return { action:'play', cards: chooseLead(hand, level, ctx) };
     }
 
-    // 队友控场: 桌面这手是对家出的 → 让牌(除非能一把走完)
+    // 队友控场: 桌面这手是对家出的 → 让牌(能一把走完已在上面「立即走完」处理, 含炸)
     if (isTeammateLead(ctx)){
-      const all = genCombos(hand, level, g.wilds.length);
-      const fin = all.find(c=>c.cards.length===hand.length && Rules.beats(c.parse, target, level));
-      if (fin) return { action:'play', cards: fin.cards };
       // ★残局推进(治"队友能走掉却不出"): 我已进残局(≤3 张)且不比对家更远 → 别再干让,
       //   出一手非炸的推进牌把自己往走完推(而不是干让, 迟迟推进不了名次)。选"出后剩余手数最少"一手,
       //   平局挑代价最小; 只压非炸(不拿炸压自己人)。对家比我更近时不触发, 仍让他先走。
@@ -251,8 +259,7 @@
     const urgent = oppMin <= 2 || (coopMe && (oppMin <= 3 || partnerOut));
 
     if (follow.length){
-      const fin = follow.find(c=>c.cards.length===hand.length);
-      if (fin) return { action:'play', cards: fin.cards };
+      // (能一把走完已在上面「立即走完」处理, 含炸/王炸)
       follow.sort((a,b)=>{
         const c = playCost(a,hand,level) - playCost(b,hand,level);
         if (c) return c;

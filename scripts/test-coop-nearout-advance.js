@@ -44,5 +44,40 @@ const c=(rank,suit)=>D.makeCard(rank, suit||'♠');
   ok(r2.action==='pass', '掼蛋·对家更近(2<3): 仍让牌 pass');
 }
 
+// ── 立即走完·含炸/王炸(治"手握能一把清空的牌却不打") ──────────────
+{
+  // 斗地主 跟牌: 整手四个9(炸弹), 对手(地主 seat1)领出单5 → 该炸出去赢, 而非拆单9
+  const r1=DDZ.decide({ seat:0, hand:[c(9,'♠'),c(9,'♥'),c(9,'♣'),c(9,'♦')],
+    tableParse:DR.parse([c(5,'♦')]), lastSeat:1, landlord:1, handsLeft:[4,6,17] });
+  ok(r1.action==='play' && r1.cards.length===4, '斗地主·跟牌: 整手炸弹能压单牌走完 → 炸出去赢(不拆单)');
+  // 斗地主 跟牌: 整手双王(王炸), 对手领出单A → 王炸走完, 而非拆单个王
+  const r2=DDZ.decide({ seat:0, hand:[c(16),c(17)],
+    tableParse:DR.parse([c(14,'♦')]), lastSeat:1, landlord:1, handsLeft:[2,6,17] });
+  ok(r2.action==='play' && r2.cards.length===2, '斗地主·跟牌: 整手王炸能压单 → 王炸走完(不拆王)');
+  // 斗地主 首出: 整手四个9 → 炸出去走完, 而非领单9
+  const r3=DDZ.decide({ seat:0, hand:[c(9,'♠'),c(9,'♥'),c(9,'♣'),c(9,'♦')],
+    tableParse:null, lastSeat:null, landlord:2, handsLeft:[4,6,17] });
+  ok(r3.action==='play' && r3.cards.length===4, '斗地主·首出: 整手炸弹 → 炸出去走完(不领单)');
+  // 队友领出也一样: 整手炸弹能压 → 炸出去赢(农民清空即赢), 不让不垫
+  const r4=DDZ.decide({ seat:0, hand:[c(9,'♠'),c(9,'♥'),c(9,'♣'),c(9,'♦')],
+    tableParse:DR.parse([c(5,'♦')]), lastSeat:1, landlord:2, handsLeft:[4,6,17] });
+  ok(r4.action==='play' && r4.cards.length===4, '斗地主·队友领出: 整手炸弹能压 → 炸出去赢(不干让)');
+}
+{
+  // 掼蛋 跟牌: 整手四个8(天然炸弹), 对手(seat1)领出单6 → 炸出去走完
+  const L=2;
+  const r1=GD.decide({ seat:0, hand:[c(8,'♠'),c(8,'♥'),c(8,'♣'),c(8,'♦')],
+    tableParse:GR.parse([c(6,'♦')],L), lastSeat:1, level:L, handsLeft:[4,8,6,8] });
+  ok(r1.action==='play' && r1.cards.length===4, '掼蛋·跟牌: 整手炸弹能压单 → 炸出去走完(不拆单)');
+}
+
+{
+  // 斗地主 chooseLead 直接调用(人类超时自动出/decide 兜底路径): 整手炸弹 → 领整炸走完, 不领单
+  const hand=[c(9,'♠'),c(9,'♥'),c(9,'♣'),c(9,'♦')];
+  const cand=DDZ.candidates(hand, null);
+  const lead=DDZ.chooseLead(hand, cand.plays, cand.bombs, cand.rocket, {});
+  ok(lead.length===4, '斗地主·chooseLead 直调: 整手炸弹 → 领整炸走完(不领单)');
+}
+
 console.log(`\n通过 ${pass} · 失败 ${fail}`);
 process.exit(fail?1:0);
