@@ -1130,7 +1130,13 @@
         }
         // 组牌异常空 → 落大小排
       }
-      return [[], rankSeq];   // 大小/兜底: 单排码牌(百搭前置), layoutRow 自适应叠放吃满不溢
+      // 大小模式: 手牌多时上下分两排(对标腾讯欢乐掼蛋 27 张双排 —— 单排挤 27 张每张只露一条看不清点数);
+      //   残局少牌(<15)收一排更紧凑。百搭已在 rankSeq 最前 → 自然落上排头保持醒目。
+      if (rankSeq.length >= 15){
+        const half = Math.ceil(rankSeq.length / 2);
+        return [rankSeq.slice(0, half), rankSeq.slice(half)];
+      }
+      return [[], rankSeq];   // 残局少牌: 单排码牌(百搭前置), layoutRow 自适应叠放吃满不溢
     }
     let lastHandSig = '', lastSelSig = '';
     function renderHand(){
