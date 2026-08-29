@@ -301,6 +301,20 @@
         || (estTricks(withoutCards(hand,a.cards)) - estTricks(withoutCards(hand,b.cards))));
       // 若对手不紧急,且要出的牌点很大(≥2/A)又是单张,倾向 pass 保牌
       const best = plays[0];
+      // ★卡报单对手(治"跟牌出最小单张, 正好被剩 1 张的对手反压走脱"——主人反馈"对手剩单张灵魂不卡牌"):
+      //   桌面是单张、某真对手已报单(剩 1 张)时, 出【他压不过的单张】把他卡住 —— 他这轮跟不了, 牌权大概率
+      //   转回我方; 而出最小单可能正好被他那张更大的单压过、白送他走。读公开牌(unseen)判他压不过: 有多个取
+      //   最小那个(省大牌); 一个都没有(他可能有更大单)→ 甩最大单赌憋(总强过随手最小被反压; 报单场景绝不能
+      //   pass 把牌权送出让他领出走掉)。跟牌只能同型 → 桌面单张时无法"改出对子", 卡法就是出他压不过的大单。
+      if (target.type==='single' && minOpponentCards(ctx)===1){
+        const singles = plays.filter(p=>p.parse.type==='single');
+        const unseen = unseenRankCounts(ctx);
+        if (unseen && singles.length){
+          const boss = singles.filter(p=>!hasHigherSingle(unseen, p.parse.key));
+          if (boss.length){ boss.sort((a,b)=> a.parse.key-b.parse.key); return { action:'play', cards: boss[0].cards }; }
+          singles.sort((a,b)=> b.parse.key-a.parse.key); return { action:'play', cards: singles[0].cards };
+        }
+      }
       // ★压制地主(队友协作): 我是农民、桌面这手正是地主领出的 → 别为"保 2/A 大单张"而放地主过牌。
       //   地主一旦顺出散牌就滚雪球; 农民该主动接管牌权把地主的节奏打断。故面对地主领出时取消保牌 pass。
       const suppressLandlord = ctx.coop!==false && isPeasantSeat(ctx, ctx.seat) && ctx.lastSeat===ctx.landlord;

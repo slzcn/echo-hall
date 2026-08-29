@@ -267,6 +267,19 @@
         return estTricks(withoutCards(hand,a.cards),level) - estTricks(withoutCards(hand,b.cards),level);
       });
       const best = follow[0];
+      // ★卡报单对手(治"跟牌出最小单张, 正好被剩 1 张的对手反压走脱"——主人反馈"对手剩单张灵魂不卡牌"):
+      //   桌面是单张、某真对手报单(剩 1 张)时, 掼蛋无公开读牌 → 启发式出能压的【最大】单张赌他压不过,
+      //   而不是随手最小单被反压白送他走。只在天然散单里挑(排除拆炸/王的高代价单, 那些留着更值);
+      //   跟牌只能同型, 桌面单张无法改出对子, 卡法就是出大单。报单场景不 pass(否则牌权送出让他领出走掉)。
+      if (target.type==='single' && minOpponentCards(ctx)===1){
+        const singles = follow.filter(p=>p.parse.type==='single');
+        if (singles.length > 1){
+          const cheap = singles.filter(p=> playCost(p,hand,level) < 40);   // 不拆王(+40)/炸(+120)
+          const pickFrom = cheap.length ? cheap : singles;
+          pickFrom.sort((a,b)=> b.parse.key - a.parse.key);                // 最大单优先(最可能憋住报单对手)
+          return { action:'play', cards: pickFrom[0].cards };
+        }
+      }
       // ★压制对手(协作): 走到这里桌面必是对手领出(对家领出已在上面让牌)。别为保 A/级大单张
       //   而放对手过牌滚雪球 —— 主动接管牌权打断对手节奏。故协作开启时取消对手领出的保牌 pass。
       // ★卡对手: 领出这手的真对手快走完(≤4)时别为保 A/级大单而 pass, 主动卡住他。

@@ -79,5 +79,29 @@ const c=(rank,suit)=>D.makeCard(rank, suit||'♠');
   ok(lead.length===4, '斗地主·chooseLead 直调: 整手炸弹 → 领整炸走完(不领单)');
 }
 
+// ── 卡报单对手·跟牌别送牌(治"对手剩单张灵魂不卡牌") ──────────────
+{
+  // 斗地主 跟牌: 桌面单6(地主seat2报单领出), 我(农民seat0)有单8/单K, 无读牌信息 →
+  //   出最大能压单K赌憋(别出最小单8正好被他反压走脱)
+  const r1=DDZ.decide({ seat:0, hand:[c(8,'♠'),c(13,'♦'),c(4,'♣')],
+    tableParse:DR.parse([c(6,'♦')]), lastSeat:2, landlord:2, handsLeft:[3,10,1], log:[] });
+  ok(r1.action==='play' && r1.cards[0].rank===13,
+     '斗地主·卡报单: 桌面单、对手剩1张、无读牌 → 出最大能压单K(不送最小单8)');
+  // 斗地主 跟牌·读牌精准: 2 与双王的单都已打光 → A 之上无牌可压, 出 A(他压不过)而非 K(怕被 A 压); 省到最合适的 boss
+  const r2=DDZ.decide({ seat:0, hand:[c(13,'♦'),c(14,'♠'),c(4,'♣')],
+    tableParse:DR.parse([c(6,'♥')]), lastSeat:2, landlord:2, handsLeft:[3,10,1],
+    log:[{ t:'play', cards:['s15','h15','c15','d15','js','jb'] }] });
+  ok(r2.action==='play' && r2.cards[0].rank===14,
+     '斗地主·卡报单·读牌: 2/双王已出光 → 出 A(对手压不过)卡死, 不出会被 A 反压的 K');
+}
+{
+  // 掼蛋 跟牌: 桌面单6(对手seat1报单领出), 我(seat0)有单8/单K → 启发式出最大能压单K
+  const L=2;
+  const r1=GD.decide({ seat:0, hand:[c(8,'♠'),c(13,'♦'),c(4,'♣')],
+    tableParse:GR.parse([c(6,'♦')],L), lastSeat:1, level:L, handsLeft:[3,1,9,9] });
+  ok(r1.action==='play' && r1.cards[0].rank===13,
+     '掼蛋·卡报单: 桌面单、对手剩1张 → 出最大能压单K(不送最小单8)');
+}
+
 console.log(`\n通过 ${pass} · 失败 ${fail}`);
 process.exit(fail?1:0);
