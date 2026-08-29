@@ -12,7 +12,8 @@ create table if not exists public.eh_game_tables (
   game text not null default 'guandan',        -- 'guandan' | 'doudizhu'
   host_uid uuid not null,                       -- 开桌者 = phase-1 裁判
   status text not null default 'lobby',         -- lobby | playing | done | closed
-  seats jsonb not null default '[]'::jsonb,     -- [{seat,kind,uid,name,emoji}] kind: human|soul|ai|empty
+  seats jsonb not null default '[]'::jsonb,     -- [{seat,kind,uid,name,emoji}] kind: human|soul|clone|ai|empty
+                                                --   clone=灵魂分身(灵魂不够时借在场灵魂身份补位, uid=原灵魂, name="原名·分身[序号]")
   seat_count int not null default 4,
   msg_id bigint,                                -- 牌桌卡在 eh_messages 的 id(定位刷新)
   seed bigint,                                  -- 开局洗牌种子
@@ -219,6 +220,47 @@ begin
 end;
 $$;
 grant execute on function public.eh_gt_seat_soul(uuid,int,uuid) to public;
+
+-- ---- RPC: 灵魂分身入座(仅 host) ----
+-- 房里真灵魂不够坐满时, 借一位【在场灵魂】的身份克隆出"分身"补位: 顶原灵魂头像、名字标成
+-- "原名·分身[序号]"(序号≥2 才带数字, 首个分身只叫"·分身"), 由 host 本机 AI 代打。
+-- 与 seat_soul 一样: 名字取【房内原名】(eh_members.name), 绝不取 eh_users 全表唯一名(带·<uid前6>后缀)
+-- 以免把内部唯一名泄漏到牌桌。p_seq = 该原灵魂被克隆的第几个分身(客户端从 1 起传)。
+create or replace function public.eh_gt_seat_clone(p_table uuid, p_seat int, p_origin uuid, p_seq int)
+returns public.eh_game_tables
+language plpgsql security definer set search_path to 'public' as $$
+declare v_me uuid := auth.uid(); v_row public.eh_game_tables%rowtype; v_target jsonb;
+  v_name text; v_emoji text; v_disp text;
+begin
+  if v_me is null then raise exception 'not authenticated'; end if;
+  select * into v_row from public.eh_game_tables where id=p_table for update;
+  if not found then raise exception 'table not found'; end if;
+  if v_row.host_uid <> v_me then raise exception 'host only'; end if;
+  if v_row.status <> 'lobby' then raise exception 'not joinable'; end if;
+  if p_seat < 0 or p_seat >= v_row.seat_count then raise exception 'bad seat'; end if;
+  v_target := v_row.seats -> p_seat;
+  if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
+  -- 房内原名优先, 逐级兜底(同 seat_soul)
+  select m.name, m.emoji into v_name, v_emoji
+    from public.eh_members m where m.room_id=v_row.room_id and m.user_id=p_origin;
+  if v_name is null then
+    select s.name, s.emoji into v_name, v_emoji
+      from public.eh_souls s where s.auth_uid=p_origin and s.room_id=v_row.room_id limit 1;
+  end if;
+  if v_name is null then
+    select name, emoji into v_name, v_emoji from public.eh_users where id=p_origin;
+  end if;
+  if v_name is null then raise exception 'origin soul not found'; end if;
+  v_disp := v_name || '·分身' || (case when coalesce(p_seq,1) > 1 then p_seq::text else '' end);
+  update public.eh_game_tables
+    set seats = jsonb_set(seats, array[p_seat::text],
+          jsonb_build_object('seat',p_seat,'kind','clone','uid',p_origin,'name',v_disp,'emoji',v_emoji)),
+        updated_at=now()
+    where id=p_table returning * into v_row;
+  return v_row;
+end;
+$$;
+grant execute on function public.eh_gt_seat_clone(uuid,int,uuid,int) to public;
 
 -- ---- RPC: 请离某座(仅 host, 把该座变空; 不能踢自己那种走 leave) ----
 create or replace function public.eh_gt_kick(p_table uuid, p_seat int)

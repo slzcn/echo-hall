@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260828-gd-countdown';
+window.__EH_APP_VER = '20260829-soul-clone';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6801,9 +6801,9 @@ async function launchTexas(){
   }catch(e){ console.warn('[gt] post table card failed', e); }
   if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 开桌→就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
 }
-// 灵魂补位: 把当前所有空位从小到大依次坐上房里灵魂(排除已坐的), 灵魂不够则坐到用完为止。
-// 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像/性格)填满, 不再是匿名 AI 机器人。
-// 静默(不 toast, 不因空手拦截): 无空位/无灵魂时直接返回, 剩余空位交给本机 AI 代打。仅 host 招募中有效。
+// 灵魂补位: 把当前所有空位从小到大依次坐满 —— 先用房里【真灵魂】一席一位, 灵魂不够时用【灵魂分身】继续补到无空位。
+// 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像)填满, 不再是匿名 AI 机器人;分身顶原灵魂头像、名标"原名·分身[序号]"。
+// 静默(不 toast, 不因空手拦截): 无空位/房里真无灵魂时直接返回, 剩余空位才交给 eh_gt_start 兜底成机器人。仅 host 招募中有效。
 async function gtSeatSoulsIntoEmpties(row){
   if(!row || row.status!=='lobby' || row.host_uid!==myUid) return 0;
   // ★竞态修: roomSouls 是进房后异步 RPC(eh_room_souls)才灌上的内存名册。临时用户"刚飘入就点开始"时它可能还空,
@@ -6815,9 +6815,26 @@ async function gtSeatSoulsIntoEmpties(row){
   const seated=new Set((row.seats||[]).filter(s=>s&&s.kind==='soul'&&s.uid).map(s=>s.uid));
   const empties=(row.seats||[]).filter(s=>s&&s.kind==='empty'&&typeof s.seat==='number').map(s=>s.seat).sort((a,b)=>a-b);
   const souls=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid&&!seated.has(s.auth_uid));
-  let n=0;
-  for(let i=0;i<empties.length&&i<souls.length;i++){
-    try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[i],p_soul:souls[i].auth_uid}); n++; }catch(_){}
+  let n=0, ei=0;
+  const origins=[];   // 已入座的真灵魂 uid, 作为分身克隆源(轮流复用)
+  // pass1: 真灵魂一席一位
+  for(;ei<empties.length&&ei<souls.length;ei++){
+    try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[ei],p_soul:souls[ei].auth_uid}); n++; origins.push(souls[ei].auth_uid); }
+    catch(_){}
+  }
+  // pass2: 真灵魂坐完仍有空位 → 借在场灵魂身份克隆"分身"填满(灵魂分身, 非匿名机器人)
+  if(ei<empties.length){
+    // 克隆源优先取刚入座的真灵魂; 若本轮一个都没坐上(极端), 退回房里全部灵魂名册作源
+    let pool=origins.slice();
+    if(!pool.length) pool=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid).map(s=>s.auth_uid);
+    if(pool.length){
+      const seq={};   // 每个原灵魂已克隆出的分身数(1 起, 首个不带序号)
+      for(let k=0; ei<empties.length; ei++, k++){
+        const origin=pool[k%pool.length];
+        seq[origin]=(seq[origin]||0)+1;
+        try{ await gtRpc('eh_gt_seat_clone',{p_table:row.id,p_seat:empties[ei],p_origin:origin,p_seq:seq[origin]}); n++; }catch(_){}
+      }
+    }
   }
   return n;
 }
