@@ -149,6 +149,45 @@
     return out;
   }
 
+  function withoutCards(hand, cards){
+    const ids = new Set(cards.map(c=>c.id));
+    return hand.filter(c=>!ids.has(c.id));
+  }
+  // ── 手数估计(estTricks): 把一手牌拆成最少的"出牌手数", 越少越接近赢 ──────────
+  //   复用 arrangeGroups 的贪心分解(炸/同花顺/顺子/连对/钢板/三张/对子已正确摘出, 含级牌/百搭/王),
+  //   记账对齐斗地主 estTricks: 长牌型/对/三各 1 手, 散牌每张 1 手, 三条白吃一翼(带单优先再带对, 不额外计手)。
+  //   —— 这就是掼蛋 AI 过去缺的"全局观": 拆散顺子/连对留孤张的走法手数飙升会被领出评估自然淘汰。
+  function estTricks(hand, level){
+    if (!hand || !hand.length) return 0;
+    const groups = arrangeGroups(hand, level);
+    let longT=0, trios=0, pairs=0, singles=0;
+    for (const g of groups){
+      if (!g || !g.length) continue;
+      const p = g.length>=2 ? Rules.parse(g, level) : null;
+      if (!p){ singles += g.length; }                 // 散牌末组: 每张一手
+      else if (p.type==='trio') trios++;
+      else if (p.type==='pair') pairs++;
+      else longT++;                                   // 炸/同花顺/顺子/连对/钢板/三带二
+    }
+    let tricks = longT + trios;
+    let wings = trios;                                // 每个三条白吃一翼(带单优先清散张, 其次带对)
+    while (wings>0 && singles>0){ singles--; wings--; }
+    while (wings>0 && pairs>0){ pairs--; wings--; }
+    tricks += pairs + singles;
+    return tricks;
+  }
+  // 领出候选打分(越小越好), chooseLead 与 hints 领出共用 → 灵魂选择与玩家提示同源。
+  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先)。
+  function leadScore(hand, play, level){
+    const t = estTricks(withoutCards(hand, play.cards), level);
+    const k = play.parse.key, ty = play.parse.type;
+    let ctl = 0;
+    const hasJoker = play.cards.some(c=>c.joker);
+    if (ty==='single'){ if (hasJoker) ctl += 3; else if (k>=14) ctl += 1; }  // 甩王单=丢强回手权; A/级大单略惜
+    else if (ty==='pair' && k>=14) ctl += 2;                                  // A/级大对=强控, 别早拆
+    return t*100 + ctl*8 - Math.min(play.cards.length, 9);
+  }
+
   // ── 决策 ────────────────────────────────────────────────────
   // ctx: { seat, hand, tableParse, lastSeat, handsLeft:[4], level }
   function decide(ctx){
@@ -197,7 +236,12 @@
     if (follow.length){
       const fin = follow.find(c=>c.cards.length===hand.length);
       if (fin) return { action:'play', cards: fin.cards };
-      follow.sort((a,b)=> playCost(a,hand,level) - playCost(b,hand,level));
+      follow.sort((a,b)=>{
+        const c = playCost(a,hand,level) - playCost(b,hand,level);
+        if (c) return c;
+        // 同代价平局: 出后剩余手数少者优先(别为压一手拆散自己的牌型结构)
+        return estTricks(withoutCards(hand,a.cards),level) - estTricks(withoutCards(hand,b.cards),level);
+      });
       const best = follow[0];
       // ★压制对手(协作): 走到这里桌面必是对手领出(对家领出已在上面让牌)。别为保 A/级大单张
       //   而放对手过牌滚雪球 —— 主动接管牌权打断对手节奏。故协作开启时取消对手领出的保牌 pass。
@@ -244,15 +288,19 @@
         if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
       }
     }
+    // 先按廉价启发式粗排(长牌型清散牌优先), 取前 K 个做手数精算 —— 限流 estTricks/arrangeGroups 调用防卡顿。
     pool.sort((a,b)=>{
       const ra=order[a.parse.type]??9, rb=order[b.parse.type]??9;
       if (ra!==rb) return ra-rb;
       if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
       return a.parse.key-b.parse.key;                                   // 点小优先
     });
-    // 避免首出甩大单张(A/级/王); 有别的就换
-    const notBig = pool.filter(c=>!(c.parse.type==='single' && c.parse.key>=14));
-    return (notBig[0] || pool[0]).cards;
+    // 逐候选按 leadScore 精算(剩余手数主导): 出后手数最少、又不过早花掉 A/级/王回手权者胜出。
+    //   拆散顺子/连对留孤张的选择手数飙升被自然淘汰; 小散单/小对趁早随手清掉。
+    const K = Math.min(pool.length, 14);
+    let best=null, bestS=Infinity;
+    for (let i=0;i<K;i++){ const s=leadScore(hand, pool[i], level); if (s<bestS){ bestS=s; best=pool[i]; } }
+    return (best || pool[0]).cards;
   }
 
   // 提示排序: 产出 best-first 的可打牌序列(每项 card[])。UI 的「提示」直接吃它。
@@ -269,23 +317,19 @@
     if (!combos.length) return [];
     const handN = hand.length;
     const isB = c=>Rules.isBomb(c.parse);
-    const leadOrder = { straight:0, pairline:0, trioline:0, fullhouse:1, trio:2, pair:3, single:5 };
+    // 领出评分预算一次(与灵魂 chooseLead 同源的 leadScore: 剩余手数主导 + 惜控 + 多清); 炸弹不计→垫底。
+    const leadSc = target ? null : new Map();
+    if (leadSc){ for (const c of combos){ if (!isB(c)) leadSc.set(c, leadScore(hand, c, level)); } }
     combos.sort((a,b)=>{
       // ① 一把走完 → 最优先(无论领出/跟牌)
       const fa = a.cards.length===handN ? 0:1, fb = b.cards.length===handN ? 0:1;
       if (fa!==fb) return fa-fb;
       if (!target){
-        // 领出: 长牌型优先清散牌; 炸弹/大单张垫底; 拆炸代价高的靠后
-        const ba = isB(a)?8:(leadOrder[a.parse.type]??6);
-        const bb = isB(b)?8:(leadOrder[b.parse.type]??6);
+        // 领出: 炸弹垫底(小炸优先), 非炸按 leadScore(少留手数 + 惜控 A/级/王 + 多清散牌)。
+        const ba = isB(a)?1:0, bb = isB(b)?1:0;
         if (ba!==bb) return ba-bb;
-        const bigA = (a.parse.type==='single' && a.parse.key>=14)?1:0;
-        const bigB = (b.parse.type==='single' && b.parse.key>=14)?1:0;
-        if (bigA!==bigB) return bigA-bigB;
-        if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
-        const ca=playCost(a,hand,level), cb=playCost(b,hand,level);
-        if (ca!==cb) return ca-cb;
-        return a.parse.key-b.parse.key;                                   // 点小优先
+        if (ba===1) return Rules.bombStrength(a.parse)-Rules.bombStrength(b.parse);
+        return leadSc.get(a) - leadSc.get(b);
       }
       // 跟牌: 非炸优先(炸弹垫底), 再按代价最小
       const ba = isB(a)?1:0, bb = isB(b)?1:0;
@@ -335,5 +379,6 @@
 
   return {
     decide, chooseLead, hints, genCombos, allBombs, groups, findLines, arrangeGroups,
+    estTricks, leadScore,
   };
 });

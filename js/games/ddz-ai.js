@@ -274,8 +274,9 @@
       // 若某手出完后手牌清空(接近赢) → 优先
       const finisher = plays.find(p => p.cards.length === hand.length);
       if (finisher) return { action:'play', cards: finisher.cards };
-      // 否则挑「代价最小」的一手:优先不拆大牌、点数最小
-      plays.sort((a,b)=> playCost(a,hand) - playCost(b,hand));
+      // 否则挑「代价最小」的一手:优先不拆大牌、点数最小; 同代价则出后剩余手数少者优先(别拆散自己结构)
+      plays.sort((a,b)=> (playCost(a,hand) - playCost(b,hand))
+        || (estTricks(withoutCards(hand,a.cards)) - estTricks(withoutCards(hand,b.cards))));
       // 若对手不紧急,且要出的牌点很大(≥2/A)又是单张,倾向 pass 保牌
       const best = plays[0];
       // ★压制地主(队友协作): 我是农民、桌面这手正是地主领出的 → 别为"保 2/A 大单张"而放地主过牌。
