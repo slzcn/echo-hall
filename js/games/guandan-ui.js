@@ -876,13 +876,13 @@
       if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排'); }
       else renderHand();
     }
-    const canCombo = ()=> !!(root.EHGuandanAI && typeof root.EHGuandanAI.arrangeGroups === 'function');
-    // 短按理牌: 退出手动排后回自动; 自动态则在 大小↔智能组牌 间循环。组牌不可用时只保留大小。
+    // 短按理牌 = 纯按大小排(级牌/王一端, 同点数天然相邻)。
+    //   主人诉求: 理牌只为"方便按牌型框选出牌", 不做"智能组牌"那种替玩家拆牌重组(会打乱大小顺序、
+    //   强加一套分堆方案)。想自己码牌 → 长按进手动拖排。arrangeGroups 仍供 AI 决策用, 不在理牌里露出。
     function autoSort(){
-      rows = null;
-      if (canCombo()) sortMode = sortMode === 'rank' ? 'combo' : 'rank';
+      rows = null; sortMode = 'rank';
       renderHand(); sfx('cardsel');
-      toast(sortMode === 'combo' ? '已智能组牌 · 按牌型竖列分组' : '已按大小理牌');
+      toast('已按大小理牌 · 同点数相邻好框选');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1383,24 +1383,31 @@
       if (isGuest && awaitingHost){   // 已回传动作, 锁操作条防重复
         els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>⏳ 等待裁决…</button></div>`; return; }
       const myTurn=st.turn===mySeat;
-      const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
+      const lastPlay = st.table.lastPlay;
+      const mustBeat = lastPlay && lastPlay.seat!==mySeat;
+      // 队友当家: 桌面最后一手是队友出的且没人盖过 → 默认让队友走, 不提示压/炸队友(主人诉求)。
+      //   规则上你仍可压(偶有战术: 顶一手接风前铺垫), 故只收敛"引导/提示", 手动选牌照样能出。
+      const mateLead = myTurn && lastPlay && Engine.partnerOf(mySeat)===lastPlay.seat;
       // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
+      //   队友当家时【不】算压牌提示——避免推荐我盖/炸自家队友。
       let plays=[];
-      if (myTurn){
-        const target = mustBeat ? st.table.lastPlay.parse : null;
+      if (myTurn && !mateLead){
+        const target = mustBeat ? lastPlay.parse : null;
         plays = AI.hints({ hand: st.players[mySeat].hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) });
       }
-      const noBeat = myTurn && mustBeat && plays.length===0;   // 要压却压不过 → 只能不出
+      const noBeat = myTurn && mustBeat && !mateLead && plays.length===0;   // 对手当家却压不过 → 只能不出
+      const passPrimary = mateLead || noBeat;                               // 高亮引导"不出"
+      const passLbl = mateLead ? '队友当家 · 不出' : (noBeat ? '压不过 · 不出' : '不出');
       els.ctrl.innerHTML=`<div class="gd-acts">
-        <button class="gd-btn ${noBeat?'primary':'ghost'}" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'压不过 · 不出':'不出'}</button>
+        <button class="gd-btn ${passPrimary?'primary':'ghost'}" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>${passLbl}</button>
         <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="gd-btn primary" id="gdPlay" disabled>出牌</button>
       </div>`;
       $('#gdPass').addEventListener('click', ()=>doPass(mySeat));
       $('#gdPlay').addEventListener('click', doPlay);
       $('#gdHint').addEventListener('click', doHint);
-      // 只有唯一合法打法(常见于残局/剩一对) → 直接替玩家选好, 省得一张张点
-      if (myTurn && plays.length===1 && selected.size===0){
+      // 只有唯一合法打法(常见于残局/剩一对) → 直接替玩家选好, 省得一张张点。队友当家不自动选(默认让牌)。
+      if (myTurn && !mateLead && plays.length===1 && selected.size===0){
         selected = new Set(plays[0].map(c=>c.id)); renderHand();
       }
       updatePlayBtn();

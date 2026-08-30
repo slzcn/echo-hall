@@ -2085,7 +2085,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260830-gd-joker-pair';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260830-gd-mate-lead';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2589,7 +2589,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/bgm.js?v=20260818-bgm-contract"></script>
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
-<script defer src="./js/app.js?v=20260830-gd-joker-pair"></script>
+<script defer src="./js/app.js?v=20260830-gd-mate-lead"></script>
 <script defer src="./js/keyboard.js?v=20260820-fold-ime-fallback"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
