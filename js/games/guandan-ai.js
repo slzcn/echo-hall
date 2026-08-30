@@ -178,8 +178,20 @@
     tricks += pairs + singles;
     return tricks;
   }
+  // 孤张小单判定: 该自然点在手里仅此 1 张、非王、点力≤阈值 → 注定要单走的废牌(掼蛋无三带一, 消化不掉)。
+  //   领出是甩废牌的最佳时机(不用比大小), 这类牌趁早清; J/Q/K/A/级/王 留作中后期控场, 不算小单。
+  const EARLY_SINGLE_MAX = 10;   // 点力≤10(自然点 2..10)算"小单"
+  let EARLY_CLEAR_ON = true;     // 孤小单早清开关(默认开; 仅供对抗测试临时关闭对比棋力)
+  function setEarlyClear(b){ EARLY_CLEAR_ON = !!b; }
+  function isLoneSmallSingle(hand, card, level){
+    if (!EARLY_CLEAR_ON) return false;
+    if (card.joker) return false;
+    if (Rules.powerOf(card, level) > EARLY_SINGLE_MAX) return false;
+    const nr = Rules.naturalRank(card);
+    return hand.filter(x=>!x.joker && Rules.naturalRank(x)===nr).length === 1;
+  }
   // 领出候选打分(越小越好), chooseLead 与 hints 领出共用 → 灵魂选择与玩家提示同源。
-  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先)。
+  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先) − 孤小单早清加成。
   function leadScore(hand, play, level){
     const t = estTricks(withoutCards(hand, play.cards), level);
     const k = play.parse.key, ty = play.parse.type;
@@ -187,7 +199,12 @@
     const hasJoker = play.cards.some(c=>c.joker);
     if (ty==='single'){ if (hasJoker) ctl += 3; else if (k>=14) ctl += 1; }  // 甩王单=丢强回手权; A/级大单略惜
     else if (ty==='pair' && k>=14) ctl += 2;                                  // A/级大对=强控, 别早拆
-    return t*100 + ctl*8 - Math.min(play.cards.length, 9);
+    // ★孤张小单尽早清(治"残局连甩碎牌单张"——主人反馈"出牌逻辑不好, 最后剩下都是碎牌单张"):
+    //   领出免比大小, 趁此把注定单走的孤小单甩掉, 别憋到残局连甩; 保长牌型/大牌到中后期控场。
+    //   与出长牌型一样只减 1 手(孤张在 estTricks 里=独立一手), 不增总手数, 仅把出牌时机前移改善节奏。
+    let earlyClear = 0;
+    if (ty==='single' && isLoneSmallSingle(hand, play.cards[0], level)) earlyClear = 12;
+    return t*100 + ctl*8 - Math.min(play.cards.length, 9) - earlyClear;
   }
 
   // ── 决策 ────────────────────────────────────────────────────
@@ -328,8 +345,10 @@
       }
     }
     // 先按廉价启发式粗排(长牌型清散牌优先), 取前 K 个做手数精算 —— 限流 estTricks/arrangeGroups 调用防卡顿。
+    //   ★孤张小单提到长牌型同梯队(rank=0): 否则 single 垫底会被 K 截断挤出精算, leadScore 的早清加成就白加了。
+    const rankOf = (c)=> (c.parse.type==='single' && isLoneSmallSingle(hand, c.cards[0], level)) ? 0 : (order[c.parse.type]??9);
     pool.sort((a,b)=>{
-      const ra=order[a.parse.type]??9, rb=order[b.parse.type]??9;
+      const ra=rankOf(a), rb=rankOf(b);
       if (ra!==rb) return ra-rb;
       if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
       return a.parse.key-b.parse.key;                                   // 点小优先
@@ -418,6 +437,6 @@
 
   return {
     decide, chooseLead, hints, genCombos, allBombs, groups, findLines, arrangeGroups,
-    estTricks, leadScore,
+    estTricks, leadScore, setEarlyClear,
   };
 });
