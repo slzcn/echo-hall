@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260830-gd-mate-lead';
+window.__EH_APP_VER = '20260830-gd-souls-grace';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -880,19 +880,28 @@ window._ehCleanupRoomPlay=_gtCleanupPlay;
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
 //       (2) host 每 8s 发一次 host_ping; guest 15s 未收到 → 判定房主离线, 锁 UI 提醒;
 //       (3) 页面切后台或牌桌折叠时, 若轮到我, title 前置 "🫵" 每秒闪 + 允许时桌面通知 + 一次震动。
-let _gtPingT=null, _gtHostAliveT=null, _gtLastHostAt=0, _gtDbKeepT=null;
-function _gtStopPing(){ if(_gtPingT){ clearInterval(_gtPingT); _gtPingT=null; } if(_gtHostAliveT){ clearInterval(_gtHostAliveT); _gtHostAliveT=null; } if(_gtDbKeepT){ clearInterval(_gtDbKeepT); _gtDbKeepT=null; } _gtLastHostAt=0; }
+let _gtPingT=null, _gtHostAliveT=null, _gtLastHostAt=0, _gtDbKeepT=null, _gtReconnGraceT=null;
+function _gtStopPing(){ if(_gtPingT){ clearInterval(_gtPingT); _gtPingT=null; } if(_gtHostAliveT){ clearInterval(_gtHostAliveT); _gtHostAliveT=null; } if(_gtDbKeepT){ clearInterval(_gtDbKeepT); _gtDbKeepT=null; } if(_gtReconnGraceT){ clearTimeout(_gtReconnGraceT); _gtReconnGraceT=null; } _gtLastHostAt=0; }
 function gtBindConnStatus(chan, opts){
   opts = opts || {};
   let firstOnline = true;
   chan.subscribe((status)=>{
     if(status==='SUBSCRIBED'){
+      if(_gtReconnGraceT){ clearTimeout(_gtReconnGraceT); _gtReconnGraceT=null; }   // 已恢复 → 撤销待亮的"重连中"
       try{ if(_ehGame && _ehGame.setConn) _ehGame.setConn('online'); }catch(_){ }
       try{ chan.send({type:'broadcast', event:'hello', payload:{uid:myUid}}); }catch(_){ }
       if(!firstOnline && opts.onReconnected){ try{ opts.onReconnected(); }catch(_){ } }
       firstOnline = false;
     } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-      try{ if(_ehGame && _ehGame.setConn) _ehGame.setConn('reconnecting'); }catch(_){ }
+      // ★后台/瞬断宽限(治"退前台一下就提醒重连"): 页面隐藏时 socket 被浏览器挂起=预期断开, 不打扰(回前台自动重订阅);
+      //   前台真断也先给一段宽限, 期间静默等 Realtime 自愈重订阅, 只有超过宽限仍没恢复才亮"重连中"。
+      if(document.hidden) return;                    // 后台断开是预期的, 不报
+      if(_gtReconnGraceT) return;                    // 宽限计时已在跑
+      _gtReconnGraceT = setTimeout(()=>{
+        _gtReconnGraceT = null;
+        if(document.hidden) return;                  // 宽限期内进了后台 → 不报
+        try{ if(_ehGame && _ehGame.setConn) _ehGame.setConn('reconnecting'); }catch(_){ }
+      }, 12000);                                     // 12s 宽限: 短暂切前台/瞬断不闪 banner
     }
   });
 }
@@ -920,8 +929,9 @@ function gtWatchHostPing(chan, hostUid){
   });
   _gtHostAliveT = setInterval(()=>{
     if(!_ehGame) return;
+    if(document.hidden) return;   // ★后台不判房主离线: 后台收不到 host_ping 是浏览器节流所致, 非房主真离线(回前台会归零心跳时钟再给足追平窗口)
     const gap = Date.now() - _gtLastHostAt;
-    if(gap>15000){ try{ if(_ehGame.setConn) _ehGame.setConn('host_offline'); }catch(_){ } }
+    if(gap>45000){ try{ if(_ehGame.setConn) _ehGame.setConn('host_offline'); }catch(_){ } }   // 放宽到 45s: 切前台后给足追平心跳的时间, 不因短暂离开误报
   }, 3000);
 }
 // wrap _gtCleanupPlay 停心跳(在下一步替换处已合并)
@@ -2432,7 +2442,7 @@ function gtLaunchGuandanLobby(row){
   _ehGame = window.EHGuandanGame.open({
     scoreKey:'gtsc:'+row.id,
     lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
-    names:A0.names, avatars:A0.avatars, isAI:A0.isAI,
+    names:A0.names, avatars:A0.avatars, isAI:A0.isAI, souls:A0.souls, ids:A0.ids,
     mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
@@ -2591,7 +2601,7 @@ function gtLaunchGuandan(row){
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
     scoreKey:'gtsc:'+row.id,
-    names:A.names, avatars:A.avatars, isAI:A.isAI,
+    names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
@@ -2639,7 +2649,7 @@ function gtEnterGuandan(row){
   _gtActiveTable={id:row.id,host:false};
   _ehGame = window.EHGuandanGame.open({
     scoreKey:'gtsc:'+row.id,
-    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
+    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
@@ -6334,6 +6344,9 @@ async function resumeStuckPendingSongs(){
 //     · 多源: visibilitychange / pageshow(bfcache 恢复) / window focus 都触发, 300ms 去抖合并防重复。
 let _fgResyncTimer = null;
 function foregroundResync(){
+  // ★回前台先把房主心跳时钟归零(治"退前台一下就提醒重连"): 后台期间没收到的 host_ping 不算"离线",
+  //   给 host_ping 一个完整窗口重新到达; 放在去抖/curRoom 守卫之前, 保证每次回前台都归零。
+  try{ if(_gtActiveTable && !document.hidden) _gtLastHostAt = Date.now(); }catch(_){ }
   if(document.hidden || !curRoom) return;
   if(_fgResyncTimer) return;   // 300ms 去抖: 多源同时触发只跑一批
   _fgResyncTimer = setTimeout(()=>{ _fgResyncTimer = null; }, 300);

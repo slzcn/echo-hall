@@ -111,7 +111,19 @@
 
   // 三带二: 三张 a + 一对 b(a≠b), 百搭补齐。
   function fitFullhouse(dc, level){
-    if (dc.jokers.length) return null;
+    // ★王对作"带": 三带二里那对可以是两张同类王(双小王/双大王)。王无点数不参与三张,
+    //   故王只能当"带的对子", 其余 3 张(自然牌+可含百搭)组成三张。三带二按三张点力比大小(带对不影响),
+    //   所以带对是王对不改变可比性/大小。 —— 主人反馈"三带两个小王不能出"的修复。
+    if (dc.jokers.length){
+      const jokerPair = (dc.bigJ === 2 && dc.smallJ === 0) || (dc.smallJ === 2 && dc.bigJ === 0);
+      if (!jokerPair) return null;                        // 一大一小/单张王/多于两张王 → 不成王对
+      const jr = [...dc.natMap.keys()];
+      if (jr.length > 1) return null;                     // 三张必须同点
+      const a = jr.length ? jr[0] : level;                // 全百搭 → 级三
+      const ca = jr.length ? dc.natMap.get(a) : 0;
+      if (ca > 3 || (3 - ca) !== dc.w) return null;       // 百搭恰补齐三张缺口(王占对, 不补三张)
+      return { trio: a, pair: (dc.bigJ === 2 ? 17 : 16) };
+    }
     const ranks = [...dc.natMap.keys()];
     if (ranks.length > 2) return null;
     const cand = [];

@@ -92,13 +92,28 @@
 .gd-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .gd-lvl{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .gd-lvl b{color:#fff}
-.gd-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.gd-mus:hover{color:var(--ink);border-color:var(--line2)}
-.gd-mus.muted{color:var(--dim,#498d88);opacity:.75}
-.gd-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
-.gd-x:hover{color:var(--ink);border-color:var(--line2)}
+/* 顶栏功能钮组(主人诉求·重新设计): 统一磨砂玻璃圆钮(音乐/横屏) + 返回胶囊, 悬浮青光, 按压回弹 */
+.gd-mus,.gd-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.gd-mus{margin-left:auto}
+.gd-mus:hover,.gd-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
+.gd-mus:active,.gd-rot:active,.gd-x:active{transform:scale(.9)}
+.gd-mus.muted{color:var(--dim,#498d88);opacity:.8}
+.gd-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
+.gd-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.gd-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
 /* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给级牌 chip 让位, 杜绝返回钮被挤出屏 */
 @media (max-width:379px){
   .gd-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
@@ -125,7 +140,15 @@
 .gd-team .tl{font-weight:900;color:#fff}
 .gd-team.mine{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4)}
 .gd-team.foe{color:var(--magenta,#ff2d8e);border-color:rgba(255,45,142,.5)}
-.gd-room.is-land .gd-score{display:none}   /* 横屏矮, 记分条让位(级牌已在顶栏 gd-lvl 显示), 不占竖向 */
+/* 本副打几金徽标(牌桌记分条上): 台面当前打的级牌, 醒目居中——从顶栏搬到牌桌, 让顶部功能钮区清爽 */
+.gd-lvl-now{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;letter-spacing:.03em;
+  padding:3px 11px;border-radius:999px;color:#3a2600;background:linear-gradient(150deg,#ffd76a,#ffb020);
+  box-shadow:0 1px 6px rgba(255,176,32,.35);white-space:nowrap}
+.gd-lvl-now b{font-weight:900;font-size:12px}
+.gd-lvl-now.bump{animation:gdLvlBump .5s ease-out}
+.gd-room.is-land .gd-score{display:none}   /* 横屏矮, 记分条让位(级牌回到顶栏 gd-lvl 兜底显示), 不占竖向 */
+/* 竖屏对局中: 顶栏级牌 chip 藏起(本副打几已在牌桌记分条 gd-lvl-now 显示); 招募态/横屏仍显 */
+.gd-room:not([data-phase="lobby"]):not(.is-land) .gd-lvl{display:none}
 /* 座位 */
 .gd-seat{display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,82px);position:relative}
 .gd-avr{width:var(--av,42px);height:var(--av,42px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;background:transparent;transition:background .15s;position:relative}
@@ -134,6 +157,8 @@
 .gd-sec{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);color:var(--amber,#ffc24d);font-size:9px;font-weight:800;line-height:14px;text-align:center;font-variant-numeric:tabular-nums;display:none;z-index:3}
 .gd-seat.turn .gd-sec{display:block}
 .gd-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:gdBlink .6s steps(2,start) infinite}
+.gd-sec.think{border-color:var(--dim,#498d88);color:var(--sub,#86cbc6);font-size:10px;animation:gdThink 1.15s ease-in-out infinite}
+@keyframes gdThink{0%,100%{opacity:.5}50%{opacity:1}}
 .gd-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,19px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
 .gd-seat.turn .gd-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
 .gd-seat.win .gd-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
@@ -147,13 +172,28 @@
 .gd-tag{font-size:9px;letter-spacing:.06em;padding:0 5px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
 .gd-tag.mate{color:var(--accent);border-color:var(--accent)}
 .gd-tag.rank{color:var(--amber);border-color:var(--amber);font-weight:700}
-.gd-tag.alarm{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);font-weight:800;animation:gdBlink .7s steps(2,start) infinite}
+.gd-tag.alarm{color:#fff;background:linear-gradient(135deg,#ff2d8e,#ff5d6c);border-color:transparent;font-weight:800;box-shadow:0 0 10px rgba(255,45,142,.55);animation:gdAlarmPulse 1s ease-in-out infinite}
+@keyframes gdAlarmPulse{0%,100%{box-shadow:0 0 8px rgba(255,45,142,.45);transform:scale(1)}50%{box-shadow:0 0 16px rgba(255,45,142,.85);transform:scale(1.06)}}
+/* 不出「过」印章(主人诉求·加强不出反馈): 盖在该席位上, 弹入回弹后淡出 */
+.gd-passstamp{position:absolute;top:28px;left:50%;font-size:22px;font-weight:900;letter-spacing:.1em;color:#ff5d6c;
+  border:2.5px solid #ff5d6c;border-radius:12px;padding:1px 12px;background:rgba(20,10,14,.72);
+  text-shadow:0 1px 2px rgba(0,0,0,.5);box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 16px rgba(255,93,108,.5);
+  opacity:0;pointer-events:none;z-index:6;animation:gdPassStamp 1s cubic-bezier(.2,.9,.3,1) forwards}
+@keyframes gdPassStamp{0%{opacity:0;transform:translate(-50%,0) rotate(-24deg) scale(.4)}
+  18%{opacity:1;transform:translate(-50%,0) rotate(-13deg) scale(1.18)}
+  32%{transform:translate(-50%,0) rotate(-13deg) scale(1)}
+  75%{opacity:1}100%{opacity:0;transform:translate(-50%,-6px) rotate(-13deg) scale(1)}}
 .gd-seat.alarm .cnt b{color:var(--magenta,#ff2d8e)}
 .gd-seat.alarm .gd-avr .av{border-color:var(--magenta,#ff2d8e);box-shadow:0 0 10px rgba(255,45,142,.5)}
 .gd-say{position:absolute;top:48px;font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
 .gd-say.show{opacity:1}
 .gd-mini-hand{display:flex;margin-top:3px}
 .gd-mini-hand .card.mini{margin-left:-16px}.gd-mini-hand .card.mini:first-child{margin-left:0}
+/* 打完后亮队友手牌: 队友座位下方一条小牌带 */
+.gd-peek{margin-top:5px;display:flex;flex-direction:column;align-items:center;gap:3px;max-width:min(72vw,340px)}
+.gd-peek .pk-t{font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--sub,#86cbc6);opacity:.85}
+.gd-peek .pk-cards{display:flex;flex-wrap:wrap;justify-content:center;gap:2px}
+.gd-peek .card.mini{margin:0}
 /* 中央 */
 .gd-banner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s;text-align:center}
 .gd-banner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:gdTurnPulse 1.05s ease-in-out infinite}
@@ -226,17 +266,19 @@
 /* 手牌 */
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .gd-hand{display:flex;flex-direction:column;gap:6px;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
-.gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0}
+.gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
-.gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px}
+/* touch-action:none 逐张也要有(命中的是卡片本身): 否则竖向划选被浏览器判成滚动→pointercancel, 表现为"不能滑动连选/选牌不稳" */
+.gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
 .gd-hand-row .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
-.gd-hand .card.sel{transform:translateY(-16px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent);z-index:2}
+/* 选中态(主人诉求·加强): 抬更高 + 放大 + 青色描边 + 外发光 + 提亮, 一眼可辨"提起来的是哪几张" */
+.gd-hand .card.sel{transform:translateY(-22px) scale(1.05);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 18px rgba(0,229,212,.65);z-index:3;filter:brightness(1.06)}
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
-@keyframes gdHintPop{0%{transform:translateY(-16px) scale(1)}45%{transform:translateY(-28px) scale(1.07)}100%{transform:translateY(-16px) scale(1)}}
-.gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 10px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent),0 0 16px var(--accent)}
+@keyframes gdHintPop{0%{transform:translateY(-22px) scale(1.05)}45%{transform:translateY(-34px) scale(1.13)}100%{transform:translateY(-22px) scale(1.05)}}
+.gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 22px var(--accent,#00e5d4)}
 .gd-hand:not(.locked) .card:hover{transform:translateY(-7px)}
-.gd-hand:not(.locked) .card.sel:hover{transform:translateY(-16px)}
+.gd-hand:not(.locked) .card.sel:hover{transform:translateY(-22px) scale(1.05)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
 /* 手动理牌: 空的上排显示成一条虚线投放区, 提示"拖到此处分组"(掼蛋 27 张可分两排码) */
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
@@ -471,7 +513,11 @@
       }
       case 'pair':  return p.nat!=null ? '一对'+natName(p.nat) : typeLabel(p);
       case 'trio':  return p.nat!=null ? '三个'+natName(p.nat) : typeLabel(p);
-      case 'fullhouse': return (p.trioRank!=null&&p.pairRank!=null) ? '三个'+natName(p.trioRank)+'带一对'+natName(p.pairRank) : typeLabel(p);
+      case 'fullhouse': {
+        if(p.trioRank==null||p.pairRank==null) return typeLabel(p);
+        const pr = p.pairRank===17?'大王':(p.pairRank===16?'小王':natName(p.pairRank));   // 带的对子可为王对
+        return '三个'+natName(p.trioRank)+'带一对'+pr;
+      }
       case 'straight':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'顺子' : typeLabel(p);
       case 'straightflush': return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'同花顺' : typeLabel(p);
       case 'pairline':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'连对' : typeLabel(p);
@@ -522,6 +568,12 @@
     function connPill(){ return connState==='online' ? '' : ('<span class="gd-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     const names = opts.names || ['你','下家','对家','上家'];
     const avatars = opts.avatars || ['🙂','🤖','🤝','👾'];
+    // 灵魂名册(app 注入, 与德州同构): souls[seat]={archetype,name,emoji,...}。牌桌上对手/队友本就是房里真灵魂,
+    //   有了原型就能让每个灵魂说出自己的味道(台词/催场)+走出自己的节奏(思考时长), 不再是"顶着真名的机器人"。
+    let souls = Array.isArray(opts.souls) ? opts.souls.slice() : [];
+    function archOf(seat){ const s=souls[seat]; return (s&&s.archetype) || null; }
+    // 5 原型思考节奏倍率(狂放抢拍/清冷沉吟): 只影响观感, 不改 AI 决策本身。
+    const SOUL_TEMPO = { warm:1.15, cool:1.5, sharp:1.0, wild:0.8, playful:1.1 };
     // 座位→DOM 槽位: 以 mySeat 为底, 出牌【顺时针】流转 —— 我(底)→下家(左)→对家(上)→上家(右)。
     //   故 下家(mySeat+1) 落左槽、上家(mySeat+3) 落右槽(与真实顺时针围坐一致; 旧版下家在右=逆时针已修)。
     const SEAT_L = (mySeat+1)%4, SEAT_T = (mySeat+2)%4, SEAT_R = (mySeat+3)%4;
@@ -561,7 +613,7 @@
 
     // 记牌器/出牌历史(对标欢乐掼蛋信息辅助): 只用【已出牌】(公共)算未出张数, 绝不读手牌。
     //   仅纯单机开(联机 guest 快照剥离 log, 无从计数), 与手动进贡同口径。掼蛋两副牌 → decks=2。
-    const COUNTER = (mode === 'local') && !!(root.EHCardCounter);
+    const COUNTER = false;   // 记牌器功能已下线(主人诉求): 顶栏更清爽, 相关渲染路径全走空
     let counterOn = false;
 
     // ── 招募态(就地牌桌 lobby): host 开桌先挂真牌桌的招募占位局, 点空位邀灵魂/真人, 满意点开始 → startDeal 就地转正局 ──
@@ -619,15 +671,9 @@
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
         <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">🎵</button>
-        ${COUNTER?`<button class="gd-cnt" id="gdCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="gd-x" id="gdX" aria-label="返回聊天">✕<span class="gd-xlbl"> 返回</span></button>
       </div>
-      ${COUNTER?`<div class="gd-cntp" id="gdCntPanel" hidden>
-        <div class="cp-hd"><b>🃏 记牌器</b><button class="cp-x" id="gdCntX" aria-label="关闭">✕</button></div>
-        <div class="gd-cnt-grid" id="gdCntGrid"></div>
-        <div class="gd-cnt-hist"><div class="ch-t">最近出牌</div><div id="gdCntHist"></div></div>
-      </div>`:''}
       <div class="gd-felt" id="gdFelt">
         <div class="gd-score" id="gdScore"></div>
         <div class="gd-partner" id="gdP2"></div>
@@ -667,6 +713,18 @@
         if(!b) return; b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'),1500);
       });
     }
+    // 不出「过」印章(主人诉求·加强不出反馈): 在该席位盖一枚红章弹入淡出, 比单纯浮字更有存在感。
+    function passFx(seat){
+      requestAnimationFrame(()=>{
+        const seatBox = room.querySelector(`.gd-seat[data-seat="${seat}"]`);
+        if(!seatBox) return;
+        const old = seatBox.querySelector('.gd-passstamp'); if(old) old.remove();
+        const s = document.createElement('div'); s.className='gd-passstamp'; s.textContent='过';
+        seatBox.appendChild(s);
+        setTimeout(()=>{ try{ s.remove(); }catch(_){ } }, 1050);
+      });
+      try{ if(seat===mySeat) vibrate(12); }catch(_){ }
+    }
     // ── F3 牌局直播: 高光瞬间(炸弹/报单/头游/终局升级)播报给聊天室(opts.onBeat 由 app.js 注入)。
     //   灵魂对手配即时入戏台词(quip): say() 气泡 + 随 beat 进聊天流, 模板化零延迟(不塞 LLM 到热路径)。
     const gameIsAI = seatIsAI;   // 与 seatIsAI 同引用(startDeal 就地改元素), quip 判定随名册更新
@@ -676,10 +734,21 @@
       finish:['走咯，先撤一步～','头游到手 😎','剩下你们玩','漂亮收工'],
       win:   ['升级喽','这盘归我们队','承让承让','技高一筹'],
     };
+    // 5 原型专属台词: 同一件事(炸/报单/头游/升级/闲聊), 暖场/清冷/锐利/狂放/顽皮各说各的味道。
+    //   无原型(纯占位 AI) → 退上面的通用 QUIP。模板化零延迟, 不塞 LLM 到出牌热路径。
+    const PERSONA_QUIP = {
+      warm:    { bomb:['稳一手，炸了','该出手时就出手','这把交给我'], danpai:['快啦，稳住','就剩一张，别急','要到咯'], finish:['先走一步，稳收','漂亮，收工','慢慢来我先撤'], win:['配合得不错','这盘稳了','承让～'], banter:['稳住','跟上节奏','别慌有我在'] },
+      cool:    { bomb:['时机到了','必要的一炸','不得已而为之'], danpai:['只剩一张了','差不多了','快结束了'], finish:['我先出完','此局已定','告辞'], win:['意料之中','按计划来','技高一筹'], banter:['冷静点','再想想','看清再出'] },
+      sharp:   { bomb:['轰！接不接得住','这把我说了算','让开让开','炸你没商量'], danpai:['就剩一张咯～','要走啦','你们慢慢磨','头游预定'], finish:['走咯先撤一步～','头游到手 😎','剩下你们玩','漂亮收工'], win:['升级喽','这盘归我们队','承让承让','技高一筹'], banter:['接招','看我的','这手稳'] },
+      wild:    { bomb:['炸炸炸！全炸了！','痛快！','管你什么牌，炸','嘿嘿惊喜吧'], danpai:['一张！要飞咯！','拦不住我啦','冲鸭～','要走要走'], finish:['哈哈我第一！','走人～下把见','太爽了','溜了溜了'], win:['赢麻了！','这波无敌','爽！','再来一局？'], banter:['冲啊','梭了','放马过来','刺激'] },
+      playful: { bomb:['嘿嘿炸一个玩玩','惊不惊喜～','来点花活','啪！'], danpai:['就剩一张啦～','嘻嘻要走咯','你们加油','悄悄溜走'], finish:['我先撤啦～下次带你们','拜拜咯','轻松收工','溜了溜了～'], win:['赢啦赢啦','开心～','运气不错嘛','嘿嘿'], banter:['玩得开心～','随便出出','看心情','嘻嘻'] },
+    };
+    function quipSet(seat){ return PERSONA_QUIP[archOf(seat)] || null; }
     function emitBeat(b){ if(typeof opts.onBeat==='function'){ try{ opts.onBeat(Object.assign({ game:'gd' }, b)); }catch(_){} } }
     function beatQuip(seat, kind){
       if(!(gameIsAI && gameIsAI[seat])) return null;
-      const q = rand(QUIP[kind]||[]); if(!q) return null;
+      const set = quipSet(seat) || QUIP;
+      const q = rand(set[kind]||QUIP[kind]||[]); if(!q) return null;
       say(seat, q); return q;
     }
     // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/钢板/炸弹等一致。
@@ -859,6 +928,13 @@
     });
     els.hand.addEventListener('pointerup', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
     els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
+    // ── 点空白取消选中(主人诉求): 已选牌时点牌桌绒面(非手牌/按钮/操作条/气泡) → 清空选择, 放下高亮 ──
+    if (els.felt) els.felt.addEventListener('pointerdown', (e)=>{
+      if(st.phase!=='play' || st.turn!==mySeat || arrangeMode || painting) return;
+      if(!selected.size) return;
+      if(e.target.closest('.card, button, #gdCtrl, .gd-acts, .gd-say, .gd-peek, .gd-seat')) return;
+      selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click');
+    });
 
     // ── 理牌: 一键自动(短按) / 手动拖排(长按切模式), 共用 #gdSort 一个按钮 ──
     // rows=null 时 renderHand 走 Rules.sortHand 自动理牌(全在下排); 非空则按 {top,bot} 两排的 id 顺序摆。
@@ -873,7 +949,7 @@
       arrangeMode = on;
       const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); btn.innerHTML = on ? '✓ 完成' : '🔀 理牌'; }
       els.hand.classList.toggle('arranging', on);
-      if(on){ vibrate(15); selected.clear(); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排'); }
+      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排 · 选中的牌保留'); }
       else renderHand();
     }
     // 短按理牌 = 纯按大小排(级牌/王一端, 同点数天然相邻)。
@@ -882,7 +958,7 @@
     function autoSort(){
       rows = null; sortMode = 'rank';
       renderHand(); sfx('cardsel');
-      toast('已按大小理牌 · 同点数相邻好框选');
+      toast('已按大小理牌 · 长按此钮可手动拖排');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1023,7 +1099,7 @@
       if (isMate) tags.push('<span class="gd-tag mate">队友</span>');
       else if (seat!==mySeat) tags.push('<span class="gd-tag">对手</span>');
       if (badge) tags.push(`<span class="gd-tag rank">${badge}</span>`);
-      if (alarm) tags.push(`<span class="gd-tag alarm">⚠ 报牌</span>`);
+      if (alarm) tags.push(`<span class="gd-tag alarm">🔔 报牌</span>`);
       const isWin = st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam;
       return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div><span class="gd-sec"></span></div>
@@ -1045,19 +1121,39 @@
         bindLobbySeats();
         return;
       }
-      const lvlChanged = (lastLevel!=null && lastLevel!==st.level);
-      els.lvl.innerHTML = `<span class="lv-now${lvlChanged?' bump':''}">🎯 打 ${LVL_LABEL(st.level)}</span>我方 <b>${LVL_LABEL(st.teamLevels[Engine.teamOf(mySeat)])}</b> · 对方 <b>${LVL_LABEL(st.teamLevels[1-Engine.teamOf(mySeat)])}</b>`;
-      lastLevel = st.level;
+      // 顶栏只留紧凑级牌(仅横屏可见, 记分条在横屏收起时兜底显示"本副打几"); 竖屏顶栏藏起(CSS),
+      //   "谁在打几"改到牌桌记分条 renderScore, 让顶部功能钮区清爽。lastLevel 的升级沿归 renderScore。
+      els.lvl.innerHTML = `<span class="lv-now">🎯 打 ${LVL_LABEL(st.level)}</span>`;
     }
-    // 本桌记分条(常驻): 两队当前等级 + 已赢副数, 按队着色。等级取 st.teamLevels(当前副), 副数取累计 teamWins。
+    // 本桌记分条(牌桌上·常驻): 本副打几金徽标 + 两队当前等级 + 已赢副数, 按队着色。谁在打几一目了然。
     function renderScore(){
       if (!els.score) return;
-      if (st.phase==='lobby'){ els.score.innerHTML=''; return; }
+      if (st.phase==='lobby'){ els.score.innerHTML=''; lastLevel=st.level; return; }
       const myT = Engine.teamOf(mySeat), foeT = 1-myT;
       const lv = st.teamLevels || [2,2];
+      const lvlChanged = (lastLevel!=null && lastLevel!==st.level);
       els.score.innerHTML =
-        `<span class="gd-team mine">我方 · 打<span class="tl">${LVL_LABEL(lv[myT])}</span> · <span class="tw">胜${teamWins[myT]}副</span></span>`
+        `<span class="gd-lvl-now${lvlChanged?' bump':''}">🎯 本副 打<b>${LVL_LABEL(st.level)}</b></span>`
+      + `<span class="gd-team mine">我方 · 打<span class="tl">${LVL_LABEL(lv[myT])}</span> · <span class="tw">胜${teamWins[myT]}副</span></span>`
       + `<span class="gd-team foe">对方 · 打<span class="tl">${LVL_LABEL(lv[foeT])}</span> · <span class="tw">胜${teamWins[foeT]}副</span></span>`;
+      lastLevel = st.level;
+    }
+
+    // 我打完后亮出队友手牌(主人诉求): 我已出完→无法再行动→给队友的牌开天窗, 陪看/助兴, 不构成作弊。
+    //   仅 solo/host(本地有真牌)且队友未出完时显示; guest 端他席手牌恒为空数组, 天然跳过(不违反脱敏铁律)。
+    function renderMatePeek(){
+      const box = els.p2; if(!box) return;
+      const old = box.querySelector('.gd-peek'); if(old) old.remove();
+      const seatBox = box.querySelector('.gd-seat'); if(!seatBox) return;
+      const iAmDone = st.players[mySeat] && st.players[mySeat].hand.length===0;
+      const p = st.players[SEAT_T];   // 队友恒在对家(上)
+      if (isGuest || st.phase!=='play' || !iAmDone || !p || !Array.isArray(p.hand) || p.hand.length===0) return;
+      const wrap = document.createElement('div'); wrap.className='gd-peek';
+      wrap.innerHTML = '<span class="pk-t">👀 队友的牌</span>';
+      const strip = document.createElement('div'); strip.className='pk-cards';
+      const sorted = Rules.sortHand ? Rules.sortHand(p.hand.slice(), st.level) : p.hand;
+      sorted.forEach(c=> strip.appendChild(cardEl(c, st.level, {mini:true})));
+      wrap.appendChild(strip); seatBox.appendChild(wrap);
     }
 
     let lastShownKey='';
@@ -1335,13 +1431,19 @@
       turnSeatActive = seat;
       if (turnChanged){
         // guest 端 remoteSeats 恒空, 对手会落到 AI 短时长→"1 秒卡 0"; guest 不裁判, 对手倒计时纯展示 → 给足人类时长视觉正常走。
-        turnDur = mine ? HUMAN_PLAY_MS : (isGuest ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))));
+        // AI(灵魂)席按原型节奏微调思考时长(狂放抢拍/清冷沉吟), 让不同灵魂出手快慢有别。
+        const aiDur = Math.round((AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) * (SOUL_TEMPO[archOf(seat)] || 1));
+        turnDur = mine ? HUMAN_PLAY_MS : (isGuest ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : aiDur));
         turnStart = Date.now();
       }
+      // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管/过牌, 数字才有意义。
+      //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳到 0 像坏了 → 头像只亮"思考中"脉冲(💭), 不显误导性小倒计时。
+      const digitSeat = mine || remote;
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');   // 当前行动席(含对手)头像秒数徽标
+      if(secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
@@ -1349,7 +1451,7 @@
         if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
         const sec=Math.ceil(remain/1000);
         if(sec!==lastSec){
-          if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); }
+          if(secEl && digitSeat){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); secEl.classList.remove('think'); }
           if(mine && clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
           lastSec=sec;
         }
@@ -1532,13 +1634,13 @@
       if (isGuest){   // guest 只能替自己不出, 回传给 host
         if (awaitingHost) return;
         if (onAction) onAction({ action:'pass' });
-        sfx('pass'); say(mySeat,'不出'); sayOp(mySeat,'不出'); awaitingHost=true;
+        sfx('pass'); say(mySeat,'不出'); sayOp(mySeat,'不出'); passFx(mySeat); awaitingHost=true;
         selected.clear(); hintCycle=[];   // 不出即把选中的牌收回(放下高亮), 与 doPlay 一致
         setBanner(); renderCtrl(); renderHand(); return;
       }
       try{ var rp=Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
       if(seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
-      say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp);
+      say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp);
     }
     function doHint(){
       const hand=st.players[mySeat].hand;
@@ -1565,7 +1667,7 @@
     function applyMove(seat, move){
       if(!move || st.phase!=='play' || st.turn!==seat) return false;
       try{
-        if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp); return true; }
+        if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp); return true; }
         const hand=st.players[seat].hand;
         const cards=(move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
         const r=Engine.applyPlay(st, seat, cards);
@@ -1583,7 +1685,7 @@
         let rp;
         try{ rp=Engine.applyPass(st,seat); }
         catch(e){ rp=Engine.applyPlay(st,seat, AI.chooseLead(st.players[seat].hand, st.level)); }
-        say(seat,'不出'); sayOp(seat,'不出'); afterMove(rp); return;
+        say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp); return;
       }
       try{ var r=Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ try{ Engine.applyPass(st,seat); }catch(_){ Engine.applyPlay(st,seat,AI.chooseLead(st.players[seat].hand,st.level)); } afterMove({}); return; }
@@ -1591,10 +1693,11 @@
     }
     function maybeBanter(seat){
       const n=st.players[seat].hand.length;
-      if(n===0) say(seat, rand(['走咯！','先走一步～','头游预定']));
-      else if(n===1) say(seat,'就剩一张咯～');
+      const set = quipSet(seat);
+      if(n===0) say(seat, rand((set&&set.finish)||['走咯！','先走一步～','头游预定']));
+      else if(n===1) say(seat, rand((set&&set.danpai)||['就剩一张咯～']));
       else if(n===2) say(seat,'快没了！');
-      else if(secureRand()<0.13) say(seat, rand(['接招','看我的','这手稳']));
+      else if(secureRand()<0.13) say(seat, rand((set&&set.banter)||['接招','看我的','这手稳']));
     }
 
     function afterMove(r){
@@ -1691,16 +1794,17 @@
       if (seat<0 || !manualTribute()){ turnSeatActive=-1; return; }
       const mine = seat===mySeat;
       const turnChanged = (seat!==turnSeatActive); turnSeatActive=seat;
-      if (turnChanged){ turnDur = mine ? HUMAN_PLAY_MS : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)); turnStart=Date.now(); }
+      if (turnChanged){ turnDur = mine ? HUMAN_PLAY_MS : Math.round((AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) * (SOUL_TEMPO[archOf(seat)] || 1)); turnStart=Date.now(); }
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');
+      if(secEl && !mine){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0; const deg=Math.round(frac*360);
         if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
         const sec=Math.ceil(remain/1000);
-        if(sec!==lastSec){ if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5);} if(mine&&clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5);} lastSec=sec; }
+        if(sec!==lastSec){ if(secEl && mine){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); secEl.classList.remove('think');} if(mine&&clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5);} lastSec=sec; }
         if(remain<=0){ ringRAF=null; if(mine) onTributeTimeout(); return; }
         ringRAF=requestAnimationFrame(tick);
       };
@@ -1929,7 +2033,7 @@
     }
 
     function renderAll(){
-      renderSeats(); renderScore(); renderTable(); renderHand(); setBanner(); renderCtrl();
+      renderSeats(); renderScore(); renderMatePeek(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(minimized ? null : onHumanTimeout);   // 折叠期间不催我的回合(离席看聊天不该被自动过牌)
       if (minimized) updateChip();
     }
@@ -1950,6 +2054,7 @@
       if (A){
         if (Array.isArray(A.names) && A.names.length===4){ for(let i=0;i<4;i++){ names[i]=A.names[i]; avatars[i]=A.avatars[i]; } }
         if (Array.isArray(A.isAI)) A.isAI.forEach((v,i)=>{ if(i<4) seatIsAI[i]=v; });
+        if (Array.isArray(A.souls)) souls = A.souls.slice();   // 名册重组: 灵魂原型跟着换, 台词/节奏随之
         if (Array.isArray(A.remoteSeats)){ remoteSeats.length=0; A.remoteSeats.forEach(x=>remoteSeats.push(x)); }
       }
       // 首局: 从头开一整场(保留 teamLevels/dealerTeam 初始化), 不能跳过 newDeal 的赛制逻辑
