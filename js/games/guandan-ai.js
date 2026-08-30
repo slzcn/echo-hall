@@ -74,8 +74,10 @@
         add(cs.slice(0, Math.min(size, cs.length)).concat(useW(wNeed)));
       }
     }
-    // 四大天王(王不成对, 双王不作对子; 只有四王齐可成天王炸)
+    // 王对(同类两王成对: 双小王力16 / 双大王力17)+ 四大天王(四王齐)
     const bigs=g.jokers.filter(j=>j.joker==='big'), smalls=g.jokers.filter(j=>j.joker==='small');
+    if (smalls.length>=2) add([smalls[0],smalls[1]]);
+    if (bigs.length>=2)   add([bigs[0],bigs[1]]);
     if (bigs.length>=2 && smalls.length>=2) add([bigs[0],bigs[1],smalls[0],smalls[1]]);
 
     // 三带二: 三 a + 对 b (a≠b)

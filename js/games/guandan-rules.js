@@ -158,8 +158,13 @@
 
     // 对子
     if (n === 2){
-      // 王不成对: 双大王/双小王/一大一小都不是对子(主流掼蛋里王只作单张或四大天王)。
-      if (dc.jokers.length) return null;
+      // 王对: 两张同类王成对——双小王(力16)、双大王(力17), 均压过级牌对(力15)。
+      //   一大一小点数不同, 不成对; 百搭不替王, 故王+百搭也不成王对。
+      if (dc.jokers.length){
+        if (dc.w === 0 && dc.nats.length === 0 && (dc.bigJ === 2 || dc.smallJ === 2))
+          return { type:'pair', key: dc.bigJ === 2 ? 17 : 16, len:2, nat: null };
+        return null;
+      }
       const ranks = [...dc.natMap.keys()];
       if (ranks.length > 1) return null;
       const r = ranks.length ? ranks[0] : level;   // 全百搭 → 级对
