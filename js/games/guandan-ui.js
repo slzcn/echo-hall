@@ -125,7 +125,13 @@
 .gd-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;max-width:var(--maxw,none);width:100%;margin:0 auto;box-sizing:border-box}
 .gd-felt.shake{animation:gdShake .42s cubic-bezier(.36,.07,.19,.97)}
 @keyframes gdShake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
-.gd-partner{display:flex;justify-content:center;padding:8px 8px 0}
+.gd-partner{display:flex;justify-content:center;padding:5px 8px 2px}
+/* 顶部队友座位压扁(主人诉求·省竖向): 头像+名字+剩牌横排一行(仿 .gd-me), 不再竖着堆四行, 省出的空间给中央牌桌/手牌托盘 */
+.gd-partner .gd-seat{flex-direction:row;width:auto;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94%}
+.gd-partner .gd-avr{width:34px;height:34px;padding:2px}
+.gd-partner .gd-avr .av{font-size:16px}
+.gd-partner .nm{max-width:38vw}
+.gd-partner .gd-say{top:36px}
 .gd-mid{flex:1;display:flex;align-items:stretch;min-height:0}
 .gd-side{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 4px;flex:none}
 .gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative;isolation:isolate}
@@ -266,6 +272,9 @@
 /* 手牌 */
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .gd-hand{display:flex;flex-direction:column;gap:6px;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
+/* 手牌托盘定高(主人诉求): 以≈6张重叠牌高为参考钉死高度, 手牌在 1 排/2 排间切换时托盘不缩放,
+   由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。 */
+.gd-room:not(.is-land) .gd-hand{height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
 .gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
 /* touch-action:none 逐张也要有(命中的是卡片本身): 否则竖向划选被浏览器判成滚动→pointercancel, 表现为"不能滑动连选/选牌不稳" */

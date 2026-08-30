@@ -42,28 +42,41 @@ const CSS='html,body{margin:0;background:#070a12;color:#eaf6ff}#hall{position:re
       hand.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:x,clientY:y,pointerId:1}));
     }
     function selIds(){ return [...hand.querySelectorAll('.card.sel')].map(c=>c.dataset.id); }
+    // 样本间彻底清空选择: 点牌桌绒面空白处触发"点空白取消选中"(清内部 selected 集合), 只清 .sel class
+    // 不够——内部 selected 会跨样本累积, 且 autoExtendSelection 会连选同点数牌, 污染下一次判定。
+    const felt=document.querySelector('.gd-felt');
+    function clearSel(){
+      if(felt) felt.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:195,clientY:300,pointerId:9}));
+    }
     const tests=[];
-    if(rows.length===2 && !out.combo){
-      const [topRow,botRow]=rows;
-      const botTop=botRow.getBoundingClientRect().top;
-      // 采样: 每排取第 1/中/末 张(末张露全宽最好点; 首末测边界)
-      const sample=row=>{ const ks=[...row.children]; return [ks[0],ks[Math.floor(ks.length/2)],ks[ks.length-1]].filter(Boolean); };
-      const runOne=(cardEl, rowName, y)=>{
-        const cr=cardEl.getBoundingClientRect();
+    // 全程按 data-id 操作: tap 会触发 autoExtend→renderHand 重建 DOM, 早捕获的元素引用会失效(rect 归零),
+    // 故每次 tap 前都用 freshRows() 现查当前两排的元素与坐标。
+    const freshRows=()=>[...hand.children].filter(r=>r.children.length);
+    const idsOf=rowEl=>[...rowEl.children].map(c=>c.dataset.id);
+    const rowsNow0=freshRows();
+    if(rowsNow0.length===2 && !out.combo){
+      // 采样: 每排取第 1/中/末 张的 id(末张露全宽最好点; 首末测边界)
+      const pick3=ids=>[ids[0], ids[Math.floor(ids.length/2)], ids[ids.length-1]].filter(Boolean);
+      const topIds=pick3(idsOf(rowsNow0[0])), botIds=pick3(idsOf(rowsNow0[1]));
+      const rowIdxOf=id=>{ const rs=freshRows(); for(let i=0;i<rs.length;i++){ if(rs[i].querySelector(`.card[data-id="${id}"]`)) return i; } return -1; };
+      const runOne=(wantId, rowName, yPick)=>{
+        clearSel();                     // 清内部 selected(否则跨样本累积+autoExtend 连选污染)
+        const el=hand.querySelector(`.card[data-id="${wantId}"]`); if(!el){ tests.push({row:rowName,want:wantId,got:null,hit:false,selCount:0,gotInBot:false,tapX:0,tapY:0}); return; }
+        const cr=el.getBoundingClientRect();
         const x=cr.left+2;              // 露出条左沿右侧 2px → 命中"left≤x 的最右张"=它自己
-        // 先清空选择(点同坐标可能 toggle): 直接清 + 重绘由 tap 触发
-        [...hand.querySelectorAll('.card.sel')].forEach(c=>c.classList.remove('sel'));
+        const y=yPick();               // y 现算(基于当前两排 rect)
         tap(x,y);
-        const sel=selIds();
-        const hit = sel.length===1 && sel[0]===cardEl.dataset.id;
-        const inBot = botRow.contains(document.querySelector(`.card[data-id="${sel[0]}"]`)||document.createElement('i'));
-        tests.push({ row:rowName, want:cardEl.dataset.id, got:sel[0]||null, hit, selCount:sel.length, gotInBot:inBot, tapX:+x.toFixed(1), tapY:+y.toFixed(1) });
+        // 判据: 点到的【那张目标牌】是否被选中(autoExtend 会连带同点数牌一起选, 属正常, 不用 selCount===1)。
+        const selNow=hand.querySelector(`.card[data-id="${wantId}"]`);
+        const hit = !!(selNow && selNow.classList.contains('sel'));
+        const botIdx=freshRows().length-1;
+        const inBot = rowIdxOf(wantId)===botIdx;
+        tests.push({ row:rowName, want:wantId, got:hit?wantId:(selIds()[0]||null), hit, selCount:selIds().length, gotInBot:inBot, tapX:+x.toFixed(1), tapY:+y.toFixed(1) });
       };
       // 下排: 关键回归点——在下排【上沿+3px】(旧代码会误判成上排)也必须命中下排牌
-      sample(botRow).forEach(c=> runOne(c, 'bot', botTop+3));
+      botIds.forEach(id=> runOne(id, 'bot', ()=>freshRows()[1].getBoundingClientRect().top+3));
       // 上排: 在下排上沿之上(上排露出条中部)命中上排牌
-      const topRect=topRow.getBoundingClientRect();
-      sample(topRow).forEach(c=> runOne(c, 'top', (topRect.top+botTop)/2));
+      topIds.forEach(id=> runOne(id, 'top', ()=>{ const rs=freshRows(); const tr=rs[0].getBoundingClientRect(); return (tr.top+rs[1].getBoundingClientRect().top)/2; }));
     }
     out.tests=tests;
     return out;
