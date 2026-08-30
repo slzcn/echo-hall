@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260830-gd-seat-tray';
+window.__EH_APP_VER = '20260831-chat-order-time';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1448,6 +1448,27 @@ function ensureBottom(persistent){
   requestAnimationFrame(()=>requestAnimationFrame(kick));
 }
 
+// ★按 mid 有序插入消息行(修"聊天记录/卡片顺序错乱"): 各异步路径(灵魂打字队列延时吐、补拉、实时)
+//   过去一律 appendChild 到底 —— 当延时路径吐出一条【较旧】消息时, 期间已到的【较新】消息已在底部,
+//   旧的被塞到新的下面 = 乱序。改为按数字 mid 找正确时间位插入: 从底向上找到第一条 mid>目标 的行,
+//   插到它前面; 若无更新的行(常态: 新消息 id 最大)则照常追加到底(O(1))。无 mid / 本地乐观(local_)→ 到底。
+function insertStreamElByMid(el, mid){
+  const stream=$('#stream'); if(!stream || !el) return;
+  const id = mid==null ? NaN : +mid;
+  if(isNaN(id)){ stream.appendChild(el); return; }
+  let ref=null, node=stream.lastElementChild;
+  while(node){
+    const nm = node.dataset ? node.dataset.mid : null;
+    const nid = nm==null ? NaN : +nm;
+    if(nm!=null && !isNaN(nid)){
+      if(nid>id){ ref=node; node=node.previousElementSibling; continue; }
+      break;                       // 命中第一条 mid<=id 的行, el 应排它之后
+    }
+    break;                         // 无数字 mid 的行(sysmsg/加载按钮等)= 边界, 停
+  }
+  if(ref) stream.insertBefore(el, ref); else stream.appendChild(el);
+}
+
 // 双击房间名 → 软刷新: 只重拉当前房消息数据 + 重渲染 + 回到最新, 不刷新整个页面。
 // 用途: realtime 偶发漏消息 / 感觉不是最新时, 手动强制对齐一次。
 let _softRefreshing=false;
@@ -1554,10 +1575,12 @@ async function refreshSnapshotTail(room, fillOlder=false){
       if(!exist){
         // 只补比 DOM 现有最新还新的(空窗新消息); 更早的不补(交给分批渲染, 防重复)
         if(m.id>domMaxMid){
-          // ★灵魂文字消息(msg/act)走渲染队列一条条节奏吐出, 不在此同步批量 append(否则又"一口气冒几条")。
-          //   队列自带 pending 去重, 已排队/已渲染的不会重复。其余(真人/song/voice/proj/interact)仍即时 append。
-          if(m.is_bot && (m.kind==='msg' || m.kind==='act') && m.user_id!==myUid){ enqueueSoulMsg(m); return; }
-          const el=buildMsgEl(m, true); if(el){ stream.appendChild(el); domByMid.set(String(m.id),el); appended++; }
+          // ★补拉/进房催拉到的消息属【历史/催拉批】, 一律同步就地有序渲染, 不再把灵魂消息丢进打字机队列。
+          //   旧逻辑把灵魂 msg/act 入队逐条吐 → 进房时"上一分钟的灵魂发言"被当实时新消息重放 = "历史一条条冒",
+          //   且边吐边 append 顶高容器 → 落不到最后一条。催拉批本就该一次到位(在场时补空窗也更真实)。
+          //   仅"真正实时单条到达"才由下面 realtime 分支入队走打字机。按 mid 有序插, 防与队列/实时并发的错序。
+          if(m.is_bot && (m.kind==='msg'||m.kind==='act') && m.user_id!==myUid && _soulMsgKnown(m.id)) return;  // 已在队列/DOM → 防重复
+          const el=buildMsgEl(m, true); if(el){ insertStreamElByMid(el, m.id); domByMid.set(String(m.id),el); appended++; }
         }
         return;
       }
@@ -1924,7 +1947,7 @@ async function subscribeMessages(rid){
       // 内容已到达 → 本地立刻抹掉该人"正在输入"并即时刷新 typing bar, 不等 presence 通道(否则会有空档)。
       if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){ _ehCatch('subscribeMessages',_); } }
       const _wasNear=nearBottom(); const _mine=(m.user_id===myUid);
-      const el=buildMsgEl(m); if(el){ $('#stream').appendChild(el); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){ _ehCatch('subscribeMessages',e); } }
+      const el=buildMsgEl(m); if(el){ insertStreamElByMid(el, m.id); if(_wasNear||_mine){ scrollStream(!_mine); } else { bumpUnread(); } ehFx(el, m.is_bot?'fx-soul':'fx-in', m.is_bot?1200:600); if(!m.is_bot && !_mine) ehFx(el,'fx-say',900); try{ EhSfx.play(m.is_bot?'soul':'receive'); }catch(e){ _ehCatch('subscribeMessages',e); } }
       // 灵魂普通文字消息 → 本地打字机逐字显示(好看; 零成本, 不走网关流式)
       if(el && m.is_bot && m.kind==='msg' && !isEmojiOnly(m.text)) typewriterInto(el, m.text);
       maybeResonate(m);
@@ -3239,6 +3262,11 @@ function _buildMsgElRaw(m, isHistory){
   if(m.kind==='game'){
     const el=buildGameEl(m);
     if(el && m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='game'; }   // ★去重键
+    // ★卡片补时间(修"卡片没有时间"): 与文字气泡一致标出 created_at。gt 联机牌桌卡会异步重渲 innerHTML
+    //   (gtRenderInto/gtHydrateCard 会覆盖), 追加的时间会被冲掉, 故排除; 其余战绩/海龟汤卡在此统一补。
+    if(el && m.created_at && !el.classList.contains('gt-card')){
+      el.insertAdjacentHTML('beforeend', `<div class="gc-time">${fmtTime(m.created_at)}</div>`);
+    }
     return el;
   }
   const el=document.createElement('div');
@@ -4719,7 +4747,7 @@ async function _flushSoulQ(){
       if(m.user_id!==myUid){ _typingSuppress.set(m.user_id, Date.now()); try{ renderTyping(lastUsersSnapshot||[]); }catch(_){} }
       const el = buildMsgEl(m);
       if(el){
-        $('#stream').appendChild(el);
+        insertStreamElByMid(el, m.id);   // ★按 mid 有序插: 排队延时期间若有更新消息已到底, 本条(较旧)插到其上方, 不再错序
         _soulQPending.delete(m.id);   // ★append 完再 delete: 判重真空窗关闭
         if(wasNear) scrollStream(true); else bumpUnread();
         ehFx(el, 'fx-soul', 1200);
