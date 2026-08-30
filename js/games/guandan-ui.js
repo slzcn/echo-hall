@@ -780,8 +780,20 @@
     // resize rAF 节流: 旋转/移动端地址栏收放连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
+    // 发牌落定补渲染: 首帧 renderAll() 紧跟 appendChild 同步跑, 此刻 #hall 盒子可能尚未落定成竖高,
+    //   reflect() 按实测宽高比误判 is-land → orderedRows 收成单排 → applyRowOverlap 因单排跳过 =
+    //   "默认发牌没有两排竖向重叠, 手点理牌后才有"(理牌时盒子早已竖高)。盒子若无 resize 事件地异步落定
+    //   则一直不自愈。发牌后补两帧 rAF + 一拍兜底(盖住开场展开过渡 ~300ms)重跑 renderHand: 用真实竖高重判
+    //   →两排竖向重叠, 默认即生效不必手点。structSig 增量护栏保证布局已正确时为 no-op, 不误伤选牌/别家回合。
+    let _settleRAF=0, _settleTO=0;
+    function settleHandLayout(){
+      const kick=()=>{ try{ if(st && st.phase!=='lobby') renderHand(); }catch(_){} };
+      if(_settleRAF) cancelAnimationFrame(_settleRAF);
+      _settleRAF=requestAnimationFrame(()=>{ _settleRAF=requestAnimationFrame(()=>{ _settleRAF=0; kick(); }); });
+      clearTimeout(_settleTO); _settleTO=setTimeout(kick, 320);
+    }
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } if(_settleRAF){ cancelAnimationFrame(_settleRAF); _settleRAF=0; } clearTimeout(_settleTO); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
@@ -1772,7 +1784,7 @@
       lastSnap = snap;
       st = GNet.pseudoState(snap, mySeat, myHand);
       renderAll();
-      if (isNewDeal) showTributeBanner();
+      if (isNewDeal){ settleHandLayout(); showTributeBanner(); }
       if (st.phase==='over' && st.result && prevPhase!=='over') showOver();
       if (minimized) updateChip();
     }
@@ -1780,7 +1792,7 @@
     function feedHand(cards){
       myHand = (cards||[]).map(c=> (c && c.id) ? c : findCardById(c)).filter(Boolean);
       if (st && st.players[mySeat]) st.players[mySeat].hand = myHand.map(c=>GNet?GNet.cardPlain(c):c);
-      renderHand(); renderCtrl(); if(minimized) updateChip();
+      renderHand(); settleHandLayout(); renderCtrl(); if(minimized) updateChip();
     }
 
     function onHumanTimeout(){
@@ -2025,7 +2037,7 @@
             over.remove();
             st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
             tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
-            sfx('deal'); broadcast(); renderAll(); showTributeBanner();
+            sfx('deal'); broadcast(); renderAll(); settleHandLayout(); showTributeBanner();
           };
           let done=false; const once=()=>{ if(done) return; done=true; go(); };
           over.addEventListener('animationend', once, { once:true });
@@ -2090,10 +2102,11 @@
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastMyTurn=false; lastFinishedN=0; tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
       sfx('deal');
-      renderAll(); showTributeBanner(); broadcast();
+      renderAll(); settleHandLayout(); showTributeBanner(); broadcast();
     }
 
     renderAll();
+    if (!lobbyMode) settleHandLayout();   // 开局发牌: 盒子落定后校准两排竖向重叠(默认即生效)
     if (!lobbyMode) showTributeBanner();
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播(顺带写各远程席初始手牌); lobby 态不发牌不广播
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
