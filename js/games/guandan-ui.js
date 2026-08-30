@@ -869,11 +869,12 @@
     function rowAt(y){
       const rowsEl=[...els.hand.children].filter(r=>r.children.length);
       if(!rowsEl.length) return null;
-      for(const r of rowsEl){ const rr=r.getBoundingClientRect(); if(y>=rr.top-26 && y<=rr.bottom+26) return r; }
-      // 落在两排之外: 取竖直中心最近的一排(拖到边缘也不丢牌)
-      let best=null, bd=Infinity;
-      for(const r of rowsEl){ const rr=r.getBoundingClientRect(); const d=Math.abs(y-(rr.top+rr.bottom)/2); if(d<bd){ bd=d; best=r; } }
-      return best;
+      if(rowsEl.length===1) return rowsEl[0];
+      // 两排(竖向重叠码放): 分界=下排上沿。上排被下排盖住下半 → 其上沿即视觉分界:
+      //   上沿之上=上排露出的顶条, 之下(含下排整体)=下排。旧版按各排 ±26 容差 + 上排先命中,
+      //   使下排上半的点被误判成上排(点下排选中上排牌)→"选不上/选错牌"。改按硬分界杜绝串排。
+      const bot=rowsEl[rowsEl.length-1];
+      return (y < bot.getBoundingClientRect().top) ? rowsEl[0] : bot;
     }
     function handCardAt(x,y){
       if(els.hand.classList.contains('combo')){
@@ -1397,6 +1398,22 @@
       _lastLand = land;
       if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
       for (const row of els.hand.children) layoutRow(row);
+      applyRowOverlap();
+    }
+    // 两排大小牌竖向重叠码放(默认·主人诉求"上下重叠放最大程度利用空间"): 下排上移盖住上排下半,
+    //   上排只露顶条(点数/花色在牌顶, 够读)。省出竖向空间 + 每排牌数减半横向更疏 → 牌更大更好点。
+    //   手动理牌(arrangeMode)保持两排分离——要拖牌换排 + 上排空时的虚线投放区, 重叠会挡住拖放。
+    function applyRowOverlap(){
+      const rowsEl=[...els.hand.children].filter(r=>r.children.length);
+      rowsEl.forEach(r=>{ r.style.marginTop=''; });
+      els.hand.style.gap='';
+      if (arrangeMode || rowsEl.length<2) return;   // 手动理牌/单排: 不重叠
+      const bot=rowsEl[rowsEl.length-1];
+      const ch=(bot.children[0] && bot.children[0].offsetHeight)
+        || parseFloat(getComputedStyle(room).getPropertyValue('--ch')) || 54;
+      const overlap=Math.round(ch*0.44);            // 上排露出 ~56%(顶条含点数+花色)
+      els.hand.style.gap='0px';                      // 抵消 flex gap, 由 marginTop 精确控叠量
+      bot.style.marginTop=(-overlap)+'px';
     }
 
     function setBanner(){
