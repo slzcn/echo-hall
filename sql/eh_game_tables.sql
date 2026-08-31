@@ -206,6 +206,12 @@ begin
   if p_seat < 0 or p_seat >= v_row.seat_count then raise exception 'bad seat'; end if;
   v_target := v_row.seats -> p_seat;
   if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
+  -- 德州(nlhe)真牌桌【至少留 2 空位】给真人(见 eh_gt_join 放行 playing 态坐下): 服务端硬保底,
+  --   坐这席后剩余空位 < 2 就拒 —— 即便旧版客户端(缓存未更新)仍无脑召唤灵魂焊满桌, 也焊不动。
+  if lower(coalesce(v_row.game,'')) in ('nlhe','holdem','texas')
+     and (select count(*) from jsonb_array_elements(v_row.seats) s where (s->>'kind')='empty') <= 2 then
+    raise exception 'nlhe keep seats open';
+  end if;
   -- 座位名取【房内原名】(eh_members.name = "狼姐"), 不取 eh_users.name ——
   -- 后者全表 UNIQUE, 召唤的灵魂副本存的是内部唯一名"狼姐·<uid前6>", 直接坐进座位会把后缀泄漏到牌桌。
   select m.name, m.emoji into v_name, v_emoji
@@ -244,6 +250,12 @@ begin
   if not found then raise exception 'table not found'; end if;
   if v_row.host_uid <> v_me then raise exception 'host only'; end if;
   if v_row.status <> 'lobby' then raise exception 'not joinable'; end if;
+  -- 德州(nlhe)真牌桌从不用【灵魂分身】焊死空座 —— 空位留给真人 + host 本机 AI 逐手顶位。
+  --   服务端硬拒: 即便旧版客户端(缓存未更新)仍走 clone 补满全桌的老逻辑, 也一律焊不动(客户端 catch 静默丢弃)。
+  --   这是"德州点·分身焊满桌导致进不去/加不进"的根治(掼蛋/斗地主固定阵型仍正常用分身补位)。
+  if lower(coalesce(v_row.game,'')) in ('nlhe','holdem','texas') then
+    raise exception 'nlhe no clone';
+  end if;
   if p_seat < 0 or p_seat >= v_row.seat_count then raise exception 'bad seat'; end if;
   v_target := v_row.seats -> p_seat;
   if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
