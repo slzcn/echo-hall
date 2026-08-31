@@ -290,6 +290,12 @@
     let follow = genCombos(hand, level, 0).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
     if (!follow.length && g.wilds.length)   // 无纯天然可压 → 允许百搭
       follow = genCombos(hand, level, g.wilds.length).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+    // ★别为压一手就拆自己的炸弹(主人反馈"剩4个8+2个2却出888+22, 剩一张单8"): 剔除"拆炸凑出来"的压牌。
+    //   若因此无非炸可压 → 下方"紧迫用真炸 / 否则不出", 两者都远胜拆炸留单张(打普通级时本就走这条,行为正确)。
+    if (follow.length){
+      const clean = follow.filter(c=>!breaksBomb(c, hand, level));
+      follow = clean;   // 全是拆炸压法 → 清空, 交给下方炸弹/pass 逻辑
+    }
 
     const coopMe = ctx.coop!==false;
     // 队友(对家)是否已经出完 → 本方已锁头游, 我该全力冲二游拿【双下】(最高分), 别再保守保牌。
@@ -444,6 +450,19 @@
     }
     for (const c of play.cards) if (c.joker) cost += 40;   // 拆王
     return cost;
+  }
+
+  // 这手是否拆了炸弹: 用了某自然点 <4 张, 而手里该点持有 >=4 张(与 playCost 的 +120 判据一致)。
+  //   百搭/王不计入自然点(它们拆没拆王另有惩罚)。用于跟牌路径硬性剔除"拆炸凑出来"的压牌。
+  function breaksBomb(play, hand, level){
+    const g = groups(hand, level);
+    const rc = {};
+    for (const c of play.cards){ if (c.joker || Rules.isWild(c, level)) continue; const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
+    for (const r in rc){
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      if (have>=4 && rc[r]<have && rc[r]<4) return true;
+    }
+    return false;
   }
 
   function isTeammateLead(ctx){
