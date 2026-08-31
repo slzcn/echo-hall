@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-clone-badge';
+window.__EH_APP_VER = '20260831-nextgame-fix';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6773,11 +6773,18 @@ function ehGameBeat(b){
   }catch(_){}
 }
 function _restoreActiveGameIfAny(){
-  if(document.querySelector('.ddz-room, .gd-room, .pk-room')){
-    if(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
+  const roomEl = document.querySelector('.ddz-room, .gd-room, .pk-room');
+  if(!roomEl) return false;
+  // _gtActiveTable 是"当前有活牌局"的权威标志: 每次引擎 open 前都置 {id,host}, 收工/清场(_gtCleanupPlay)置 null。
+  //   真有活牌局 → 折叠的拉回, 全屏的提示先收工(拦住重复开新局)。
+  if(_gtActiveTable && _ehGame){
+    if(_ehGame.isMinimized && _ehGame.isMinimized() && _ehGame.restore) _ehGame.restore();
     else toast('先收工当前牌局再开新的');
     return true;
   }
+  // ★孤儿牌桌页体(引擎已收工/切房清场, 但 .pk-room 等页 DOM 没跟着删): 旧逻辑会误判"有活牌局"永久 toast 挡住
+  //   → "点下一局/开新局进不去"的真凶。清掉残留页体, 放行新开局(不再 return true 硬拦)。
+  try{ document.querySelectorAll('.ddz-room, .gd-room, .pk-room').forEach(el=>el.remove()); }catch(_){}
   return false;
 }
 // ── 斗地主:唤起入室牌桌。3 席(1 地主 vs 2 农民), 空位由 AI(灵魂)补齐。──
