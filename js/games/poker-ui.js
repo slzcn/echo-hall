@@ -629,7 +629,8 @@
           <div class="nm">空位</div><div class="stk pk-lob">点击邀请</div></div>`;
       }
       const isMe = seat===mySeat;
-      const roleTxt = p.kind==='soul' ? '灵魂' : (isMe ? '你' : '玩家');
+      // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
+      const roleTxt = p.kind==='soul' ? '灵魂' : (p.kind==='clone' ? '分身' : (isMe ? '你' : '玩家'));
       const canKick = isHostLobby && !isMe && p.dbSeat!==0;
       return `<div class="pk-seat pk-lobby-filled" data-seat="${seat}" style="--p:360">
         <div class="pk-avr"><div class="av">${p.emoji||avatars[seat]||'🙂'}</div></div>

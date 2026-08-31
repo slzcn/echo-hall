@@ -91,8 +91,10 @@
         div.appendChild(sel);
       }
     } else {
-      var roleCls = kind==='soul'?' soul':(kind==='ai'?' ai':'');
-      var roleTxt = kind==='soul'?'灵魂':(kind==='ai'?'AI':(isMe?'你':'玩家'));
+      // clone = 灵魂分身(host 本机 AI 顶着灵魂身份代打的副本): 归灵魂色系(非真人), 但文字用「分身」
+      //   与真灵魂/匿名 AI/真人玩家都区分开 —— 状态忠实: 别把 AI 副本冒充成真人玩家。
+      var roleCls = (kind==='soul'||kind==='clone')?' soul':(kind==='ai'?' ai':'');
+      var roleTxt = kind==='soul'?'灵魂':(kind==='clone'?'分身':(kind==='ai'?'AI':(isMe?'你':'玩家')));
       div.innerHTML='<span class="gt-av">'+esc(seat.emoji||'🙂')+'</span>'
         +'<span class="gt-nm">'+esc(seat.name||'—')+'</span>'
         +'<span class="gt-role'+roleCls+'">'+roleTxt+'</span>';
