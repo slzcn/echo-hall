@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-nextgame-join';
+window.__EH_APP_VER = '20260831-nextgame-enter';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2228,7 +2228,7 @@ async function gtRpc(fn,args){
     if(data && data.id){ _gtTables.set(data.id,data); gtRenderCard(data); } return data;
   }catch(e){ toast(gtErr(e)); return null; }
 }
-async function gtJoin(id,seat){ await gtRpc('eh_gt_join',{p_table:id,p_seat:seat,p_name:me.name,p_emoji:me.emoji}); }
+async function gtJoin(id,seat){ return await gtRpc('eh_gt_join',{p_table:id,p_seat:seat,p_name:me.name,p_emoji:me.emoji}); }
 async function gtLeave(id){ await gtRpc('eh_gt_leave',{p_table:id}); }
 async function gtSeatSoul(id,seat,soul){ await gtRpc('eh_gt_seat_soul',{p_table:id,p_seat:seat,p_soul:soul}); }
 async function gtKick(id,seat){ await gtRpc('eh_gt_kick',{p_table:id,p_seat:seat}); }
@@ -2358,7 +2358,7 @@ function gtEnter(id){
 //   旧逻辑只 scrollIntoView 到牌桌卡就 return, 客人点「🎰下一局」看着毫无反应 = 主人反馈的"点下一局进不去"。
 //   现在: 我的桌 → 招募中就地摆阵 / 已开局重进; 别人的桌 → 已在座直接进桌, 未入座就自动坐进第一个空位
 //   (gtJoin 后 seated+playing 会由 realtime 自动进桌), 满座/不可加入时 gtJoin(eh_gt_join) 或 toast 给诚实反馈。
-function gtGotoExistingTable(row){
+async function gtGotoExistingTable(row){
   if(!row) return;
   const card=document.querySelector(`[data-gt-id="${row.id}"]`);
   if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
@@ -2370,7 +2370,16 @@ function gtGotoExistingTable(row){
   const A=gtSeatArrays(row);
   if(A.mySeat>=0){ gtEnter(row.id); return; }                 // 别人的桌但我已在座 → 直接(重)进桌
   const empty=(row.seats||[]).find(s=>s&&s.kind==='empty'&&typeof s.seat==='number');
-  if(empty){ gtJoin(row.id, empty.seat); return; }            // 坐进第一个空位; 坐下后 realtime 自动进桌
+  if(empty){
+    // 坐进第一个空位。★别只靠 realtime 自动进桌 —— 自投 postgres_changes 回声有时序竞态、
+    //   且【招募中】的桌 realtime 压根没有进桌分支(它只认 status=playing)。用 eh_gt_join 返回的
+    //   最新桌行【直接进桌】: 招募中→进等待视图看着开局, 已开局→gtEnterPoker(此刻 mySeat 已≥0)立刻进场。
+    const jr=await gtJoin(row.id, empty.seat);
+    const fresh=jr||{...row, seats:(row.seats||[]).map(s=>s&&s.seat===empty.seat?{seat:empty.seat,kind:'human',uid:myUid,name:me.name,emoji:me.emoji}:s)};
+    _gtTables.set(fresh.id, fresh);
+    gtEnter(fresh.id);
+    return;
+  }
   toast(card ? '本房这桌满了，点桌上「加入」换下 AI 席入座' : '本房已有一桌，往上翻找牌桌卡加入');
 }
 // ── 招募态就地落牌桌(第1条·主人): 开桌不再弹独立座位页, 直接把【真牌桌 UI】以招募态挂起来 ——
@@ -6832,7 +6841,7 @@ async function launchDoudizhu(){
       if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
     }catch(e){ console.warn('[gt] post table card failed', e); }
   } else if(row.host_uid!==myUid || row.status==='playing'){
-    gtGotoExistingTable(row);
+    await gtGotoExistingTable(row);
   }
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
@@ -6852,7 +6861,7 @@ async function launchTexas(){
   _gtTables.set(row.id,row);
   // 本房已有一桌(别人开的, 或我之前开过还没散) → 带我进桌(见 gtGotoExistingTable), 不重复开
   if(!(row.host_uid===myUid && !row.msg_id)){
-    gtGotoExistingTable(row);
+    await gtGotoExistingTable(row);
     return;
   }
   // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用每空位「🤝灵魂」下拉指定补位, 满意再点「开始 ▶」(空位自动补灵魂)
@@ -7016,7 +7025,7 @@ async function launchGuandan(){
       if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
     }catch(e){ console.warn('[gt] post table card failed', e); }
   } else if(row.host_uid!==myUid || row.status==='playing'){
-    gtGotoExistingTable(row);
+    await gtGotoExistingTable(row);
   }
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
