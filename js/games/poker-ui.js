@@ -335,6 +335,18 @@
 .pk-netline .nl-v.up{color:var(--accent,#00e5d4)}
 .pk-netline .nl-v.down{color:var(--magenta,#ff2d8e)}
 .pk-netline .nl-v.zero{color:var(--dim,#498d88)}
+/* 结算减负: 默认只显 结果+赢家一行+按钮; 摊牌/边池/净盈亏收进「本手详情」折叠(主人反馈"页面太复杂逻辑不清") */
+.pk-over .pk-champ{font-size:13.5px;font-weight:800;color:var(--amber,#ffc24d);letter-spacing:.02em;line-height:1.4}
+.pk-over .pk-more{width:100%;border-top:1px solid var(--line,rgba(0,229,212,.24));padding-top:4px;text-align:left}
+.pk-over .pk-more>summary{font-size:12px;color:var(--sub,#8fb6b1);cursor:pointer;list-style:none;padding:5px 2px;font-weight:700;letter-spacing:.03em;user-select:none;text-align:center}
+.pk-over .pk-more>summary::-webkit-details-marker{display:none}
+.pk-over .pk-more>summary::after{content:' ▾';opacity:.7}
+.pk-over .pk-more[open]>summary::after{content:' ▴'}
+.pk-over .pk-more[open]>summary{margin-bottom:8px}
+.pk-over .pk-more .pk-showbox{border-top:none;padding-top:0;margin-top:0}
+.pk-over .pk-more .pk-nets{border-top:none;padding-top:10px}
+.pk-over .pk-more .pk-pots{margin-top:8px}
+.pk-over .pk-offnote{width:100%;font-size:12.5px;font-weight:700;color:#ff5d6c;padding:2px 0 6px;letter-spacing:.02em}
 
 `;
     document.head.appendChild(s);
@@ -519,12 +531,22 @@
     };
     // 联机连接状态: online / reconnecting / host_offline —— 由 app.js 通过返回值 setConn(kind) 灌入
     let connState = 'online';
+    let curOver = null;   // 当前挂着的结算浮层(供 setConn 在房主掉线时把客人的"等下一手"换成"可离开", 别对着灰按钮干等)
     function connLabel(k){ return ({online:'● 在线', reconnecting:'⟳ 重连中', host_offline:'⚠ 房主离线'})[k] || ''; }
     function setConn(kind){
       if(!kind) kind='online';
       if(kind===connState) return;
       connState = kind;
       renderMsg(); renderActs(); updateChip();
+      // 结算浮层挂着时房主掉线: 客人别对着灰"下一手自动开始…"干等 —— 换成"房主离线·可离开", 并把收工按钮变主行动。
+      if(kind==='host_offline' && isGuest && curOver && curOver.parentNode){
+        const wait=curOver.querySelector('#pkWait');
+        if(wait){
+          const note=document.createElement('div'); note.className='pk-offnote'; note.textContent='⚠ 房主已离线 · 本桌即将解散';
+          wait.replaceWith(note);
+          const done=curOver.querySelector('#pkDone'); if(done){ done.textContent='离开牌桌'; done.classList.add('call'); }
+        }
+      }
       if(kind==='host_offline'){ try{ vibrate([40,80,40]); }catch(_){ } }
     }
     function emitBeat(b){ if(typeof opts.onBeat==='function'){ try{ opts.onBeat(Object.assign({ game:'nlhe' }, b)); }catch(_){} } }
@@ -1353,8 +1375,10 @@
       if (iLeaveNow){
         footer = `<button class="pk-b call" id="pkLeave">离桌</button>`;
       } else if (isGuest){
-        // 客人: 下一手由房主引擎自动连发(非手动门), 文案讲清"自动即将开始"别让人以为要等房主点操作。
-        footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>下一手自动开始…</button>`;
+        // 客人: 常态下一手由房主引擎自动连发(非手动门); 但房主已离线时别显灰"自动开始"让人干等 —— 直接给"离开牌桌"。
+        footer = (connState==='host_offline')
+          ? `<div class="pk-offnote">⚠ 房主已离线 · 本桌即将解散</div><button class="pk-b call" id="pkDone">离开牌桌</button>`
+          : `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>下一手自动开始…</button>`;
       } else if (matchOver){
         footer = (iBust && bustLimit)
           ? `<button class="pk-b call" id="pkDone">收工</button>`
@@ -1362,25 +1386,43 @@
       } else {
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkAuto" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
-      over.innerHTML=`
-        <div class="pk-over-card">
-          <h2>${h2}</h2>
-          ${subLine}
-          ${dailyLine}
-          <div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>
-          ${potsHtml}
-          <div class="pk-nets"><div class="pk-nets-t">本桌净盈亏（相对买入）</div>${
+      // 赢家一行(常显): 谁靠什么赢下多少 —— 一眼看清结果, 不必展开摊牌逐行去数。
+      const champSeat0 = (res.winnersBySeat||[])[0];
+      const champCount = (res.winnersBySeat||[]).length;
+      const potTotalAll = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+      const champNm = (champSeat0!=null && st.players[champSeat0]) ? st.players[champSeat0].name : '赢家';
+      const champHnd = (res.wentToShowdown && res.reveal && champSeat0!=null && res.reveal[champSeat0]) ? res.reveal[champSeat0].hand : '';
+      const champLine = champCount>1
+        ? `🏆 ${champCount} 家平分 ${potTotalAll}`
+        : `🏆 ${escapeHtml(champNm)} 赢下 ${potTotalAll}${champHnd?(' · '+champHnd):''}`;
+      // 详情(默认折叠): 摊牌逐行(仅摊牌局) + 边池明细 + 本桌累计净盈亏 —— 想细看再点开, 默认不糊一屏。
+      const showdownBox = (res.wentToShowdown && res.reveal)
+        ? `<div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>` : '';
+      const netsHtml = `<div class="pk-nets"><div class="pk-nets-t">本桌净盈亏（相对买入）</div>${
             displayOrder().map(seat=>{
               const v=netSettled[seat]||0; const cls=v>0?'up':(v<0?'down':'zero');
               const nm=st.players[seat].name;
               return `<div class="pk-netline"><span class="nl-n">${escapeHtml(nm)}${seat===mySeat&&nm!=='你'?'（你）':''}</span><span class="nl-v ${cls}">${v>=0?'+':''}${v}</span></div>`;
             }).join('')
-          }</div>
+          }</div>`;
+      over.innerHTML=`
+        <div class="pk-over-card">
+          <h2>${h2}</h2>
+          ${subLine}
+          ${dailyLine}
+          <div class="pk-champ">${champLine}</div>
+          <details class="pk-more">
+            <summary>本手详情</summary>
+            ${showdownBox}
+            ${potsHtml}
+            ${netsHtml}
+          </details>
           <div class="pk-row" style="margin-top:2px">${footer}</div>
         </div>`;
       // 推池动画: 底池飞向赢家席位(我方=底部), 浮层延后淡入让筹码在绒面上先跑完
       if ((res.winnersBySeat||[]).length){ over.classList.add('payout-in'); payoutChipsFx(res.winnersBySeat); }
       els.felt.appendChild(over);
+      curOver = over;   // 供 setConn 在房主掉线时改写本浮层的客人按钮(离场用 parentNode 判活, 无需处处清空)
       if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
       else if(busted){ sfx('void'); vibrate([90,60,90]); }
       else if(delta<0){ sfx('void'); vibrate(90); }
