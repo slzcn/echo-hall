@@ -171,6 +171,10 @@ def probe_business_readonly():
     for name,path,payload,expected,method in edge_cases:
         try:
             st, raw, dt = _sb_request(path,key,payload,method or "POST",timeout=15)
+            # Edge Function 5xx 瞬时抖动（Supabase 冷启动偶发 503）：等 2s 重试一次
+            if st >= 500:
+                time.sleep(2)
+                st, raw, dt = _sb_request(path,key,payload,method or "POST",timeout=15)
             info[name]={"http":st,"time":round(dt,3),"method":method or "POST"}
             if st >= 500 or st not in expected: issues.append(f"Edge Function {name} 探活异常 HTTP={st}（预期 {sorted(expected)}）")
             elif dt > EDGE_SLOW: issues.append(f"Edge Function {name} 冷启动/响应慢 {round(dt,2)}s")
