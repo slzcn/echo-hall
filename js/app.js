@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-nextgame-fix';
+window.__EH_APP_VER = '20260831-nextgame-join';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2353,6 +2353,25 @@ function gtEnter(id){
   if(row.game==='guandan'){ gtEnterGuandan(row); return; }
   if(row.game==='ddz'){ gtEnterDdz(row); return; }
   toast('房主已开局 · 该游戏联机对战暂未接入');
+}
+// 本房已有一桌(别人开的, 或我之前开过还没散)时【真的把我带进桌】——
+//   旧逻辑只 scrollIntoView 到牌桌卡就 return, 客人点「🎰下一局」看着毫无反应 = 主人反馈的"点下一局进不去"。
+//   现在: 我的桌 → 招募中就地摆阵 / 已开局重进; 别人的桌 → 已在座直接进桌, 未入座就自动坐进第一个空位
+//   (gtJoin 后 seated+playing 会由 realtime 自动进桌), 满座/不可加入时 gtJoin(eh_gt_join) 或 toast 给诚实反馈。
+function gtGotoExistingTable(row){
+  if(!row) return;
+  const card=document.querySelector(`[data-gt-id="${row.id}"]`);
+  if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
+  if(row.host_uid===myUid){
+    if(row.status==='lobby') gtLaunchLobbyLocal(row);        // 我的桌还在招募中 → 就地落招募态摆阵
+    else if(row.status==='playing') gtEnter(row.id);          // 我的桌已在打 → 重新进桌
+    return;
+  }
+  const A=gtSeatArrays(row);
+  if(A.mySeat>=0){ gtEnter(row.id); return; }                 // 别人的桌但我已在座 → 直接(重)进桌
+  const empty=(row.seats||[]).find(s=>s&&s.kind==='empty'&&typeof s.seat==='number');
+  if(empty){ gtJoin(row.id, empty.seat); return; }            // 坐进第一个空位; 坐下后 realtime 自动进桌
+  toast(card ? '本房这桌满了，点桌上「加入」换下 AI 席入座' : '本房已有一桌，往上翻找牌桌卡加入');
 }
 // ── 招募态就地落牌桌(第1条·主人): 开桌不再弹独立座位页, 直接把【真牌桌 UI】以招募态挂起来 ——
 //   每空位可点邀灵魂/真人, 操作按钮区有「一键邀请/邀真人/开始」; 满意点开始 → startDeal 就地转正局(不重挂)。
@@ -6813,9 +6832,7 @@ async function launchDoudizhu(){
       if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
     }catch(e){ console.warn('[gt] post table card failed', e); }
   } else if(row.host_uid!==myUid || row.status==='playing'){
-    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
-    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
-    else toast('本房已有一桌，往上翻找牌桌卡加入');
+    gtGotoExistingTable(row);
   }
 }
 // ── 德州扑克(单人/联机合一): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人点卡入座 ——
@@ -6833,13 +6850,9 @@ async function launchTexas(){
   catch(e){ toast('开桌失败，稍后再试'); return; }
   if(!row){ toast('开桌失败'); return; }
   _gtTables.set(row.id,row);
-  // 本房已有一桌(别人开的, 或我之前开过还没散) → 只定位到那张卡, 不重复开
+  // 本房已有一桌(别人开的, 或我之前开过还没散) → 带我进桌(见 gtGotoExistingTable), 不重复开
   if(!(row.host_uid===myUid && !row.msg_id)){
-    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
-    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
-    else toast('本房已有一桌，往上翻找牌桌卡加入');
-    if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 我的桌还在招募中 → 就地落招募态牌桌摆阵, 不直接发牌
-    else if(row.host_uid===myUid && row.status==='playing') gtEnter(row.id);   // 已在打 → 重新进桌
+    gtGotoExistingTable(row);
     return;
   }
   // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用每空位「🤝灵魂」下拉指定补位, 满意再点「开始 ▶」(空位自动补灵魂)
@@ -6868,13 +6881,20 @@ async function gtSeatSoulsIntoEmpties(row){
   const souls=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid&&!seated.has(s.auth_uid));
   let n=0, ei=0;
   const origins=[];   // 已入座的真灵魂 uid, 作为分身克隆源(轮流复用)
-  // pass1: 真灵魂一席一位
-  for(;ei<empties.length&&ei<souls.length;ei++){
+  // ★德州(nlhe)是真牌桌: 空座【不焊死】—— host 本机引擎逐手把空席当 AI 顶位打, 真人随时坐空位进桌
+  //   (见 eh_gt_join 放行 playing 态加入)。所以德州只用真灵魂点缀身份, 且【至少留 2 个空位】给真人,
+  //   绝不 clone 补满全桌。此前不分游戏一律 clone 填满 → 午夜聊天那桌 6 席全被"·分身"焊死、emptyCount=0,
+  //   真人点「🎰下一局」既没空位可坐(eh_gt_join 只放行 empty)、旧代码又静默滚动 = 主人反馈的"点下一局进不去"根因。
+  //   掼蛋/斗地主是固定阵型(开局后不接受加入), 维持 clone 补满不变。
+  const isNlhe = row.game==='nlhe';
+  const soulCap = isNlhe ? Math.max(0, empties.length-2) : empties.length;
+  // pass1: 真灵魂一席一位(德州受 soulCap 约束, 强制留空位给真人)
+  for(;ei<empties.length&&ei<souls.length&&ei<soulCap;ei++){
     try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[ei],p_soul:souls[ei].auth_uid}); n++; origins.push(souls[ei].auth_uid); }
     catch(_){}
   }
-  // pass2: 真灵魂坐完仍有空位 → 借在场灵魂身份克隆"分身"填满(灵魂分身, 非匿名机器人)
-  if(ei<empties.length){
+  // pass2: 真灵魂坐完仍有空位 → 借在场灵魂身份克隆"分身"填满(灵魂分身, 非匿名机器人)。德州跳过, 空位留给真人+host AI。
+  if(!isNlhe && ei<empties.length){
     // 克隆源优先取刚入座的真灵魂; 若本轮一个都没坐上(极端), 退回房里全部灵魂名册作源
     let pool=origins.slice();
     if(!pool.length) pool=(roomSouls||[]).filter(s=>s&&s.auth_uid&&s.auth_uid!==myUid).map(s=>s.auth_uid);
@@ -6996,9 +7016,7 @@ async function launchGuandan(){
       if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
     }catch(e){ console.warn('[gt] post table card failed', e); }
   } else if(row.host_uid!==myUid || row.status==='playing'){
-    const card=document.querySelector(`[data-gt-id="${row.id}"]`);
-    if(card){ card.scrollIntoView({block:'center'}); gtRenderInto(card,row); }
-    else toast('本房已有一桌，往上翻找牌桌卡加入');
+    gtGotoExistingTable(row);
   }
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
