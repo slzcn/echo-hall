@@ -9,7 +9,13 @@
 // 时序安全:游戏文件按依赖顺序串行 append,每个脚本 onload 才进下一个,避免依赖未定义
 (function (root) {
   'use strict';
-  var VER = (root.__EH_APP_VER || 'lazy1');   // 复用主版本号做指纹,主版本换清缓存自动生效
+  // ★指纹取值时序陷阱(主人"iOS 掼蛋看不到新版"真因): 本 loader 与 app.js 都是 <script defer>,
+  //   defer 按文档顺序执行 → loader 先跑, 此刻 app.js 尚未运行, __EH_APP_VER 还是 undefined →
+  //   旧写法 VER 恒为 'lazy1', 懒加载游戏脚本 ?v=lazy1 指纹被永久冻结, 主版本号再升也不失效,
+  //   JS_CACHE 按 URL 持久缓存 → 永远吃第一次下的旧字节(且壳自愈只查 index/app.js, 察觉不到)。
+  //   改取 __EH_BUILD_VER: 它由 index.html 内联脚本(在 loader 之前、解析即执行)写入, 取值时必已就绪,
+  //   且每次发版随壳变 → 游戏脚本 ?v= 随发版失效, 换版自动拉新。回退链保底不崩。
+  var VER = (root.__EH_BUILD_VER || root.__EH_APP_VER || 'lazy1');
   var loaded = {};        // {poker: Promise, guandan: Promise, ddz: Promise}
 
   // 每个游戏依赖的文件(按加载顺序,前提依赖在前)

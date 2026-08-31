@@ -255,9 +255,12 @@
 .pk-preb.on:not(.fold):not(.call){background:rgba(0,229,212,.14);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px rgba(0,229,212,.3)}
 .pk-preb.on.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 /* 结算 */
-.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;
+/* 结算浮层可滚动(输光/多池高结算超出 felt 高度时, justify-content:center 会把卡片上下两头一起挤出 overflow:hidden 的 felt,
+   底部"再来一局/收工"被裁掉 → 主人"德州输光后没法继续玩"的真因)。改用 overflow-y:auto 容器 + 卡片 margin:auto:
+   内容矮时垂直居中, 内容高时可滚动且首尾都够得着(flex 里唯一不裁切的居中写法, 优于 justify-content:center)。 */
+.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
-.pk-over-card{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);box-sizing:border-box;
+.pk-over-card{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);box-sizing:border-box;
   padding:22px 20px 18px;border-radius:20px;animation:pkOverCard .28s cubic-bezier(.2,.9,.3,1) both;
   background:linear-gradient(180deg,rgba(19,42,41,.66),rgba(6,12,18,.72));border:1px solid var(--line2,rgba(0,229,212,.4));
   box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
