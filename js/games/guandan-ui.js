@@ -166,10 +166,16 @@
 .gd-sec.think{border-color:var(--dim,#498d88);color:var(--sub,#86cbc6);font-size:10px;animation:gdThink 1.15s ease-in-out infinite}
 @keyframes gdThink{0%,100%{opacity:.5}50%{opacity:1}}
 .gd-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,19px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
-.gd-seat.turn .gd-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+/* 行动席发光改脉冲: 静态发光扫一眼抓不住"轮到谁", 脉冲把眼睛拉过去(纯 box-shadow, 不改盒模型不跳动) */
+.gd-seat.turn .gd-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6));animation:gdSeatTurn 1.1s ease-in-out infinite}
+@keyframes gdSeatTurn{0%,100%{box-shadow:0 0 10px 1px var(--accent,rgba(0,229,212,.5))}50%{box-shadow:0 0 20px 5px var(--accent,rgba(0,229,212,.9))}}
 .gd-seat.win .gd-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .gd-seat.win .nm{color:var(--amber,#ffc24d);font-weight:700}
 .gd-seat.mate .gd-avr .av{border-color:var(--accent)}
+/* 压桌席(上一手牌的主人): 静态标识, 区别于 .turn 的动态脉冲 —— 让"这手是谁出的、该谁接"一眼可辨。
+   自我他者对等: 我/队友/对手谁压桌都标。同时也是 turn 时不抢 turn 的青光(:not(.turn))。 */
+.gd-seat.last:not(.turn) .gd-avr .av{border-color:var(--sub,#86cbc6);box-shadow:0 0 0 2px rgba(134,203,198,.3),0 0 10px rgba(134,203,198,.35)}
+.gd-tag.last{color:#04121a;background:linear-gradient(135deg,#9fe0d8,#5fb6cc);border-color:transparent;font-weight:800}
 .gd-seat .nm{font-size:11px;color:var(--sub);max-width:var(--seatw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gd-seat.turn .nm{color:var(--accent);font-weight:700}
 .gd-seat .cnt{font-size:11px;color:var(--dim,#498d88);font-variant-numeric:tabular-nums}
@@ -1117,13 +1123,16 @@
       // 剩牌告警: 未出完且 ≤2 张 → 座位报牌(对标大厂残局紧张感)
       const alarm = st.phase==='play' && !done && p.hand.length<=2;
       const miniHand = (mini && !done) ? `<div class="gd-mini-hand">${Array.from({length:Math.min(p.hand.length,10)}).map(()=>'').join('')}</div>` : '';
+      // 压桌席: 台面这手牌的主人(众人须压或过), 持久标到出完/新一圈清台。别人出完只剩最后一张也在此显。
+      const isLast = st.phase==='play' && st.table.lastPlay && st.table.lastPlay.seat===seat;
       const tags = [];
       if (isMate) tags.push('<span class="gd-tag mate">队友</span>');
       else if (seat!==mySeat) tags.push('<span class="gd-tag">对手</span>');
+      if (isLast) tags.push('<span class="gd-tag last">刚出</span>');
       if (badge) tags.push(`<span class="gd-tag rank">${badge}</span>`);
       if (alarm) tags.push(`<span class="gd-tag alarm">🔔 报牌</span>`);
       const isWin = st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam;
-      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
+      return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLast?' last':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div><span class="gd-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
