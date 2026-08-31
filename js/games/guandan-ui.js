@@ -1997,8 +1997,8 @@
           <div class="lvlup">${lvlLine}</div>
           <div class="gd-cum">${cumLine}</div>
           <div class="gd-acts" style="margin-top:4px">
-            <button class="gd-btn" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
-            <button class="gd-btn primary" id="gdDone">收工</button>
+            <button class="gd-btn ${isGuest?'':'primary'}" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
+            <button class="gd-btn ghost" id="gdDone">收工</button>
           </div>
         </div>`;
       room.appendChild(over);   // ★挂到整个房间(非 felt): 盖满全屏, 不再让底部"我的座位/理牌钮/手牌条"漏在战报下方(治"结算页也乱")
@@ -2044,20 +2044,8 @@
           setTimeout(once, 400);   // 动画事件兜底(被打断/不触发也不卡在战报页)
         };
         againBtn.addEventListener('click', startRematch);
-        // ★默认再来一局(主人要求): 收局后自动倒计时开下一副, 期间按钮读秒; 点它立刻开、点"收工"取消。
-        //   通关(matchWon)是整场终点, 不自动续 —— 让人看清通关战报再决定新对局。折叠期间暂停读秒。
-        if (!res.matchWon){
-          let left = 5;
-          const baseLbl = '打下一副';
-          againBtn.textContent = `${baseLbl} (${left})`;
-          over._againTimer = setInterval(()=>{
-            if (!over.isConnected){ clearAgainTimer(); return; }
-            if (minimized) return;
-            left--;
-            if (left <= 0){ clearAgainTimer(); startRematch(); return; }
-            if (!over._leaving) againBtn.textContent = `${baseLbl} (${left})`;
-          }, 1000);
-        }
+        // ★默认再来一局(主人要求): 战报页把"打下一副"设为高亮主按钮(默认落点), 但不自动倒计时——
+        //   由主人手动点开下一副或点"收工"离桌, 不再读秒自动开局。
       }
       over.querySelector('#gdDone').addEventListener('click', ()=>{ clearAgainTimer(); close(); });
       // F3 终局战报进聊天流(升级/双下/通关一并播报); 头游若是灵魂配一句收官台词

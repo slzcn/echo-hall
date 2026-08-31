@@ -1553,8 +1553,8 @@
           <div class="score">${(res.delta[mySeat]>=0?'+':'')}${res.delta[mySeat]} 分</div>
           ${cumBox}
           <div class="ddz-acts">
-            <button class="ddz-btn" id="ddzAgain">再来一局</button>
-            <button class="ddz-btn primary" id="ddzDone">收工</button>
+            <button class="ddz-btn primary" id="ddzAgain">再来一局</button>
+            <button class="ddz-btn ghost" id="ddzDone">收工</button>
           </div>
         </div>`;
       room.appendChild(over);
@@ -1596,17 +1596,8 @@
           setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
         };
         againBtn.addEventListener('click', startRematch);
-        // ★默认再来一局(主人要求): 收局后自动倒计时开新局, 期间"再来一局"按钮读秒; 点它立刻开、点"收工"取消。
-        //   折叠(离席看聊天)期间暂停读秒不打扰; 战报被拆掉(!isConnected)即停表, 防 close 后仍偷偷开局。
-        let left = 5;
-        againBtn.textContent = `再来一局 (${left})`;
-        over._againTimer = setInterval(()=>{
-          if (!over.isConnected){ clearAgainTimer(); return; }
-          if (minimized) return;                    // 折叠中暂停读秒
-          left--;
-          if (left <= 0){ clearAgainTimer(); startRematch(); return; }
-          if (!over._leaving) againBtn.textContent = `再来一局 (${left})`;
-        }, 1000);
+        // ★默认再来一局(主人要求): 战报页把"再来一局"设为高亮主按钮(默认落点), 但不自动倒计时——
+        //   由主人手动点"再来一局"或"收工", 不再读秒自动开新局。
       }
       over.querySelector('#ddzDone').addEventListener('click', ()=>{ clearAgainTimer(); close(); });
       if (typeof opts.onResult === 'function'){
