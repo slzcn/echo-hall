@@ -190,8 +190,30 @@
     const nr = Rules.naturalRank(card);
     return hand.filter(x=>!x.joker && Rules.naturalRank(x)===nr).length === 1;
   }
+  // 领出护炸/护王/护三(治"AI 打着打着把炸破掉了, 残局剩一堆碎单"——主人反馈): estTricks 里三条白吃一翼
+  //   会掩盖拆炸损失(拆 8888 领单 8 → 剩 888 仍 1 手, 手数不变), 而 leadScore 又不看 playCost → 平局时粗排
+  //   把小点单(常正是炸弹里的一张)当"最小可清"打出, 炸弹就这么被一张张拆没了。炸弹是掼蛋压制命门,
+  //   领出绝不为清散牌拆炸: 显式重罚拆同点炸/耗王/耗百搭, 与 playCost 同量级(拆炸远超任何清牌/早清加成)。
+  function leadWaste(hand, play, level){
+    const g = groups(hand, level);
+    const rc = {};
+    let pen = 0;
+    for (const c of play.cards){
+      if (c.joker){ pen += 30; continue; }                 // 耗王(大小王=最强单张/组王炸的料, 领出别甩)
+      if (Rules.isWild(c, level)){ pen += 24; continue; }  // 耗百搭(逢人配, 补顺/连对/组炸全靠它)
+      const r = Rules.naturalRank(c); rc[r] = (rc[r]||0)+1;
+    }
+    for (const r in rc){
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      if (have>=4 && rc[r]<have && rc[r]<4) pen += 120;    // 拆同点炸(领出重罚, 与 playCost 一致)
+      else if (have===3 && rc[r]<3) pen += 10;             // 拆三条(留三带更值)
+      else if (have===2 && rc[r]===1) pen += 4;            // 拆对出单(先出真散张)
+    }
+    return pen;
+  }
   // 领出候选打分(越小越好), chooseLead 与 hints 领出共用 → 灵魂选择与玩家提示同源。
-  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先) − 孤小单早清加成。
+  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先) − 孤小单早清加成
+  //   + 护炸/护王/护三(leadWaste: 拆炸重罚, 别为清散牌把炸/王/百搭拆了)。
   function leadScore(hand, play, level){
     const t = estTricks(withoutCards(hand, play.cards), level);
     const k = play.parse.key, ty = play.parse.type;
@@ -204,7 +226,7 @@
     //   与出长牌型一样只减 1 手(孤张在 estTricks 里=独立一手), 不增总手数, 仅把出牌时机前移改善节奏。
     let earlyClear = 0;
     if (ty==='single' && isLoneSmallSingle(hand, play.cards[0], level)) earlyClear = 12;
-    return t*100 + ctl*8 - Math.min(play.cards.length, 9) - earlyClear;
+    return t*100 + ctl*8 - Math.min(play.cards.length, 9) - earlyClear + leadWaste(hand, play, level);
   }
 
   // ── 决策 ────────────────────────────────────────────────────
