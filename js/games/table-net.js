@@ -108,6 +108,15 @@
         var kb=document.createElement('button'); kb.className='gt-mini kick'; kb.textContent='✕'; kb.title='请离';
         kb.onclick=function(){ ctx.actions.kick(seat.seat); }; div.appendChild(kb);
       }
+      // 德州: 灵魂/分身/AI 席可被真人【顶替】—— 真人点一下换下 AI 顶位、自己坐进这席(招募中/进行中都放行)。
+      //   我未在座 且 非本人席时才显示; 顶替走 eh_gt_join(nlhe 已放行非真人席), host 下一手把该席换成真人。
+      if(ctx.game==='nlhe' && !isMe && !ctx.iAmPlaying
+         && (kind==='soul'||kind==='clone'||kind==='ai')
+         && (ctx.status==='lobby'||ctx.status==='playing')){
+        var tk=document.createElement('button'); tk.className='gt-mini'; tk.textContent='顶替';
+        tk.title='换下这个 AI/灵魂席，自己坐下'; tk.onclick=function(){ ctx.actions.join(seat.seat); };
+        div.appendChild(tk);
+      }
     }
     return div;
   }
@@ -190,7 +199,8 @@
       }
     } else if(st==='playing'){
       var tp=document.createElement('span'); tp.className='gt-tip';
-      tp.textContent = ctx.iAmPlaying ? '你在这局里' : '对局进行中';
+      tp.textContent = ctx.iAmPlaying ? '你在这局里'
+        : (ctx.game==='nlhe' ? '点空位「加入」或 AI/灵魂席「顶替」坐下' : '对局进行中');
       foot.appendChild(tp);
       // host 随时可散桌: 防"开局后房主离开→桌永远卡 playing"的僵尸桌
       if(ctx.isHost){

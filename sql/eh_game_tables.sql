@@ -146,7 +146,14 @@ begin
   where t.id=p_table;
   select * into v_row from public.eh_game_tables where id=p_table;
   v_target := v_row.seats -> p_seat;
-  if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
+  -- 德州(nlhe): 真人可坐空位, 也可【顶替灵魂/分身/AI 席】—— 真人随时点卡换掉 AI 顶位(设计本意),
+  --   只不许顶替另一个真人。灵魂/AI 席手牌只活在 host 引擎、从不落库, 顶替者要到下一手才被发牌, 无偷牌风险。
+  --   掼蛋/斗地主(固定阵型, 开局后不接受加入): 仍只允许坐空位。
+  if v_nlhe then
+    if (v_target->>'kind') = 'human' then raise exception 'seat taken'; end if;
+  else
+    if (v_target->>'kind') <> 'empty' then raise exception 'seat taken'; end if;
+  end if;
   update public.eh_game_tables
     set seats = jsonb_set(seats, array[p_seat::text],
           jsonb_build_object('seat',p_seat,'kind','human','uid',v_me,'name',p_name,'emoji',p_emoji)),

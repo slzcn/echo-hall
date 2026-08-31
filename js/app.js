@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-nextgame-enter';
+window.__EH_APP_VER = '20260831-texas-takeover';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2369,18 +2369,21 @@ async function gtGotoExistingTable(row){
   }
   const A=gtSeatArrays(row);
   if(A.mySeat>=0){ gtEnter(row.id); return; }                 // 别人的桌但我已在座 → 直接(重)进桌
-  const empty=(row.seats||[]).find(s=>s&&s.kind==='empty'&&typeof s.seat==='number');
-  if(empty){
-    // 坐进第一个空位。★别只靠 realtime 自动进桌 —— 自投 postgres_changes 回声有时序竞态、
-    //   且【招募中】的桌 realtime 压根没有进桌分支(它只认 status=playing)。用 eh_gt_join 返回的
-    //   最新桌行【直接进桌】: 招募中→进等待视图看着开局, 已开局→gtEnterPoker(此刻 mySeat 已≥0)立刻进场。
-    const jr=await gtJoin(row.id, empty.seat);
-    const fresh=jr||{...row, seats:(row.seats||[]).map(s=>s&&s.seat===empty.seat?{seat:empty.seat,kind:'human',uid:myUid,name:me.name,emoji:me.emoji}:s)};
+  // 找个座坐下: 优先空位; 德州(nlhe)满座时可【顶替】灵魂/分身/AI 席(真人换掉 AI 顶位, 设计本意, 见 eh_gt_join)。
+  const seats=row.seats||[];
+  let target=seats.find(s=>s&&s.kind==='empty'&&typeof s.seat==='number');
+  if(!target && row.game==='nlhe') target=seats.find(s=>s&&s.kind!=='human'&&typeof s.seat==='number');
+  if(target){
+    // ★别只靠 realtime 自动进桌 —— 自投 postgres_changes 回声有时序竞态、且【招募中】的桌 realtime 只认
+    //   status=playing 没有进桌分支。用 eh_gt_join 返回的最新桌行【直接进桌】: 招募中→进等待视图看着开局,
+    //   已开局→gtEnterPoker(此刻 mySeat 已≥0)立刻进场。
+    const jr=await gtJoin(row.id, target.seat);
+    const fresh=jr||{...row, seats:seats.map(s=>s&&s.seat===target.seat?{seat:target.seat,kind:'human',uid:myUid,name:me.name,emoji:me.emoji}:s)};
     _gtTables.set(fresh.id, fresh);
     gtEnter(fresh.id);
     return;
   }
-  toast(card ? '本房这桌满了，点桌上「加入」换下 AI 席入座' : '本房已有一桌，往上翻找牌桌卡加入');
+  toast(card ? '这桌坐满真人了，等有人离座再来' : '本房已有一桌，往上翻找牌桌卡加入');
 }
 // ── 招募态就地落牌桌(第1条·主人): 开桌不再弹独立座位页, 直接把【真牌桌 UI】以招募态挂起来 ——
 //   每空位可点邀灵魂/真人, 操作按钮区有「一键邀请/邀真人/开始」; 满意点开始 → startDeal 就地转正局(不重挂)。
