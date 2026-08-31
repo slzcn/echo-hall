@@ -246,6 +246,9 @@
 .pk-b.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .pk-b.raise{background:var(--amber,#ffc24d);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
 .pk-b.raise.allin{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);color:#fff;box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6))}
+/* 全下二次确认态: 第一次点"全下"进此态(需再点一次才真梭哈), 白描边+脉冲提示"这步会梭全部筹码, 别误触" */
+.pk-b.raise.confirm{background:var(--magenta,#ff2d8e);border-color:#fff;color:#fff;animation:pkConfirmPulse .6s ease-in-out infinite alternate}
+@keyframes pkConfirmPulse{from{box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 10px rgba(255,45,142,.5)}to{box-shadow:0 0 0 3px rgba(255,255,255,.98),0 0 20px rgba(255,45,142,.85)}}
 .pk-b .bt{font-size:11px;line-height:14px;font-weight:700;opacity:.85;display:block}
 /* 预选(pre-action)条: 提示行 + 三键(默认暗态, 选中 .on 高亮) */
 .pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;min-height:14px}
@@ -923,6 +926,16 @@
       else if (mine){
         const la=Engine.legalActions(st, mySeat);
         hint = la.toCall>0 ? `需跟注 <b>${la.callAmount}</b>` : '可过牌或下注';
+        // 单机练习桌: 给真人和 AI 同等的数值辅助 —— 蒙特卡洛胜率 + 底池赔率(要赢多少才不亏)。
+        //   只用【我自己的底牌+公共牌】算(我本就知道的信息, 不碰别家底牌), 不违脱敏命门; 仅单机开, 联机不显。
+        if (isLocalSolo && AI && AI.equityMC && holeCards.length===2 && holeCards[0] && holeCards[1]){
+          try{
+            const nOpp = Math.max(1, st.players.filter(x=>x.seat!==mySeat && !x.folded).length);
+            const eq = AI.equityMC(holeCards, Array.isArray(st.board)?st.board:[], nOpp, secureRand, 120);
+            hint += ` · 胜率 <b>${Math.round(eq*100)}%</b>`;
+            if (la.toCall>0){ const odds=la.toCall/((st.pot||0)+la.toCall); hint += ` · 需赢 ${Math.round(odds*100)}%`; }
+          }catch(e){ _ehCatch('poker.equityHint', e); }
+        }
       } else { hint='等待其他玩家行动'; }
       const holeHtml = holeCards.map((c,i)=>{
         const e=cardEl(c,{big:true});
@@ -949,7 +962,7 @@
     function actsSkeleton(callLbl){
       return `
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
-        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>½ 池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>2×池</button><button class="pk-qbtn" disabled>全下</button></div>
+        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
         <div class="pk-row">
           <button class="pk-b fold" disabled>弃牌<span class="bt">&nbsp;</span></button>
           <button class="pk-b call" disabled>${callLbl}<span class="bt">&nbsp;</span></button>
@@ -1019,9 +1032,10 @@
           <span class="pk-amt" id="pkAmt">${raiseTo}</span>
         </div>
         <div class="pk-quick${canRaiseLike?'':' reserved'}">
-          <button class="pk-qbtn" data-q="half">½ 池</button>
+          <button class="pk-qbtn" data-q="min">最小</button>
+          <button class="pk-qbtn" data-q="half">½池</button>
+          <button class="pk-qbtn" data-q="twothird">⅔池</button>
           <button class="pk-qbtn" data-q="pot">底池</button>
-          <button class="pk-qbtn" data-q="2x">2×池</button>
           <button class="pk-qbtn" data-q="allin">全下</button>
         </div>
         <div class="pk-row">
@@ -1033,13 +1047,17 @@
       // syncAmt 只做廉价 textContent 写(拖动每秒触发数十次): 不再每 tick 整段重建 rb.innerHTML,
       //   只在"是否全下"真正翻转时改前导词 + .allin 类; 金额走 .bt 子节点 textContent。拖动丝滑不掉帧。
       let lastAllin = isAllinAmt;
+      let allinArmed = false;   // 全下二次确认: true=已点过一次"全下", 再点才真梭哈
+      let allinConfirmT = null;
+      function disarmAllin(){ allinArmed=false; if(allinConfirmT){ clearTimeout(allinConfirmT); allinConfirmT=null; } if(rb) rb.classList.remove('confirm'); }
       function syncAmt(){
         if(amt) amt.textContent=raiseTo;
         if(rb){
           const ai=raiseTo>=max;
-          const bt=rb.querySelector('.bt'); if(bt) bt.textContent = ai? String(raiseTo) : ('至 '+raiseTo);
+          if(!allinArmed){ const bt=rb.querySelector('.bt'); if(bt) bt.textContent = ai? String(raiseTo) : ('至 '+raiseTo); }
           if(ai!==lastAllin){ lastAllin=ai; rb.classList.toggle('allin',ai);
-            if(rb.firstChild && rb.firstChild.nodeType===3) rb.firstChild.nodeValue = (ai?'全下':raiseLabel)+' '; }
+            if(!ai){ disarmAllin(); }   // 拖离全下额: 撤销待确认态
+            if(!allinArmed && rb.firstChild && rb.firstChild.nodeType===3) rb.firstChild.nodeValue = (ai?'全下':raiseLabel)+' '; }
         }
       }
       // 音效只在拖动结束(change)响一次, 不再每个 input tick 打一发("机关枪"音)。
@@ -1049,12 +1067,26 @@
       }
       room.querySelectorAll('.pk-qbtn').forEach(b=> b.addEventListener('click', ()=>{
         const q=b.dataset.q; const pot=Math.max(st.pot,bb);
-        let to = q==='half'? st.currentBet+Math.round(pot*0.5) : q==='pot'? st.currentBet+pot : q==='2x'? st.currentBet+pot*2 : max;
+        // 快捷档均按"加注到"语义(当前注 + 底池比例); 最小=引擎给的 minRaiseTo, 全下=max。
+        let to = q==='min'? min : q==='half'? st.currentBet+Math.round(pot*0.5) : q==='twothird'? st.currentBet+Math.round(pot*2/3) : q==='pot'? st.currentBet+pot : max;
         raiseTo=Math.min(Math.max(to,min),max); if(slider) slider.value=raiseTo; syncAmt(); sfx('cardsel');
       }));
       $('#pkFold').addEventListener('click', ()=>humanAct('fold'));
       $('#pkCall').addEventListener('click', ()=>humanAct(la.canCheck?'check':'call'));
-      if(rb) rb.addEventListener('click', ()=>humanAct(la.canBet?'bet':'raise', raiseTo));
+      if(rb) rb.addEventListener('click', ()=>{
+        // 全下(把全部筹码梭进去)要二次确认防误触: 第一次点亮"确认全下", 3.5s 内再点才执行, 逾时/拖离自动撤销。
+        if(raiseTo>=max && !allinArmed){
+          allinArmed=true; rb.classList.add('confirm');
+          if(rb.firstChild && rb.firstChild.nodeType===3) rb.firstChild.nodeValue='确认全下 ';
+          const bt=rb.querySelector('.bt'); if(bt) bt.textContent='再点一次';
+          sfx('click'); vibrate(14);
+          if(allinConfirmT) clearTimeout(allinConfirmT);
+          allinConfirmT=setTimeout(()=>{ allinArmed=false; allinConfirmT=null; if(rb){ rb.classList.remove('confirm'); syncAmt(); } }, 3500);
+          return;
+        }
+        disarmAllin();
+        humanAct(la.canBet?'bet':'raise', raiseTo);
+      });
     }
 
     // 预选条: 与骨架同高(占位滑杆行 + 提示行 + 三键行), 三键为可点开关(再点取消)。
@@ -1359,8 +1391,8 @@
       function stopAuto(){ if(overTimer){ clearInterval(overTimer); overTimer=null; } }
       stopAuto();
       if (!isGuest && !matchOver){
-        // 多局连打提速: 结算只停够看清赢家(联机 3s 让多名真人读摊牌 / 单机 2s), 到点即自动发下一手。
-        let left = (remoteSeats.length>0) ? 3 : 2;
+        // 多局连打提速: 结算只停够看清赢家(联机 4s 让多名真人读摊牌 / 单机 3s 读净盈亏+摊牌), 到点即自动发下一手。
+        let left = (remoteSeats.length>0) ? 4 : 3;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         overTimer=setInterval(()=>{
           left--;
