@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260901-slash-scrollbar';
+window.__EH_APP_VER = '20260901-game-stats';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2482,6 +2482,7 @@ function gtLaunchDdzLobby(row){
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
+      bumpGameStats('doudizhu', res, A);
       postDdzResult(res, A.names).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
@@ -2515,6 +2516,7 @@ function gtLaunchPokerLobby(row){
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
+      bumpGameStats('nlhe', res, A);
       postTexasResult(res,A.names,meta).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },
@@ -2546,6 +2548,7 @@ function gtLaunchGuandanLobby(row){
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
+      bumpGameStats('guandan', res, A);
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
@@ -2616,6 +2619,7 @@ function gtLaunchPoker(row){
     },
     onResult:(res,log,meta)=>{
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
+      bumpGameStats('nlhe', res, A);
       postTexasResult(res,A.names,meta).catch(()=>{});
       // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
       // 重连者被踢、唯一活桌索引提前释放而重复开桌)。牌桌保持 playing, 只在房主"收工"(onExit)时散桌。
@@ -2704,6 +2708,7 @@ function gtLaunchGuandan(row){
     },
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
+      bumpGameStats('guandan', res, A);
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
@@ -2798,6 +2803,7 @@ function gtLaunchDdz(row){
     },
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
+      bumpGameStats('doudizhu', res, A);
       postDdzResult(res, A.names).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
@@ -7022,6 +7028,31 @@ async function postDdzResult(res, names){
     if(data && el) el.dataset.mid=data.id;   // 回填真实 id → realtime 回声按 mid 去重, 不重复
   }catch(e){ console.warn('[ddz] post result failed', e); }
 }
+// ── 历史积分累加: 每局结束由【host】(本局引擎权威)把全桌【真人席】的账变累加进 eh_user_stats。
+//   只取真人席(A.isAI[seat]===false 且有 uid): 灵魂/AI/空位不计分。灵魂虽有 auth 身份但 isAI=true, 天然排除。
+//   单机跟灵魂玩 → entries 只含 host 自己; 联机 → host 一次上报全桌真人(guest 不重复上报, 避免多写)。
+//   服务端 eh_stat_bump 幂等累加 + 限幅 + 校验上报者在座。失败静默, 绝不挡玩家。
+function _statEntries(game, res, A){
+  const entries=[]; const isAI=A.isAI||[];
+  isAI.forEach((ai,seat)=>{
+    if(ai || !A.ids[seat]) return;                       // 只记真人席
+    let delta=0, won=false;
+    const d=(res.delta&&typeof res.delta[seat]==='number')?res.delta[seat]:0;
+    if(game==='doudizhu'){ delta=d; won=(res.winners||[]).includes(seat); }
+    else if(game==='guandan'){ delta=d; won=(seat%2)===res.winnerTeam; }
+    else if(game==='nlhe'){ delta=d; won=(res.winnersBySeat||[]).includes(seat); }
+    entries.push({uid:A.ids[seat], delta, won});
+  });
+  return entries;
+}
+function bumpGameStats(game, res, A){
+  try{
+    const entries=_statEntries(game,res,A);
+    if(!entries.length) return;
+    sb.rpc('eh_stat_bump',{p_game:game,p_entries:entries})
+      .then(({error})=>{ if(error) console.warn('[stat] bump', error.message); }, ()=>{});
+  }catch(e){ console.warn('[stat] bump', e&&e.message); }
+}
 // 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
 async function recordGameResult(game, res, log, names, avatars, souls){
   if(!myUid || !curRoom) return;
@@ -8000,6 +8031,8 @@ async function openMe(){
         <button class="dbtn me-dm-entry" id="meDmEntry">✉️ <span>私信</span><span class="mde-badge" id="meDmBadge"></span></button>
       </div>
     </div>
+    <div class="dsec"><div class="dl">游戏战绩<span class="dl-refresh" id="meStatsRefresh" title="刷新">↻</span></div>
+      <div class="dcard" id="meStatsList"><div class="empty-hint">加载中…</div></div></div>
     <div class="dsec"><div class="dl" id="meRoomsLabel">我的房间${roomsN!=null?`<span class="dl-n" id="meRoomsN">${roomsN}</span>`:''}<span class="dl-refresh" id="meRoomsRefresh" title="刷新">↻</span></div>
       <div class="mlist" id="meRoomsList">${_meCache.rooms?renderMyRoomList(_meCache.rooms):'<div class="empty-hint">加载中…</div>'}</div></div>
     <div class="dsec"><div class="dl" id="meMsgsLabel">最近发言${msgsN!=null?`<span class="dl-n" id="meMsgsN">${msgsN}</span>`:''}<span class="dl-refresh" id="meMsgsRefresh" title="刷新">↻</span></div>
@@ -8015,8 +8048,41 @@ async function openMe(){
   // ↻ 按钮点击 → 强制刷新对应区域(用户主动)
   $('#meMsgsRefresh')&&($('#meMsgsRefresh').onclick=()=>refreshMeData('msgs',isBound,acctKnown));
   $('#meRoomsRefresh')&&($('#meRoomsRefresh').onclick=()=>refreshMeData('rooms',isBound,acctKnown));
+  $('#meStatsRefresh')&&($('#meStatsRefresh').onclick=()=>loadMyStats());
   // 首次打开自动刷一次(即使有缓存, 也无条件覆盖为最新)
   refreshMeData('all',isBound,acctKnown);
+  loadMyStats();
+}
+// 历史战绩: 从 eh_user_stats 聚合表读本人三游戏累计(只读自己, RLS 保证)。
+const _STAT_GAME_LABEL={
+  doudizhu:{name:'斗地主',unit:'局',emoji:'🃏'},
+  guandan :{name:'掼蛋',  unit:'局',emoji:'🀄'},
+  nlhe    :{name:'德州扑克',unit:'手',emoji:'🎰'}
+};
+function renderMyStats(rows){
+  const order=['doudizhu','guandan','nlhe'];
+  const map={}; (rows||[]).forEach(r=>{ map[r.game]=r; });
+  if(!order.some(g=>map[g])) return '<div class="empty-hint">还没有战绩，去房间开一局吧</div>';
+  return order.filter(g=>map[g]).map(g=>{
+    const r=map[g], L=_STAT_GAME_LABEL[g]||{name:g,unit:'局',emoji:'🎲'};
+    const sc=+r.score||0;
+    const scStr=(sc>0?'+':'')+sc;
+    const scColor=sc>0?'var(--cyan)':(sc<0?'var(--magenta)':'var(--sub)');
+    const wr=r.plays?Math.round((r.wins||0)*100/r.plays):0;
+    return `<div class="drow"><span class="dv" style="text-align:left;flex:0 0 auto">${L.emoji} ${L.name}</span>`
+      +`<span class="dk" style="min-width:auto;text-align:right;flex:1">${r.plays||0}${L.unit} · 胜率${wr}% · <b style="color:${scColor}">${scStr}</b></span></div>`;
+  }).join('');
+}
+async function loadMyStats(){
+  const box=$('#meStatsList'); if(!box) return;
+  if(!myUid){ box.innerHTML='<div class="empty-hint">身份加载中</div>'; return; }
+  $('#meStatsRefresh')?.classList.add('spinning');
+  try{
+    const {data,error}=await sb.from('eh_user_stats').select('game,plays,wins,losses,score').eq('user_id',myUid);
+    if(error) throw error;
+    box.innerHTML=renderMyStats(data);
+  }catch(e){ console.warn('[stat] load',e&&e.message); box.innerHTML='<div class="empty-hint">加载失败，点↻重试</div>'; }
+  setTimeout(()=>$('#meStatsRefresh')?.classList.remove('spinning'),300);
 }
 // 抽出的刷新函数, ↻ 按钮和 openMe 复用. scope: 'all'|'msgs'|'rooms'
 async function refreshMeData(scope, isBound, acctKnown){
