@@ -258,8 +258,13 @@
 #ddzCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(92px + env(safe-area-inset-bottom,0px))}
 .ddz-room.is-land #ddzCtrl{min-height:calc(70px + env(safe-area-inset-bottom,0px))}
 .ddz-acts{display:flex;gap:10px;justify-content:center;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
-.ddz-btn{flex:1;max-width:130px;padding:13px 8px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
-  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.05em;transition:.14s}
+/* ★等宽+定高+长文字自动缩字号(主人诉求 msg5): min-width:0 让 flex 等分真正生效(不被"要不起/抢地主"等长文
+   撑破对不齐); min-height 定高防不同按钮高低差; flex 居中 + gap 让 .bt 副标并排居中(不用 margin 破坏居中);
+   font-size clamp 随视口收放, 窄屏自动小一号; overflow:hidden 兜底极端长文不溢出。 */
+.ddz-btn{flex:1;min-width:0;max-width:130px;min-height:48px;padding:6px 8px;border-radius:12px;font-weight:800;
+  font-size:clamp(13px,4vw,16px);line-height:1.15;cursor:pointer;white-space:nowrap;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
 .ddz-btn:active{transform:scale(.96)}
 .ddz-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .ddz-btn.primary:disabled{background:var(--panel);color:var(--ink)}
@@ -267,7 +272,7 @@
 .ddz-btn.ghost{background:transparent;color:var(--sub)}
 .ddz-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
 .ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
-.ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
+.ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
 /* 叫地主浮条 */
 .ddz-bidbar{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 .ddz-bidbar .q{font-size:13px;color:var(--sub)}

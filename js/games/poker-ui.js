@@ -113,8 +113,11 @@
 .pk-table::before{content:'';position:absolute;left:4%;right:4%;top:6%;bottom:6%;border-radius:50%/46%;
   background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
   border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06)}
-/* 中央: 底池 + 公共牌 */
-.pk-center{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
+/* 中央: 底池 + 公共牌
+ * ★下移到 52%(椭圆偏下半): "我"坐桌外底部, 椭圆下半本是空绒面(见上方竖屏注释); 上弧 6 席的身前下注筹码
+ *   在 CY≈48 一圈汇聚, 旧的 top:44% 让底池标签/公共牌与这一圈下注筹码糊在一起(主人反馈"页面太乱")。
+ *   下移后: 各家下注在上(各自身前), 底池+公共牌独占中下方空白 —— 层次分明, 对标大厂德州"桌心底池"。 */
+.pk-center{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
 .pk-pot{font-size:13px;color:var(--amber,#ffc24d);font-weight:800;letter-spacing:.03em;display:flex;align-items:center;gap:6px;
   background:rgba(4,10,14,.5);border:1px solid rgba(255,194,77,.35);border-radius:999px;padding:3px 12px;white-space:nowrap}
 .pk-pot .pc{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020);box-shadow:0 1px 2px rgba(0,0,0,.4)}
@@ -238,8 +241,13 @@
 .pk-qbtn{flex:1;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-row{display:flex;gap:9px;justify-content:center}
-.pk-b{flex:1;max-width:150px;padding:12px 0;border-radius:12px;font-weight:800;font-size:15px;line-height:18px;cursor:pointer;white-space:nowrap;
-  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
+/* ★恒定高度 + flex 垂直居中: 单行(弃牌/预选)与两行(跟注 114/加注 至 404)按钮一律 min-height:54px 同高,
+ *   状态在"预选条(单行)↔我的回合(两行)↔骨架"之间切换时按钮行不再忽高忽低跳动(主人反馈"按钮高度不一样,来回跳跃")。
+ *   长文字靠 flex-center + nowrap 居中不溢出; 主标题字号用 clamp 随按钮宽自适应, 保证"文字长也定宽美观"。 */
+.pk-b{flex:1;min-width:0;max-width:150px;min-height:54px;padding:6px 6px;border-radius:12px;font-weight:800;
+  font-size:clamp(13px,3.7vw,15px);line-height:1.16;cursor:pointer;white-space:nowrap;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.03em;transition:.14s}
 .pk-b:active{transform:scale(.96)}
 .pk-b:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 .pk-b.fold{color:var(--sub)}
@@ -783,8 +791,8 @@
         const cx = 50 + RX*Math.cos(t);
         const cy = CY - RY*Math.sin(t);
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
-        if (commitEl){   // 投入筹码摆在座位与中心之间(朝中心方向 ~55% 处)
-          const ccx = 50 + (cx-50)*0.5, ccy = CY + (cy-CY)*0.5;
+        if (commitEl){   // 投入筹码摆在座位与中心之间, 偏座位一侧(0.62)→下注贴各家身前, 不再往桌心堆(配合底池下移到 52%)
+          const ccx = 50 + (cx-50)*0.62, ccy = CY + (cy-CY)*0.62;
           commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
         }
       }
@@ -1137,7 +1145,10 @@
       if (!pa) return false;
       if (st.toAct!==mySeat || awaitingHost) return false;
       const la = Engine.legalActions(st, mySeat);
-      if (!la || la.toAct!==mySeat) return false;
+      // ★la.toAct 是布尔(见 poker-engine legalActions: 返回 {toAct:true}), 不是座位号。
+      //   旧写法 `la.toAct!==mySeat` = `true!==0` 恒真 → 所有预选被静默丢弃(过牌/弃牌/跟任意注全不执行,
+      //   主人反馈"预选过牌/弃牌后别人加注不自动弃牌"的真因)。这里只需判"我此刻确实可行动"。
+      if (!la || !la.toAct) return false;
       if (pa==='checkfold'){ humanAct(la.canCheck?'check':'fold'); return true; }
       if (pa==='check'){ if (la.canCheck){ humanAct('check'); return true; } toast('有人下注 · 预选「过牌」已取消'); return false; }
       if (pa==='callany'){ humanAct(la.canCheck?'check':'call'); return true; }

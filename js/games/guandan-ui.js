@@ -346,14 +346,18 @@
 #gdCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(60px + env(safe-area-inset-bottom,0px))}
 .gd-room.is-land #gdCtrl{min-height:calc(48px + env(safe-area-inset-bottom,0px))}
 .gd-acts{display:flex;gap:9px;justify-content:center;padding:8px 14px calc(11px + env(safe-area-inset-bottom,0px))}
-.gd-btn{flex:1;max-width:120px;padding:13px 8px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;
-  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.05em;transition:.14s}
+/* ★等宽+定高+长文字自动缩字号(主人诉求 msg5, 与斗地主 .ddz-btn 同一套): min-width:0 让 flex 等分真正生效,
+   min-height 定高防高低差, flex 居中 + gap 让 .bt 副标并排居中, font-size clamp 随视口收放, overflow 兜底。 */
+.gd-btn{flex:1;min-width:0;max-width:130px;min-height:48px;padding:6px 8px;border-radius:12px;font-weight:800;
+  font-size:clamp(13px,4vw,16px);line-height:1.15;cursor:pointer;white-space:nowrap;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
 .gd-btn:active{transform:scale(.96)}
 .gd-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .gd-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .gd-btn.ghost{background:transparent;color:var(--sub)}
 .gd-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
-.gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;margin-left:5px;letter-spacing:.02em}
+.gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
 /* 结算 */
 .gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:safe center;
   overflow-y:auto;overscroll-behavior:contain;
@@ -983,20 +987,33 @@
     let sortMode = 'rank';
     let groupStartIds = new Set();
     let dragCard = null, dragId = null, dragStartX = 0, dragStartY = 0;
+    // combo(竖列组牌)可用前提: 有手牌 & AI 分组器在场。进贡/手动排/别家回合的门禁由 renderHand 各自把关,
+    //   这里只兜底基本前提——早先此函数缺失, 一旦 sortMode='combo' 就 ReferenceError, 竖列视图从没真正露出过。
+    function canCombo(){
+      const hand = st.players[mySeat] && st.players[mySeat].hand;
+      return !!(hand && hand.length && root.EHGuandanAI && typeof root.EHGuandanAI.arrangeGroups === 'function');
+    }
+    // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成")
+    function refreshSortBtn(){
+      const btn = $('#gdSort'); if(!btn || arrangeMode) return;
+      btn.innerHTML = sortMode==='combo' ? '📚 竖列' : '🔀 理牌';
+    }
     function setArrange(on){
       arrangeMode = on;
-      const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); btn.innerHTML = on ? '✓ 完成' : '🔀 理牌'; }
+      const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); if(on) btn.innerHTML = '✓ 完成'; }
       els.hand.classList.toggle('arranging', on);
       if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排 · 选中的牌保留'); }
-      else renderHand();
+      else { refreshSortBtn(); renderHand(); }
     }
-    // 短按理牌 = 纯按大小排(级牌/王一端, 同点数天然相邻)。
-    //   主人诉求: 理牌只为"方便按牌型框选出牌", 不做"智能组牌"那种替玩家拆牌重组(会打乱大小顺序、
-    //   强加一套分堆方案)。想自己码牌 → 长按进手动拖排。arrangeGroups 仍供 AI 决策用, 不在理牌里露出。
+    // 短按理牌 = 在【按大小排】↔【竖列组牌】之间循环切换(对标腾讯欢乐掼蛋一键理牌)。
+    //   主人诉求(msg1): 选理牌要能"自动竖着叠放" → 竖列组牌把每个成型牌型(炸/顺子/连对/三张/对子)竖直叠成一列,
+    //     一眼看清手里有哪些现成组合; 再点回大小排(级牌/王一端, 同点数相邻)。竖列纯展示, 不改出牌自由点选。
+    //   想自己码牌 → 长按进手动拖排。
     function autoSort(){
-      rows = null; sortMode = 'rank';
-      renderHand(); sfx('cardsel');
-      toast('已按大小理牌 · 长按此钮可手动拖排');
+      rows = null;
+      sortMode = (sortMode === 'combo') ? 'rank' : 'combo';
+      refreshSortBtn(); renderHand(); sfx('cardsel');
+      toast(sortMode==='combo' ? '已竖列组牌 · 再点切回大小排 · 长按可手动拖排' : '已按大小理牌 · 再点切竖列组牌 · 长按可手动拖排');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
