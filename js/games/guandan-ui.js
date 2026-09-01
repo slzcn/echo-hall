@@ -287,17 +287,18 @@
 .gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s,opacity .14s,filter .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
 .gd-hand-row .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
-/* 选中态(主人诉求·加强): 抬更高 + 放大 + 青色描边 + 外发光 + 提亮, 一眼可辨"提起来的是哪几张" */
-/*   z-index 抬到 20: 两排叠放时被选中的牌要稳稳浮在【两排所有牌】之上, 免升起后仍被邻牌/上排盖住看不清。 */
-.gd-hand .card.sel{transform:translateY(-22px) scale(1.05);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 18px rgba(0,229,212,.65);z-index:20;filter:brightness(1.06)}
+/* 选中态(主人诉求"选中牌绝不压住未选牌"): 不再 translateY 抬起盖在别的牌上, 改为【原地放大 + 青色描边 +
+   外发光 + 提亮】标识。配合 JS: 有选中时两排拆开(去竖向重叠)+ 在选中/未选边界撑开横向空档 → 选中牌落在
+   完全空的位置, 上下左右都不覆盖任何未选牌。z-index 20 仅防残余亚像素叠压, 因已无重叠故不会真盖牌。 */
+.gd-hand .card.sel{transform:scale(1.08);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 20px rgba(0,229,212,.7);z-index:20;filter:brightness(1.08)}
 /* 有选中时压暗未选中的牌(非理牌态): 让"自动/手动选出的这组牌"整体跳出来, 一眼看清选的是哪几张、
    凑成什么牌型是否合适(主人诉求: autoExtend 后遮挡+散落, 看不出自动选牌合不合适)。 */
 .gd-hand.has-sel:not(.arranging) .card:not(.sel){opacity:.42;filter:brightness(.8) saturate(.85)}
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
-@keyframes gdHintPop{0%{transform:translateY(-22px) scale(1.05)}45%{transform:translateY(-34px) scale(1.13)}100%{transform:translateY(-22px) scale(1.05)}}
+@keyframes gdHintPop{0%{transform:scale(1.08)}45%{transform:scale(1.24)}100%{transform:scale(1.08)}}
 .gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 22px var(--accent,#00e5d4)}
 .gd-hand:not(.locked) .card:hover{transform:translateY(-7px)}
-.gd-hand:not(.locked) .card.sel:hover{transform:translateY(-22px) scale(1.05)}
+.gd-hand:not(.locked) .card.sel:hover{transform:scale(1.08)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
 /* 手动理牌: 空的上排显示成一条虚线投放区, 提示"拖到此处分组"(掼蛋 27 张可分两排码) */
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
@@ -946,6 +947,7 @@
       // 若不在此同步, lastSelSig 会停滞在发牌时的空值 → 之后"点绒面清空"时 selSig(空) 恰等于停滞值,
       // renderHand 误判"选中没变"跳过 .sel 更新 → 选中的牌清不掉。同步后 diff 才准。
       lastSelSig = [...selected].sort().join(',');
+      layoutHand();   // 划选/点选 settle 后重排: 撑开选中牌两侧空档 + 拆开两排(选中清空则复原重叠), 选中牌不压未选牌
     }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
@@ -1322,6 +1324,7 @@
         if (selSig !== lastSelSig){
           lastSelSig = selSig;
           els.hand.querySelectorAll('.card').forEach(el=>{ el.classList.toggle('sel', selected.has(el.dataset.id)); });
+          layoutHand();   // 选中变了→重排: 撑开选中牌两侧空档 + 拆开两排, 让选中牌不压未选牌
         }
         return;
       }
@@ -1390,20 +1393,26 @@
       const n = cards.length; if (!n) return;
       const W = els.hand.clientWidth; if (!W) return;
       const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 38;
-      // 智能组牌: 每组首张(除第一张)左侧额外留白 GAP, 让分堆可见。先扣掉总留白再算步距, 保证整排仍吃满不溢。
-      let nGap = 0; for (let i=1;i<n;i++) if (cards[i].classList.contains('grp-start')) nGap++;
-      let GAP = cw * 0.34;
-      // 组多导致留白吃掉过多宽度时按比例收窄 GAP, 给牌留足叠放空间(最挤时每张至少露 ~22%)
-      if (nGap > 0){ const maxGapTotal = W - cw - (n - 1) * (cw * -0.78); if (nGap * GAP > maxGapTotal) GAP = Math.max(0, maxGapTotal / nGap); }
-      // 排满: 步距 step 使 cw + (n-1)*step + nGap*GAP ≤ W; 牌少时封顶给自然扇形叠放
-      let step = n>1 ? (W - cw - nGap * GAP) / (n - 1) : 0;
+      // 每个牌间隙的额外留白: ①智能组牌每组首张左侧留白(分堆可见); ②有选中时在【选中/未选边界】两侧撑开
+      //   更大空档 → 被选中的牌落在清空区、绝不横向压住相邻未选牌(主人诉求"选中牌不压未选牌")。
+      const hasSel = els.hand.classList.contains('has-sel') && !els.hand.classList.contains('arranging');
+      const GRP = cw * 0.34, SELG = cw * 0.62;
+      const gaps = new Array(n).fill(0); let gapTotal = 0;
+      for (let i=1;i<n;i++){
+        let g = cards[i].classList.contains('grp-start') ? GRP : 0;
+        if (hasSel && cards[i].classList.contains('sel') !== cards[i-1].classList.contains('sel')) g = Math.max(g, SELG);
+        gaps[i] = g; gapTotal += g;
+      }
+      // 留白吃掉过多宽度时整体按比例收窄, 保证整排仍吃满不溢(最挤时每张至少露 ~22%)
+      const maxGapTotal = W - cw - (n - 1) * (cw * -0.78);
+      if (gapTotal > 0 && gapTotal > maxGapTotal){ const k = Math.max(0, maxGapTotal) / gapTotal; for (let i=1;i<n;i++) gaps[i]*=k; gapTotal = Math.max(0, maxGapTotal); }
+      // 排满: 步距 step 使 cw + (n-1)*step + gapTotal ≤ W; 牌少时封顶给自然扇形叠放
+      let step = n>1 ? (W - cw - gapTotal) / (n - 1) : 0;
       step = Math.min(step, cw * 0.64);         // 上限: 不过度分散
-      // 亚像素外边距, 不 Math.round —— 取整会让每张多漂 ~0.15px, 满手 27 张累积溢出 ~10px
-      // (最右一张右沿越出手牌带自身宽度)。精确到两位小数使 cw+(n-1)*step 恰好吃满 W, 严丝合缝不溢。
+      // 亚像素外边距, 不 Math.round —— 取整会让每张多漂 ~0.15px, 满手 27 张累积溢出 ~10px。精确到两位小数吃满 W。
       const ov = (step - cw);                    // 负外边距(叠放量)
       for (let i=0;i<n;i++){
-        const extra = (i>0 && cards[i].classList.contains('grp-start')) ? GAP : 0;
-        cards[i].style.marginLeft = i===0 ? '0px' : (ov + extra).toFixed(2)+'px';
+        cards[i].style.marginLeft = i===0 ? '0px' : (ov + gaps[i]).toFixed(2)+'px';
       }
     }
     // 竖列分组落位: 组内竖向叠放(定比露顶, 保证点数花色可读), 列间距按手牌宽度自适应(列多超宽收成负间距略叠)。
@@ -1453,6 +1462,12 @@
       const bot=rowsEl[rowsEl.length-1];
       const ch=(bot.children[0] && bot.children[0].offsetHeight)
         || parseFloat(getComputedStyle(room).getPropertyValue('--ch')) || 54;
+      // 有选中(非理牌): 两排拆开不竖向重叠 → 被选中那排完整露出、不与另一排交叠。配合 layoutRow 的选中边界
+      //   横向空档, 选中牌上下左右都不压未选牌(主人诉求)。定高托盘 2.35ch 容得下两排(2ch)+ 此小间距。
+      if (els.hand.classList.contains('has-sel') && !els.hand.classList.contains('arranging')){
+        els.hand.style.gap = Math.round(ch*0.14)+'px';
+        return;
+      }
       const overlap=Math.round(ch*0.44);            // 上排露出 ~56%(顶条含点数+花色)
       els.hand.style.gap='0px';                      // 抵消 flex gap, 由 marginTop 精确控叠量
       bot.style.marginTop=(-overlap)+'px';
