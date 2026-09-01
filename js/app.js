@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-pk-recap-slim';
+window.__EH_APP_VER = '20260831-slash-groups';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6708,20 +6708,22 @@ function checkResonance(mid, emoji, count){
 }
 
 // ============ 斜杠命令 ============
+// 分组(g)让 14 条命令按类目成块、逻辑清晰, 不再是一堵平铺的墙; 说明(d)去掉重复的
+// "/xxx →" 前缀(命令已在左列 .sc 显示), 只留"要干嘛", 减噪。渲染时按 g 变化插分组标题。
 const SLASH_CMDS=[
-  {c:'/me',    d:'以动作形式说话，如 /me 跳了段舞'},
-  {c:'/dice',  d:'掷一颗骰子 🎲'},
-  {c:'/flip',  d:'抛硬币，正面还是反面'},
-  {c:'/whisper',d:'/whisper @昵称 悄悄话（仅对方可见）'},
-  {c:'/echo',  d:'放一串全屏烟花 🎆'},
-  {c:'/sing',  d:'/sing 文字 → 变洗脑神曲（随机曲风）🎵'},
-  {c:'/bgm',   d:'/bgm 描述 → 请灵魂制作一首本地 BGM 🎼'},
-  {c:'/bgm库', d:'/bgm库 → 查看我的 BGM 曲库'},
-  {c:'/胶囊', d:'/胶囊 7天 想说的话 → 封存进时间胶囊，到期由灵魂在房里念出'},
-  {c:'/胶囊库', d:'/胶囊库 → 查看我封存的时间胶囊'},
-  {c:'/斗地主', d:'/斗地主 → 和房里的灵魂打一局斗地主 🃏'},
-  {c:'/掼蛋', d:'/掼蛋 → 和房里的灵魂组队打一局掼蛋 🎴'},
-  {c:'/德州', d:'/德州 → 开一桌德州，等真人点卡入座，点开始空位由房里灵魂补齐 🎰'},
+  {g:'互动',   c:'/me',    d:'以动作形式说话，如「跳了段舞」'},
+  {g:'互动',   c:'/whisper',d:'@昵称 悄悄话（仅对方可见）'},
+  {g:'手气',   c:'/dice',  d:'掷一颗骰子 🎲'},
+  {g:'手气',   c:'/flip',  d:'抛硬币，正面还是反面'},
+  {g:'气氛',   c:'/echo',  d:'放一串全屏烟花 🎆'},
+  {g:'音乐',   c:'/sing',  d:'文字 → 变洗脑神曲（随机曲风）🎵'},
+  {g:'音乐',   c:'/bgm',   d:'描述 → 请灵魂制作一首本地 BGM 🎼'},
+  {g:'音乐',   c:'/bgm库', d:'查看我的 BGM 曲库'},
+  {g:'时间胶囊',c:'/胶囊', d:'7天 想说的话 → 到期由灵魂在房里念出'},
+  {g:'时间胶囊',c:'/胶囊库', d:'查看我封存的时间胶囊'},
+  {g:'游戏',   c:'/斗地主', d:'和房里的灵魂打一局斗地主 🃏'},
+  {g:'游戏',   c:'/掼蛋', d:'和房里的灵魂组队打一局掼蛋 🎴'},
+  {g:'游戏',   c:'/德州', d:'开一桌等真人点卡入座，空位由灵魂补齐 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
@@ -7154,7 +7156,13 @@ function renderSlashMenu(filter){
   _slashList=SLASH_CMDS.filter(c=>c.c.startsWith(filter));
   if(!_slashList.length){ hideSlash(); return; }
   if(_slashSel>=_slashList.length) _slashSel=0;
-  menu.innerHTML=_slashList.map((c,i)=>`<div class="slash-item ${i===_slashSel?'sel':''}" data-i="${i}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`).join('');
+  // 按分组插标题: 仅当过滤后该组仍有条目才出标题; data-i 仍映射 _slashList 下标(标题无 data-i, 不参与选中/导航)
+  let _html='', _lastG=null;
+  _slashList.forEach((c,i)=>{
+    if(c.g && c.g!==_lastG){ _html+=`<div class="slash-grp">${esc(c.g)}</div>`; _lastG=c.g; }
+    _html+=`<div class="slash-item ${i===_slashSel?'sel':''}" data-i="${i}"><span class="sc">${c.c}</span><span class="sd">${esc(c.d)}</span></div>`;
+  });
+  menu.innerHTML=_html;
   menu.scrollTop=0;
   bindMenuTap(menu, '.slash-item', i=>pickSlash(i));   // 点选/滑动分离: 见 bindMenuTap
   menu.classList.add('on'); _slashActive=true;
