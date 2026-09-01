@@ -1365,7 +1365,15 @@
      两者并存会双倍滚; 关掉原生的, 只留手动, 滚动与"点选/滑动分离"判定同源、不打架。 */
   .slash-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;background:var(--panel-solid);
     border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);
-    max-height:min(46vh,340px);overflow-y:auto;overscroll-behavior:contain;touch-action:none;-webkit-overflow-scrolling:touch}
+    max-height:min(46vh,340px);overflow-y:auto;overscroll-behavior:contain;touch-action:none;-webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--cyan) 30%,transparent) transparent}
+  /* ★细化滚动条: 默认原生滚动条在部分安卓/折叠屏渲染成一整根不透明深色粗条, 压住圆角很突兀。
+     改成 6px 覆盖式半透明青条 + 透明轨道, 两端各留 3px 圆角内缩不碰边框圆角。 */
+  .slash-menu::-webkit-scrollbar{width:6px}
+  .slash-menu::-webkit-scrollbar-track{background:transparent}
+  .slash-menu::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--cyan) 28%,transparent);border-radius:3px;border:1px solid transparent;background-clip:padding-box}
+  .slash-menu::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--cyan) 45%,transparent);background-clip:padding-box}
+  .slash-menu::-webkit-scrollbar-button{display:none;width:0;height:0}
   .slash-menu.on{display:block}
   /* margin 左右各留 5px 明沟: 选中/hover 高亮是【内缩的悬浮胶囊】, 不再一条横杠贴到卡片左右边把两侧描边"打通" */
   .slash-item{display:flex;align-items:center;gap:12px;min-height:44px;padding:9px 12px;margin:1px 5px;border-radius:10px;cursor:pointer;transition:.12s}
@@ -2091,7 +2099,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260901-gt-closed-card';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260901-slash-scrollbar';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2587,15 +2595,15 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
-<script defer src="./js/games/table-net.js?v=20260901-gt-closed-card"></script>
-<script defer src="./js/game-loader.js?v=20260901-gt-closed-card"></script>
+<script defer src="./js/games/table-net.js?v=20260901-slash-scrollbar"></script>
+<script defer src="./js/game-loader.js?v=20260901-slash-scrollbar"></script>
 <script defer src="./js/sfx-engine.js?v=20260825-game-flow-fix"></script>
   <script defer src="./js/modules/lobby.js?v=20260824-live-lobby"></script>
 <script defer src="./js/modules/auth.js?v=20260818-auth-contract"></script>
 <script defer src="./js/modules/bgm.js?v=20260818-bgm-contract"></script>
 <script defer src="./js/modules/room.js?v=20260818-room-contract"></script>
 <script defer src="./js/modules/messages.js?v=20260818-messages-contract"></script>
-<script defer src="./js/app.js?v=20260901-gt-closed-card"></script>
+<script defer src="./js/app.js?v=20260901-slash-scrollbar"></script>
 <script defer src="./js/keyboard.js?v=20260820-fold-ime-fallback"></script>
 <script defer src="./js/boot.js?v=20260802-entryFreezeFix"></script>
 <script defer src="./js/dm.js?v=20260816-kb-gap5"></script>
