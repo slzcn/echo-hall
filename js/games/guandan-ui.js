@@ -997,7 +997,7 @@
     function startReorder(e){
       const c = handCardAt(e.clientX,e.clientY); if(!c) return;
       dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX; dragStartY = e.clientY;
-      c.classList.add('dragging');
+      c.classList.add('dragging'); c.style.zIndex='50';   // 叠放态: 抬高被拖牌, 免被下排盖住
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
     }
@@ -1433,12 +1433,14 @@
     }
     // 两排大小牌竖向重叠码放(默认·主人诉求"上下重叠放最大程度利用空间"): 下排上移盖住上排下半,
     //   上排只露顶条(点数/花色在牌顶, 够读)。省出竖向空间 + 每排牌数减半横向更疏 → 牌更大更好点。
-    //   手动理牌(arrangeMode)保持两排分离——要拖牌换排 + 上排空时的虚线投放区, 重叠会挡住拖放。
+    //   手动理牌(arrangeMode)同样叠放: 命中(rowAt/handCardAt)与落位(endReorder)都已按"下排上沿"
+    //   硬分界, 叠放不破坏拖放; 且分离两排会超出定高托盘裁掉上排。上排空时只剩单排→自动跳过叠放,
+    //   虚线投放区正常露出。拖动中的牌由 startReorder 抬高 z-index, 不被下排盖住。
     function applyRowOverlap(){
       const rowsEl=[...els.hand.children].filter(r=>r.children.length);
       rowsEl.forEach(r=>{ r.style.marginTop=''; });
       els.hand.style.gap='';
-      if (arrangeMode || rowsEl.length<2) return;   // 手动理牌/单排: 不重叠
+      if (rowsEl.length<2) return;   // 单排/上排空: 不重叠
       const bot=rowsEl[rowsEl.length-1];
       const ch=(bot.children[0] && bot.children[0].offsetHeight)
         || parseFloat(getComputedStyle(room).getPropertyValue('--ch')) || 54;
