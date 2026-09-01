@@ -284,11 +284,15 @@
 .gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
 /* touch-action:none 逐张也要有(命中的是卡片本身): 否则竖向划选被浏览器判成滚动→pointercancel, 表现为"不能滑动连选/选牌不稳" */
-.gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
+.gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s,opacity .14s,filter .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
 .gd-hand-row .card:first-child{margin-left:0}
 .gd-hand.locked .card{cursor:default}
 /* 选中态(主人诉求·加强): 抬更高 + 放大 + 青色描边 + 外发光 + 提亮, 一眼可辨"提起来的是哪几张" */
-.gd-hand .card.sel{transform:translateY(-22px) scale(1.05);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 18px rgba(0,229,212,.65);z-index:3;filter:brightness(1.06)}
+/*   z-index 抬到 20: 两排叠放时被选中的牌要稳稳浮在【两排所有牌】之上, 免升起后仍被邻牌/上排盖住看不清。 */
+.gd-hand .card.sel{transform:translateY(-22px) scale(1.05);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 18px rgba(0,229,212,.65);z-index:20;filter:brightness(1.06)}
+/* 有选中时压暗未选中的牌(非理牌态): 让"自动/手动选出的这组牌"整体跳出来, 一眼看清选的是哪几张、
+   凑成什么牌型是否合适(主人诉求: autoExtend 后遮挡+散落, 看不出自动选牌合不合适)。 */
+.gd-hand.has-sel:not(.arranging) .card:not(.sel){opacity:.42;filter:brightness(.8) saturate(.85)}
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
 @keyframes gdHintPop{0%{transform:translateY(-22px) scale(1.05)}45%{transform:translateY(-34px) scale(1.13)}100%{transform:translateY(-22px) scale(1.05)}}
 .gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 22px var(--accent,#00e5d4)}
@@ -938,6 +942,10 @@
       const wasSelect = painting && paintMode==='select';
       painting=false; paintSeen=null; paintLastIdx=null; paintCards=null;
       if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
+      // 手动划选/点选是直接 toggle DOM 的 .sel、绕过 renderHand 的, 从不更新增量护栏的 lastSelSig。
+      // 若不在此同步, lastSelSig 会停滞在发牌时的空值 → 之后"点绒面清空"时 selSig(空) 恰等于停滞值,
+      // renderHand 误判"选中没变"跳过 .sel 更新 → 选中的牌清不掉。同步后 diff 才准。
+      lastSelSig = [...selected].sort().join(',');
     }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
@@ -1308,6 +1316,7 @@
         + (comboView ? 'C'+comboGroups.map(g=>g.map(c=>c.id).join('-')).join('_')
                      : top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(','));
       const selSig = [...selected].sort().join(',');
+      els.hand.classList.toggle('has-sel', selected.size>0);   // 有选中→压暗未选牌, 让选出的一组跳出来
       if (structSig === lastHandSig){
         // 结构没变、只是选牌变了 → 只在既有牌上切 .sel, 升降走 CSS transform 过渡(丝滑), 不整段重建
         if (selSig !== lastSelSig){
@@ -1537,13 +1546,13 @@
       const myTurn=st.turn===mySeat;
       const lastPlay = st.table.lastPlay;
       const mustBeat = lastPlay && lastPlay.seat!==mySeat;
-      // 队友当家: 桌面最后一手是队友出的且没人盖过 → 默认让队友走, 不提示压/炸队友(主人诉求)。
-      //   规则上你仍可压(偶有战术: 顶一手接风前铺垫), 故只收敛"引导/提示", 手动选牌照样能出。
+      // 队友当家: 桌面最后一手是队友出的且没人盖过 → 默认建议让队友走(不出高亮), 但【不强制】——
+      //   规则上你仍可压(战术: 顶一手接风/清手)。故只把"不出"设为建议(primary), 提示与手动出牌照常可用。
       const mateLead = myTurn && lastPlay && Engine.partnerOf(mySeat)===lastPlay.seat;
       // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
-      //   队友当家时【不】算压牌提示——避免推荐我盖/炸自家队友。
+      //   队友当家也照算(供"提示"按钮可用, 让玩家能主动选择压过队友), 只是默认不高亮/不自动选(见下)。
       let plays=[];
-      if (myTurn && !mateLead){
+      if (myTurn){
         const target = mustBeat ? lastPlay.parse : null;
         plays = AI.hints({ hand: st.players[mySeat].hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) });
       }
@@ -1584,6 +1593,7 @@
       const ok=$('#gdTribOk'); if(ok) ok.addEventListener('click', ()=>{ if(tributeSel) doTribute(mySeat, tributeSel); });
     }
     function updatePlayBtn(){
+      els.hand && els.hand.classList.toggle('has-sel', selected.size>0);   // 划选途中即时压暗未选牌(paintTo 只调本函数不重渲)
       const btn=$('#gdPlay'); if(!btn) return;
       const cards=[...selected].map(findCardById).filter(Boolean);
       const p = cards.length ? Rules.parse(cards, st.level) : null;
