@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260901-slash-polish';
+window.__EH_APP_VER = '20260901-reap-await';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2146,8 +2146,12 @@ async function setupGameTables(room){
   _gtTables.clear();
   // 「5分钟没人玩自动解散」: 进房先回收一次本房陈旧桌, 再每 2min 扫一次。
   //   reap 只关 5min 无活动的僵尸桌(幂等安全), 关掉即经 realtime 把牌桌卡翻成"已散桌"。
-  const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){} };
-  reap();
+  const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) return sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){} };
+  // ★首刷必须 await: reap 若 fire-and-forget, 下面的初始快照查询会赶在 reap 的 UPDATE 提交前跑,
+  //   把本该散掉的陈旧僵尸桌(焊满分身的死德州)当活桌渲染出来 —— 正是"进房还看到焊死德州桌"的真凶。
+  //   先 await 掉这一次回收, 陈旧桌已翻 closed, 初始快照(status in lobby/playing)自然不含它。
+  try{ await reap(); }catch(_){}
+  if(setupEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
   const nextReapTimer = setInterval(reap, 120000);
   const nextGtChan = sb.channel('room-gt:'+room.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'eh_game_tables',filter:'room_id=eq.'+room.id}, p=>{
