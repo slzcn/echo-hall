@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260831-slash-groups';
+window.__EH_APP_VER = '20260831-slash-polish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6721,9 +6721,9 @@ const SLASH_CMDS=[
   {g:'音乐',   c:'/bgm库', d:'查看我的 BGM 曲库'},
   {g:'时间胶囊',c:'/胶囊', d:'7天 想说的话 → 到期由灵魂在房里念出'},
   {g:'时间胶囊',c:'/胶囊库', d:'查看我封存的时间胶囊'},
-  {g:'游戏',   c:'/斗地主', d:'和房里的灵魂打一局斗地主 🃏'},
-  {g:'游戏',   c:'/掼蛋', d:'和房里的灵魂组队打一局掼蛋 🎴'},
-  {g:'游戏',   c:'/德州', d:'开一桌等真人点卡入座，空位由灵魂补齐 🎰'},
+  {g:'游戏',   c:'/斗地主', d:'和灵魂打一局斗地主 🃏'},
+  {g:'游戏',   c:'/掼蛋', d:'和灵魂组队打掼蛋 🎴'},
+  {g:'游戏',   c:'/德州', d:'开一桌等真人入座 🎰'},
 ];
 async function handleSlash(text){
   const [cmd,...rest]=text.split(' '); const arg=rest.join(' ').trim();
