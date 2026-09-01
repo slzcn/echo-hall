@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260901-reap-await';
+window.__EH_APP_VER = '20260901-gt-closed-card';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2195,6 +2195,16 @@ function gtCtx(row){
       inviteHumans:()=>gtInviteHumans(row.id) } };
 }
 function gtRenderInto(el,row){
+  // ★closed 终态守卫: 牌桌卡是一条【持久聊天消息】, 刷新/翻历史都会重渲。gtEnsureRow 按 id 取行
+  //   不带 status 过滤 → 已散的死桌照样被捞回, 若直接 renderLobby 就画成"满座带顶替按钮的活招募卡"
+  //   (焊死分身德州复活的真凶, 与设备/缓存/reap 无关)。散桌一律画成不可交互的"已散桌"终态, 绝不复活。
+  if(row && row.status && row.status!=='lobby' && row.status!=='playing'){
+    el.classList.add('gt-card'); el.classList.remove('gt-card-openable'); el.onclick=null;
+    const g=row.game==='nlhe'?'德州扑克':row.game==='guandan'?'掼蛋':row.game==='ddz'?'斗地主':'牌局';
+    el.innerHTML='<div class="gt-head"><span class="gk" style="color:var(--dim,#498d88)">🎴 '+g+' · 这桌已散</span></div>'
+      +'<div class="gt-foot"><span class="gt-tip" style="color:var(--dim,#498d88)">牌局已结束，往下发送 /'+(row.game==='nlhe'?'德州':row.game==='guandan'?'掼蛋':'斗地主')+' 可再开一桌</span></div>';
+    return;
+  }
   if(!window.EHTable){ console.warn('[gt] EHTable 未就绪, 牌桌卡暂无法渲染'); return; }
   try{ EHTable.renderLobby(el,row,gtCtx(row)); }
   catch(e){ console.warn('[gt] renderLobby 抛错', e); }
