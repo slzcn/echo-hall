@@ -281,7 +281,8 @@
 /* 手牌托盘定高(主人诉求): 以≈6张重叠牌高为参考钉死高度, 手牌在 1 排/2 排间切换时托盘不缩放,
    由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。 */
 .gd-room:not(.is-land) .gd-hand{height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
-.gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0;touch-action:none}
+/* 手牌向左对齐(主人诉求): 牌不填满整行时靠左码放、右侧留空, 出牌后左端不动更稳定, 不再居中飘。 */
+.gd-hand-row{display:flex;justify-content:flex-start;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
 /* touch-action:none 逐张也要有(命中的是卡片本身): 否则竖向划选被浏览器判成滚动→pointercancel, 表现为"不能滑动连选/选牌不稳" */
 .gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s,opacity .14s,filter .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
@@ -305,7 +306,7 @@
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
 /* ── 智能组牌·竖列分组(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型竖直叠成一列,
    组内牌上下叠(露顶角点数花色, 底牌露大花色), 多列横向排开底对齐, 列底标牌型名 ── */
-.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
+.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:flex-start;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
   background:linear-gradient(180deg,rgba(0,229,212,.055),rgba(8,14,26,.36));border:1px solid rgba(0,229,212,.15);border-radius:16px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 10px 24px rgba(0,0,0,.26)}
 .gd-col{display:flex;flex-direction:column;align-items:center;flex:none}
@@ -1468,7 +1469,7 @@
       const totalCol=widths.reduce((a,b)=>a+b,0);
       // 列间距只落在 cols[1..](首列 margin=0): 总占用 = totalCol + (nCol-1)*gap。
       //   gap ≤ (avail-totalCol)/(nCol-1) 时总宽 ≤ avail; 封顶 12px。首列不给负 margin(否则被拽出左沿),
-      //   justify-center 下: 总宽<avail 居中留白, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
+      //   justify-start 下: 总宽<avail 靠左码放右侧留白, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
       const gap = nCol>1 ? Math.min(12, (avail - totalCol)/(nCol-1)) : 0;
       cols.forEach((c,i)=>{ c.style.marginLeft = (i===0 ? 0 : gap).toFixed(2)+'px'; });
     }
