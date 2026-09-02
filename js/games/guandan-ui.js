@@ -291,9 +291,8 @@
    外发光 + 提亮】标识。配合 JS: 有选中时两排拆开(去竖向重叠)+ 在选中/未选边界撑开横向空档 → 选中牌落在
    完全空的位置, 上下左右都不覆盖任何未选牌。z-index 20 仅防残余亚像素叠压, 因已无重叠故不会真盖牌。 */
 .gd-hand .card.sel{transform:scale(1.08);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 20px rgba(0,229,212,.7);z-index:20;filter:brightness(1.08)}
-/* 有选中时压暗未选中的牌(非理牌态): 让"自动/手动选出的这组牌"整体跳出来, 一眼看清选的是哪几张、
-   凑成什么牌型是否合适(主人诉求: autoExtend 后遮挡+散落, 看不出自动选牌合不合适)。 */
-.gd-hand.has-sel:not(.arranging) .card:not(.sel){opacity:.42;filter:brightness(.8) saturate(.85)}
+/* 选中牌只靠"放大+青色描边+发光"标识, 不再压暗其余牌(主人诉求"选中要出对牌时不用虚化其他牌")。
+   仍靠 JS 在选中/未选边界撑开横向空档 + 拆开两排, 保证选中牌不压住未选牌 —— 与"虚化"是两回事。 */
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
 @keyframes gdHintPop{0%{transform:scale(1.08)}45%{transform:scale(1.24)}100%{transform:scale(1.08)}}
 .gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 22px var(--accent,#00e5d4)}
@@ -956,7 +955,9 @@
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
       if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
-      if(st.phase!=='play' || st.turn!==mySeat) return;
+      // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
+      // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
+      if(st.phase!=='play') return;
       const c=handCardAt(e.clientX,e.clientY); if(!c) return;
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintCards=[...els.hand.querySelectorAll('.card')];   // 全局阅读序(上排→下排), 供区间连选按 data-idx 补齐
@@ -972,7 +973,7 @@
     els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
     // ── 点空白取消选中(主人诉求): 已选牌时点牌桌绒面(非手牌/按钮/操作条/气泡) → 清空选择, 放下高亮 ──
     if (els.felt) els.felt.addEventListener('pointerdown', (e)=>{
-      if(st.phase!=='play' || st.turn!==mySeat || arrangeMode || painting) return;
+      if(st.phase!=='play' || arrangeMode || painting) return;   // 预选态(含别家回合)点绒面也能收回
       if(!selected.size) return;
       if(e.target.closest('.card, button, #gdCtrl, .gd-acts, .gd-say, .gd-peek, .gd-seat')) return;
       selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click');
@@ -1012,6 +1013,7 @@
     function autoSort(){
       rows = null;
       sortMode = (sortMode === 'combo') ? 'rank' : 'combo';
+      hintCycle=[]; hintIdx=0;   // 切换理牌模式后, 下次"提示"按新组牌重建(组牌态优先推荐理出的牌型)
       refreshSortBtn(); renderHand(); sfx('cardsel');
       toast(sortMode==='combo' ? '已竖列组牌 · 再点切回大小排 · 长按可手动拖排' : '已按大小理牌 · 再点切竖列组牌 · 长按可手动拖排');
     }
@@ -1346,7 +1348,7 @@
         return;
       }
       lastHandSig = structSig; lastSelSig = selSig;
-      els.hand.className='gd-hand'+(comboView?' combo':'')+(myTurn||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
+      els.hand.className='gd-hand'+(comboView?' combo':'')+(st.phase==='play'||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
       if (comboView){
@@ -1438,14 +1440,28 @@
       const W=els.hand.clientWidth; if(!W) return;
       const c0=els.hand.querySelector('.card'); if(!c0) return;
       const cw=c0.offsetWidth||36, ch=c0.offsetHeight||51;
-      // 竖向: 露顶 ~34% (够露 cn@top2 点数 + cs@top16 花色); 定比不随容器高变(容器高随内容自适应, 会循环)
-      const vstep=Math.max(Math.round(ch*0.34), 15);
-      const vov=(vstep-ch);
+      const cs=getComputedStyle(els.hand);
+      // 竖向叠放露顶: 舒适值 ~34%(够露 cn@top2 点数 + cs@top16 花色)。但一列最多 6~8 张(三连对/钢板/炸弹),
+      //   固定露顶会让最高列超出托盘 → 主人反馈"六张牌叠放会超出去"。故托盘高度随【最高列】自适应;
+      //   若舒适露顶下最高列仍超过本屏可给的高度上限, 再把露顶压到恰好塞下(不低于可读下限 14px)。
+      const padTop=parseFloat(cs.paddingTop)||0, padBot=parseFloat(cs.paddingBottom)||0;
+      const labelEl=els.hand.querySelector('.gd-col-label');
+      const labelH=labelEl ? labelEl.offsetHeight+5 : 22;        // 列底组名标签占高
+      const maxCount=cols.reduce((m,c)=>Math.max(m, c.querySelectorAll('.card').length), 1);
+      const comfy=Math.max(Math.round(ch*0.34), 15);
+      const roomH=room.getBoundingClientRect().height || (ch*8);
+      const trayCap=Math.max(ch*2.35, roomH*0.46);              // 托盘高度上限: 不吃掉中央牌桌
+      const bodyCap=trayCap - padTop - padBot - labelH;         // 上限下留给列体(整列叠牌高)的空间
+      let reveal=comfy;
+      if (maxCount>1 && ch+(maxCount-1)*comfy > bodyCap) reveal=Math.max(14, (bodyCap-ch)/(maxCount-1));
+      const bodyH=ch+(maxCount-1)*reveal;
+      const vov=(reveal-ch);
       cols.forEach(c=>{ const ks=c.querySelectorAll('.card'); ks.forEach((k,i)=>{ k.style.marginTop = i===0?'0px':vov.toFixed(2)+'px'; }); });
+      // 托盘高随最高列自适应(不低于原定 2.35ch, 不高于 trayCap): 六张列也整列可见, 余量由 .gd-mid(flex:1) 吸收。
+      els.hand.style.height=Math.round(Math.min(trayCap, Math.max(ch*2.35, bodyH+labelH+padTop+padBot)))+'px';
       // 横向: 按各列实际宽(标签可能比牌宽)均摊剩余宽度, 封顶 12px; 列多超宽则收成负间距(列略叠),
       //   底限叠掉最窄列半宽, 保证整簇不横向溢出手牌带。用内容区宽度(clientWidth 扣左右 padding)。
       const nCol=cols.length;
-      const cs=getComputedStyle(els.hand);
       const avail=(els.hand.clientWidth||W) - (parseFloat(cs.paddingLeft)||0) - (parseFloat(cs.paddingRight)||0);
       cols.forEach(c=>{ c.style.marginLeft='0px'; });        // 先清零再量自然宽
       const widths=cols.map(c=>c.getBoundingClientRect().width);
@@ -1463,6 +1479,7 @@
       if (_lastLand !== null && land !== _lastLand){ _lastLand = land; renderHand(); return; }
       _lastLand = land;
       if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
+      els.hand.style.height='';   // 退出竖列组牌: 清掉组牌态设的自适应高, 恢复 CSS 定高(2.35ch)
       for (const row of els.hand.children) layoutRow(row);
       applyRowOverlap();
     }
@@ -1739,7 +1756,24 @@
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==mySeat)?st.table.lastPlay.parse:null;
       if(!hintCycle.length){
         // best-first: 能一把走完排最前(剩一对提示打对子而非拆单张), 领出走长牌型、跟牌走最小代价
-        hintCycle = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) }); hintIdx=0;
+        const ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) });
+        // ★理牌优先(主人诉求): 已用竖列组牌整理过手牌时, 先把我理出的成型牌型(当前合法者)排到提示最前,
+        //   让"理牌"真正指导提示 —— 否则理了牌提示却推荐别的组合, 理牌就失去意义。其余 AI 建议去重后接在后面。
+        let cyc = ai;
+        if (sortMode==='combo' && canCombo()){
+          const key = g => g.map(c=>c.id).sort().join(',');
+          const mine = [];
+          root.EHGuandanAI.arrangeGroups(hand, st.level).forEach(g=>{
+            if (g.length < 2) return;                            // 单张不算"理出的牌型"
+            const p = Rules.parse(g, st.level); if (!p) return;  // 组不成合法牌型的跳过
+            if (!target || Rules.beats(p, target, st.level)) mine.push(g);  // 领出全收/跟牌只收能压的
+          });
+          if (mine.length){
+            const seen = new Set(mine.map(key));
+            cyc = mine.concat(ai.filter(g=>!seen.has(key(g))));
+          }
+        }
+        hintCycle = cyc; hintIdx=0;
       }
       if(!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
       const pick=hintCycle[hintIdx%hintCycle.length]; hintIdx++;

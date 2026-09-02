@@ -140,7 +140,11 @@
         if (b.cards.length !== a.cards.length) return b.cards.length - a.cards.length; // 张多优先(清更多散牌)
         const wa = a.cards.filter(c=>Rules.isWild(c,level)).length, wb = b.cards.filter(c=>Rules.isWild(c,level)).length;
         if (wa !== wb) return wa - wb;                                   // 少用百搭优先(留逢人配灵活)
-        return b.parse.key - a.parse.key;                               // 点力大的组靠前
+        // ★连续牌型(顺子/连对/钢板/同花顺)优先用【低窗口】组牌: 把连牌搭在小牌上, 让高牌(如 AA)剩出来
+        //   单独成强对做控场。否则 JJ QQ KK AA 会被组成 QQKKAA 连对而把 JJ 甩成孤对 —— 主人反馈"该是对勾对Q对K"。
+        const lineT = t => t==='straight'||t==='pairline'||t==='trioline'||t==='straightflush';
+        if (lineT(a.parse.type) && lineT(b.parse.type)) return a.parse.key - b.parse.key;  // 连牌: 低窗口在前
+        return b.parse.key - a.parse.key;                               // 其余(对/三/炸): 点力大的组靠前
       });
       const pick = combos[0];
       out.push(Rules.sortHand(pick.cards, level));                      // 组内点力降序(级牌/王在左)
