@@ -1007,8 +1007,7 @@
       const empties = st.players.filter(p=>p.kind==='empty').length;
       const hasSouls = ((lobbyCtx.souls||[]).length>0);
       const btns=[];
-      if (empties>0 && hasSouls && a.fillSouls) btns.push('<button class="pk-b" data-lob="fill">🤝 一键邀请</button>');
-      if (empties>0 && a.inviteHumans) btns.push('<button class="pk-b" data-lob="invite">👥 邀真人</button>');
+      // 「一键邀请」「邀真人」去掉(主人诉求): 空位可点座位邀灵魂/真人, 「开始」本就先补满灵魂再发牌, 两钮纯冗余。
       btns.push('<button class="pk-b call" data-lob="start">开始 ▶</button>');
       els.acts.innerHTML = `<div class="pk-row pk-lobacts">${btns.join('')}</div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };

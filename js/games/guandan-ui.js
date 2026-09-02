@@ -1137,8 +1137,8 @@
       const empties = st.players.filter(p=>p.kind==='empty').length;
       const hasSouls = ((lobbyCtx.souls||[]).length>0);
       const btns=[];
-      if (empties>0 && hasSouls && a.fillSouls) btns.push('<button class="gd-btn ghost" data-lob="fill">🤝 一键邀请</button>');
-      if (empties>0 && a.inviteHumans) btns.push('<button class="gd-btn ghost" data-lob="invite">👥 邀真人</button>');
+      // 「一键邀请」「邀真人」去掉(主人诉求"左边两个按钮没意义"): 空位可点座位邀灵魂/真人,
+      //   而「开始」本就会先补满灵魂再发牌(gtStart→gtSeatSoulsIntoEmpties), 两个按钮纯冗余。
       btns.push('<button class="gd-btn primary" data-lob="start">开始 ▶</button>');
       els.ctrl.innerHTML=`<div class="gd-acts gd-lobacts">${btns.join('')}</div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
@@ -1597,7 +1597,10 @@
       const mustBeat = lastPlay && lastPlay.seat!==mySeat;
       // 队友当家: 桌面最后一手是队友出的且没人盖过 → 默认建议让队友走(不出高亮), 但【不强制】——
       //   规则上你仍可压(战术: 顶一手接风/清手)。故只把"不出"设为建议(primary), 提示与手动出牌照常可用。
-      const mateLead = myTurn && lastPlay && Engine.partnerOf(mySeat)===lastPlay.seat;
+      // 队友当家仅当队友【手里还有牌】: 队友已出完(头游)后, 桌面仍是他最后一手, 但他已经走了,
+      //   再显示"队友当家·不出/让对家出"是错的(主人反馈"对家出完牌了还提示我让对家出")。此时改按常规:
+      //   压不过→"压不过·不出", 压得过→正常出牌。之后众人过完自然接风到我领出。
+      const mateLead = myTurn && lastPlay && Engine.partnerOf(mySeat)===lastPlay.seat && st.players[lastPlay.seat].hand.length>0;
       // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
       //   队友当家也照算(供"提示"按钮可用, 让玩家能主动选择压过队友), 只是默认不高亮/不自动选(见下)。
       let plays=[];
