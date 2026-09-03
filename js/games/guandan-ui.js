@@ -930,7 +930,13 @@
       return pick;
     }
     function applyPaintIdx(i){
-      const c = paintCards ? paintCards[i] : els.hand.querySelectorAll('.card')[i]; if(!c) return;
+      // 优先用 pointerdown 时的快照(阅读序稳定)。但若划选途中手牌被整段重建 —— 典型: 别家回合
+      //   预选、手指按住不放直到轮到我, myTurn 翻转使 structSig 变 → renderHand 走 innerHTML='' 重建,
+      //   快照里的旧节点已 detach。再 toggle 它只改看不见的游离节点, 却仍写进 selected → 出的牌没高亮、
+      //   endPaint 同步 lastSelSig 后增量渲染永不补高亮。故快照节点脱离文档就回退到当前 DOM 同序节点(自愈)。
+      let c = paintCards ? paintCards[i] : null;
+      if (!c || !c.isConnected) c = els.hand.querySelectorAll('.card')[i];
+      if(!c) return;
       const id = c.dataset.id; if(!id || paintSeen.has(id)) return; paintSeen.add(id);
       if(paintMode==='select') selected.add(id); else selected.delete(id);
       c.classList.toggle('sel', selected.has(id));

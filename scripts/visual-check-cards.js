@@ -143,7 +143,8 @@ async function main(){
     for (const f of ['deck.js','guandan-rules.js','guandan-engine.js','guandan-ai.js','guandan-ui.js',
                      'ddz-rules.js','ddz-engine.js','ddz-ai.js','game-ui.js'])
       await page.addScriptTag({ content: G(f) });
-    // 掼蛋: 我坐 2 席 → 底=2 右=(2+1)%4=3 上=(2+2)%4=0 左=(2+3)%4=1
+    // 掼蛋座位方向: UI 刻意让【下家(mySeat+1)落左槽、上家(mySeat+3)落右槽】(guandan-ui.js:601-603,
+    //   注释"旧版下家在右=逆时针已修"), 与斗地主的"+1 在右"相反。我坐 2 席 → 底=2 右=(2+3)%4=1 上=(2+2)%4=0 左=(2+1)%4=3。
     const gd = await page.evaluate(() => {
       window.EHGuandanGame.open({ mySeat:2, names:['甲','乙','丙','丁'], avatars:['🅰','🅱','🅲','🅳'], onResult(){} });
       const ds = sel => { const s=document.querySelector(sel+' .gd-seat'); return s?s.getAttribute('data-seat'):null; };
@@ -152,7 +153,7 @@ async function main(){
       return r;
     });
     if (gd.me!=='2') bad(`掼蛋 mySeat=2 时底部槽应画 2 席, 实为 ${gd.me}`); else ok('掼蛋非0席: 底部=我(2)');
-    if (gd.right!=='3'||gd.top!=='0'||gd.left!=='1') bad(`掼蛋座位旋转错: 右${gd.right}/上${gd.top}/左${gd.left} (应 3/0/1)`); else ok('掼蛋非0席: 右3/上0(队友)/左1 旋转正确');
+    if (gd.right!=='1'||gd.top!=='0'||gd.left!=='3') bad(`掼蛋座位旋转错: 右${gd.right}/上${gd.top}/左${gd.left} (应 右1上家/上0队友/左3下家)`); else ok('掼蛋非0席: 右1(上家)/上0(队友)/左3(下家) 旋转正确');
     // 斗地主: 我坐 1 席 → 底=1, 对手=[(1+1)%3, (1+2)%3]=[2,0]
     const dz = await page.evaluate(() => {
       window.EHDdzGame.open({ mySeat:1, names:['甲','乙','丙'], avatars:['🅰','🅱','🅲'], onResult(){} });
