@@ -102,9 +102,10 @@
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-/* 底分/倍数: 从顶栏移进中央绒面, 钉在椭圆桌面下沿正中(像牌桌上的筹码位), 避开中间落牌区。
-   给顶部按钮腾地方, 又落在"桌里"而非贴屏边水印。半透明毛玻璃底 + pointer-events:none 不挡操作。 */
-.ddz-mult{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
+/* 底分/倍数: 钉在中央椭圆桌面【内部】下半区那片空白正中(像牌桌桌心的筹码/彩池位),
+   坐在框里而非挂在框沿外。落牌/横幅在椭圆中上部, 这里在其下方留白处, 互不打架。
+   半透明毛玻璃底 + pointer-events:none 不挡操作。 */
+.ddz-mult{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
 .ddz-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -233,12 +234,15 @@
 .card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
 .card.mini{width:var(--cmw,28px);height:var(--cmh,40px)}.card.mini .cn{font-size:11px}.card.mini .cs{font-size:8px;top:13px}.card.mini .cc{font-size:15px}
 /* 我的座位标(手牌上方左侧) */
-.ddz-me{display:flex;align-items:center;justify-content:center;gap:9px;padding:4px 14px 0}
-.ddz-me .ddz-seat{flex-direction:row;width:auto;gap:8px}
-.ddz-me .ddz-avr{width:40px;height:40px;padding:2.5px}
-.ddz-me .ddz-avr .av{font-size:19px}
-.ddz-me .meta{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
-.ddz-me .meta .nm{max-width:150px}
+.ddz-me{display:flex;align-items:center;justify-content:center;gap:11px;padding:6px 14px 2px}
+.ddz-me .ddz-seat{flex-direction:row;align-items:center;width:auto;gap:11px}
+.ddz-me .ddz-avr{width:46px;height:46px;padding:2.5px}
+.ddz-me .ddz-avr .av{font-size:22px}
+/* 自己信息不再三行竖挤: 名字单列在上, 剩牌·角色·累计分并成一行横排, 整体两行更透气 */
+.ddz-me .meta{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:9px;row-gap:2px;max-width:230px}
+.ddz-me .meta .nm{flex-basis:100%;max-width:100%;font-size:14px;color:var(--ink)}
+.ddz-me .meta .cnt{font-size:12px}
+.ddz-me .meta .ddz-cum{margin-top:0}
 /* 手牌扇形 */
 .ddz-hand-wrap{padding:2px 10px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap;touch-action:none}
