@@ -102,7 +102,8 @@
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-.ddz-mult{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 8px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+/* 底分/倍数: 从顶栏移到绒面左下角悬浮 chip, 给顶部按钮腾地方(对标欢乐斗地主的桌面倍数牌) */
+.ddz-mult{position:absolute;left:12px;bottom:10px;z-index:4;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:3px 10px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
 .ddz-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -231,7 +232,7 @@
 .card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
 .card.mini{width:var(--cmw,28px);height:var(--cmh,40px)}.card.mini .cn{font-size:11px}.card.mini .cs{font-size:8px;top:13px}.card.mini .cc{font-size:15px}
 /* 我的座位标(手牌上方左侧) */
-.ddz-me{display:flex;align-items:center;gap:9px;padding:4px 14px 0}
+.ddz-me{display:flex;align-items:center;justify-content:center;gap:9px;padding:4px 14px 0}
 .ddz-me .ddz-seat{flex-direction:row;width:auto;gap:8px}
 .ddz-me .ddz-avr{width:40px;height:40px;padding:2.5px}
 .ddz-me .ddz-avr .av{font-size:19px}
@@ -575,7 +576,6 @@
     room.innerHTML = `
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
-        <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
         ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
@@ -594,6 +594,7 @@
           <div class="ddz-lastwho" id="ddzWho"></div>
           <div class="ddz-played" id="ddzPlayed"></div>
         </div>
+        <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
       </div>
       <div class="ddz-me" id="ddzMe"></div>
       <div class="ddz-hand-wrap"><div class="ddz-hand" id="ddzHand"></div></div>
