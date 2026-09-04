@@ -243,6 +243,29 @@
 .ddz-me .meta .nm{flex-basis:100%;max-width:100%;font-size:14px;color:var(--ink)}
 .ddz-me .meta .cnt{font-size:12px}
 .ddz-me .meta .ddz-cum{margin-top:0}
+/* ═══════ 招募态专属排版(.is-lobby): 复用打牌桌几何但没牌填充会显空洞失衡,
+   这里把三席收成协调等腰三角、中心换紧凑牌章、去掉无意义的空椭圆与底分、竖向节奏收敛。
+   全部门控在 .is-lobby 下, 打牌态一律不受影响。 ═══════ */
+/* 竖向骨架: 顶栏在上、开始钮锚底, 中间「两空位+牌章+自己」用 flex auto-margin 作为一整组垂直居中 */
+.ddz-room.is-lobby .ddz-felt{flex:0 0 auto;margin-top:auto;justify-content:flex-start;gap:0}
+.ddz-room.is-lobby .ddz-me{margin-bottom:auto;padding:16px 14px 0}
+.ddz-room.is-lobby .ddz-hand-wrap{display:none}      /* 招募态无手牌 → 去掉空白手牌带 */
+.ddz-room.is-lobby .ddz-mult{display:none}           /* 招募态底分恒 1·×1, 无意义 → 隐藏 */
+/* 中心: 巨大空椭圆 → 一枚紧凑牌章, 招募提示坐在其中, 居中收窄不再霸屏 */
+.ddz-room.is-lobby .ddz-center{flex:none;align-self:center;width:min(84%,340px);min-height:0;margin:18px 0;padding:20px 22px;isolation:isolate}
+.ddz-room.is-lobby .ddz-center::before{left:0;right:0;top:0;bottom:0;width:auto;height:auto;transform:none;border-radius:20px;
+  background:radial-gradient(ellipse at 50% 40%,rgba(0,229,212,.12),rgba(0,120,104,.05) 62%,transparent 82%);
+  border:1px solid rgba(0,229,212,.16);box-shadow:inset 0 0 30px rgba(0,0,0,.3)}
+.ddz-room.is-lobby .ddz-turnbanner{max-width:260px;text-align:center;line-height:1.55;white-space:normal}
+/* 招募态中心区里的打牌元素(底牌/落牌/上家)都空着却占位撑高牌章 → 收起, 牌章只裹提示文字 */
+.ddz-room.is-lobby .ddz-played,.ddz-room.is-lobby .ddz-lastwho,.ddz-room.is-lobby .ddz-bottom-cards{display:none}
+/* 两空位在上、自己在下, 三席统一竖排大头像 → 等腰三角 */
+.ddz-room.is-lobby .ddz-opps{padding:0 22px}
+.ddz-room.is-lobby .ddz-me .ddz-seat{flex-direction:column;align-items:center;gap:5px;width:var(--seatw,120px)}
+.ddz-room.is-lobby .ddz-me .ddz-avr{width:var(--av,60px);height:var(--av,60px);padding:3px}
+.ddz-room.is-lobby .ddz-me .ddz-avr .av{font-size:var(--avf,27px)}
+.ddz-room.is-lobby .ddz-me .meta{flex-direction:column;align-items:center;max-width:none;row-gap:3px}
+.ddz-room.is-lobby .ddz-me .meta .nm{flex-basis:auto;max-width:120px;font-size:13px;text-align:center}
 /* 手牌扇形 */
 .ddz-hand-wrap{padding:2px 10px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap;touch-action:none}
@@ -1624,6 +1647,7 @@
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
+      room.classList.toggle('is-lobby', st.phase==='lobby');   // 招募态专属排版(三角构图/牌章中心), 打牌态自动摘除
       if (lastLord===null && st.landlord!=null){
         sfx('landlord');   // 地主刚揭晓: 号角定音
         const nm = st.players[st.landlord].name;
@@ -1671,6 +1695,7 @@
       if (ctx) lobbyCtx = ctx;
       if (Array.isArray(seats)) lobbySeats = seats;
       st = lobbyState(lobbySeats);
+      room.classList.add('is-lobby');
       renderSeats(); setBanner(); renderCtrl();
       if (minimized) updateChip();
     }
