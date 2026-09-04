@@ -102,8 +102,9 @@
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .ddz-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
 .ddz-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-/* 底分/倍数: 从顶栏移到绒面左下角悬浮 chip, 给顶部按钮腾地方(对标欢乐斗地主的桌面倍数牌) */
-.ddz-mult{position:absolute;left:12px;bottom:10px;z-index:4;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:3px 10px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
+/* 底分/倍数: 从顶栏移进中央绒面, 钉在椭圆桌面下沿正中(像牌桌上的筹码位), 避开中间落牌区。
+   给顶部按钮腾地方, 又落在"桌里"而非贴屏边水印。半透明毛玻璃底 + pointer-events:none 不挡操作。 */
+.ddz-mult{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
 .ddz-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -593,8 +594,8 @@
           <div class="ddz-turnbanner" id="ddzBanner"></div>
           <div class="ddz-lastwho" id="ddzWho"></div>
           <div class="ddz-played" id="ddzPlayed"></div>
+          <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
         </div>
-        <div class="ddz-mult" id="ddzMult">底分 1 · ×1</div>
       </div>
       <div class="ddz-me" id="ddzMe"></div>
       <div class="ddz-hand-wrap"><div class="ddz-hand" id="ddzHand"></div></div>
