@@ -129,6 +129,9 @@
     let _lastSayText='', _lastSayAt=0;
     function say(text, who){
       if(!enabled||!text) return;
+      // 静音闸: 报牌/操作语音(TTS)跟随全局 🎵/🔇 开关(EH_BGM)。此前只查内部 enabled,
+      //   导致静音后 BGM 停了、报牌语音仍照念。EH_BGM.on()===false 即静音, 直接不发声。
+      try{ if(window.EH_BGM && !window.EH_BGM.on()){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} return; } }catch(e){}
       // 丝滑: 极短窗内相同文本重复(如一圈里两三席连续"不出", 或同牌型齐发)只念一次。
       //   否则后一句会 speechSynthesis.cancel() 把前一句拦腰砍断 → 听感是"不出—不"的结巴。
       //   纯时间比较、不排队、不依赖 onend, 绝不会卡死后续语音(某些浏览器 onend 会丢失)。

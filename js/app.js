@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260903-preselect-fix';
+window.__EH_APP_VER = '20260904-mute-voice';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -359,7 +359,7 @@ function detachBgmGestureUnlock(){
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
 function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on) AudioEngine.stop(); else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on){ AudioEngine.stop(); try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} } else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
     // 换房触发时先清过期 override（同房再进不清，续播用户生成曲）
