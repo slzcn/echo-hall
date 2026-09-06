@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260904-ddz-lobby-triangle';
+window.__EH_APP_VER = '20260906-career-score';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2305,7 +2305,10 @@ function gtSeatPageCSS(){
     '.gt-seatpage .gt-foot{margin-top:14px}',
     '.gt-seatpage .gt-btn{padding:9px 16px;font-size:13.5px}',
     '.gt-seatpage .gt-soulsel{max-width:120px;padding:5px 6px;font-size:12px}',
-    '.gt-seatpage .gt-mini{padding:5px 11px;font-size:12px}'
+    '.gt-seatpage .gt-mini{padding:5px 11px;font-size:12px}',
+    // 生涯战绩行(A): 入座前亮本人该游戏历史累计, 破"每次从零"错觉
+    '.gt-seatpage .gtsp-career{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--cyan,#00e5d4);',
+      'background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.25);border-radius:10px;padding:6px 10px;text-align:center}'
   ].join('');
   document.head.appendChild(s);
 }
@@ -2319,11 +2322,16 @@ function gtOpenSeatingPage(id){
   const meta={nlhe:'德州扑克',guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'牌桌';
   const wrap=document.createElement('div'); wrap.className='gt-seatpage'; wrap.dataset.gtId=id;
   wrap.innerHTML='<div class="gtsp-wrap"><div class="gtsp-bar"><div class="gtsp-ttl">🪑 '+meta+' · 入座</div>'
-    +'<button class="gtsp-x">返回</button></div><div class="gtsp-card"></div></div>';
+    +'<button class="gtsp-x">返回</button></div>'
+    +'<div class="gtsp-career" id="gtspCareer" style="display:none"></div>'
+    +'<div class="gtsp-card"></div></div>';
   const card=wrap.querySelector('.gtsp-card');
   wrap.querySelector('.gtsp-x').onclick=()=>gtCloseSeatingPage();   // 返回聊天(牌桌卡仍在, 桌不散, 可再点开)
   wrap.addEventListener('click',(e)=>{ if(e.target===wrap) gtCloseSeatingPage(); });   // 点遮罩空白处也退回
   (document.getElementById('hall')||document.body).appendChild(wrap);
+  // 入座前亮本人生涯累计(A): 有战绩才显示, 第一次玩确实从零就不假装
+  const _cg=CAREER_GAME_KEY[row.game];
+  if(_cg){ fetchCareer(_cg).then(r=>{ const t=careerText(_cg,r); const el=wrap.querySelector('#gtspCareer'); if(el&&t){ el.textContent=t; el.style.display=''; } }); }
   _gtSeatPage={ id, card, wrap };
   gtRefreshSeatingPage(row);
 }
@@ -6803,6 +6811,84 @@ async function handleSlash(text){
 
 // 当前活跃牌局控制器(斗地主/掼蛋共用单例; 一次只允许一桌)。F1: "返回"折叠不销毁, 再开同类/异类游戏时先把它拉回来。
 let _ehGame = null;
+
+// journey-exempt: 纯展示已存好的生涯积分(eh_user_stats), 不改计分/DB/游戏流程, 无新用户旅程; 浮标 pointer-events:none 不介入操作, 已 headless 验证观察器+文案+淡出机制
+// ═══ 生涯积分展示: 把已存好的 eh_user_stats 亮出来, 破"每次从零"的错觉。纯展示, 不碰计分/DB。 ═══
+//   A(座位页): 入座前显示本人该游戏历史累计(见 gtOpenSeatingPage)。
+//   B(牌桌里): 开局那一刻在桌面顶部闪一条生涯战绩(pointer-events:none 不挡任何操作, 3.6s 淡出),
+//     让人一眼看到"我不是从零开始"。靠 MutationObserver 监视游戏全屏根节点(.ddz-room/.pk-room/.gd-room)
+//     的出现/消失驱动, 与各游戏 open() 完全解耦——不改 game-ui。
+const CAREER_GAME_KEY={nlhe:'nlhe',guandan:'guandan',ddz:'doudizhu',doudizhu:'doudizhu'};
+const _GAME_ROOT_CLS={'ddz-room':'doudizhu','pk-room':'nlhe','gd-room':'guandan'};
+const _careerCache={};   // {game:{plays,wins,losses,score,t}}, 30s 缓存
+async function fetchCareer(game){
+  if(!myUid) return null;
+  const c=_careerCache[game];
+  if(c && (Date.now()-c.t)<30000) return c;
+  try{
+    const {data,error}=await sb.from('eh_user_stats').select('plays,wins,losses,score').eq('user_id',myUid).eq('game',game).maybeSingle();
+    if(error) throw error;
+    const r={plays:(data&&data.plays)||0,wins:(data&&data.wins)||0,losses:(data&&data.losses)||0,score:+((data&&data.score)||0),t:Date.now()};
+    _careerCache[game]=r; return r;
+  }catch(e){ console.warn('[career] load', e&&e.message); return null; }
+}
+function careerText(game,r){
+  if(!r || !r.plays) return null;    // 没战绩不显示: 第一次玩确实从零, 不假装
+  const L=(typeof _STAT_GAME_LABEL!=='undefined'&&_STAT_GAME_LABEL[game])||{name:'',unit:'局',emoji:'🎲'};
+  const sc=(r.score>0?'+':'')+r.score;
+  const wr=Math.round((r.wins||0)*100/r.plays);
+  return `${L.emoji} 生涯 ${r.plays}${L.unit} · 胜率${wr}% · ${sc}`;
+}
+function _ensureCareerChipCSS(){
+  if(document.getElementById('ehCareerChipCSS')) return;
+  const s=document.createElement('style'); s.id='ehCareerChipCSS';
+  s.textContent='#ehCareerChip{position:fixed;left:50%;transform:translateX(-50%);'
+    +'top:calc(env(safe-area-inset-top,0px) + 6px);z-index:9999;pointer-events:none;'
+    +'padding:5px 13px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;'
+    +'color:#eafff9;background:rgba(6,20,18,.82);border:1px solid rgba(0,229,212,.5);'
+    +'box-shadow:0 4px 16px rgba(0,0,0,.35);backdrop-filter:blur(6px);opacity:0;'
+    +'transition:opacity .35s ease;white-space:nowrap;max-width:86vw;overflow:hidden;text-overflow:ellipsis}'
+    +'#ehCareerChip.on{opacity:1}';
+  document.head.appendChild(s);
+}
+let _careerChipTimer=null;
+async function showCareerChip(game){
+  _ensureCareerChipCSS();
+  const r=await fetchCareer(game); const txt=careerText(game,r);
+  if(!txt) return;   // 无战绩不闪
+  let el=document.getElementById('ehCareerChip');
+  if(!el){ el=document.createElement('div'); el.id='ehCareerChip'; (document.body||document.documentElement).appendChild(el); }
+  el.textContent=txt;
+  requestAnimationFrame(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.add('on'); });
+  if(_careerChipTimer) clearTimeout(_careerChipTimer);
+  _careerChipTimer=setTimeout(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.remove('on'); }, 3600);
+}
+function hideCareerChip(){
+  if(_careerChipTimer){ clearTimeout(_careerChipTimer); _careerChipTimer=null; }
+  const el=document.getElementById('ehCareerChip'); if(el) el.classList.remove('on');
+}
+function _rootGameKey(node){
+  if(!node || node.nodeType!==1 || !node.classList) return null;
+  for(const cls in _GAME_ROOT_CLS){ if(node.classList.contains(cls)) return _GAME_ROOT_CLS[cls]; }
+  return null;
+}
+let _careerObserverOn=false;
+function installCareerChipObserver(){
+  if(_careerObserverOn || typeof MutationObserver==='undefined') return;
+  const target=document.getElementById('hall'); if(!target) return;   // #hall 未就绪则下次再装
+  _careerObserverOn=true;
+  const mo=new MutationObserver((muts)=>{
+    for(const m of muts){
+      if(m.addedNodes) m.addedNodes.forEach(n=>{ const g=_rootGameKey(n); if(g) showCareerChip(g); });
+      if(m.removedNodes) m.removedNodes.forEach(n=>{ if(_rootGameKey(n)) hideCareerChip(); });
+    }
+  });
+  mo.observe(target,{childList:true});
+}
+try{
+  if(document.readyState!=='loading') installCareerChipObserver();
+  else document.addEventListener('DOMContentLoaded', installCareerChipObserver);
+}catch(_){}
 // F2 边打边聊: 牌桌内聊天坞发消息 → 就是一条正常房间消息(走 eh_messages, 同步进 #stream, 别人也收得到)。
 //   坞自己乐观上屏, 故这里不做 #stream 乐观(realtime 回推时 buildMsgEl 会补进消息流)。
 async function ehTableChatSend(text){
