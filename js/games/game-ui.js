@@ -243,24 +243,31 @@
 .ddz-me .meta .nm{flex-basis:100%;max-width:100%;font-size:14px;color:var(--ink)}
 .ddz-me .meta .cnt{font-size:12px}
 .ddz-me .meta .ddz-cum{margin-top:0}
-/* ═══════ 招募态专属排版(.is-lobby): 复用打牌桌几何但没牌填充会显空洞失衡,
-   这里把三席收成协调等腰三角、中心换紧凑牌章、去掉无意义的空椭圆与底分、竖向节奏收敛。
-   全部门控在 .is-lobby 下, 打牌态一律不受影响。 ═══════ */
-/* 竖向骨架: 顶栏在上、开始钮锚底, 中间「两空位+牌章+自己」用 flex auto-margin 作为一整组垂直居中 */
-.ddz-room.is-lobby .ddz-felt{flex:0 0 auto;margin-top:auto;justify-content:flex-start;gap:0}
-.ddz-room.is-lobby .ddz-me{margin-bottom:auto;padding:16px 14px 0}
+/* ═══════ 招募态专属排版(.is-lobby): 直接复用打牌桌【完整几何】——绒面桌铺满整片、两空位坐桌上沿、
+   自己坐桌下沿, 三席围成一张等着开局的真牌桌(不再是空荡的过渡页)。只把"还没牌"的落牌/底分/手牌带
+   收起, 把中心那条霸屏灰横幅换成一枚居中发光的招募牌章。全部门控在 .is-lobby, 打牌态一律不受影响。 ═══════ */
 .ddz-room.is-lobby .ddz-hand-wrap{display:none}      /* 招募态无手牌 → 去掉空白手牌带 */
-.ddz-room.is-lobby .ddz-mult{display:none}           /* 招募态底分恒 1·×1, 无意义 → 隐藏 */
-/* 中心: 巨大空椭圆 → 一枚紧凑牌章, 招募提示坐在其中, 居中收窄不再霸屏 */
-.ddz-room.is-lobby .ddz-center{flex:none;align-self:center;width:min(84%,340px);min-height:0;margin:18px 0;padding:20px 22px;isolation:isolate}
-.ddz-room.is-lobby .ddz-center::before{left:0;right:0;top:0;bottom:0;width:auto;height:auto;transform:none;border-radius:20px;
-  background:radial-gradient(ellipse at 50% 40%,rgba(0,229,212,.12),rgba(0,120,104,.05) 62%,transparent 82%);
-  border:1px solid rgba(0,229,212,.16);box-shadow:inset 0 0 30px rgba(0,0,0,.3)}
-.ddz-room.is-lobby .ddz-turnbanner{max-width:260px;text-align:center;line-height:1.55;white-space:normal}
-/* 招募态中心区里的打牌元素(底牌/落牌/上家)都空着却占位撑高牌章 → 收起, 牌章只裹提示文字 */
-.ddz-room.is-lobby .ddz-played,.ddz-room.is-lobby .ddz-lastwho,.ddz-room.is-lobby .ddz-bottom-cards{display:none}
-/* 两空位在上、自己在下, 三席统一竖排大头像 → 等腰三角 */
-.ddz-room.is-lobby .ddz-opps{padding:0 22px}
+.ddz-room.is-lobby .ddz-mult,                        /* 底分恒 1·×1 无意义 */
+.ddz-room.is-lobby .ddz-played,                      /* 还没落牌 */
+.ddz-room.is-lobby .ddz-lastwho,                     /* 没有上家 */
+.ddz-room.is-lobby .ddz-bottom-cards{display:none}   /* 没有底牌 → 这几项招募态皆空, 收起免占位撑空 */
+/* 中心绒面: 招募态桌面收得更饱满(insets 收窄→椭圆铺大), 桌心承托招募牌章, 观感是一张真桌围坐 */
+.ddz-room.is-lobby .ddz-center::before{left:9%;right:9%;top:8%;bottom:8%;
+  background:radial-gradient(ellipse at 50% 42%,rgba(0,229,212,.13),rgba(0,120,104,.06) 54%,transparent 76%);
+  border-color:rgba(0,229,212,.15);box-shadow:inset 0 0 60px rgba(0,0,0,.32)}
+/* 日间: 浅底上"暗鸡蛋"式内阴影太重, 换成极浅的绿绒渐变 + 柔外晕, 桌面清透不压眼(夜间保持上面的深纵深) */
+html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
+  background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.5),rgba(0,127,118,.05) 58%,transparent 78%);
+  border-color:rgba(0,127,118,.14);box-shadow:inset 0 0 46px rgba(0,127,118,.07),0 8px 30px rgba(0,127,118,.06)}
+/* 招募牌章: 霸屏灰横幅 → 桌心一枚居中发光胶囊, 文字换行居中, 自适应日/夜配色 */
+.ddz-room.is-lobby .ddz-turnbanner{display:block;font-size:13px;font-weight:600;color:var(--ink);
+  max-width:min(82%,300px);text-align:center;line-height:1.62;letter-spacing:.02em;white-space:normal;
+  padding:13px 22px;border-radius:16px;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 22px rgba(0,229,212,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* 两空位坐桌上沿、自己坐桌下沿, 三席都用竖排大头像围坐(等腰三角构图), 自己与对手视觉对等 */
+.ddz-room.is-lobby .ddz-opps{padding:20px 22px 0}
+.ddz-room.is-lobby .ddz-me{padding:0 14px 8px;justify-content:center}
 .ddz-room.is-lobby .ddz-me .ddz-seat{flex-direction:column;align-items:center;gap:5px;width:var(--seatw,120px)}
 .ddz-room.is-lobby .ddz-me .ddz-avr{width:var(--av,60px);height:var(--av,60px);padding:3px}
 .ddz-room.is-lobby .ddz-me .ddz-avr .av{font-size:var(--avf,27px)}
