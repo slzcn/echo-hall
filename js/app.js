@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260909-table-flow';
+window.__EH_APP_VER = '20260909-instant-start';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6976,10 +6976,10 @@ async function launchDoudizhu(){
   catch(e){ toast('开桌失败，稍后再试'); return; }
   if(!row){ toast('开桌失败'); return; }
   _gtTables.set(row.id,row);
-  // 第4条(主人·与掼蛋对齐): 点开局【先就地挂牌桌招募态】—— 一步进牌桌页, 不再先 appendChild+scrollStream 把镜头
-  //   跳到聊天里的牌桌卡再盖页(那一下"卡片跳转"就是主人说的开局中间页闪跳)。牌桌卡改后台补发, 不挡进桌、不抢镜头。
-  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 就地落真牌桌招募态, 手动/一键邀灵魂真人, 满意点开始才发牌
-  // 牌桌卡供房里其他真人加入/断线重进。host 已在招募态页, 卡片仅落库(本地不 scroll 抢镜); 已有卡则静默复用。
+  // 大结构(与德州/掼蛋一致): 点入口=立刻进牌桌页并发牌, 去掉座位页招募态中间态。
+  //   gtStart 默认用房里灵魂/分身把 3 席补满(固定阵型无自然满员点)再 eh_gt_start, 直落 gtLaunchDdz 首帧。
+  if(row.host_uid===myUid && row.status==='lobby') await gtStart(row.id);
+  // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); 已有卡则静默复用。
   if(row.host_uid===myUid && !row.msg_id){
     const text=window.EHTable ? EHTable.encode(row.id,'ddz') : ('game|gt|'+row.id+'|ddz');
     const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
@@ -7187,10 +7187,10 @@ async function launchGuandan(){
   catch(e){ toast('开桌失败，稍后再试'); return; }
   if(!row){ toast('开桌失败'); return; }
   _gtTables.set(row.id,row);
-  // 第4条(主人): 点开局【先就地挂牌桌招募态】—— 一步进牌桌页, 不再先 appendChild+scrollStream 把镜头
-  //   跳到聊天里的牌桌卡再盖页(那一下"卡片跳转"是开局瞬间的闪跳)。牌桌卡改后台补发, 不挡进桌、不抢镜头。
-  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
-  // 牌桌卡供房里其他真人加入/断线重进。host 已在招募态页, 卡片仅落库(本地不 scroll 抢镜); 已有卡则静默复用。
+  // 大结构(与德州/斗地主一致): 点入口=立刻进牌桌页并发牌, 去掉座位页招募态中间态。
+  //   gtStart 默认用房里灵魂/分身把 4 席(2v2)补满再 eh_gt_start, 直落 gtLaunchGuandan 首帧。
+  if(row.host_uid===myUid && row.status==='lobby') await gtStart(row.id);
+  // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); 已有卡则静默复用。
   if(row.host_uid===myUid && !row.msg_id){
     const text=window.EHTable ? EHTable.encode(row.id,'guandan') : ('game|gt|'+row.id+'|guandan');
     const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
