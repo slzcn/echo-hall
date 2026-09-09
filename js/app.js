@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260909-poker-redesign';
+window.__EH_APP_VER = '20260909-table-flow';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -7012,7 +7012,7 @@ async function launchTexas(){
     await gtGotoExistingTable(row);
     return;
   }
-  // 贴牌桌卡到聊天室 —— 停在招募中: 真人点卡「加入」, 或房主用每空位「🤝灵魂」下拉指定补位, 满意再点「开始 ▶」(空位自动补灵魂)
+  // 贴牌桌卡到聊天室(留档 + 供房里其他真人点卡加入); 德州空座不焊死, 真人可随时坐空位中途进桌。
   const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -7020,7 +7020,9 @@ async function launchTexas(){
   try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
-  if(row.host_uid===myUid && row.status==='lobby') gtLaunchLobbyLocal(row);   // 第1条: 开桌→就地落真牌桌招募态(ddz)/座位页(掼蛋·德州), 手动/一键邀灵魂真人, 满意点开始才发牌
+  // 大结构: 点入口=立刻进牌桌页, 去掉座位页/招募态中间态。gtStart 自动补灵魂满座 + eh_gt_start,
+  //   无已挂起座位页时直落 gtLaunchPoker(打牌页)首帧发牌。空座仍留给真人中途加入(德州模型)。
+  if(row.host_uid===myUid && row.status==='lobby') await gtStart(row.id);
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐满 —— 先用房里【真灵魂】一席一位, 灵魂不够时用【灵魂分身】继续补到无空位。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像)填满, 不再是匿名 AI 机器人;分身顶原灵魂头像、名标"原名·分身[序号]"。

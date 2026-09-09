@@ -696,7 +696,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       setTimeout(()=>room.classList.remove('pk-expanding'), 300);
       renderAll(); positionSeats(); sfx('click');
     }
-    $('#pkX').addEventListener('click', minimize);
+    // 大结构: 「✕ 返回」= 立刻回聊天室(close→onExit 散桌), 去掉折叠成浮片挂在聊天上的中间态。
+    //   仅当【有远程真人】依赖本机 host 引擎当裁判时才保留折叠(close 会杀掉全桌牌局); 单人/纯灵魂桌直接离场。
+    $('#pkX').addEventListener('click', ()=>{ if(remoteSeats.length===0 && !isGuest) close(); else minimize(); });
     const rotBtn = $('#pkRot');
     if (rotBtn) rotBtn.addEventListener('click', ()=>{
       const on = root.EHTableOrient ? root.EHTableOrient.toggle(room) : false;
