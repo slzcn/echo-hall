@@ -110,9 +110,14 @@
 .pk-felt.shake{animation:pkShake .42s cubic-bezier(.36,.07,.19,.97)}
 @keyframes pkShake{10%,90%{transform:translateX(-1px)}30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
 .pk-table{position:absolute;left:3%;right:3%;top:9px;bottom:9px}
+/* 绒面椭圆: 三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 形状各随布局。★与斗地主/掼蛋 .*-center::before 同一套配方 */
 .pk-table::before{content:'';position:absolute;left:4%;right:4%;top:6%;bottom:6%;border-radius:50%/46%;
   background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
   border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06)}
+/* 日间: 深绿绒在浅底上会成"灰蛋", 换浅绿绒(白心→淡绿绒边)+ 青描边, 桌面清透不压眼 */
+html[data-mode="day"] .pk-table::before{
+  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
+  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
 /* 中央: 底池 + 公共牌
  * ★下移到 52%(椭圆偏下半): "我"坐桌外底部, 椭圆下半本是空绒面(见上方竖屏注释); 上弧 6 席的身前下注筹码
  *   在 CY≈48 一圈汇聚, 旧的 top:44% 让底池标签/公共牌与这一圈下注筹码糊在一起(主人反馈"页面太乱")。
@@ -290,9 +295,10 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-over.win .pk-over-card{border-color:rgba(255,194,77,.5);box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 34px rgba(255,194,77,.14),inset 0 1px 0 rgba(255,255,255,.06)}
 @keyframes pkOverCard{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
 .pk-over-card .pk-row{width:100%}
-.pk-over h2{font-size:26px;margin:0;letter-spacing:.06em;font-weight:900}
+/* 结算标题: 三游戏统一 27px/.07em/900; 胜=金(--amber)负=品红(--magenta), 与🏆桌面横幅同一套胜负色语言 */
+.pk-over h2{font-size:27px;margin:0;letter-spacing:.07em;font-weight:900}
 .pk-over.win h2{color:var(--amber,#ffc24d);text-shadow:0 0 18px rgba(255,194,77,.6)}
-.pk-over.lose h2{color:var(--sub)}
+.pk-over.lose h2{color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag)}
 .pk-over .pk-delta{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
 .pk-over .pk-delta.up{color:var(--accent)}.pk-over .pk-delta.down{color:var(--magenta,#ff2d8e)}
 .pk-over .pk-daily{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--sub,#8fb6b1)}

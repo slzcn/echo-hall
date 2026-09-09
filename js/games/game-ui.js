@@ -189,9 +189,14 @@
 .ddz-center.has-bottom{padding-top:58px;justify-content:safe center}
 /* 中央绒面椭圆(对标掼蛋/德州: 三家统一有张"桌面"落牌, 不再是空黑 void)。
    落牌/横幅/passtag 都坐在这张绒面上; 椭圆自身发微光 + 内阴影拉出纵深, z-index:-1 沉底不吃点击。 */
+/* ★三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 与德州 .pk-table::before / 掼蛋 .gd-center::before 同一配方; 形状各随布局 */
 .ddz-center::before{content:'';position:absolute;left:7%;right:7%;top:9%;bottom:9%;border-radius:50%/44%;
-  background:radial-gradient(ellipse at center,rgba(0,229,212,.09),rgba(0,120,104,.05) 52%,transparent 72%);
-  border:1px solid rgba(0,229,212,.08);box-shadow:inset 0 0 55px rgba(0,0,0,.34);z-index:-1;pointer-events:none}
+  background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
+  border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06);z-index:-1;pointer-events:none}
+/* 日间: 深绿绒在浅底上成"灰蛋", 换浅绿绒 + 青描边 */
+html[data-mode="day"] .ddz-center::before{
+  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
+  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
 .ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
 .ddz-turnbanner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:ddzTurnPulse 1.05s ease-in-out infinite}
 .ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
@@ -321,10 +326,11 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
 .ddz-over-card{display:flex;flex-direction:column;align-items:center;gap:15px;width:min(320px,90%);box-sizing:border-box;
   padding:28px 24px 24px;border-radius:22px;background:linear-gradient(170deg,var(--panel-solid,#132a29),var(--bg2,#0d1524));
   border:1px solid var(--line2,rgba(0,229,212,.4));box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05)}
-.ddz-over.win .ddz-over-card{border-color:rgba(0,229,212,.55);box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 40px rgba(0,229,212,.22),inset 0 1px 0 rgba(255,255,255,.06)}
+.ddz-over.win .ddz-over-card{border-color:rgba(255,194,77,.5);box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 40px rgba(255,194,77,.2),inset 0 1px 0 rgba(255,255,255,.06)}
 .ddz-over.lose .ddz-over-card{border-color:rgba(255,45,142,.42);box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 40px rgba(255,45,142,.16),inset 0 1px 0 rgba(255,255,255,.05)}
-.ddz-over h2{font-size:32px;margin:0;letter-spacing:.1em;font-weight:900;display:flex;align-items:center;gap:10px}
-.ddz-over.win h2{color:var(--accent);text-shadow:var(--glow-cyan)}
+/* 结算标题: 三游戏统一 27px/.07em/900; 胜=金(--amber)负=品红(--magenta), 与德州🏆横幅同一套胜负色语言 */
+.ddz-over h2{font-size:27px;margin:0;letter-spacing:.07em;font-weight:900;display:flex;align-items:center;gap:10px}
+.ddz-over.win h2{color:var(--amber,#ffc24d);text-shadow:0 0 18px rgba(255,194,77,.55)}
 .ddz-over.lose h2{color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag)}
 .ddz-over .sub{color:var(--sub);font-size:13px;text-align:center;line-height:1.7}
 .ddz-over .score{font-size:30px;font-weight:900;color:var(--amber);letter-spacing:.02em;font-variant-numeric:tabular-nums;

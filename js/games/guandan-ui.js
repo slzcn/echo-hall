@@ -135,9 +135,14 @@
 .gd-mid{flex:1;display:flex;align-items:stretch;min-height:0}
 .gd-side{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 4px;flex:none}
 .gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative;isolation:isolate}
+/* ★三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 与德州 .pk-table::before / 斗地主 .ddz-center::before 同一配方; 形状各随布局 */
 .gd-center::before{content:'';position:absolute;left:2%;right:2%;top:8%;bottom:8%;border-radius:50%/42%;
-  background:radial-gradient(ellipse at center,rgba(0,229,212,.13),rgba(0,229,212,.045) 52%,rgba(0,229,212,.015) 72%,transparent 82%);
-  border:1px solid rgba(0,229,212,.14);box-shadow:inset 0 0 40px rgba(0,229,212,.06),0 0 24px rgba(0,229,212,.04);z-index:-1;pointer-events:none}
+  background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
+  border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06);z-index:-1;pointer-events:none}
+/* 日间: 深绿绒在浅底上成"灰蛋", 换浅绿绒 + 青描边 */
+html[data-mode="day"] .gd-center::before{
+  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
+  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
 /* 本桌记分条: 两队当前等级 + 已赢副数(按队着色), 常驻牌桌顶部——按"队"展示不每席重复堆信息 */
 .gd-score{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:5px 10px 0;flex-shrink:0}
 .gd-team{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
@@ -371,11 +376,12 @@
   background:linear-gradient(158deg,rgba(19,42,41,.96),rgba(9,15,26,.96));
   border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:22px;
   box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),0 0 40px rgba(0,229,212,.12)}
-.gd-over.win .gd-over-panel{border-color:rgba(0,229,212,.55)}
+.gd-over.win .gd-over-panel{border-color:rgba(255,194,77,.5);box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),0 0 40px rgba(255,194,77,.16)}
 .gd-over.lose .gd-over-panel{border-color:rgba(255,45,142,.5);box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),0 0 40px rgba(255,45,142,.12)}
 .gd-over-panel .gd-acts{padding:0;gap:10px;width:100%}
-.gd-over h2{font-size:28px;margin:0;letter-spacing:.08em;font-weight:900}
-.gd-over.win h2{color:var(--accent);text-shadow:var(--glow-cyan)}
+/* 结算标题: 三游戏统一 27px/.07em/900; 胜=金(--amber)负=品红(--magenta), 与德州🏆横幅同一套胜负色语言 */
+.gd-over h2{font-size:27px;margin:0;letter-spacing:.07em;font-weight:900}
+.gd-over.win h2{color:var(--amber,#ffc24d);text-shadow:0 0 18px rgba(255,194,77,.55)}
 .gd-over.lose h2{color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag)}
 .gd-over .rank-list{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
 .gd-over .rank-row{display:flex;align-items:center;gap:7px;justify-content:center}
