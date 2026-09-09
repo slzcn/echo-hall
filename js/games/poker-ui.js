@@ -203,6 +203,18 @@
 /* 结算浮层带推池动画时: 前 ~330ms 保持透明, 让底池筹码在可见绒面上飞向赢家, 之后再淡入盖住 */
 .pk-over.payout-in{animation:pkOverPayoutIn .58s ease both}
 @keyframes pkOverPayoutIn{0%,56%{opacity:0}100%{opacity:1}}
+/* 桌面赢家横幅(单机常规手替代结算弹窗): 顶部居中一行, 弹入停留→随自动发牌淡出。z 低于卡牌高亮, 不挡摊牌牌面 */
+.pk-winline{position:absolute;left:50%;top:14%;transform:translateX(-50%);z-index:8;pointer-events:none;
+  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink,#eaf6ff);white-space:nowrap;
+  padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
+  border:1px solid var(--line2,rgba(0,229,212,.4));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px rgba(0,229,212,.18);
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
+.pk-winline.win{color:var(--amber,#ffc24d);border-color:rgba(255,194,77,.5);box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 22px rgba(255,194,77,.28)}
+.pk-winline.out{animation:pkWinOut .24s ease forwards}
+html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(234,244,244,.92));border-color:var(--line2,rgba(0,127,118,.42));box-shadow:0 6px 20px rgba(0,127,118,.16),0 0 14px rgba(0,127,118,.1)}
+html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rgba(200,137,46,.55);box-shadow:0 6px 20px rgba(0,127,118,.16),0 0 18px rgba(200,137,46,.22)}
+@keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+@keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
   box-shadow:0 2px 5px rgba(0,0,0,.4);border:1px solid rgba(0,0,0,.08);user-select:none;font-family:"SF Pro Rounded","SF Pro Display",-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif}
@@ -371,12 +383,8 @@
   border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
   font-size:11px;cursor:pointer;padding:0;z-index:6}
 .pk-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
-/* 招募牌章: 朴素提示文字 → 桌心居中发光胶囊(与斗地主 .ddz-turnbanner 招募态同款) */
-.pk-room[data-phase="lobby"] .pk-msg{display:inline-flex;justify-content:center;font-size:13px;font-weight:600;color:var(--ink);
-  max-width:min(80%,280px);text-align:center;line-height:1.6;letter-spacing:.02em;white-space:normal;
-  padding:11px 20px;border-radius:16px;background:var(--panel);border:1px solid var(--line2);
-  box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 22px rgba(0,229,212,.12),inset 0 1px 0 rgba(255,255,255,.06);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* 招募态桌心留白: "我"已坐正下方、招募提示交给底部 pk-me 条 → 藏掉桌心 msg 胶囊(免与底部文案重复、免压住围坐的座位圈) */
+.pk-room[data-phase="lobby"] .pk-msg{display:none}
 /* 日间: 深色绒面椭圆在浅底上会糊成"灰蛋", 招募态换极浅绿绒渐变 + 柔外晕(与斗地主/掼蛋日间同治) */
 html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.05) 60%,transparent 82%);
@@ -519,6 +527,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnSeatActive=-1, turnStreetActive='';
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
+    let _winBanner=null;                    // 桌面赢家横幅(单机常规手替代结算弹窗, 见 showWinBanner)
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
     let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
 
@@ -599,7 +608,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const q = rand(QUIP[kind]||[]); if(!q) return null; say(seat, q); return q;
     }
 
-    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearInterval(overTimer);overTimer=null;} }
+    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearTimeout(overTimer);clearInterval(overTimer);overTimer=null;} try{ hideWinBanner(); }catch(_){} }
     // resize rAF 节流: 旋转/移动端地址栏收放会连发数十个 resize, 每个都全桌重排 —— 合并到每帧一次。
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; positionSeats(); }); };
@@ -789,7 +798,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       _lastOppSig=sig;
       // 移除旧对手节点(保留 pk-table 内的 center)
       els.table.querySelectorAll('.pk-seat, .pk-commit').forEach(e=>e.remove());
-      for (let d=1; d<order.length; d++){
+      // 招募态从 d=0 起(把"我"也画上椭圆底部座位); 打牌态从 d=1 起("我"在桌外 pk-me 条)
+      const startD = st.phase==='lobby' ? 0 : 1;
+      for (let d=startD; d<order.length; d++){
         const seat = order[d];
         const wrap = document.createElement('div');
         const pending = introSeating && arrived && !arrived.has(seat);
@@ -811,19 +822,27 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function positionSeats(){
       const land = root.EHTableOrient ? root.EHTableOrient.reflect(room) : false;  // 横屏态标记(open/resize/旋转都会过这里)
       const order = displayOrder();
-      const m = order.length - 1;                 // 对手数(我固定坐底, 不占上弧)
-      // 对手沿【上弧】分布(而非绕整椭圆): 免得侧位落到 3/9 点钟中线上, 既撞中央公共牌又戳出屏外。
-      // 角度域 158°(左上)→90°(正上)→22°(右上); 横半径 40%/竖半径 34% 收在牌桌内(seat 宽 78px 时两侧不溢出)。
-      const TMAX=158, TMIN=22;
-      // 横屏: 桌面又宽又矮 → 横向半径放大(铺开占满宽度不挤中央), 竖向半径压扁 + 中心上移(上弧别顶出矮felt)。
-      // 竖屏 felt 收成比例椭圆后变矮(见上方 @media 注释), 上弧中心随之下移(CY 46→48), 免得高约 110px 的座位卡顶边戳出矮 felt。
-      const RX = land ? 46 : 40, RY = land ? 30 : 34, CY = land ? 42 : 48;
-      for (let d=1; d<order.length; d++){
+      const lob = st.phase==='lobby';
+      const N = order.length;                     // 总席数(含我)
+      const m = N - 1;                             // 对手数
+      // 招募态: 把"我"也摆上椭圆(坐正下方 270°), 全 n 席绕椭圆【均衡分布】—— 一桌人围坐感,
+      //   不再"5 席挤顶、我孤零零一个人在桌外条上"(主人反馈"都挤在上边位置, 把自己也放到牌桌上均衡分布")。
+      // 打牌态: "我"固定在桌外底部 pk-me 条(底牌/操作都在那), 对手沿"绕开底部我位缺口"的宽弧
+      //   (210°左下 → 90°顶 → -30°右下)均分, 也不再全堆顶部, 与招募态同一套围坐观感。
+      // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 招募态椭圆竖直居中(CY=50)让底部我位不溢出。
+      const RX = land ? 46 : 40, RY = land ? 30 : 34;
+      const CY = lob ? 50 : (land ? 42 : 48);
+      const start = lob ? 0 : 1;                   // 招募态含我(d=0), 打牌态跳过我
+      for (let d=start; d<N; d++){
         const seat=order[d];
         const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
         const commitEl = els.table.querySelector(`.pk-commit[data-seat="${seat}"]`);
         if(!seatEl) continue;
-        const t = (m===1 ? 90 : TMAX - (TMAX-TMIN)*(d-1)/(m-1)) * Math.PI/180;
+        let deg;
+        if (d===0) deg = 270;                                    // 我: 正下方(仅招募态摆上桌)
+        else if (lob) deg = 270 - d*(360/N);                     // 招募态: 全 n 席等分整椭圆(我在 270°)
+        else deg = (m===1) ? 90 : (210 - 240*(d-1)/(m-1));       // 打牌态: 对手在 210°→-30° 宽弧均分(绕开底部我位)
+        const t = deg * Math.PI/180;
         const cx = 50 + RX*Math.cos(t);
         const cy = CY - RY*Math.sin(t);
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
@@ -935,6 +954,22 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         for(let i=0;i<5;i++) flyChip(tr, pot.x, pot.y, tx, ty, 'payout', i*60);
       });
     }
+    // ── 桌面赢家横幅 ──────────────────────────────────────────
+    //   单机常规手不再弹结算面板: 摊牌牌面已随 phase='over' 铺在各席, 这里补一行顶部横幅
+    //   (谁靠什么赢多少) + 推池筹码飞(payoutChipsFx), 停 ~2.3s 后自动发下一手(见 showOver)。
+    function showWinBanner(html, win){
+      hideWinBanner();
+      const b=document.createElement('div');
+      b.className='pk-winline'+(win?' win':'');
+      b.innerHTML=html;
+      els.felt.appendChild(b);
+      _winBanner=b;
+    }
+    function hideWinBanner(){
+      if(!_winBanner) return;
+      const el=_winBanner; _winBanner=null;
+      el.classList.add('out'); setTimeout(()=>{ if(el.parentNode) el.remove(); }, 260);
+    }
     function streetName(){ return ({preflop:'翻牌前',flop:'翻牌',turn:'转牌',river:'河牌',showdown:'摊牌',over:'结算'})[st.phase]||''; }
     function connPill(){ return connState==='online' ? '' : ('<span class="pk-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     function renderMsg(){
@@ -950,13 +985,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     function renderMe(){
       if (st.phase==='lobby'){
-        const p=st.players[mySeat]||{};
-        const nm = p.name || names[mySeat] || '你';
-        const roleTxt = p.kind==='soul' ? '灵魂' : '你 · 房主';
+        // "我"已画在椭圆底部座位(见 positionSeats 招募态), 这里的 pk-me 条不再重复头像,
+        //   只留一行居中房主提示, 与 pk-acts 的「开始」按钮上下呼应。
         els.me.innerHTML = `
-          <div class="pk-hole"><div class="pk-avr" style="width:var(--av,44px);height:var(--av,44px);border-radius:50%"><div class="av">${avatars[mySeat]||p.emoji||'🙂'}</div></div></div>
-          <div class="pk-info"><div class="pk-nmrow"><span class="pk-nm">${escapeHtml(nm)}</span><span class="pk-stk" style="color:var(--sub)">${roleTxt}</span></div>
-          <div class="pk-hint">🪑 招募中 · 点空位邀灵魂或真人入座</div></div>`;
+          <div class="pk-info" style="flex:1;text-align:center">
+            <div class="pk-hint">🪑 招募中 · 点空位邀灵魂或真人入座，齐了点「开始」发牌</div>
+          </div>`;
         lastMeSig=''; return;
       }
       const p=st.players[mySeat];
@@ -1354,6 +1388,43 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const won=(res.winnersBySeat||[]).includes(mySeat);
       const my=st.players[mySeat];
       const delta = my.stack - my.start;
+
+      // ── 单机常规手: 去掉结算弹窗, 直接在牌桌上"演赢筹码 + 自动发下一手" ──
+      //   (主人: 多个弹窗太复杂, 直接在牌桌上完成下一局; 用动画表示赢走筹码, 再直接进发牌动画)
+      //   仅单机(isLocalSolo)且非本场终结(未输光/未通吃)走此路; 破产/通吃/联机仍用下方完整面板。
+      {
+        const myNow = my.stack;
+        const soulsAlive = st.players.filter(p=> p.seat!==mySeat && p.stack>0).length;
+        const iBustNow   = isLocalSolo && myNow<=0;
+        const iWonAllNow = isLocalSolo && soulsAlive===0 && myNow>0;
+        if (isLocalSolo && !iBustNow && !iWonAllNow){
+          const champSeat = (res.winnersBySeat||[])[0];
+          const champName = (champSeat!=null && st.players[champSeat]) ? st.players[champSeat].name : '赢家';
+          const champCount = (res.winnersBySeat||[]).length;
+          const potTotal = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+          const handName = (res.wentToShowdown && res.reveal && champSeat!=null && res.reveal[champSeat]) ? res.reveal[champSeat].hand : '';
+          const line = champCount>1
+            ? `🏆 ${champCount} 家平分 ${potTotal}`
+            : `🏆 ${escapeHtml(champName)} 赢下 ${potTotal}${handName?(' · '+handName):''}`;
+          showWinBanner(line, won);
+          if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
+          if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); vibrate([20,60,30]); confetti(); }
+          else if(delta<0){ sfx('void'); vibrate(60); }
+          emitBeat({ type:'over', actor:champName, big:true,
+            text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
+            quip: beatQuip(champSeat, 'win') });
+          if(typeof opts.onResult==='function'){ try{
+            const potWon0=(res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=>a+Math.floor(pt.amount/(pt.winners.length||1)),0);
+            opts.onResult(res, st.log, { mySeat, potWon:potWon0, delta, handName });
+          }catch(e){ _ehCatch('poker.onResult', e); } }
+          if (minimized) updateChip();
+          // 自动发下一手(可被 clearTimers/close 清): 停 ~2.3s 看清摊牌牌面 + 推池筹码飞, 到点淡出横幅→nextHand
+          if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
+          overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 2300);
+          return;
+        }
+      }
+
       const over=document.createElement('div'); over.className='pk-over '+(delta>0?'win':'lose');
       let rowsHtml='';
       if (res.wentToShowdown && res.reveal){
