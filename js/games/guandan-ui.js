@@ -466,6 +466,7 @@ html[data-mode="day"] .gd-center::before{
   font-size:11px;cursor:pointer;padding:0;z-index:5}
 .gd-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
 .gd-acts.gd-lobacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+.gd-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:6px 12px;letter-spacing:.02em}
 .gd-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
   background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
   box-shadow:0 8px 26px rgba(0,0,0,.5);animation:gdRoomIn .16s ease}
@@ -1125,7 +1126,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const isMate = Engine.partnerOf(mySeat)===seat;
       // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
       const roleTxt = p.kind==='soul' ? '灵魂' : (p.kind==='clone' ? '分身' : (isMe ? '你' : '玩家'));
-      const canKick = isHostLobby && !isMe && p.dbSeat!==0;
+      const canKick = false;   // 去房主: 招募态不再有"请离"特权(满员即自动开局)
       return `<div class="gd-seat gd-lobby-filled${isMate?' mate':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${p.emoji||'🙂'}</div></div>
         <div class="nm">${escapeHtml(p.name||'—')}</div>
@@ -1165,19 +1166,14 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       sfx('click');
       setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
     }
-    // 招募态操作区(与出牌操作条同位): 一键邀请(灵魂补位) / 邀真人 / 开始 ▶
+    // 招募态操作区(去房主·满员自动开局): 无「开始 ▶」按钮 —— 坐满(无空位)由 host 自动起局。
+    //   只留一条引导: 点空位邀灵魂/真人凑满即自动开打。
     function renderLobbyCtrl(){
-      if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
-      const a = lobbyCtx.actions;
+      if (!lobbyCtx){ els.ctrl.innerHTML=''; return; }
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hasSouls = ((lobbyCtx.souls||[]).length>0);
-      const btns=[];
-      // 「一键邀请」「邀真人」去掉(主人诉求"左边两个按钮没意义"): 空位可点座位邀灵魂/真人,
-      //   而「开始」本就会先补满灵魂再发牌(gtStart→gtSeatSoulsIntoEmpties), 两个按钮纯冗余。
-      btns.push('<button class="gd-btn primary" data-lob="start">开始 ▶</button>');
-      els.ctrl.innerHTML=`<div class="gd-acts gd-lobacts">${btns.join('')}</div>`;
-      const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
-      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } });
+      els.ctrl.innerHTML=`<div class="gd-acts gd-lobacts"><div class="gd-lobhint">${
+        empties>0 ? `还差 ${empties} 席 · 点空位邀灵魂/真人，坐满自动开局` : '座位已满 · 即将开局…'
+      }</div></div>`;
     }
     function seatHTML(seat, mini){
       if (st.phase==='lobby') return lobbySeatHTML(seat);
@@ -1544,7 +1540,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
 
     function setBanner(){
       const b=els.banner; const cp=connPill();
-      if (st.phase==='lobby'){ b.className='gd-banner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂或真人入座'; return; }
+      if (st.phase==='lobby'){ b.className='gd-banner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐满自动开局'; return; }
       if (st.phase==='over'){ b.className='gd-banner'; b.innerHTML=cp; return; }
       if (st.phase==='tribute'){
         const seat=st.turn, lbl=tributeTaskKind()==='return'?'还贡':'进贡';
@@ -2110,7 +2106,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         ? `🏆 ${winSide}打过 A，通关胜利！`
         : `${winSide}升级：${lvlFrom} → <b>${lvlTo}</b>（+${res.advance}，${res.doubleDown?'双下':'单下'}）`;
       // guest 无权开新一副: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报。只留"收工"。
-      const againLabel = isGuest ? '等房主开局…' : (res.matchWon?'新对局':'打下一副');
+      const againLabel = isGuest ? '等待开新局…' : (res.matchWon?'新对局':'打下一副');
       // 本桌累计: 两队当前等级(取本手后 teamLevelsAfter) + 累计副数(teamWins, 上方守卫已计过本手)
       const myT=Engine.teamOf(mySeat), foeT=1-myT;
       const lvA = res.teamLevelsAfter || st.teamLevels || [2,2];

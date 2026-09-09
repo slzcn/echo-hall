@@ -103,8 +103,8 @@
         var lb=document.createElement('button'); lb.className='gt-mini warn'; lb.textContent='离座';
         lb.onclick=function(){ ctx.actions.leave(); }; div.appendChild(lb);
       }
-      // host 可请离非 0 席的其他占用者
-      if(ctx.status==='lobby' && ctx.isHost && seat.seat!==0){
+      // host 可请离非 0 席的其他占用者(仅德州: 斗地主/掼蛋已"满员自动开局", 无请离环节)
+      if(ctx.status==='lobby' && ctx.isHost && seat.seat!==0 && ctx.game==='nlhe'){
         var kb=document.createElement('button'); kb.className='gt-mini kick'; kb.textContent='✕'; kb.title='请离';
         kb.onclick=function(){ ctx.actions.kick(seat.seat); }; div.appendChild(kb);
       }
@@ -167,18 +167,26 @@
       if(ctx.isHost){
         var emptyN = seats.filter(function(s){return s.kind==='empty';}).length;
         var hasSouls = !!(ctx.souls && ctx.souls.length);
+        // 去房主·满员自动开局(斗地主/掼蛋): 无「开始发牌」按钮 —— 坐满(无空位)即自动开打;
+        //   想马上玩就点「🤝灵魂坐满」把空位补满灵魂 → 立即触发自动开局。德州座位模型不同, 仍手动开始。
+        var autoGame = (ctx.game==='ddz'||ctx.game==='guandan');
         var tip=document.createElement('span'); tip.className='gt-tip';
-        // 两条路径讲清楚: ⚡一键开始 = 空位召唤灵魂立即开打(想马上玩); 手动开房 = 邀真人点「加入」/用每空位🤝灵魂逐位召唤, 或先「🤝召唤灵魂」补满不开局, 满意再开始。
-        tip.textContent = humans>1
-          ? (humans+' 位真人在座 · 空位由灵魂补满后发牌')
-          : (emptyN>0 ? '点空位邀灵魂/真人，或用下方一键补位，满意「开始发牌」' : '座位已满 · 点「开始发牌」开打');
+        if(autoGame){
+          tip.textContent = emptyN>0
+            ? ('还差 '+emptyN+' 席 · 点空位邀灵魂/真人，坐满自动开局')
+            : '座位已满 · 即将开局…';
+        } else {
+          tip.textContent = humans>1
+            ? (humans+' 位真人在座 · 空位由灵魂补满后发牌')
+            : (emptyN>0 ? '点空位邀灵魂/真人，或用下方一键补位，满意「开始发牌」' : '座位已满 · 点「开始发牌」开打');
+        }
         foot.appendChild(tip);
         var close=document.createElement('button'); close.className='gt-btn ghost'; close.textContent='散桌';
         close.onclick=function(){ ctx.actions.close(); }; foot.appendChild(close);
-        // 「🤝召唤灵魂」: 只把空位坐满灵魂、不开局 —— 手动开房时先召唤补位, 房主再等真人换座或径直开始。
+        // 「🤝灵魂坐满」: 把空位坐满房里灵魂。斗地主/掼蛋满员即自动开局, 故等同"立即开打"; 德州仅补位不开局。
         if(emptyN>0 && hasSouls){
-          var fill=document.createElement('button'); fill.className='gt-btn ghost'; fill.textContent='🤝一键灵魂';
-          fill.title='把空位坐满房里灵魂(不发牌)';
+          var fill=document.createElement('button'); fill.className='gt-btn go'; fill.textContent=autoGame?'🤝灵魂坐满开打':'🤝一键灵魂';
+          fill.title=autoGame?'把空位坐满灵魂→满员自动开局':'把空位坐满房里灵魂(不发牌)';
           fill.onclick=function(){ ctx.actions.fillSouls(); }; foot.appendChild(fill);
         }
         // 「👥邀请真人」: 一键把牌桌招呼发到聊天区, 房里真人点卡加入(手动逐位邀请仍走各空位的「加入」/🤝灵魂)。
@@ -187,11 +195,14 @@
           inv.title='把牌桌招呼发到聊天区叫真人来';
           inv.onclick=function(){ ctx.actions.inviteHumans(); }; foot.appendChild(inv);
         }
-        var go=document.createElement('button'); go.className='gt-btn go'; go.textContent='开始发牌 ▶';
-        go.title='空位自动补灵魂后发牌开打';
-        go.onclick=function(){ ctx.actions.start(); }; foot.appendChild(go);
+        if(!autoGame){
+          var go=document.createElement('button'); go.className='gt-btn go'; go.textContent='开始发牌 ▶';
+          go.title='空位自动补灵魂后发牌开打';
+          go.onclick=function(){ ctx.actions.start(); }; foot.appendChild(go);
+        }
       } else if(ctx.iAmPlaying){
-        var t2=document.createElement('span'); t2.className='gt-tip'; t2.textContent='已入座 · 等房主开始…';
+        var autoG2 = (ctx.game==='ddz'||ctx.game==='guandan');
+        var t2=document.createElement('span'); t2.className='gt-tip'; t2.textContent=autoG2?'已入座 · 坐满自动开局…':'已入座 · 等房主开始…';
         foot.appendChild(t2);
       } else {
         var t3=document.createElement('span'); t3.className='gt-tip'; t3.textContent='点空位「加入」上桌';

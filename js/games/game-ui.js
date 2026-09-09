@@ -150,6 +150,24 @@
 .ddz-seat .cnt b{color:var(--ink)}
 .ddz-seat .role{font-size:9px;letter-spacing:.08em;padding:0 5px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
 .ddz-seat.landlord .role{color:var(--amber);border-color:var(--amber)}
+/* ═══════ 结算态就地呈现(.is-over): 不弹全屏模态, 结果就在牌桌上 ——
+   各座位亮出剩牌(自己=底部手牌扇, 对手=座位下小牌行)、结果横幅在牌桌正中、再来一局/收工在底部按钮区。 ═══════ */
+.ddz-seat-reveal{display:flex;justify-content:center;flex-wrap:nowrap;margin-top:6px;min-height:1px}
+.ddz-seat-reveal .card{margin-left:-16px;box-shadow:0 2px 5px rgba(0,0,0,.45)}
+.ddz-seat-reveal .card:first-child{margin-left:0}
+.ddz-seat-reveal.dense .card{margin-left:-20px}
+/* over 态: 落牌/上家/底分收起, 中央只留结果横幅居中(提示在牌桌正中) */
+.ddz-room.is-over .ddz-played,
+.ddz-room.is-over .ddz-lastwho,
+.ddz-room.is-over .ddz-mult{display:none}
+.ddz-overbanner{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:88%;text-align:center;white-space:normal;line-height:1.4}
+.ddz-overbanner .ov-h{font-size:27px;font-weight:900;letter-spacing:.07em}
+.ddz-overbanner .ov-h.win{color:var(--amber,#ffc24d);text-shadow:0 0 18px rgba(255,194,77,.55)}   /* 胜=金, 与德州🏆横幅/结算标题同一套胜负色语言(BatchB统一) */
+.ddz-overbanner .ov-h.lose{color:var(--magenta,#ff2d8e);text-shadow:var(--glow-mag)}
+.ddz-overbanner .ov-sub{font-size:12px;color:var(--sub,#86cbc6);line-height:1.6}
+.ddz-overbanner .ov-delta{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.ddz-overbanner .ov-delta.pos{color:var(--amber,#ffc24d)}
+.ddz-overbanner .ov-delta.neg{color:var(--magenta,#ff2d8e)}
 /* 本桌累计比分徽标(常驻座位): 正分暖色亮起, 负分品红压暗, 0 分中性 —— 与结算面板 .ddz-cumbox 同一套语言 */
 .ddz-cum{margin-top:2px;font-size:10px;font-weight:800;line-height:15px;padding:0 6px;border-radius:8px;
   font-variant-numeric:tabular-nums;border:1px solid var(--line);display:inline-block}
@@ -248,36 +266,18 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-me .meta .nm{flex-basis:100%;max-width:100%;font-size:14px;color:var(--ink)}
 .ddz-me .meta .cnt{font-size:12px}
 .ddz-me .meta .ddz-cum{margin-top:0}
-/* ═══════ 招募态专属排版(.is-lobby): 直接复用打牌桌【完整几何】——绒面桌铺满整片、两空位坐桌上沿、
-   自己坐桌下沿, 三席围成一张等着开局的真牌桌(不再是空荡的过渡页)。只把"还没牌"的落牌/底分/手牌带
-   收起, 把中心那条霸屏灰横幅换成一枚居中发光的招募牌章。全部门控在 .is-lobby, 打牌态一律不受影响。 ═══════ */
-.ddz-room.is-lobby .ddz-hand-wrap{display:none}      /* 招募态无手牌 → 去掉空白手牌带 */
-.ddz-room.is-lobby .ddz-mult,                        /* 底分恒 1·×1 无意义 */
-.ddz-room.is-lobby .ddz-played,                      /* 还没落牌 */
-.ddz-room.is-lobby .ddz-lastwho,                     /* 没有上家 */
-.ddz-room.is-lobby .ddz-bottom-cards{display:none}   /* 没有底牌 → 这几项招募态皆空, 收起免占位撑空 */
-/* 中心绒面: 招募态桌面收得更饱满(insets 收窄→椭圆铺大), 桌心承托招募牌章, 观感是一张真桌围坐 */
-.ddz-room.is-lobby .ddz-center::before{left:9%;right:9%;top:8%;bottom:8%;
-  background:radial-gradient(ellipse at 50% 42%,rgba(0,229,212,.13),rgba(0,120,104,.06) 54%,transparent 76%);
-  border-color:rgba(0,229,212,.15);box-shadow:inset 0 0 60px rgba(0,0,0,.32)}
-/* 日间: 浅底上"暗鸡蛋"式内阴影太重, 换成极浅的绿绒渐变 + 柔外晕, 桌面清透不压眼(夜间保持上面的深纵深) */
-html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
-  background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.5),rgba(0,127,118,.05) 58%,transparent 78%);
-  border-color:rgba(0,127,118,.14);box-shadow:inset 0 0 46px rgba(0,127,118,.07),0 8px 30px rgba(0,127,118,.06)}
-/* 招募牌章: 霸屏灰横幅 → 桌心一枚居中发光胶囊, 文字换行居中, 自适应日/夜配色 */
-.ddz-room.is-lobby .ddz-turnbanner{display:block;font-size:13px;font-weight:600;color:var(--ink);
-  max-width:min(82%,300px);text-align:center;line-height:1.62;letter-spacing:.02em;white-space:normal;
-  padding:13px 22px;border-radius:16px;background:var(--panel);border:1px solid var(--line2);
-  box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 22px rgba(0,229,212,.12),inset 0 1px 0 rgba(255,255,255,.06);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-/* 两空位坐桌上沿、自己坐桌下沿, 三席都用竖排大头像围坐(等腰三角构图), 自己与对手视觉对等 */
-.ddz-room.is-lobby .ddz-opps{padding:20px 22px 0}
-.ddz-room.is-lobby .ddz-me{padding:0 14px 8px;justify-content:center}
-.ddz-room.is-lobby .ddz-me .ddz-seat{flex-direction:column;align-items:center;gap:5px;width:var(--seatw,120px)}
-.ddz-room.is-lobby .ddz-me .ddz-avr{width:var(--av,60px);height:var(--av,60px);padding:3px}
-.ddz-room.is-lobby .ddz-me .ddz-avr .av{font-size:var(--avf,27px)}
-.ddz-room.is-lobby .ddz-me .meta{flex-direction:column;align-items:center;max-width:none;row-gap:3px}
-.ddz-room.is-lobby .ddz-me .meta .nm{flex-basis:auto;max-width:120px;font-size:13px;text-align:center}
+/* ═══════ 招募态(.is-lobby): 复用对局桌骨架 —— 对手空位贴顶、大牌桌居中显示招募提示、
+   自己在底、手牌区留空占位。坐人前(招募)/坐人后(对局)结构完全一致, 进局无跳跃感。
+   仅隐藏未发牌时无意义的元素(底牌/落牌/上家/底分)。桌心绒面复用 Batch C 统一的 .ddz-center::before(含日间 override)。
+   全部门控 .is-lobby, 对局态不受影响。 ═══════ */
+.ddz-room.is-lobby .ddz-mult{display:none}           /* 未发牌: 底分恒 1·×1, 无意义 → 隐藏 */
+.ddz-room.is-lobby .ddz-played,
+.ddz-room.is-lobby .ddz-lastwho,
+.ddz-room.is-lobby .ddz-bottom-cards{display:none}   /* 未发牌: 无落牌/上家/底牌 → 收起, 大牌桌里只留招募提示 */
+.ddz-room.is-lobby .ddz-turnbanner{max-width:80%;text-align:center;line-height:1.5;white-space:normal}  /* 招募提示在牌桌正中居中换行 */
+/* 手牌区留空占位(不 display:none): 高度与对局态一致, 发牌后自己座位不上跳; 未发牌时隐去描边/底纹成隐形空位 */
+.ddz-room.is-lobby .ddz-hand-wrap{border-top-color:transparent;background:none}
+.ddz-room.is-lobby .ddz-hand{min-height:92px}
 /* 手牌扇形 */
 .ddz-hand-wrap{padding:2px 10px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .ddz-hand{display:flex;justify-content:center;padding:var(--hand-pad,24px) 0 6px;min-height:92px;flex-wrap:nowrap;touch-action:none}
@@ -472,6 +472,7 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
   font-size:11px;cursor:pointer;padding:0;z-index:5}
 .ddz-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
 .ddz-acts.ddz-lobacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+.ddz-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:6px 12px;letter-spacing:.02em}
 .ddz-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
   background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
   box-shadow:0 8px 26px rgba(0,0,0,.5);animation:ddzRoomIn .16s ease}
@@ -878,7 +879,7 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
       const isMe = seat===mySeat;
       // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
       const roleTxt = p.kind==='soul' ? '灵魂' : (p.kind==='clone' ? '分身' : (isMe ? '你' : '玩家'));
-      const canKick = isHostLobby && !isMe && p.dbSeat!==0;
+      const canKick = false;   // 去房主: 招募态不再有"请离"特权(满员即自动开局, 无需谁管座位)
       return `<div class="ddz-seat ddz-lobby-filled" data-seat="${seat}">
         <div class="ddz-avr"><div class="av">${p.emoji||'🙂'}</div></div>
         <div class="meta"><div class="nm">${escapeHtml(p.name||'—')}</div>
@@ -899,6 +900,7 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
           <div class="cnt">剩 <b>${p.hand.length}</b> 张${role?` · <span class="role">${role}</span>`:''}</div>
           ${cumPill(seat)}
         </div>
+        ${(st.phase==='over' && seat!==mySeat) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
         <div class="ddz-say"></div>
       </div>`;
     }
@@ -906,6 +908,7 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
       els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
       els.me.innerHTML = seatHTML(mySeat);
       if (st.phase==='lobby') bindLobbySeats();
+      if (st.phase==='over' && st.result) renderSeatReveal();   // 结算: 对手在各自座位下亮出剩牌(自己的剩牌=底部手牌扇)
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
       const center = els.bottom.parentElement;
@@ -919,6 +922,28 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
         });
         els.bottom.appendChild(lbl); els.bottom.appendChild(row);
       }
+    }
+    // 结算态: 把各对手席剩牌小牌行填进座位下的占位; 超宽(地主没出几张)时动态收紧叠放, 不溢出到邻座
+    function renderSeatReveal(){
+      const reveal = (st.result && st.result.reveal) || {};
+      room.querySelectorAll('.ddz-seat-reveal[data-rv]').forEach(box=>{
+        const s = +box.dataset.rv;
+        box.innerHTML = '';
+        const objs = (reveal[s]||[]).map(findCardById).filter(Boolean);
+        if (!objs.length){ return; }
+        if (objs.length > 12) box.classList.add('dense');
+        (Deck.sortHand ? Deck.sortHand(objs) : objs).forEach(c=> box.appendChild(cardEl(c,{mini:true})));
+        // 单座位可用宽 ~ 半个牌桌; 超出则均匀收紧(同 layoutPlayed 思路)
+        const maxW = Math.max(120, Math.floor((els.opps.clientWidth||360)/2) - 16);
+        const cards = box.children, n = cards.length;
+        if (n > 1){
+          const cw = cards[0].offsetWidth || 32;
+          if (n*cw > maxW){
+            const ov = Math.round((maxW - cw)/(n - 1) - cw);
+            for (let i=1;i<n;i++) cards[i].style.marginLeft = ov+'px';
+          }
+        }
+      });
     }
     // ── 招募态: 空位点击邀请 / host 请离 ──
     function bindLobbySeats(){
@@ -1099,8 +1124,20 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
     // ── 轮次横幅 + 倒计时环 ──
     function setBanner(){
       const b = els.banner; const cp = connPill();
-      if (st.phase==='over'){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
-      if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀请，满意点「开始」'; return; }
+      if (st.phase==='over'){
+        const res = st.result;
+        if (!res){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
+        b.className = 'ddz-turnbanner ddz-overbanner';
+        const iWon = res.winners.includes(mySeat);
+        const roleTxt = st.landlord===mySeat ? '地主' : '农民';
+        const d = res.delta[mySeat] || 0;
+        b.innerHTML = cp
+          + `<div class="ov-h ${iWon?'win':'lose'}">${iWon?'🎉 你赢了':'😵 你输了'}</div>`
+          + `<div class="ov-sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''} · 底分 ${res.base}×${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}</div>`
+          + `<div class="ov-delta ${d>=0?'pos':'neg'}">${d>=0?'+':''}${d} 分</div>`;
+        return;
+      }
+      if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐满自动开局'; return; }
       if (st.phase!=='bid' && st.phase!=='play' && st.phase!=='double'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
       if (isGuest && awaitingHost){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 已提交 · 等待裁决…'; return; }
       const seat = st.phase==='bid' ? st.bid.turn : (st.phase==='double' ? (st.dbl&&st.dbl.turn) : st.turn);
@@ -1218,21 +1255,39 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
     }
 
     // ── 控制区:叫地主 / 出牌 ──
-    // 招募态操作区: 一键邀请(灵魂补位) / 邀真人 / 开始 ▶ —— 就在打牌页的操作按钮位置(主人要求)
+    // 招募态操作区(去房主·满员自动开局): 不再有「开始 ▶」按钮 —— 坐满(无空位)由 host 自动起局。
+    //   这里只留一条引导: 点空位邀灵魂/真人凑满即自动开打; 想马上玩就把空位都邀成灵魂。
     function renderLobbyCtrl(){
-      if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
-      const a = lobbyCtx.actions;
+      if (!lobbyCtx){ els.ctrl.innerHTML=''; return; }
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hasSouls = ((lobbyCtx.souls||[]).length>0);
-      const btns=[];
-      // 「一键邀请」「邀真人」去掉(主人诉求): 空位可点座位邀灵魂/真人, 「开始」本就先补满灵魂再发牌, 两钮纯冗余。
-      btns.push('<button class="ddz-btn primary" data-lob="start">开始 ▶</button>');
-      els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts">${btns.join('')}</div>`;
-      const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
-      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } });
+      els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts"><div class="ddz-lobhint">${
+        empties>0 ? `还差 ${empties} 席 · 点空位邀灵魂/真人，坐满自动开局` : '座位已满 · 即将开局…'
+      }</div></div>`;
+    }
+    // 结算态操作区(就在打牌页底部按钮位, 不再弹全屏模态): 再来一局(默认高亮) / 收工。
+    // guest 无权开新局 → 由 host 驱动, 下副快照到达自动接新局; 只留"收工"。
+    function renderOverCtrl(){
+      if (isGuest){
+        els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" disabled>等待开新局…</button><button class="ddz-btn ghost" id="ddzDone">收工</button></div>`;
+      } else {
+        els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" id="ddzAgain">再来一局</button><button class="ddz-btn ghost" id="ddzDone">收工</button></div>`;
+        const again = $('#ddzAgain'); if (again) again.addEventListener('click', startRematch);
+      }
+      const done = $('#ddzDone'); if (done) done.addEventListener('click', ()=>close());
+    }
+    // 再来一局: 就地重建新局(同一 room 不重挂 → 顺势接发牌入场动画), 复位一局态标志。host 广播新局首帧。
+    function startRematch(){
+      if (startRematch._busy) return; startRematch._busy = true;   // 防连点
+      showOver._done = false;
+      st = Engine.createGame({ isAI: gameIsAI, names, doubling: DOUBLING });
+      dealNo++; selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
+      lastLord=null; lastMyTurn=false; justCrowned=false;
+      sfx('deal'); broadcast(); renderAll();
+      startRematch._busy = false;
     }
     function renderCtrl(){
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
+      if (st.phase === 'over'){ renderOverCtrl(); return; }
       if (st.phase === 'bid'){
         // 别人叫分时也渲染按钮行(下面 renderBidBar 用 visibility:hidden 占位), 免得轮到我时凭空多一行→整桌上下跳
         const waiting = (isGuest && awaitingHost) ? '⏳ 已叫分 · 等待裁决…'
@@ -1564,103 +1619,35 @@ html[data-mode="day"] .ddz-room.is-lobby .ddz-center::before{
       }
     }
 
-    // ── 结算浮层 ──
+    // ── 结算: 不再弹全屏模态, 就地在牌桌上呈现 —— 各座位亮牌(自己=底部手牌扇, 对手=座位下小牌行) +
+    //    中央结果横幅 + 底部「再来一局/收工」, 均由 renderAll 的 over 分支绘出(setBanner/renderSeats/renderOverCtrl)。
+    //    本函数只做一次性副作用: 计分 / 胜负音效+震动+彩带 / 战报进聊天流 / onResult 回调。 ──
     function showOver(){
-      if (showOver._done) return; showOver._done = true;   // 幂等: guest 会连收多张 over 快照, 只弹一次
+      if (showOver._done) return; showOver._done = true;   // 幂等: guest 会连收多张 over 快照, 只结算一次
       clearTimers();
       const res = st.result;
       if (!res) { showOver._done = false; return; }
-      // 本桌累计: 每手只计一次(res._scored 守卫, guest 连收多张 over 快照也只加一次); 放在幂等 _done 通过之后
-      if (res && !res._scored){ res._scored = true; st.players.forEach(p=>{ cumScore[p.seat] += (res.delta[p.seat]||0); }); saveScore(); }   // delta 是 {seat→分} 对象非数组, 按座位号累加; 存本桌累计防重进清零
-      try{ renderSeats(); }catch(_){}   // 累计刷新: 结算面板揭起前先更新底层座位徽标(下一局 renderAll 也会再刷)
+      // 本桌累计: 每手只计一次(res._scored 守卫, guest 连收多张 over 快照也只加一次); delta 按座位号累加, 存本桌累计防重进清零
+      if (!res._scored){ res._scored = true; st.players.forEach(p=>{ cumScore[p.seat] += (res.delta[p.seat]||0); }); saveScore(); }
       const iWon = res.winners.includes(mySeat);
-      const over = document.createElement('div');
-      over.className = 'ddz-over ' + (iWon?'win':'lose');
       const roleTxt = st.landlord===mySeat ? '地主' : '农民';
-      // 加倍摘要(仅本地加倍局有 doubles 且有人 >1): 列出各家加倍系数, 让玩家看懂账变为何被放大
-      const dbls = res.doubles || {};
-      const anyDbl = Object.keys(dbls).some(k=>dbls[k]>1);
-      const dblTxt = anyDbl ? ('<br>加倍 · ' + st.players.map(p=>{
-        const f = dbls[p.seat]||1; return `${escapeHtml(p.name)}${p.seat===st.landlord?'(地主)':''}×${f}`;
-      }).join(' ')) : '';
-      // 本桌累计块: 逐席列名字(含地主标)+ 累计分, 正分暖色 / 负分品红
-      const cumBox = `<div class="ddz-cumbox"><div class="cum-ttl">本桌累计</div>${
-        st.players.map(p=>{
-          const v = cumScore[p.seat]||0;
-          const cls = v>0?'pos':(v<0?'neg':'zero');
-          const isL = st.landlord===p.seat;
-          return `<div class="cum-row"><span class="cum-nm">${escapeHtml(p.name)}${p.seat===mySeat?'（你）':''}${isL?' <span class="cum-role">地主</span>':''}</span><span class="cum-v ${cls}">${v>0?'+':''}${v} 分</span></div>`;
-        }).join('')
-      }</div>`;
-      over.innerHTML = `
-        <div class="ddz-over-card">
-          <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
-          <div class="sub">你是${roleTxt} · ${res.landlordWon?'地主赢':'农民赢'}${res.spring?' · 春天翻倍':''}<br>底分 ${res.base} × 倍数 ${res.finalMultiplier}${res.bombs?(' · '+res.bombs+' 炸'):''}${dblTxt}</div>
-          <div class="ddz-remains" id="ddzRemains"></div>
-          <div class="score">${(res.delta[mySeat]>=0?'+':'')}${res.delta[mySeat]} 分</div>
-          ${cumBox}
-          <div class="ddz-acts">
-            <button class="ddz-btn primary" id="ddzAgain">再来一局</button>
-            <button class="ddz-btn ghost" id="ddzDone">收工</button>
-          </div>
-        </div>`;
-      room.appendChild(over);
-      // 残局:亮出仍有剩牌的席位(赢家已出完 → 不列)。对标腾讯斗地主终局亮残牌, 让人看清对手"卡"在什么牌上。
-      const remainBox = over.querySelector('#ddzRemains');
-      if (remainBox){
-        const reveal = res.reveal || {};
-        const seats = st.players.map(p=>p.seat).filter(s => (reveal[s]||[]).length > 0);
-        if (!seats.length){ remainBox.remove(); }
-        else seats.forEach((s, ri)=>{
-          const p = st.players[s];
-          const roleS = st.landlord==null ? '' : (st.landlord===s?'地主':'农民');
-          const row = document.createElement('div'); row.className='rm-row'; row.style.setProperty('--i', ri);
-          const nm = document.createElement('div'); nm.className='rm-nm';
-          nm.innerHTML = `${escapeHtml(p.name)}${s===mySeat?'（你）':''}${roleS?` <span class="rm-role">${roleS}</span>`:''} <span class="rm-n">剩${reveal[s].length}</span>`;
-          const cards = document.createElement('div'); cards.className='rm-cards';
-          const objs = (reveal[s]||[]).map(findCardById).filter(Boolean);
-          if (objs.length > 18) cards.classList.add('dense');
-          (Deck.sortHand ? Deck.sortHand(objs) : objs).forEach(c=> cards.appendChild(cardEl(c,{mini:true})));
-          row.appendChild(nm); row.appendChild(cards); remainBox.appendChild(row);
-        });
-      }
+      renderAll();   // 就地绘出结算态: 座位亮牌 / 中央结果横幅 / 底部再来一局·收工(累计分随座位徽标刷新)
+      // 胜负音效 + 触感 + 彩带
       if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
       else { sfx('void'); vibrate(120); }
-      // guest 无权开新一局: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报; 只留"收工"
-      const againBtn = over.querySelector('#ddzAgain');
-      const clearAgainTimer = ()=>{ if (over._againTimer){ clearInterval(over._againTimer); over._againTimer=null; } };
-      if (isGuest){ againBtn.textContent='等房主开局…'; againBtn.disabled=true; }
-      else {
-        const startRematch = ()=>{
-          if (over._leaving) return; over._leaving = true;   // 防连点
-          clearAgainTimer();
-          // 丝滑过渡(对标腾讯): 结算面板先淡出下沉 ~.34s, 再拆掉重建新局 → 顺势接发牌入场动画, 不再"啪"地跳切。
-          showOver._done=false;
-          over.classList.add('out');
-          const go = ()=>{ over.remove(); st = Engine.createGame({isAI:gameIsAI,names,doubling:DOUBLING}); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); broadcast(); renderAll(); };
-          let done=false; const once=()=>{ if(done) return; done=true; go(); };
-          over.addEventListener('animationend', once, { once:true });
-          setTimeout(once, 420);   // 动画事件兜底(被打断/不触发时仍推进)
-        };
-        againBtn.addEventListener('click', startRematch);
-        // ★默认再来一局(主人要求): 战报页把"再来一局"设为高亮主按钮(默认落点), 但不自动倒计时——
-        //   由主人手动点"再来一局"或"收工", 不再读秒自动开新局。
-      }
-      over.querySelector('#ddzDone').addEventListener('click', ()=>{ clearAgainTimer(); close(); });
-      if (typeof opts.onResult === 'function'){
-        try { opts.onResult(res, st.log, { mySeat, roleTxt }); } catch(_){}
-      }
       // F3 终局战报进聊天流(春天/炸弹倍数一并播报); 赢家若是灵魂配一句收官台词
       const winNm = st.players[res.winners[0]] ? st.players[res.winners[0]].name : (res.landlordWon?'地主':'农民');
       emitBeat({ type:'over', actor:winNm, big:true,
         text:`🏁 ${res.landlordWon?'地主':'农民'}方胜 · 底分 ${res.base} × ${res.finalMultiplier}${res.spring?' · 春天翻倍':''}${res.bombs?` · ${res.bombs} 炸`:''}`,
         quip: beatQuip(res.winners[0], 'win') });
+      if (typeof opts.onResult === 'function'){ try { opts.onResult(res, st.log, { mySeat, roleTxt }); } catch(_){} }
       if (minimized) updateChip();   // 折叠中终局: 片子翻到"点看战报"态并高亮
     }
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
-      room.classList.toggle('is-lobby', st.phase==='lobby');   // 招募态专属排版(三角构图/牌章中心), 打牌态自动摘除
+      room.classList.toggle('is-lobby', st.phase==='lobby');   // 招募态复用对局桌骨架, 仅隐未发牌无意义元素
+      room.classList.toggle('is-over', st.phase==='over');      // 结算态: 就地亮牌+中央结果横幅, 隐落牌/上家/倍数徽标
       if (lastLord===null && st.landlord!=null){
         sfx('landlord');   // 地主刚揭晓: 号角定音
         const nm = st.players[st.landlord].name;

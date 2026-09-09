@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260909-table-unify';
+window.__EH_APP_VER = '20260909-ddz-autostart';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -874,6 +874,7 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
+const _gtAutoStarted = new Set();  // 去房主·满员自动开局: 已自动起局过的桌 id(防 realtime 多投重复起局)
 function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
@@ -2165,6 +2166,15 @@ async function setupGameTables(room){
       if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host && row.game==='nlhe'
          && _ehGame && typeof _ehGame.updateRoster==='function'){
         try{ _ehGame.updateRoster(gtSeatArrays(row)); }catch(_){}
+      }
+      // ── 去房主·满员自动开局: host 本机检测招募态坐满(无空位) → 自动起局, 不用谁点「开始」。
+      //   斗地主/掼蛋开局本就把空位焊灵魂/AI, "满员=可开"; 德州座位模型留空位给真人+逐手AI补位, 无自然满员点, 不走此路。
+      //   eh_gt_start 有 status<>'lobby' 幂等守卫, 叠加本地 _gtAutoStarted 去重 → realtime 多投也只起一次。 ──
+      if(row.status==='lobby' && row.host_uid===myUid && (row.game==='ddz'||row.game==='guandan')
+         && _gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host && !_gtAutoStarted.has(row.id)){
+        const need = row.seat_count || (row.game==='ddz'?3:4);
+        const filled = (row.seats||[]).filter(s=>s && s.kind && s.kind!=='empty').length;
+        if(filled>=need){ _gtAutoStarted.add(row.id); try{ gtStart(row.id); }catch(_){} }
       }
       // 本人在座且桌在 playing 且我还没进这桌 → 自动进牌桌。
       //   覆盖两种入场: lobby→playing 开局瞬间; 以及德州进行中我刚坐下空位(中途加入)。
