@@ -356,6 +356,42 @@
 .pk-over .pk-more .pk-pots{margin-top:8px}
 .pk-over .pk-offnote{width:100%;font-size:12.5px;font-weight:700;color:#ff5d6c;padding:2px 0 6px;letter-spacing:.02em}
 
+/* ── 招募态桌面化(对齐斗地主/掼蛋"思路"): 空桌=一张亮着的真牌桌, 空位虚线可点环坐, 桌心一枚居中发光的招募牌章。
+   德州原本连空位/邀请菜单/请离钮都没样式(裸态), 这里一并补齐。全部门控在 [data-phase="lobby"], 打牌态不受影响。 ── */
+.pk-room[data-phase="lobby"] .pk-pot{display:none}      /* 招募态无底池 → 藏掉空药丸(不然桌心浮一枚空琥珀圈) */
+.pk-room[data-phase="lobby"] .pk-board{display:none}    /* 招募态无公共牌 → 收起免占位 */
+/* 空位: 虚线头像 + 可点(与斗地主/掼蛋空位同款视觉) */
+.pk-lobby-empty{cursor:pointer}
+.pk-lobby-empty .av{background:transparent;border-style:dashed;color:var(--accent,#00e5d4);font-weight:700}
+.pk-lobby-empty:hover .av{box-shadow:0 0 12px var(--accent,rgba(0,229,212,.5))}
+.pk-seat .stk.pk-lob{color:var(--sub,#86cbc6);font-weight:600}
+.pk-lobby-filled .stk.pk-lob .role{color:var(--accent,#00e5d4)}
+/* 请离钮(host 点已入座者旁的 ×) */
+.pk-lob-kick{position:absolute;top:-4px;right:0;width:18px;height:18px;line-height:16px;text-align:center;
+  border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
+  font-size:11px;cursor:pointer;padding:0;z-index:6}
+.pk-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
+/* 招募牌章: 朴素提示文字 → 桌心居中发光胶囊(与斗地主 .ddz-turnbanner 招募态同款) */
+.pk-room[data-phase="lobby"] .pk-msg{display:inline-flex;justify-content:center;font-size:13px;font-weight:600;color:var(--ink);
+  max-width:min(80%,280px);text-align:center;line-height:1.6;letter-spacing:.02em;white-space:normal;
+  padding:11px 20px;border-radius:16px;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 22px rgba(0,229,212,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* 日间: 深色绒面椭圆在浅底上会糊成"灰蛋", 招募态换极浅绿绒渐变 + 柔外晕(与斗地主/掼蛋日间同治) */
+html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
+  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.05) 60%,transparent 82%);
+  border-color:rgba(0,127,118,.16);box-shadow:inset 0 0 46px rgba(0,127,118,.06),0 8px 30px rgba(0,127,118,.06)}
+/* 邀请入座菜单(招募态点空位弹出): 与掼蛋 .gd-invite-menu 同款 */
+.pk-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
+  background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
+  box-shadow:0 8px 26px rgba(0,0,0,.5)}
+.pk-invite-menu .im-ttl{font-size:11px;font-weight:800;color:var(--accent,#00e5d4);padding:4px 8px 6px;letter-spacing:.04em}
+.pk-invite-menu .im-sep{font-size:10px;color:var(--dim,#498d88);padding:6px 8px 2px}
+.pk-invite-menu .im-empty{font-size:11px;color:var(--dim,#498d88);padding:6px 8px}
+.pk-invite-menu .im-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;
+  padding:8px 10px;color:var(--ink,#eaf6ff);font-size:13px;cursor:pointer}
+.pk-invite-menu .im-item:hover{background:rgba(0,229,212,.12)}
+
 `;
     document.head.appendChild(s);
   }
@@ -1588,6 +1624,7 @@
     }
 
     function renderAll(){
+      room.dataset.phase = st.phase;   // 招募态桌面化的 CSS 钩子: [data-phase="lobby"] 命中一整套空桌样式(打牌态无此属性→不受影响)
       maybeCollectChips();   // 街结束→筹码归池(须在 renderOpponents 重建座位/清 commit 之前捕获旧位置)
       renderPot(); renderBoard(); renderOpponents(); renderMe(); renderMsg(); renderActs();
       armTurn(minimized ? null : onHumanTimeout);

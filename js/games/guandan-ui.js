@@ -279,8 +279,11 @@
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .gd-hand{display:flex;flex-direction:column;gap:6px;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
 /* 手牌托盘定高(主人诉求): 以≈6张重叠牌高为参考钉死高度, 手牌在 1 排/2 排间切换时托盘不缩放,
-   由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。 */
-.gd-room:not(.is-land) .gd-hand{height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
+   由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。
+   ⚠ 必须排除 .combo(竖列组牌): 此规则的 justify-content:flex-end 是给两排手牌(flex-direction:column, 主轴竖直)"沉底"用的;
+   而 combo 把方向改成 row(主轴水平), 同一个 flex-end 就变成"牌靠右", 且本规则特异性(0,3,0)高于 .gd-hand.combo 的
+   flex-start(0,2,0)会把它遮蔽 —— 这正是"少牌时竖列组牌跑到右侧"的真凶(上次左对齐修复被此规则盖掉)。 */
+.gd-room:not(.is-land) .gd-hand:not(.combo){height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
 /* 手牌向左对齐(主人诉求): 牌不填满整行时靠左码放、右侧留空, 出牌后左端不动更稳定, 不再居中飘。 */
 .gd-hand-row{display:flex;justify-content:flex-start;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
@@ -466,6 +469,25 @@
 .gd-invite-menu .im-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;
   padding:8px 10px;color:var(--ink,#eaf6ff);font-size:13px;cursor:pointer}
 .gd-invite-menu .im-item:hover{background:rgba(0,229,212,.12)}
+/* ── 招募态桌面化(对齐斗地主"思路"): 空桌不再是"朴素文字浮在空竖蛋上", 而是一张亮着的真牌桌——
+   桌心一枚居中发光的招募牌章, 空位环坐等开局。全部门控在 [data-phase="lobby"], 打牌态一律不受影响。 ── */
+.gd-room[data-phase="lobby"] .gd-who,
+.gd-room[data-phase="lobby"] .gd-played,
+.gd-room[data-phase="lobby"] .gd-score{display:none}   /* 招募态无出牌/记分 → 收起免占位撑空 */
+/* 中心绒面: 招募态收敛成一张居中牌桌(不再顶天立地的空竖蛋), 桌心承托招募牌章 */
+.gd-room[data-phase="lobby"] .gd-center::before{top:12%;bottom:12%;left:6%;right:6%;
+  background:radial-gradient(ellipse at 50% 44%,rgba(0,229,212,.14),rgba(0,120,104,.05) 56%,transparent 78%);
+  border-color:rgba(0,229,212,.16);box-shadow:inset 0 0 54px rgba(0,0,0,.3)}
+/* 日间: 浅底上深内阴影会糊成"灰蛋", 换极浅绿绒渐变 + 柔外晕(与斗地主日间同治) */
+html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
+  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.5),rgba(0,127,118,.05) 60%,transparent 80%);
+  border-color:rgba(0,127,118,.14);box-shadow:inset 0 0 44px rgba(0,127,118,.06),0 8px 30px rgba(0,127,118,.06)}
+/* 招募牌章: 朴素横幅文字 → 桌心居中发光胶囊, 文字换行居中, 自适应日/夜(与斗地主 .ddz-turnbanner 招募态同款) */
+.gd-room[data-phase="lobby"] .gd-banner{display:inline-flex;justify-content:center;font-size:13px;font-weight:600;color:var(--ink);
+  max-width:min(84%,300px);text-align:center;line-height:1.6;letter-spacing:.02em;white-space:normal;
+  padding:12px 22px;border-radius:16px;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 22px rgba(0,229,212,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 
 /* ── 记牌器/出牌历史(仅纯单机信息辅助): 顶栏切换钮 + 悬浮面板 ─────────── */
 .gd-cnt{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:transparent;
