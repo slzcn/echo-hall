@@ -276,6 +276,10 @@ html[data-mode="day"] .gd-center::before{
 .card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
 .card.mini{width:var(--cmw,22px);height:var(--cmh,32px)}.card.mini .cn{font-size:9px}.card.mini .cs{font-size:7px;top:11px}.card.mini .cc{font-size:12px}
 /* 我的座位 */
+/* 我的座位行: 座位信息占左, 🔀理牌钮贴右 —— 理牌钮从前独占一行(.gd-hand-head)搬进这一行, 省一整行竖向(主人诉求) */
+.gd-me-row{display:flex;align-items:center;gap:8px;padding-right:12px}
+.gd-me-row .gd-me{flex:1;min-width:0}
+.gd-room[data-phase="lobby"] .gd-me-row #gdSort{display:none}  /* 招募态无手牌 → 藏理牌钮(原随 .gd-hand-wrap 一起藏, 现已移出) */
 .gd-me{display:flex;align-items:center;gap:9px;padding:3px 14px 0}
 .gd-me .gd-seat{flex-direction:row;width:auto;gap:8px}
 .gd-me .gd-avr{width:36px;height:36px;padding:2.5px}
@@ -768,8 +772,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           <div class="gd-side right" id="gdP1"></div>
         </div>
       </div>
-      <div class="gd-me" id="gdMe"></div>
-      <div class="gd-hand-wrap"><div class="gd-hand-head"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button></div><div class="gd-hand" id="gdHand"></div></div>
+      <div class="gd-me-row"><div class="gd-me" id="gdMe"></div><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button></div>
+      <div class="gd-hand-wrap"><div class="gd-hand" id="gdHand"></div></div>
       <div id="gdCtrl"></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
@@ -1022,7 +1026,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
       // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
       if(st.phase!=='play') return;
-      const c=handCardAt(e.clientX,e.clientY); if(!c) return;
+      const c=handCardAt(e.clientX,e.clientY);
+      // 点手牌托盘的空白处(牌与牌之间/两侧留白, 非某张牌)= 取消选牌: 手牌条不在 .gd-felt 里,
+      //   felt 的"点绒面取消"覆盖不到这块, 主人点手牌旁边空白收不回选中就是这里漏的。
+      if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintCards=[...els.hand.querySelectorAll('.card')];   // 全局阅读序(上排→下排), 供区间连选按 data-idx 补齐
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
@@ -1830,6 +1837,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           root.EHGuandanAI.arrangeGroups(hand, st.level).forEach(g=>{
             if (g.length < 2) return;                            // 单张不算"理出的牌型"
             const p = Rules.parse(g, st.level); if (!p) return;  // 组不成合法牌型的跳过
+            if (Rules.isBomb(p)) return;                         // ★炸弹不进"理牌优先"(主人反馈"跟对子却提示先出炸"):
+            //   arrangeGroups 把炸排最前, 而炸能压任何牌型 → 会抢到提示第一位。炸交回下方 ai(hints)列表,
+            //   那里领出/跟牌都把炸垫底(能一把走完的炸仍会靠 hints 的"整手清"规则排到最前, 不误伤)。
             if (!target || Rules.beats(p, target, st.level)) mine.push(g);  // 领出全收/跟牌只收能压的
           });
           if (mine.length){

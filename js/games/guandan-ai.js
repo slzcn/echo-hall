@@ -200,6 +200,8 @@
   //   领出绝不为清散牌拆炸: 显式重罚拆同点炸/耗王/耗百搭, 与 playCost 同量级(拆炸远超任何清牌/早清加成)。
   function leadWaste(hand, play, level){
     const g = groups(hand, level);
+    const wildN = g.wilds.length;                          // ★手里可用百搭(逢人配)数 → 认"3天然+1百搭"的现成炸
+    const playIsBomb = Rules.isBomb(play.parse);           //   出的就是炸时不算拆(否则会误罚打百搭炸本身)
     const rc = {};
     let pen = 0;
     for (const c of play.cards){
@@ -209,7 +211,8 @@
     }
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      if (have>=4 && rc[r]<have && rc[r]<4) pen += 120;    // 拆同点炸(领出重罚, 与 playCost 一致)
+      const isBombRank = have>=4 || (have===3 && wildN>=1);          // 天然炸 或 百搭补齐的炸(主人反馈"四个五+尖却领三个五")
+      if (!playIsBomb && isBombRank && rc[r]<4) pen += 120; // 拆同点炸(领出重罚, 与 playCost 一致; 含百搭补齐的炸)
       else if (have===3 && rc[r]<3) pen += 10;             // 拆三条(留三带更值)
       else if (have===2 && rc[r]===1) pen += 4;            // 拆对出单(先出真散张)
     }
@@ -365,6 +368,11 @@
     const order = { straight:0, pairline:0, trioline:0, fullhouse:1, trio:2, pair:3, single:4 };
     const nonBomb = combos.filter(c=>!Rules.isBomb(c.parse));
     let pool = nonBomb.length ? nonBomb : combos;
+    // ★护炸硬约束(主人反馈"灵魂剩四个五和五个尖, 居然出三个五"): 领出绝不打"拆掉自己炸弹"的牌型
+    //   (天然炸 或 逢人配补齐的炸), 除非全部候选都拆炸才退回。比 leadWaste 软罚更硬 —— 软罚会被
+    //   estTricks 的手数收益(拆炸领三张能少一手)盖过, 于是炸被一张张拆没。整手一炸走完已在上面 fin 处理。
+    const keepsBomb = pool.filter(c => !breaksBomb(c, hand, level));
+    if (keepsBomb.length) pool = keepsBomb;
 
     // 对手报单: 收窄到多张牌型憋死他; 只有单张时改甩最大单张
     const oppMin = ctx ? minOpponentCards(ctx) : 99;
@@ -444,11 +452,14 @@
   function playCost(play, hand, level){
     let cost = play.parse.key;
     const g = groups(hand, level);
+    const wildN = g.wilds.length;                          // ★同 leadWaste: 认"3天然+1百搭"的现成炸
+    const playIsBomb = Rules.isBomb(play.parse);
     const rc = {};
     for (const c of play.cards){ if(Rules.isWild(c,level)){ cost+=60; continue; } const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      if (have>=4 && rc[r]<have && rc[r]<4) cost += 120;  // 拆炸
+      const isBombRank = have>=4 || (have===3 && wildN>=1);
+      if (!playIsBomb && isBombRank && rc[r]<4) cost += 120;  // 拆炸(含百搭补齐的炸)
       else if (have===3 && rc[r]<3) cost += 15;           // 拆三条: 破坏可留的三带
       else if (have===2 && rc[r]===1) cost += 6;          // 拆对子出单张: 有散张先出散张
     }
@@ -456,15 +467,18 @@
     return cost;
   }
 
-  // 这手是否拆了炸弹: 用了某自然点 <4 张, 而手里该点持有 >=4 张(与 playCost 的 +120 判据一致)。
-  //   百搭/王不计入自然点(它们拆没拆王另有惩罚)。用于跟牌路径硬性剔除"拆炸凑出来"的压牌。
+  // 这手是否拆了炸弹: 用了某自然点 <4 张, 而手里该点是炸(天然>=4 张, 或 3天然+至少1百搭=逢人配补齐的炸)。
+  //   百搭/王不计入自然点(它们拆没拆王另有惩罚)。用于领出/跟牌路径硬性剔除"拆炸凑出来"的牌。
+  //   出的本身就是炸 → 不算拆(否则打百搭炸会被自己剔掉)。
   function breaksBomb(play, hand, level){
+    if (Rules.isBomb(play.parse)) return false;
     const g = groups(hand, level);
+    const wildN = g.wilds.length;
     const rc = {};
     for (const c of play.cards){ if (c.joker || Rules.isWild(c, level)) continue; const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      if (have>=4 && rc[r]<have && rc[r]<4) return true;
+      if ((have>=4 || (have===3 && wildN>=1)) && rc[r]<4) return true;
     }
     return false;
   }

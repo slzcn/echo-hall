@@ -106,10 +106,14 @@
       const M=/Kangkang|Kang-?Kang|Yunyang|Yun-?Yang|Liang|Yunye|Male|康康|云扬|男/i;
       return { all, female:all.filter(v=>F.test(v.name)), male:all.filter(v=>M.test(v.name)) };
     }
+    // 每个灵魂一副专属嗓: 音高(pitch)/语速(rate)拉开距离, 让浏览器 TTS 也能听出是不同角色
+    //   (系统中文嗓往往只有一把 → 只能靠音高语速塑形。真·录制级灵魂音色需预生成音频片, 属另一档工程)。
+    //   拉宽后区间: pitch 0.70~1.34 / rate 0.90~1.30, 各角色按人设定调:
+    //   狼姐御姐低缓 · 老K老练低沉慢 · 阿夜冷峻 · 回音空灵偏高 · 图灵机敏快(顺势演"AI感") · 小暖温软慢 · 小绵羊软萌高快
     const SOUL_VOICE={
-      '狼姐':{g:'f',pitch:0.96,rate:1.14}, '老K':{g:'m',pitch:0.80,rate:1.02}, '阿夜':{g:'m',pitch:0.90,rate:1.06},
-      '回音':{g:'f',pitch:1.14,rate:1.08}, '图灵':{g:'m',pitch:0.94,rate:1.20}, '小暖':{g:'f',pitch:1.16,rate:1.00},
-      '小绵羊':{g:'f',pitch:1.24,rate:1.10}
+      '狼姐':{g:'f',pitch:0.88,rate:1.04}, '老K':{g:'m',pitch:0.70,rate:0.94}, '阿夜':{g:'m',pitch:0.84,rate:1.02},
+      '回音':{g:'f',pitch:1.22,rate:1.02}, '图灵':{g:'m',pitch:1.02,rate:1.30}, '小暖':{g:'f',pitch:1.12,rate:0.92},
+      '小绵羊':{g:'f',pitch:1.34,rate:1.18}
     };
     function _hash(s){ let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31 + s.charCodeAt(i))>>>0; return h; }
     function voiceProfile(who){
