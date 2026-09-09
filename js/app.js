@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260909-idle-spectator';
+window.__EH_APP_VER = '20260909-career-chip';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6862,19 +6862,31 @@ function _ensureCareerChipCSS(){
   document.head.appendChild(s);
 }
 let _careerChipTimer=null;
-async function showCareerChip(game){
+let _careerChipGame=null;   // 当前挂着生涯积分条的游戏(供结算后刷新数字用)
+// persist=true: 牌桌里常驻显示(不淡出), 每局结算后刷新数字 → 主人玩时一直看到"积分在存、在涨、没从零"。
+//   (旧行为是开局闪 3.6s 就淡出, 太容易错过, 主人遂以为"每次从零"。)
+async function showCareerChip(game, persist){
   _ensureCareerChipCSS();
+  _careerChipGame = game;   // 先记 game: 即便本局暂无战绩(careerText 返回 null)早退, 结算后也能据此刷新
   const r=await fetchCareer(game); const txt=careerText(game,r);
-  if(!txt) return;   // 无战绩不闪
+  if(!txt) return;   // 无战绩不显示: 第一次玩确实从零, 不假装
   let el=document.getElementById('ehCareerChip');
   if(!el){ el=document.createElement('div'); el.id='ehCareerChip'; (document.body||document.documentElement).appendChild(el); }
   el.textContent=txt;
   requestAnimationFrame(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.add('on'); });
-  if(_careerChipTimer) clearTimeout(_careerChipTimer);
-  _careerChipTimer=setTimeout(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.remove('on'); }, 3600);
+  if(_careerChipTimer){ clearTimeout(_careerChipTimer); _careerChipTimer=null; }
+  if(!persist) _careerChipTimer=setTimeout(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.remove('on'); }, 3600);
+}
+// 结算后即时刷新常驻积分条: 清缓存拉最新, 让本局赢/输的分当场累加进"生涯 X · +N"。
+function refreshCareerChip(game){
+  if(_careerChipGame!==game) return;                        // 只刷当前牌桌那个游戏
+  if(!document.getElementById('ehCareerChip')) return;      // 不在牌桌就不刷
+  try{ delete _careerCache[game]; }catch(_){}
+  showCareerChip(game, true);
 }
 function hideCareerChip(){
   if(_careerChipTimer){ clearTimeout(_careerChipTimer); _careerChipTimer=null; }
+  _careerChipGame=null;
   const el=document.getElementById('ehCareerChip'); if(el) el.classList.remove('on');
 }
 function _rootGameKey(node){
@@ -6889,7 +6901,7 @@ function installCareerChipObserver(){
   _careerObserverOn=true;
   const mo=new MutationObserver((muts)=>{
     for(const m of muts){
-      if(m.addedNodes) m.addedNodes.forEach(n=>{ const g=_rootGameKey(n); if(g) showCareerChip(g); });
+      if(m.addedNodes) m.addedNodes.forEach(n=>{ const g=_rootGameKey(n); if(g) showCareerChip(g, true); });   // 常驻
       if(m.removedNodes) m.removedNodes.forEach(n=>{ if(_rootGameKey(n)) hideCareerChip(); });
     }
   });
@@ -7148,7 +7160,7 @@ function bumpGameStats(game, res, A){
     const entries=_statEntries(game,res,A);
     if(!entries.length) return;
     sb.rpc('eh_stat_bump',{p_game:game,p_entries:entries})
-      .then(({error})=>{ if(error) console.warn('[stat] bump', error.message); }, ()=>{});
+      .then(({error})=>{ if(error){ console.warn('[stat] bump', error.message); return; } try{ refreshCareerChip(game); }catch(_){} }, ()=>{});
   }catch(e){ console.warn('[stat] bump', e&&e.message); }
 }
 // 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
