@@ -186,6 +186,12 @@ html[data-mode="day"] .pk-table::before{
 .pk-cd{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 .pk-mini-hole{display:flex;gap:2px;margin-top:1px;min-height:1px}
 .pk-mini-hole .card{margin:0}
+/* "我"的桌底座位(pk-me-seat): 底牌正面朝上, 比对手牌背大且带花色可读; 头像点青光 + 名字点青, 一眼认出"这是你" */
+.pk-me-seat .pk-avr .av{box-shadow:0 0 0 2px var(--accent,#00e5d4),0 0 12px rgba(0,229,212,.35)}
+.pk-me-seat .nm{color:var(--accent,#00e5d4);font-weight:800}
+.pk-my-hole{--cw:30px;--ch:42px;--cn:12px;--cs:9px;--cc:17px;gap:4px;margin-top:2px}
+.pk-my-hole .card{box-shadow:0 3px 8px rgba(0,0,0,.5)}
+.pk-my-hole .card .cs{top:13px}
 .pk-say{position:absolute;top:calc(var(--av,44px) + 2px);font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:140px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:8;white-space:nowrap}
 .pk-say.show{opacity:1}
 /* 身前投入筹码(朝中央) */
@@ -764,6 +770,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const cs = rv.hole.map(id=>{ const el=cardEl(idCard(id),{mini:false}); if(b5&&b5.has(id)) el.classList.add('pk-win-card'); return el.outerHTML; }).join('');
         // 摊牌台面直接标各家成手牌型(同花顺/葫芦…), 不必等结算面板 —— 一眼看清谁靠什么赢
         hole = `<div class="pk-mini-hole">${cs}</div><div class="pk-mini-hn">${escapeHtml(rv.hand||'')}</div>`;
+      } else if (seat===mySeat && !p.folded){
+        // "我"也坐在椭圆底部(主人诉求"把自己放桌里, 不单独拿出来") → 自己的底牌正面朝上、带花色可读(不走 mini, mini 会藏花色)
+        const cs = (p.hole||[]).map(c=>cardEl(c,{}).outerHTML).join('');
+        hole = `<div class="pk-mini-hole pk-my-hole">${cs}</div>`;
       } else if (!p.folded){
         hole = `<div class="pk-mini-hole">${cardEl(null,{back:true,mini:true}).outerHTML}${cardEl(null,{back:true,mini:true}).outerHTML}</div>`;
       } else {
@@ -771,7 +781,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       const dbtn = seat===st.button ? `<span class="pk-btn-d">D</span>` : '';
       const blbtn = blindBadge(seat);
-      return `<div class="pk-seat${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}" data-seat="${seat}" style="--p:360">
+      return `<div class="pk-seat${seat===mySeat?' pk-me-seat':''}${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
@@ -799,13 +809,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const pending = introSeating && arrived && !arrived.has(seat);
         return seat+':'+(pending?'P':(p.folded?'F':'')+(p.allin?'A':'')+':'+(p.stack||0)+':'+(p.street||0));
       }).join('|');
-      const sig = order.join(',')+'#'+parts+'#T'+st.toAct+'#'+(land?'L':'P')+'#'+(lastSeated||'')+'#'+st.phase;
+      // "我"也画上椭圆底部座位, 故底牌进签名(新发牌/摊牌换牌要重建我的座位面); 弃牌/筹码已在 parts 里没我 → 单列我
+      const mp = st.players[mySeat]||{};
+      const myHoleSig = (mp.hole||[]).map(c=>c?(c.suit+''+c.rank):'x').join('')+':'+(mp.folded?'F':'')+(mp.allin?'A':'')+':'+(mp.stack||0)+':'+(mp.street||0);
+      const sig = order.join(',')+'#'+parts+'#ME'+myHoleSig+'#T'+st.toAct+'#'+(land?'L':'P')+'#'+(lastSeated||'')+'#'+st.phase;
       if(!force && sig===_lastOppSig) return;
       _lastOppSig=sig;
-      // 移除旧对手节点(保留 pk-table 内的 center)
+      // 移除旧座位节点(保留 pk-table 内的 center)
       els.table.querySelectorAll('.pk-seat, .pk-commit').forEach(e=>e.remove());
-      // 招募态从 d=0 起(把"我"也画上椭圆底部座位); 打牌态从 d=1 起("我"在桌外 pk-me 条)
-      const startD = st.phase==='lobby' ? 0 : 1;
+      // 全席(含我 d=0)都画上椭圆: 我在正下方 270°, 对手绕上弧 —— 一桌人围坐, 不再把"我"单独拎到桌外条
+      const startD = 0;
       for (let d=startD; d<order.length; d++){
         const seat = order[d];
         const wrap = document.createElement('div');
@@ -831,14 +844,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const lob = st.phase==='lobby';
       const N = order.length;                     // 总席数(含我)
       const m = N - 1;                             // 对手数
-      // 招募态: 把"我"也摆上椭圆(坐正下方 270°), 全 n 席绕椭圆【均衡分布】—— 一桌人围坐感,
-      //   不再"5 席挤顶、我孤零零一个人在桌外条上"(主人反馈"都挤在上边位置, 把自己也放到牌桌上均衡分布")。
-      // 打牌态: "我"固定在桌外底部 pk-me 条(底牌/操作都在那), 对手沿"绕开底部我位缺口"的宽弧
-      //   (210°左下 → 90°顶 → -30°右下)均分, 也不再全堆顶部, 与招募态同一套围坐观感。
-      // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 招募态椭圆竖直居中(CY=50)让底部我位不溢出。
+      // 招募态 & 打牌态一致: 把"我"也摆上椭圆(坐正下方 270°), 对手绕上弧均分 —— 一桌人围坐感,
+      //   不再"我孤零零一个人在桌外条上"(主人反馈"把自己也放到牌桌里, 不用单独拿出来")。
+      //   招募态: 全 n 席等分整椭圆(我在 270°)。打牌态: 我固定 270°, 对手沿"绕开底部我位缺口"的宽弧
+      //   (210°左下 → 90°顶 → -30°右下)均分, 底牌正面就在我这张桌底座位上。
+      // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 椭圆竖直居中(CY 偏上)让底部我位不溢出。
       const RX = land ? 46 : 40, RY = land ? 30 : 34;
-      const CY = lob ? 50 : (land ? 42 : 48);
-      const start = lob ? 0 : 1;                   // 招募态含我(d=0), 打牌态跳过我
+      const CY = lob ? 50 : (land ? 42 : 46);
+      const start = 0;                             // 全席含我(d=0, 270°底部), 招募/打牌一致
       for (let d=start; d<N; d++){
         const seat=order[d];
         const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
@@ -1044,16 +1057,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           }catch(e){ _ehCatch('poker.equityHint', e); }
         }
       } else { hint='等待其他玩家行动'; }
-      const holeHtml = holeCards.map((c,i)=>{
-        const e=cardEl(c,{big:true});
-        if(dealAnim){ e.classList.add('justdealt'); e.style.animationDelay=(i*90)+'ms'; }
-        return e.outerHTML;
-      }).join('');
+      // "我"的头像/名字/筹码/底牌(正面)已画在椭圆底部座位(见 seatHTML 的 pk-me-seat 分支), 倒计时走座位环。
+      //   这条桌外 pk-me 只留一行操作提示(需跟注/可过牌/胜率/当前成手), 紧贴下方操作按钮, 不再重复展示我的信息。
       els.me.innerHTML = `
-        <div class="pk-hole">${holeHtml}</div>
-        <div class="pk-info">
-          <div class="pk-nmrow"><span class="pk-nm${mine?' turn':''}">${escapeHtml(p.name)}</span><span class="pk-stk">💰 ${p.stack}</span>${st.button===mySeat?'<span class="pk-btn-d" style="position:static;width:16px;height:16px">D</span>':''}${myBlind?myBlind.replace('class="pk-btn-bl','class="pk-btn-bl inline'):''}${madeStr?`<span class="pk-made">${madeStr}</span>`:''}<span class="pk-clk" id="pkClk"></span></div>
-          <div class="pk-hint">${hint}</div>
+        <div class="pk-info" style="flex:1;text-align:center">
+          <div class="pk-hint">${hint}${madeStr?` · 当前 <b>${escapeHtml(madeStr)}</b>`:''}</div>
         </div>`;
       dealAnim=false;
     }
@@ -1323,9 +1331,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
                 : 0;
         turnStart = Date.now();
       }
-      const seatEl = mine ? null : els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
-      const clk = mine ? $('#pkClk') : null;
-      const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 对手行动席头像秒数徽标
+      // 我也坐椭圆了 → 我方回合也在自己座位上走圆环+秒数徽标(与对手一致), 不再依赖桌外 #pkClk(已移除)
+      const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
+      const clk = mine ? $('#pkClk') : null;       // #pkClk 已从 pk-me 移除, 此处恒 null, 下方 if(mine&&clk) 自然跳过
+      const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 行动席头像秒数徽标(含我)
       if (turnDur<=0) return;
       // ★折叠(minimized)态: 房 display:none, 环不可见 —— 不再起 rAF 每帧对隐藏节点写 --p(后台自动连打时
       //   会一直空转耗电)。只挂一个到点定时器: host 兜底代打远程超时 / 我方超时(onExpire, 折叠时为 null 即不动)。
