@@ -1621,7 +1621,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
     }
 
+    // 主人诉求: 点"返回"后不再无限后台连打 —— 到"下一局开始"这一刻就离场。
+    //   有其他真人在桌 → 只是退出(离桌, 别人继续); 纯灵魂/AI 桌 → 结束整局。
+    //   离桌 vs 散桌的实际落地由 app.js 注入的 onExit 按角色兜底(host→gtClose 散桌 / guest→本地清场离场),
+    //   角色天然编码"有无真人": 你是客人 ⟺ 桌上有房主(真人)→ onExit 离场; 你是独自带灵魂的房主 → onExit 散桌。
+    function leaveAfterReturn(){ close(); }
+
     function nextHand(){
+      // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)
+      if (minimized){ leaveAfterReturn(); return; }
       // 写回筹码 → (应用中途加入/离座名册变化) → 开新一手
       st.players.forEach(p=> stacks[p.seat]=p.stack);
       applyPendingRoster();
@@ -1736,6 +1744,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const prevHand = handNo;
       lastSnap = snap; handNo = snap.handNo || 0;
       if (snap.handNo !== prevHand){          // 新一手: 清结算层 + 重置动画; 底牌等 feedHand 补
+        // 客人在"返回"(折叠)态下等到房主开出新一手 → 到此离场(房主/其余真人继续), 不再随房主无限连打。
+        if (minimized){ close(); return; }
         const ov=els.felt.querySelector('.pk-over'); if(ov) ov.remove();
         lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       }

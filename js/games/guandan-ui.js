@@ -1895,6 +1895,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (!snap || !GNet) return;
       const prevPhase = st ? st.phase : null;
       const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || (prevPhase==='over' && snap.phase==='play');
+      if (isNewDeal && minimized){ close(); return; }   // 主人诉求: 客人在"返回"(折叠)态下等到房主开新一副 → 到此离场(房主/其余真人继续)
       if (isNewDeal){
         dealAnim=true; selected.clear(); hintCycle=[]; rows=null;
         lastShownKey=''; lastFinishedN=0; lastMyTurn=false;

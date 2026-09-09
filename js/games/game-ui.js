@@ -1669,6 +1669,7 @@ html[data-mode="day"] .ddz-center::before{
       if (!snap || !GNet) return;
       const prevPhase = st ? st.phase : null;
       const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || ((prevPhase==='over'||prevPhase==='wait') && (snap.phase==='play'||snap.phase==='bid'));
+      if (isNewDeal && minimized){ close(); return; }   // 主人诉求: 客人在"返回"(折叠)态下等到房主开新一局 → 到此离场(房主/其余真人继续)
       if (isNewDeal){
         dealAnim=true; selected.clear(); hintCycle=[];
         lastShownKey=''; lastMyTurn=false; lastLord=null; showOver._done=false;
