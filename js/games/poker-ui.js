@@ -82,12 +82,12 @@
    这里把桌面收成一个比例匀称的椭圆并竖直居中(操作钮仍钉底、"我"贴其上), 座位/公共牌走 %
    定位随桌高等比缩放, 不再被拉长。.pk-room 前缀提特异性以压过后面定义的基础 .pk-table 规则。 */
 @media (max-width:599px){
-  .pk-room .pk-table{top:48%;bottom:auto;height:clamp(340px,50vh,430px);transform:translateY(-50%)}
+  .pk-room .pk-table{top:47%;bottom:auto;height:clamp(360px,58vh,500px);transform:translateY(-50%)}
 }
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
-.pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px}
+.pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .pk-blinds{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .pk-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
@@ -111,13 +111,19 @@
 @keyframes pkShake{10%,90%{transform:translateX(-1px)}30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
 .pk-table{position:absolute;left:3%;right:3%;top:9px;bottom:9px}
 /* 绒面椭圆: 三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 形状各随布局。★与斗地主/掼蛋 .*-center::before 同一套配方 */
+/* 夜间: 更饱和的翡翠绒 —— 亮心 → 深绿绒 → 暗青边缘晕影, 叠一层极淡青雾光, 桌面从"灰蛋"变"真绿呢台面"。 */
 .pk-table::before{content:'';position:absolute;left:4%;right:4%;top:6%;bottom:6%;border-radius:50%/46%;
-  background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
-  border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06)}
-/* 日间: 深绿绒在浅底上会成"灰蛋", 换浅绿绒(白心→淡绿绒边)+ 青描边, 桌面清透不压眼 */
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(20,160,142,.46),rgba(9,92,86,.5) 52%,rgba(4,34,36,.72) 100%);
+  border:2px solid rgba(0,229,212,.22);
+  box-shadow:inset 0 3px 42px rgba(0,0,0,.5),inset 0 0 70px rgba(0,229,212,.06),0 0 30px rgba(0,229,212,.09)}
+/* 内圈亮唇边: 台面边缘的一道细高光, 让椭圆有"绒台+围边"的立体层次(对标真实牌桌的皮质围边) */
+.pk-table::after{content:'';position:absolute;left:4%;right:4%;top:6%;bottom:6%;border-radius:50%/46%;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(0,229,212,.14),inset 0 1px 0 rgba(255,255,255,.06)}
+/* 日间: 深绿绒在浅底上会成"灰蛋", 换清透薄荷绒(亮心→淡翡翠边)+ 青描边, 桌面清透不压眼且明显是"绿台" */
 html[data-mode="day"] .pk-table::before{
-  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
-  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(150,232,214,.62),rgba(0,168,154,.24) 54%,rgba(0,120,110,.16) 100%);
+  border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1)}
+html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 /* 中央: 底池 + 公共牌
  * ★下移到 52%(椭圆偏下半): "我"坐桌外底部, 椭圆下半本是空绒面(见上方竖屏注释); 上弧 6 席的身前下注筹码
  *   在 CY≈48 一圈汇聚, 旧的 top:44% 让底池标签/公共牌与这一圈下注筹码糊在一起(主人反馈"页面太乱")。
@@ -235,7 +241,23 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,18px);opacity:.92}
 .card.mini{width:16px;height:22px;border-radius:3px}.card.mini .cn{font-size:8px;top:1px;left:2px}.card.mini .cs{display:none}.card.mini .cc{display:none}
 .card.big{width:var(--bcw,38px);height:var(--bch,54px)}.card.big .cn{font-size:calc(var(--cn,12px) + 3px)}.card.big .cc{font-size:calc(var(--cc,18px) + 5px)}.card.big .cs{top:19px}
-.card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
+/* 盖着的牌(对手底牌): 斜织纹 + 双色角光 + 更亮的青描边, 在深绿绒上也读得出是"张牌"而非黑洞 */
+.card.back{background:
+  repeating-linear-gradient(48deg,rgba(0,229,212,.09) 0 2px,transparent 2px 6px),
+  radial-gradient(circle at 30% 24%,rgba(0,229,212,.22),transparent 52%),
+  radial-gradient(circle at 76% 80%,rgba(156,133,255,.18),transparent 58%),
+  linear-gradient(150deg,#1d3a5c 0%,#152a4a 46%,#0d1c33 100%);
+  border:1px solid rgba(0,229,212,.42);
+  box-shadow:inset 0 0 0 1.5px rgba(0,229,212,.12),inset 0 5px 12px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.5)}
+/* 牌背中央菱形徽记: 让盖着的牌一眼是"张牌" */
+.card.back::after{content:'';position:absolute;left:50%;top:50%;width:38%;height:26%;transform:translate(-50%,-50%) rotate(45deg);
+  border-radius:2px;background:linear-gradient(135deg,rgba(0,229,212,.5),rgba(156,133,255,.35));
+  box-shadow:0 0 8px rgba(0,229,212,.4),inset 0 0 0 1px rgba(255,255,255,.15)}
+.card.mini.back::after{width:46%;height:32%}
+/* 公共牌未发的空位: 不是盖着的牌, 而是"待发牌槽"—— 虚线内凹, 明显区别于对手盖牌, 也不再是灰块/黑洞 */
+.pk-board .card.back{background:rgba(0,229,212,.03);border:1px dashed rgba(0,229,212,.26);box-shadow:inset 0 2px 10px rgba(0,0,0,.28);opacity:1}
+.pk-board .card.back::after{display:none}
+html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border-color:rgba(0,127,118,.32);box-shadow:inset 0 2px 8px rgba(0,80,74,.1)}
 .card.dim{opacity:.5}
 /* 我的座位条 */
 .pk-me{display:flex;align-items:center;gap:12px;padding:4px 16px 0;flex-shrink:0}
@@ -282,7 +304,12 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 @keyframes pkConfirmPulse{from{box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 10px rgba(255,45,142,.5)}to{box-shadow:0 0 0 3px rgba(255,255,255,.98),0 0 20px rgba(255,45,142,.85)}}
 .pk-b .bt{font-size:11px;line-height:14px;font-weight:700;opacity:.85;display:block}
 /* 预选(pre-action)条: 提示行 + 三键(默认暗态, 选中 .on 高亮) */
-.pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;min-height:14px}
+/* ★提示行高度对齐骨架的快捷注行(.pk-quick=38px): 骨架(等待态)与预选条(轮我前)是同为"非我回合"的
+ *   两种中间行——骨架用快捷注行、预选条用这条提示行。二者高差 20px 曾让 .pk-acts 在 发牌(seating→preflop)
+ *   之间忽高忽低, 而 felt(flex:1)吸收高差 → 桌面(竖屏钉在 felt 48% 处)随之上下滑 → "发牌跳动"真凶。
+ *   统一到 38px 后, 骨架/预选条/我的回合三态 .pk-acts 恒 163px, felt 高不变, 牌桌纹丝不动。 */
+.pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;
+  min-height:38px;display:flex;align-items:center;justify-content:center}
 .pk-preb{font-size:13px;padding:10px 0}
 .pk-preb:not(.on){background:var(--panel);color:var(--sub);border-color:var(--line2);box-shadow:none}
 .pk-preb.on.fold{background:rgba(255,255,255,.06);color:var(--ink);border-color:var(--line2);box-shadow:inset 0 0 0 1.5px var(--sub)}
