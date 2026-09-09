@@ -137,12 +137,13 @@
 .gd-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px 6px;min-height:110px;position:relative;isolation:isolate}
 /* ★三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 与德州 .pk-table::before / 斗地主 .ddz-center::before 同一配方; 形状各随布局 */
 .gd-center::before{content:'';position:absolute;left:2%;right:2%;top:8%;bottom:8%;border-radius:50%/42%;
-  background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
-  border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06);z-index:-1;pointer-events:none}
-/* 日间: 深绿绒在浅底上成"灰蛋", 换浅绿绒 + 青描边 */
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(20,160,142,.46),rgba(9,92,86,.5) 52%,rgba(4,34,36,.72) 100%);
+  border:2px solid rgba(0,229,212,.22);
+  box-shadow:inset 0 3px 42px rgba(0,0,0,.5),inset 0 0 70px rgba(0,229,212,.06),0 0 30px rgba(0,229,212,.09),inset 0 0 0 1px rgba(0,229,212,.14),inset 0 1px 0 rgba(255,255,255,.06);z-index:-1;pointer-events:none}
+/* 日间: 深绿绒在浅底上成"灰蛋", 换清透薄荷绒(亮心→淡翡翠边)+ 青描边, 与德州同配方 */
 html[data-mode="day"] .gd-center::before{
-  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
-  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(150,232,214,.62),rgba(0,168,154,.24) 54%,rgba(0,120,110,.16) 100%);
+  border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1),inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 /* 本桌记分条: 两队当前等级 + 已赢副数(按队着色), 常驻牌桌顶部——按"队"展示不每席重复堆信息 */
 .gd-score{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:5px 10px 0;flex-shrink:0}
 .gd-team{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;

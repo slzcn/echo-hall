@@ -73,8 +73,15 @@
 /* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮, 收紧上下留白, 出牌区不再撑空, 消除"叫分条贴手牌"的挤压 */
 .ddz-room.is-land{--av:38px;--avf:17px;--seatw:130px;--banner:12px;--hand-pad:8px;--cw:40px;--ch:56px;--cn:14px;--cs:11px;--cc:22px;--cmw:26px;--cmh:37px}
 .ddz-room.is-land .ddz-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
-.ddz-room.is-land .ddz-opps{padding:4px 12px 0}
+/* 横屏 390 高度不够竖排(栏+对手行+中央+我+手牌+操作区叠加溢出、糊成一团)。
+   把两个对手席从顶部占位的流式行里抽出来, 绝对定位钉在牌桌左右上角(紧凑横排:头像+名/剩牌), 让出整段竖向空间给中央区/我/手牌/操作区——对标掼蛋横屏"对手在两侧、中路留空"。*/
+.ddz-room.is-land .ddz-opps{position:absolute;top:2px;left:0;right:0;padding:0 10px;justify-content:space-between;z-index:4;pointer-events:none}
+.ddz-room.is-land .ddz-opps .ddz-seat{flex-direction:row;width:auto;gap:7px;align-items:center;pointer-events:auto}
+.ddz-room.is-land .ddz-opps .ddz-seat .meta{align-items:flex-start;text-align:left}
 .ddz-room.is-land .ddz-center{min-height:0;gap:4px}
+/* 横屏中央区矮(~106px): 底分绝对定位 bottom:18% 会顶到居中的横幅→贴到底边; has-bottom 顶部空档也收薄 */
+.ddz-room.is-land .ddz-center.has-bottom{padding-top:30px}
+.ddz-room.is-land .ddz-mult{bottom:2px}
 .ddz-room.is-land .ddz-played{min-height:50px}
 .ddz-room.is-land .ddz-me{padding:0 14px}
 .ddz-room.is-land .ddz-hand{min-height:74px}
@@ -82,13 +89,11 @@
 .ddz-room.is-land .ddz-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
 /* ── 竖屏(手机, <600px)专属美化: 只动竖屏, 横屏(.is-land)与各大屏断点不受影响(用 :not(.is-land) + 窄屏 query 双重隔离) ── */
 @media (max-width:599px){
-  /* 中央区收紧: 绒面椭圆缩成贴合牌堆的"落牌盘"(insets 拉大→椭圆变小)+ 微增辉光, 不再是撑满半屏的空圈; 上下留白削薄 */
+  /* 中央区收紧: 上下留白削薄; 绒面椭圆走三游戏统一的翡翠绒(不再是缩小的暗青"落牌盘"), 与掼蛋/德州同材质、同"真牌桌"观感, 只按竖屏收一点 insets */
   .ddz-room:not(.is-land) .ddz-center{min-height:96px;padding:2px 16px;gap:5px}
   /* 手机竖屏上面用了 padding 简写会把顶部空档吃回 2px, 这里高特异性补回底牌空档(仅有底牌态) */
   .ddz-room:not(.is-land) .ddz-center.has-bottom{padding-top:56px}
-  .ddz-room:not(.is-land) .ddz-center::before{left:13%;right:13%;top:15%;bottom:15%;
-    background:radial-gradient(ellipse at center,rgba(0,229,212,.12),rgba(0,120,104,.06) 52%,transparent 74%);
-    border-color:rgba(0,229,212,.12);box-shadow:inset 0 0 42px rgba(0,0,0,.32)}
+  .ddz-room:not(.is-land) .ddz-center::before{left:5%;right:5%;top:8%;bottom:8%}
   .ddz-room:not(.is-land) .ddz-opps{padding:10px 12px 0}
   /* 回合提示分层清晰、占位稳定不跳动: 轮次横幅醒目, 上一手信息压一档但恒留位 */
   .ddz-room:not(.is-land) .ddz-turnbanner{min-height:22px}
@@ -208,13 +213,14 @@
 /* 中央绒面椭圆(对标掼蛋/德州: 三家统一有张"桌面"落牌, 不再是空黑 void)。
    落牌/横幅/passtag 都坐在这张绒面上; 椭圆自身发微光 + 内阴影拉出纵深, z-index:-1 沉底不吃点击。 */
 /* ★三游戏统一"真牌桌"材质(绿绒 radial + 实心暗边 + 青描边), 与德州 .pk-table::before / 掼蛋 .gd-center::before 同一配方; 形状各随布局 */
-.ddz-center::before{content:'';position:absolute;left:7%;right:7%;top:9%;bottom:9%;border-radius:50%/44%;
-  background:radial-gradient(ellipse at 50% 42%,rgba(0,120,110,.30),rgba(4,20,20,.55) 62%,rgba(2,10,12,.6) 100%);
-  border:2px solid rgba(0,229,212,.18);box-shadow:inset 0 2px 30px rgba(0,0,0,.55),0 0 24px rgba(0,229,212,.06);z-index:-1;pointer-events:none}
-/* 日间: 深绿绒在浅底上成"灰蛋", 换浅绿绒 + 青描边 */
+.ddz-center::before{content:'';position:absolute;left:4%;right:4%;top:7%;bottom:7%;border-radius:50%/44%;
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(20,160,142,.46),rgba(9,92,86,.5) 52%,rgba(4,34,36,.72) 100%);
+  border:2px solid rgba(0,229,212,.22);
+  box-shadow:inset 0 3px 42px rgba(0,0,0,.5),inset 0 0 70px rgba(0,229,212,.06),0 0 30px rgba(0,229,212,.09),inset 0 0 0 1px rgba(0,229,212,.14),inset 0 1px 0 rgba(255,255,255,.06);z-index:-1;pointer-events:none}
+/* 日间: 深绿绒在浅底上成"灰蛋", 换清透薄荷绒(亮心→淡翡翠边)+ 青描边, 与德州同配方 */
 html[data-mode="day"] .ddz-center::before{
-  background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),rgba(0,127,118,.08) 58%,rgba(0,127,118,.05) 100%);
-  border-color:rgba(0,127,118,.22);box-shadow:inset 0 2px 22px rgba(0,127,118,.06),0 8px 26px rgba(0,127,118,.06)}
+  background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(150,232,214,.62),rgba(0,168,154,.24) 54%,rgba(0,120,110,.16) 100%);
+  border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1),inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 .ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
 .ddz-turnbanner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:ddzTurnPulse 1.05s ease-in-out infinite}
 .ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
