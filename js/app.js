@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260909-career-chip';
+window.__EH_APP_VER = '20260909-chip-wallet';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2603,6 +2603,21 @@ function gtWritePokerHands(tableId, state, mySeat){
   sb.rpc('eh_gt_set_hands',{p_table:tableId,p_hands:hands}).then(({error})=>{ if(error) console.warn('[nlhe] set hands', error.message); }, ()=>{});
 }
 // ── 德州联机 · HOST: 本机跑引擎当裁判, 每步产脱敏快照广播 + 写远程席底牌; 收远程动作经引擎校验后应用。──
+// ── 德州筹码钱包(跨桌带着走) ──────────────────────────────────────────────
+//   一桌赢/输的筹码不再关桌清零, 而是记在本机钱包里, 下张桌用它买入 → "带着走"。
+//   落地: localStorage(单机跨桌/跨会话持久); 跨设备同步与联机各自钱包留待联调, 不在本批。
+//   破产兜底: 余额低于 PK_WALLET_MIN 视为输光, 下次开桌重新发 PK_WALLET_GRANT(练习桌不至于卡死)。
+const PK_WALLET_KEY = 'eh_pk_chips';
+const PK_WALLET_GRANT = 1000;
+const PK_WALLET_MIN = 100;      // 低于一手最低下注体量即视为破产
+function pkWallet(){
+  try{ const v = parseInt(localStorage.getItem(PK_WALLET_KEY), 10); if(Number.isFinite(v) && v >= PK_WALLET_MIN) return v; }catch(_){}
+  return PK_WALLET_GRANT;
+}
+function pkSetWallet(v){
+  try{ const n = Math.max(0, Math.round(Number(v)||0)); localStorage.setItem(PK_WALLET_KEY, String(n)); }catch(_){}
+}
+
 function gtLaunchPoker(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtLaunchPoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   const A=gtSeatArrays(row);
@@ -2626,10 +2641,16 @@ function gtLaunchPoker(row){
   gtStartHostPing(chan, row.id);
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
+  // 跨桌钱包: 纯单机练习桌(无远程真人)才带钱包买入 —— 我这席带上一桌余额进场, 结算后回写落地。
+  //   有远程真人的联机桌先不接钱包(各自钱包买入需 host 逐席协调, 留待联调), 走原 startStack。
+  const _pkSolo = !(A.remoteSeats && A.remoteSeats.length);
+  const _pkMyStack = _pkSolo ? pkWallet() : 1000;
+  if(_pkSolo && _pkMyStack !== PK_WALLET_GRANT){ try{ toast('带入筹码 '+_pkMyStack); }catch(_){} }
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
+    myStack: _pkMyStack, onWallet: _pkSolo ? pkSetWallet : undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}

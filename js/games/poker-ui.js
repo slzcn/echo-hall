@@ -532,16 +532,21 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const sb = opts.sb || 5, bb = opts.bb || 10;
     const ACT_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_ACT_MS;   // 真人思考时长(可调, 测试可压小)
     const START = opts.startStack || 1000;
-    let stacks = names.map(() => START);
+    // 跨桌钱包: 我这席的买入可带上一桌的余额进场(opts.myStack), 其余席各自新买入 START。
+    //   每次结算/重开后经 opts.onWallet(我的最新筹码)回传 app.js 落地, 下张桌再带着走。
+    const MY_START = (typeof opts.myStack === 'number' && opts.myStack > 0) ? Math.round(opts.myStack) : START;
+    let stacks = names.map((_, i) => i === mySeat ? MY_START : START);
     // 本桌累计净盈亏(相对买入): buyin[seat]=该席至今累计买入(每破产补带一次 +START); netSettled=上一手结算后的净额(stack-buyin)。
     // 净额只在 showOver 结算时刷新, 故座位徽标不随手内下注抖动(展示"进本手时的本桌战绩")。
     // 持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
     const SCOREKEY = opts.scoreKey || null;
     const _psav = (()=>{ if(!SCOREKEY) return null; try{ return JSON.parse(localStorage.getItem(SCOREKEY)||'null'); }catch(_){ return null; } })();
     const _okArr = a => Array.isArray(a) && a.length===names.length && a.every(x=>typeof x==='number');
-    const buyin = (_psav && _okArr(_psav.buyin)) ? _psav.buyin.slice() : names.map(() => START);
+    const buyin = (_psav && _okArr(_psav.buyin)) ? _psav.buyin.slice() : names.map((_, i) => i === mySeat ? MY_START : START);
     let netSettled = (_psav && _okArr(_psav.net)) ? _psav.net.slice() : names.map(() => 0);
     function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify({buyin, net:netSettled})); }catch(e){ _ehCatch('poker.saveScore', e); } }
+    // 把我这席的最新筹码回传给 app.js 落地(跨桌钱包)。结算/重开后调, 空防护。
+    function emitWallet(){ if(typeof opts.onWallet!=='function') return; try{ const p = st && st.players && st.players[mySeat]; opts.onWallet(p ? Math.max(0, Math.round(p.stack)) : 0); }catch(e){ _ehCatch('poker.onWallet', e); } }
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
@@ -1505,8 +1510,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             quip: beatQuip(champSeat, 'win') });
           if(typeof opts.onResult==='function'){ try{
             const potWon0=(res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=>a+Math.floor(pt.amount/(pt.winners.length||1)),0);
-            opts.onResult(res, st.log, { mySeat, potWon:potWon0, delta, handName });
+            opts.onResult(res, st.log, { mySeat, potWon:potWon0, delta, handName, myStack:my.stack });
           }catch(e){ _ehCatch('poker.onResult', e); } }
+          emitWallet();
           if (minimized) updateChip();
           // 自动发下一手(可被 clearTimers/close 清): 停 ~2.3s 看清摊牌牌面 + 推池筹码飞, 到点淡出横幅→nextHand
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
@@ -1667,7 +1673,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       emitBeat({ type:'over', actor:champName, big:true,
         text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
         quip: beatQuip(champSeat, 'win') });
-      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName }); }catch(e){ _ehCatch('poker.onResult', e); } }
+      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName, myStack:my.stack }); }catch(e){ _ehCatch('poker.onResult', e); } }
+      emitWallet();
       if (minimized) updateChip();
     }
 
@@ -1725,6 +1732,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();
+      emitWallet();   // 本场重来 = 重新补带 START, 钱包同步落地(否则破产后再来的 START 不落库, 关桌又回 0)
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
