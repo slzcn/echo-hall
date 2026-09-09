@@ -647,8 +647,34 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     //   单机路径(isGuest=false)完全走原逻辑, 零改动; 所有 guest 行为一律走 isGuest 分支旁路。
     const mode = opts.mode || 'local';
     const isGuest = mode === 'guest';
-    const remoteSeats = opts.remoteSeats || [];          // host 视角: 哪些席是远程真人(等其回传, 超时代打)
+    let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    // ── 多次超时 → 自动离座旁观(主人诉求) ──
+    //   真人连续 N 次「超时被代打」(而非主动操作)判定挂机: 自动离座, 该席转本机灵魂/AI 托管,
+    //   本人转旁观(仍看牌、无操作)。积分靠 showOver 逐副已入库, 离座不丢分。
+    //   host 侧对远程真人席同理: 连超时到阈值 → 移出 remoteSeats(即刻转 AI 托管)并请 app 落库离座, 防卡死全桌。
+    const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
+    const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const missStreak = {};                 // seat -> 连续超时次数
+    let spectating = false;                // 本人(mySeat)是否已离座旁观
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
+    function bumpMiss(seat){
+      if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
+      if (seat===mySeat ? spectating : !isRemote(seat)) return;   // 只盯我(未旁观) 或 在场远程真人席(未转 AI)
+      missStreak[seat] = (missStreak[seat]||0) + 1;
+      if (missStreak[seat] >= MAX_MISS) idleOut(seat);
+    }
+    function idleOut(seat){
+      missStreak[seat] = 0;
+      const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
+      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 托管
+      if (seat===mySeat){ spectating = true; selected = new Set();
+        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
+      else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
+      try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
+      if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
+      try{ renderCtrl(); }catch(_){}
+    }
     const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
     const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
     const GNet = root.EHGuandanNet;
@@ -657,6 +683,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let dealNo = 0;         // 本桌第几副(host 广播随快照带出; guest 据此识别新一副去拉手牌)
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复出牌
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打(不出/领出)
+    const ACT_PLAY_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_PLAY_MS;   // 我方思考时长(可调, 测试可压小)
 
     // ── 手动进贡/还贡(仅纯单机陪玩开): 无任何联网(非 guest、无 onSync 广播、无远程真人席)时,
     //   进贡/还贡由玩家逐张选牌(对标欢乐掼蛋"选牌进贡"); 一旦联机(host/guest)则走引擎一次性自动
@@ -1560,7 +1587,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       clearTimers();
       if (st.phase==='tribute'){ armTribute(); return; }   // 手动进贡阶段: 走进贡回合驱动
       if (st.phase!=='play' || st.turn<0) { turnSeatActive=-1; return; }
-      const seat=st.turn, mine=seat===mySeat;
+      const seat=st.turn, mine=seat===mySeat && !spectating;   // 旁观后我这席交 AI 托管, 不再算"我的回合"
       if (isGuest && awaitingHost) return;   // guest 回传后等裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
@@ -1573,7 +1600,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         // guest 端 remoteSeats 恒空, 对手会落到 AI 短时长→"1 秒卡 0"; guest 不裁判, 对手倒计时纯展示 → 给足人类时长视觉正常走。
         // AI(灵魂)席按原型节奏微调思考时长(狂放抢拍/清冷沉吟), 让不同灵魂出手快慢有别。
         const aiDur = Math.round((AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) * (SOUL_TEMPO[archOf(seat)] || 1));
-        turnDur = mine ? HUMAN_PLAY_MS : (isGuest ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : aiDur));
+        turnDur = mine ? ACT_PLAY_MS : (isGuest ? HUMAN_PLAY_MS : (remote ? REMOTE_TIMEOUT_MS : aiDur));
         turnStart = Date.now();
       }
       // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管/过牌, 数字才有意义。
@@ -1611,11 +1638,13 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // host: 远程真人超时未回传 → host 托管代打(与 aiStep 同源, 出完即随 afterMove 广播)。
     function onRemoteTimeout(seat){
       if (st.phase!=='play' || st.turn!==seat) return;
+      bumpMiss(seat);                        // 远客多次超时 → 自动离座交 AI 托管
       toast('远客超时 · 暂由房主托管');
       aiStep(seat);
     }
 
     function renderCtrl(){
+      if (spectating){ els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
       if (st.phase==='lobby'){ renderLobbyCtrl(); return; }
       if (st.phase==='tribute'){ renderTributeCtrl(); return; }
       if (isGuest && connState!=='online'){
@@ -1648,8 +1677,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="gd-btn primary" id="gdPlay" disabled>出牌</button>
       </div>`;
-      $('#gdPass').addEventListener('click', ()=>doPass(mySeat));
-      $('#gdPlay').addEventListener('click', doPlay);
+      $('#gdPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
+      $('#gdPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
       $('#gdHint').addEventListener('click', doHint);
       // 只有唯一合法打法(常见于残局/剩一对) → 直接替玩家选好, 省得一张张点。队友当家不自动选(默认让牌)。
       if (myTurn && !mateLead && plays.length===1 && selected.size===0){
@@ -1674,7 +1703,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const hint = kind==='return' ? '挑一张点数≤10 的小牌还回' : '规则要求进贡手里最大的牌';
       els.ctrl.innerHTML=`<div class="gd-trib-hint">🎁 轮到你${lbl} · ${hint}</div>
         <div class="gd-acts"><button class="gd-btn primary" id="gdTribOk" ${tributeSel?'':'disabled'}>确认${lbl}</button></div>`;
-      const ok=$('#gdTribOk'); if(ok) ok.addEventListener('click', ()=>{ if(tributeSel) doTribute(mySeat, tributeSel); });
+      const ok=$('#gdTribOk'); if(ok) ok.addEventListener('click', ()=>{ if(tributeSel){ resetMiss(mySeat); doTribute(mySeat, tributeSel); } });
     }
     function updatePlayBtn(){
       els.hand && els.hand.classList.toggle('has-sel', selected.size>0);   // 划选途中即时压暗未选牌(paintTo 只调本函数不重渲)
@@ -1827,6 +1856,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // 返回 true=引擎接受并应用; false=非本人回合/非法/牌不在手 → 调用方应 resync 把权威快照重播给客人纠偏。
     function applyMove(seat, move){
       if(!move || st.phase!=='play' || st.turn!==seat) return false;
+      resetMiss(seat);                       // 远客真回传动作 → 清超时计数
       try{
         if(move.action==='pass'){ const rp=Engine.applyPass(st, seat); say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp); return true; }
         const hand=st.players[seat].hand;
@@ -1920,11 +1950,12 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
 
     function onHumanTimeout(){
+      if (spectating) return;                // 已离座旁观, 由 AI 托管, 不再走人席超时
       if (st.phase!=='play' || st.turn!==mySeat) return;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
-      if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); return; }
-      const lead = AI.chooseLead(st.players[mySeat].hand, st.level);
-      toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay();
+      if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); }
+      else { const lead = AI.chooseLead(st.players[mySeat].hand, st.level); toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay(); }
+      bumpMiss(mySeat);                       // 多次超时累计 → 自动离座进旁观
     }
 
     // ── 手动进贡/还贡(仅纯单机): 当前任务的种类 give/return ─────────────
@@ -1954,9 +1985,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       clearTimers();
       const seat = st.turn;
       if (seat<0 || !manualTribute()){ turnSeatActive=-1; return; }
-      const mine = seat===mySeat;
+      const mine = seat===mySeat && !spectating;   // 旁观后进/还贡也交 AI 托管
       const turnChanged = (seat!==turnSeatActive); turnSeatActive=seat;
-      if (turnChanged){ turnDur = mine ? HUMAN_PLAY_MS : Math.round((AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) * (SOUL_TEMPO[archOf(seat)] || 1)); turnStart=Date.now(); }
+      if (turnChanged){ turnDur = mine ? ACT_PLAY_MS : Math.round((AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) * (SOUL_TEMPO[archOf(seat)] || 1)); turnStart=Date.now(); }
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');
@@ -1989,9 +2020,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       doTribute(seat, pick);
     }
     function onTributeTimeout(){
+      if (spectating) return;
       if (st.phase!=='tribute' || st.turn!==mySeat) return;
       toast('超时 · 自动'+(tributeTaskKind()==='return'?'还贡':'进贡'));
       aiTribute(mySeat);
+      bumpMiss(mySeat);
     }
     // 落一步进贡/还贡(人/AI 共用引擎裁决)。全部完成 → 引擎转 play + 定首出, 弹进贡摘要(与自动路径同视觉)。
     function doTribute(seat, cardId){
@@ -2225,6 +2258,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      _forceTimeout:()=>{ if(st.phase==='tribute') onTributeTimeout(); else onHumanTimeout(); }, missOf:s=>missStreak[s]||0,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }
 

@@ -489,6 +489,36 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 注意"自动开下一手"不再是单机独占 —— 见结算 footer: 只要不是 guest, host(单机/联机)都自动连打,
     // 且不设手动"下一手"按钮, 到点自动发牌(真人一起玩时那种每手必点的门最难受)。想停手点"收工"。
     const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
+    // ── 多次超时 → 自动离座旁观(主人诉求) ──
+    //   真人连续 N 次「超时被代打」(而非主动操作)判定挂机: 自动离座, 该席转本机灵魂/AI 托管,
+    //   本人转旁观(仍看牌、无操作)。积分靠 onResult 逐手已入库, 被判入座的每手都已计, 离座不丢分。
+    //   host 侧对远程真人席同理: 连续超时到阈值 → 该席即刻转 AI 驱动并请 app 落库(换灵魂/离座),
+    //   防一人掉线空等卡死全桌。主动操作(含预选执行)即把该席计数清零。
+    const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
+    const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const missStreak = {};                 // seat -> 连续超时次数
+    let spectating = false;                // 本人(mySeat)是否已离座旁观
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
+    function bumpMiss(seat){
+      if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
+      // 只盯"本该真人推进却没推进"的席: 我(未旁观) 或 仍在场的远程真人席(未转 AI)
+      if (seat===mySeat ? spectating : (isAI[seat] || !isRemote(seat))) return;
+      missStreak[seat] = (missStreak[seat]||0) + 1;
+      if (missStreak[seat] >= MAX_MISS) idleOut(seat);
+    }
+    function idleOut(seat){
+      missStreak[seat] = 0;
+      const nm = (st.players[seat] && st.players[seat].name) || names[seat] || ('席'+seat);
+      isAI[seat] = true;                             // 该席即刻转本机托管(AI 驱动), 不再空等真人
+      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
+      personaBySeat[seat] = personaFor(seat);
+      if (seat===mySeat){ spectating = true; preAct = null;
+        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
+      else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
+      try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
+      if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine: seat===mySeat }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
+      try{ renderActs(true); }catch(_){}
+    }
     // ── 招募态(lobby): 与斗地主/掼蛋同构 —— 开桌先落真牌桌页(本文件), 6 席里空位可点邀灵魂/真人,
     //   host 满意点「开始 ▶」→ startDeal 就地转正局(同一 room 不重挂)。招募态不产快照(无牌可泄, 见 renderAll onSync 守卫)。
     const lobbyMode = !!opts.lobby;
@@ -500,6 +530,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let lastSnap = null;   // guest: 最近一张公共快照
 
     const sb = opts.sb || 5, bb = opts.bb || 10;
+    const ACT_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_ACT_MS;   // 真人思考时长(可调, 测试可压小)
     const START = opts.startStack || 1000;
     let stacks = names.map(() => START);
     // 本桌累计净盈亏(相对买入): buyin[seat]=该席至今累计买入(每破产补带一次 +START); netSettled=上一手结算后的净额(stack-buyin)。
@@ -1130,6 +1161,13 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function renderActs(force){
       if (st.phase==='lobby'){ _lastActsSig='lobby'; renderLobbyCtrl(); return; }
       const p=st.players[mySeat];
+      // 已离座旁观: 恒显"旁观中"占位条, 无任何操作(我的回合已交 AI 托管)
+      if (spectating){
+        if(!force && _lastActsSig==='spectate') return;
+        _lastActsSig='spectate';
+        els.acts.innerHTML = actsSkeleton('🔭 旁观中 · 已离座');
+        return;
+      }
       const offline = isGuest && connState!=='online';
       const mine = !offline && !awaitingHost && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
       // 非本人行动态: 渲染同高禁用骨架(而非清空塌陷), 三键常驻不跳版
@@ -1267,8 +1305,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       return false;
     }
 
-    function humanAct(action, amount){
+    function humanAct(action, amount, auto){
       if (st.toAct!==mySeat || awaitingHost) return;
+      if (!auto) resetMiss(mySeat);   // 主动操作(点按/预选执行) → 清零挂机计数; 超时自动代打(auto)不清
       if (isGuest){
         if(onAction){
           try{ onAction({ action, amount }); }
@@ -1283,13 +1322,18 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       afterAction(mySeat, action, amount, r);
     }
 
-    // host 权威应用远程真人动作 / 测试驱动任意席; 返回是否被引擎接受(app.js 据此决定要不要重播快照纠偏)
-    function applyMove(seat, move){
+    // 底层权威落子(不碰挂机计数): onRemoteTimeout 的兜底代打走这里, 不清零远程席的超时累计。
+    function _rawApply(seat, move){
       if(isGuest) return false;                // 客人无权威, 不本地应用
       if(!move || st.toAct!==seat) return false;
       try{ var r=Engine.applyAction(st, seat, move.action, move.amount); }catch(e){ return false; }
       afterAction(seat, move.action, move.amount, r);
       return true;
+    }
+    // host 权威应用【远程真人主动动作】 / 测试驱动任意席; 主动落子 → 清零该席挂机计数。
+    function applyMove(seat, move){
+      resetMiss(seat);
+      return _rawApply(seat, move);
     }
 
     function aiStep(seat){
@@ -1341,7 +1385,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 摊牌/结算之外, 无人需行动的中间态不该发生(引擎自动跑完); 安全兜底
       const seat=st.toAct;
       if (seat<0 || !st.players[seat]) { turnSeatActive=-1; return; }
-      const mine = seat===mySeat;
+      const mine = seat===mySeat && !spectating;   // 旁观后我这席(isAI 已置真)按 AI 席自动推进, 不再算"我的回合"
       // 轮到我且有预选: 先按实况复核执行/作废。执行成功则状态已推进(afterAction→renderAll→armTurn 重入), 中止本次。
       if (mine && preAct){ if (consumePreAction()) return; }
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
@@ -1353,10 +1397,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const turnChanged = (seat!==turnSeatActive) || (st.street!==turnStreetActive);
       turnSeatActive = seat; turnStreetActive = st.street;
       if (turnChanged){
-        turnDur = mine     ? HUMAN_ACT_MS
-                : isGuest  ? HUMAN_ACT_MS          // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
+        turnDur = mine     ? ACT_MS
+                : isGuest  ? ACT_MS               // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
                 : aiSeat   ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))
-                : remote   ? (HUMAN_ACT_MS + 6000)   // host 兜底比对端 25s 稍长, 留网络冗余; 久不动就代打
+                : remote   ? (ACT_MS + 6000)       // host 兜底比对端稍长, 留网络冗余; 久不动就代打
                 : 0;
         turnStart = Date.now();
       }
@@ -1404,14 +1448,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // host 侧: 远程真人久不响应 → 用引擎权威替其过牌/弃牌, 防一人掉线卡死全桌
     function onRemoteTimeout(seat){
       if (isGuest || st.toAct!==seat || st.phase==='over') return;
+      bumpMiss(seat);   // 累计该远程席超时(达阈值→idleOut 转 AI); 先计再兜底代打本回合
       const la=Engine.legalActions(st, seat);
-      applyMove(seat, { action: la.canCheck?'check':'fold' });
+      _rawApply(seat, { action: la.canCheck?'check':'fold' });
     }
     function onHumanTimeout(){
-      if (st.toAct!==mySeat || st.phase==='over') return;
+      if (st.toAct!==mySeat || st.phase==='over' || spectating) return;
       const la=Engine.legalActions(st, mySeat);
-      if (la.canCheck){ toast('超时 · 自动过牌'); humanAct('check'); }
-      else { toast('超时 · 自动弃牌'); humanAct('fold'); }
+      if (la.canCheck){ toast('超时 · 自动过牌'); humanAct('check', undefined, true); }
+      else { toast('超时 · 自动弃牌'); humanAct('fold', undefined, true); }
+      bumpMiss(mySeat);   // 累计我的超时(达阈值→idleOut 离座旁观)
     }
 
     // 摊牌时该席最优 5 张成手牌的 id 集合(高亮用)。数据只取自 st.result(公开 reveal+board),
@@ -1815,6 +1861,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
+      missOf:s=>missStreak[s]||0,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }

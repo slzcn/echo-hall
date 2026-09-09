@@ -527,6 +527,33 @@ html[data-mode="day"] .ddz-center::before{
     let counterOn = false;
     let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    // ── 多次超时 → 自动离座旁观(主人诉求) ──
+    //   真人连续 N 次「超时被代打」(而非主动操作)判定挂机: 自动离座, 该席转本机灵魂/AI 托管,
+    //   本人转旁观(仍看牌、无操作)。积分靠 showOver 逐局已入库, 离座不丢分。
+    //   host 侧对远程真人席同理: 连超时到阈值 → 移出 remoteSeats(即刻转 AI 托管)并请 app 落库离座, 防卡死全桌。
+    const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
+    const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const missStreak = {};                 // seat -> 连续超时次数
+    let spectating = false;                // 本人(mySeat)是否已离座旁观
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
+    function bumpMiss(seat){
+      if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
+      // 只盯"本该真人推进却没推进"的席: 我(未旁观) 或 仍在场的远程真人席(未转 AI)
+      if (seat===mySeat ? spectating : !isRemote(seat)) return;
+      missStreak[seat] = (missStreak[seat]||0) + 1;
+      if (missStreak[seat] >= MAX_MISS) idleOut(seat);
+    }
+    function idleOut(seat){
+      missStreak[seat] = 0;
+      const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
+      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 托管
+      if (seat===mySeat){ spectating = true; selected = new Set();
+        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
+      else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
+      try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
+      if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
+      try{ renderCtrl(); }catch(_){}
+    }
     // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
     const lobbyMode = !!opts.lobby;                      // 首帧以招募态开桌(仅 host 走此路)
     const isHostLobby = !!opts.isHost;
@@ -540,6 +567,8 @@ html[data-mode="day"] .ddz-center::before{
     let dealNo = 0;         // 本桌第几局(host 广播随快照带出; guest 据此识别新一局去拉手牌)
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打
+    const ACT_PLAY_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_PLAY_MS;   // 我方出牌思考时长(可调, 测试可压小)
+    const ACT_BID_MS  = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_BID_MS;
 
     function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed, doubling: DOUBLING }); }
     // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
@@ -571,6 +600,7 @@ html[data-mode="day"] .ddz-center::before{
     // 返回 true=引擎接受并应用; false=非本人回合/非法/牌不在手 → 调用方 resync 把权威快照重播给客人纠偏。
     function applyMove(seat, move){
       if (!move || st.phase==='over' || st.phase==='wait') return false;
+      resetMiss(seat);   // 远程真人主动动作 → 清零该席挂机计数(超时代打走 aiStep, 不经此)
       try {
         if (st.phase==='bid'){
           if (!st.bid || st.bid.turn!==seat) return false;
@@ -1164,7 +1194,7 @@ html[data-mode="day"] .ddz-center::before{
       if (st.phase!=='bid' && st.phase!=='play' && st.phase!=='double') { turnSeatActive=-1; turnPhaseActive=''; return; }   // over/wait/lobby: 不武装倒计时
       const seat = st.phase==='bid' ? st.bid.turn : (st.phase==='double' ? (st.dbl&&st.dbl.turn) : st.turn);
       if (seat==null || seat<0) { turnSeatActive=-1; return; }
-      const mine = seat===mySeat;
+      const mine = seat===mySeat && !spectating;   // 旁观后我这席交 AI 托管, 不再算"我的回合"
       if (isGuest && awaitingHost) return;   // guest 回传后等 host 裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }   // 刚轮到我: 提示音+震动(上升沿, 不每帧响)
       lastMyTurn = mine;
@@ -1177,7 +1207,7 @@ html[data-mode="day"] .ddz-center::before{
       if (turnChanged){
         // guest 端 remoteSeats 恒空(host-only), 对手会落到 AI-思考短时长→"1 秒跑完卡 0"; guest 无裁判职责,
         //   对手倒计时纯展示 → 给足人类时长, 视觉上正常走(真实超时判定在 host)。
-        turnDur = mine ? ((st.phase==='bid'||st.phase==='double')?HUMAN_BID_MS:HUMAN_PLAY_MS)
+        turnDur = mine ? ((st.phase==='bid'||st.phase==='double')?ACT_BID_MS:ACT_PLAY_MS)
                 : isGuest ? HUMAN_PLAY_MS
                 : remote ? REMOTE_TIMEOUT_MS
                 : (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS));
@@ -1225,6 +1255,7 @@ html[data-mode="day"] .ddz-center::before{
       const active = st.phase==='bid' ? (st.bid && st.bid.turn) : st.turn;
       if ((st.phase!=='bid' && st.phase!=='play') || active!==seat) return;
       toast('远客超时 · 暂由房主托管');
+      bumpMiss(seat);   // 累计该远程席超时(达阈值→idleOut 转 AI); 先计再兜底代打
       aiStep(seat);
     }
     function seatOf(seat){
@@ -1294,6 +1325,7 @@ html[data-mode="day"] .ddz-center::before{
     function renderCtrl(){
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'over'){ renderOverCtrl(); return; }
+      if (spectating){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
       if (st.phase === 'bid'){
         // 别人叫分时也渲染按钮行(下面 renderBidBar 用 visibility:hidden 占位), 免得轮到我时凭空多一行→整桌上下跳
         const waiting = (isGuest && awaitingHost) ? '⏳ 已叫分 · 等待裁决…'
@@ -1320,7 +1352,7 @@ html[data-mode="day"] .ddz-center::before{
                        : ('等待 ' + escapeHtml(who) + ' 加倍…');
       els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div><div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
       if (myTurn) els.ctrl.querySelectorAll('[data-dbl]').forEach(b=>{
-        b.addEventListener('click', ()=>doDouble(mySeat, +b.dataset.dbl));
+        b.addEventListener('click', ()=>{ resetMiss(mySeat); doDouble(mySeat, +b.dataset.dbl); });
       });
     }
     function renderBidBar(waitingMsg){
@@ -1333,7 +1365,7 @@ html[data-mode="day"] .ddz-center::before{
       const q = waitingMsg ? waitingMsg : `${max>0?('当前最高 '+max+' 分，'):''}要不要抢地主？`;
       els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div><div class="ddz-bidbtns"${waitingMsg?' style="visibility:hidden"':''}>${opts2}</div></div>`;
       if (!waitingMsg) els.ctrl.querySelectorAll('[data-bid]').forEach(b=>{
-        b.addEventListener('click', ()=>doCall(mySeat, +b.dataset.bid));
+        b.addEventListener('click', ()=>{ resetMiss(mySeat); doCall(mySeat, +b.dataset.bid); });
       });
     }
     // 提示用的残局上下文(报单意识): 只喂公开信息(座位/各家剩牌数/地主), 绝不含任何隐藏手牌 → 公平。
@@ -1353,8 +1385,8 @@ html[data-mode="day"] .ddz-center::before{
         <button class="ddz-btn ghost" id="ddzHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
-      $('#ddzPass').addEventListener('click', ()=>doPass(mySeat));
-      $('#ddzPlay').addEventListener('click', doPlay);
+      $('#ddzPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
+      $('#ddzPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
       $('#ddzHint').addEventListener('click', doHint);
       if (myTurn && plays.length===1 && selected.size===0){
         selected = new Set(plays[0].map(c=>c.id)); renderHand();
@@ -1613,16 +1645,21 @@ html[data-mode="day"] .ddz-center::before{
 
     // ── 人类超时兜底(与断线托管同一逻辑) ──
     function onHumanTimeout(){
-      if (st.phase==='bid' && st.bid.turn===mySeat){ toast('超时 · 自动不叫'); doCall(mySeat, 0); return; }
-      if (st.phase==='double' && st.dbl && st.dbl.turn===mySeat){ toast('超时 · 自动不加倍'); doDouble(mySeat, 1); return; }
-      if (st.phase==='play' && st.turn===mySeat){
+      if (spectating) return;
+      let acted=false;
+      if (st.phase==='bid' && st.bid.turn===mySeat){ toast('超时 · 自动不叫'); doCall(mySeat, 0); acted=true; }
+      else if (st.phase==='double' && st.dbl && st.dbl.turn===mySeat){ toast('超时 · 自动不加倍'); doDouble(mySeat, 1); acted=true; }
+      else if (st.phase==='play' && st.turn===mySeat){
         const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
-        if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); return; }
-        // 领出必须出牌:托管出最小合法牌(用 AI 决策)
-        const mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:null,
-          handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
-        if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); }
+        if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); acted=true; }
+        else {
+          // 领出必须出牌:托管出最小合法牌(用 AI 决策)
+          const mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:null,
+            handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
+          if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); acted=true; }
+        }
       }
+      if (acted) bumpMiss(mySeat);   // 累计我的超时(达阈值→idleOut 离座旁观)
     }
 
     // ── 结算: 不再弹全屏模态, 就地在牌桌上呈现 —— 各座位亮牌(自己=底部手牌扇, 对手=座位下小牌行) +
@@ -1727,6 +1764,8 @@ html[data-mode="day"] .ddz-center::before{
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播脱敏快照(招募态无局可播)
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
       applyMove, setConn, connState:()=>connState,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      _forceTimeout:()=>onHumanTimeout(), missOf:s=>missStreak[s]||0,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
