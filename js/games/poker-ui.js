@@ -70,7 +70,7 @@
     --av:74px;--avf:34px;--seatw:140px;--chip:14px;--maxw:860px}
   .pk-felt{justify-content:center}}
 /* 横屏(手机侧持/⟳ 旋转态, 由 JS 挂 .is-land): 又宽又矮, 收紧上下留白, 操作区压扁不再顶出屏 —— 座位弧另在 positionSeats 里放宽横向半径 */
-.pk-room.is-land{--av:38px;--avf:18px;--seatw:74px;--cw:32px;--ch:45px;--cn:11px;--cs:9px;--cc:17px;--bcw:36px;--bch:51px}
+.pk-room.is-land{--av:38px;--avf:18px;--seatw:74px;--cw:32px;--ch:38px;--cn:11px;--cs:9px;--cc:17px;--bcw:30px;--bch:42px}
 .pk-room.is-land .pk-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
 .pk-room.is-land .pk-felt{overflow:visible}
 .pk-room.is-land .pk-table{top:4px;bottom:4px}
@@ -80,12 +80,23 @@
 .pk-room.is-land .pk-b{padding:9px 0;font-size:14px}
 .pk-room.is-land .pk-qbtn{padding:4px 0}
 /* ── 横屏矮 felt(高~200px)防挤压专项: 6-max 椭圆 + 桌心 + 我的大底牌纵向本会互叠, 这里把各块压扁/横排/挪位 ── */
-/* 桌心: 底池 pill 与公共牌【横向并排】(块高 106→~47px), 去掉"轮到谁"文字(交给底部提示条)——不再上撞顶席、下压我的座位 */
-.pk-room.is-land .pk-center{top:55%;flex-direction:row;flex-wrap:nowrap;gap:9px;width:auto;max-width:82%}
+/* 桌心: 仍走列布局(池组在上·公共牌横排在下, 标准德州), 但压紧 + 去"轮到谁"文字(交给底部提示条)。
+   ★不可改 flex-direction:row —— 全下出多个边池 pill 时会把横排宽度吃光, 公共牌(flex-wrap:wrap)被挤到
+     右侧空间不足→竖向叠成一列铺满屏(实测崩)。故边池改横排省纵向、公共牌强制 nowrap 永不竖叠。 */
+.pk-room.is-land .pk-center{top:58%;gap:3px;width:auto;max-width:90%}
 .pk-room.is-land .pk-msg{display:none}
+.pk-room.is-land .pk-pot{font-size:11px;padding:2px 8px}
+.pk-room.is-land .pk-pots{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:4px;margin:0;width:auto}
+.pk-room.is-land .pk-board{flex-wrap:nowrap}
 /* 对手: 底牌背隐去(悬头像下会压桌心公共牌; 弃牌仍以灰显表达), 名/筹码贴紧收短整列高度 */
 .pk-room.is-land .pk-seat:not(.pk-me-seat){gap:1px}
 .pk-room.is-land .pk-seat:not(.pk-me-seat) .pk-mini-hole{display:none}
+/* 摊牌牌型标签(.pk-mini-hn "一对/两对/三条")横屏也隐去: 它给对手列多加 ~11px, 矮 felt 里把顶席顶进
+   标题栏、侧位相邻两席挤触(2~4px); 摊底牌本就随 .pk-mini-hole 隐了, 标签成孤儿, 赢家牌型另有中央公告。 */
+.pk-room.is-land .pk-seat:not(.pk-me-seat) .pk-mini-hn{display:none}
+/* 本桌累计盈亏徽标(.pk-net "本桌 ±N")对手席横屏隐去: 第2手起每席多这一行(~11px), 是跨手撑高对手列、
+   把顶席顶进标题栏/侧位互叠的真凶(单手测不到)。逐席净额结算面板 .pk-nets 里全有; 我的横向座位 net 内联不撑高, 保留。 */
+.pk-room.is-land .pk-seat:not(.pk-me-seat) .pk-net{display:none}
 /* 我的座位: 横向排(头像|名/筹码|正面底牌 一排), 列高 ~134→~54px, 坐桌底不再顶穿到桌心/动作栏 */
 .pk-room.is-land .pk-me-seat{flex-direction:row;align-items:center;gap:9px;width:auto}
 .pk-room.is-land .pk-me-seat .nm{max-width:76px}
@@ -981,7 +992,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
               commitEl.style.left = ccx0+'%'; commitEl.style.top = ccy0+'%';
             }
           } else {
-            const ccx = 50 + (cx-50)*0.62, ccy = CY + (cy-CY)*0.62;
+            // 横屏矮 felt: 投入筹码更贴各家座位(0.44 而非 0.62)——顶中席的筹码本会摆到座位与桌心之间,
+            //   正压在底池药丸上(实测"底池×席3叠")。往座位一侧收后, 让出中央狭带给底池+公共牌。
+            const f = land ? 0.44 : 0.62;
+            const ccx = 50 + (cx-50)*f, ccy = CY + (cy-CY)*f;
             commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
           }
         }
