@@ -79,6 +79,17 @@
 .pk-room.is-land .pk-raise input[type=range]{height:18px}
 .pk-room.is-land .pk-b{padding:9px 0;font-size:14px}
 .pk-room.is-land .pk-qbtn{padding:4px 0}
+/* ── 横屏矮 felt(高~200px)防挤压专项: 6-max 椭圆 + 桌心 + 我的大底牌纵向本会互叠, 这里把各块压扁/横排/挪位 ── */
+/* 桌心: 底池 pill 与公共牌【横向并排】(块高 106→~47px), 去掉"轮到谁"文字(交给底部提示条)——不再上撞顶席、下压我的座位 */
+.pk-room.is-land .pk-center{top:55%;flex-direction:row;flex-wrap:nowrap;gap:9px;width:auto;max-width:82%}
+.pk-room.is-land .pk-msg{display:none}
+/* 对手: 底牌背隐去(悬头像下会压桌心公共牌; 弃牌仍以灰显表达), 名/筹码贴紧收短整列高度 */
+.pk-room.is-land .pk-seat:not(.pk-me-seat){gap:1px}
+.pk-room.is-land .pk-seat:not(.pk-me-seat) .pk-mini-hole{display:none}
+/* 我的座位: 横向排(头像|名/筹码|正面底牌 一排), 列高 ~134→~54px, 坐桌底不再顶穿到桌心/动作栏 */
+.pk-room.is-land .pk-me-seat{flex-direction:row;align-items:center;gap:9px;width:auto}
+.pk-room.is-land .pk-me-seat .nm{max-width:76px}
+.pk-room.is-land .pk-my-hole{margin-top:0}
 /* 竖屏美化(手机窄屏): 原 .pk-table 用 top/bottom:9px 撑满整列高度, 椭圆被抻成长蛋——
    上弧座位+公共牌全堆在顶部, 下半个绿肚皮空(因"我"坐在 felt 下方的 pk-me 条, 桌底本无人)。
    这里把桌面收成一个比例匀称的椭圆并竖直居中(操作钮仍钉底、"我"贴其上), 座位/公共牌走 %
@@ -934,8 +945,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       //   招募态: 全 n 席等分整椭圆(我在 270°)。打牌态: 我固定 270°, 对手沿"绕开底部我位缺口"的宽弧
       //   (210°左下 → 90°顶 → -30°右下)均分, 底牌正面就在我这张桌底座位上。
       // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 椭圆竖直居中(CY 偏上)让底部我位不溢出。
-      const RX = land ? 46 : 40, RY = land ? 30 : 34;
-      const CY = lob ? 50 : (land ? 42 : 46);
+      const RX = land ? 46 : 40, RY = land ? 41 : 34;
+      const CY = lob ? 50 : (land ? 59 : 46);
       const start = 0;                             // 全席含我(d=0, 270°底部), 招募/打牌一致
       for (let d=start; d<N; d++){
         const seat=order[d];
@@ -948,7 +959,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         else deg = (m===1) ? 90 : (210 - 240*(d-1)/(m-1));       // 打牌态: 对手在 210°→-30° 宽弧均分(绕开底部我位)
         const t = deg * Math.PI/180;
         const cx = 50 + RX*Math.cos(t);
-        const cy = CY - RY*Math.sin(t);
+        // 横屏我的座位已改横向(矮), 压到桌底(86%)腾出桌心竖向空间给底池/公共牌; 竖屏/招募态仍走椭圆几何
+        let cy = CY - RY*Math.sin(t);
+        if (land && !lob && d===0) cy = 86;
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
         if (commitEl){   // 投入筹码摆在座位与中心之间, 偏座位一侧(0.62)→下注贴各家身前, 不再往桌心堆(配合底池下移到 52%)
           if (d===0){
