@@ -951,8 +951,26 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const cy = CY - RY*Math.sin(t);
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
         if (commitEl){   // 投入筹码摆在座位与中心之间, 偏座位一侧(0.62)→下注贴各家身前, 不再往桌心堆(配合底池下移到 52%)
-          const ccx = 50 + (cx-50)*0.62, ccy = CY + (cy-CY)*0.62;
-          commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
+          if (d===0){
+            // 我(桌底)座位列很高(含正面大底牌), flex 居中把头像顶到列首; 老 0.62 公式把筹码摆到头像上被自己遮住(主人反馈)。
+            //   摆到头像正上方又会撞中央行动提示 → 改贴【头像右侧·同高】的空档felt: 既不被大头像盖, 也不压中央提示。
+            //   用实测头像矩形定位(座位是 translate 居中、列高不定, 按 offset 算不准); 拿不到时兜底老公式。
+            const avrEl = seatEl.querySelector('.pk-avr');
+            const tr = els.table.getBoundingClientRect();
+            if (avrEl && tr.width && tr.height){
+              const ar = avrEl.getBoundingClientRect();
+              // chip 是 translate(-50%) 居中: 中心 x = 头像右缘 + chip半宽 + 8px 间隙 → 整块清出头像, 不叠青环。
+              const cw = commitEl.offsetWidth||34;
+              commitEl.style.left = ((ar.right - tr.left + cw/2 + 8)/tr.width*100)+'%';
+              commitEl.style.top  = (((ar.top+ar.bottom)/2 - tr.top)/tr.height*100)+'%';
+            } else {
+              const ccx0 = 50 + (cx-50)*0.62, ccy0 = CY + (cy-CY)*0.62;
+              commitEl.style.left = ccx0+'%'; commitEl.style.top = ccy0+'%';
+            }
+          } else {
+            const ccx = 50 + (cx-50)*0.62, ccy = CY + (cy-CY)*0.62;
+            commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
+          }
         }
       }
     }
