@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260910-guandan-bomb';
+window.__EH_APP_VER = '20260910-texas-polish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2339,8 +2339,8 @@ function gtOpenSeatingPage(id){
   wrap.querySelector('.gtsp-x').onclick=()=>gtCloseSeatingPage();   // 返回聊天(牌桌卡仍在, 桌不散, 可再点开)
   wrap.addEventListener('click',(e)=>{ if(e.target===wrap) gtCloseSeatingPage(); });   // 点遮罩空白处也退回
   (document.getElementById('hall')||document.body).appendChild(wrap);
-  // 入座前亮本人生涯累计(A): 有战绩才显示, 第一次玩确实从零就不假装
-  const _cg=CAREER_GAME_KEY[row.game];
+  // 入座前亮本人生涯累计(A): 有战绩才显示, 第一次玩确实从零就不假装。德州按主人要求整体去掉生涯展示。
+  const _cg = row.game==='nlhe' ? null : CAREER_GAME_KEY[row.game];
   if(_cg){ fetchCareer(_cg).then(r=>{ const t=careerText(_cg,r); const el=wrap.querySelector('#gtspCareer'); if(el&&t){ el.textContent=t; el.style.display=''; } }); }
   _gtSeatPage={ id, card, wrap };
   gtRefreshSeatingPage(row);
@@ -6887,6 +6887,8 @@ let _careerChipGame=null;   // 当前挂着生涯积分条的游戏(供结算后
 // persist=true: 牌桌里常驻显示(不淡出), 每局结算后刷新数字 → 主人玩时一直看到"积分在存、在涨、没从零"。
 //   (旧行为是开局闪 3.6s 就淡出, 太容易错过, 主人遂以为"每次从零"。)
 async function showCareerChip(game, persist){
+  // 德州: 主人反馈牌桌里那条常驻"生涯"横标去掉、别占一行(也免顶到中间区内容)。其余游戏保留。
+  if(game==='nlhe'){ hideCareerChip(); return; }
   _ensureCareerChipCSS();
   _careerChipGame = game;   // 先记 game: 即便本局暂无战绩(careerText 返回 null)早退, 结算后也能据此刷新
   const r=await fetchCareer(game); const txt=careerText(game,r);

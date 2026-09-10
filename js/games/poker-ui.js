@@ -24,7 +24,9 @@
   const Engine = root.EHPokerEngine, AI = root.EHPokerAI, Eval = root.EHPokerEval;
 
   const HUMAN_ACT_MS = 25000;
-  const AI_MIN_MS = 900, AI_JIT_MS = 900;
+  // 灵魂"思考→出手"时长: 2.2~7s 人类般节奏(旧 0.9~1.8s 太快, 环刚亮就消失像"从1s起")。
+  //   这是真正出手的时刻; 座位倒计时环另按满格 ACT_MS 显示(见 armTurn turnDur), 到点前出手→环随回合切换重置。
+  const AI_MIN_MS = 2200, AI_JIT_MS = 4800;
   const STREET_PAUSE_MS = 650;   // 一街下注结束 → 发下一街前的停顿(让筹码归池动画走完)
 
   // journey-exempt: 单机德州每日输光上限为新增独立功能(localStorage 计数+封盘页), 需连输 5 局才触发,
@@ -125,10 +127,11 @@ html[data-mode="day"] .pk-table::before{
   border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1)}
 html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 /* 中央: 底池 + 公共牌
- * ★下移到 52%(椭圆偏下半): "我"坐桌外底部, 椭圆下半本是空绒面(见上方竖屏注释); 上弧 6 席的身前下注筹码
- *   在 CY≈48 一圈汇聚, 旧的 top:44% 让底池标签/公共牌与这一圈下注筹码糊在一起(主人反馈"页面太乱")。
- *   下移后: 各家下注在上(各自身前), 底池+公共牌独占中下方空白 —— 层次分明, 对标大厂德州"桌心底池"。 */
-.pk-center{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
+ * ★上移到 44%(贴椭圆几何中心 CY≈46, 略偏上): "我"已摆上椭圆底部(270°), 底部两侧翼席(210°/-30°)落在 ~63%,
+ *   旧的 top:52% 让底池/公共牌/提示与这两个下翼席的头像糊在一起(主人反馈"中间区域被遮挡")——见探针实测。
+ *   而顶席(90°)到中心之间是大片空绒面。上移后底池+公共牌独占这块上中方空白, 下翼席让开, 层次分明。
+ *   (下注筹码现按席摆各家身前 ccy=CY+(cy-CY)*0.62, 不再中心汇聚, 故不复"糊在一起"的老问题。) */
+.pk-center{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
 .pk-pot{font-size:13px;color:var(--amber,#ffc24d);font-weight:800;letter-spacing:.03em;display:flex;align-items:center;gap:6px;
   background:rgba(4,10,14,.5);border:1px solid rgba(255,194,77,.35);border-radius:999px;padding:3px 12px;white-space:nowrap}
 .pk-pot .pc{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020);box-shadow:0 1px 2px rgba(0,0,0,.4)}
@@ -587,8 +590,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             isAI: kind!=='human', stack:START, start:START, hole:[], folded:false, allin:false, committed:0, street:0, acted:false };
         }) };
     }
-    // 单机: 开局先进"入座"态(灵魂陆续上桌), 到齐后才发第一手; guest: 等房主发牌; host 招募态: 落 lobby; host/其余: 直接发牌
-    let introSeating = isLocalSolo && !lobbyMode;
+    // guest: 等房主发牌; host 招募态: 落 lobby; 其余(含单机): 直接发第一手, 立即上桌。
+    //   ★去掉"入座序列"中间态(灵魂逐个上桌 ~3-4s): 主人反馈开始游戏/再来一局要立即进牌桌, 别有中间页/加载过程。
+    //   保留 introSeating 变量(恒 false)以兼容下方 render 的 pending 分支(现均短路不生效)。
+    let introSeating = false;
     let arrived = introSeating ? new Set([mySeat]) : null, lastSeated = -1;
     let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : (introSeating ? waitingState('seating') : newHand()));
 
@@ -600,7 +605,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     sfx('arrive'); if(!lobbyMode) sfx('deal');
 
-    let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnSeatActive=-1, turnStreetActive='';
+    let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnAiAct=0, turnSeatActive=-1, turnStreetActive='';
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let _winBanner=null;                    // 桌面赢家横幅(单机常规手替代结算弹窗, 见 showWinBanner)
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
@@ -1144,9 +1149,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
         <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
         <div class="pk-row">
-          <button class="pk-b fold" disabled>弃牌<span class="bt">&nbsp;</span></button>
-          <button class="pk-b call" disabled>${callLbl}<span class="bt">&nbsp;</span></button>
-          <button class="pk-b raise" disabled>加注<span class="bt">&nbsp;</span></button>
+          <button class="pk-b fold" disabled>弃牌</button>
+          <button class="pk-b call" disabled>${callLbl}</button>
+          <button class="pk-b raise" disabled>加注</button>
         </div>`;
     }
     // 招募态操作区: 一键邀请(灵魂补位) / 邀真人 / 开始 ▶ —— 就在打牌页操作按钮位置(与斗地主同构)
@@ -1209,7 +1214,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const canRaiseLike = la.canBet || la.canRaise;
       const min=la.minRaiseTo, max=la.maxRaiseTo;
       if (raiseTo<min || raiseTo>max) raiseTo = Math.min(Math.max(min, Math.round((st.pot||bb))), max);
-      const callTxt = la.canCheck ? '过牌 <span class="bt">&nbsp;</span>' : `跟注 <span class="bt">${la.callAmount}</span>`;
+      // 无金额的按钮(过牌)不再塞占位 .bt(&nbsp; 会占一行 14px 把文案顶离垂直中心)——
+      //   按钮本身 min-height:54px + justify-content:center, 单行文案自然上下居中(主人反馈: 没下注额度时文案要居中)。
+      const callTxt = la.canCheck ? '过牌' : `跟注 <span class="bt">${la.callAmount}</span>`;
       const raiseLabel = la.canBet ? '下注' : '加注';
       const isAllinAmt = raiseTo>=max;
       els.acts.innerHTML = `
@@ -1225,7 +1232,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-qbtn" data-q="allin">全下</button>
         </div>
         <div class="pk-row">
-          <button class="pk-b fold" id="pkFold" ${(la.canFold && !la.canCheck)?'':'disabled'}>弃牌<span class="bt">&nbsp;</span></button>
+          <button class="pk-b fold" id="pkFold" ${(la.canFold && !la.canCheck)?'':'disabled'}>弃牌</button>
           <button class="pk-b call" id="pkCall">${callTxt}</button>
           <button class="pk-b raise ${isAllinAmt?'allin':''}" id="pkRaise" ${canRaiseLike?'':'disabled'}>${isAllinAmt?'全下':raiseLabel} <span class="bt">${isAllinAmt?raiseTo:('至 '+raiseTo)}</span></button>
         </div>`;
@@ -1402,11 +1409,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const turnChanged = (seat!==turnSeatActive) || (st.street!==turnStreetActive);
       turnSeatActive = seat; turnStreetActive = st.street;
       if (turnChanged){
+        // ★灵魂/AI 席倒计时环与真人同一满格时钟(从 ACT_MS≈满格起走, 不再 1s 闪现)——主人: 灵魂倒计时要从 20s 开始不是从 1s。
+        //   环只是展示; 灵魂真正出手在 turnAiAct(人类般 2~7s)到点触发, 通常在环走完前就行动, 环随回合切换自然重置。
         turnDur = mine     ? ACT_MS
                 : isGuest  ? ACT_MS               // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
-                : aiSeat   ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS))
+                : aiSeat   ? ACT_MS               // 灵魂席: 满格环(与真人一致), 出手时刻另见 turnAiAct
                 : remote   ? (ACT_MS + 6000)       // host 兜底比对端稍长, 留网络冗余; 久不动就代打
                 : 0;
+        turnAiAct = aiSeat ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) : 0;   // 灵魂"思考→出手"真实时长(独立于展示环)
         turnStart = Date.now();
       }
       // 我也坐椭圆了 → 我方回合也在自己座位上走圆环+秒数徽标(与对手一致), 不再依赖桌外 #pkClk(已移除)
@@ -1425,7 +1435,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             else if(remote){ onRemoteTimeout(seat); }
           }, remainMs);
         }
-        if(aiSeat){ const remainMs=Math.max(0,turnDur-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }
+        if(aiSeat){ const remainMs=Math.max(0,turnAiAct-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }
         return;
       }
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
@@ -1448,7 +1458,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         ringRAF=requestAnimationFrame(tick);
       };
       tick();
-      if(aiSeat){ const remainMs=Math.max(0,turnDur-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }   // 同回合重渲用剩余时间, 否则 AI 行动被反复推迟
+      if(aiSeat){ const remainMs=Math.max(0,turnAiAct-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }   // 同回合重渲用剩余思考时间, 否则 AI 行动被反复推迟
     }
     // host 侧: 远程真人久不响应 → 用引擎权威替其过牌/弃牌, 防一人掉线卡死全桌
     function onRemoteTimeout(seat){
@@ -1712,6 +1722,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function nextHand(){
       // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)
       if (minimized){ leaveAfterReturn(); return; }
+      // ★无真人在玩就自动散桌(主人诉求): 我连续挂机被判离座旁观(spectating)后, 若桌上再无其他远程真人席,
+      //   这桌只剩灵魂自娱自乐, 继续连打无意义(还空耗心跳/资源)。到"下一局"这一刻结束整局并解散。
+      //   host solo: close→onExit→gtClose 置 closed 散桌; 有其他真人(remoteSeats 非空)照常连打, 不误伤。
+      if (spectating && remoteSeats.length===0){
+        try{ toast('你已离座 · 无真人在玩 · 牌桌自动解散', 3000); }catch(_){}
+        try{ emitBeat({ type:'over', big:true, text:'🪑 无人在玩 · 牌桌自动解散' }); }catch(_){}
+        close();
+        return;
+      }
       // 写回筹码 → (应用中途加入/离座名册变化) → 开新一手
       st.players.forEach(p=> stacks[p.seat]=p.stack);
       applyPendingRoster();
