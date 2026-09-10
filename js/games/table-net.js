@@ -233,5 +233,5 @@
     return el;
   }
 
-  root.EHTable={ encode:encode, decode:decode, renderLobby:renderLobby };
+  root.EHTable={ encode:encode, decode:decode, renderLobby:renderLobby, ensureCSS:injectCSS };
 })(typeof window!=='undefined'?window:this);

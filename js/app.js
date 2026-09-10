@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260910-lobby-fix';
+window.__EH_APP_VER = '20260910-poker-entry';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2216,8 +2216,37 @@ function gtRenderInto(el,row){
     return;
   }
   if(!window.EHTable){ console.warn('[gt] EHTable 未就绪, 牌桌卡暂无法渲染'); return; }
+  // 德州(nlhe): 招募/邀请/开始全在【全屏牌桌页】完成 —— 聊天里只留一张轻量入口卡(标题+状态+席位数),
+  //   点卡进牌桌页(房主摆阵/开始, 客人自动坐空位进桌)。不在消息流铺整张可交互招募卡界面(主人要求)。
+  if(row.game==='nlhe' && (row.status==='lobby'||row.status==='playing')){ gtRenderPokerEntry(el,row); return; }
   try{ EHTable.renderLobby(el,row,gtCtx(row)); }
   catch(e){ console.warn('[gt] renderLobby 抛错', e); }
+}
+// 德州轻量入口卡: 只展示标题/开桌人/状态/席位数, 整卡可点 → gtGotoExistingTable(房主进牌桌页摆阵·客人自动入座进桌)。
+// journey-exempt: 聊天牌桌卡是 app.js 消息流渲染, 无可启动的浏览器旅程 harness(现有 journey 只 boot js/games/*);
+//   真交互(邀请/开始/入座)全在全屏牌桌页 → 已由 poker journey + 本次 _probe-poker-entry 真渲染截图覆盖。
+function gtRenderPokerEntry(el,row){
+  try{ if(window.EHTable&&EHTable.ensureCSS) EHTable.ensureCSS(); }catch(_){}
+  const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
+  const humans=seats.filter(s=>s&&s.kind==='human').length;
+  const empties=seats.filter(s=>s&&s.kind==='empty').length;
+  const isHost=(row.host_uid===myUid);
+  const iAmIn=seats.some(s=>s&&s.kind==='human'&&s.uid===myUid);
+  const playing=(row.status==='playing');
+  const hostName=(seats[0]&&seats[0].name)||'';
+  let tip;
+  if(playing) tip = iAmIn?'你在这局里 · 点卡回到牌桌':'点卡加入/观战';
+  else if(isHost) tip = '点卡进牌桌页 · 邀人 / 开始';
+  else if(iAmIn) tip = '已入座 · 点卡进牌桌页';
+  else tip = empties>0 ? ('还有 '+empties+' 个空位 · 点卡入座') : '满座了 · 点卡顶替 AI 席';
+  el.className='game-card gt-card'; el.dataset.gtId=row.id;
+  el.innerHTML='<div class="gt-head"><span class="ge">🎰</span><span class="gk">德州牌桌</span>'
+    +'<span class="gh">'+esc(hostName)+' 开桌 <span class="gt-badge '+(playing?'playing':'lobby')+'">'+(playing?'进行中':'招募中')+'</span></span></div>'
+    +'<div class="gt-foot"><span class="gt-tip">'+esc(tip)+'</span>'
+    +'<span class="gt-tip" style="flex:0 0 auto;opacity:.75">'+humans+' 真人 / '+empties+' 空位</span></div>';
+  // 整卡可点(所有人): 房主→牌桌页招募态; 客人→自动坐空位/顶替 AI 进桌。onclick 就地绑, 不依赖 realtime 才可点。
+  el.classList.add('gt-card-openable');
+  el.onclick=(e)=>{ if(e.target.closest('button')) return; gtGotoExistingTable(row); };
 }
 // 异步把牌桌卡"补水"成真卡: 直接就地渲染进 el(不靠 querySelector 再找, 免 DOM 时序竞态)。
 // 行拿不到(散桌/网络抖动/会话过期)时给【可重试的诚实态】, 绝不永远停在"加载中…"。
@@ -2245,7 +2274,9 @@ function gtRenderCard(row){
   // Realtime 更新只改牌桌内容，不让已存在的卡片重播入场动画。
   el.classList.add('no-anim');
   gtRenderInto(el,row);
-  // 房主点自己的桌卡(非按钮区): 招募中(lobby) → 就地落真牌桌招募态(ddz)/座位页(掼蛋·德州)摆阵邀人; 已开局(playing) → 直接(重)进打牌页。
+  // 德州轻量入口卡: gtRenderPokerEntry 已就地绑好整卡 onclick(所有人可点), 这里不再叠 host-only 绑定。
+  if(row.game==='nlhe' && (row.status==='lobby'||row.status==='playing')) return;
+  // 房主点自己的桌卡(非按钮区): 招募中(lobby) → 就地落真牌桌招募态(ddz)/座位页(掼蛋)摆阵邀人; 已开局(playing) → 直接(重)进打牌页。
   if(row.host_uid===myUid && (row.status==='lobby'||row.status==='playing')){
     el.classList.add('gt-card-openable');
     el.onclick=(e)=>{ if(e.target.closest('button')) return;
@@ -7055,9 +7086,9 @@ async function launchTexas(){
   try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
     if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
   }catch(e){ console.warn('[gt] post table card failed', e); }
-  // 大结构: 点入口=立刻进牌桌页, 去掉座位页/招募态中间态。gtStart 自动补灵魂满座 + eh_gt_start,
-  //   无已挂起座位页时直落 gtLaunchPoker(打牌页)首帧发牌。空座仍留给真人中途加入(德州模型)。
-  if(row.host_uid===myUid && row.status==='lobby') await gtStart(row.id);
+  // 大结构(主人): 点/德州入口=房主直接进【全屏牌桌页·招募态】, 不在聊天里铺整张招募卡界面。
+  //   牌桌页空位可点邀灵魂/真人, 满意点「开始 ▶」就地发牌(gtStart); 空座留给真人中途加入(德州模型)。
+  if(row.host_uid===myUid && row.status==='lobby') gtLaunchPokerLobby(row);
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐满 —— 先用房里【真灵魂】一席一位, 灵魂不够时用【灵魂分身】继续补到无空位。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像)填满, 不再是匿名 AI 机器人;分身顶原灵魂头像、名标"原名·分身[序号]"。
