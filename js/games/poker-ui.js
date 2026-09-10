@@ -74,8 +74,9 @@
 .pk-room.is-land .pk-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
 .pk-room.is-land .pk-felt{overflow:visible}
 .pk-room.is-land .pk-table{top:4px;bottom:4px}
-.pk-room.is-land .pk-me{padding:2px 16px 0;gap:12px}
-.pk-room.is-land .pk-acts{gap:5px;padding:5px 14px calc(6px + env(safe-area-inset-bottom,0px))}
+.pk-room.is-land .pk-me{padding:2px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));gap:12px}
+/* 横屏动作栏: 左右内边距兜 safe-area(刘海横屏在两侧) —— 否则最外侧按钮会缩进刘海/圆角被切角 */
+.pk-room.is-land .pk-acts{gap:5px;padding:5px max(14px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
 .pk-room.is-land .pk-raise input[type=range]{height:18px}
 .pk-room.is-land .pk-b{padding:9px 0;font-size:14px}
 .pk-room.is-land .pk-qbtn{padding:4px 0}
