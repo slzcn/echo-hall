@@ -127,11 +127,11 @@ html[data-mode="day"] .pk-table::before{
   border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1)}
 html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 /* 中央: 底池 + 公共牌
- * ★上移到 44%(贴椭圆几何中心 CY≈46, 略偏上): "我"已摆上椭圆底部(270°), 底部两侧翼席(210°/-30°)落在 ~63%,
+ * ★上移到 40%(椭圆几何中心 CY≈46 之上): "我"已摆上椭圆底部(270°), 底部两侧翼席(210°/-30°)落在 ~63%,
  *   旧的 top:52% 让底池/公共牌/提示与这两个下翼席的头像糊在一起(主人反馈"中间区域被遮挡")——见探针实测。
  *   而顶席(90°)到中心之间是大片空绒面。上移后底池+公共牌独占这块上中方空白, 下翼席让开, 层次分明。
  *   (下注筹码现按席摆各家身前 ccy=CY+(cy-CY)*0.62, 不再中心汇聚, 故不复"糊在一起"的老问题。) */
-.pk-center{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
+.pk-center{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:3;width:88%}
 .pk-pot{font-size:13px;color:var(--amber,#ffc24d);font-weight:800;letter-spacing:.03em;display:flex;align-items:center;gap:6px;
   background:rgba(4,10,14,.5);border:1px solid rgba(255,194,77,.35);border-radius:999px;padding:3px 12px;white-space:nowrap}
 .pk-pot .pc{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020);box-shadow:0 1px 2px rgba(0,0,0,.4)}
@@ -198,9 +198,12 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 /* "我"的桌底座位(pk-me-seat): 底牌正面朝上, 比对手牌背大且带花色可读; 头像点青光 + 名字点青, 一眼认出"这是你" */
 .pk-me-seat .pk-avr .av{box-shadow:0 0 0 2px var(--accent,#00e5d4),0 0 12px rgba(0,229,212,.35)}
 .pk-me-seat .nm{color:var(--accent,#00e5d4);font-weight:800}
-.pk-my-hole{--cw:30px;--ch:42px;--cn:12px;--cs:9px;--cc:17px;gap:4px;margin-top:2px}
+/* "我"的底牌: 放大到可读尺寸, 去掉角标花色(.cs)——30px 小牌上"角标rank+角标花色+居中大花色"三元素挤成一坨(主人反馈"元素都叠一起了");
+ *   只留【左上角 rank + 居中大花色】= 干净的标准读法, 两张牌间距也拉开。 */
+.pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:7px;margin-top:2px}
 .pk-my-hole .card{box-shadow:0 3px 8px rgba(0,0,0,.5)}
-.pk-my-hole .card .cs{top:13px}
+.pk-my-hole .card .cn{top:3px;left:5px}
+.pk-my-hole .card .cs{display:none}
 .pk-say{position:absolute;top:calc(var(--av,44px) + 2px);font-size:11px;color:var(--ink);background:var(--panel-solid,#132a29);border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:140px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:8;white-space:nowrap}
 .pk-say.show{opacity:1}
 /* 身前投入筹码(朝中央) */
@@ -283,7 +286,16 @@ html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border
 .pk-raise.hidden{display:none}
 /* ★.reserved: 隐藏但【保留高度】(visibility 非 display) —— 操作条骨架恒定, 滑杆/快捷不显示时也占位, 按钮行不上下跳(主人反馈"按钮别跳来跳去") */
 .pk-raise.reserved,.pk-quick.reserved{visibility:hidden}
-.pk-raise input[type=range]{flex:1;accent-color:var(--accent,#00e5d4);height:32px}
+/* 加注滑杆: 自定义细轨 + 圆钮(原生 accent-color 在日间浅底会渲成刺眼黑条——主人反馈)。
+ *   已投入部分用 --accent 填充(syncAmt 写 --fill 百分比), 未填充走中性灰轨, 日/夜都干净。 */
+.pk-raise input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:32px;background:transparent;cursor:pointer;margin:0}
+.pk-raise input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:999px;border:1px solid var(--line2);
+  background:linear-gradient(90deg,var(--accent,#00e5d4) var(--fill,0%),var(--sl-track,rgba(127,127,127,.22)) var(--fill,0%))}
+.pk-raise input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin-top:-8px;border-radius:50%;
+  background:var(--accent,#00e5d4);border:2px solid var(--panel-solid,#fff);box-shadow:0 1px 5px rgba(0,0,0,.35)}
+.pk-raise input[type=range]::-moz-range-track{height:8px;border-radius:999px;border:1px solid var(--line2);background:var(--sl-track,rgba(127,127,127,.22))}
+.pk-raise input[type=range]::-moz-range-progress{height:8px;border-radius:999px;background:var(--accent,#00e5d4)}
+.pk-raise input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent,#00e5d4);border:2px solid var(--panel-solid,#fff);box-shadow:0 1px 5px rgba(0,0,0,.35)}
 .pk-raise .pk-amt{min-width:58px;text-align:center;font-size:14px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .pk-quick{display:flex;gap:6px}
 .pk-qbtn{flex:1;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
@@ -298,8 +310,11 @@ html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.03em;transition:.14s}
 .pk-b:active{transform:scale(.96)}
 .pk-b:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
-.pk-b.fold{color:var(--sub)}
+/* 弃牌: 描边式次要键(原 sub 色裸字在日间浅底几乎看不清——主人反馈)。ink 字读得清, 700 字重+透明底比彩色主键安静。 */
+.pk-b.fold{color:var(--ink);background:transparent;border-color:var(--line2);font-weight:700}
 .pk-b.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
+/* 过牌(不下注的被动动作): 不该顶满彩色主键(日间暗调 accent 会糊成脏橄榄——主人反馈)。走 accent 描边淡底, 干净且语义"温和"; 跟注/下注(真花钱)才留亮色主键。 */
+.pk-b.call.check{background:var(--panel);color:var(--accent);border-color:var(--line2);box-shadow:none}
 .pk-b.raise{background:var(--amber,#ffc24d);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
 .pk-b.raise.allin{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);color:#fff;box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6))}
 /* 全下二次确认态: 第一次点"全下"进此态(需再点一次才真梭哈), 白描边+脉冲提示"这步会梭全部筹码, 别误触" */
@@ -1233,7 +1248,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         </div>
         <div class="pk-row">
           <button class="pk-b fold" id="pkFold" ${(la.canFold && !la.canCheck)?'':'disabled'}>弃牌</button>
-          <button class="pk-b call" id="pkCall">${callTxt}</button>
+          <button class="pk-b call${la.canCheck?' check':''}" id="pkCall">${callTxt}</button>
           <button class="pk-b raise ${isAllinAmt?'allin':''}" id="pkRaise" ${canRaiseLike?'':'disabled'}>${isAllinAmt?'全下':raiseLabel} <span class="bt">${isAllinAmt?raiseTo:('至 '+raiseTo)}</span></button>
         </div>`;
       const slider=$('#pkSlider'), amt=$('#pkAmt'), rb=$('#pkRaise');
@@ -1245,6 +1260,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       function disarmAllin(){ allinArmed=false; if(allinConfirmT){ clearTimeout(allinConfirmT); allinConfirmT=null; } if(rb) rb.classList.remove('confirm'); }
       function syncAmt(){
         if(amt) amt.textContent=raiseTo;
+        if(slider) slider.style.setProperty('--fill', (max>min ? ((raiseTo-min)/(max-min)*100) : 0)+'%');   // 滑杆已投入部分填色
         if(rb){
           const ai=raiseTo>=max;
           if(!allinArmed){ const bt=rb.querySelector('.bt'); if(bt) bt.textContent = ai? String(raiseTo) : ('至 '+raiseTo); }
@@ -1255,6 +1271,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       // 音效只在拖动结束(change)响一次, 不再每个 input tick 打一发("机关枪"音)。
       if(slider){
+        syncAmt();   // 初始填色到位(否则首帧 --fill 缺省 0%)
         slider.addEventListener('input', ()=>{ raiseTo=parseInt(slider.value,10)||min; syncAmt(); });
         slider.addEventListener('change', ()=>{ sfx('cardsel'); });
       }
