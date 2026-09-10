@@ -51,9 +51,12 @@
       '.gt-soulsel{font-size:11px;background:var(--panel-solid,#132a29);color:var(--ink,#eaf6ff);',
         'border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:8px;padding:3px 4px;max-width:98px}',
       '.gt-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:11px}',
-      '.gt-foot .gt-tip{font-size:11px;color:var(--sub,#86cbc6);flex:1}',
-      '.gt-btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:6px 14px;cursor:pointer;border:1px solid}',
-      '.gt-btn.go{background:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);color:#04060c;box-shadow:var(--glow-cyan,0 0 12px rgba(0,229,212,.5))}',
+      /* 提示独占一行(flex基100%), 按钮另起一排铺开 —— 否则 tip 抢空间把多个按钮挤到极窄, 中文逐字竖排断行(主人反馈"不够美观") */
+      '.gt-foot .gt-tip{font-size:11px;color:var(--sub,#86cbc6);flex:1 1 100%;line-height:1.45}',
+      /* nowrap+不收缩: 每个按钮保持整词一行, 排不下就整体换行, 绝不再断成竖排单字 */
+      '.gt-btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:7px 13px;cursor:pointer;border:1px solid;white-space:nowrap;flex:0 0 auto}',
+      /* 字色走 --btn-ink: 夜间(深)配青底、日间(白)配深金底都读得清 —— 硬编码 #04060c 深字在日间深金 accent 上糊成一坨(主人反馈) */
+      '.gt-btn.go{background:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);color:var(--btn-ink,#04060c);box-shadow:var(--glow-cyan,0 0 12px rgba(0,229,212,.5))}',
       '.gt-btn.ghost{background:transparent;border-color:var(--line2,rgba(0,229,212,.4));color:var(--sub,#86cbc6)}',
       '.gt-btn[disabled]{opacity:.4;cursor:default;box-shadow:none}'
     ].join('');
