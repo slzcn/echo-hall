@@ -1728,7 +1728,18 @@ html[data-mode="day"] .ddz-center::before{
       const roleTxt = st.landlord===mySeat ? '地主' : '农民';
       renderAll();   // 就地绘出结算态: 座位亮牌 / 中央结果横幅 / 底部再来一局·收工(累计分随座位徽标刷新)
       // 胜负音效 + 触感 + 彩带
-      if (iWon){ sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]); confetti(); }
+      if (iWon){
+        sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220); vibrate([20,60,30,60,40]);
+        // 分级高光: 春天/反春天=名场面(tier3+横幅) · 炸弹翻倍/高倍=大牌型(tier2) · 常规=轻彩带(tier1)
+        if (window.EHTableFx){
+          let tier=1, label='', sub='';
+          const PAL=['🎉','🃏','✨','🎊','⭐','💠'];
+          if (res.spring){ tier=3; label=res.landlordWon?'春天！':'反春天！'; sub='底分 '+res.base+' × '+res.finalMultiplier; }
+          else if (res.bombs>=2 || res.finalMultiplier>=6){ tier=2; label=res.bombs?res.bombs+' 炸翻倍！':'翻 '+res.finalMultiplier+' 倍！'; }
+          else if (res.bombs>=1 || res.finalMultiplier>=4){ tier=2; }
+          EHTableFx.celebrate(els.felt, { tier, palette:PAL, label, sub });
+        } else confetti();
+      }
       else { sfx('void'); vibrate(120); }
       // F3 终局战报进聊天流(春天/炸弹倍数一并播报); 赢家若是灵魂配一句收官台词
       const winNm = st.players[res.winners[0]] ? st.players[res.winners[0]].name : (res.landlordWon?'地主':'农民');

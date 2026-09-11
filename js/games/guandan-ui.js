@@ -2229,7 +2229,18 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           remainBox.appendChild(nm); remainBox.appendChild(cards);
         }
       }
-      if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]); confetti(); }
+      if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]);
+        // 分级高光: 通关(打过A)/双下=名场面(tier3+横幅) · 连升2级=大牌型(tier2) · 常规=轻彩带(tier1)
+        if (window.EHTableFx){
+          let tier=1, label='', sub='';
+          const PAL=['🎉','🃏','✨','🎊','⭐','💠','🀄'];
+          if (res.matchWon){ tier=3; label='通关！'; sub='打过 A'; }
+          else if (res.doubleDown){ tier=3; label='双下！'; sub='连升 '+res.advance+' 级'; }
+          else if (res.advance>=2){ tier=2; label='连升 '+res.advance+' 级！'; }
+          else if (res.bombs>=2){ tier=2; }
+          EHTableFx.celebrate(els.felt, { tier, palette:PAL, label, sub });
+        } else confetti();
+      }
       else { sfx('void'); vibrate(120); }
       const againBtn = over.querySelector('#gdAgain');
       const clearAgainTimer = ()=>{ if (over._againTimer){ clearInterval(over._againTimer); over._againTimer=null; } };

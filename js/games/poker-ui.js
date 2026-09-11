@@ -1462,6 +1462,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       els.felt.appendChild(box); setTimeout(()=>box.remove(),2300);
     }
 
+    // 分级高光: 摊牌牌型越大演出越隆重(同花顺/四条/通吃=名场面 · 葫芦/同花/顺子=大牌型 · 其余=轻彩带)
+    function pkCelebrate(champTakeAll){
+      const res=st.result;
+      const PAL=['🎉','💰','✨','🎊','⭐','🪙'];
+      let tier=1, label='', sub='';
+      if (champTakeAll){ tier=3; label='通吃全场！'; }
+      else if (res){
+        const rv=(res.wentToShowdown && res.reveal && res.reveal[mySeat]) ? res.reveal[mySeat] : null;
+        if (rv){ const c=rv.cat;
+          if (c===8){ tier=3; label=/皇家/.test(rv.hand)?'皇家同花顺！':'同花顺！'; }
+          else if (c===7){ tier=3; label='四条！'; }
+          else if (c===6){ tier=2; label='葫芦！'; }
+          else if (c===5){ tier=2; label='同花！'; }
+          else if (c===4){ tier=2; label='顺子！'; }
+        }
+      }
+      if (window.EHTableFx) EHTableFx.celebrate(els.felt, { tier, palette:PAL, label, sub }); else confetti();
+    }
+
     // ── 回合驱动: 亮环倒计时 + AI/自动 ──
     function armTurn(onExpire){
       clearTimers();
@@ -1589,7 +1608,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             : `🏆 ${escapeHtml(champName)} 赢下 ${potTotal}${handName?(' · '+handName):''}`;
           showWinBanner(line, won);
           if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
-          if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); vibrate([20,60,30]); confetti(); }
+          if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); vibrate([20,60,30]); pkCelebrate(false); }
           else if(delta<0){ sfx('void'); vibrate(60); }
           emitBeat({ type:'over', actor:champName, big:true,
             text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
@@ -1722,7 +1741,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if ((res.winnersBySeat||[]).length){ over.classList.add('payout-in'); payoutChipsFx(res.winnersBySeat); }
       els.felt.appendChild(over);
       curOver = over;   // 供 setConn 在房主掉线时改写本浮层的客人按钮(离场用 parentNode 判活, 无需处处清空)
-      if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); confetti(); }
+      if(iWonAll || won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),200); vibrate([20,60,30]); pkCelebrate(iWonAll); }
       else if(busted){ sfx('void'); vibrate([90,60,90]); }
       else if(delta<0){ sfx('void'); vibrate(90); }
 
