@@ -54,7 +54,7 @@
   .ddz-seat .nm{font-size:13px}
   .ddz-seat .cnt{font-size:13px}
   .ddz-played{min-height:100px}
-  .ddz-turnbanner{min-height:26px}
+  .ddz-turnbanner{height:32px}
   .ddz-turnbanner.mine{font-size:20px}
   .ddz-me .ddz-avr{width:48px;height:48px}
   .ddz-me .ddz-avr .av{font-size:22px}
@@ -96,7 +96,7 @@
   .ddz-room:not(.is-land) .ddz-center::before{left:5%;right:5%;top:8%;bottom:8%}
   .ddz-room:not(.is-land) .ddz-opps{padding:10px 12px 0}
   /* 回合提示分层清晰、占位稳定不跳动: 轮次横幅醒目, 上一手信息压一档但恒留位 */
-  .ddz-room:not(.is-land) .ddz-turnbanner{min-height:22px}
+  .ddz-room:not(.is-land) .ddz-turnbanner{height:26px}
   .ddz-room:not(.is-land) .ddz-lastwho{min-height:16px;opacity:.92}
   /* 操作区: 按钮等宽整齐, 底部留足 safe-area */
   .ddz-room:not(.is-land) .ddz-acts{gap:12px;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
@@ -235,9 +235,11 @@
 html[data-mode="day"] .ddz-center::before{
   background:radial-gradient(ellipse 66% 58% at 50% 40%,rgba(150,232,214,.62),rgba(0,168,154,.24) 54%,rgba(0,120,110,.16) 100%);
   border-color:rgba(0,127,118,.3);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px rgba(0,127,118,.1),inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
-.ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s}
+/* 定高(非 min-height): 轮到我/轮到他两态字号/胶囊不同, 若用 min-height 会撑高列 → justify-content:center 每回合竖向重排=牌桌"跳一下"。钉死高度, 字靠 flex 居中不撑盒。 */
+.ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);height:26px;box-sizing:border-box;line-height:1;padding:0 12px;display:flex;align-items:center;justify-content:center;gap:6px;transition:color .15s,background .15s}
 .ddz-turnbanner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:ddzTurnPulse 1.05s ease-in-out infinite}
-.ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
+/* 秒数留固定宽: 不留则 18s→9s 每秒字宽变→居中的胶囊每秒横向抖=第二种"跳来跳去" */
+.ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800;min-width:2.2em;display:inline-block;text-align:center}
 .ddz-turnbanner .clk.urgent{color:var(--magenta,#ff2d8e);animation:ddzBlink .6s steps(2,start) infinite}
 @keyframes ddzBlink{50%{opacity:.35}}
 /* 轮到自己出牌: 横幅化作发光脉冲胶囊(halo+微缩放, 纯 box-shadow/transform 不改盒模型→不引入跳动) */
@@ -1062,7 +1064,9 @@ html[data-mode="day"] .ddz-center::before{
     function lastPlayHTML(seat){
       if (st.phase!=='play' || seat===mySeat) return '';   // 自己有底部手牌扇, 不重复
       const a = trickActs[seat];
-      if (!a) return '';
+      // 恒留空槽(min-height:42): 对手出牌前就占好这段高度, 出牌时只是填入卡牌而非撑高座位 →
+      // 座位不再从 107 跳到 157 把中央区/横幅整体顶下去(主人报的"出牌时牌桌跳来跳去"主因)
+      if (!a) return `<div class="ddz-lastplay" data-lp="${seat}"></div>`;
       const fresh = seat===_trickFresh ? ' fresh' : '';
       if (a.pass) return `<div class="ddz-lastplay${fresh}" data-lp="${seat}"><span class="lp-pass">不出</span></div>`;
       const cards = a.cards.map(findCardById).filter(Boolean);

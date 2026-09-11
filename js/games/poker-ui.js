@@ -117,9 +117,11 @@
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
 .pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-/* 盲注/席位牌: 从顶栏挪进牌桌(顶栏太挤/被截断)。绝对定位钉在 felt 左上角, 竖横屏该角都空(座位在 15%~29% / 10%~38% 处), 不压座位/公共牌。做暗、做小, 只当角落信息不抢戏。 */
-.pk-blinds{position:absolute;top:6px;left:max(8px,env(safe-area-inset-left,0px));z-index:4;font-size:11px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;background:rgba(0,0,0,.28);white-space:nowrap;pointer-events:none;opacity:.9}
-.pk-room.is-land .pk-blinds{top:4px;font-size:10px;padding:1px 8px}
+/* 盲注牌: 不做胶囊, 当"印在绒台上的字"——低透明白 + 一道暗压印阴影, 像真牌桌把盲注刻在台面上, 只当角落背景信息不抢戏。
+   钉在 felt 左上角, 竖横屏该角都空(座位在 15%~29% / 10%~38% 处), 不压座位/公共牌。z-index 压到 0 让卡牌/座位盖在其上。 */
+.pk-blinds{position:absolute;top:8px;left:max(12px,env(safe-area-inset-left,0px));z-index:0;font-size:12px;letter-spacing:.1em;color:rgba(234,246,255,.32);font-weight:800;white-space:nowrap;pointer-events:none;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+html[data-mode="day"] .pk-blinds{color:rgba(4,54,50,.34);text-shadow:0 1px 0 rgba(255,255,255,.5)}
+.pk-room.is-land .pk-blinds{top:6px;font-size:11px}
 .pk-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .pk-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -279,6 +281,10 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,18px);opacity:.92}
 .card.mini{width:16px;height:22px;border-radius:3px}.card.mini .cn{font-size:8px;top:1px;left:2px}.card.mini .cs{display:none}.card.mini .cc{display:none}
 .card.big{width:var(--bcw,38px);height:var(--bch,54px)}.card.big .cn{font-size:calc(var(--cn,12px) + 3px)}.card.big .cc{font-size:calc(var(--cc,18px) + 5px)}.card.big .cs{top:19px}
+/* 正面统一: 桌上牌向"我的底牌"看齐 —— 只留角标 rank + 中央大花色, 隐去角标小花色(cs)。
+   原先公共牌/亮牌是 rank+小花色+中央花色三标记堆一起(角标处尤挤), 且与早已隐 cs 的我的底牌不一致 →
+   隐去 cs 后全场正面同一套"rank 角标 + 花色浮雕水印", 既统一又不拥挤(主人报: 风格不一致 / 正面拥挤)。 */
+.pk-room .card .cs{display:none}
 /* 盖着的牌(对手底牌): 斜织纹 + 双色角光 + 更亮的青描边, 在深绿绒上也读得出是"张牌"而非黑洞 */
 .card.back{background:
   repeating-linear-gradient(48deg,rgba(0,229,212,.09) 0 2px,transparent 2px 6px),
@@ -292,9 +298,13 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
   border-radius:2px;background:linear-gradient(135deg,rgba(0,229,212,.5),rgba(156,133,255,.35));
   box-shadow:0 0 8px rgba(0,229,212,.4),inset 0 0 0 1px rgba(255,255,255,.15)}
 .card.mini.back::after{width:46%;height:32%}
-/* 公共牌未发的空位: 不是盖着的牌, 而是"待发牌槽"—— 虚线内凹, 明显区别于对手盖牌, 也不再是灰块/黑洞 */
-.pk-board .card.back{background:rgba(0,229,212,.03);border:1px dashed rgba(0,229,212,.26);box-shadow:inset 0 2px 10px rgba(0,0,0,.28);opacity:1}
-.pk-board .card.back::after{display:none}
+/* 公共牌未发的空位: 不是盖着的牌, 而是"待发牌槽"—— 虚线内凹, 明显区别于对手盖牌, 也不再是灰块/黑洞。
+   德州公共牌翻前根本没发(不存在扣着的牌), 故绝不能画成实心牌背 —— 那是谎报"这里扣着牌"。
+   ★ 选择器带 .pk-room 提到 (0,4,0): shared 皮肤 .pk-room .card.back (0,3,0) 用 !important 铺了青菱格实心背,
+     若本规则只 .pk-board .card.back (0,3,0) 则同特异性、靠源顺序定胜负(生产 poker-ui 后注入胜, 但探针里 shared 后加载反胜, 不稳)。
+     提高特异性到 (0,4,0) 后无论加载顺序都必胜 → 翻前公共牌稳定为虚线空槽, 不与对手盖牌撞成"两种背面"。 */
+.pk-room .pk-board .card.back{background:rgba(0,229,212,.03) !important;border:1px dashed rgba(0,229,212,.26) !important;box-shadow:inset 0 2px 10px rgba(0,0,0,.28) !important;opacity:1}
+.pk-room .pk-board .card.back::after{display:none !important}
 html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border-color:rgba(0,127,118,.32);box-shadow:inset 0 2px 8px rgba(0,80,74,.1)}
 .card.dim{opacity:.5}
 /* 我的座位条 */
@@ -1045,7 +1055,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function renderPot(){
       if (st.phase==='lobby'){ const nn=st.players.filter(p=>p.kind!=='empty').length;
         els.blinds.textContent='🪑 招募中 · '+nn+'/'+n+' 席'; els.pot.innerHTML=''; return; }
-      els.blinds.textContent = `盲注 ${st.sb}/${st.bb} · 第 ${handNo+1} 手`;
+      els.blinds.textContent = `盲注 ${st.sb}/${st.bb}`;   // "第N手"去掉: 单机连打无对局意义, 徒增元素
       // 有人 all-in 且投入分层 → 拆主池/边池展示(对标德州扑克); 否则单一底池
       let pots = null;
       try { pots = Engine.buildSidePots(st); } catch(e){ _ehCatch('poker.buildSidePots', e); }
