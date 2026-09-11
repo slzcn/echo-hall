@@ -107,14 +107,19 @@
    这里把桌面收成一个比例匀称的椭圆并竖直居中(操作钮仍钉底、"我"贴其上), 座位/公共牌走 %
    定位随桌高等比缩放, 不再被拉长。.pk-room 前缀提特异性以压过后面定义的基础 .pk-table 规则。 */
 @media (max-width:599px){
-  .pk-room .pk-table{top:47%;bottom:auto;height:clamp(360px,58vh,500px);transform:translateY(-50%)}
+  /* height 用 min(理想椭圆高, felt高-上下留白): 短屏(小机 + 灵动岛顶栏吃掉 ~107px)时 felt 变矮,
+     原来的定高 clamp 会撑破 felt 顶把上弧座位顶到标题栏底下(=主人反馈的"牌桌顶部遮挡")。
+     min 兜底后桌面永不超出 felt, 居中留出上下等距空隙, 顶座位始终在栏下方有呼吸位。 */
+  .pk-room .pk-table{top:50%;bottom:auto;height:min(clamp(360px,58vh,500px),calc(100% - 20px));transform:translateY(-50%)}
 }
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
 .pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink,#eaf6ff);font-size:15px;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
-.pk-blinds{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+/* 盲注/席位牌: 从顶栏挪进牌桌(顶栏太挤/被截断)。绝对定位钉在 felt 左上角, 竖横屏该角都空(座位在 15%~29% / 10%~38% 处), 不压座位/公共牌。做暗、做小, 只当角落信息不抢戏。 */
+.pk-blinds{position:absolute;top:6px;left:max(8px,env(safe-area-inset-left,0px));z-index:4;font-size:11px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;background:rgba(0,0,0,.28);white-space:nowrap;pointer-events:none;opacity:.9}
+.pk-room.is-land .pk-blinds{top:4px;font-size:10px;padding:1px 8px}
 .pk-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
   color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .pk-mus:hover{color:var(--ink);border-color:var(--line2)}
@@ -126,7 +131,6 @@
 @media (max-width:379px){
   .pk-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
   .pk-title{font-size:14px}
-  .pk-blinds{font-size:11px}
   .pk-x{padding:0 9px}
   .pk-x .pk-xlbl{display:none}
 }
@@ -654,12 +658,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
-        <div class="pk-blinds" id="pkBlinds"></div>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">🎵</button>
         <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
         <button class="pk-x" id="pkX" aria-label="返回聊天">✕<span class="pk-xlbl"> 返回</span></button>
       </div>
       <div class="pk-felt" id="pkFelt">
+        <div class="pk-blinds" id="pkBlinds"></div>
         <div class="pk-table" id="pkTable">
           <div class="pk-center">
             <div class="pk-pot" id="pkPot"></div>
@@ -957,7 +961,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       //   招募态: 全 n 席等分整椭圆(我在 270°)。打牌态: 我固定 270°, 对手沿"绕开底部我位缺口"的宽弧
       //   (210°左下 → 90°顶 → -30°右下)均分, 底牌正面就在我这张桌底座位上。
       // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 椭圆竖直居中(CY 偏上)让底部我位不溢出。
-      const RX = land ? 46 : 40, RY = land ? 41 : 34;
+      const RX = land ? 46 : 40, RY = land ? 41 : 32;
       const CY = lob ? 50 : (land ? 59 : 46);
       const start = 0;                             // 全席含我(d=0, 270°底部), 招募/打牌一致
       for (let d=start; d<N; d++){
