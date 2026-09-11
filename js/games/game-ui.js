@@ -1271,7 +1271,9 @@ html[data-mode="day"] .ddz-center::before{
       //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳 0 像坏了 → 头像只亮"思考中"💭 脉冲, 不显误导性倒计时(对齐掼蛋/状态忠实)。
       const digitSeat = mine || remote;
       const secEl = seatEl && seatEl.querySelector('.ddz-sec');   // 当前行动席(含对手)头像上的秒数徽标
+      // 无硬死线的席(AI/灵魂/远程展示): 亮💭 + 环保持满格(不消减)。消减环+💭 是两种矛盾时间信号叠一头像(主人反馈"思考和倒计时重叠")。
       if (secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
+      if (seatEl && !digitSeat) seatEl.style.setProperty('--p', 360);
       const tick = ()=>{
         const elapsed = Date.now() - turnStart;
         const remain = Math.max(0, turnDur - elapsed);
@@ -1293,7 +1295,7 @@ html[data-mode="day"] .ddz-center::before{
       };
       // 折叠(minimized)态房 display:none, 环不可见 —— 不起 rAF 每帧对隐藏节点写 --p 空转耗电。
       //   我方超时 onExpire 折叠时本就为 null(离席不自动过牌/叫分); AI/远程席由下方 setTimeout 独立推进。
-      if (!minimized) tick();
+      if (!minimized && digitSeat) tick();   // 消减环只给真有死线的席; AI/灵魂席环已置满格, 出手由下方 setTimeout 独立推进
 
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程真人席(超时托管)/host 本机 AI 席。
       if (mine) return;

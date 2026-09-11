@@ -23,7 +23,7 @@
   'use strict';
   const Engine = root.EHPokerEngine, AI = root.EHPokerAI, Eval = root.EHPokerEval;
 
-  const HUMAN_ACT_MS = 25000;
+  const HUMAN_ACT_MS = 20000;
   // 灵魂"思考→出手"时长: 2.2~7s 人类般节奏(旧 0.9~1.8s 太快, 环刚亮就消失像"从1s起")。
   //   这是真正出手的时刻; 座位倒计时环另按满格 ACT_MS 显示(见 armTurn turnDur), 到点前出手→环随回合切换重置。
   const AI_MIN_MS = 2200, AI_JIT_MS = 4800;
@@ -784,9 +784,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       setTimeout(()=>room.classList.remove('pk-expanding'), 300);
       renderAll(); positionSeats(); sfx('click');
     }
-    // 大结构: 「✕ 返回」= 立刻回聊天室(close→onExit 散桌), 去掉折叠成浮片挂在聊天上的中间态。
-    //   仅当【有远程真人】依赖本机 host 引擎当裁判时才保留折叠(close 会杀掉全桌牌局); 单人/纯灵魂桌直接离场。
-    $('#pkX').addEventListener('click', ()=>{ if(remoteSeats.length===0 && !isGuest) close(); else minimize(); });
+    // 「✕ 返回」: 牌局进行中一律折叠保活(主人: 本手没结束就返回, 再进要接着玩, 不是新开一桌);
+    //   有远程真人靠本机 host 当裁判时也必须折叠(close 会杀全桌); 只有 lobby / 本手已结束才真散桌离场。
+    $('#pkX').addEventListener('click', ()=>{
+      const handLive = st.phase!=='lobby' && st.phase!=='over';
+      if (remoteSeats.length>0 || isGuest || handLive) minimize(); else close();
+    });
     const rotBtn = $('#pkRot');
     if (rotBtn) rotBtn.addEventListener('click', ()=>{
       const on = root.EHTableOrient ? root.EHTableOrient.toggle(room) : false;
@@ -804,13 +807,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function displayOrder(){                // 从我起, 顺时针一圈的座位号
       const out=[]; for(let i=0;i<n;i++) out.push((mySeat+i)%n); return out;
     }
-    // 本桌净盈亏徽标(常驻座位): 取上一手结算后的净额, 手内不抖动。首手结算前(handNo===0)不显, 避免开局一排"±0"。
-    function netPill(seat){
-      if (handNo===0) return '';
-      const v = netSettled[seat]||0;
-      const cls = v>0?'up':(v<0?'down':'zero');
-      return `<div class="pk-net ${cls}">本桌 ${v>=0?'+':''}${v}</div>`;
-    }
+    // 本桌净盈亏不再常驻座位(主人: 座位上的输赢钱数是冗余噪声, 去掉更简洁)——
+    //   累计净额仍在结算面板「本手详情」的逐席 .pk-nets 里可查(netSettled 照常维护)。
     // 小盲/大盲席位(与 poker-engine deal 同口径: 2 人时庄=小盲/对家=大盲; 3+ 人时庄+1=小盲、庄+2=大盲)。
     //   lobby/入座态不显; 结算态仍显(便于回看本手盲位)。返回角标 HTML。
     function blindSeats(){
@@ -902,7 +900,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-avr"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
-        ${netPill(seat)}
         ${hole}
         <div class="pk-say"></div>
       </div>`;
@@ -1002,10 +999,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
               commitEl.style.left = ccx0+'%'; commitEl.style.top = ccy0+'%';
             }
           } else {
-            // 横屏矮 felt: 投入筹码更贴各家座位(0.44 而非 0.62)——顶中席的筹码本会摆到座位与桌心之间,
-            //   正压在底池药丸上(实测"底池×席3叠")。往座位一侧收后, 让出中央狭带给底池+公共牌。
-            const f = land ? 0.44 : 0.62;
-            const ccx = 50 + (cx-50)*f, ccy = CY + (cy-CY)*f;
+            // 投入筹码摆各家身前(座位→桌心方向内移)。竖屏公共牌行又宽又居中(cx≈24~76 / cy≈30~47),
+            //   侧席按比例插值会正落在牌行/底池上(主人反馈"下注位置遮挡其他元素")→ 落点若进中央牌区,
+            //   就沿竖向推出牌带(上半席推到牌行上方 cy28, 下半席推到下方 cy49), 保证不压公共牌/底池。
+            const f = land ? 0.44 : 0.6;
+            let ccx = 50 + (cx-50)*f, ccy = CY + (cy-CY)*f;
+            if (!land && ccx>22 && ccx<78 && ccy>30 && ccy<47) ccy = (cy < CY ? 28 : 49);
             commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
           }
         }
@@ -1302,7 +1301,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-qbtn" data-q="allin">全下</button>
         </div>
         <div class="pk-row">
-          <button class="pk-b fold" id="pkFold" ${(la.canFold && !la.canCheck)?'':'disabled'}>弃牌</button>
+          <button class="pk-b fold" id="pkFold" ${la.canFold?'':'disabled'}>弃牌</button>
           <button class="pk-b call${la.canCheck?' check':''}" id="pkCall">${callTxt}</button>
           <button class="pk-b raise ${isAllinAmt?'allin':''}" id="pkRaise" ${canRaiseLike?'':'disabled'}>${isAllinAmt?'全下':raiseLabel} <span class="bt">${isAllinAmt?raiseTo:('至 '+raiseTo)}</span></button>
         </div>`;
@@ -1531,6 +1530,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           }, remainMs);
         }
         if(aiSeat){ const remainMs=Math.max(0,turnAiAct-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }
+        return;
+      }
+      // ★灵魂/AI(及 guest 观战)席无硬死线: 头像亮"思考中"💭, 环保持满格稳定(不做倒计时消减)——
+      //   否则同一头像上"消减的倒计时环"与"💭思考"是两种互相矛盾的时间信号(主人反馈"思考和倒计时重叠")。
+      //   只有真有死线的席(我 / host 视角的远程真人)才走消减环 + 数字。AI 出手仍由 aiTimer 独立到点触发。
+      if (!digitSeat){
+        if (seatEl) seatEl.style.setProperty('--p', 360);
+        if (aiSeat){ aiTimer = setTimeout(()=>aiStep(seat), Math.max(0, turnAiAct-(Date.now()-turnStart))); }
         return;
       }
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。

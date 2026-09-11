@@ -178,10 +178,16 @@
   // 从 from 起(含), 找第一个「还需行动」的座位; 无则 -1。
   //   需行动 = 未盖牌 && 未全下 && 有筹码 && 不(已行动且已跟平当前注)。
   function needsActionFrom(state, from){
+    // 还能下注的活人(未盖/未全下/有筹码)。≤1 时无人能被加注 → 唯一活人已跟平当前注就没有有效决策。
+    const liveActors = state.players.filter(p => !p.folded && !p.allin && p.stack > 0).length;
     for (let i = 0; i < state.n; i++){
       const s = (from + i) % state.n, p = state.players[s];
       if (p.folded || p.allin || p.stack === 0) continue;
       if (p.acted && p.street === state.currentBet) continue;
+      // ★全下短路(主人: 除我外都 all-in 后别再让我一街街空过): 其余未盖牌者都已全下、
+      //   只剩他一个活人, 且他已无需跟注 —— 过牌无意义、下注也没人能跟, 直接判无人行动 → 跑完发牌摊牌。
+      //   (若他还欠注 toCall>0, 说明面对一个 all-in, 仍保留他 跟/弃 的真实决策, 不短路。)
+      if (liveActors <= 1 && (state.currentBet - p.street) === 0) continue;
       return s;
     }
     return -1;

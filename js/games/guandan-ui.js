@@ -17,7 +17,7 @@
   'use strict';
   const Deck = root.EHDeck, Rules = root.EHGuandanRules, Engine = root.EHGuandanEngine, AI = root.EHGuandanAI;
 
-  const HUMAN_PLAY_MS = 22000;
+  const HUMAN_PLAY_MS = 20000;
   // AI 每步思考时长 = 对手头像上的倒计时时长。旧值 750~1350ms 太短, ceil(remain/1000) 基本恒为 1,
   // 对手座位徽标"每次都显示 1、看不出在倒数"(对标腾讯机器人想 2~3 秒才看得到数字往下跳)。
   // 抬到 1.8~3.4s: 起始至少 2, 可见地 3→2→1 往下走; 仍够利落(三家 AI 一轮≈7~9s)。
@@ -1659,7 +1659,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');   // 当前行动席(含对手)头像秒数徽标
+      // 无硬死线的席(AI/灵魂/远程展示): 亮💭 + 环保持满格(不消减)。消减环+💭 是两种矛盾时间信号叠一头像(主人反馈"思考和倒计时重叠")。
       if(secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
+      if(seatEl && !digitSeat) seatEl.style.setProperty('--p',360);
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
@@ -1676,7 +1678,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       };
       // 折叠(minimized)态房 display:none, 环不可见 —— 不起 rAF 每帧对隐藏节点写 --p 空转耗电。
       //   我方超时 onExpire 折叠时本就为 null(离席不自动过牌); AI/远程席由下方 setTimeout 独立推进。
-      if(!minimized) tick();
+      if(!minimized && digitSeat) tick();   // 消减环只给真有死线的席; AI/灵魂席环已置满格, 出手由下方 setTimeout 独立推进
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程席(超时托管)/host 本机 AI 席。
       if (mine) return;
       if (isGuest) return;                                             // guest 只渲染, host 是唯一裁判
@@ -2043,7 +2045,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const seatEl=seatOf(seat), clk=room.querySelector('#gdClk');
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');
+      // 非我(AI/灵魂)进还贡席: 亮💭 + 环满格稳定, 不做倒计时消减(对齐出牌回合, 避免"思考+倒计时"矛盾信号)。
       if(secEl && !mine){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
+      if(seatEl && !mine) seatEl.style.setProperty('--p',360);
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0; const deg=Math.round(frac*360);
@@ -2053,7 +2057,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if(remain<=0){ ringRAF=null; if(mine) onTributeTimeout(); return; }
         ringRAF=requestAnimationFrame(tick);
       };
-      if(!minimized) tick();
+      if(!minimized && mine) tick();   // 消减环只给我(有死线); AI 席环已满格, 落子由下方 setTimeout 推进
       if(mine) return;                              // 人席靠 tick→onTributeTimeout 兜底
       const remainMs=Math.max(0,turnDur-(Date.now()-turnStart));
       aiTimer=setTimeout(()=>aiTribute(seat), remainMs);
