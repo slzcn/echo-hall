@@ -312,6 +312,10 @@ html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border
 .pk-me .pk-hole{display:flex;gap:6px}
 .pk-me .pk-hole .card.justdealt{animation:pkDeal .34s ease both}
 @keyframes pkDeal{from{transform:translateY(30px) scale(.7);opacity:0}to{transform:none;opacity:1}}
+/* 发牌动画: 新一手每张底牌"从桌心上方飞落"入座, 按真实发牌序(SB 起绕圈发两轮)错峰 → 补齐"发牌过程"(主人: 每局缺发牌过程/动画)。
+   对手是牌背、我是正面, 同一套落座动画; 由 runDealAnim() 逐张挂 animation-delay。一次性(both), 本手内重渲不再触发(dealAnim 门控)。 */
+.pk-seat .pk-mini-hole .card.pk-dealing{animation:pkDealIn .32s cubic-bezier(.2,.85,.3,1) both}
+@keyframes pkDealIn{from{opacity:0;transform:translateY(-40px) scale(.42) rotate(-7deg)}55%{opacity:1}to{opacity:1;transform:none}}
 .pk-me .pk-info{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pk-me .pk-nmrow{display:flex;align-items:center;gap:7px}
 .pk-me .pk-nm{font-size:14px;font-weight:800;color:var(--ink);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -961,6 +965,21 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       positionSeats();
       if (st.phase==='lobby') bindLobbySeats();
+      // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
+      //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
+      else if (dealAnim && (st.players[mySeat].hole||[]).length>0) runDealAnim();
+    }
+    // 按真实发牌顺序给底牌挂错峰落座动画: 从庄家下家(SB)起绕圈, 发两轮(每人先落第1张、再落第2张)。
+    function runDealAnim(){
+      const N=st.players.length, btn=st.button||0, STEP=55;
+      const seq=[]; for(let i=1;i<=N;i++){ const s=(btn+i)%N; const p=st.players[s]; if(p && !p.folded && (p.hole||[]).length>0) seq.push(s); }
+      const len=seq.length||1;
+      seq.forEach((s,j)=>{
+        const seatEl=els.table.querySelector(`.pk-seat[data-seat="${s}"]`); if(!seatEl) return;
+        seatEl.querySelectorAll('.pk-mini-hole .card').forEach((c,k)=>{
+          c.style.animationDelay=((k*len+j)*STEP)+'ms'; c.classList.add('pk-dealing');
+        });
+      });
     }
     function positionSeats(){
       const land = root.EHTableOrient ? root.EHTableOrient.reflect(room) : false;  // 横屏态标记(open/resize/旋转都会过这里)
@@ -1542,12 +1561,23 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         if(aiSeat){ const remainMs=Math.max(0,turnAiAct-(Date.now()-turnStart)); aiTimer=setTimeout(()=>aiStep(seat), remainMs); }
         return;
       }
-      // ★灵魂/AI(及 guest 观战)席无硬死线: 头像亮"思考中"💭, 环保持满格稳定(不做倒计时消减)——
-      //   否则同一头像上"消减的倒计时环"与"💭思考"是两种互相矛盾的时间信号(主人反馈"思考和倒计时重叠")。
-      //   只有真有死线的席(我 / host 视角的远程真人)才走消减环 + 数字。AI 出手仍由 aiTimer 独立到点触发。
+      // ★灵魂/AI(及 guest 观战)席: 头像亮"思考中"💭, 环也走消减动画 —— 与"我的"一致(主人: 别人的思考圈缺倒计时动画, 自己的有)。
+      //   环时长取该席【真实出手时刻】而非虚假硬死线, 忠实非误导: AI 席 = turnAiAct(思考 2~7s, 环走到 0 正好出手);
+      //   guest 观战他人 = turnDur(展示对家人类时钟)。只走环、不显数字秒(AI 无硬死线, 数字会从 2 跳 0 像坏了), 头像保留 💭。
       if (!digitSeat){
-        if (seatEl) seatEl.style.setProperty('--p', 360);
         if (aiSeat){ aiTimer = setTimeout(()=>aiStep(seat), Math.max(0, turnAiAct-(Date.now()-turnStart))); }
+        const ringDur = aiSeat ? turnAiAct : turnDur;
+        if (ringDur>0 && seatEl){
+          let lastDegN=-1;
+          const tickRing=()=>{
+            const remain=Math.max(0, ringDur-(Date.now()-turnStart));
+            const deg=Math.round((ringDur?remain/ringDur:0)*360);
+            if(deg!==lastDegN){ seatEl.style.setProperty('--p',deg); lastDegN=deg; }
+            if(remain<=0){ ringRAF=null; return; }
+            ringRAF=requestAnimationFrame(tickRing);
+          };
+          tickRing();
+        } else if (seatEl){ seatEl.style.setProperty('--p', 360); }
         return;
       }
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。

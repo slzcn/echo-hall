@@ -1659,9 +1659,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
       let lastDeg=-1, lastSec=-1;
       const secEl = seatEl && seatEl.querySelector('.gd-sec');   // 当前行动席(含对手)头像秒数徽标
-      // 无硬死线的席(AI/灵魂/远程展示): 亮💭 + 环保持满格(不消减)。消减环+💭 是两种矛盾时间信号叠一头像(主人反馈"思考和倒计时重叠")。
+      // 无硬死线的席(AI/灵魂/远程展示): 亮💭(思考中) + 环随【真实出手时刻】消减(下方 tick 驱动, 与我方/德州一致)。
+      //   环时长=turnDur(AI 席=aiDur), 到 0 正好触发 aiStep, 忠实非误导; 只走环不显数字秒(AI 无硬死线, 秒从 2 跳 0 像坏了)。
+      //   主人: 对手"思考圈圈"要和自己的一样有倒计时动画 → 环消减+💭 并存(💭=思考态, 环=距离真实出手还剩多久, 不矛盾)。
       if(secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
-      if(seatEl && !digitSeat) seatEl.style.setProperty('--p',360);
       const tick=()=>{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
@@ -1678,7 +1679,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       };
       // 折叠(minimized)态房 display:none, 环不可见 —— 不起 rAF 每帧对隐藏节点写 --p 空转耗电。
       //   我方超时 onExpire 折叠时本就为 null(离席不自动过牌); AI/远程席由下方 setTimeout 独立推进。
-      if(!minimized && digitSeat) tick();   // 消减环只给真有死线的席; AI/灵魂席环已置满格, 出手由下方 setTimeout 独立推进
+      if(!minimized) tick();   // 环对所有在手席消减: 有死线席(我/远程)走 turnDur+数字秒; AI/灵魂席走 aiDur(真实出手时刻), 到 0 正好出手, 只走环不显数字
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程席(超时托管)/host 本机 AI 席。
       if (mine) return;
       if (isGuest) return;                                             // guest 只渲染, host 是唯一裁判
