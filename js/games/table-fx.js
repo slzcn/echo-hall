@@ -67,6 +67,13 @@
     if (!felt) return;
     ensureCss();
     opts = opts || {};
+    // 连胜叠加: 达里程碑自动升档并追加火焰角标(3 连胜起给横幅, 5 连胜起顶格金彩)
+    if (opts.streak >= 2) {
+      var stStr = '🔥 ' + opts.streak + ' 连胜';
+      opts.sub = opts.sub ? (opts.sub + ' · ' + stStr) : stStr;
+      if (opts.streak >= 5 && (opts.tier || 1) < 3) { opts.tier = 3; if (!opts.label) opts.label = opts.streak + ' 连胜！'; }
+      else if (opts.streak >= 3 && (opts.tier || 1) < 2) { opts.tier = 2; if (!opts.label) opts.label = opts.streak + ' 连胜！'; }
+    }
     var tier = TIERS[opts.tier] || TIERS[1];
     var pal = (opts.palette && opts.palette.length) ? opts.palette : ['🎉', '✨', '🎊', '⭐'];
     // 顶级追加金色元素密度, 让"名场面"金光更满
@@ -113,5 +120,16 @@
     }
   }
 
-  window.EHTableFx = { celebrate: celebrate };
+  // 连胜账本(按游戏各存一条 localStorage): won→自增并返回新值, 输→清零返回 0。
+  // 幂等由调用方(各局 showOver 的 once-per-over 守卫)保证, 此处只做纯读写。
+  function streak(game, won) {
+    var key = 'eh_streak_' + game;
+    var n = 0;
+    try { n = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) {}
+    n = won ? n + 1 : 0;
+    try { localStorage.setItem(key, String(n)); } catch (e) {}
+    return n;
+  }
+
+  window.EHTableFx = { celebrate: celebrate, streak: streak };
 })();

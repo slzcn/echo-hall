@@ -2238,10 +2238,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           else if (res.doubleDown){ tier=3; label='双下！'; sub='连升 '+res.advance+' 级'; }
           else if (res.advance>=2){ tier=2; label='连升 '+res.advance+' 级！'; }
           else if (res.bombs>=2){ tier=2; }
-          EHTableFx.celebrate(els.felt, { tier, palette:PAL, label, sub });
+          let streak=0; if(!res._streaked){ res._streaked=true; streak=EHTableFx.streak('guandan', true); }
+          EHTableFx.celebrate(els.felt, { tier, palette:PAL, label, sub, streak });
         } else confetti();
       }
-      else { sfx('void'); vibrate(120); }
+      else { sfx('void'); vibrate(120); if (window.EHTableFx && !res._streaked){ res._streaked=true; EHTableFx.streak('guandan', false); } }
       const againBtn = over.querySelector('#gdAgain');
       const clearAgainTimer = ()=>{ if (over._againTimer){ clearInterval(over._againTimer); over._againTimer=null; } };
       if (!isGuest){

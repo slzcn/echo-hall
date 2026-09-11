@@ -17,6 +17,7 @@ const CASES = [
   { tier: 1, palette: ['🎉', '🃏', '✨', '🎊', '⭐', '💠'], label: '', sub: '', tag: 'tier1' },
   { tier: 2, palette: ['🎉', '🃏', '✨', '🎊', '⭐', '💠', '🀄'], label: '连升 2 级！', sub: '', tag: 'tier2' },
   { tier: 3, palette: ['🎉', '💰', '✨', '🎊', '⭐', '🪙'], label: '皇家同花顺！', sub: '通吃全场', tag: 'tier3' },
+  { tier: 1, palette: ['🎉', '🃏', '✨', '🎊', '⭐', '💠'], streak: 5, tag: 'streak5' }, // 连胜升档: tier1→tier3 + "5 连胜！"
 ];
 
 const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
