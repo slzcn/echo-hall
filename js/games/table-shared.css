@@ -382,6 +382,52 @@ html[data-mode="day"] .pk-avr .av{
 .ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
   transform: scale(.95) !important;
 }
+/* ── I2. 收敛"满屏青描边": 中性按钮玻璃化, 顶栏圆钮实体化 ──────
+ * 主人点名整体"赛博线框廉价", 一大来源是所有按钮都是一根扁平青描边。
+ * 只给"中性"按钮(不承载动作语义的)补玻璃受光, 带语义的彩色变体(primary/danger/ghost/
+ * call/raise/allin…)一律不动——它们靠颜色传达"这是主操作/加注/全下", 一刀切会切坏语义。
+ * background-image 走 longhand 叠在各 UI 的 background:var(--panel) 简写之上(简写在前置文件、
+ * 本 longhand 在后置文件, 只覆盖 image 子属性, 保留 --panel 底色 → 自动兼容日/夜)。 */
+.ddz-btn:not(.primary):not(.ghost):not(.danger),
+.gd-btn:not(.primary):not(.ghost),
+.pk-b.fold, .pk-b.call.check, .pk-qbtn{
+  background-image: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 44%, rgba(0,0,0,.12)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -2px 5px rgba(0,0,0,.18),
+    0 2px 7px rgba(0,0,0,.3) !important;
+  border-color: rgba(0,229,212,.24) !important;
+}
+html[data-mode="day"] .ddz-btn:not(.primary):not(.ghost):not(.danger),
+html[data-mode="day"] .gd-btn:not(.primary):not(.ghost),
+html[data-mode="day"] .pk-b.fold,
+html[data-mode="day"] .pk-b.call.check,
+html[data-mode="day"] .pk-qbtn{
+  background-image: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.2) 50%, rgba(0,90,82,.05)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.14) !important;
+  border-color: rgba(0,127,118,.26) !important;
+}
+/* 顶栏圆钮(音乐/记牌器/横屏): 透明描边圆 → 一枚受光玻璃圆盘, 与座位徽章同一材质语言 */
+.ddz-mus, .ddz-cnt, .ddz-rot, .gd-mus, .gd-rot, .pk-mus, .pk-rot{
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.10), transparent 62%),
+    rgba(255,255,255,.035) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 2px 6px rgba(0,0,0,.26) !important;
+}
+html[data-mode="day"] .ddz-mus, html[data-mode="day"] .ddz-cnt, html[data-mode="day"] .ddz-rot,
+html[data-mode="day"] .gd-mus, html[data-mode="day"] .gd-rot,
+html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-rot{
+  background:
+    radial-gradient(circle at 50% 30%, #ffffff, transparent 66%),
+    rgba(255,255,255,.6) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.12) !important;
+}
 
 /* ── J. 结算面板玻璃化 ────────────────────────────────────── */
 .ddz-over, .gd-over, .pk-over{
