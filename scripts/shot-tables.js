@@ -38,6 +38,8 @@ async function shot(browser, game, palette, tag){
     + '#hall{position:relative;width:100%;height:100vh;overflow:hidden}</style><body><div id="hall"></div>', { waitUntil:'load' });
   for (const f of cfg.files) await page.addScriptTag({ content: G(f) });
   await page.evaluate(cfg.open);
+  // 共享皮肤层(index.html 里是 <link>, 探针里手动注入, 否则截到的是没套 table-shared.css 的裸桌)
+  await page.addStyleTag({ content: fs.readFileSync(path.join(ROOT, 'js/games/table-shared.css'), 'utf8') });
   await page.waitForFunction(sel=>document.querySelector(sel), cfg.wait, { timeout: 12000 }).catch(()=>{});
   await page.waitForTimeout(900);
   const out = path.join(SHOT_DIR, PREFIX+'-'+game+'-'+tag+'.png');

@@ -100,25 +100,53 @@
 .ddz-room .card.red, .gd-room .card.red, .pk-room .card.red{ color:#d81e37; }
 .ddz-room .card.blk, .gd-room .card.blk, .pk-room .card.blk{ color:#151a24; }
 
-/* ── C. 桌面绿绒毡 (三款一致的桌面质感) ───────────────────── */
-/* 用 layered radial 做"聚光灯 + 桌面纹理"; ::after 已用作 shake/flash 的地方绕开 */
-.ddz-felt, .gd-felt, .pk-felt{
+/* ── C. 真牌桌重构 (三款统一"绿呢台面 + 皮革围边") ─────────────
+ * 旧版桌面是半透明 radial 叠在纯黑上(.46/.10 alpha) → 稀成一圈青色空心环, 中心发黑, 像线框 demo 而非台面(实拍已证)。
+ * 重构口径(对标腾讯欢乐系列真桌感):
+ *   1) 台面不透明 + 高饱和翡翠绒: 亮心聚光灯 → 深绿呢 → 边缘暗晕, 一眼是"绿台面"不是"发光的洞"。
+ *   2) 皮革围边: 用 box-shadow 叠环模拟"暗皮边 + 顶沿高光 + 底沿阴影"的立体厚度, 取代原来一根扁平青线。
+ *   3) 收敛霓虹: 青只留一道极淡外发光当品牌呼吸, 不再让青描边当台面主角。
+ *   4) 织纹: 两道±45° 极淡斜纹, 近看有呢子编织感, 远看不脏。
+ * 高特异性 .*-room 前缀提权, 稳压各 UI 文件里的 .*-center::before/.pk-table::before 基础规则(同类同伪元素, 靠 link 后置 + 前缀取胜)。 */
+.ddz-room .ddz-center::before,
+.gd-room  .gd-center::before,
+.pk-room  .pk-table::before{
   background-image:
-    radial-gradient(ellipse 90% 60% at 50% 40%,
-      rgba(0, 90, 78, .22),
-      rgba(0, 40, 40, .10) 55%,
-      transparent 75%),
-    radial-gradient(ellipse 140% 80% at 50% -10%,
-      rgba(0, 229, 212, .06),
-      transparent 65%);
-}
-/* 德州 pk-table::before 已经有绿毡椭圆, 加一层内阴影拉出"皮革"质感 */
-.pk-room .pk-table::before{
+    repeating-linear-gradient(45deg, rgba(255,255,255,.020) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,.045) 0 1px, transparent 1px 5px),
+    radial-gradient(ellipse 74% 66% at 50% 36%,
+      #2ba07f 0%, #17805f 34%, #0d5f49 60%, #084036 82%, #052a25 100%) !important;
+  border: none !important;
   box-shadow:
-    inset 0 2px 30px rgba(0, 0, 0, .55),
-    inset 0 0 0 1px rgba(255, 255, 255, .04),
-    inset 0 -20px 40px rgba(0, 0, 0, .35),
-    0 0 24px rgba(0, 229, 212, .08);
+    /* 皮革围边: 暗皮基底环 + 极淡青品牌环 */
+    0 0 0 5px #071e1b,
+    0 0 0 6px rgba(0,229,212,.12),
+    /* 台面浮起于背景 */
+    0 18px 44px rgba(0,0,0,.5),
+    0 0 26px rgba(0,229,212,.07),
+    /* 顶沿高光(光自上方) + 底沿暗影 = 立体围边厚度 */
+    inset 0 3px 1px rgba(255,255,255,.11),
+    inset 0 -24px 48px rgba(0,0,0,.42),
+    /* 四周暗晕(vignette): 让边缘沉下去, 中心被聚光灯托起 */
+    inset 0 0 62px rgba(0,0,0,.44) !important;
+}
+/* 日间: 浅底上深绿绒会发灰, 换清透薄荷呢(亮心→淡翡翠边), 皮革边换成浅木沿 + 白高光 */
+html[data-mode="day"] .ddz-room .ddz-center::before,
+html[data-mode="day"] .gd-room  .gd-center::before,
+html[data-mode="day"] .pk-room  .pk-table::before{
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgba(0,90,80,.035) 0 1px, transparent 1px 5px),
+    radial-gradient(ellipse 74% 66% at 50% 36%,
+      #8fe6cd 0%, #4cc6a7 38%, #16a488 66%, #0a8874 88%, #077062 100%) !important;
+  border: none !important;
+  box-shadow:
+    0 0 0 5px #cfe9e2,
+    0 0 0 6px rgba(0,127,118,.22),
+    0 14px 34px rgba(0,80,74,.22),
+    inset 0 3px 1px rgba(255,255,255,.7),
+    inset 0 -22px 44px rgba(0,70,64,.14),
+    inset 0 0 54px rgba(0,60,54,.12) !important;
 }
 
 /* ── D. 顶栏 chip 化: 让 title + dot + mult/lvl/blinds + conn 抱在一起 ── */
