@@ -175,12 +175,17 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-avr{width:var(--av,44px);height:var(--av,44px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;position:relative;transition:background .15s}
 .pk-seat.turn .pk-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .pk-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,20px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
-.pk-seat.turn .pk-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+/* 行动席发光改脉冲(对齐 ddz/掼蛋): 静态发光扫一眼抓不住"轮到谁", 脉冲把眼睛拉过去 */
+.pk-seat.turn .pk-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6));animation:pkSeatTurn 1.1s ease-in-out infinite}
+@keyframes pkSeatTurn{0%,100%{box-shadow:0 0 10px 1px var(--accent,rgba(0,229,212,.5))}50%{box-shadow:0 0 20px 5px var(--accent,rgba(0,229,212,.9))}}
 /* 回合秒数徽标: 只在当前行动席(含对手)头像右下角亮, 让"轮到谁、还剩几秒"看得见 */
 .pk-sec{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);color:var(--amber,#ffc24d);font-size:9px;font-weight:800;line-height:14px;text-align:center;font-variant-numeric:tabular-nums;display:none;z-index:5}
 .pk-seat.turn .pk-sec{display:block}
 .pk-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:pkBlink .6s steps(2,start) infinite}
 @keyframes pkBlink{50%{opacity:.35}}
+/* 本机 AI(灵魂)无硬死线: 显"思考中"💭 脉冲而非误导性数字倒计时(对齐 ddz/掼蛋 + 状态忠实) */
+.pk-sec.think{border-color:var(--dim,#498d88);color:var(--sub,#86cbc6);font-size:10px;animation:pkThink 1.15s ease-in-out infinite}
+@keyframes pkThink{0%,100%{opacity:.5}50%{opacity:1}}
 .pk-seat.win .pk-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .pk-btn-d{position:absolute;right:-6px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#fff;color:#111;font-size:10px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.5);z-index:5}
 /* 小盲/大盲席位角标(对标腾讯: 盲位一眼看清)。摆头像左下, 与右下的 D 标错开。SB 蓝、BB 橙。 */
@@ -1490,6 +1495,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
       const clk = mine ? $('#pkClk') : null;       // #pkClk 已从 pk-me 移除, 此处恒 null, 下方 if(mine&&clk) 自然跳过
       const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 行动席头像秒数徽标(含我)
+      // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管, 数字才有意义。
+      //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳 0 像坏了 → 头像只亮"思考中"💭 脉冲, 不显误导性倒计时(对齐 ddz/掼蛋)。
+      const digitSeat = mine || remote;
+      if (secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       if (turnDur<=0) return;
       // ★折叠(minimized)态: 房 display:none, 环不可见 —— 不再起 rAF 每帧对隐藏节点写 --p(后台自动连打时
       //   会一直空转耗电)。只挂一个到点定时器: host 兜底代打远程超时 / 我方超时(onExpire, 折叠时为 null 即不动)。
@@ -1514,7 +1523,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
         const sec=Math.ceil(remain/1000);
         if(sec!==lastSec){
-          if(secEl){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); }
+          if(secEl && digitSeat){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); secEl.classList.remove('think'); }
           if(mine && clk){ clk.textContent=sec+'s'; clk.classList.toggle('urgent',sec<=5); }
           lastSec=sec;
         }

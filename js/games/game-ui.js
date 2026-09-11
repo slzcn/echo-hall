@@ -138,7 +138,9 @@
 .ddz-seat.turn .ddz-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .ddz-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:var(--avf,23px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
-.ddz-seat.turn .ddz-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6))}
+/* 行动席发光改脉冲(对齐掼蛋 gdSeatTurn): 静态发光扫一眼抓不住"轮到谁", 脉冲把眼睛拉过去(纯 box-shadow) */
+.ddz-seat.turn .ddz-avr .av{box-shadow:0 0 14px var(--accent,rgba(0,229,212,.6));animation:ddzSeatTurn 1.1s ease-in-out infinite}
+@keyframes ddzSeatTurn{0%,100%{box-shadow:0 0 10px 1px var(--accent,rgba(0,229,212,.5))}50%{box-shadow:0 0 20px 5px var(--accent,rgba(0,229,212,.9))}}
 /* 回合秒数徽标: 只在当前行动席(含对手)头像右下角亮, 让"轮到谁、还剩几秒"看得见 */
 .ddz-sec{position:absolute;right:-4px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;box-sizing:border-box;
   border-radius:9px;background:var(--panel-solid,#132a29);border:1px solid var(--amber,#ffc24d);
@@ -146,6 +148,9 @@
   font-variant-numeric:tabular-nums;display:none;z-index:3}
 .ddz-seat.turn .ddz-sec{display:block}
 .ddz-sec.urgent{border-color:var(--magenta,#ff2d8e);color:var(--magenta,#ff2d8e);animation:ddzBlink .6s steps(2,start) infinite}
+/* 本机 AI 无硬死线: 显"思考中"💭 脉冲而非误导性数字倒计时(对齐掼蛋 + 状态忠实) */
+.ddz-sec.think{border-color:var(--dim,#498d88);color:var(--sub,#86cbc6);font-size:10px;animation:ddzThink 1.15s ease-in-out infinite}
+@keyframes ddzThink{0%,100%{opacity:.5}50%{opacity:1}}
 .ddz-seat.win .ddz-avr .av{border-color:var(--amber,#ffc24d);box-shadow:0 0 16px var(--amber,rgba(255,194,77,.7))}
 .ddz-seat.win .nm{color:var(--amber,#ffc24d);font-weight:700}
 .ddz-seat.landlord .ddz-avr .av::after{content:'👑';position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:15px}
@@ -1219,7 +1224,11 @@ html[data-mode="day"] .ddz-center::before{
       // 降频: rAF 每帧(~60fps)只在【整度数变化】时才写 --p(conic 环步进 1° ≈ 亚像素, 视觉等价),
       //   秒数也只在【整秒变化】时才写文本 —— 免掉每秒几十次无谓的 conic 重绘与 textContent 回流。
       let lastDeg=-1, lastSec=-1;
+      // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管, 数字才有意义。
+      //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳 0 像坏了 → 头像只亮"思考中"💭 脉冲, 不显误导性倒计时(对齐掼蛋/状态忠实)。
+      const digitSeat = mine || remote;
       const secEl = seatEl && seatEl.querySelector('.ddz-sec');   // 当前行动席(含对手)头像上的秒数徽标
+      if (secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       const tick = ()=>{
         const elapsed = Date.now() - turnStart;
         const remain = Math.max(0, turnDur - elapsed);
@@ -1228,7 +1237,7 @@ html[data-mode="day"] .ddz-center::before{
         if (seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p', deg); lastDeg=deg; }
         const sec = Math.ceil(remain/1000);
         if (sec!==lastSec){
-          if (secEl){ secEl.textContent = sec; secEl.classList.toggle('urgent', sec<=5); }
+          if (secEl && digitSeat){ secEl.textContent = sec; secEl.classList.toggle('urgent', sec<=5); secEl.classList.remove('think'); }
           if (mine && clk){ clk.textContent = sec+'s'; clk.classList.toggle('urgent', sec<=5); }
           lastSec=sec;
         }
