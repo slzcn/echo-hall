@@ -212,6 +212,16 @@ html[data-mode="day"] .gd-center::before{
 .gd-peek .pk-t{font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--sub,#86cbc6);opacity:.85}
 .gd-peek .pk-cards{display:flex;flex-wrap:wrap;justify-content:center;gap:2px}
 .gd-peek .card.mini{margin:0}
+/* 常驻"上一手牌"(对标腾讯): 各席本圈最近出的牌小牌行常驻座位下方, 不用飞回中央才看清谁出了啥;
+   "不出"则显灰 chip。桌心清空(新一圈)即整体消失。窄侧席(82px)用密叠, 长牌型不撑爆列。 */
+.gd-lastplay{display:flex;justify-content:center;flex-wrap:nowrap;align-items:center;margin-top:4px;min-height:38px}
+.gd-lastplay .card{width:24px;height:34px;margin-left:-14px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.gd-lastplay .card:first-child{margin-left:0}
+.gd-lastplay .card .cn{font-size:11px}.gd-lastplay .card .cs{font-size:8px;top:12px}.gd-lastplay .card .cc{font-size:13px}
+.gd-lastplay.dense .card{margin-left:-17px}
+.gd-lastplay .lp-pass{font-size:10px;font-weight:700;color:var(--sub,#86cbc6);border:1px solid var(--line2);border-radius:8px;padding:1px 8px;background:rgba(0,0,0,.28)}
+.gd-lastplay.fresh{animation:gdLpIn .22s ease-out}
+@keyframes gdLpIn{from{opacity:0;transform:translateY(-4px) scale(.92)}to{opacity:1;transform:none}}
 /* 中央 */
 .gd-banner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s;text-align:center}
 .gd-banner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px rgba(0,229,212,.75);border-radius:999px;background:linear-gradient(90deg,rgba(0,229,212,.26),rgba(0,229,212,.05));animation:gdTurnPulse 1.05s ease-in-out infinite}
@@ -1233,6 +1243,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
         <div class="gd-tags">${tags.join('')}</div>
+        ${lastPlayHTML(seat)}
         <div class="gd-say"></div>
       </div>`;
     }
@@ -1286,6 +1297,37 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let lastShownKey='';
     let lastLevel=null;          // 台面级(打几)变化上升沿 → 级牌徽标跳动
     function playKey(){ const lp=st.table.lastPlay; if(!lp) return st.table.passesInRow>0?('pass:'+st.turn):'empty'; return lp.seat+':'+lp.cards.join(','); }
+    // ── 常驻"上一手牌": 各席本圈最近动作(出牌小牌行 / 不出 chip)常驻座位下方 ──
+    // 引擎只有全局 st.table.lastPlay(每圈清空), 无逐席记录 → UI 侧按"lastPlay 变化 + 轮次推进"派生。
+    //   纯装饰不动引擎; lastPlay.cards 是已公开落牌, 不碰别家底牌; guest 快照跳步最多残留一帧自愈。
+    let trickActs = {};          // seat -> {cards:[ids]} | {pass:true}
+    let _trickPrevTurn = -1, _trickSig = '', _trickFresh = -1;
+    function updateTrickActs(){
+      _trickFresh = -1;
+      if (st.phase!=='play'){ trickActs={}; _trickPrevTurn=-1; _trickSig=''; return; }
+      const lp = st.table.lastPlay;
+      if (!lp){ trickActs={}; _trickPrevTurn=st.turn; _trickSig=''; return; }   // 新一圈领出前清空
+      const sig = lp.seat+':'+lp.cards.join(',');
+      if (sig !== _trickSig){                       // 有新的一手打出
+        trickActs[lp.seat] = { cards: lp.cards.slice() };
+        _trickFresh = lp.seat; _trickSig = sig;
+      } else if (_trickPrevTurn>=0 && _trickPrevTurn!==st.turn && _trickPrevTurn!==lp.seat && !(trickActs[_trickPrevTurn]&&trickActs[_trickPrevTurn].pass)){
+        trickActs[_trickPrevTurn] = { pass:true };   // lastPlay 未变而轮次推进 → 上个该动的人"不出"
+        _trickFresh = _trickPrevTurn;
+      }
+      _trickPrevTurn = st.turn;
+    }
+    function lastPlayHTML(seat){
+      if (st.phase!=='play' || seat===mySeat) return '';   // 自己有底部手牌托盘, 不重复
+      const a = trickActs[seat];
+      if (!a) return '';
+      const fresh = seat===_trickFresh ? ' fresh' : '';
+      if (a.pass) return `<div class="gd-lastplay${fresh}" data-lp="${seat}"><span class="lp-pass">不出</span></div>`;
+      const cards = a.cards.map(findCardById).filter(Boolean);
+      if (!cards.length) return '';
+      const dense = cards.length>=5 ? ' dense' : '';
+      return `<div class="gd-lastplay${dense}${fresh}" data-lp="${seat}">${cards.map(c=>cardEl(c, st.level, {mini:true}).outerHTML).join('')}</div>`;
+    }
     function renderTable(){
       if (counterOn) renderCounter();               // 记牌器开着时随桌面刷新未出张数/出牌历史
       if (st.phase==='lobby'){ els.who.textContent=''; els.played.className='gd-played'; els.played.innerHTML=''; return; }
@@ -2226,6 +2268,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
 
     function renderAll(){
+      updateTrickActs();   // 先派生各席本圈最近动作, 供 renderSeats 常驻"上一手牌"
       renderSeats(); renderScore(); renderMatePeek(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(minimized ? null : onHumanTimeout);   // 折叠期间不催我的回合(离席看聊天不该被自动过牌)
       if (minimized) updateChip();

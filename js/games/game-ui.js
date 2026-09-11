@@ -166,6 +166,15 @@
 .ddz-seat-reveal .card{margin-left:-16px;box-shadow:0 2px 5px rgba(0,0,0,.45)}
 .ddz-seat-reveal .card:first-child{margin-left:0}
 .ddz-seat-reveal.dense .card{margin-left:-20px}
+/* 常驻"上一手牌"(对标腾讯): 各席本圈最近出的牌小牌行常驻头像下方, 不用飞回中央才看清谁出了啥;
+   "不出"则显灰 chip。桌心清空(新一圈)即整体消失。 */
+.ddz-lastplay{display:flex;justify-content:center;flex-wrap:nowrap;align-items:center;margin-top:5px;min-height:42px}
+.ddz-lastplay .card{width:var(--cmw,28px);height:var(--cmh,40px);margin-left:-15px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.ddz-lastplay .card:first-child{margin-left:0}
+.ddz-lastplay.dense .card{margin-left:-20px}
+.ddz-lastplay .lp-pass{font-size:11px;font-weight:700;color:var(--sub,#86cbc6);border:1px solid var(--line2);border-radius:9px;padding:2px 10px;background:rgba(0,0,0,.28)}
+.ddz-lastplay.fresh{animation:ddzLpIn .22s ease-out}
+@keyframes ddzLpIn{from{opacity:0;transform:translateY(-4px) scale(.92)}to{opacity:1;transform:none}}
 /* over 态: 落牌/上家/底分收起, 中央只留结果横幅居中(提示在牌桌正中) */
 .ddz-room.is-over .ddz-played,
 .ddz-room.is-over .ddz-lastwho,
@@ -941,6 +950,7 @@ html[data-mode="day"] .ddz-center::before{
           <div class="cnt">剩 <b>${p.hand.length}</b> 张${role?` · <span class="role">${role}</span>`:''}</div>
           ${cumPill(seat)}
         </div>
+        ${lastPlayHTML(seat)}
         ${(st.phase==='over' && seat!==mySeat) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
         <div class="ddz-say"></div>
       </div>`;
@@ -1026,6 +1036,39 @@ html[data-mode="day"] .ddz-center::before{
       const lp = st.table.lastPlay;
       if (!lp) return st.table.passesInRow>0 ? ('pass:'+st.turn) : 'empty';
       return lp.seat + ':' + lp.cards.join(',');
+    }
+    // ── 常驻"上一手牌": 各席本圈最近动作(出牌小牌行 / 不出 chip)常驻头像下方 ──
+    // 引擎只有全局 st.table.lastPlay(每圈清空), 无逐席记录 → UI 侧按"lastPlay 变化 + 轮次推进"派生。
+    //   纯装饰, 不动引擎/不碰别家底牌(lastPlay.cards 是已公开落牌); guest 快照跳步最多残留一帧自愈。
+    let trickActs = {};          // seat -> {cards:[ids]} | {pass:true}
+    let _trickPrevTurn = -1;     // 上次渲染时轮到谁 → 判定"刚才那手"是谁做的
+    let _trickSig = '';
+    let _trickFresh = -1;        // 本次刚变动的席位(给入场动画)
+    function updateTrickActs(){
+      _trickFresh = -1;
+      if (st.phase!=='play'){ trickActs={}; _trickPrevTurn=-1; _trickSig=''; return; }
+      const lp = st.table.lastPlay;
+      if (!lp){ trickActs={}; _trickPrevTurn=st.turn; _trickSig=''; return; }   // 新一圈领出前清空
+      const sig = lp.seat+':'+lp.cards.join(',');
+      if (sig !== _trickSig){                       // 有新的一手打出
+        trickActs[lp.seat] = { cards: lp.cards.slice() };
+        _trickFresh = lp.seat; _trickSig = sig;
+      } else if (_trickPrevTurn>=0 && _trickPrevTurn!==st.turn && _trickPrevTurn!==lp.seat && !(trickActs[_trickPrevTurn]&&trickActs[_trickPrevTurn].pass)){
+        trickActs[_trickPrevTurn] = { pass:true };   // lastPlay 未变而轮次推进 → 上个该动的人"不出"
+        _trickFresh = _trickPrevTurn;
+      }
+      _trickPrevTurn = st.turn;
+    }
+    function lastPlayHTML(seat){
+      if (st.phase!=='play' || seat===mySeat) return '';   // 自己有底部手牌扇, 不重复
+      const a = trickActs[seat];
+      if (!a) return '';
+      const fresh = seat===_trickFresh ? ' fresh' : '';
+      if (a.pass) return `<div class="ddz-lastplay${fresh}" data-lp="${seat}"><span class="lp-pass">不出</span></div>`;
+      const cards = a.cards.map(findCardById).filter(Boolean);
+      if (!cards.length) return '';
+      const dense = cards.length>=7 ? ' dense' : '';
+      return `<div class="ddz-lastplay${dense}${fresh}" data-lp="${seat}">${cards.map(c=>cardEl(c,{mini:true}).outerHTML).join('')}</div>`;
     }
     function renderTable(){
       // 倍数条: 底分×桌面倍数(叫分×炸弹); 本地加倍局若我已选加倍, 追加"我×N"(加倍是按家独立系数, 无全局单一倍数)
@@ -1708,6 +1751,7 @@ html[data-mode="day"] .ddz-center::before{
         emitBeat({ type:'landlord', actor:nm, big:true, text:`🎪 ${nm} 抢到地主 · ${st.multiplier} 倍起` });
       }
       lastLord = st.landlord;
+      updateTrickActs();   // 先派生各席本圈最近动作, 供 renderSeats 常驻"上一手牌"
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
       justCrowned = false;
       // guest 无本地引擎(host 托管超时); 折叠期间也不催我的回合(离席看聊天不该被自动过牌)
