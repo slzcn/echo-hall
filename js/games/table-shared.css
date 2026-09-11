@@ -100,6 +100,32 @@
 .ddz-room .card.red, .gd-room .card.red, .pk-room .card.red{ color:#d81e37; }
 .ddz-room .card.blk, .gd-room .card.blk, .pk-room .card.blk{ color:#151a24; }
 
+/* ── B2. 卡牌正面"真纸张"质感 ────────────────────────────────
+ * 旧版: 纯白 #fff + 1px 淡边, 硬边白贴纸感, 大花色扁平铺中央 → 廉价。
+ * 重构: 冷白微渐变(顶亮底微灰)模拟卡纸受光 + 顶沿一道纸光高光 + 精致深描边 + 柔投影,
+ *       让每张牌像"印刷卡纸"而非 CSS 白块。中心花色做成浮雕水印, 角标 rank+花色当主读(对标真牌层次)。
+ * 排除 .back(牌背自有暗玻璃配方) 与 .joker(大小王自有金/蓝渐变, 同特异性会被覆盖故显式绕开)。 */
+.ddz-room .card:not(.back):not(.joker),
+.gd-room  .card:not(.back):not(.joker),
+.pk-room  .card:not(.back):not(.joker){
+  background: linear-gradient(158deg, #ffffff 0%, #fafbfd 46%, #eceff5 100%) !important;
+  border: 1px solid rgba(18, 32, 52, .17) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .95),
+    inset 0 -3px 7px rgba(18, 32, 52, .055),
+    0 2px 6px rgba(0, 0, 0, .34) !important;
+}
+/* 中心大花色: 浮雕水印(降透明 + 极淡内阴影), 不再扁平死铺 */
+.ddz-room .card:not(.back) .cc,
+.gd-room  .card:not(.back) .cc,
+.pk-room  .card:not(.back) .cc{
+  opacity: .82 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+}
+/* 角标: rank 与小花色抱成竖直 index 单元, 花色加重更清晰 */
+.ddz-room .card .cs, .gd-room .card .cs, .pk-room .card .cs{ font-weight: 700; }
+
 /* ── C. 真牌桌重构 (三款统一"绿呢台面 + 皮革围边") ─────────────
  * 旧版桌面是半透明 radial 叠在纯黑上(.46/.10 alpha) → 稀成一圈青色空心环, 中心发黑, 像线框 demo 而非台面(实拍已证)。
  * 重构口径(对标腾讯欢乐系列真桌感):
@@ -201,6 +227,33 @@ html.pwa-standalone .pk-bar{
 /* 只给非 turn 态补微弱 chip 底, turn 态本身已很显眼 */
 .ddz-seat .ddz-avr, .gd-seat .gd-avr, .pk-seat .pk-avr{
   transition: box-shadow .18s, transform .18s;
+}
+/* 座位徽章化: emoji 不再浮在扁平暗圆里, 而是坐在一枚"受光圆章"上——
+   顶亮高光 + 底沿暗影做出圆顶浮凸, 外加柔投影托起。turn/win/allin 态的发光在更高
+   特异性规则里(.*-seat.turn .*-avr .av 等), 会整条覆盖本 box-shadow, 状态高光不受影响。 */
+.ddz-avr .av, .gd-avr .av, .pk-avr .av{
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255,255,255,.16), transparent 58%),
+    radial-gradient(circle at 50% 120%, rgba(0,0,0,.38), transparent 62%),
+    linear-gradient(162deg, #1d403c 0%, #12302d 52%, #0d2523 100%) !important;
+  border: 1.5px solid rgba(0,229,212,.36) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.14),
+    inset 0 -4px 7px rgba(0,0,0,.42),
+    0 3px 9px rgba(0,0,0,.42) !important;
+}
+html[data-mode="day"] .ddz-avr .av,
+html[data-mode="day"] .gd-avr .av,
+html[data-mode="day"] .pk-avr .av{
+  background:
+    radial-gradient(circle at 50% 28%, #ffffff, transparent 60%),
+    radial-gradient(circle at 50% 122%, rgba(0,90,82,.16), transparent 62%),
+    linear-gradient(162deg, #f2fbf9 0%, #dcf1ee 100%) !important;
+  border: 1.5px solid rgba(0,127,118,.32) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.9),
+    inset 0 -3px 6px rgba(0,80,74,.10),
+    0 3px 8px rgba(0,70,64,.18) !important;
 }
 .ddz-seat .nm, .gd-seat .nm, .pk-seat .nm{
   font-weight: 600;
