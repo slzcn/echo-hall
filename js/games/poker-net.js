@@ -54,11 +54,12 @@
   // ── 脱敏公共快照: host 每次状态变更后广播这一份给【所有人】(含 handNo 便于客户端识别新一手去拉底牌) ──
   // 原则: 公共信息全给; 任何人的 hole 都不给([]); _deck/seed/log 由"只拷白名单字段"天然剥离。
   function snapshot(state, handNo){
-    return {
+    var snap = {
       v: 'nlhe',
       handNo: (typeof handNo === 'number') ? handNo : 0,
       phase: state.phase, street: state.street,
       n: state.n, button: state.button, sb: state.sb, bb: state.bb,
+      sbSeat: state.sbSeat, bbSeat: state.bbSeat,   // 权威盲位席号(公开信息, 客人角标直接用, 无需底牌)
       currentBet: state.currentBet, minRaise: state.minRaise, aggressor: state.aggressor,
       toAct: state.toAct, pot: state.pot,
       board: (state.board || []).map(cardPlain),
@@ -73,6 +74,15 @@
       }),
       result: state.result ? sanitizeResult(state.result) : null,
     };
+    // ★命门自检(防御纵深): 广播前每条快照都过一遍防泄漏, 万一将来白名单被改漏了底牌/牌堆/种子,
+    //   这里就地清空底牌并告警, 绝不把泄漏帧发出去。测试期同一函数会因 leaks 非空被断言逮住。
+    var chk = assertNoLeak(snap);
+    if (!chk.ok){
+      try{ (snap.players||[]).forEach(function(p){ p.hole = []; }); }catch(_){}
+      delete snap._deck; delete snap.seed; delete snap.log;
+      try{ console.error('[poker-net] 快照防泄漏拦截:', chk.leaks); }catch(_){}
+    }
+    return snap;
   }
 
   // ── 客户端: 把公共快照 + 自己的两张底牌, 组装成一个"够像引擎 state"的伪状态, 直接喂 UI 渲染 + engine.legalActions ──
@@ -81,6 +91,7 @@
     var st = {
       variant: 'nlhe', phase: snap.phase, street: snap.street,
       n: snap.n, button: snap.button, sb: snap.sb, bb: snap.bb,
+      sbSeat: snap.sbSeat, bbSeat: snap.bbSeat,
       currentBet: snap.currentBet, minRaise: snap.minRaise, aggressor: snap.aggressor,
       toAct: snap.toAct, pot: snap.pot,
       board: (snap.board || []).map(cardPlain),

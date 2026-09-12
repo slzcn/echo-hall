@@ -24,6 +24,11 @@ const dcard=(rank,s)=>({rank,id:(s||'h')+rank});
   const hMate=DDZ.hints(hand, target, {...base, lastSeat:2});
   ok(hMate.length===0, 'ddz 队友领出→提示空(让队友走), 实得 '+hMate.length+' 手');
 
+  // ①' 同一手牌【物理可压】(lastSeat=null, renderActBar 据此判 noBeat): 队友领出时协作提示虽空,
+  //     但我客观压得过 → UI 必须显示"不出"而非谎报"要不起"(状态忠实红线)。
+  const hCan=DDZ.hints(hand, target, {...base, lastSeat:null});
+  ok(hCan.length>0, 'ddz 队友领出但物理可压→canBeat 非空(UI 显"不出"非"要不起"), 实得 '+hCan.length+' 手');
+
   // ② 地主(seat1)领出 → 照常给能压的牌
   const hOpp=DDZ.hints(hand, target, {...base, lastSeat:1});
   ok(hOpp.length>0, 'ddz 对手领出→提示非空(能压), 实得 '+hOpp.length+' 手');
@@ -50,6 +55,10 @@ let gid=0; const gc=(rank,suit)=>({rank,suit,id:'g'+(gid++)+'_'+suit+rank});
   // ① 对家(seat2)领出 → 空
   const hMate=GD.hints({ hand, tableParse:target, ...base, lastSeat:2 });
   ok(hMate.length===0, '掼蛋 对家领出→提示空(让对家走), 实得 '+hMate.length+' 手');
+
+  // ①' 同一手牌【物理可压】(renderCtrl 的 plays 不带 lastSeat, 据此亮"提示"钮/判 mateLead 下不谎报):
+  const hCan=GD.hints({ hand, tableParse:target, ...base });
+  ok(hCan.length>0, '掼蛋 对家领出但物理可压→plays 非空(提示钮可点/不谎报压不过), 实得 '+hCan.length+' 手');
 
   // ② 对手(seat1)领出 → 非空
   const hOpp=GD.hints({ hand, tableParse:target, ...base, lastSeat:1 });

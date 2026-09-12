@@ -1725,7 +1725,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       //   压不过→"压不过·不出", 压得过→正常出牌。之后众人过完自然接风到我领出。
       const mateLead = myTurn && lastPlay && Engine.partnerOf(mySeat)===lastPlay.seat && st.players[lastPlay.seat].hand.length>0;
       // 智能预判: 轮到我时先算一遍可打的牌(best-first)。压不过=引导不出; 只有一种打法=自动选好。
-      //   队友当家也照算(供"提示"按钮可用, 让玩家能主动选择压过队友), 只是默认不高亮/不自动选(见下)。
+      //   这里 hints 不带 lastSeat = 物理可打(供"提示"钮亮/自动选判定); 队友当家也照算, 只是默认不高亮/不自动选。
+      //   注意: 队友当家时点"提示"给的是"让对家走"引导(doHint 带 lastSeat 会清空建议), 不会替你选压队友的牌
+      //   —— 想顶一手接风得手动点牌(状态忠实: 能压不谎报, 但也不诱导你压自己人)。
       let plays=[];
       if (myTurn){
         const target = mustBeat ? lastPlay.parse : null;
@@ -2235,23 +2237,26 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           </div>
         </div>`;
       room.appendChild(over);   // ★挂到整个房间(非 felt): 盖满全屏, 不再让底部"我的座位/理牌钮/手牌条"漏在战报下方(治"结算页也乱")
-      // 残局(对标腾讯亮残牌): 掼蛋终局只有末游还捏着牌 → 亮它剩了哪些, 让人看清"卡在哪几张"。
+      // 残局(对标腾讯亮残牌): 亮所有还捏着牌的败者剩了哪些 —— 单下只末游一人, 双下则三游+末游两人都留牌,
+      //   过去只亮末游会漏掉双下时三游手里那摞牌。按名次从前到后逐个铺开(三游在上、末游在下)。
       const remainBox = over.querySelector('#gdRemains');
       if (remainBox){
         const reveal = res.reveal || {};
-        const lastSeat = res.finishOrder[res.finishOrder.length-1];
-        const lastIds = reveal[lastSeat] || [];
-        if (!lastIds.length){ remainBox.remove(); }
-        else {
-          const lp = st.players[lastSeat];
-          const meL = lastSeat===mySeat, mateL = Engine.partnerOf(mySeat)===lastSeat;
+        const POS = ['头游','二游','三游','末游'];
+        const losers = res.finishOrder
+          .map((seat,i)=>({ seat, pos:i, ids: reveal[seat]||[] }))
+          .filter(x=> x.ids.length);
+        if (!losers.length){ remainBox.remove(); }
+        else losers.forEach(({seat,pos,ids})=>{
+          const lp = st.players[seat];
+          const meL = seat===mySeat, mateL = Engine.partnerOf(mySeat)===seat;
           const nm = document.createElement('div'); nm.className='rm-nm';
-          nm.innerHTML = `末游 ${escapeHtml(lp.name)}${meL?'（你）':(mateL?'（队友）':'')} <span class="rm-n">剩${lastIds.length}</span>`;
+          nm.innerHTML = `${POS[pos]||'败者'} ${escapeHtml(lp.name)}${meL?'（你）':(mateL?'（队友）':'')} <span class="rm-n">剩${ids.length}</span>`;
           const cards = document.createElement('div'); cards.className='rm-cards';
-          if (lastIds.length > 18) cards.classList.add('dense');
-          lastIds.map(findCardById).filter(Boolean).forEach(c=> cards.appendChild(cardEl(c, st.level, {mini:true})));
+          if (ids.length > 18) cards.classList.add('dense');
+          ids.map(findCardById).filter(Boolean).forEach(c=> cards.appendChild(cardEl(c, st.level, {mini:true})));
           remainBox.appendChild(nm); remainBox.appendChild(cards);
-        }
+        });
       }
       if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220); vibrate([20,60,30,60,40]);
         // 分级高光: 通关(打过A)/双下=名场面(tier3+横幅) · 连升2级=大牌型(tier2) · 常规=轻彩带(tier1)

@@ -885,8 +885,18 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   lobby/入座态不显; 结算态仍显(便于回看本手盲位)。返回角标 HTML。
     function blindSeats(){
       if (typeof st.button!=='number' || st.phase==='lobby') return {};
-      const b=st.button;
-      return n===2 ? { sb:b, bb:(b+1)%n } : { sb:(b+1)%n, bb:(b+2)%n };
+      // 优先用引擎权威盲位(deal 时按在座席轮转算好, 落进 state/快照)——纯取模不跳空席/离座会把 SB/BB 标错位。
+      if (typeof st.sbSeat==='number' && typeof st.bbSeat==='number') return { sb:st.sbSeat, bb:st.bbSeat };
+      // 兜底(旧快照无 sbSeat 字段时): 按引擎口径重算 —— 跳过 sitOut/空席, 用【在座数】判单挑而非 n。
+      const seated = s => st.players[s] && !st.players[s].sitOut && st.players[s].kind!=='empty';
+      const nextSeated = from => { for(let i=0;i<n;i++){ const s=(from+i)%n; if(seated(s)) return s; } return -1; };
+      const b = seated(st.button) ? st.button : nextSeated(st.button);
+      if (b<0) return {};
+      const cnt = st.players.filter((_,s)=>seated(s)).length;
+      if (cnt<2) return {};
+      if (cnt===2) return { sb:b, bb:nextSeated((b+1)%n) };
+      const sb = nextSeated((b+1)%n);
+      return { sb, bb:nextSeated((sb+1)%n) };
     }
     function blindBadge(seat){
       const bl=blindSeats();

@@ -158,6 +158,7 @@
     let sbSeat, bbSeat, firstToAct;
     if (seatedCount === 2){ sbSeat = button; bbSeat = nextSeated((button + 1) % n); firstToAct = button; }
     else { sbSeat = nextSeated((button + 1) % n); bbSeat = nextSeated((sbSeat + 1) % n); firstToAct = nextSeated((bbSeat + 1) % n); }
+    state.sbSeat = sbSeat; state.bbSeat = bbSeat;   // 落进 state: UI 角标/快照直接读权威盲位, 免得纯取模不跳空席
     postBlind(state, sbSeat, sb, 'sb');
     postBlind(state, bbSeat, bb, 'bb');
     state.currentBet = Math.max(state.players[sbSeat].street, state.players[bbSeat].street);

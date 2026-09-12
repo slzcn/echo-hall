@@ -1483,15 +1483,21 @@ html[data-mode="day"] .ddz-center::before{
       const myTurn = st.turn === mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat !== mySeat;
       // 智能预判: 轮到我时先算可出的牌(best-first)。压不过=引导不出; 唯一打法=自动选好。
-      let plays = [];
+      let plays = [], canBeat = false;
       if (myTurn){
         const target = mustBeat ? st.table.lastPlay.parse : null;
         plays = AI.hints(st.players[mySeat].hand, target, hintCtx());
+        // 物理可压(忽略协作让牌 lastSeat=null): 队友领出时 plays 会被清空成让牌建议,
+        // 但"我到底压不压得过"是客观状态 —— 能压就绝不谎报"要不起"(状态忠实红线)。
+        canBeat = mustBeat ? AI.hints(st.players[mySeat].hand, target, { ...hintCtx(), lastSeat:null }).length>0 : false;
       }
-      const noBeat = myTurn && mustBeat && plays.length===0;
+      // "要不起"只在物理上真的压不过时才显示; 队友领出但我能压 → 显示"不出"(可主动压也可让牌)。
+      const noBeat = myTurn && mustBeat && !canBeat;
+      // 提示钮: 有多套可出方案可循环, 或队友领出且我能压(点一下给"让队友走"引导) 才亮。
+      const hintOn = myTurn && (plays.length>1 || (mustBeat && canBeat));
       els.ctrl.innerHTML = `<div class="ddz-acts">
         <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'要不起':'不出'}</button>
-        <button class="ddz-btn ghost" id="ddzHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
+        <button class="ddz-btn ghost" id="ddzHint" ${hintOn?'':'disabled'}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
       $('#ddzPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });

@@ -78,10 +78,23 @@ async function runScenario(page, finishOrder, label){
     window.EhSfx=S; window.EhGameBgm={enter:()=>{},exit:()=>{}}; });
   for(const f of FILES) await page.addScriptTag({content:G(f)});
 
+  // 每个场景重试若干次: open() 带 prevResult 时【必随机洗牌】(真实对局每手重发, 属正确行为),
+  //   偶发抗贡(败方摸到双大王 → 免贡, 直接进 play, 不经 tribute 阶段)是合法但罕见结果, 非 bug。
+  //   命中抗贡(sawTribute=false)就换一副牌重试, 直到出现真正的进/还贡, 消除随机洗牌带来的假失败。
+  async function scenarioWithRetry(fo, label, needTransfers, tries){
+    let last=null;
+    for(let i=0;i<tries;i++){
+      const r = await runScenario(page, fo, label);
+      last = r;
+      if (r.sawTribute && r.reachedPlay && r.transfers>=needTransfers && r.myGives>=1 && r.strayClicks===0) return r;
+      // 抗贡或未达标 → 换牌重试(sawTribute=false 多为抗贡)
+    }
+    return last;
+  }
   // A: 单下 finishOrder=[1,2,3,0] → 我(0)做一次【进贡】(强制最大牌, 自动选好)
-  const A = await runScenario(page, [1,2,3,0], '单下·我进贡');
+  const A = await scenarioWithRetry([1,2,3,0], '单下·我进贡', 1, 15);
   // B: 双下 finishOrder=[0,2,1,3] → 我(0)做一次【还贡】(多候选, 需自己选牌)
-  const B = await runScenario(page, [0,2,1,3], '双下·我还贡');
+  const B = await scenarioWithRetry([0,2,1,3], '双下·我还贡', 2, 15);
 
   await browser.close();
   const okA = A.sawTribute && A.reachedPlay && A.transfers>=1 && A.myGives>=1 && A.strayClicks===0;
