@@ -260,8 +260,10 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 /* 结算浮层带推池动画时: 前 ~330ms 保持透明, 让底池筹码在可见绒面上飞向赢家, 之后再淡入盖住 */
 .pk-over.payout-in{animation:pkOverPayoutIn .58s ease both}
 @keyframes pkOverPayoutIn{0%,56%{opacity:0}100%{opacity:1}}
-/* 桌面赢家横幅(单机常规手替代结算弹窗): 顶部居中一行, 弹入停留→随自动发牌淡出。z 低于卡牌高亮, 不挡摊牌牌面 */
-.pk-winline{position:absolute;left:50%;top:14%;transform:translateX(-50%);z-index:8;pointer-events:none;
+/* 桌面赢家横幅(单机常规手替代结算弹窗): 居中一行, 弹入停留→随自动发牌淡出。z 低于卡牌高亮, 不挡摊牌牌面。
+   ★top 从 14% 下移到 26%: 14% 正压顶部中央席(对手数为奇数时 deg=90 那席落在 cx50%/cy14%),
+   摊牌时横幅与该席头像/名字/气泡重叠(实测重叠~11px)。26% 落在"顶席气泡(~18%)"与"公共牌区(~40%)"之间的空档, 两不相撞。 */
+.pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
   font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink,#eaf6ff);white-space:nowrap;
   padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
   border:1px solid var(--line2,rgba(0,229,212,.4));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px rgba(0,229,212,.18);
