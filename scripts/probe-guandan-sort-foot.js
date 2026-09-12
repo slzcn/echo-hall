@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-/* #2 理牌钮移入底部操作区体检: #gdSort 在 .gd-foot 内、与 .gd-acts 按钮无重叠、招募态隐藏。
+/* 理牌钮浮到【牌的右上角】体检: #gdSort 在 .gd-hand-wrap 内、贴其右上角、对局中可见、招募态隐藏、
+ *   紧凑不横跨整条手牌(不死压牌面)、不在 #gdHand 内(不误触发划选)。
  * 用法: node scripts/probe-guandan-sort-foot.js */
 const fs=require('fs'), path=require('path');
 const ROOT=path.join(__dirname,'..');
@@ -28,21 +29,24 @@ let pass=0, fail=0; const ok=(c,m)=>{ if(c)pass++; else{fail++; console.log('  �
 
   const r=await page.evaluate(()=>{
     const sort=document.querySelector('#gdSort');
-    const foot=document.querySelector('.gd-foot');
-    const acts=document.querySelector('.gd-foot .gd-acts');
-    const btns=[...document.querySelectorAll('.gd-foot .gd-acts .gd-btn')];
+    const wrap=document.querySelector('.gd-hand-wrap');
+    const hand=document.querySelector('#gdHand');
     const rc=el=>{ if(!el) return null; const b=el.getBoundingClientRect(); return {l:+b.left.toFixed(1),r:+b.right.toFixed(1),t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),w:+b.width.toFixed(1),h:+b.height.toFixed(1),vis:b.width>0&&b.height>0}; };
-    const sr=rc(sort);
-    const inFoot = !!(sort && foot && foot.contains(sort));
-    const overlaps = btns.map(rc).filter(Boolean).some(br=> sr && !(sr.r<=br.l || sr.l>=br.r || sr.b<=br.t || sr.t>=br.b));
-    return { inFoot, sr, sortVis:sr&&sr.vis, phase:document.querySelector('.gd-room').getAttribute('data-phase'), nBtns:btns.length, overlaps };
+    const sr=rc(sort), wr=rc(wrap);
+    const inWrap = !!(sort && wrap && wrap.contains(sort));
+    const inHand = !!(sort && hand && hand.contains(sort));   // 不该在手牌容器内(否则会触发划选)
+    // 贴右上角: 右沿离 wrap 右沿 ≤14px、上沿离 wrap 上沿 ≤12px
+    const topRight = !!(sr && wr && (wr.r - sr.r) <= 14 && (sr.t - wr.t) <= 12);
+    // 紧凑: 宽度不超过 wrap 的 45%(不横跨整条手牌)
+    const compact = !!(sr && wr && sr.w <= wr.w*0.45);
+    return { inWrap, inHand, topRight, compact, sr, wr, sortVis:sr&&sr.vis, phase:document.querySelector('.gd-room').getAttribute('data-phase') };
   });
-  ok(r.inFoot, '理牌钮在 .gd-foot 底部操作区内');
+  ok(r.inWrap && !r.inHand, '理牌钮在 .gd-hand-wrap 内且不在 #gdHand 内(不误触发划选)');
   ok(r.sortVis, '对局中理牌钮可见 (rect '+(r.sr?r.sr.w+'x'+r.sr.h+' @'+r.sr.l+','+r.sr.t:'缺')+')');
-  ok(!r.overlaps, `理牌钮与 ${r.nBtns} 个操作按钮无重叠`);
-  await page.screenshot({path:path.join(ROOT,'scripts','_gd-sort-foot.png'), clip:{x:0,y:640,width:390,height:204}});
+  ok(r.topRight, '理牌钮贴手牌托盘【右上角】 (sort.r='+(r.sr&&r.sr.r)+' wrap.r='+(r.wr&&r.wr.r)+' / sort.t='+(r.sr&&r.sr.t)+' wrap.t='+(r.wr&&r.wr.t)+')');
+  ok(r.compact, '理牌钮紧凑不横跨整条手牌 (w='+(r.sr&&r.sr.w)+' / wrap='+(r.wr&&r.wr.w)+')');
+  await page.screenshot({path:path.join(ROOT,'scripts','_gd-sort-foot.png'), clip:{x:0,y:560,width:390,height:284}});
 
-  // 招募态隐藏验证: 重开一局停在 lobby 前不易, 改测 CSS 规则命中——直接切 phase
   const hid=await page.evaluate(()=>{ const room=document.querySelector('.gd-room'); const prev=room.getAttribute('data-phase'); room.setAttribute('data-phase','lobby'); const cs=getComputedStyle(document.querySelector('#gdSort')); const disp=cs.display; room.setAttribute('data-phase',prev||''); return disp; });
   ok(hid==='none', '招募态(lobby)理牌钮隐藏 (display='+hid+')');
 

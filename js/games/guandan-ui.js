@@ -353,16 +353,17 @@ html[data-mode="day"] .gd-center::before{
 .gd-room.is-land .gd-hand.combo{padding:7px 5px 6px;background:none;border:none;border-radius:0;box-shadow:none}
 .gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:3px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
-   主人诉求(结构更清晰): 从手牌上方的座位条移到【底部操作区】gd-foot 内, 与出牌/提示/不出同处一区。
-   gd-foot 横向 flex: 理牌钮在流内靠左, 操作条(#gdCtrl)flex:1 占右侧——二者天然不重叠, 出牌钮组照常填满右区。
-   #gdCtrl 每回合整段重绘, 而理牌钮在其外(gd-foot 直属), 故长按/短按接线一次到位不被重绘冲掉。 */
+   主人诉求: 浮到【牌的右上角】—— 绝对定位贴 gd-hand-wrap 右上角, 悬在手牌托盘之上。
+   手牌底对齐(justify-content:flex-end)+托盘顶留白, 故右上角基本是空区, 只在满牌时轻掠最右一张顶角;
+   z-index 高于选中牌(20)保证可点, 半透明底不死压牌面。按钮不在 #gdHand 内 → 不触发划选, 长按/短按接线照旧。 */
 .gd-hand-wrap{position:relative}
+.gd-hand-wrap #gdSort{position:absolute;top:4px;right:10px;z-index:25;backdrop-filter:blur(3px)}
 .gd-foot{display:flex;align-items:stretch;gap:8px}
-.gd-foot #gdSort{align-self:center;flex:none;margin-left:14px}
 .gd-foot #gdCtrl{flex:1;min-width:0}
 .gd-room[data-phase="lobby"] .gd-foot{gap:0}   /* 招募态理牌钮藏起, 免留空隙 */
-.gd-sort{padding:6px 12px;border-radius:11px;font-size:12px;font-weight:800;
-  border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none}
+.gd-sort{padding:4px 10px;border-radius:10px;font-size:11px;font-weight:800;
+  border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .gd-sort:active{transform:scale(.94)}
 .gd-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
 .gd-hand.arranging .card{cursor:grab}
@@ -786,8 +787,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         </div>
       </div>
       <div class="gd-me-row"><div class="gd-me" id="gdMe"></div></div>
-      <div class="gd-hand-wrap"><div class="gd-hand" id="gdHand"></div></div>
-      <div class="gd-foot"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div id="gdCtrl"></div></div>
+      <div class="gd-hand-wrap"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div class="gd-hand" id="gdHand"></div></div>
+      <div class="gd-foot"><div id="gdCtrl"></div></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
 
