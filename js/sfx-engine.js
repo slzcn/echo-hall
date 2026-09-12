@@ -8,7 +8,12 @@
 (function() {
   // ---- EhSfx ----
   const EhSfx=(function(){
-    let ctx=null, master=null, enabled=true, lastClickAt=0;
+    // 音效/语音各自独立静音位(与 BGM 三分开关, 主人诉求"分开静音 BGM/音效/语音"):
+    //   enabled = 音效(SFX) 开关, 持久化 localStorage['eh_sfx']; _voiceOn = 报牌/操作语音(TTS) 开关, 'eh_voice'。
+    //   此前音效恒开(无 UI)、语音绑死在 BGM 开关上 → 三者无法分控。现在各读各的 flag, 默认全开。
+    function _lsBool(k){ try{ const v=localStorage.getItem(k); return v===null?true:v==='1'; }catch(e){ return true; } }
+    function _lsSet(k,v){ try{ localStorage.setItem(k, v?'1':'0'); }catch(e){} }
+    let ctx=null, master=null, enabled=_lsBool('eh_sfx'), _voiceOn=_lsBool('eh_voice'), lastClickAt=0;
     const VOL=.38;
     function ensure(){
       if(!ctx){
@@ -132,10 +137,10 @@
     }
     let _lastSayText='', _lastSayAt=0;
     function say(text, who){
-      if(!enabled||!text) return;
-      // 静音闸: 报牌/操作语音(TTS)跟随全局 🎵/🔇 开关(EH_BGM)。此前只查内部 enabled,
-      //   导致静音后 BGM 停了、报牌语音仍照念。EH_BGM.on()===false 即静音, 直接不发声。
-      try{ if(window.EH_BGM && !window.EH_BGM.on()){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} return; } }catch(e){}
+      if(!text) return;
+      // 静音闸: 报牌/操作语音(TTS)走【独立语音开关】_voiceOn(不再绑 SFX 的 enabled, 也不再绑 BGM)。
+      //   三分开关后: 关音效不影响语音, 关语音不影响音效/BGM。语音关 → 直接静默并清掉在念的队列。
+      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} return; }
       // 丝滑: 极短窗内相同文本重复(如一圈里两三席连续"不出", 或同牌型齐发)只念一次。
       //   否则后一句会 speechSynthesis.cancel() 把前一句拦腰砍断 → 听感是"不出—不"的结巴。
       //   纯时间比较、不排队、不依赖 onend, 绝不会卡死后续语音(某些浏览器 onend 会丢失)。
@@ -158,7 +163,12 @@
       ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true,once:true}));
       document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ctx&&ctx.state!=='running') ctx.resume(); },{passive:true});
     }catch(e){}
-    return {play,playClick,setEnabled(v){enabled=!!v; if(!enabled){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }},isEnabled(){return enabled},unlock,say};
+    return {play,playClick,
+      setEnabled(v){enabled=!!v; _lsSet('eh_sfx',enabled);},                                  // 音效开关(持久化)
+      isEnabled(){return enabled},
+      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }},   // 语音开关(持久化)
+      isVoiceOn(){return _voiceOn},
+      unlock,say};
   })();
   window.EhSfx=EhSfx;
 
@@ -244,4 +254,85 @@
     };
   })();
   window.AudioEngine = AudioEngine;
+
+  // ---- EhAudioPrefs: 三分音频开关的统一读写口(BGM/音效/语音) ----
+  // BGM 仍走既有 EH_BGM(app.js 里定义, 本文件先加载故惰性取 window.EH_BGM); 音效/语音走 EhSfx 的独立位。
+  window.EhAudioPrefs = {
+    bgm(){ try{ return !window.EH_BGM || window.EH_BGM.on(); }catch(e){ return true; } },
+    setBgm(v){ try{ if(window.EH_BGM) window.EH_BGM.set(!!v); }catch(e){} },
+    sfx(){ try{ return window.EhSfx ? window.EhSfx.isEnabled() : true; }catch(e){ return true; } },
+    setSfx(v){ try{ if(window.EhSfx) window.EhSfx.setEnabled(!!v); }catch(e){} },
+    voice(){ try{ return window.EhSfx ? window.EhSfx.isVoiceOn() : true; }catch(e){ return true; } },
+    setVoice(v){ try{ if(window.EhSfx) window.EhSfx.setVoice(!!v); }catch(e){} },
+    // 任一开着即认"有声"(用于牌桌 🎵/🔇 图标: 全关才显 🔇)
+    anyOn(){ return this.bgm()||this.sfx()||this.voice(); },
+  };
+
+  // ---- EhAudioMenu: 牌桌 🎵 钮点开的三档静音小面板(BGM/音效/语音各一个开关) ----
+  // 主人诉求"分开静音 BGM/音效/语音"。三游戏顶栏 🎵 钮统一改成点开此面板, 而非单纯切 BGM。
+  // 纯内联样式 + 主题变量, 不依赖 game CSS; 锚定在钮下方, 点面板外/滚动/切游戏即关。
+  window.EhAudioMenu = (function(){
+    let panel=null, onDoc=null, curAnchor=null;
+    function close(){
+      if(!panel) return;
+      try{ document.removeEventListener('pointerdown', onDoc, true); }catch(e){}
+      try{ panel.remove(); }catch(e){}
+      panel=null; onDoc=null; curAnchor=null;
+    }
+    function row(label, get, set, repaint){
+      const P=window.EhAudioPrefs;
+      const r=document.createElement('button');
+      r.type='button';
+      r.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;'
+        +'padding:9px 12px;border:none;background:transparent;color:var(--ink,#eaf6ff);'
+        +'font:600 13px/1.2 inherit;cursor:pointer;border-radius:10px;-webkit-tap-highlight-color:transparent;';
+      const nm=document.createElement('span'); nm.textContent=label; r.appendChild(nm);
+      const sw=document.createElement('span');
+      const paint=()=>{ const on=get();
+        sw.textContent=on?'开':'关';
+        sw.style.cssText='min-width:44px;text-align:center;padding:3px 0;border-radius:999px;font:800 11px/1 inherit;'
+          +'transition:all .16s;'+(on
+            ? 'background:var(--accent,#00e5d4);color:#04121a;box-shadow:0 0 10px rgba(0,229,212,.45);'
+            : 'background:rgba(255,255,255,.10);color:var(--sub,#86cbc6);');
+      };
+      paint();
+      r.appendChild(sw);
+      r.addEventListener('click',(e)=>{ e.stopPropagation(); set(!get()); paint(); if(repaint) repaint();
+        try{ if(window.EhSfx) window.EhSfx.play('click'); }catch(_){} });
+      return r;
+    }
+    function open(anchor, repaint){
+      close();
+      const P=window.EhAudioPrefs;
+      panel=document.createElement('div');
+      panel.className='eh-audio-menu';
+      panel.style.cssText='position:fixed;z-index:99999;min-width:186px;padding:6px;'
+        +'background:linear-gradient(180deg,rgba(12,20,32,.97),rgba(8,14,24,.97));'
+        +'border:1px solid var(--line2,rgba(0,229,212,.38));border-radius:14px;'
+        +'box-shadow:0 14px 34px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset;'
+        +'backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);'
+        +'font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;';
+      const hd=document.createElement('div');
+      hd.textContent='声音';
+      hd.style.cssText='padding:5px 12px 6px;font:800 11px/1 inherit;letter-spacing:.12em;color:var(--sub,#86cbc6);';
+      panel.appendChild(hd);
+      panel.appendChild(row('🎵 背景音乐', ()=>P.bgm(),  v=>P.setBgm(v),  repaint));
+      panel.appendChild(row('🔔 音效',     ()=>P.sfx(),  v=>P.setSfx(v),  repaint));
+      panel.appendChild(row('🗣️ 语音',     ()=>P.voice(),v=>P.setVoice(v),repaint));
+      document.body.appendChild(panel);
+      // 锚定: 钮正下方右对齐; 越界则贴边
+      const ar=anchor.getBoundingClientRect(), pr=panel.getBoundingClientRect();
+      let left=Math.min(ar.right-pr.width, window.innerWidth-pr.width-8);
+      left=Math.max(8,left);
+      let top=ar.bottom+8;
+      if(top+pr.height>window.innerHeight-8) top=Math.max(8, ar.top-pr.height-8);
+      panel.style.left=left+'px'; panel.style.top=top+'px';
+      curAnchor=anchor;
+      onDoc=(e)=>{ if(panel && !panel.contains(e.target) && e.target!==anchor && !anchor.contains(e.target)) close(); };
+      setTimeout(()=>{ try{ document.addEventListener('pointerdown', onDoc, true); }catch(e){} },0);
+    }
+    // 点钮: 开则关, 关则开(toggle 面板显隐)
+    function toggle(anchor, repaint){ if(panel && curAnchor===anchor){ close(); } else { open(anchor, repaint); } }
+    return { open, toggle, close };
+  })();
 })();

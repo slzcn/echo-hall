@@ -87,6 +87,11 @@
 .ddz-room.is-land .ddz-hand{min-height:74px}
 .ddz-room.is-land .ddz-hand-wrap{padding-bottom:2px}
 .ddz-room.is-land .ddz-acts{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+/* 横屏叫分/加倍浮条同步压扁: 原版沿用竖屏 96px 高, 而横屏出牌条只有 70px 地板 → 切到出牌时操作区骤缩 26px、牌桌猛抖一下。
+   收紧 padding/gap/按钮高/问句字号, 让浮条 ≤70px 落进同一地板, 横屏加倍→出牌也零抖动。 */
+.ddz-room.is-land .ddz-bidbar{gap:4px;padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+.ddz-room.is-land .ddz-bidbar .q{font-size:11px}
+.ddz-room.is-land .ddz-bidbtns .ddz-btn{min-height:34px;padding:5px 4px;font-size:12px}
 /* ── 竖屏(手机, <600px)专属美化: 只动竖屏, 横屏(.is-land)与各大屏断点不受影响(用 :not(.is-land) + 窄屏 query 双重隔离) ── */
 @media (max-width:599px){
   /* 中央区收紧: 上下留白削薄; 绒面椭圆走三游戏统一的翡翠绒(不再是缩小的暗青"落牌盘"), 与掼蛋/德州同材质、同"真牌桌"观感, 只按竖屏收一点 insets */
@@ -111,13 +116,28 @@
    坐在框里而非挂在框沿外。落牌/横幅在椭圆中上部, 这里在其下方留白处, 互不打架。
    半透明毛玻璃底 + pointer-events:none 不挡操作。 */
 .ddz-mult{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
-.ddz-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ddz-mus:hover{color:var(--ink);border-color:var(--line2)}
-.ddz-mus.muted{color:var(--dim,#498d88);opacity:.75}
-.ddz-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
-.ddz-x:hover{color:var(--ink);border-color:var(--line2)}
+/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏圆钮 + 返回胶囊, 悬浮青光, 按压回弹; 横屏态 ⟳ 亮青 */
+.ddz-mus,.ddz-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.ddz-mus{margin-left:auto}
+.ddz-mus:hover,.ddz-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
+.ddz-mus:active,.ddz-rot:active,.ddz-x:active{transform:scale(.9)}
+.ddz-mus.muted{color:var(--dim,#498d88);opacity:.8}
+.ddz-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
+.ddz-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.ddz-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
 /* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给倍数 chip 让位, 杜绝返回钮被挤出屏 */
 @media (max-width:379px){
   .ddz-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
@@ -337,7 +357,9 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
 .ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
 /* 叫地主浮条 */
-.ddz-bidbar{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+/* 叫分/加倍浮条: 高度必须 ≤ #ddzCtrl 竖屏 92px 地板, 否则叫分/加倍→出牌切换时操作区一缩、牌桌抖一下。
+   gap/上padding 收紧到内容 ~90px(留 2px 余量), 与出牌条同处 92px 地板内, 全程零抖动; 牌桌尺寸不动。 */
+.ddz-bidbar{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 .ddz-bidbar .q{font-size:13px;color:var(--sub)}
 .ddz-bidbtns{display:flex;gap:8px}
 .ddz-bidbtns .ddz-btn{min-width:62px;max-width:none;flex:none;padding:9px 4px;font-size:14px}
@@ -539,7 +561,7 @@ html[data-mode="day"] .ddz-center::before{
     const DOUBLING = (mode === 'local');
     // 记牌器/出牌历史(对标欢乐斗地主的信息辅助): 只用【已出牌】(公共信息, 全场可见)算未出张数, 绝不读手牌。
     //   仅纯单机开: 联机 guest 快照按命门剥离了 log(见 ddz-net), 无从计数 → 只在 local 挂, 与加倍同口径。
-    const COUNTER = (mode === 'local') && !!(root.EHCardCounter);
+    const COUNTER = false;   // 记牌器功能已下线(主人诉求): 顶栏只留 🎵 ⟳ ✕, 与掼蛋/德州一致
     let counterOn = false;
     let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
@@ -643,9 +665,18 @@ html[data-mode="day"] .ddz-center::before{
     let selected = new Set();     // 选中的 card id
     // 本桌累计比分持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
     const SCOREKEY = opts.scoreKey || null;
-    function saveScore(){ if(!SCOREKEY) return; try{ localStorage.setItem(SCOREKEY, JSON.stringify(cumScore)); }catch(_){ } }
+    // ── 跨桌个人累计分(主人诉求"赢的积分换桌继续保留, 不从零") ──
+    //   与德州 eh_pk_chips 同思路: 单机练习桌把我这席的累计分记在本机, 换桌/刷新继续累加; 对手是新玩家仍从 0。
+    //   只在单机(无远程真人)且非 guest 时带入 —— 联机桌各自记分不混, guest 只渲染 host 快照不记分。
+    const DDZ_WALLET_KEY = 'eh_ddz_score';
+    const carryScore = !isGuest && !(Array.isArray(opts.remoteSeats) && opts.remoteSeats.length);
+    function ddzWalletLoad(){ try{ const v=parseInt(localStorage.getItem(DDZ_WALLET_KEY),10); return Number.isFinite(v)?v:0; }catch(_){ return 0; } }
+    function ddzWalletSave(v){ try{ localStorage.setItem(DDZ_WALLET_KEY, String(Math.round(Number(v)||0))); }catch(_){ } }
+    function saveScore(){ if(SCOREKEY){ try{ localStorage.setItem(SCOREKEY, JSON.stringify(cumScore)); }catch(_){ } } if(carryScore) ddzWalletSave(cumScore[mySeat]); }
     function loadScore(){ if(!SCOREKEY) return null; try{ const v=JSON.parse(localStorage.getItem(SCOREKEY)||'null'); return (Array.isArray(v)&&v.length===3&&v.every(x=>typeof x==='number'))?v:null; }catch(_){ return null; } }
-    const cumScore = loadScore() || [0,0,0];   // 本桌累计比分(按座位号, 跨"再来一局"累加; showOver 里每手计一次)
+    const _savedScore = loadScore();
+    const cumScore = _savedScore || [0,0,0];   // 累计比分(按座位号, 跨"再来一局"累加; showOver 里每手计一次)
+    if (carryScore && !_savedScore) cumScore[mySeat] = ddzWalletLoad();   // 新桌无本桌存档 → 我这席用跨桌累计分开局(换桌不从零)
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
 
@@ -804,11 +835,18 @@ html[data-mode="day"] .ddz-center::before{
       const wasSelect = painting && paintMode==='select';
       painting=false; paintSeen=null; paintLastIdx=null; paintGeo=null;
       if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
+      // 涂抹直接改了 DOM 的 .sel 却没走 renderHand → 同步 lastSelSig, 否则之后"清空选中"时
+      //   新 selSig 与陈旧 lastSelSig 可能相等, 增量护栏误判"没变"而跳过落下高亮(点绒面清不掉的真凶)。
+      syncSelSig();
     }
     els.hand.addEventListener('pointerdown', (e)=>{
-      if(st.phase!=='play' || st.turn!==mySeat || (isGuest && awaitingHost)) return;
+      // 出牌阶段任何时候都能选牌/预选(含别家回合先把要出的牌选好, 对齐掼蛋"任何情况可手动选牌"):
+      //   真正出牌仍由 updatePlayBtn/doPlay 的 st.turn===mySeat 把关, 预选不会误出。旁观/guest待host除外。
+      if(st.phase!=='play' || spectating || (isGuest && awaitingHost)) return;
       buildPaintGeo();                                     // 先量好几何缓存, 本次拖动全程复用
-      const c=handCardAt(e.clientX,e.clientY); if(!c) return;
+      const c=handCardAt(e.clientX,e.clientY);
+      // 点手牌托盘空白(牌与牌之间/两侧留白, 非某张牌) = 取消选牌(对齐掼蛋), 免得逐张再点一遍收回。
+      if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
@@ -817,6 +855,14 @@ html[data-mode="day"] .ddz-center::before{
     els.hand.addEventListener('pointermove', (e)=>{ if(painting) paintTo(handCardAt(e.clientX,e.clientY)); });
     els.hand.addEventListener('pointerup', endPaint);
     els.hand.addEventListener('pointercancel', endPaint);
+    // ── 点空白取消选中(对齐掼蛋): 已选牌时点牌桌绒面(非手牌/按钮/操作条/气泡/座位) → 清空选择, 放下高亮 ──
+    //   手牌带不在 felt 里, 上面 pointerdown 的空白清空覆盖不到桌心这块, 点绒面收不回选中就靠这里补。
+    if (els.felt) els.felt.addEventListener('pointerdown', (e)=>{
+      if(st.phase!=='play' || painting) return;
+      if(!selected.size) return;
+      if(e.target.closest('.card, button, #ddzCtrl, .ddz-acts, .ddz-say, .ddz-seat')) return;
+      selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click');
+    });
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回到牌桌) ──
     // "返回"不再销毁牌局: 牌桌 zoom 进右下角一枚活牌桌片, 引擎/定时器后台继续跑(AI 照走),
@@ -873,10 +919,10 @@ html[data-mode="day"] .ddz-center::before{
       rotBtn.classList.toggle('on', on); sfx('click');
       if (!minimized) layoutHand();   // 旋转后按新宽度重排手牌
     });
-    // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
+    // 牌桌内声音开关(点开三档静音面板 BGM/音效/语音, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#ddzMus');
-    function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
-    if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
 
     // 🃏 记牌器/出牌历史(仅纯单机): 切换悬浮面板, 开着时每次出牌后随 renderTable 自动刷新。
@@ -1149,6 +1195,8 @@ html[data-mode="day"] .ddz-center::before{
       return Deck.sortHand ? Deck.sortHand(hand) : hand;
     }
     let lastHandSig = '', lastSelSig = '';
+    // 涂抹选牌直接改 DOM 后, 让增量护栏的选牌指纹与真实 selected 对齐(见 endPaint 注释)。
+    function syncSelSig(){ lastSelSig = [...selected].sort().join(','); }
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const order = handOrder();
@@ -1428,7 +1476,9 @@ html[data-mode="day"] .ddz-center::before{
       });
     }
     // 提示用的残局上下文(报单意识): 只喂公开信息(座位/各家剩牌数/地主), 绝不含任何隐藏手牌 → 公平。
-    function hintCtx(){ return { seat: mySeat, handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, log: st.log }; }
+    // lastSeat 供提示识别"队友领出"(农民协作提示: 别压自己人); 有桌面牌且非我出时才带, 否则 null(领出场景)。
+    function hintCtx(){ return { seat: mySeat, handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, log: st.log,
+      lastSeat: (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.seat : null }; }
     function renderActBar(){
       const myTurn = st.turn === mySeat;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat !== mySeat;
@@ -1657,7 +1707,13 @@ html[data-mode="day"] .ddz-center::before{
         hintCycle = AI.hints(hand, target, hintCtx());
         hintIdx = 0;
       }
-      if (!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
+      if (!hintCycle.length){
+        // 空提示两种成因分开报: 队友领出且提示建议让牌 vs 真的没牌能压。
+        const lp = st.table.lastPlay;
+        const teammate = target && lp && st.landlord!=null && mySeat!==st.landlord && lp.seat!==st.landlord && lp.seat!==mySeat;
+        toast(teammate ? '队友出的牌，让队友走（可不出）' : '没有能压的牌，只能不出');
+        return;
+      }
       const pick = hintCycle[hintIdx % hintCycle.length]; hintIdx++;
       selected = new Set(pick.map(c=>c.id));
       renderHand(); updatePlayBtn(); popHint();

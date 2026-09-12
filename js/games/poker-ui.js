@@ -122,13 +122,28 @@
 .pk-blinds{position:absolute;top:8px;left:max(12px,env(safe-area-inset-left,0px));z-index:0;font-size:12px;letter-spacing:.1em;color:rgba(234,246,255,.32);font-weight:800;white-space:nowrap;pointer-events:none;text-shadow:0 1px 0 rgba(0,0,0,.4)}
 html[data-mode="day"] .pk-blinds{color:rgba(4,54,50,.34);text-shadow:0 1px 0 rgba(255,255,255,.5)}
 .pk-room.is-land .pk-blinds{top:6px;font-size:11px}
-.pk-mus{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.pk-mus:hover{color:var(--ink);border-color:var(--line2)}
-.pk-mus.muted{color:var(--dim,#498d88);opacity:.75}
-.pk-x{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;
-  color:var(--sub,#86cbc6);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
-.pk-x:hover{color:var(--ink);border-color:var(--line2)}
+/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏圆钮 + 返回胶囊, 悬浮青光, 按压回弹; 横屏态 ⟳ 亮青 */
+.pk-mus,.pk-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.pk-mus{margin-left:auto}
+.pk-mus:hover,.pk-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
+.pk-mus:active,.pk-rot:active,.pk-x:active{transform:scale(.9)}
+.pk-mus.muted{color:var(--dim,#498d88);opacity:.8}
+.pk-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
+.pk-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
+  border:1px solid var(--line,rgba(0,229,212,.24));
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
+  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
+.pk-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
 /* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给盲注 chip 让位, 杜绝返回钮被挤出屏 */
 @media (max-width:379px){
   .pk-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
@@ -287,27 +302,11 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
    原先公共牌/亮牌是 rank+小花色+中央花色三标记堆一起(角标处尤挤), 且与早已隐 cs 的我的底牌不一致 →
    隐去 cs 后全场正面同一套"rank 角标 + 花色浮雕水印", 既统一又不拥挤(主人报: 风格不一致 / 正面拥挤)。 */
 .pk-room .card .cs{display:none}
-/* 盖着的牌(对手底牌): 斜织纹 + 双色角光 + 更亮的青描边, 在深绿绒上也读得出是"张牌"而非黑洞 */
-.card.back{background:
-  repeating-linear-gradient(48deg,rgba(0,229,212,.09) 0 2px,transparent 2px 6px),
-  radial-gradient(circle at 30% 24%,rgba(0,229,212,.22),transparent 52%),
-  radial-gradient(circle at 76% 80%,rgba(156,133,255,.18),transparent 58%),
-  linear-gradient(150deg,#1d3a5c 0%,#152a4a 46%,#0d1c33 100%);
-  border:1px solid rgba(0,229,212,.42);
-  box-shadow:inset 0 0 0 1.5px rgba(0,229,212,.12),inset 0 5px 12px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.5)}
-/* 牌背中央菱形徽记: 让盖着的牌一眼是"张牌" */
-.card.back::after{content:'';position:absolute;left:50%;top:50%;width:38%;height:26%;transform:translate(-50%,-50%) rotate(45deg);
-  border-radius:2px;background:linear-gradient(135deg,rgba(0,229,212,.5),rgba(156,133,255,.35));
-  box-shadow:0 0 8px rgba(0,229,212,.4),inset 0 0 0 1px rgba(255,255,255,.15)}
-.card.mini.back::after{width:46%;height:32%}
-/* 公共牌未发的空位: 不是盖着的牌, 而是"待发牌槽"—— 虚线内凹, 明显区别于对手盖牌, 也不再是灰块/黑洞。
-   德州公共牌翻前根本没发(不存在扣着的牌), 故绝不能画成实心牌背 —— 那是谎报"这里扣着牌"。
-   ★ 选择器带 .pk-room 提到 (0,4,0): shared 皮肤 .pk-room .card.back (0,3,0) 用 !important 铺了青菱格实心背,
-     若本规则只 .pk-board .card.back (0,3,0) 则同特异性、靠源顺序定胜负(生产 poker-ui 后注入胜, 但探针里 shared 后加载反胜, 不稳)。
-     提高特异性到 (0,4,0) 后无论加载顺序都必胜 → 翻前公共牌稳定为虚线空槽, 不与对手盖牌撞成"两种背面"。 */
-.pk-room .pk-board .card.back{background:rgba(0,229,212,.03) !important;border:1px dashed rgba(0,229,212,.26) !important;box-shadow:inset 0 2px 10px rgba(0,0,0,.28) !important;opacity:1}
-.pk-room .pk-board .card.back::after{display:none !important}
-html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border-color:rgba(0,127,118,.32);box-shadow:inset 0 2px 8px rgba(0,80,74,.1)}
+/* 盖着的牌(对手底牌)统一走 table-shared.css 的"同副牌·白纸青花背" —— 此处不再各画一套深色背, 免"两种牌背"分叉。 */
+/* 公共牌未发的位置: 主人要求"这五张的背面用发给玩家那种" → 直接沿用 table-shared 的白纸青花背(与对手盖牌同一副),
+   不再画成虚线空槽; 仅整体略降透明(dim)表示"还没翻到", 翻牌时逐张 flip-in 亮出正面。
+   (不再自绘背景/边框/::after, 让共享的 .pk-room .card.back 白底+青花面板透出。) */
+.pk-room .pk-board .card.back.dim{opacity:.6}
 .card.dim{opacity:.5}
 /* 我的座位条 */
 .pk-me{display:flex;align-items:center;gap:12px;padding:4px 16px 0;flex-shrink:0}
@@ -483,6 +482,12 @@ html[data-mode="day"] .pk-board .card.back{background:rgba(0,127,118,.05);border
 .pk-lobby-empty:hover .av{box-shadow:0 0 12px var(--accent,rgba(0,229,212,.5))}
 .pk-seat .stk.pk-lob{color:var(--sub,#86cbc6);font-weight:600}
 .pk-lobby-filled .stk.pk-lob .role{color:var(--accent,#00e5d4)}
+/* 打牌态空位(机器人输光离场后): 虚线＋号可点邀请, 与 lobby 空位同款; locked=非 host 不可点(仅示意) */
+.pk-vacant{cursor:pointer;opacity:.92}
+.pk-vacant .av{background:transparent;border-style:dashed;color:var(--accent,#00e5d4);font-weight:700}
+.pk-vacant:hover .av{box-shadow:0 0 12px var(--accent,rgba(0,229,212,.5))}
+.pk-vacant.locked{cursor:default;opacity:.55}
+.pk-seat .stk.pk-vac{color:var(--sub,#86cbc6);font-weight:600;font-size:11px}
 /* 请离钮(host 点已入座者旁的 ×) */
 .pk-lob-kick{position:absolute;top:-4px;right:0;width:18px;height:18px;line-height:16px;text-align:center;
   border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
@@ -616,17 +621,68 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
+
+    // ── 机器人输光离场 + 手动邀请补位(主人诉求) ──────────────────────────────
+    //   对手(机器人/灵魂)把筹码输光 → 不再无限自动补带, 而是【离场】: 座位空出、标 vacated,
+    //   台面画成"＋ 点击邀请"空位, 房主可随时邀机器人/灵魂/真人补位。我这席与远程真人席不在此列。
+    //   vacatedUid 记离场时占席的 uid: 防名册(realtime)在 DB 腾空前把同一位灵魂重新灌回"复活"。
+    let vacated    = names.map(()=>false);
+    let vacatedUid = names.map(()=>null);
+    const onSeatVacate = (typeof opts.onSeatVacate==='function') ? opts.onSeatVacate : null;
+    const canInvite = !isGuest;                       // host/单机才有权威邀请补位
+    const BOT_POOL = [
+      {name:'阿岩',e:'🗿'},{name:'小凶',e:'🔥'},{name:'疯哥',e:'🤪'},{name:'冷面',e:'🥶'},
+      {name:'老练',e:'🧊'},{name:'莽夫',e:'😤'},{name:'狐狸',e:'🦊'},{name:'铁头',e:'🐗'},
+    ];
+    function pickBotIdentity(seat){
+      const used = new Set(names.map((nm,i)=> i!==seat ? nm : null).filter(Boolean));
+      const free = BOT_POOL.filter(b=>!used.has(b.name));
+      const b = free.length ? free[Math.floor(Math.random()*free.length)] : BOT_POOL[seat % BOT_POOL.length];
+      return b;
+    }
+    // 本地邀请一个机器人补位(纯本机, 无需 DB): 席位下一手起加入, 全新买入 START。
+    //   resume: 停摆桌邀满即续打(默认 true); 批量补位时传 false, 由调用方填完再统一续打, 免逐个触发。
+    function inviteBot(seat, resume){
+      if (resume === undefined) resume = true;
+      if (seat===mySeat || isRemote(seat)) return;
+      const b = pickBotIdentity(seat);
+      names[seat]=b.name; avatars[seat]=b.e; isAI[seat]=true;
+      if (ids) ids[seat]=null; souls[seat]=null;
+      stacks[seat]=START; buyin[seat]=(buyin[seat]||0)+START; netSettled[seat]=0;
+      vacated[seat]=false; vacatedUid[seat]=null;
+      personaBySeat[seat]=personaFor(seat);
+      saveScore();
+      try{ closeInviteMenu(); }catch(_){}
+      sfx('click');
+      try{ emitBeat({ type:'join', actor:b.name, text:'🪑 '+b.name+' 入座补位' }); }catch(_){}
+      // 牌桌因对手离光而停摆(结算态且无自动续手在跑): 邀满 2 人即刻续打; 否则只提示"下一手加入"。
+      if (resume && st.phase==='over' && !overTimer && aliveSeats().length>=2){
+        toast(b.name+' 入座 · 开新一手'); try{ if(curOver&&curOver.parentNode) curOver.remove(); }catch(_){}
+        try{ hideWinBanner(); }catch(_){}
+        nextHand();
+      } else {
+        toast(b.name+' 入座 · 下一手加入');
+        if (!inHand()){ renderOpponents(true); positionSeats(); }
+      }
+    }
+    // 是否正处于一手进行中(发牌后、未结算): 邀请/离场只在手与手之间真正落地, 绝不打断本手。
+    function inHand(){ return st && st.phase && st.phase!=='over' && st.phase!=='lobby' && st.toAct!==-1; }
+
     function newHand(seedOverride){
-      // 破产补带: 灵魂/对手破产一律自动补带(练习桌总有对手可打);
-      //   真人破产——单机模式保持 0(showOver 已判本场终结, 根本走不到这里发牌),
-      //   联机模式沿用旧的"全员补带"语义(在线对局不因一人破产而终止, 由房主掌控)。
+      // 破产处理: 我这席——单机 0 由 showOver 判本场终结(走不到这里)、联机沿用补带; 远程真人席沿用补带。
+      //   对手机器人/灵魂输光 → 【离场腾席】(不补带), 标 vacated + 通知 app 腾 DB 座, 空位待邀请补位。
       stacks = stacks.map((v, seat) => {
         if (v > 0) return v;
-        const rebought = (seat !== mySeat) ? START : (isLocalSolo ? v : START);
-        if (rebought > 0) buyin[seat] += START;     // 破产补带一次 = 追加一次买入(计入净盈亏基准)
-        return rebought;
+        if (seat === mySeat) return isLocalSolo ? v : START;
+        if (isRemote(seat)) { buyin[seat]+=START; return START; }
+        if (!vacated[seat]){
+          vacated[seat] = true; vacatedUid[seat] = (ids && ids[seat]) || null;
+          if (onSeatVacate){ try{ onSeatVacate(seat, { uid: vacatedUid[seat] }); }catch(e){ _ehCatch('poker.onSeatVacate', e); } }
+          try{ emitBeat({ type:'leave', actor: names[seat], text:'🪑 '+names[seat]+' 输光筹码, 离开牌桌' }); }catch(_){}
+        }
+        return 0;
       });
-      while (stacks[button] <= 0) button = (button+1)%n;   // 庄家落在有筹码的人身上
+      let _bg=0; while (stacks[button] <= 0 && _bg++ < n) button = (button+1)%n;   // 庄家落在有筹码的人身上
       let seed; try{ seed = crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed = Math.floor(Math.random()*4294967296); }
       return Engine.createGame({ seed: seedOverride!=null?seedOverride:(opts.seed!=null && handNo===0?opts.seed:seed),
         names, isAI, stacks: stacks.slice(), sb, bb, button, ids: ids || undefined });
@@ -812,10 +868,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       rotBtn.classList.toggle('on', on); sfx('click');
       if (!minimized) positionSeats();
     });
-    // 牌桌内背景音乐开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里复用同一套 BGM 控制(EH_BGM)让打牌时也能开关
+    // 牌桌内声音开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里点开三档静音面板(BGM/音效/语音各自独立开关)
     const musBtn = $('#pkMus');
-    function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
-    if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
     window.addEventListener('resize', onResize);
 
@@ -868,31 +924,51 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function _imAway(e){
       const m=room.querySelector('.pk-invite-menu');
-      if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.pk-lobby-empty'))) closeInviteMenu();
+      if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.pk-lobby-empty,.pk-vacant'))) closeInviteMenu();
     }
     function closeInviteMenu(){ const m=room.querySelector('.pk-invite-menu'); if(m) m.remove(); document.removeEventListener('click', _imAway, true); }
     function openInviteMenu(dbSeat, anchorEl){
       closeInviteMenu();
-      if(!lobbyCtx || !lobbyCtx.actions){ return; }
-      const souls = (lobbyCtx.souls||[]).filter(s=>s&&s.auth_uid);
+      const acts = (lobbyCtx && lobbyCtx.actions) || null;
+      const souls = ((lobbyCtx && lobbyCtx.souls)||[]).filter(s=>s&&s.auth_uid);
       const menu=document.createElement('div'); menu.className='pk-invite-menu';
       let html='<div class="im-ttl">邀请入座</div>';
-      if(lobbyCtx.actions.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
-      html += souls.length ? '<div class="im-sep">灵魂</div>' : '<div class="im-empty">房里暂无灵魂</div>';
-      souls.forEach(s=>{ html+=`<button class="im-item" data-soul="${escapeHtml(s.auth_uid)}">${escapeHtml((s.emoji||'👤')+s.name)}</button>`; });
+      html+='<button class="im-item" data-bot="1">🤖 邀请机器人</button>';   // 纯本机, 无需 DB, 下一手加入
+      if(acts && acts.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
+      if(acts && acts.seatSoul){
+        html += souls.length ? '<div class="im-sep">灵魂</div>' : '<div class="im-empty">房里暂无灵魂</div>';
+        souls.forEach(s=>{ html+=`<button class="im-item" data-soul="${escapeHtml(s.auth_uid)}">${escapeHtml((s.emoji||'👤')+s.name)}</button>`; });
+      }
       menu.innerHTML=html;
       room.appendChild(menu);
       const rr=room.getBoundingClientRect(), ar=anchorEl.getBoundingClientRect();
       menu.style.left=Math.min(Math.max(8, ar.left-rr.left+ar.width/2-90), Math.max(8, rr.width-188))+'px';
       menu.style.top=Math.min(ar.bottom-rr.top+6, rr.height-60)+'px';
-      menu.querySelectorAll('[data-soul]').forEach(b=> b.onclick=()=>{ lobbyCtx.actions.seatSoul(dbSeat, b.dataset.soul); closeInviteMenu(); });
-      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ lobbyCtx.actions.inviteHumans(); closeInviteMenu(); };
+      const bot=menu.querySelector('[data-bot]'); if(bot) bot.onclick=()=>{ inviteBot(dbSeat); };   // inviteBot 内会 closeInviteMenu
+      menu.querySelectorAll('[data-soul]').forEach(b=> b.onclick=()=>{ if(acts&&acts.seatSoul) acts.seatSoul(dbSeat, b.dataset.soul); closeInviteMenu(); });
+      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ if(acts&&acts.inviteHumans) acts.inviteHumans(); closeInviteMenu(); };
       sfx('click');
       setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
     }
     function seatHTML(seat){
       if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p=st.players[seat];
+      // 机器人输光离场后的空位: 画成"＋ 点击邀请"(host/单机可点邀机器人/灵魂/真人补位)。
+      if (seat!==mySeat && vacated[seat]){
+        const clickable = canInvite;
+        return `<div class="pk-seat pk-vacant${clickable?'':' locked'}" data-seat="${seat}"${clickable?` data-invite="${seat}"`:''} style="--p:360">
+          <div class="pk-avr"><div class="av">＋</div></div>
+          <div class="nm">空位</div>
+          <div class="stk pk-vac">${clickable?'点击邀请':'空位'}</div>
+          <div class="pk-mini-hole"></div><div class="pk-say"></div></div>`;
+      }
+      // 已受邀但本手尚未发牌(引擎坐席仍 sitOut): 画成"入座中·下一手"占位, 不参与本手。
+      if (seat!==mySeat && p && p.sitOut && stacks[seat]>0){
+        return `<div class="pk-seat arriving" data-seat="${seat}" style="--p:360">
+          <div class="pk-avr"><div class="av">${avatars[seat]||'🙂'}</div></div>
+          <div class="nm">${escapeHtml(names[seat]||'牌手')}</div>
+          <div class="stk">下一手入座</div></div>`;
+      }
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[seat]);
       const won = (st.phase==='over' && (st.result.winnersBySeat||[]).includes(seat));
       let hole='';
@@ -901,8 +977,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const cs = rv.hole.map(id=>{ const el=cardEl(idCard(id),{mini:false}); if(b5&&b5.has(id)) el.classList.add('pk-win-card'); return el.outerHTML; }).join('');
         // 摊牌台面直接标各家成手牌型(同花顺/葫芦…), 不必等结算面板 —— 一眼看清谁靠什么赢
         hole = `<div class="pk-mini-hole">${cs}</div><div class="pk-mini-hn">${escapeHtml(rv.hand||'')}</div>`;
-      } else if (seat===mySeat && !p.folded){
-        // "我"也坐在椭圆底部(主人诉求"把自己放桌里, 不单独拿出来") → 自己的底牌正面朝上、带花色可读(不走 mini, mini 会藏花色)
+      } else if (seat===mySeat){
+        // "我"也坐在椭圆底部(主人诉求"把自己放桌里, 不单独拿出来") → 自己的底牌正面朝上、带花色可读(不走 mini, mini 会藏花色)。
+        //   弃牌后底牌不撤、继续朝上显示, 由座位 .folded 类整体灰掉(opacity+grayscale) —— 主人诉求"自己弃牌牌可继续显示, 灰掉即可"。
         const cs = (p.hole||[]).map(c=>cardEl(c,{}).outerHTML).join('');
         hole = `<div class="pk-mini-hole pk-my-hole">${cs}</div>`;
       } else if (!p.folded){
@@ -966,10 +1043,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         els.table.appendChild(commit);
       }
       positionSeats();
-      if (st.phase==='lobby') bindLobbySeats();
-      // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
-      //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
-      else if (dealAnim && (st.players[mySeat].hole||[]).length>0) runDealAnim();
+      if (st.phase==='lobby'){ bindLobbySeats(); }
+      else {
+        // 打牌态空位(机器人离场后): 点击 → 邀请补位菜单(机器人/灵魂/真人)
+        els.table.querySelectorAll('.pk-vacant[data-invite]').forEach(el=>{
+          el.onclick=()=>openInviteMenu(+el.dataset.invite, el);
+        });
+        // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
+        //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
+        if (dealAnim && (st.players[mySeat].hole||[]).length>0) runDealAnim();
+      }
     }
     // 按真实发牌顺序给底牌挂错峰落座动画: 从庄家下家(SB)起绕圈, 发两轮(每人先落第1张、再落第2张)。
     function runDealAnim(){
@@ -1077,16 +1160,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (st.phase==='lobby'){ const nn=st.players.filter(p=>p.kind!=='empty').length;
         els.blinds.textContent='🪑 招募中 · '+nn+'/'+n+' 席'; els.pot.innerHTML=''; return; }
       els.blinds.textContent = `盲注 ${st.sb}/${st.bb}`;   // "第N手"去掉: 单机连打无对局意义, 徒增元素
-      // 有人 all-in 且投入分层 → 拆主池/边池展示(对标德州扑克); 否则单一底池
-      let pots = null;
-      try { pots = Engine.buildSidePots(st); } catch(e){ _ehCatch('poker.buildSidePots', e); }
-      const anyAllin = st.players.some(p=>p.allin && !p.folded);
-      if (pots && pots.length>1 && anyAllin){
-        const parts = pots.map((pt,i)=> `<span class="pk-potpart${i?' side':''}">${i===0?'主池':'边'+i} ${pt.amount}</span>`).join('');
-        els.pot.innerHTML = `<span class="pc"></span>${parts}`;
-      } else {
-        els.pot.innerHTML = `<span class="pc"></span>底池 ${st.pot}`;
-      }
+      // 台面底池: 常态只显【总底池】一枚居中药丸(st.pot ≡ 各家 committed 之和, 见 engine.syncPot)。
+      //   旧版一旦有人全下, 就把 主池+每个边池 铺成一整排 pill —— 多次全下(4+ 边池)时那排 pill 横贯桌面、
+      //   挤爆两侧对手牌与公共牌区(主人反馈"太紧凑·有点乱")。边池明细只在【结算面板 .pk-pots】展开,
+      //   那里才真正需要"谁赢哪一池"的拆分; 打牌途中玩家只关心总池大小(算池底赔率), 一枚总池干净又忠实。
+      els.pot.innerHTML = `<span class="pc"></span>底池 ${st.pot}`;
       // 底池增额时数字跳动(与筹码归池同拍); 新一手底池清零不跳
       if (lastPotShown>=0 && st.pot>lastPotShown){
         els.pot.classList.remove('bump'); void els.pot.offsetWidth; els.pot.classList.add('bump');
@@ -1747,9 +1825,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           ? `<div class="pk-offnote">⚠ 房主已离线 · 本桌即将解散</div><button class="pk-b call" id="pkDone">离开牌桌</button>`
           : `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkWait" disabled>下一手自动开始…</button>`;
       } else if (matchOver){
+        // 通吃全场(对手都被我打光离场): 除"再来一局"外, 给"邀请对手继续"——补位新对手, 带着当前筹码接着打。
         footer = (iBust && bustLimit)
           ? `<button class="pk-b call" id="pkDone">收工</button>`
-          : `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`;
+          : (iWonAll
+              ? `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkRestart">重开一桌</button><button class="pk-b call" id="pkInviteOn">邀请对手继续</button>`
+              : `<button class="pk-b" id="pkDone">收工</button><button class="pk-b call" id="pkRestart">再来一局</button>`);
       } else {
         footer = `<button class="pk-b" id="pkDone">收工</button><button class="pk-b" id="pkAuto" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
@@ -1812,6 +1893,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       const restartBtn = over.querySelector('#pkRestart');
       if (restartBtn) restartBtn.addEventListener('click', ()=>{ stopAuto(); over.remove(); resetMatch(); });
+      // 通吃后"邀请对手继续": 空席全部补上机器人, 带着当前筹码接着打(不重置我的战果)。
+      const invOnBtn = over.querySelector('#pkInviteOn');
+      if (invOnBtn) invOnBtn.addEventListener('click', ()=>{ stopAuto();
+        st.players.forEach(p=> { if(!p.sitOut) stacks[p.seat]=p.stack; });   // 固化本手结果(我的筹码)
+        for (let s=0;s<n;s++){ if (s!==mySeat && !isRemote(s) && stacks[s]<=0){ vacated[s]=true; inviteBot(s, false); } }  // 先全部补位, 不逐个续打
+        if (curOver && curOver.parentNode) curOver.remove();
+        try{ hideWinBanner(); }catch(_){}
+        if (aliveSeats().length>=2) nextHand();                  // 填完统一开新一手
+      });
       // 破产离桌: 通知 app.js 把我的席位腾空(gtLeave), 再拆本地牌桌。
       const leaveBtn = over.querySelector('#pkLeave');
       if (leaveBtn) leaveBtn.addEventListener('click', ()=>{ stopAuto();
@@ -1846,12 +1936,22 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       for (let s=0; s<n; s++){
         if (s === mySeat) continue;                 // 我这席不受名册改动影响
         const wasHuman = !isAI[s], nowHuman = !A.isAI[s];
+        const newUid = A.ids ? (A.ids[s] || null) : null;
+        const realOccupant = !!newUid;              // 真人 uid / 指定灵魂 auth_uid(空位·AI 占位 id 为 null)
         names[s]   = A.names[s];
         avatars[s] = A.avatars[s];
         isAI[s]    = A.isAI[s];
-        if (ids) ids[s] = A.ids[s] || null;
+        if (ids) ids[s] = newUid;
         if (A.souls) souls[s] = A.souls[s];
-        if (!wasHuman && nowHuman){ stacks[s] = START; buyin[s] = START; netSettled[s] = 0; saveScore(); }   // 新真人坐下: 全新买入, 净盈亏归零重算
+        // 空缺席被【真正的新占位】填上(换了个人/灵魂): 全新买入, 净盈亏归零, 解除 vacated。
+        //   newUid !== vacatedUid: 防 DB 尚未腾空前, 名册仍带着刚离场那位 → 被误当"新人"复活。
+        const fillingVacant = vacated[s] && realOccupant && newUid !== vacatedUid[s];
+        if (fillingVacant || (!wasHuman && nowHuman)){
+          stacks[s] = START; buyin[s] = START; netSettled[s] = 0;
+          vacated[s] = false; vacatedUid[s] = null; saveScore();
+        } else if (vacated[s] && !realOccupant){
+          vacatedUid[s] = null;                     // DB 已把该席腾空 → 之后同一位灵魂也可被重新邀请
+        }
       }
       personaBySeat = names.map((_, seat) => personaFor(seat));
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
@@ -1876,21 +1976,27 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         return;
       }
       // 写回筹码 → (应用中途加入/离座名册变化) → 开新一手
-      st.players.forEach(p=> stacks[p.seat]=p.stack);
+      //   只同步"本手在座(非 sitOut)"席的结果: 空缺席/刚受邀补位席未参与本手, 其筹码以 stacks 为准(0=空 / START=新补位), 不被 st.players 的 0 覆盖。
+      st.players.forEach(p=> { if (!p.sitOut) stacks[p.seat]=p.stack; });
       applyPendingRoster();
+      // 对手都离场了(在座不足 2 人): 不强发牌, 停在结算态 —— 台面空位可点邀请补位, 邀满 2 人自动续打(见 inviteBot)。
+      if (aliveSeats().length < 2){
+        try{ toast('桌上没有对手了 · 点空位＋邀请补位', 3200); }catch(_){}
+        renderOpponents(true); positionSeats();
+        return;
+      }
       button = (button+1)%n;
       handNo++;
       st = newHand();
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
-      if (aliveSeats().length<2){}   // newHand 已兜底重新带入
     }
 
     // 单机: 本场结束(真人输光)后从头再来 —— 全员重新带入 START, 从第一手开始
     function resetMatch(){
       stacks = names.map(()=>START);
-      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; }   // 本场重来: 买入基准 + 净盈亏全部归零
+      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }   // 本场重来: 买入基准/净盈亏归零, 离场标记清空
       saveScore();
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
@@ -1923,9 +2029,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         remoteSeats.length=0; (A.remoteSeats||[]).forEach(x=>remoteSeats.push(x));
         personaBySeat = names.map((_, seat)=>personaFor(seat));
       }
-      // 全新一桌: 筹码/买入/净盈亏/手数/庄位全部重置
+      // 全新一桌: 筹码/买入/净盈亏/手数/庄位/离场标记全部重置
       stacks = names.map(()=>START);
-      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; }
+      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
       handNo = 0; button = 0; pendingRoster = null;
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       st = newHand(seed);
@@ -2034,6 +2140,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       setConn, connState:()=>connState,
       isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
       _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
+      _bustSeat:(seat)=>{ if(st.players[seat]){ st.players[seat].stack=0; } stacks[seat]=0; },  // 测试: 把某席筹码清零(模拟输光)
+      _nextHand:()=>nextHand(),              // 测试: 推进到下一手(触发离场/补位落地)
+      _isVacant:(seat)=>!!vacated[seat],     // 测试: 该席是否已离场空缺
+      _stackOf:(seat)=>stacks[seat],         // 测试: 读某席筹码
+      _fakeWinAllOver:()=>{                   // 测试: 伪造"通吃全场"结算(对手清零弃牌 + 我收池), 触发真实 showOver 面板
+        st.players.forEach((p,i)=>{ if(i!==mySeat){ p.stack=0; p.folded=true; } });
+        st.result={ winnersBySeat:[mySeat], pots:[{amount:st.pot||0, winners:[mySeat]}], wentToShowdown:false };
+        st.phase='over'; showOver();
+      },
+      _foldMe:()=>{ if(st.players[mySeat]){ st.players[mySeat].folded=true; } renderOpponents(true); },  // 测试: 我方弃牌(验底牌灰显不撤)
       missOf:s=>missStreak[s]||0,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };

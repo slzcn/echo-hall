@@ -54,37 +54,44 @@
   font-feature-settings: "tnum" 1;
 }
 
-/* ── B. 卡牌背面: 青菱格(argyle lattice) + 居中菱形徽记 ──────────
- * 旧暗玻璃版几乎融进绒面、辨识度低; 换成经典牌背的青色斜格纹理 + 中央菱徽,
- * 一眼就是"扑克牌背", 品牌青配色, 日夜绒面上都清晰。(牌背对比见 shot-cardbacks.js) */
+/* ── B. 卡牌背面: 与正面同一副牌 ────────────────────────────────
+ * 旧版是整张深蓝 navy 底(#16345a…) → 白色正面 + 深蓝背面, 像两副不同的牌(主人反馈"牌背要和玩家发的牌一样")。
+ * 现在: 卡身用与正面【完全相同】的白纸渐变/边/角/影, 中央嵌一块留白边框的青色斜格花纹面板 ——
+ *       扣着是"白边青花背卡", 翻过来是白牌, 一眼就是同一副牌。(牌背对比见 shot-cardbacks.js) */
 .ddz-room .card.back,
 .gd-room  .card.back,
 .pk-room  .card.back{
-  background:
-    repeating-linear-gradient(45deg,  rgba(0,229,212,.13) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(-45deg, rgba(0,229,212,.13) 0 1px, transparent 1px 7px),
-    linear-gradient(160deg, #16345a 0%, #0e2340 55%, #0a1a30 100%) !important;
-  border: 1px solid rgba(0,229,212,.45) !important;
+  background: linear-gradient(158deg, #ffffff 0%, #fafbfd 46%, #eceff5 100%) !important;
+  border: 1px solid rgba(18,32,52,.17) !important;
   box-shadow:
-    inset 0 0 0 1px rgba(0,229,212,.14),
-    inset 0 6px 12px rgba(0,0,0,.34),
-    0 2px 6px rgba(0,0,0,.45);
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -3px 7px rgba(18,32,52,.055),
+    0 2px 6px rgba(0,0,0,.34) !important;
   position: relative;
   overflow: hidden;
 }
+/* 背纹: 白纸留边内嵌一块青色斜格面板(经典扑克牌背花纹) + 中央一圈柔光菱徽 */
 .ddz-room .card.back::after,
 .gd-room  .card.back::after,
 .pk-room  .card.back::after{
   content: "";
   position: absolute;
-  left: 50%; top: 50%;
-  width: 40%; height: 28%;
-  transform: translate(-50%,-50%) rotate(45deg);
-  border-radius: 2px;
-  background: linear-gradient(135deg, rgba(0,229,212,.55), rgba(0,229,212,.15));
-  box-shadow: 0 0 8px rgba(0,229,212,.4), inset 0 0 0 1px rgba(255,255,255,.22);
+  inset: 3px;
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(45deg,  rgba(255,255,255,.30) 0 1.5px, transparent 1.5px 7px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.30) 0 1.5px, transparent 1.5px 7px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.30), transparent 44%),
+    linear-gradient(150deg, #10a89b 0%, #0b8f9c 55%, #0a6f9c 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.55),
+    inset 0 0 7px rgba(0,0,0,.16);
   pointer-events: none;
 }
+/* mini 小牌(对手底牌缩略): 留边收到 2px, 圆角随之收小, 花纹面板才不被 3px 边吃光 */
+.ddz-room .card.mini.back::after,
+.gd-room  .card.mini.back::after,
+.pk-room  .card.mini.back::after{ inset: 2px; border-radius: 3px; }
 /* 卡牌正面: 白底不动, 但角标数字更清晰 (稍加对比 + 半衬阴影, 手机上不糊) */
 .ddz-room .card:not(.back) .cn,
 .gd-room  .card:not(.back) .cn,

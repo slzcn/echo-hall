@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260912-winbanner';
+window.__EH_APP_VER = '20260912-gamepolish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1359,6 +1359,12 @@ async function enterRoom(room){
   try{ EhSfx.play('enter'); }catch(e){ _ehCatch('enterRoom',e); }
   try{ window.EhFx&&EhFx.warp(); }catch(e){ _ehCatch('enterRoom',e); }   // 空间穿越转场
   ehArm();   // 进房武装返回键: 之后按浏览器返回=退回大厅,不离开页面
+  // 秒开牌桌(主人诉求): 进房首屏空闲后, 后台悄悄预热三个游戏引擎到缓存, 点桌时免网络等待即现牌桌。
+  //   省流/2G 网络跳过(保住弱网首屏); 懒加载器 warm() 自带只跑一次的守卫, 每次进房调也无害。
+  try{
+    const _warmGames=()=>{ try{ const c=navigator.connection; if(c && (c.saveData || /(^|-)2g$/.test(c.effectiveType||''))) return; if(window.EHGameLoader && window.EHGameLoader.warm) window.EHGameLoader.warm(); }catch(_){} };
+    if(window.requestIdleCallback) requestIdleCallback(_warmGames,{timeout:6000}); else setTimeout(_warmGames,3000);
+  }catch(_){ _ehCatch('enterRoom',_); }
   _presenceSettled = false;   // 进场动效: 新房光墙重新计"首批", 首批渲染不弹入
   curRoom = room;
   // 💋 私密房(尤其邀了狼姐 @wolf)→ 挂"暧昧红"氛围类; 其余房去掉
@@ -2679,6 +2685,7 @@ function gtLaunchPoker(row){
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
+    lobbyCtx:gtCtx(row),   // 打牌态空位邀请菜单复用: 邀请真人(发聊天卡)/指定灵魂(改 DB 座, realtime 补位)
     myStack: _pkMyStack, onWallet: _pkSolo ? pkSetWallet : undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
@@ -2691,6 +2698,13 @@ function gtLaunchPoker(row){
       postTexasResult(res,A.names,meta).catch(()=>{});
       // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
       // 重连者被踢、唯一活桌索引提前释放而重复开桌)。牌桌保持 playing, 只在房主"收工"(onExit)时散桌。
+    },
+    // 对手(机器人/灵魂)输光离场 → 腾空对应 DB 座位(灵魂席解绑), 免 realtime 名册把它当占用回填/复活。
+    //   引擎座位号→DB 座位号: 按 seat 排序后的第 seat 个座位行。AI 占位席本就为空, gtKick 无副作用。
+    onSeatVacate:(seat)=>{
+      try{ const r=_gtTables.get(row.id)||row; const arr=(r.seats||[]).slice().filter(s=>s&&typeof s.seat==='number').sort((a,b)=>a.seat-b.seat);
+        const ds=arr[seat]; if(ds && ds.kind && ds.kind!=='empty' && ds.kind!=='human') gtKick(row.id, ds.seat);
+      }catch(_){}
     },
     // 房主收工 → 引擎权威消失, 必须散桌(置 closed 释放唯一活桌索引 + 通知在座 guest 清场)。
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },

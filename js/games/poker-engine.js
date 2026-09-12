@@ -112,7 +112,7 @@
     const sb = opts.sb || 5, bb = opts.bb || 10;
     const startStack = opts.startStack || 1000;
     const stacks = opts.stacks || names.map(() => startStack);
-    const button = (typeof opts.button === 'number') ? (opts.button % n) : 0;
+    let button = (typeof opts.button === 'number') ? (opts.button % n) : 0;
 
     const { seed, cards } = Deck.shuffle(pokerDeck(), opts.seed);
     // 发牌偏置: 让散牌座位有概率补成搭子(见 arrangeActionDeck)。强度取自 opts(回放传旧值),
@@ -120,12 +120,25 @@
     const actionBias = (opts.actionBias != null) ? +opts.actionBias : DEFAULT_ACTION_BIAS;
     arrangeActionDeck(cards, n, Deck.mulberry32((seed ^ 0x9e3779b9) >>> 0), actionBias);
 
-    const players = names.map((nm, seat) => ({
-      id: (opts.ids && opts.ids[seat]) || ('p' + seat),
-      seat, name: nm || ('席' + seat), isAI: !!isAI[seat],
-      stack: stacks[seat], start: stacks[seat],
-      hole: [], folded: false, allin: false, committed: 0, street: 0, acted: false,
-    }));
+    const players = names.map((nm, seat) => {
+      const stk = stacks[seat];
+      // 无筹码的席 = 本手空缺(机器人输光离场 / 待邀请的空位): 不发牌、不下盲、不轮到行动。
+      // 用 sitOut 标记, 并预置 folded=true 让既有的 contenders/needsActionFrom/AI 过滤天然跳过它。
+      const sitOut = !(stk > 0);
+      return {
+        id: (opts.ids && opts.ids[seat]) || ('p' + seat),
+        seat, name: nm || ('席' + seat), isAI: !!isAI[seat],
+        stack: sitOut ? 0 : stk, start: sitOut ? 0 : stk,
+        hole: [], folded: sitOut, allin: false, sitOut, committed: 0, street: 0, acted: false,
+      };
+    });
+
+    // 本手在座(有筹码)的席位: 至少两人才成局
+    const seatedCount = players.filter(p => !p.sitOut).length;
+    if (seatedCount < 2) throw new Error('need_2_seated');
+    const nextSeated = (from) => { for (let i = 0; i < n; i++){ const s = (from + i) % n; if (!players[s].sitOut) return s; } return -1; };
+    // 庄家必须落在在座席上(调用方一般已保证; 这里兜底, 防呆)
+    if (players[button].sitOut) button = nextSeated(button);
 
     const state = {
       variant: 'nlhe', phase: 'preflop', seed, n, button, sb, bb,
@@ -136,15 +149,15 @@
       log: [{ t:'deal', seed, button, sb, bb, n, stacks: stacks.slice(), names: names.slice(), actionBias }],
     };
 
-    // 发底牌: 从庄家左手第一位起, 每人两张(轮发, 与真实一致)
-    const order = seatOrderFrom(state, (button + 1) % n);
+    // 发底牌: 从庄家左手第一位起, 每人两张(轮发, 与真实一致); 空缺席不发
+    const order = seatOrderFrom(state, (button + 1) % n).filter(s => !state.players[s].sitOut);
     for (let round = 0; round < 2; round++)
       for (const s of order) state.players[s].hole.push(drawCard(state));
 
-    // 下盲注
+    // 下盲注: 盲位在【在座席】上轮转(跳过空缺席); 在座两人 = 单挑规则(庄家即小盲)
     let sbSeat, bbSeat, firstToAct;
-    if (n === 2){ sbSeat = button; bbSeat = (button + 1) % n; firstToAct = button; }
-    else { sbSeat = (button + 1) % n; bbSeat = (button + 2) % n; firstToAct = (button + 3) % n % n; }
+    if (seatedCount === 2){ sbSeat = button; bbSeat = nextSeated((button + 1) % n); firstToAct = button; }
+    else { sbSeat = nextSeated((button + 1) % n); bbSeat = nextSeated((sbSeat + 1) % n); firstToAct = nextSeated((bbSeat + 1) % n); }
     postBlind(state, sbSeat, sb, 'sb');
     postBlind(state, bbSeat, bb, 'bb');
     state.currentBet = Math.max(state.players[sbSeat].street, state.players[bbSeat].street);

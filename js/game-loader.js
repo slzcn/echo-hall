@@ -81,5 +81,16 @@
     return true;
   }
 
-  root.EHGameLoader = { ensure: ensure, isReady: isReady };
+  // 后台预热(主人诉求"发指令牌桌要秒开"): 首屏空闲后把三个游戏引擎悄悄拉到缓存, 用户点桌时 isReady 已真 → 免网络等待、牌桌即现。
+  //   仍保住懒加载的首屏收益: 只在首屏交互完成后的空闲档触发, 且省流/2G 网络下不预热。
+  //   逐个游戏串行(不并发轰 17 个请求), 单个失败静默跳过(点桌那次会再正常 ensure)。
+  var _warmed = false;
+  function warm(kinds) {
+    if (_warmed) return; _warmed = true;
+    (kinds || ['ddz', 'guandan', 'poker']).reduce(function (p, k) {
+      return p.then(function () { return ensure(k).catch(function () {}); });
+    }, Promise.resolve());
+  }
+
+  root.EHGameLoader = { ensure: ensure, isReady: isReady, warm: warm };
 })(window);

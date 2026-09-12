@@ -446,6 +446,19 @@
         return 0;
       });
     }
+    // ★队友(对家)协作提示(与 decide 同源): 桌面这手是对家领出的 → 别提示压自己人。
+    //   ①能一把走完(含炸) 或 ②残局抢门(我≤3 张且不比对家更远, 只推进不上炸) 才给牌; 否则空 → UI 提示让对家走。
+    //   缺 lastSeat(doHint 未传时)→ isTeammateLead=false, 退化为旧行为不受影响。
+    if (target && isTeammateLead(ctx)){
+      const goOut = combos.filter(c=>c.cards.length===handN).map(c=>c.cards);
+      if (goOut.length) return goOut;
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (handN <= 3 && handN <= leaderLeft){
+        const adv = combos.filter(c=>!isB(c)).sort((a,b)=> playCost(a,hand,level)-playCost(b,hand,level) || a.parse.key-b.parse.key);
+        if (adv.length) return adv.map(c=>c.cards);
+      }
+      return [];   // 让对家走
+    }
     return combos.map(c=>c.cards);
   }
 

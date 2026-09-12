@@ -505,6 +505,22 @@
         return playCost(a,hand)-playCost(b,hand);                        // 最小代价
       });
     }
+    // ★队友协作(提示与 decide 同源): 桌面这手是我队友(同为农民)领出的 → 别提示去压自己人。
+    //   仅在①能一把走完(含炸/王炸, 农民任一家清空即赢) 或 ②残局抢门(我≤3 张且不比队友更远)时给推进牌;
+    //   否则返回空 → 提示"让队友走"(UI 据此给"队友的牌，建议不出"文案, 而非误报"没有能压的牌")。
+    //   只吃公开的 lastSeat/landlord/handsLeft, 不看隐藏手牌; 缺信息(无 lastSeat)时 isTeammateLead=false 退化为旧行为。
+    if (target && ctx && isTeammateLead(ctx)){
+      const goOutPlays = list.filter(p=>p.cards.length===handN).map(p=>p.cards);
+      const goOutBombs = bombItems.filter(x=>x.cards.length===handN).map(x=>x.cards);
+      if (goOutPlays.length || goOutBombs.length) return [...goOutBombs, ...goOutPlays];
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (list.length && handN <= 3 && handN <= leaderLeft){
+        // 残局抢门: 出一手非炸推进牌把自己往"走掉"推(近门该抢, 别傻让), 代价最小者优先; 绝不上炸压队友。
+        const adv = list.slice().sort((a,b)=> playCost(a,hand)-playCost(b,hand) || a.parse.key-b.parse.key);
+        return adv.map(p=>p.cards);
+      }
+      return [];   // 让队友走
+    }
     // 炸弹垫底; 但能一把走完的炸弹提到最前
     const goBombs = bombItems.filter(x=>x.cards.length===handN).map(x=>x.cards);
     const restBombs = bombItems.filter(x=>x.cards.length!==handN).map(x=>x.cards);

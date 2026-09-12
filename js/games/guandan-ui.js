@@ -289,7 +289,7 @@ html[data-mode="day"] .gd-center::before{
 /* 我的座位行: 座位信息占左, 🔀理牌钮贴右 —— 理牌钮从前独占一行(.gd-hand-head)搬进这一行, 省一整行竖向(主人诉求) */
 .gd-me-row{display:flex;align-items:center;gap:8px;padding-right:12px}
 .gd-me-row .gd-me{flex:1;min-width:0}
-.gd-room[data-phase="lobby"] .gd-me-row #gdSort{display:none}  /* 招募态无手牌 → 藏理牌钮(原随 .gd-hand-wrap 一起藏, 现已移出) */
+.gd-room[data-phase="lobby"] #gdSort{display:none}  /* 招募态无手牌 → 藏理牌钮 */
 .gd-me{display:flex;align-items:center;gap:9px;padding:3px 14px 0}
 .gd-me .gd-seat{flex-direction:row;width:auto;gap:8px}
 .gd-me .gd-avr{width:36px;height:36px;padding:2.5px}
@@ -314,14 +314,14 @@ html[data-mode="day"] .gd-center::before{
 /* 选中态(主人诉求"选中牌绝不压住未选牌"): 不再 translateY 抬起盖在别的牌上, 改为【原地放大 + 青色描边 +
    外发光 + 提亮】标识。配合 JS: 有选中时两排拆开(去竖向重叠)+ 在选中/未选边界撑开横向空档 → 选中牌落在
    完全空的位置, 上下左右都不覆盖任何未选牌。z-index 20 仅防残余亚像素叠压, 因已无重叠故不会真盖牌。 */
-.gd-hand .card.sel{transform:scale(1.08);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 20px rgba(0,229,212,.7);z-index:20;filter:brightness(1.08)}
+.gd-hand .card.sel{transform:translateY(-8px) scale(1.04);box-shadow:0 12px 18px -7px rgba(0,0,0,.5),0 0 0 2px var(--accent,#00e5d4),0 0 10px rgba(0,229,212,.4);z-index:20;filter:brightness(1.035)}
 /* 选中牌只靠"放大+青色描边+发光"标识, 不再压暗其余牌(主人诉求"选中要出对牌时不用虚化其他牌")。
    仍靠 JS 在选中/未选边界撑开横向空档 + 拆开两排, 保证选中牌不压住未选牌 —— 与"虚化"是两回事。 */
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
-@keyframes gdHintPop{0%{transform:scale(1.08)}45%{transform:scale(1.24)}100%{transform:scale(1.08)}}
-.gd-hand .card.sel.hintpop{animation:gdHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 2.5px var(--accent,#00e5d4),0 0 22px var(--accent,#00e5d4)}
+@keyframes gdHintPop{0%{transform:translateY(-8px) scale(1.04)}45%{transform:translateY(-15px) scale(1.13)}100%{transform:translateY(-8px) scale(1.04)}}
+.gd-hand .card.sel.hintpop{animation:gdHintPop .38s cubic-bezier(.2,.85,.3,1);box-shadow:0 14px 22px -7px rgba(0,0,0,.5),0 0 0 2px var(--accent,#00e5d4),0 0 15px var(--accent,#00e5d4)}
 .gd-hand:not(.locked) .card:hover{transform:translateY(-7px)}
-.gd-hand:not(.locked) .card.sel:hover{transform:scale(1.08)}
+.gd-hand:not(.locked) .card.sel:hover{transform:translateY(-8px) scale(1.04)}
 .gd-hand .card.justdealt{animation:gdDeal .3s ease both}
 /* 手动理牌: 空的上排显示成一条虚线投放区, 提示"拖到此处分组"(掼蛋 27 张可分两排码) */
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
@@ -337,7 +337,7 @@ html[data-mode="day"] .gd-center::before{
 .gd-col .card:first-child{margin-top:0}
 .gd-hand.combo.locked .card{cursor:default}
 /* 竖列里选中: 往左错开+上抬+高层级冒头(直接抬会被下一张压住), 一眼看清选了哪张 */
-.gd-hand.combo .card.sel{transform:translate(-7px,-12px) scale(1.06);box-shadow:0 8px 16px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 16px var(--accent);z-index:6}
+.gd-hand.combo .card.sel{transform:translate(-7px,-13px) scale(1.05);box-shadow:0 10px 16px -6px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 11px rgba(0,229,212,.45);z-index:6}
 .gd-hand.combo:not(.locked) .card:hover{transform:translateX(-5px)}
 .gd-col-label{margin-top:5px;font-size:10px;font-weight:900;color:var(--accent,#00e5d4);
   background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.42);border-radius:999px;
@@ -353,12 +353,15 @@ html[data-mode="day"] .gd-center::before{
 .gd-room.is-land .gd-hand.combo{padding:7px 5px 6px;background:none;border:none;border-radius:0;box-shadow:none}
 .gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:3px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
-   放进独立表头条(in-flow, 右对齐), 不再 position:absolute 浮在牌面上——
-   旧版按钮压住最右几张牌的角标(rank 在 top:3px), 满手 27 张时最右牌像"缺角/被裁";
-   选牌上抬 16px 时更糟。收进表头后与牌面彻底分层, 抬牌至多贴到表头底边不再压按钮。 */
+   主人诉求(结构更清晰): 从手牌上方的座位条移到【底部操作区】gd-foot 内, 与出牌/提示/不出同处一区。
+   gd-foot 横向 flex: 理牌钮在流内靠左, 操作条(#gdCtrl)flex:1 占右侧——二者天然不重叠, 出牌钮组照常填满右区。
+   #gdCtrl 每回合整段重绘, 而理牌钮在其外(gd-foot 直属), 故长按/短按接线一次到位不被重绘冲掉。 */
 .gd-hand-wrap{position:relative}
-.gd-hand-head{display:flex;justify-content:flex-end;align-items:center;padding:2px 6px 3px;min-height:22px}
-.gd-sort{z-index:6;padding:5px 11px;border-radius:11px;font-size:12px;font-weight:800;
+.gd-foot{display:flex;align-items:stretch;gap:8px}
+.gd-foot #gdSort{align-self:center;flex:none;margin-left:14px}
+.gd-foot #gdCtrl{flex:1;min-width:0}
+.gd-room[data-phase="lobby"] .gd-foot{gap:0}   /* 招募态理牌钮藏起, 免留空隙 */
+.gd-sort{padding:6px 12px;border-radius:11px;font-size:12px;font-weight:800;
   border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none}
 .gd-sort:active{transform:scale(.94)}
 .gd-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px rgba(255,194,77,.5)}
@@ -782,9 +785,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           <div class="gd-side right" id="gdP1"></div>
         </div>
       </div>
-      <div class="gd-me-row"><div class="gd-me" id="gdMe"></div><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button></div>
+      <div class="gd-me-row"><div class="gd-me" id="gdMe"></div></div>
       <div class="gd-hand-wrap"><div class="gd-hand" id="gdHand"></div></div>
-      <div id="gdCtrl"></div>
+      <div class="gd-foot"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div id="gdCtrl"></div></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
 
@@ -931,10 +934,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       rotBtn.classList.toggle('on', on); sfx('click');
       if (!minimized) layoutHand();
     });
-    // 牌桌内背景音乐开关(复用 EH_BGM, 因大厅 🎵 被牌桌浮层盖住)
+    // 牌桌内声音开关(点开三档静音面板 BGM/音效/语音, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#gdMus');
-    function paintMus(){ if(!musBtn) return; const on = !root.EH_BGM || root.EH_BGM.on(); musBtn.textContent = on?'🎵':'🔇'; musBtn.classList.toggle('muted', !on); }
-    if (musBtn) musBtn.addEventListener('click', ()=>{ try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); sfx('click'); });
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
 
     // 🃏 记牌器/出牌历史(仅纯单机): 掼蛋两副牌 decks=2; 高亮当前级牌所在 rank(打2→牌面 rank 15)。
@@ -970,7 +973,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
-    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, paintCards=null;
+    let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, paintCards=null, paintLastRowEl=null;
     // 手牌现分上/下两排(掼蛋 27 张可码两排)。先按 y 定位命中哪一排, 再在该排里按 x 命中"露出的那张":
     // 左→右叠放后牌盖前牌右半, elementFromPoint 在牌中心会命中右邻牌(漏最左那张) → 改逐张比左沿。
     function rowAt(y){
@@ -1016,13 +1019,17 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
     function paintTo(c){
       if(!c) return; const idx=+c.dataset.idx;
-      if(paintLastIdx==null) applyPaintIdx(idx);
+      // 区间连选只在【同一排内】回填(阅读序里同排 idx 连续): 手指横扫一排=精确选中掠过的那几张。
+      //   跨排(上下两排叠放, 手指从下排移到上排)不回填全局 idx 区间——旧逻辑会把两排之间阅读序上
+      //   所有牌一股脑选上(选出一大片没掠过的牌)。跨排时改从当前牌在新排里重新起选, 更清晰更贴手指路径。
+      const rowEl = c.parentElement;
+      if(paintLastIdx==null || rowEl!==paintLastRowEl) applyPaintIdx(idx);
       else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
-      paintLastIdx=idx; updatePlayBtn();
+      paintLastIdx=idx; paintLastRowEl=rowEl; updatePlayBtn();
     }
     function endPaint(){
       const wasSelect = painting && paintMode==='select';
-      painting=false; paintSeen=null; paintLastIdx=null; paintCards=null;
+      painting=false; paintSeen=null; paintLastIdx=null; paintCards=null; paintLastRowEl=null;
       if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
       // 手动划选/点选是直接 toggle DOM 的 .sel、绕过 renderHand 的, 从不更新增量护栏的 lastSelSig。
       // 若不在此同步, lastSelSig 会停滞在发牌时的空值 → 之后"点绒面清空"时 selSig(空) 恰等于停滞值,
@@ -1040,7 +1047,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 点手牌托盘的空白处(牌与牌之间/两侧留白, 非某张牌)= 取消选牌: 手牌条不在 .gd-felt 里,
       //   felt 的"点绒面取消"覆盖不到这块, 主人点手牌旁边空白收不回选中就是这里漏的。
       if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
-      painting=true; paintSeen=new Set(); paintLastIdx=null;
+      painting=true; paintSeen=new Set(); paintLastIdx=null; paintLastRowEl=null;
       paintCards=[...els.hand.querySelectorAll('.card')];   // 全局阅读序(上排→下排), 供区间连选按 data-idx 补齐
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
@@ -1607,7 +1614,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 有选中(非理牌): 两排拆开不竖向重叠 → 被选中那排完整露出、不与另一排交叠。配合 layoutRow 的选中边界
       //   横向空档, 选中牌上下左右都不压未选牌(主人诉求)。定高托盘 2.35ch 容得下两排(2ch)+ 此小间距。
       if (els.hand.classList.contains('has-sel') && !els.hand.classList.contains('arranging')){
-        els.hand.style.gap = Math.round(ch*0.14)+'px';
+        // 拆开的间距要略大于"选中牌上抬量"(translateY -8px + 放大顶部溢出 ~2px), 使下排选中牌抬起后
+        //   顶部仍不吃到上排底边 —— 守住"选中牌不压未选牌"。定高托盘 2.35ch 容得下 2ch 两排 + 此间距。
+        els.hand.style.gap = Math.round(ch*0.24)+'px';
         return;
       }
       const overlap=Math.round(ch*0.44);            // 上排露出 ~56%(顶条含点数+花色)
@@ -1872,11 +1881,15 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const target=(st.table.lastPlay && st.table.lastPlay.seat!==mySeat)?st.table.lastPlay.parse:null;
       if(!hintCycle.length){
         // best-first: 能一把走完排最前(剩一对提示打对子而非拆单张), 领出走长牌型、跟牌走最小代价
-        const ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, handsLeft: st.players.map(p=>p.hand.length) });
+        // lastSeat 供提示识别"对家(队友)领出"→ 别压自己人; 有桌面牌且非我出时才带。
+        const lastSeat = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.seat : null;
+        const ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, lastSeat, handsLeft: st.players.map(p=>p.hand.length) });
         // ★理牌优先(主人诉求): 已用竖列组牌整理过手牌时, 先把我理出的成型牌型(当前合法者)排到提示最前,
         //   让"理牌"真正指导提示 —— 否则理了牌提示却推荐别的组合, 理牌就失去意义。其余 AI 建议去重后接在后面。
         let cyc = ai;
-        if (sortMode==='combo' && canCombo()){
+        // ai 为空且是对家领出 → 提示建议让对家走: 不能靠"理牌优先"把压对家的牌型再塞回来(否则等于教你压自己人)。
+        //   故仅在 ai 非空时才做理牌优先重排。
+        if (ai.length && sortMode==='combo' && canCombo()){
           const key = g => g.map(c=>c.id).sort().join(',');
           const mine = [];
           root.EHGuandanAI.arrangeGroups(hand, st.level).forEach(g=>{
@@ -1894,7 +1907,12 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         }
         hintCycle = cyc; hintIdx=0;
       }
-      if(!hintCycle.length){ toast('没有能压的牌，只能不出'); return; }
+      if(!hintCycle.length){
+        const lp=st.table.lastPlay;
+        const teammate = target && lp && lp.seat!==mySeat && (lp.seat%2)===(mySeat%2);
+        toast(teammate ? '对家出的牌，让对家走（可不出）' : '没有能压的牌，只能不出');
+        return;
+      }
       const pick=hintCycle[hintIdx%hintCycle.length]; hintIdx++;
       selected=new Set(pick.map(c=>c.id)); renderHand(); updatePlayBtn(); popHint();
     }
