@@ -355,6 +355,11 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-btn.ghost{background:transparent;color:var(--sub)}
 .ddz-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
 .ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
+/* 托管开关: 出牌条最左一枚窄钮(开)/ 托管中整条收成一枚收回钮 */
+.ddz-btn.trustee-tog{flex:none;max-width:66px;min-width:52px;font-size:12px}
+.ddz-btn.trustee-on{max-width:none;color:var(--amber,#ffc24d);border-color:var(--amber,#ffc24d)}
+/* 明牌钮(地主加倍轮): 加倍按钮上方居中的醒目搏一把 */
+.ddz-ming{margin-bottom:3px;min-width:130px;max-width:190px;align-self:center;flex:none}
 .ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
 /* 叫地主浮条 */
 /* 叫分/加倍浮条: 高度必须 ≤ #ddzCtrl 竖屏 92px 地板, 否则叫分/加倍→出牌切换时操作区一缩、牌桌抖一下。
@@ -573,6 +578,8 @@ html[data-mode="day"] .ddz-center::before{
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
+    let trustee = false;                    // 托管: 我这席交 AI 代打(叫分/加倍/出牌全自动), 直到手动收回
+    const TRUSTEE_MS = 650;                 // 托管代打前的短延时(让人看清是自动出的, 不瞬闪)
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function bumpMiss(seat){
       if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
@@ -999,7 +1006,7 @@ html[data-mode="day"] .ddz-center::before{
           ${cumPill(seat)}
         </div>
         ${lastPlayHTML(seat)}
-        ${(st.phase==='over' && seat!==mySeat) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
+        ${((st.phase==='over' && seat!==mySeat) || (st.mingpai && st.phase==='play' && seat===st.landlord && seat!==mySeat)) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
         <div class="ddz-say"></div>
       </div>`;
     }
@@ -1008,6 +1015,7 @@ html[data-mode="day"] .ddz-center::before{
       els.me.innerHTML = seatHTML(mySeat);
       if (st.phase==='lobby') bindLobbySeats();
       if (st.phase==='over' && st.result) renderSeatReveal();   // 结算: 对手在各自座位下亮出剩牌(自己的剩牌=底部手牌扇)
+      else renderMingpaiReveal();                               // 明牌: 地主(非我)亮出实时手牌到座位下(复用同一牌行)
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
       const center = els.bottom.parentElement;
@@ -1022,27 +1030,35 @@ html[data-mode="day"] .ddz-center::before{
         els.bottom.appendChild(lbl); els.bottom.appendChild(row);
       }
     }
-    // 结算态: 把各对手席剩牌小牌行填进座位下的占位; 超宽(地主没出几张)时动态收紧叠放, 不溢出到邻座
+    // 把一手牌填进某座位下的亮牌小牌行; 超宽(牌多)时动态收紧叠放, 不溢出到邻座。结算亮牌 / 明牌共用。
+    function fillRevealBox(box, objs){
+      box.innerHTML = '';
+      if (!objs.length){ box.classList.remove('dense'); return; }
+      box.classList.toggle('dense', objs.length > 12);
+      (Deck.sortHand ? Deck.sortHand(objs) : objs).forEach(c=> box.appendChild(cardEl(c,{mini:true})));
+      // 单座位可用宽 ~ 半个牌桌; 超出则均匀收紧(同 layoutPlayed 思路)
+      const maxW = Math.max(120, Math.floor((els.opps.clientWidth||360)/2) - 16);
+      const cards = box.children, n = cards.length;
+      if (n > 1){
+        const cw = cards[0].offsetWidth || 32;
+        if (n*cw > maxW){
+          const ov = Math.round((maxW - cw)/(n - 1) - cw);
+          for (let i=1;i<n;i++) cards[i].style.marginLeft = ov+'px';
+        }
+      }
+    }
+    // 结算态: 把各对手席剩牌小牌行填进座位下的占位
     function renderSeatReveal(){
       const reveal = (st.result && st.result.reveal) || {};
       room.querySelectorAll('.ddz-seat-reveal[data-rv]').forEach(box=>{
-        const s = +box.dataset.rv;
-        box.innerHTML = '';
-        const objs = (reveal[s]||[]).map(findCardById).filter(Boolean);
-        if (!objs.length){ return; }
-        if (objs.length > 12) box.classList.add('dense');
-        (Deck.sortHand ? Deck.sortHand(objs) : objs).forEach(c=> box.appendChild(cardEl(c,{mini:true})));
-        // 单座位可用宽 ~ 半个牌桌; 超出则均匀收紧(同 layoutPlayed 思路)
-        const maxW = Math.max(120, Math.floor((els.opps.clientWidth||360)/2) - 16);
-        const cards = box.children, n = cards.length;
-        if (n > 1){
-          const cw = cards[0].offsetWidth || 32;
-          if (n*cw > maxW){
-            const ov = Math.round((maxW - cw)/(n - 1) - cw);
-            for (let i=1;i<n;i++) cards[i].style.marginLeft = ov+'px';
-          }
-        }
+        fillRevealBox(box, (reveal[+box.dataset.rv]||[]).map(findCardById).filter(Boolean));
       });
+    }
+    // 明牌态: 地主(非我)把当前手牌亮到座位下(随出牌实时缩短); 我是地主时自己牌本就可见, 无需再亮。
+    function renderMingpaiReveal(){
+      if (!(st.mingpai && st.phase==='play' && st.landlord!=null && st.landlord!==mySeat)) return;
+      const box = room.querySelector('.ddz-seat-reveal[data-rv="'+st.landlord+'"]');
+      if (box) fillRevealBox(box, (st.players[st.landlord].hand||[]).slice());
     }
     // ── 招募态: 空位点击邀请 / host 请离 ──
     function bindLobbySeats(){
@@ -1351,7 +1367,11 @@ html[data-mode="day"] .ddz-center::before{
       if (!minimized) tick();   // 环对所有在手席消减: 有死线席(我/远程)走 turnDur+数字秒; AI/灵魂席走 aiDur(真实出手时刻), 到 0 正好出手, 只走环不显数字
 
       // 定时驱动: 我(靠 onExpire)/guest(全等 host 快照, 不驱动任何席)/host 远程真人席(超时托管)/host 本机 AI 席。
-      if (mine) return;
+      if (mine){
+        // 托管中: 我这回合不等我操作, 短延时后交 AI 代打(与手动同走 do* 路径, 本地/联机通用)。
+        if (trustee && !minimized) aiTimer = setTimeout(trusteeStep, TRUSTEE_MS);
+        return;
+      }
       if (isGuest) return;                                    // guest 只渲染, host 是唯一裁判
       const remainMs = Math.max(0, turnDur - (Date.now()-turnStart));   // 同回合重渲用剩余时间, 否则 AI/远程行动被反复推迟到永不触发
       if (remote) aiTimer = setTimeout(()=>onRemoteTimeout(seat), remainMs);
@@ -1433,6 +1453,12 @@ html[data-mode="day"] .ddz-center::before{
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'over'){ renderOverCtrl(); return; }
       if (spectating){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
+      // 托管中: 三阶段(叫分/加倍/出牌)统一交 AI, 控制条收成一枚"收回托管"钮(点掉即恢复手动)。
+      if (trustee && (st.phase==='bid'||st.phase==='double'||st.phase==='play') && !(isGuest && awaitingHost)){
+        els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost trustee-on" id="ddzTrustee">🤖 托管中 · 点此收回</button></div>`;
+        $('#ddzTrustee').addEventListener('click', ()=>{ trustee=false; clearTimers(); sfx('click'); toast('已收回托管 · 由你操作'); renderAll(); });
+        return;
+      }
       if (st.phase === 'bid'){
         // 别人叫分时也渲染按钮行(下面 renderBidBar 用 visibility:hidden 占位), 免得轮到我时凭空多一行→整桌上下跳
         const waiting = (isGuest && awaitingHost) ? '⏳ 已叫分 · 等待裁决…'
@@ -1455,12 +1481,19 @@ html[data-mode="day"] .ddz-center::before{
       const opts2 = [ {f:1,t:'不加倍',c:''}, {f:2,t:'加倍 ×2',c:'primary'}, {f:4,t:'超级加倍 ×4',c:'danger'} ]
         .map(o=>`<button class="ddz-btn ${o.c}" data-dbl="${o.f}">${o.t}</button>`).join('');
       const who = (st.dbl && st.dbl.turn!=null && st.players[st.dbl.turn]) ? st.players[st.dbl.turn].name : '';
-      const q = myTurn ? (iAmLord?'你是地主，要不要加倍下注？':'要不要给地主加点彩头？')
+      // 明牌(地主专属, 只在地主自己的加倍回合、未明过时给): 亮牌换 ×2, 明后仍可再选加倍系数叠加。
+      const canMing = myTurn && iAmLord && !st.mingpai;
+      const mingRow = canMing ? `<button class="ddz-btn danger ddz-ming" id="ddzMing">🔦 明牌 ×2</button>` : '';
+      const q = myTurn ? (iAmLord ? (st.mingpai?'已明牌 ×2 · 再选加倍系数':'你是地主，明牌搏一把 或 直接加倍？')
+                                  : '要不要给地主加点彩头？')
                        : ('等待 ' + escapeHtml(who) + ' 加倍…');
-      els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div><div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
-      if (myTurn) els.ctrl.querySelectorAll('[data-dbl]').forEach(b=>{
-        b.addEventListener('click', ()=>{ resetMiss(mySeat); doDouble(mySeat, +b.dataset.dbl); });
-      });
+      els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div>${mingRow}<div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
+      if (myTurn){
+        els.ctrl.querySelectorAll('[data-dbl]').forEach(b=>{
+          b.addEventListener('click', ()=>{ resetMiss(mySeat); doDouble(mySeat, +b.dataset.dbl); });
+        });
+        const mb=$('#ddzMing'); if(mb) mb.addEventListener('click', ()=>{ resetMiss(mySeat); doMingpai(); });
+      }
     }
     function renderBidBar(waitingMsg){
       const max = st.bid.max;
@@ -1496,10 +1529,12 @@ html[data-mode="day"] .ddz-center::before{
       // 提示钮: 有多套可出方案可循环, 或队友领出且我能压(点一下给"让队友走"引导) 才亮。
       const hintOn = myTurn && (plays.length>1 || (mustBeat && canBeat));
       els.ctrl.innerHTML = `<div class="ddz-acts">
+        <button class="ddz-btn ghost trustee-tog" id="ddzTrustee" title="交给 AI 自动出牌">托管</button>
         <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'要不起':'不出'}</button>
         <button class="ddz-btn ghost" id="ddzHint" ${hintOn?'':'disabled'}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
+      $('#ddzTrustee').addEventListener('click', ()=>{ trustee=true; sfx('click'); toast('🤖 已托管 · AI 替你出牌'); renderAll(); });
       $('#ddzPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
       $('#ddzPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
       $('#ddzHint').addEventListener('click', doHint);
@@ -1762,6 +1797,34 @@ html[data-mode="day"] .ddz-center::before{
       if (n === 1) say(seat, '只剩一张咯～');
       else if (n === 2) say(seat, '快没牌了！');
       else if (secureRand()<0.15) say(seat, rand(['接招','看我的','这手不错']));
+    }
+
+    // ── 托管代打: 我这席交 AI, 叫分/加倍/出牌全自动。走与手动一致的 do* 路径(本地直裁, 联机回传 host)。 ──
+    //   与「超时兜底」不同: 跟牌时不是一律不出, 而是用 AI.decide 该压则压该走则走(真·代打, 非保守放弃)。
+    function trusteeStep(){
+      if (spectating || !trustee) return;
+      if (st.phase==='bid'){
+        if (st.bid.turn!==mySeat) return;
+        doCall(mySeat, AI.chooseBid(st.players[mySeat].hand, st.bid.max)); return;
+      }
+      if (st.phase==='double'){
+        if (!st.dbl || st.dbl.turn!==mySeat) return;
+        doDouble(mySeat, AI.chooseDouble(st.players[mySeat].hand, mySeat===st.landlord)); return;
+      }
+      if (st.phase!=='play' || st.turn!==mySeat) return;
+      const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
+      const mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:target,
+        lastSeat: st.table.lastPlay ? st.table.lastPlay.seat : null,
+        handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
+      if (mv.action==='pass'){ doPass(mySeat); return; }
+      selected = new Set(mv.cards.map(c=>c.id)); doPlay();
+    }
+    // ── 明牌(仅本地加倍局, 地主专属): 亮出整手牌换 ×2 倍数 ──
+    function doMingpai(){
+      if (!(st.phase==='double' && st.mingpai===false && st.dbl && st.dbl.turn===mySeat && mySeat===st.landlord)) return;
+      try { Engine.applyMingpai(st, mySeat); }
+      catch(e){ toast('明牌失败'); return; }
+      sfx('landlord'); toast('🔦 明牌！倍数 ×2'); renderAll();
     }
 
     // ── 人类超时兜底(与断线托管同一逻辑) ──

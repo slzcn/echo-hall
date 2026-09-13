@@ -56,6 +56,7 @@
       // 加倍系统: 仅本地单机(对标欢乐斗地主)开启。默认关 → 联机/引擎测试/回看旅程全走经典流程不受影响。
       doubling: !!opts.doubling,
       dbl: null,                  // {turn, order:[seat...], choices:{seat:factor}} —— 仅 doubling 局在 double 阶段有值
+      mingpai: false,             // 明牌(仅 doubling 局): 地主亮牌换 ×2 倍数(对标欢乐斗地主明牌抢地主)
       log: [{ t:'deal', seed: deal.seed, firstBid, doubling: !!opts.doubling }],
       result: null,
     };
@@ -152,6 +153,22 @@
     state.turn = state.landlord;
     state.dbl.turn = null;
     return { ok:true, doubleDone:true };
+  }
+
+  // ── 明牌(仅 doubling 局, 地主在自己加倍回合可选) ───────────────
+  // 地主亮出整手牌换取全局倍数 ×2(对标欢乐斗地主"明牌抢地主")。只影响 multiplier + mingpai 标记,
+  //   不推进 dbl.turn —— 地主明牌后仍需正常选加倍系数(可再叠 ×2/×4)。一局只能明一次。
+  function applyMingpai(state, seat){
+    if (state.phase !== 'double') throw new Error('not_double_phase');
+    if (!state.dbl) throw new Error('no_double_state');
+    if (seat !== state.landlord) throw new Error('not_landlord');
+    if (seat !== state.dbl.turn) throw new Error('not_your_double_turn');   // 只在地主的加倍回合(轮首)可明
+    if (state.dbl.choices[seat] != null) throw new Error('already_doubled'); // 已选完加倍再明无意义
+    if (state.mingpai) throw new Error('already_mingpai');
+    state.mingpai = true;
+    state.multiplier *= 2;
+    state.log.push({ t:'mingpai', seat });
+    return { ok:true, multiplier: state.multiplier };
   }
 
   // ── 出牌 / 过 ──────────────────────────────────────────────
@@ -280,6 +297,7 @@
     for (const e of log){
       if (e.t === 'call') applyCall(st, e.seat, e.val);
       else if (e.t === 'landlord') { /* 由 applyCall 内部触发,无需重放 */ }
+      else if (e.t === 'mingpai') applyMingpai(st, e.seat);
       else if (e.t === 'double') applyDouble(st, e.seat, e.factor);
       else if (e.t === 'play') {
         const hand = handOf(st, e.seat);
@@ -292,7 +310,7 @@
   }
 
   return {
-    createGame, applyCall, applyDouble, applyPlay, applyPass, replay,
+    createGame, applyCall, applyDouble, applyMingpai, applyPlay, applyPass, replay,
     // 工具
     nextSeat, handOf,
   };

@@ -314,12 +314,16 @@
 
     if (follow.length){
       // (能一把走完已在上面「立即走完」处理, 含炸/王炸)
-      follow.sort((a,b)=>{
-        const c = playCost(a,hand,level) - playCost(b,hand,level);
-        if (c) return c;
-        // 同代价平局: 出后剩余手数少者优先(别为压一手拆散自己的牌型结构)
-        return estTricks(withoutCards(hand,a.cards),level) - estTricks(withoutCards(hand,b.cards),level);
-      });
+      // ★出后剩余手数(estTricks)为主序、代价(playCost)为次序 —— 与领出 leadScore 的"全局观"一致。
+      //   过去以 playCost 为主序只看 parse.key + 拆炸/三/对, 看不见顺子/连对/钢板: 跟一手小单时会挑
+      //   key 最小的牌, 哪怕它正是顺子中段, 一刀把成型顺子拆成一堆孤张(主人反馈"拆牌不好")。手数才是
+      //   真目标: 拆顺子留孤张的走法手数飙升会被自然淘汰; 手数相同再挑最便宜(低点力/不耗百搭王)的一手。
+      //   预算每候选一次, 避免比较器里重复调用 estTricks/playCost。
+      for (const c of follow){
+        c._trk  = estTricks(withoutCards(hand, c.cards), level);
+        c._cost = playCost(c, hand, level);
+      }
+      follow.sort((a,b)=> (a._trk - b._trk) || (a._cost - b._cost));
       const best = follow[0];
       // ★卡报单对手(治"跟牌出最小单张, 正好被剩 1 张的对手反压走脱"——主人反馈"对手剩单张灵魂不卡牌"):
       //   桌面是单张、某真对手报单(剩 1 张)时, 掼蛋无公开读牌 → 启发式出能压的【最大】单张赌他压不过,

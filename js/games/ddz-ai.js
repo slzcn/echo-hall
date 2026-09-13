@@ -135,6 +135,12 @@
       findChains(b.m,2,3).forEach(seq=> push([].concat(...seq.map(r=>takeCards(b.m,r,2)))));
       // 飞机(纯)
       findChains(b.m,3,2).forEach(seq=> push([].concat(...seq.map(r=>takeCards(b.m,r,3)))));
+      // 四带二(四带两单 / 四带两对): 用整个四张 + 两张小翼一次清 6/8 张。leadScore/playCost 决定值不值当
+      //   把炸弹拆成四带二(炸能压全场是强控, 一般留着; 但残局/清散牌时四带二一手走 6/8 张更快)。
+      b.bombs.forEach(q=>{
+        const ws = pickQuadSingles(hand, q[0].rank); if (ws) push(q.concat(ws));
+        const wp = pickSmallPairs(b, new Set([q[0].rank]), 2); if (wp) push(q.concat(wp));
+      });
       return { plays: out, bombs: b.bombs, rocket: b.rocket };
     }
 
@@ -178,9 +184,11 @@
         });
         break;
       }
-      case 'quad_single': case 'quad_pair':
-        // 只有更大的四带 or 炸弹能压;四带较少见,交给炸弹逻辑
-        break;
+      case 'quad_single':
+        // 更大的四张(拆作四带两单)可压; 不动则由下方炸弹逻辑用炸压。
+        b.bombs.forEach(q=>{ if (q[0].rank > t.key){ const ws=pickQuadSingles(hand,q[0].rank); if(ws) tryPush(q.concat(ws)); }}); break;
+      case 'quad_pair':
+        b.bombs.forEach(q=>{ if (q[0].rank > t.key){ const wp=pickSmallPairs(b,new Set([q[0].rank]),2); if(wp) tryPush(q.concat(wp)); }}); break;
     }
     return { plays: bigger, bombs: b.bombs, rocket: b.rocket };
   }
@@ -225,6 +233,18 @@
     const picks=[];
     for (const p of b.pairs){ if (usedRanks.has(p[0].rank)) continue; picks.push(...p); if (picks.length===n*2) break; }
     return picks.length===n*2 ? picks : null;
+  }
+  // 四带两单的两张翼: 须【两个不同点】的单张(引擎 quad_single 要求 singles.length===2), 排除四张所在 rank。
+  //   择牌优先真散张→拆对→拆三→拆炸(尽量不破坏成型组); 王(16/17)垫底(别拆王炸当翼); 同类点数小优先。
+  function pickQuadSingles(hand, excludeRank){
+    const m = groupByRank(hand);
+    const cand = [...m.keys()].filter(r=>r!==excludeRank).map(r=>({ rank:r, count:m.get(r).length, card:m.get(r)[0] }));
+    cand.sort((a,b)=>{
+      const w = c => c.rank>=16 ? 9 : (c.count===1?0 : c.count===2?1 : c.count===3?2 : 3);
+      return w(a)-w(b) || a.rank-b.rank;
+    });
+    if (cand.length < 2) return null;
+    return [cand[0].card, cand[1].card];   // 两个不同 rank → 保证解析为 quad_single 而非四带一对
   }
 
   // ── 决策入口 ────────────────────────────────────────────────
@@ -348,7 +368,9 @@
     for (const [r,cs] of m) cnt.set(r, cs.length);
     let tricks = 0;
     if ((cnt.get(16)||0)>=1 && (cnt.get(17)||0)>=1){ cnt.set(16,cnt.get(16)-1); cnt.set(17,cnt.get(17)-1); tricks++; }
-    for (const r of [...cnt.keys()]) if ((cnt.get(r)||0)===4){ cnt.set(r,0); tricks++; }
+    // 四张先记下但【暂不摘】: 末尾择优—— 独立成炸(1 手) 或 并 2 张散翼作四带二(把翼一起带走, 省手)。
+    const quadRanks = [];
+    for (const r of [...cnt.keys()]) if ((cnt.get(r)||0)===4){ quadRanks.push(r); cnt.set(r,0); }
     const extract = (per, minLen)=>{
       while (true){
         let bS=-1,bE=-1,bLen=0, r=3;
@@ -377,6 +399,12 @@
     let wings = trios;                                  // 每个三条白吃一个翼(带单优先, 其次带对)不额外计手
     while (wings>0 && singles>0){ singles--; wings--; }
     while (wings>0 && pairs>0){ pairs--; wings--; }
+    // 四张: 每个四张 1 手(作炸或四带二皆 1 手)。若尚有 2 张同型散翼(2 单 or 2 对), 并作四带二一起带走 → 省 2 手。
+    for (let i=0;i<quadRanks.length;i++){
+      tricks++;
+      if (singles>=2) singles-=2;
+      else if (pairs>=2) pairs-=2;
+    }
     tricks += pairs + singles;
     return tricks;
   }

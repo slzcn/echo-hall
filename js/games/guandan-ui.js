@@ -158,6 +158,19 @@ html[data-mode="day"] .gd-center::before{
   box-shadow:0 1px 6px rgba(255,176,32,.35);white-space:nowrap}
 .gd-lvl-now b{font-weight:900;font-size:12px}
 .gd-lvl-now.bump{animation:gdLvlBump .5s ease-out}
+/* 级牌进度轴: 两队从"打2"一路爬到"打A"的赛道, 一眼看清谁离夺冠更近(标记随升级平滑滑动+跳一下) */
+.gd-lvltrack{position:relative;flex-basis:100%;width:100%;max-width:340px;height:24px;margin:3px auto 1px}
+.gd-lvltrack .tk-line{position:absolute;left:3%;right:3%;top:15px;height:2px;background:var(--line,rgba(0,229,212,.2));border-radius:2px}
+.gd-lvltrack .tk{position:absolute;top:11px;transform:translateX(-50%);font-size:8px;line-height:1;color:var(--dim,#498d88);font-weight:700}
+.gd-lvltrack .tk.goal{color:#ffb020}
+.gd-lvltrack .mk{position:absolute;top:0;transform:translateX(-50%);min-width:15px;height:15px;padding:0 2px;box-sizing:border-box;
+  border-radius:999px;display:grid;place-items:center;font-size:9px;font-weight:900;color:#03201e;
+  box-shadow:0 1px 4px rgba(0,0,0,.45),inset 0 0 0 1.5px rgba(255,255,255,.6);transition:left .6s cubic-bezier(.34,1.4,.5,1)}
+.gd-lvltrack .mk.mine{background:var(--accent,#00e5d4);z-index:3}
+.gd-lvltrack .mk.foe{background:var(--magenta,#ff2d8e);color:#fff;z-index:2}
+.gd-lvltrack .mk.up{animation:gdLvlBump .6s ease-out}
+.gd-lvltrack .mk.dup-l{margin-left:-9px}   /* 两队同级时左右错开半个身位, 免得一个把另一个完全盖住 */
+.gd-lvltrack .mk.dup-r{margin-left:9px}
 .gd-room.is-land .gd-score{display:none}   /* 横屏矮, 记分条让位(级牌回到顶栏 gd-lvl 兜底显示), 不占竖向 */
 /* 竖屏对局中: 顶栏级牌 chip 藏起(本副打几已在牌桌记分条 gd-lvl-now 显示); 招募态/横屏仍显 */
 .gd-room:not([data-phase="lobby"]):not(.is-land) .gd-lvl{display:none}
@@ -1274,15 +1287,28 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // 本桌记分条(牌桌上·常驻): 本副打几金徽标 + 两队当前等级 + 已赢副数, 按队着色。谁在打几一目了然。
     function renderScore(){
       if (!els.score) return;
-      if (st.phase==='lobby'){ els.score.innerHTML=''; lastLevel=st.level; return; }
+      if (st.phase==='lobby'){ els.score.innerHTML=''; lastLevel=st.level; lastTeamLv=(st.teamLevels||[2,2]).slice(); return; }
       const myT = Engine.teamOf(mySeat), foeT = 1-myT;
       const lv = st.teamLevels || [2,2];
       const lvlChanged = (lastLevel!=null && lastLevel!==st.level);
+      // 级牌进度轴: 2→3→…→A(13 档), 两队标记按当前等级定位; 升级(比上次高)时标记跳一下。
+      //   档位 lv=2..14, A(14)=终点金标; 百分比线性铺在 3%~97% 上, 标记 transition 平滑滑到新档。
+      const posOf = (l)=> 3 + (Math.max(2,Math.min(14,l))-2)*(94/12);
+      const LV_SEQ = [2,3,4,5,6,7,8,9,10,11,12,13,14];
+      const ticks = LV_SEQ.map(l=> `<span class="tk${l===14?' goal':''}" style="left:${posOf(l)}%">${LVL_LABEL(l)}</span>`).join('');
+      const upCls = (t)=> (lastTeamLv[t]!=null && lv[t]>lastTeamLv[t]) ? ' up' : '';
+      const dup = lv[myT]===lv[foeT];   // 同级 → 左右错开半个身位, 两队都露出来
+      const track = `<div class="gd-lvltrack"><div class="tk-line"></div>${ticks}`
+        + `<span class="mk foe${upCls(foeT)}${dup?' dup-r':''}" style="left:${posOf(lv[foeT])}%">${LVL_LABEL(lv[foeT])}</span>`
+        + `<span class="mk mine${upCls(myT)}${dup?' dup-l':''}" style="left:${posOf(lv[myT])}%">${LVL_LABEL(lv[myT])}</span>`
+        + `</div>`;
       els.score.innerHTML =
         `<span class="gd-lvl-now${lvlChanged?' bump':''}">🎯 本副 打<b>${LVL_LABEL(st.level)}</b></span>`
       + `<span class="gd-team mine">我方 · 打<span class="tl">${LVL_LABEL(lv[myT])}</span> · <span class="tw">胜${teamWins[myT]}副</span></span>`
-      + `<span class="gd-team foe">对方 · 打<span class="tl">${LVL_LABEL(lv[foeT])}</span> · <span class="tw">胜${teamWins[foeT]}副</span></span>`;
+      + `<span class="gd-team foe">对方 · 打<span class="tl">${LVL_LABEL(lv[foeT])}</span> · <span class="tw">胜${teamWins[foeT]}副</span></span>`
+      + track;
       lastLevel = st.level;
+      lastTeamLv = lv.slice();
     }
 
     // 我打完后亮出队友手牌(主人诉求): 我已出完→无法再行动→给队友的牌开天窗, 陪看/助兴, 不构成作弊。
@@ -1304,6 +1330,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
 
     let lastShownKey='';
     let lastLevel=null;          // 台面级(打几)变化上升沿 → 级牌徽标跳动
+    let lastTeamLv=[null,null];  // 两队上次等级 → 进度轴标记升级跳动上升沿
     function playKey(){ const lp=st.table.lastPlay; if(!lp) return st.table.passesInRow>0?('pass:'+st.turn):'empty'; return lp.seat+':'+lp.cards.join(','); }
     // ── 常驻"上一手牌": 各席本圈最近动作(出牌小牌行 / 不出 chip)常驻座位下方 ──
     // 引擎只有全局 st.table.lastPlay(每圈清空), 无逐席记录 → UI 侧按"lastPlay 变化 + 轮次推进"派生。
