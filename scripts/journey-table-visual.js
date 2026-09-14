@@ -129,8 +129,16 @@ const NET = R('js/games/table-net.js');
 assert(!/\{c:'\/德州联机'/.test(APP), 'app.js 命令面板退休了 /德州联机 独立项(与 /德州 合一)');
 const LT = (APP.match(/async function launchTexas\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌桌: eh_gt_open 开桌 + 贴牌桌卡');
-assert(/gtLaunchLobbyLocal\s*\(/.test(LT) && !/\bgtStart\s*\(/.test(LT),
-  '第1条: launchTexas 开桌走 gtLaunchLobbyLocal(招募态), 不再自动 gtStart 发牌');
+// 第1条(主人复述 2026-09-14「游戏指令发出后都进牌桌招募态, 可邀真人, 不立即开始」):
+//   三个入口(德州/斗地主/掼蛋)开桌都落各自招募态(gtLaunch{Poker,Ddz,Guandan}Lobby), 不再 await gtStart 自动发牌。
+assert(/gtLaunchPokerLobby\s*\(/.test(LT) && !/await gtStart\s*\(/.test(LT),
+  '第1条: launchTexas 开桌落招募态(gtLaunchPokerLobby), 不自动 gtStart 发牌');
+const LDZ = (APP.match(/async function launchDoudizhu\(\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtLaunchDdzLobby\s*\(/.test(LDZ) && !/await gtStart\s*\(/.test(LDZ),
+  '第1条: launchDoudizhu 开桌落招募态(gtLaunchDdzLobby), 不自动 gtStart 发牌');
+const LGD = (APP.match(/async function launchGuandan\(\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtLaunchGuandanLobby\s*\(/.test(LGD) && !/await gtStart\s*\(/.test(LGD),
+  '第1条: launchGuandan 开桌落招募态(gtLaunchGuandanLobby), 不自动 gtStart 发牌');
 assert(!/gtOpenLobby\s*\(/.test(APP), '不再调用 gtOpenLobby(旧单独招募页已退休)');
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(APP), '有 gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
 // gtLaunchLobbyLocal: 招募态就地落牌桌的统一入口 —— ddz/nlhe/guandan 三种玩法一律就地招募态; gtOpenSeatingPage 仅兜底。
