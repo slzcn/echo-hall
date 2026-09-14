@@ -48,8 +48,10 @@ for(const [n,ok] of staticChecks){ console.log((ok?'✓':'✗')+' '+n); if(!ok) 
       for(let i=1;i<n;i++){ names.push('席'+i); avatars.push('🤖'); isAI.push(true); }
       const lobbySeats=[{seat:0,kind:'human',uid:'me',name:'我',emoji:'🙂'}];
       for(let i=1;i<n;i++) lobbySeats.push({seat:i,kind:'empty'});
+      const calls={fill:0,start:0};
       const g=window[G].open({
-        scoreKey:'t', lobby:true, isHost:true, lobbySeats, lobbyCtx:{myUid:'me',actions:{}},
+        scoreKey:'t', lobby:true, isHost:true, lobbySeats,
+        lobbyCtx:{myUid:'me',souls:[{auth_uid:'s1',name:'狼姐',emoji:'🐺'}],actions:{fillSouls:()=>{calls.fill++;},start:()=>{calls.start++;},inviteHumans:()=>{},seatSoul:()=>{},kick:()=>{},close:()=>{}}},
         names,avatars,isAI, mySeat:0, remoteSeats:[], sb:5,bb:10,startStack:1000,
         chat:{post:()=>{}}, onBeat:()=>{}, onSync:()=>{}, onResult:()=>{},
       });
@@ -57,15 +59,23 @@ for(const [n,ok] of staticChecks){ console.log((ok?'✓':'✗')+' '+n); if(!ok) 
       const inLobbyAtOpen = !!(g.isLobby && g.isLobby());
       // 招募态不应有已发到手的牌(用 .card 计数近似: 招募态牌桌页无手牌)
       const dealtCards = document.querySelectorAll('.card').length;
+      // 招募态操作区按钮: 有空位时应同时有「一键邀请(fill)」和「开始(start)」
+      const fillBtn = document.querySelector('[data-lob="fill"]');
+      const startBtn = document.querySelector('[data-lob="start"]');
+      const hasFill = !!fillBtn, hasStart = !!startBtn;
+      if(fillBtn) fillBtn.click(); await sleep(30);
+      if(startBtn) startBtn.click(); await sleep(30);   // 验证「开始」按钮接线到 actions.start(spy 计数)
+      // 真实开局由 actions.start→gtStart→startDeal 完成; 探针里 start 是 spy, 故直接调 startDeal 验证 lobby→正局转换
       let inLobbyAfterStart = inLobbyAtOpen;
       if(g.startDeal){ try{ g.startDeal(); }catch(_){}; await sleep(500); inLobbyAfterStart = !!(g.isLobby && g.isLobby()); }
       try{ g.close && g.close(); }catch(_){}
-      return { inLobbyAtOpen, dealtCards, inLobbyAfterStart, hasStartDeal: !!g.startDeal };
+      return { inLobbyAtOpen, dealtCards, inLobbyAfterStart, hasStartDeal: !!g.startDeal, hasFill, hasStart, calls };
     }, {G:GLOBAL[game], n});
     const okOpen = r.inLobbyAtOpen && r.dealtCards===0;
+    const okBtns = r.hasFill && r.hasStart && r.calls.fill>=1 && r.calls.start>=1;
     const okStart = r.hasStartDeal && !r.inLobbyAfterStart;
-    console.log(`${(okOpen?'✓':'✗')} ${game}: 开局即招募态(isLobby=${r.inLobbyAtOpen}, 手牌=${r.dealtCards}) · ${(okStart?'✓':'✗')} startDeal 后转正局(isLobby=${r.inLobbyAfterStart})`);
-    if(!okOpen||!okStart) fail++;
+    console.log(`${(okOpen?'✓':'✗')} ${game}: 招募态(isLobby=${r.inLobbyAtOpen},手牌=${r.dealtCards}) · ${(okBtns?'✓':'✗')} 按钮(一键邀请=${r.hasFill}/开始=${r.hasStart}/调用 fill=${r.calls.fill},start=${r.calls.start}) · ${(okStart?'✓':'✗')} 开始后转正局(isLobby=${r.inLobbyAfterStart})`);
+    if(!okOpen||!okStart||!okBtns) fail++;
   }
   if(errs.length) console.log('ERR:', errs.slice(0,4).join(' | '));
   await browser.close();

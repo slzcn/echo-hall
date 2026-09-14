@@ -1419,14 +1419,20 @@ html[data-mode="day"] .ddz-center::before{
     }
 
     // ── 控制区:叫地主 / 出牌 ──
-    // 招募态操作区(去房主·满员自动开局): 不再有「开始 ▶」按钮 —— 坐满(无空位)由 host 自动起局。
-    //   这里只留一条引导: 点空位邀灵魂/真人凑满即自动开打; 想马上玩就把空位都邀成灵魂。
+    // 招募态操作区(主人诉求: 手动开始, 不坐满自动开): host 有「🤝 一键邀请」(把空位一次补满灵魂, 不发牌)
+    //   + 「开始 ▶」(补满剩余空位灵魂再发牌)。逐位点空位邀请仍在(邀灵魂/真人), 三者并存, 房主自己掌控开局时机。
     function renderLobbyCtrl(){
-      if (!lobbyCtx){ els.ctrl.innerHTML=''; return; }
+      if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
+      const a = lobbyCtx.actions;
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts"><div class="ddz-lobhint">${
-        empties>0 ? `还差 ${empties} 席 · 点空位邀灵魂/真人，坐满自动开局` : '座位已满 · 即将开局…'
-      }</div></div>`;
+      const hint = empties>0 ? `还差 ${empties} 席 · 逐个点空位邀，或「一键邀请」补满` : '座位已满 · 点「开始」发牌';
+      els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts">`
+        + `<div class="ddz-lobhint">${hint}</div>`
+        + (empties>0 ? `<button class="ddz-btn ghost" data-lob="fill">🤝 一键邀请</button>` : '')
+        + `<button class="ddz-btn primary" data-lob="start">开始 ▶</button>`
+        + `</div>`;
+      const map={ fill:a.fillSouls, start:a.start };
+      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
     }
     // 结算态操作区(就在打牌页底部按钮位, 不再弹全屏模态): 再来一局(默认高亮) / 收工。
     // guest 无权开新局 → 由 host 驱动, 下副快照到达自动接新局; 只留"收工"。

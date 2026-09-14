@@ -1346,10 +1346,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function renderLobbyCtrl(){
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.acts.innerHTML=''; return; }
       const a = lobbyCtx.actions;
-      const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hasSouls = ((lobbyCtx.souls||[]).length>0);
       const btns=[];
-      // 「一键邀请」「邀真人」去掉(主人诉求): 空位可点座位邀灵魂/真人, 「开始」本就先补满灵魂再发牌, 两钮纯冗余。
+      // 主人诉求(2026-09-15 复位): 招募态给回「🤝 一键邀请」(一次把空位补满灵魂, 不发牌) + 「开始 ▶」(补满剩余空位再发牌)。
+      //   逐位点空位邀灵魂/真人仍在, 三者并存, 房主自控开局时机(不再坐满自动开)。
+      const empties = st.players.filter(p=>p.kind==='empty').length;
+      if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键邀请</button>');
       btns.push('<button class="pk-b call" data-lob="start">开始 ▶</button>');
       els.acts.innerHTML = `<div class="pk-row pk-lobacts">${btns.join('')}</div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
