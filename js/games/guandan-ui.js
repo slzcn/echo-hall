@@ -302,7 +302,9 @@ html[data-mode="day"] .gd-center::before{
 /* 我的座位行: 座位信息占左, 🔀理牌钮贴右 —— 理牌钮从前独占一行(.gd-hand-head)搬进这一行, 省一整行竖向(主人诉求) */
 .gd-me-row{display:flex;align-items:center;gap:8px;padding-right:12px}
 .gd-me-row .gd-me{flex:1;min-width:0}
-.gd-room[data-phase="lobby"] #gdSort{display:none}  /* 招募态无手牌 → 藏理牌钮 */
+.gd-room[data-phase="lobby"] #gdSort,
+.gd-room[data-phase="over"] #gdSort,
+.gd-room[data-phase="tribute"] #gdSort{display:none}  /* 招募/结算/进贡态无需理牌 → 藏理牌钮(治"结果页还挂'理牌'两字") */
 .gd-me{display:flex;align-items:center;gap:9px;padding:3px 14px 0}
 .gd-me .gd-seat{flex-direction:row;width:auto;gap:8px}
 .gd-me .gd-avr{width:36px;height:36px;padding:2.5px}
@@ -1057,6 +1059,21 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
       // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
       if(st.phase!=='play') return;
+      // ── 竖列组牌态: 点一列 = 选/取消【整组】(成型牌型), 散牌列 = 单张 toggle ──
+      //   竖列把一手牌型叠成窄条(6炸/连对能叠 6 张), 逐张精确点必然被胖手指打偏 = 主人"竖列经常选不上"。
+      //   竖列本就是"理成一手手打出去"的视图: 点哪列选哪组, 不必点中具体某张; 且不进划选管道(免手指微动连选一片)。
+      if(els.hand.classList.contains('combo')){
+        const c=handCardAt(e.clientX,e.clientY);
+        if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
+        const col=c.parentElement;
+        const isGroup = !!(col && col.querySelector('.gd-col-label:not(.ph)'));   // 成型列(有牌型名) vs 散牌占位列
+        const ids = isGroup ? [...col.querySelectorAll('.card')].map(x=>x.dataset.id) : [c.dataset.id];
+        const allSel = ids.every(id=>selected.has(id));
+        ids.forEach(id=> allSel ? selected.delete(id) : selected.add(id));
+        hintCycle=[]; renderHand(); updatePlayBtn(); sfx('cardsel');
+        try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}   // 吞掉后续 move: 竖列不划选
+        e.preventDefault(); return;
+      }
       const c=handCardAt(e.clientX,e.clientY);
       // 点手牌托盘的空白处(牌与牌之间/两侧留白, 非某张牌)= 取消选牌: 手牌条不在 .gd-felt 里,
       //   felt 的"点绒面取消"覆盖不到这块, 主人点手牌旁边空白收不回选中就是这里漏的。
@@ -1113,11 +1130,19 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     //     一眼看清手里有哪些现成组合; 再点回大小排(级牌/王一端, 同点数相邻)。竖列纯展示, 不改出牌自由点选。
     //   想自己码牌 → 长按进手动拖排。
     function autoSort(){
-      rows = null;
-      sortMode = (sortMode === 'combo') ? 'rank' : 'combo';
-      hintCycle=[]; hintIdx=0;   // 切换理牌模式后, 下次"提示"按新组牌重建(组牌态优先推荐理出的牌型)
-      refreshSortBtn(); renderHand(); sfx('cardsel');
-      toast(sortMode==='combo' ? '已竖列组牌 · 再点切回大小排 · 长按可手动拖排' : '已按大小理牌 · 再点切竖列组牌 · 长按可手动拖排');
+      // 短按 = 三态循环: 大小排 → 竖列组牌 → 手动拖排 → 大小排。
+      //   主人诉求: 手动理牌该"集成在理牌里"(此前只有长按能进, 发现性差) → 短按也能循环到手动。长按仍可直达。
+      if(arrangeMode){   // 手动态 → 回大小排(相当于"完成"并继续循环)
+        setArrange(false); sortMode='rank'; rows=null; hintCycle=[]; hintIdx=0;
+        refreshSortBtn(); renderHand(); sfx('cardsel'); toast('已按大小理牌 · 再点切竖列组牌'); return;
+      }
+      if(sortMode==='rank'){   // 大小 → 竖列组牌
+        rows=null; sortMode='combo'; hintCycle=[]; hintIdx=0;
+        refreshSortBtn(); renderHand(); sfx('cardsel');
+        toast('已竖列组牌 · 每列一手牌型, 点列即选 · 再点切手动拖排'); return;
+      }
+      // 竖列 → 手动拖排(setArrange 内含 renderHand + 拖排提示)
+      setArrange(true);
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1164,7 +1189,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       let pressTimer=null, longFired=false;
       btn.addEventListener('pointerdown', ()=>{ longFired=false; pressTimer=setTimeout(()=>{ longFired=true; setArrange(!arrangeMode); }, 350); });
       const cancel=()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
-      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; if(arrangeMode){ setArrange(false); } else autoSort(); });
+      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; autoSort(); });   // 短按统一走 autoSort 三态循环(含手动态→大小)
       btn.addEventListener('pointerleave', cancel);
       btn.addEventListener('pointercancel', cancel);
     })();
