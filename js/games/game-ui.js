@@ -520,8 +520,9 @@ html[data-mode="day"] .ddz-center::before{
   border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
   font-size:11px;cursor:pointer;padding:0;z-index:5}
 .ddz-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
-.ddz-acts.ddz-lobacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
-.ddz-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:6px 12px;letter-spacing:.02em}
+.ddz-acts.ddz-lobacts{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+.ddz-lobbtns{display:flex;gap:10px;justify-content:center;width:100%}
+.ddz-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:2px 12px;letter-spacing:.02em}
 .ddz-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
   background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
   box-shadow:0 8px 26px rgba(0,0,0,.5);animation:ddzRoomIn .16s ease}
@@ -1289,7 +1290,7 @@ html[data-mode="day"] .ddz-center::before{
           + `<div class="ov-delta ${d>=0?'pos':'neg'}">${d>=0?'+':''}${d} 分</div>`;
         return;
       }
-      if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐满自动开局'; return; }
+      if (st.phase==='lobby'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐好点开始'; return; }
       if (st.phase!=='bid' && st.phase!=='play' && st.phase!=='double'){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 等待开局…'; return; }
       if (isGuest && awaitingHost){ b.className='ddz-turnbanner'; b.innerHTML=cp+'⏳ 已提交 · 等待裁决…'; return; }
       const seat = st.phase==='bid' ? st.bid.turn : (st.phase==='double' ? (st.dbl&&st.dbl.turn) : st.turn);
@@ -1425,12 +1426,13 @@ html[data-mode="day"] .ddz-center::before{
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
       const a = lobbyCtx.actions;
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hint = empties>0 ? `还差 ${empties} 席 · 逐个点空位邀，或「一键邀请」补满` : '座位已满 · 点「开始」发牌';
+      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀，或一键补满` : '座位已满 · 点开始发牌';
       els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts">`
         + `<div class="ddz-lobhint">${hint}</div>`
+        + `<div class="ddz-lobbtns">`
         + (empties>0 ? `<button class="ddz-btn ghost" data-lob="fill">🤝 一键邀请</button>` : '')
         + `<button class="ddz-btn primary" data-lob="start">开始 ▶</button>`
-        + `</div>`;
+        + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
       els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
     }

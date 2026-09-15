@@ -499,8 +499,9 @@ html[data-mode="day"] .gd-center::before{
   border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,#132a29);color:var(--dim,#498d88);
   font-size:11px;cursor:pointer;padding:0;z-index:5}
 .gd-lob-kick:hover{color:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e)}
-.gd-acts.gd-lobacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
-.gd-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:6px 12px;letter-spacing:.02em}
+.gd-acts.gd-lobacts{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
+.gd-lobbtns{display:flex;gap:10px;justify-content:center;width:100%}
+.gd-lobhint{font-size:13px;color:var(--sub,#86cbc6);text-align:center;line-height:1.5;padding:2px 12px;letter-spacing:.02em}
 .gd-invite-menu{position:absolute;z-index:40;width:180px;max-height:60%;overflow:auto;padding:6px;
   background:var(--panel-solid,#132a29);border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:12px;
   box-shadow:0 8px 26px rgba(0,0,0,.5);animation:gdRoomIn .16s ease}
@@ -1263,12 +1264,13 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
       const a = lobbyCtx.actions;
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hint = empties>0 ? `还差 ${empties} 席 · 逐个点空位邀，或「一键邀请」补满` : '座位已满 · 点「开始」发牌';
+      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀，或一键补满` : '座位已满 · 点开始发牌';
       els.ctrl.innerHTML=`<div class="gd-acts gd-lobacts">`
         + `<div class="gd-lobhint">${hint}</div>`
+        + `<div class="gd-lobbtns">`
         + (empties>0 ? `<button class="gd-btn ghost" data-lob="fill">🤝 一键邀请</button>` : '')
         + `<button class="gd-btn primary" data-lob="start">开始 ▶</button>`
-        + `</div>`;
+        + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
       els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
     }
@@ -1685,7 +1687,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
 
     function setBanner(){
       const b=els.banner; const cp=connPill();
-      if (st.phase==='lobby'){ b.className='gd-banner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐满自动开局'; return; }
+      if (st.phase==='lobby'){ b.className='gd-banner'; b.innerHTML=cp+'🪑 招募中 · 点空位邀灵魂/真人，坐好点开始'; return; }
       if (st.phase==='over'){ b.className='gd-banner'; b.innerHTML=cp; return; }
       if (st.phase==='tribute'){
         const seat=st.turn, lbl=tributeTaskKind()==='return'?'还贡':'进贡';
