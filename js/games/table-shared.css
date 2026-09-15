@@ -76,22 +76,30 @@
 .pk-room  .card.back::after{
   content: "";
   position: absolute;
-  inset: 3px;
+  inset: 2px;                              /* 白边收窄(主人反馈"白边太大"): 3px→2px, 青花面板更大 */
   border-radius: 5px;
   background:
-    repeating-linear-gradient(45deg,  rgba(255,255,255,.30) 0 1.5px, transparent 1.5px 7px),
-    repeating-linear-gradient(-45deg, rgba(255,255,255,.30) 0 1.5px, transparent 1.5px 7px),
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,.30), transparent 44%),
+    repeating-linear-gradient(45deg,  rgba(255,255,255,.32) 0 1.5px, transparent 1.5px 8px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.32) 0 1.5px, transparent 1.5px 8px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.34), transparent 54%),   /* 中央菱徽放大 44%→54%, 图形元素更醒目 */
     linear-gradient(150deg, #10a89b 0%, #0b8f9c 55%, #0a6f9c 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.55),
+    inset 0 0 0 1px rgba(255,255,255,.28),   /* 内白环减弱(.55→.28): 少一圈视觉白边 */
     inset 0 0 7px rgba(0,0,0,.16);
   pointer-events: none;
 }
-/* mini 小牌(对手底牌缩略): 留边收到 2px, 圆角随之收小, 花纹面板才不被 3px 边吃光 */
+/* mini 小牌(对手底牌缩略, 德州每人两张牌背最明显): 白边再收到 1px + 图案纹样放大, 让 16×22 小卡上花纹看得清、白边不喧宾夺主 */
 .ddz-room .card.mini.back::after,
 .gd-room  .card.mini.back::after,
-.pk-room  .card.mini.back::after{ inset: 2px; border-radius: 3px; }
+.pk-room  .card.mini.back::after{
+  inset: 1px; border-radius: 2.5px;
+  background:
+    repeating-linear-gradient(45deg,  rgba(255,255,255,.34) 0 1.4px, transparent 1.4px 6px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.34) 0 1.4px, transparent 1.4px 6px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.38), transparent 60%),
+    linear-gradient(150deg, #10a89b 0%, #0b8f9c 55%, #0a6f9c 100%);
+  box-shadow: inset 0 0 4px rgba(0,0,0,.16);   /* mini 去掉内白环, 面板尽量吃满 */
+}
 /* 卡牌正面: 白底不动, 但角标数字更清晰 (稍加对比 + 半衬阴影, 手机上不糊) */
 .ddz-room .card:not(.back) .cn,
 .gd-room  .card:not(.back) .cn,

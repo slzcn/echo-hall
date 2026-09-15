@@ -1027,6 +1027,12 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const kids=row.children, n=kids.length; if(!n) return null;
       let pick=kids[0];
       for(let i=0;i<n;i++){ if(x >= kids[i].getBoundingClientRect().left-0.5) pick=kids[i]; else break; }
+      // 精准命中(主人诉求"选牌区域再精准一点, 其余=取消区"): 点必须真的落在 pick 的可见矩形内。
+      //   牌左→右叠放, pick="left≤x 的最右张", 其可见条=[left, 右邻牌 left](末张为整张)。
+      //   若 x 越过 pick 右沿(两牌间被撑开的空档/末张右侧留白)、x 在首张左侧留白、或 y 超出牌高
+      //   (牌行上下 padding)→ 均为"其余区域", 返 null, 由调用处清空选牌。叠放正常态无空档, 选牌照样好点。
+      const r=pick.getBoundingClientRect();
+      if(x < r.left-0.5 || x > r.right+0.5 || y < r.top-0.5 || y > r.bottom+0.5) return null;
       return pick;
     }
     function applyPaintIdx(i){

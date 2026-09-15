@@ -1575,6 +1575,34 @@ html[data-mode="day"] .ddz-center::before{
       }
     }
     const isBoomType = (p)=> !!p && (p.type==='bomb'||p.type==='rocket');
+    // ── 叫牌读【具体牌】(主人诉求, 参考掼蛋): 单张不再只叫"单张", 而是"一张老K"/"一对尖"/"7到J顺子" ──
+    //   ddz-rules.parse 只给 {type,key,len}: key=决定大小的主点, 无带牌/花色。故只报主牌型与主点范围。
+    //   rank: 3..10 数字, J=11 Q=12 K=13 A=14 2=15, 小王16 大王17。黑话与掼蛋同源(尖/老K/皮蛋/钩)。
+    const D_NAT = {11:'J',12:'Q',13:'K',14:'A',15:'2'};
+    const natName = (r)=> (r==null?'':(r>=3&&r<=10?String(r):(D_NAT[r]||String(r))));
+    const D_NICK = {14:'尖',13:'老K',12:'皮蛋',11:'钩'};
+    const nickName = (r)=>{ if(r==null) return ''; if(r===17) return '大王'; if(r===16) return '小王'; return D_NICK[r]||natName(r); };
+    function spokenLabel(p){
+      if(!p) return '';
+      const k=p.key, len=p.len;
+      switch(p.type){
+        case 'rocket': return '火箭';
+        case 'single': return '一张'+nickName(k);
+        case 'pair':   return '一对'+nickName(k);
+        case 'trio':   return '三个'+nickName(k);
+        case 'trio_single': return '三个'+nickName(k)+'带一';
+        case 'trio_pair':   return '三个'+nickName(k)+'带一对';
+        case 'bomb':   return nickName(k)+'炸弹';
+        case 'quad_single': return '四个'+nickName(k)+'带二';
+        case 'quad_pair':   return '四个'+nickName(k)+'带两对';
+        case 'straight':    return natName(k-len+1)+'到'+natName(k)+'顺子';
+        case 'pairs':       { const cnt=len/2; return natName(k-cnt+1)+'到'+natName(k)+'连对'; }
+        case 'plane':       { const g=len/3;  return natName(k-g+1)+'到'+natName(k)+'飞机'; }
+        case 'plane_single':{ const g=Math.floor(len/4); return natName(k-g+1)+'到'+natName(k)+'飞机带单'; }
+        case 'plane_pair':  { const g=Math.floor(len/5); return natName(k-g+1)+'到'+natName(k)+'飞机带对'; }
+        default: return typeLabel(p);
+      }
+    }
     // 语音报牌型(主人要求): 所有牌型都报——单张/对子/三张先前被跳过, 现补齐, 与三带二/炸弹等一致。
     const VOICE_SKIP = new Set();
     // 取某席"发言人"音色档: 灵魂用角色专属嗓(SOUL_VOICE 按名), 真人按名哈希稳定分配; 省略则退全局嗓
@@ -1585,7 +1613,7 @@ html[data-mode="day"] .ddz-center::before{
     }
     function sayPlay(p, seat){
       if(!p || VOICE_SKIP.has(p.type)) return;
-      const lab = typeLabel(p);
+      const lab = spokenLabel(p) || typeLabel(p);   // 读具体牌(一张老K / 7到J顺子), 无法细化则退简短牌型
       if(!(lab && root.EhSfx && root.EhSfx.say)) return;
       root.EhSfx.say(lab, whoOf(seat));
     }
