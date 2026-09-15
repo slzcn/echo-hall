@@ -613,7 +613,14 @@ html[data-mode="day"] .ddz-center::before{
     const ACT_PLAY_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_PLAY_MS;   // 我方出牌思考时长(可调, 测试可压小)
     const ACT_BID_MS  = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_BID_MS;
 
-    function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed, doubling: DOUBLING }); }
+    // 首叫席逐局轮转(#5, 主人诉求"座位/地主别总是同一分配"): 正统斗地主首叫逐局换人。
+    //   此前 4 处 createGame 都省略 firstBidSeat → 恒为 0 席(我)先叫, 地主角色偏静态、我常当地主
+    //   而"对面两位"恒是一家农民。逐局 +1 轮转首叫席(三席轮流先叫), 地主在三席间自然摊匀 →
+    //   我时而地主时而农民, 农民局里我的队友就是"对面两位"之一, 不再感觉对面永远一家。
+    //   联机由 host 权威创建后随脱敏快照下发, guest 从不调 createGame(只镜像), 故本地轮转不会 desync。
+    let bidLead = 0;
+    function nextBidLead(){ const s = bidLead % 3; bidLead++; return s; }
+    function newGame(){ return Engine.createGame({ isAI: gameIsAI, names, seed: opts.seed, doubling: DOUBLING, firstBidSeat: nextBidLead() }); }
     // guest 占位局: 等 host 首帧快照到达前的空桌, 字段齐全避免渲染读空。
     function waitingState(){
       return { phase:'wait', seed:undefined, turn:-1, landlord:null, multiplier:1, base:1, bombs:0,
@@ -1475,7 +1482,7 @@ html[data-mode="day"] .ddz-center::before{
     function startRematch(){
       if (startRematch._busy) return; startRematch._busy = true;   // 防连点
       showOver._done = false;
-      st = Engine.createGame({ isAI: gameIsAI, names, doubling: DOUBLING });
+      st = Engine.createGame({ isAI: gameIsAI, names, doubling: DOUBLING, firstBidSeat: nextBidLead() });
       dealNo++; selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastLord=null; lastMyTurn=false; justCrowned=false;
       sfx('deal'); broadcast(); renderAll();
@@ -1764,7 +1771,7 @@ html[data-mode="day"] .ddz-center::before{
       }
       try { var r = Engine.applyCall(st, seat, val); }
       catch(e){ toast('不能这样叫'); return; }
-      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names,doubling:DOUBLING}); dealNo++; selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
+      if (r && r.redeal){ toast('都不叫，重新发牌'); st = Engine.createGame({isAI:gameIsAI,names,doubling:DOUBLING,firstBidSeat:nextBidLead()}); dealNo++; selected.clear(); dealAnim=true; lastLord=null; lastMyTurn=false; sfx('deal'); renderAll(); return; }
       renderAll();
       bidVisual(seat, val, prevMax);   // 印章画在重绘后的座位上, 不被 renderSeats 清掉
     }
@@ -2020,7 +2027,7 @@ html[data-mode="day"] .ddz-center::before{
       closeInviteMenu();
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastLord=null; lastMyTurn=false; justCrowned=false; showOver._done=false;
-      st = Engine.createGame({ isAI: gameIsAI, names, seed: (typeof seed!=='undefined' ? seed : opts.seed) });
+      st = Engine.createGame({ isAI: gameIsAI, names, seed: (typeof seed!=='undefined' ? seed : opts.seed), firstBidSeat: nextBidLead() });
       sfx('deal');
       renderAll();
       broadcast();   // 首帧脱敏快照(此刻 hostChan 已接好, 见 app.gtStart)
