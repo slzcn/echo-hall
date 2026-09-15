@@ -319,8 +319,10 @@ html[data-mode="day"] .gd-center::before{
    而 combo 把方向改成 row(主轴水平), 同一个 flex-end 就变成"牌靠右", 且本规则特异性(0,3,0)高于 .gd-hand.combo 的
    flex-start(0,2,0)会把它遮蔽 —— 这正是"少牌时竖列组牌跑到右侧"的真凶(上次左对齐修复被此规则盖掉)。 */
 .gd-room:not(.is-land) .gd-hand:not(.combo){height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
-/* 手牌向左对齐(主人诉求): 牌不填满整行时靠左码放、右侧留空, 出牌后左端不动更稳定, 不再居中飘。 */
-.gd-hand-row{display:flex;justify-content:flex-start;flex-wrap:nowrap;min-height:0;touch-action:none}
+/* 手牌居中(主人诉求 msg 更新): 牌不填满整行时在手牌带内居中, 不再贴左显歪。见 .gd-hand-row 的 justify-content。 */
+/* 居中(主人诉求"剩余的牌局要居中不居左"): layoutRow 步距封顶 cw*0.64, 牌少时(残局单排/两排各≤14 张)
+   整排宽 < 手牌带宽, flex-start 会让牌堆贴左显得歪; center 让不满宽的排在带内居中, 满手(总宽=带宽)时无副作用。 */
+.gd-hand-row{display:flex;justify-content:center;flex-wrap:nowrap;min-height:0;touch-action:none}
 .gd-hand-row.top:empty{display:none}
 /* touch-action:none 逐张也要有(命中的是卡片本身): 否则竖向划选被浏览器判成滚动→pointercancel, 表现为"不能滑动连选/选牌不稳" */
 .gd-hand-row .card{margin-left:var(--hand-ov,-19px);transition:transform .14s ease,box-shadow .14s,opacity .14s,filter .14s;cursor:pointer;transform-origin:bottom center;margin-bottom:4px;touch-action:none}
@@ -344,7 +346,7 @@ html[data-mode="day"] .gd-center::before{
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
 /* ── 智能组牌·竖列分组(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型竖直叠成一列,
    组内牌上下叠(露顶角点数花色, 底牌露大花色), 多列横向排开底对齐, 列底标牌型名 ── */
-.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:flex-start;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
+.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
   background:linear-gradient(180deg,rgba(0,229,212,.055),rgba(8,14,26,.36));border:1px solid rgba(0,229,212,.15);border-radius:16px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 10px 24px rgba(0,0,0,.26)}
 .gd-col{display:flex;flex-direction:column;align-items:center;flex:none}
@@ -399,7 +401,7 @@ html[data-mode="day"] .gd-center::before{
 .gd-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .gd-btn.ghost{background:transparent;color:var(--sub)}
 .gd-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
-.gd-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
+.gd-btn .bt{font-size:.72em;font-weight:700;opacity:.85;letter-spacing:.02em}   /* em 相对按钮字号 → 随 fitBtnText 缩字时一起缩 */
 /* 结算 */
 .gd-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:safe center;
   overflow-y:auto;overscroll-behavior:contain;
@@ -431,7 +433,10 @@ html[data-mode="day"] .gd-center::before{
 .gd-over .gd-remains .rm-cards .card:first-child{margin-left:0}
 .gd-over.out{animation:gdOverOut .32s cubic-bezier(.4,0,.9,.5) forwards;pointer-events:none}
 @keyframes gdOverOut{from{opacity:1}to{opacity:0;transform:scale(.94) translateY(12px)}}
-.gd-toast{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center;max-width:80%}
+/* 提示条放【中央回合横幅之下、手牌托盘之上】的空档: 横幅恒在竖向正中, 旧 top:40% 与它死叠 → 长提示
+   (理牌/拖排引导)糊成一团。下移到 60% 让它落进 felt 下半空档: 既避开横幅+副标题, 又清于最高的竖列组牌
+   托盘顶(单排/两排/竖列三种托盘高度都不相撞), 用不透明底 + 阴影盖住绒面纹理。 */
+.gd-toast{position:absolute;top:60%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;line-height:1.5;opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center;max-width:86%;box-shadow:0 6px 22px rgba(0,0,0,.5)}
 .gd-toast.show{opacity:1}
 .gd-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
 .gd-confetti i{position:absolute;top:-8%;font-size:20px;animation:gdFall linear forwards;will-change:transform,opacity}
@@ -1123,7 +1128,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       arrangeMode = on;
       const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); if(on) btn.innerHTML = '✓ 完成'; }
       els.hand.classList.toggle('arranging', on);
-      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 拖到上方可分成两排 · 选中的牌保留'); }
+      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 上下两排随意挪动 · 选中的牌保留'); }
       else { refreshSortBtn(); renderHand(); }
     }
     // 短按理牌 = 在【按大小排】↔【竖列组牌】之间循环切换(对标腾讯欢乐掼蛋一键理牌)。
@@ -1273,6 +1278,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
       els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
+      fitBtnText(els.ctrl);
     }
     function seatHTML(seat, mini){
       if (st.phase==='lobby') return lobbySeatHTML(seat);
@@ -1465,6 +1471,25 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
         return [top, bot];
       }
+      // 手动拖排入场(rows 尚空): 一律按【两排】起手。此前从竖列组牌切进手动时 sortMode 仍是 'combo',
+      //   会命中下方 combo 分支把 27 张全塞进单排 → 每张只露一条、中段点数糊成一团(主人反馈"理牌乱")。
+      //   种子序: 竖列进来沿用组牌序(同型相邻, 微调好挪), 否则大小序; 落两排后玩家再自由拖动。横屏仍单排。
+      if (arrangeMode){
+        let seq;
+        if (sortMode==='combo' && canCombo()){
+          const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
+          seq = groups.length ? [].concat.apply([], groups) : Rules.sortHand(hand, st.level);
+        } else {
+          const sorted = Rules.sortHand(hand, st.level), w=[], r=[];
+          for (const c of sorted){ (Rules.isWild(c, st.level) ? w : r).push(c); }
+          seq = w.concat(r);
+        }
+        if (seq.length >= 15 && !room.classList.contains('is-land')){
+          const half = Math.ceil(seq.length / 2);
+          return [seq.slice(0, half), seq.slice(half)];
+        }
+        return [[], seq];
+      }
       // 大小序(百搭=♥级牌前置醒目单列, cardEl 已给 .wild 光晕+"配"角标), 作兜底 / rank 模式用。
       const sorted = Rules.sortHand(hand, st.level);
       const wild = [], rest = [];
@@ -1644,7 +1669,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const totalCol=widths.reduce((a,b)=>a+b,0);
       // 列间距只落在 cols[1..](首列 margin=0): 总占用 = totalCol + (nCol-1)*gap。
       //   gap ≤ (avail-totalCol)/(nCol-1) 时总宽 ≤ avail; 封顶 12px。首列不给负 margin(否则被拽出左沿),
-      //   justify-start 下: 总宽<avail 靠左码放右侧留白, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
+      //   justify-center 下: 总宽<avail 整簇居中, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
       const gap = nCol>1 ? Math.min(12, (avail - totalCol)/(nCol-1)) : 0;
       cols.forEach((c,i)=>{ c.style.marginLeft = (i===0 ? 0 : gap).toFixed(2)+'px'; });
     }
@@ -1795,7 +1820,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       }
       const noBeat = myTurn && mustBeat && !mateLead && plays.length===0;   // 对手当家却压不过 → 只能不出
       const passPrimary = mateLead || noBeat;                               // 高亮引导"不出"
-      const passLbl = mateLead ? '队友当家 · 不出' : (noBeat ? '压不过 · 不出' : '不出');
+      // 主标恒短("不出"), 事由放 .bt 小字副标(与"出牌 <三连对>"同构) → 按钮不被长文撑破/裁字。
+      const passLbl = mateLead ? '不出 <span class="bt">队友当家</span>' : (noBeat ? '不出 <span class="bt">压不过</span>' : '不出');
       els.ctrl.innerHTML=`<div class="gd-acts">
         <button class="gd-btn ${passPrimary?'primary':'ghost'}" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>${passLbl}</button>
         <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
@@ -1828,6 +1854,17 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       els.ctrl.innerHTML=`<div class="gd-trib-hint">🎁 轮到你${lbl} · ${hint}</div>
         <div class="gd-acts"><button class="gd-btn primary" id="gdTribOk" ${tributeSel?'':'disabled'}>确认${lbl}</button></div>`;
       const ok=$('#gdTribOk'); if(ok) ok.addEventListener('click', ()=>{ if(tributeSel){ resetMiss(mySeat); doTribute(mySeat, tributeSel); } });
+      fitBtnText(els.ctrl);
+    }
+    // 长文字真·缩字号(主人诉求): CSS 的 clamp 只随视口收放, 不看内容长度 → "出牌 三连对"/"不出 队友当家"这类
+    //   长标仍会被 overflow:hidden 裁字。此处逐钮量: 内容超出可视宽就一步步降字号(含 em 副标一起缩), 到 10px 下限止。
+    function fitBtnText(scope){
+      if(!scope) return;
+      scope.querySelectorAll('.gd-btn').forEach(b=>{
+        b.style.fontSize='';                                     // 先还原到 CSS clamp 基准, 再按需缩(短文不误缩)
+        let size=parseFloat(getComputedStyle(b).fontSize)||15, g=0;
+        while(b.scrollWidth > b.clientWidth+0.5 && size>10 && g++<14){ size-=0.5; b.style.fontSize=size+'px'; }
+      });
     }
     function updatePlayBtn(){
       els.hand && els.hand.classList.toggle('has-sel', selected.size>0);   // 划选途中即时压暗未选牌(paintTo 只调本函数不重渲)
@@ -1847,6 +1884,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       } else {
         btn.textContent = '出牌';
       }
+      fitBtnText(els.ctrl);   // 出牌标可能变长(牌型名) → 量宽缩字号防裁
     }
 
     // ── 智能补选: 选了搭子的一头, 自动补成定长连张 ────────────────

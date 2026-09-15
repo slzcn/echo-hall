@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260915-lobby-fix';
+window.__EH_APP_VER = '20260915-hand-polish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2610,7 +2610,8 @@ function gtSeatArrays(row){
   const names=[],avatars=[],isAI=[],ids=[],souls=[];
   seats.forEach((s,i)=>{
     const human=s.kind==='human';
-    names[i]=s.name || (human?'玩家':(s.kind==='soul'?'灵魂':'牌手'+(i+1)));
+    // 兜底名与 SQL(eh_gt_start 补位)统一叫「机器人N」——旧版这里叫「牌手N」, 同一批 AI 两条路径两个词, 主人反馈"命名不一致"。座位号(seat)对齐 SQL 用真实席位而非渲染下标 i。
+    names[i]=s.name || (human?'玩家':(s.kind==='soul'?'灵魂':'机器人'+(typeof s.seat==='number'?s.seat:i+1)));
     avatars[i]=s.emoji || (human?'🙂':(s.kind==='soul'?'👤':'🤖'));
     isAI[i]=!human;                       // 灵魂/AI/空位一律 host 本机 AI 代打
     ids[i]=s.uid||null;

@@ -360,7 +360,7 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-btn.trustee-on{max-width:none;color:var(--amber,#ffc24d);border-color:var(--amber,#ffc24d)}
 /* 明牌钮(地主加倍轮): 加倍按钮上方居中的醒目搏一把 */
 .ddz-ming{margin-bottom:3px;min-width:130px;max-width:190px;align-self:center;flex:none}
-.ddz-btn .bt{font-size:11px;font-weight:700;opacity:.85;letter-spacing:.02em}
+.ddz-btn .bt{font-size:.72em;font-weight:700;opacity:.85;letter-spacing:.02em}   /* em 相对按钮字号 → 随 fitBtnText 缩字时一起缩 */
 /* 叫地主浮条 */
 /* 叫分/加倍浮条: 高度必须 ≤ #ddzCtrl 竖屏 92px 地板, 否则叫分/加倍→出牌切换时操作区一缩、牌桌抖一下。
    gap/上padding 收紧到内容 ~90px(留 2px 余量), 与出牌条同处 92px 地板内, 全程零抖动; 牌桌尺寸不动。 */
@@ -1435,6 +1435,7 @@ html[data-mode="day"] .ddz-center::before{
         + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
       els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
+      fitBtnText(els.ctrl);
     }
     // 结算态操作区(就在打牌页底部按钮位, 不再弹全屏模态): 再来一局(默认高亮) / 收工。
     // guest 无权开新局 → 由 host 驱动, 下副快照到达自动接新局; 只留"收工"。
@@ -1446,6 +1447,7 @@ html[data-mode="day"] .ddz-center::before{
         const again = $('#ddzAgain'); if (again) again.addEventListener('click', startRematch);
       }
       const done = $('#ddzDone'); if (done) done.addEventListener('click', ()=>close());
+      fitBtnText(els.ctrl);
     }
     // 再来一局: 就地重建新局(同一 room 不重挂 → 顺势接发牌入场动画), 复位一局态标志。host 广播新局首帧。
     function startRematch(){
@@ -1589,6 +1591,16 @@ html[data-mode="day"] .ddz-center::before{
     }
     // 操作语音(叫分/不出等): 与报牌型同音色, 让每一步动作都出声。
     function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
+    // 长文字真·缩字号(主人诉求): CSS clamp 只随视口不看内容 → 4 钮操作条里"出牌 四带两对"这类长标仍会被
+    //   overflow:hidden 裁字。逐钮量, 内容超宽就一步步降字号(含 em 副标一起缩), 到 10px 下限止。
+    function fitBtnText(scope){
+      if(!scope) return;
+      scope.querySelectorAll('.ddz-btn').forEach(b=>{
+        b.style.fontSize='';
+        let size=parseFloat(getComputedStyle(b).fontSize)||15, g=0;
+        while(b.scrollWidth > b.clientWidth+0.5 && size>10 && g++<14){ size-=0.5; b.style.fontSize=size+'px'; }
+      });
+    }
     function updatePlayBtn(){
       const btn = $('#ddzPlay'); if (!btn) return;
       const cards = [...selected].map(findCardById);
@@ -1606,6 +1618,7 @@ html[data-mode="day"] .ddz-center::before{
       } else {
         btn.textContent = '出牌';
       }
+      fitBtnText(els.ctrl);   // 出牌标可能变长(牌型名) → 量宽缩字号防裁
     }
 
     // ── 智能补选: 选了搭子的一头, 自动把能成型的连张补齐 ─────────────
