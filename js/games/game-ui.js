@@ -118,7 +118,7 @@
 .ddz-mult{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
 /* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
    悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
-.ddz-mus,.ddz-rot,.ddz-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+.ddz-mus,.ddz-rot,.ddz-x,.ddz-auto{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;color:var(--sub,#86cbc6);
   border:1px solid var(--line,rgba(0,229,212,.24));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
@@ -126,10 +126,14 @@
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .ddz-mus{margin-left:auto}
 .ddz-ico{width:18px;height:18px;display:block}
-.ddz-mus:hover,.ddz-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
+.ddz-mus:hover,.ddz-rot:hover,.ddz-auto:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
-.ddz-mus:active,.ddz-rot:active,.ddz-x:active{transform:scale(.9)}
+.ddz-mus:active,.ddz-rot:active,.ddz-x:active,.ddz-auto:active{transform:scale(.9)}
 .ddz-mus.muted{color:var(--dim,#498d88);opacity:.8}
+/* 托管开启: 钮体转琥珀高亮 + 轻微呼吸, 一眼可辨"正在托管"(状态忠实映射) */
+.ddz-auto.on{color:var(--amber,#ffc24d);border-color:var(--amber,#ffc24d);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(255,194,77,.5);animation:ddzAutoPulse 1.8s ease-in-out infinite}
+@keyframes ddzAutoPulse{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 10px rgba(255,194,77,.4)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 18px rgba(255,194,77,.72)}}
 .ddz-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
 .ddz-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
@@ -349,8 +353,7 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-btn.ghost{background:transparent;color:var(--sub)}
 .ddz-btn.primary.boom-ready{background:var(--magenta,#ff2d8e);border-color:var(--magenta,#ff2d8e);box-shadow:var(--glow-mag,0 0 12px rgba(255,45,142,.6));color:#fff}
 .ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
-/* 托管开关: 出牌条最左一枚窄钮(开)/ 托管中整条收成一枚收回钮 */
-.ddz-btn.trustee-tog{flex:none;max-width:66px;min-width:52px;font-size:12px}
+/* 托管中: 出牌条整条收成一枚"收回托管"钮(开关本体已挪到控制角 .ddz-auto 图标钮) */
 .ddz-btn.trustee-on{max-width:none;color:var(--amber,#ffc24d);border-color:var(--amber,#ffc24d)}
 /* 明牌钮(地主加倍轮): 加倍按钮上方居中的醒目搏一把 */
 .ddz-ming{margin-bottom:3px;min-width:130px;max-width:190px;align-self:center;flex:none}
@@ -705,12 +708,15 @@ html[data-mode="day"] .ddz-center::before{
     const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
     const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
     const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
+    // 托管图标(机器人): 与音乐/旋转/返回同款描边圆钮, 放控制角。开启时钮体转琥珀高亮。
+    const ICO_AUTO = SVG('<rect x="4.5" y="8" width="15" height="11" rx="2.4"/><path d="M12 4.2V8"/><circle cx="12" cy="3.4" r="1.1"/><circle cx="9.2" cy="13" r="1.25" fill="currentColor" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="currentColor" stroke="none"/><path d="M9.5 16.4h5"/>');
     const room = document.createElement('div'); room.className = 'ddz-room';
     room.innerHTML = `
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
         ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
+        <button class="ddz-auto" id="ddzAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
         <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
         <button class="ddz-x" id="ddzX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
@@ -961,6 +967,22 @@ html[data-mode="day"] .ddz-center::before{
     }
     if (cntBtn) cntBtn.addEventListener('click', toggleCounter);
     if (cntPanel){ const cx=cntPanel.querySelector('#ddzCntX'); if(cx) cx.addEventListener('click', toggleCounter); }
+
+    // ── 托管开关(控制角图形钮, 主人诉求: 从出牌条挪到角落用小图标) ──
+    //   开=我这席交 AI 代打(叫分/加倍/出牌全自动); 关=收回手动。钮体开启转琥珀呼吸, 状态一眼可辨。
+    //   出牌条/收回入口都走 setTrustee, 单一真源, 不再各写一份。
+    const autoBtn = $('#ddzAuto');
+    function paintAuto(){ if(autoBtn) autoBtn.classList.toggle('on', !!trustee); }
+    function setTrustee(on){
+      on = !!on;
+      if (trustee === on) return;
+      trustee = on;
+      if (on){ toast('🤖 已托管 · AI 替你自动出牌'); }
+      else { clearTimers(); toast('已收回托管 · 由你操作'); }
+      sfx('click'); paintAuto(); renderAll();
+    }
+    if (autoBtn) autoBtn.addEventListener('click', ()=> setTrustee(!trustee));
+    paintAuto();
 
     // lastPlay 只存 id,需要一张 id→card 表(用整副牌重建)
     const ALL = {}; Deck.standardDeck().forEach(c=>ALL[c.id]=c);
@@ -1466,7 +1488,7 @@ html[data-mode="day"] .ddz-center::before{
       // 托管中: 三阶段(叫分/加倍/出牌)统一交 AI, 控制条收成一枚"收回托管"钮(点掉即恢复手动)。
       if (trustee && (st.phase==='bid'||st.phase==='double'||st.phase==='play') && !(isGuest && awaitingHost)){
         els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost trustee-on" id="ddzTrustee">🤖 托管中 · 点此收回</button></div>`;
-        $('#ddzTrustee').addEventListener('click', ()=>{ trustee=false; clearTimers(); sfx('click'); toast('已收回托管 · 由你操作'); renderAll(); });
+        $('#ddzTrustee').addEventListener('click', ()=> setTrustee(false));
         return;
       }
       if (st.phase === 'bid'){
@@ -1539,12 +1561,10 @@ html[data-mode="day"] .ddz-center::before{
       // 提示钮: 有多套可出方案可循环, 或队友领出且我能压(点一下给"让队友走"引导) 才亮。
       const hintOn = myTurn && (plays.length>1 || (mustBeat && canBeat));
       els.ctrl.innerHTML = `<div class="ddz-acts">
-        <button class="ddz-btn ghost trustee-tog" id="ddzTrustee" title="交给 AI 自动出牌">托管</button>
         <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'要不起':'不出'}</button>
         <button class="ddz-btn ghost" id="ddzHint" ${hintOn?'':'disabled'}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
-      $('#ddzTrustee').addEventListener('click', ()=>{ trustee=true; sfx('click'); toast('🤖 已托管 · AI 替你出牌'); renderAll(); });
       $('#ddzPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
       $('#ddzPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
       $('#ddzHint').addEventListener('click', doHint);
