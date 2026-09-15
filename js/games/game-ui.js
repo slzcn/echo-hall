@@ -187,9 +187,11 @@
 /* 常驻"上一手牌"(对标腾讯): 各席本圈最近出的牌小牌行常驻头像下方, 不用飞回中央才看清谁出了啥;
    "不出"则显灰 chip。桌心清空(新一圈)即整体消失。 */
 .ddz-lastplay{display:flex;justify-content:center;flex-wrap:nowrap;align-items:center;margin-top:5px;min-height:42px}
-.ddz-lastplay .card{width:var(--cmw,28px);height:var(--cmh,40px);margin-left:-15px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+/* 各席"上一手牌"叠放放松(主人反馈"叠一起看不清"): 原 -15/-20 只露 8~13px, 点数糊成一团。
+   收到 -7(露 ~21px, 点数+花色都看得清); 牌多(≥7)才收紧到 -14 保证不溢出邻座。 */
+.ddz-lastplay .card{width:var(--cmw,28px);height:var(--cmh,40px);margin-left:-7px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 .ddz-lastplay .card:first-child{margin-left:0}
-.ddz-lastplay.dense .card{margin-left:-20px}
+.ddz-lastplay.dense .card{margin-left:-14px}
 .ddz-lastplay .lp-pass{font-size:11px;font-weight:700;color:var(--sub,#86cbc6);border:1px solid var(--line2);border-radius:9px;padding:2px 10px;background:rgba(0,0,0,.28)}
 .ddz-lastplay.fresh{animation:ddzLpIn .22s ease-out}
 @keyframes ddzLpIn{from{opacity:0;transform:translateY(-4px) scale(.92)}to{opacity:1;transform:none}}
@@ -324,12 +326,13 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-hand .card{margin-left:var(--hand-ov,-20px);transition:transform .14s ease,box-shadow .14s;cursor:pointer;transform-origin:bottom center}
 .ddz-hand .card:first-child{margin-left:0}
 .ddz-hand.locked .card{cursor:default}
-.ddz-hand .card.sel{transform:translateY(-18px);box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 2px var(--accent)}
+/* 选中态(主人反馈"不能确定是不是选中了"): 抬得更高 + 更亮的描边光环 + 牌面提亮, 让"提起来的是哪几张"绝不含糊 */
+.ddz-hand .card.sel{transform:translateY(-24px);box-shadow:0 10px 22px rgba(0,0,0,.5),0 0 0 3px var(--accent),0 0 18px var(--accent);filter:brightness(1.14)}
 /* 提示时被选中的牌弹跳一下, 让"提起来的是哪几张"一眼看清 */
-@keyframes ddzHintPop{0%{transform:translateY(-18px) scale(1)}45%{transform:translateY(-30px) scale(1.07)}100%{transform:translateY(-18px) scale(1)}}
-.ddz-hand .card.sel.hintpop{animation:ddzHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 10px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent),0 0 16px var(--accent)}
+@keyframes ddzHintPop{0%{transform:translateY(-24px) scale(1)}45%{transform:translateY(-36px) scale(1.07)}100%{transform:translateY(-24px) scale(1)}}
+.ddz-hand .card.sel.hintpop{animation:ddzHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 12px 24px rgba(0,0,0,.5),0 0 0 3px var(--accent),0 0 20px var(--accent);filter:brightness(1.14)}
 .ddz-hand:not(.locked) .card:hover{transform:translateY(-8px)}
-.ddz-hand:not(.locked) .card.sel:hover{transform:translateY(-18px)}
+.ddz-hand:not(.locked) .card.sel:hover{transform:translateY(-24px)}
 .ddz-hand .card.justdealt{animation:ddzDeal .3s ease both}/* both: 配 idx*20ms 错峰延迟, 未轮到的牌须保持起始态(隐藏), 否则先闪现终态再snap回起点=发牌闪跳 */
 @keyframes ddzDeal{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
 /* 斗地主发牌即按大小自动理好(Deck.sortHand), 手牌少且点选直接, 不设手动理牌(与掼蛋不同) */
@@ -355,8 +358,6 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-btn.danger{background:linear-gradient(150deg,#ff4d6d,#e0263e);border-color:#ff96a8;color:#fff;box-shadow:0 0 12px rgba(224,38,62,.45)}
 /* 托管中: 出牌条整条收成一枚"收回托管"钮(开关本体已挪到控制角 .ddz-auto 图标钮) */
 .ddz-btn.trustee-on{max-width:none;color:var(--amber,#ffc24d);border-color:var(--amber,#ffc24d)}
-/* 明牌钮(地主加倍轮): 加倍按钮上方居中的醒目搏一把 */
-.ddz-ming{margin-bottom:3px;min-width:130px;max-width:190px;align-self:center;flex:none}
 .ddz-btn .bt{font-size:.72em;font-weight:700;opacity:.85;letter-spacing:.02em}   /* em 相对按钮字号 → 随 fitBtnText 缩字时一起缩 */
 /* 叫地主浮条 */
 /* 叫分/加倍浮条: 高度必须 ≤ #ddzCtrl 竖屏 92px 地板, 否则叫分/加倍→出牌切换时操作区一缩、牌桌抖一下。
@@ -665,8 +666,8 @@ html[data-mode="day"] .ddz-center::before{
             const cards = (move.cards||[]).map(c=> hand.find(h=>h.id===(c&&c.id||c))).filter(Boolean);
             const r = Engine.applyPlay(st, seat, cards);
             if (!Rules.isBomb(r&&r.played)) sfx('cardplay');
+            if (r && r.over){ overSoon(); return true; }   // 制胜最后一手先亮一拍再翻结算
             renderAll(); maybeBanter(seat);   // 先重绘座位再说话: say() 写的气泡若在 renderAll 前加, 会被 renderSeats 整段重建吞掉(从不显示)
-            if (r && r.over) showOver();
             return true;
           }
         }
@@ -691,6 +692,11 @@ html[data-mode="day"] .ddz-center::before{
     if (carryScore && !_savedScore) cumScore[mySeat] = ddzWalletLoad();   // 新桌无本桌存档 → 我这席用跨桌累计分开局(换桌不从零)
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
+    // 制胜的最后一手先留在桌心亮一拍再翻结算(主人反馈"赢的人最后出的什么没看清就赢了"):
+    //   赢牌落定后不立刻切结算态(结算态 is-over 会收起桌心落牌), 而是保持"对局态"多留 WIN_REVEAL_MS 再翻。
+    let winReveal = false;
+    let _overRevealTimer = null;
+    const WIN_REVEAL_MS = 1400;
 
     // ── 音效 + 触感(复用聊天室 EhSfx 合成器; 未加载则静默, 全程 try/catch 不打断牌局) ──
     function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
@@ -803,6 +809,7 @@ html[data-mode="day"] .ddz-center::before{
       if (aiTimer){ clearTimeout(aiTimer); aiTimer = null; }
       if (actionTimer){ clearTimeout(actionTimer); actionTimer = null; }
       if (ringRAF){ cancelAnimationFrame(ringRAF); ringRAF = null; }
+      if (_overRevealTimer){ clearTimeout(_overRevealTimer); _overRevealTimer = null; }
     }
     // resize rAF 节流: 旋转/移动端地址栏收放会连发数十个 resize, 每个都整段重排手牌 —— 合并到每帧一次。
     let _rzRAF=0;
@@ -816,9 +823,17 @@ html[data-mode="day"] .ddz-center::before{
     // 只绑一次(挂在手牌容器上, 手牌重绘不重复绑)。手牌左→右叠放, 后牌盖前牌右半,
     // 故 handCardAt 不用 elementFromPoint(会在牌中心命中右邻牌漏掉最左那张), 改按 x 命中"露出的那张"。
     let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, lastSelTick=0;
+    // 点=单选 / 拖=连选 的分界: 落点后须移过 DRAG_SLOP 才算"拖"。否则想点一张牌时手指几像素抖动会连选到
+    //   相邻的牌 —— 尤其两张王(大小王挨在手牌最右、露出窄)最易误连成"对", 即主人报的"大王对子选不了一张"。
+    let pdX=0, pdY=0, pdDragging=false;
+    const DRAG_SLOP=8;
     // 划选期几何缓存: pointerdown 时一次性量好手牌带上沿/下沿 + 每张左沿(选中只上移不横移, 左沿在一次拖动内恒定)。
     //   免得每个 pointermove 都对全部牌 getBoundingClientRect —— 那紧跟 .sel 的 class 写会强制同步重排, 拖动掉帧。
     let paintGeo=null;
+    // 出牌钮刷新按帧合并(治"划选卡顿不跟手"): updatePlayBtn 内含 Rules.parse + fitBtnText(量 scrollWidth 循环缩字号),
+    //   那是强制同步重排。每个 pointermove 都跑一遍 → 拖过整排掉帧。rAF 节流: 一帧内多次 move 只在帧末刷一次钮。
+    let _pbRAF=0;
+    function schedulePlayBtn(){ if(_pbRAF) return; _pbRAF=requestAnimationFrame(()=>{ _pbRAF=0; updatePlayBtn(); }); }
     function buildPaintGeo(){
       const kids=els.hand.children, hr=els.hand.getBoundingClientRect();
       const lefts=new Array(kids.length);
@@ -850,12 +865,14 @@ html[data-mode="day"] .ddz-center::before{
       if(!c) return; const idx=+c.dataset.idx;
       if(paintLastIdx==null) applyPaintIdx(idx);
       else { const lo=Math.min(paintLastIdx,idx), hi=Math.max(paintLastIdx,idx); for(let i=lo;i<=hi;i++) applyPaintIdx(i); }
-      paintLastIdx=idx; updatePlayBtn();
+      paintLastIdx=idx; schedulePlayBtn();   // 拖动中按帧合并刷钮, 免每个 move 强制重排
     }
     function endPaint(){
       const wasSelect = painting && paintMode==='select';
       painting=false; paintSeen=null; paintLastIdx=null; paintGeo=null;
-      if (wasSelect && autoExtendSelection()){ renderHand(); updatePlayBtn(); sfx('cardsel'); }
+      if (wasSelect && autoExtendSelection()){ renderHand(); sfx('cardsel'); }
+      if(_pbRAF){ cancelAnimationFrame(_pbRAF); _pbRAF=0; }
+      updatePlayBtn();   // 松手: 立即以最终选区刷一次钮(取消挂起的帧节流, 不重复)
       // 涂抹直接改了 DOM 的 .sel 却没走 renderHand → 同步 lastSelSig, 否则之后"清空选中"时
       //   新 selSig 与陈旧 lastSelSig 可能相等, 增量护栏误判"没变"而跳过落下高亮(点绒面清不掉的真凶)。
       syncSelSig();
@@ -870,10 +887,18 @@ html[data-mode="day"] .ddz-center::before{
       if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
+      pdX=e.clientX; pdY=e.clientY; pdDragging=false;   // 记落点: 阈值内的抖动不当拖动(见 pointermove)
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       paintTo(c); e.preventDefault();
     });
-    els.hand.addEventListener('pointermove', (e)=>{ if(painting) paintTo(handCardAt(e.clientX,e.clientY)); });
+    els.hand.addEventListener('pointermove', (e)=>{
+      if(!painting) return;
+      if(!pdDragging){
+        if(Math.abs(e.clientX-pdX)<DRAG_SLOP && Math.abs(e.clientY-pdY)<DRAG_SLOP) return;   // 抖动阈值内: 仍是"点一张", 不连选
+        pdDragging=true;
+      }
+      paintTo(handCardAt(e.clientX,e.clientY));
+    });
     els.hand.addEventListener('pointerup', endPaint);
     els.hand.addEventListener('pointercancel', endPaint);
     // ── 点空白取消选中(对齐掼蛋): 已选牌时点牌桌绒面(非手牌/按钮/操作条/气泡/座位) → 清空选择, 放下高亮 ──
@@ -1036,7 +1061,7 @@ html[data-mode="day"] .ddz-center::before{
           ${cumPill(seat)}
         </div>
         ${lastPlayHTML(seat)}
-        ${((st.phase==='over' && seat!==mySeat) || (st.mingpai && st.phase==='play' && seat===st.landlord && seat!==mySeat)) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
+        ${(st.phase==='over' && !winReveal && seat!==mySeat) ? `<div class="ddz-seat-reveal" data-rv="${seat}"></div>` : ''}
         <div class="ddz-say"></div>
       </div>`;
     }
@@ -1044,8 +1069,7 @@ html[data-mode="day"] .ddz-center::before{
       els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
       els.me.innerHTML = seatHTML(mySeat);
       if (st.phase==='lobby') bindLobbySeats();
-      if (st.phase==='over' && st.result) renderSeatReveal();   // 结算: 对手在各自座位下亮出剩牌(自己的剩牌=底部手牌扇)
-      else renderMingpaiReveal();                               // 明牌: 地主(非我)亮出实时手牌到座位下(复用同一牌行)
+      if (st.phase==='over' && !winReveal && st.result) renderSeatReveal();   // 结算: 对手在各自座位下亮出剩牌(自己的剩牌=底部手牌扇)
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。
       els.bottom.innerHTML = '';
       const center = els.bottom.parentElement;
@@ -1083,12 +1107,6 @@ html[data-mode="day"] .ddz-center::before{
       room.querySelectorAll('.ddz-seat-reveal[data-rv]').forEach(box=>{
         fillRevealBox(box, (reveal[+box.dataset.rv]||[]).map(findCardById).filter(Boolean));
       });
-    }
-    // 明牌态: 地主(非我)把当前手牌亮到座位下(随出牌实时缩短); 我是地主时自己牌本就可见, 无需再亮。
-    function renderMingpaiReveal(){
-      if (!(st.mingpai && st.phase==='play' && st.landlord!=null && st.landlord!==mySeat)) return;
-      const box = room.querySelector('.ddz-seat-reveal[data-rv="'+st.landlord+'"]');
-      if (box) fillRevealBox(box, (st.players[st.landlord].hand||[]).slice());
     }
     // ── 招募态: 空位点击邀请 / host 请离 ──
     function bindLobbySeats(){
@@ -1163,7 +1181,7 @@ html[data-mode="day"] .ddz-center::before{
       if (a.pass) return `<div class="ddz-lastplay${fresh}" data-lp="${seat}"><span class="lp-pass">不出</span></div>`;
       const cards = a.cards.map(findCardById).filter(Boolean);
       if (!cards.length) return '';
-      const dense = cards.length>=7 ? ' dense' : '';
+      const dense = cards.length>=6 ? ' dense' : '';
       return `<div class="ddz-lastplay${dense}${fresh}" data-lp="${seat}">${cards.map(c=>cardEl(c,{mini:true}).outerHTML).join('')}</div>`;
     }
     function renderTable(){
@@ -1306,6 +1324,12 @@ html[data-mode="day"] .ddz-center::before{
     // ── 轮次横幅 + 倒计时环 ──
     function setBanner(){
       const b = els.banner; const cp = connPill();
+      if (winReveal){   // 制胜亮牌过渡: 桌心留着最后一手, 横幅先报"谁打出制胜一手", 别急着弹"你赢了"盖住牌
+        const w = st.table.lastPlay ? st.players[st.table.lastPlay.seat] : null;
+        b.className = 'ddz-turnbanner';
+        b.innerHTML = cp + (w ? ('🏆 ' + escapeHtml(w.name) + ' 打出制胜一手') : '');
+        return;
+      }
       if (st.phase==='over'){
         const res = st.result;
         if (!res){ b.className='ddz-turnbanner'; b.innerHTML=cp; return; }
@@ -1489,6 +1513,7 @@ html[data-mode="day"] .ddz-center::before{
       startRematch._busy = false;
     }
     function renderCtrl(){
+      if (winReveal){ els.ctrl.innerHTML = ''; return; }   // 制胜亮牌过渡: 先不弹"再来一局/收工", 让制胜手安静亮一拍
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'over'){ renderOverCtrl(); return; }
       if (spectating){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
@@ -1520,18 +1545,13 @@ html[data-mode="day"] .ddz-center::before{
       const opts2 = [ {f:1,t:'不加倍',c:''}, {f:2,t:'加倍 ×2',c:'primary'}, {f:4,t:'超级加倍 ×4',c:'danger'} ]
         .map(o=>`<button class="ddz-btn ${o.c}" data-dbl="${o.f}">${o.t}</button>`).join('');
       const who = (st.dbl && st.dbl.turn!=null && st.players[st.dbl.turn]) ? st.players[st.dbl.turn].name : '';
-      // 明牌(地主专属, 只在地主自己的加倍回合、未明过时给): 亮牌换 ×2, 明后仍可再选加倍系数叠加。
-      const canMing = myTurn && iAmLord && !st.mingpai;
-      const mingRow = canMing ? `<button class="ddz-btn danger ddz-ming" id="ddzMing">🔦 明牌 ×2</button>` : '';
-      const q = myTurn ? (iAmLord ? (st.mingpai?'已明牌 ×2 · 再选加倍系数':'你是地主，明牌搏一把 或 直接加倍？')
-                                  : '要不要给地主加点彩头？')
+      const q = myTurn ? (iAmLord ? '你是地主，要不要加倍搏一把？' : '要不要给地主加点彩头？')
                        : ('等待 ' + escapeHtml(who) + ' 加倍…');
-      els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div>${mingRow}<div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
+      els.ctrl.innerHTML = `<div class="ddz-bidbar"><div class="q">${q}</div><div class="ddz-bidbtns"${myTurn?'':' style="visibility:hidden"'}>${opts2}</div></div>`;
       if (myTurn){
         els.ctrl.querySelectorAll('[data-dbl]').forEach(b=>{
           b.addEventListener('click', ()=>{ resetMiss(mySeat); doDouble(mySeat, +b.dataset.dbl); });
         });
-        const mb=$('#ddzMing'); if(mb) mb.addEventListener('click', ()=>{ resetMiss(mySeat); doMingpai(); });
       }
     }
     function renderBidBar(waitingMsg){
@@ -1799,8 +1819,8 @@ html[data-mode="day"] .ddz-center::before{
       catch(e){ toast(playErr(e.message)); return; }
       if (!Rules.isBomb(r && r.played)) sfx('cardplay');   // 出牌拍击音(炸弹交给 boom, 不叠)
       selected.clear(); hintCycle=[];
+      if (r && r.over){ overSoon(); return; }   // 制胜最后一手先亮一拍再翻结算
       renderAll();
-      if (r && r.over){ showOver(); return; }
     }
     function doPass(seat){
       if (isGuest){   // guest 只能替自己不出, 回传给 host
@@ -1864,9 +1884,9 @@ html[data-mode="day"] .ddz-center::before{
       if (mv.action === 'pass'){ doPass(seat); return; }
       try { var r = Engine.applyPlay(st, seat, mv.cards); }
       catch(e){ doPass(seat); return; }   // AI 兜底:决策失误就过
+      if (r && r.over){ overSoon(); return; }   // 制胜最后一手先亮一拍再翻结算
       renderAll();
       maybeBanter(seat);   // 先重绘再说话: 气泡若在 renderSeats 之前加会被整段重建吞掉
-      if (r && r.over){ showOver(); return; }
     }
     function maybeBanter(seat){
       const n = st.players[seat].hand.length;
@@ -1895,14 +1915,6 @@ html[data-mode="day"] .ddz-center::before{
       if (mv.action==='pass'){ doPass(mySeat); return; }
       selected = new Set(mv.cards.map(c=>c.id)); doPlay();
     }
-    // ── 明牌(仅本地加倍局, 地主专属): 亮出整手牌换 ×2 倍数 ──
-    function doMingpai(){
-      if (!(st.phase==='double' && st.mingpai===false && st.dbl && st.dbl.turn===mySeat && mySeat===st.landlord)) return;
-      try { Engine.applyMingpai(st, mySeat); }
-      catch(e){ toast('明牌失败'); return; }
-      sfx('landlord'); toast('🔦 明牌！倍数 ×2'); renderAll();
-    }
-
     // ── 人类超时兜底(与断线托管同一逻辑) ──
     function onHumanTimeout(){
       if (spectating) return;
@@ -1922,6 +1934,15 @@ html[data-mode="day"] .ddz-center::before{
       if (acted) bumpMiss(mySeat);   // 累计我的超时(达阈值→idleOut 离座旁观)
     }
 
+    // ── 制胜亮牌过渡(主人反馈"赢的人最后出的什么没看清就赢了"): 终局那一手先以"对局态"留在桌心亮
+    //    WIN_REVEAL_MS, 让"谁用什么牌赢的"看得清, 再翻结算(showOver 弹再来一局/胜负横幅/亮全家底牌)。 ──
+    function overSoon(){
+      if (winReveal) return;              // 已在亮牌过渡中(幂等: guest 可能连收多张 over 快照)
+      winReveal = true;
+      clearTimers();                       // 终局: 停掉倒计时/AI 定时(winReveal 期 renderAll→armTurn 本就不武装)
+      renderAll();                         // 以对局态再绘: is-over 不加, 桌心留着制胜的最后一手(+ 掷牌动画)
+      _overRevealTimer = setTimeout(()=>{ _overRevealTimer=null; winReveal=false; showOver(); }, WIN_REVEAL_MS);
+    }
     // ── 结算: 不再弹全屏模态, 就地在牌桌上呈现 —— 各座位亮牌(自己=底部手牌扇, 对手=座位下小牌行) +
     //    中央结果横幅 + 底部「再来一局/收工」, 均由 renderAll 的 over 分支绘出(setBanner/renderSeats/renderOverCtrl)。
     //    本函数只做一次性副作用: 计分 / 胜负音效+震动+彩带 / 战报进聊天流 / onResult 回调。 ──
@@ -1962,7 +1983,7 @@ html[data-mode="day"] .ddz-center::before{
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
       room.classList.toggle('is-lobby', st.phase==='lobby');   // 招募态复用对局桌骨架, 仅隐未发牌无意义元素
-      room.classList.toggle('is-over', st.phase==='over');      // 结算态: 就地亮牌+中央结果横幅, 隐落牌/上家/倍数徽标
+      room.classList.toggle('is-over', st.phase==='over' && !winReveal);      // 结算态: 就地亮牌+中央结果横幅, 隐落牌/上家/倍数徽标(winReveal 期间先不切, 让制胜手留在桌心)
       if (lastLord===null && st.landlord!=null){
         sfx('landlord');   // 地主刚揭晓: 号角定音
         const nm = st.players[st.landlord].name;
@@ -1995,8 +2016,8 @@ html[data-mode="day"] .ddz-center::before{
       dealNo = (typeof snap.dealNo==='number') ? snap.dealNo : dealNo;
       lastSnap = snap;
       st = GNet.pseudoState(snap, mySeat, myHand);
-      renderAll();
-      if (st.phase==='over' && st.result && prevPhase!=='over') showOver();
+      if (st.phase==='over' && st.result && prevPhase!=='over'){ overSoon(); }   // 制胜最后一手先亮一拍再翻结算(overSoon 内部会 renderAll)
+      else renderAll();
       if (minimized) updateChip();
     }
     // ── guest: 收到自己那副手牌(来自 eh_gt_hands, RLS 只放行本人)。可传 id 数组或牌对象数组。地主领底后 host 会重写本行。 ──
