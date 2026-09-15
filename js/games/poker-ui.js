@@ -666,7 +666,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     // 本地邀请一个机器人补位(纯本机, 无需 DB): 席位下一手起加入, 全新买入 START。
     //   resume: 停摆桌邀满即续打(默认 true); 批量补位时传 false, 由调用方填完再统一续打, 免逐个触发。
-    function inviteBot(seat, resume){
+    function inviteBot(seat, resume, walkIn){
       if (resume === undefined) resume = true;
       if (seat===mySeat || isRemote(seat)) return;
       const b = pickBotIdentity(seat);
@@ -684,14 +684,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       saveScore();
       try{ closeInviteMenu(); }catch(_){}
       sfx('click');
-      try{ emitBeat({ type:'join', actor:b.name, text:'🪑 '+b.name+' 入座补位' }); }catch(_){}
+      try{ emitBeat({ type:'join', actor:b.name, text:(walkIn?'🚶 '+b.name+' 走进来坐下':'🪑 '+b.name+' 入座补位') }); }catch(_){}
       // 牌桌因对手离光而停摆(结算态且无自动续手在跑): 邀满 2 人即刻续打; 否则提示"下一手加入"。
       if (resume && st.phase==='over' && !overTimer && aliveSeats().length>=2){
         toast(b.name+' 入座 · 开新一手'); try{ if(curOver&&curOver.parentNode) curOver.remove(); }catch(_){}
         try{ hideWinBanner(); }catch(_){}
         nextHand();
       } else {
-        toast(b.name + (st.phase==='lobby' ? ' 入座' : ' 入座 · 下一手加入'));
+        toast((walkIn?'🚶 ':'') + b.name + (st.phase==='lobby' ? (walkIn?' 加入牌桌':' 入座') : ' 入座 · 下一手加入'));
         // 立即刷新座位: 招募态显示机器人已入座; 局中显示"下一手入座"占位(不再停在"空位"死等下次重渲)。
         renderOpponents(true); positionSeats();
       }
@@ -762,6 +762,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnAiAct=0, turnSeatActive=-1, turnStreetActive='';
     let pendingAiDecision=null, pendingAiSeat=-1;   // armTurn 定时算好的 AI 决策(思考时长按它定)→ aiStep 复用, 免同回合二次 MC
+    let walkInTimer=null, walkInTarget=0;           // 招募态"路人不定时入座": 每桌随机定一个目标人数, 到点有概率来一个新玩家(机器人)
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let _winBanner=null;                    // 桌面赢家横幅(单机常规手替代结算弹窗, 见 showWinBanner)
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
@@ -855,7 +856,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; positionSeats(); }); };
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
+    function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── 折叠 / 展开(返回聊天但牌局继续) ──
@@ -985,6 +986,40 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       delete lobbyBots[seat];
       if (st && st.phase==='lobby'){ st = lobbyState(lobbySeats); renderOpponents(true); positionSeats(); sfx('click'); }
     }
+    // ── 招募态"路人不定时入座"(主人: 空位在不手动邀请时, 可不定时来新玩家, 随机、不必每次补满、看牌桌情况) ──
+    //   纯本机: 复用 inviteBot 那条【不落 DB】的补位路径。只在 host 招募态跑, 手动邀请照常叠加。
+    //   不定时 = 每 5~14s 一跳且到点也只"有概率"来人; 不补满 = 每桌开局随机定一个目标人数[2,n], 到目标就停。
+    function lobbyEmptySeats(){
+      if (!st || st.phase!=='lobby') return [];
+      return st.players.filter(p=>p.kind==='empty').map(p=>p.seat);   // lobbyBots 已在 lobbyState 里落成 kind='bot', 自然不算空
+    }
+    function walkInTick(){
+      walkInTimer=null;
+      if (!isHostLobby || !st || st.phase!=='lobby') return;   // 离开招募态即停(startDeal/close 另有清理)
+      const empty = lobbyEmptySeats();
+      const occupied = n - empty.length;
+      if (empty.length && occupied < walkInTarget){
+        // 越空越积极, 越接近目标越懒(看牌桌情况); 再叠一层随机 → 不是每次都来, 来得不定时。
+        const eager = walkInTarget>0 ? (walkInTarget - occupied)/walkInTarget : 0;   // 缺口占比 0~1
+        if (Math.random() < 0.5 + 0.4*eager){
+          const seat = empty[Math.floor(Math.random()*empty.length)];
+          inviteBot(seat, true, true);   // walkIn=true: 播报/提示用"走进来坐下"而非"补位"
+        }
+      }
+      scheduleWalkIn();   // 到目标后仍守望: 万一有人被请离又空出, 可再来人
+    }
+    function scheduleWalkIn(){
+      if (walkInTimer) return;                                  // 已排程不重复(setLobby 每次刷新都会调到)
+      if (!isHostLobby || !st || st.phase!=='lobby') return;
+      const gap = 5000 + Math.floor(Math.random()*9000);        // 5~14s 不定时
+      walkInTimer = setTimeout(walkInTick, gap);
+    }
+    function startWalkIns(){
+      if (!isHostLobby || !st || st.phase!=='lobby') return;
+      if (!walkInTarget){ walkInTarget = 2 + Math.floor(Math.random()*(n-1)); }   // 本桌随机目标人数[2,n], 只定一次 → 常不补满
+      scheduleWalkIn();
+    }
+    function clearWalkIn(){ if(walkInTimer){ clearTimeout(walkInTimer); walkInTimer=null; } walkInTarget=0; }
     function _imAway(e){
       const m=room.querySelector('.pk-invite-menu');
       if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.pk-lobby-empty,.pk-vacant'))) closeInviteMenu();
@@ -2145,9 +2180,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       st = lobbyState(lobbySeats);
       renderOpponents(true); renderMe(); renderMsg(); renderPot(); renderActs(true);
       positionSeats();
+      startWalkIns();   // 名册刷新后仍在招募态 → 确保路人入座定时器在跑(内部去重, 不会重复排程)
     }
     function startDeal(A, seed){
       if (st.phase!=='lobby') return;
+      clearWalkIn();   // 转正局: 停"路人入座"
       try{ closeInviteMenu(); }catch(_){}
       // 名册就地全量生效(与 applyPendingRoster 同语义, 但这是首发, 全员重置买入)
       if (A && Array.isArray(A.names) && A.names.length===n){
@@ -2264,6 +2301,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     renderAll();
     // 首帧对手位置需等布局稳定
     requestAnimationFrame(positionSeats);
+    if (lobbyMode && isHostLobby) startWalkIns();   // 招募态开桌即起"路人不定时入座"(host 没手动邀满时慢慢来人)
     // 单机今日输光已达上限: 不入座不发牌, 直接封盘页(收工)。否则正常走入座序列。
     if (isLocalSolo && !lobbyMode && pkLimitReached()){
       introSeating = false;
@@ -2285,6 +2323,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       },
       _foldMe:()=>{ if(st.players[mySeat]){ st.players[mySeat].folded=true; } renderOpponents(true); },  // 测试: 我方弃牌(验底牌灰显不撤)
       _aiThinkMs:(d,la)=>aiThinkMs(d,la),   // 测试: 按决策类型采样思考时长(验"不再每次耗满")
+      _walkInTick:()=>{ if(walkInTimer){clearTimeout(walkInTimer);walkInTimer=null;} walkInTick(); if(walkInTimer){clearTimeout(walkInTimer);walkInTimer=null;} },  // 测试: 手动跑一次路人入座判定(不留真实定时器)
+      _walkInState:()=>({ target:walkInTarget, empty:lobbyEmptySeats().length, occupied:n-lobbyEmptySeats().length, n }),
+      _setWalkInTarget:(t)=>{ walkInTarget=t; },   // 测试: 固定目标人数, 消除随机性做确定性断言
       missOf:s=>missStreak[s]||0,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
