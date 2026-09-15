@@ -566,6 +566,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function bumpMiss(seat){
       if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
+      // 单机练习桌只我一个真人: 超时已自动过牌/弃牌代打, 再把自己踢下桌旁观毫无意义(没有别人被我拖累),
+      //   还会卡出"轮到你↔旁观中"的矛盾态。故单机桌本人永不离座, 走开回来照样接着打。离座旁观只服务联机(防一人挂机卡死全桌)。
+      if (seat===mySeat && isLocalSolo) return;
       // 只盯"本该真人推进却没推进"的席: 我(未旁观) 或 仍在场的远程真人席(未转 AI)
       if (seat===mySeat ? spectating : (isAI[seat] || !isRemote(seat))) return;
       missStreak[seat] = (missStreak[seat]||0) + 1;
@@ -1282,6 +1285,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🎴 等房主发牌…'; return; }
       if (st.phase==='over'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp; return; }
       const seat=st.toAct;
+      // 已离座旁观(联机挂机被判): 我这席灵魂在替我行动, 绝不显示"轮到你"(否则与操作栏"旁观中"占位打架)。
+      if (spectating){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🔭 旁观中 · 灵魂替你行动'; return; }
       if (seat===mySeat){ els.msg.className='pk-msg mine'; els.msg.innerHTML=cp+'🫵 轮到你 · '+streetName(); }
       else { els.msg.className='pk-msg'; els.msg.innerHTML=cp+(st.players[seat]?escapeHtml(st.players[seat].name):'…')+' 思考中… · '+streetName(); }
     }
@@ -1297,7 +1302,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         lastMeSig=''; return;
       }
       const p=st.players[mySeat];
-      const mine = st.toAct===mySeat && st.phase!=='over';
+      const mine = st.toAct===mySeat && st.phase!=='over' && !spectating;   // 旁观后我这席由灵魂推进, 不算"我的回合"
       const showdown = (st.phase==='over' && st.result && st.result.wentToShowdown && st.result.reveal && st.result.reveal[mySeat]);
       const holeCards = (showdown ? st.result.reveal[mySeat].hole.map(idCard) : p.hole);
       // 增量护栏: 底牌条只在 阶段/是否轮我/摊牌/弃全下/筹码/庄位/需跟额/发牌帧/底牌 变化时重建。
@@ -1313,14 +1318,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         catch(e){ _ehCatch('poker.madeHand', e); }
       }
       const boardSig = Array.isArray(st.board) ? st.board.map(c=>c.id).join('') : '';
-      const meSig = st.phase+'|'+(mine?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
+      const meSig = st.phase+'|'+(mine?1:0)+'|'+(spectating?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
         +'|'+(st.button===mySeat?1:0)+'|'+myBlind+'|'+callAmt+'|'+(dealAnim?1:0)+'|'+boardSig+'|'+madeStr
         +'|'+holeCards.map(c=>c?(c.suit+''+c.rank):'x').join(',')
         +'|'+(st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'');
       if (meSig === lastMeSig) return;
       lastMeSig = meSig;
       let hint='';
-      if (st.phase==='seating'){ hint='🪑 等灵魂入座后开牌…'; }
+      if (spectating){ madeStr=''; hint='🔭 已离座旁观 · 灵魂替你行动 · 想重玩点右上角返回再进桌'; }
+      else if (st.phase==='seating'){ hint='🪑 等灵魂入座后开牌…'; }
       else if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
       else if (st.phase==='over'){
         const won=(st.result.winnersBySeat||[]).includes(mySeat);
