@@ -758,6 +758,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     sfx('arrive'); if(!lobbyMode) sfx('deal');
 
     let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnAiAct=0, turnSeatActive=-1, turnStreetActive='';
+    let pendingAiDecision=null, pendingAiSeat=-1;   // armTurn 定时算好的 AI 决策(思考时长按它定)→ aiStep 复用, 免同回合二次 MC
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let _winBanner=null;                    // 桌面赢家横幅(单机常规手替代结算弹窗, 见 showWinBanner)
     let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
@@ -1627,7 +1628,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function aiStep(seat){
       if (isGuest) return;                     // 客人从不本地跑 AI
       if (st.toAct!==seat || st.phase==='over') return;
-      let d; try{ d=AI.decide(st, seat, { persona: personaBySeat[seat] || 'tag', samples: 120 }); }catch(e){ d=null; }
+      // 优先用 armTurn 定时时算好的决策(思考时长正是按它定的); 缓存不属于本席才现算, 免同回合重复 MC。
+      let d = (pendingAiSeat===seat) ? pendingAiDecision : null;
+      pendingAiDecision=null; pendingAiSeat=-1;
+      if(!d){ try{ d=AI.decide(st, seat, { persona: personaBySeat[seat] || 'tag', samples: 120 }); }catch(e){ d=null; } }
       if(!d){ // 兜底: 能过就过, 否则弃
         const la=Engine.legalActions(st,seat); d = la.canCheck?{action:'check'}:{action:'fold'};
       }
@@ -1686,6 +1690,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
 
     // ── 回合驱动: 亮环倒计时 + AI/自动 ──
+    // 按决策难易给"思考时长": 人打牌不会每步都想满 —— 白给的过牌、明显的烂牌弃牌几乎秒决;
+    //   要不要跟一注得算算; 主动下注/加注更费神; 全下是重手, 略停顿。再给少数回合叠一段深思(真人偶尔的长考)。
+    //   区间比原来的 2.2~7s 整体收窄且下压, 免"每手都卡满好几秒"的机械感。
+    function rnd(lo, hi){ return lo + Math.floor(secureRand()*(hi-lo)); }
+    function aiThinkMs(d, la){
+      const act = (d && d.action) || (la && la.canCheck ? 'check' : 'fold');
+      let ms;
+      switch(act){
+        case 'check': ms = rnd(350, 1000); break;   // 免费过牌: 几乎不用想
+        case 'fold':  ms = rnd(500, 1400); break;   // 弃牌: 快
+        case 'call':  ms = rnd(900, 2500); break;   // 跟注: 得掂量赔率
+        case 'bet':
+        case 'raise': ms = rnd(1100, 3300); break;  // 主动进攻: 更费神
+        case 'allin': ms = rnd(1400, 4000); break;  // 全下: 重手, 略停
+        default:      ms = rnd(900, 2200);
+      }
+      if (secureRand() < 0.15) ms += rnd(800, 2200);   // ~15% 长考: 偶尔才真"想很久"
+      return ms;
+    }
     function armTurn(onExpire){
       clearTimers();
       if (st.phase==='lobby' || st.phase==='over' || st.phase==='waiting' || st.phase==='seating') { turnSeatActive=-1; turnStreetActive=''; return; }
@@ -1711,7 +1734,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
                 : aiSeat   ? ACT_MS               // 灵魂席: 满格环(与真人一致), 出手时刻另见 turnAiAct
                 : remote   ? (ACT_MS + 6000)       // host 兜底比对端稍长, 留网络冗余; 久不动就代打
                 : 0;
-        turnAiAct = aiSeat ? (AI_MIN_MS + Math.floor(secureRand()*AI_JIT_MS)) : 0;   // 灵魂"思考→出手"真实时长(独立于展示环)
+        if (aiSeat){
+          // 决策此刻先算(本席回合静止, 无他人插手)→ 缓存给 aiStep 复用免二次 MC;
+          //   思考时长按"这步好不好想"定: 免费过牌/弃牌秒决, 跟注中等, 下注/加注稍长, 全下略久,
+          //   再给 ~15% 概率叠一段"深思"抖动。不再雷打不动耗满 2~7s(主人: 别每次都把思考时间用光)。
+          let d; try{ d=AI.decide(st, seat, { persona: personaBySeat[seat] || 'tag', samples: 120 }); }catch(_){ d=null; }
+          pendingAiDecision = d; pendingAiSeat = seat;
+          turnAiAct = aiThinkMs(d, Engine.legalActions(st, seat));
+        } else { turnAiAct = 0; pendingAiDecision = null; pendingAiSeat = -1; }
         turnStart = Date.now();
       }
       // 我也坐椭圆了 → 我方回合也在自己座位上走圆环+秒数徽标(与对手一致), 不再依赖桌外 #pkClk(已移除)
@@ -2251,6 +2281,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         st.phase='over'; showOver();
       },
       _foldMe:()=>{ if(st.players[mySeat]){ st.players[mySeat].folded=true; } renderOpponents(true); },  // 测试: 我方弃牌(验底牌灰显不撤)
+      _aiThinkMs:(d,la)=>aiThinkMs(d,la),   // 测试: 按决策类型采样思考时长(验"不再每次耗满")
       missOf:s=>missStreak[s]||0,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
