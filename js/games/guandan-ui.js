@@ -308,11 +308,8 @@ html[data-mode="day"] .gd-center::before{
 .gd-hand-wrap{padding:2px 8px 4px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(0,0,0,.18))}
 .gd-hand{display:flex;flex-direction:column;gap:6px;padding:var(--hand-pad,16px) 0 4px;min-height:0;touch-action:none}
 /* 手牌托盘定高(主人诉求): 以≈6张重叠牌高为参考钉死高度, 手牌在 1 排/2 排间切换时托盘不缩放,
-   由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。
-   ⚠ 必须排除 .combo(竖列组牌): 此规则的 justify-content:flex-end 是给两排手牌(flex-direction:column, 主轴竖直)"沉底"用的;
-   而 combo 把方向改成 row(主轴水平), 同一个 flex-end 就变成"牌靠右", 且本规则特异性(0,3,0)高于 .gd-hand.combo 的
-   flex-start(0,2,0)会把它遮蔽 —— 这正是"少牌时竖列组牌跑到右侧"的真凶(上次左对齐修复被此规则盖掉)。 */
-.gd-room:not(.is-land) .gd-hand:not(.combo){height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
+   由 .gd-mid(flex:1) 吸收余量 → 底部操作区高度恒定, 不再随出牌一缩一涨。牌底对齐, 选中上抬留头顶余量。横屏矮屏除外(它自有短距布局)。 */
+.gd-room:not(.is-land) .gd-hand{height:calc(var(--ch,54px) * 2.35);box-sizing:border-box;justify-content:flex-end}
 /* 手牌居中(主人诉求 msg 更新): 牌不填满整行时在手牌带内居中, 不再贴左显歪。见 .gd-hand-row 的 justify-content。 */
 /* 居中(主人诉求"剩余的牌局要居中不居左"): layoutRow 步距封顶 cw*0.64, 牌少时(残局单排/两排各≤14 张)
    整排宽 < 手牌带宽, flex-start 会让牌堆贴左显得歪; center 让不满宽的排在带内居中, 满手(总宽=带宽)时无副作用。 */
@@ -338,35 +335,6 @@ html[data-mode="day"] .gd-center::before{
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
 .gd-hand.arranging .gd-hand-row.top:empty::before{content:'⬆ 拖到此处分成上排';color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.03em}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
-/* ── 智能组牌(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型收进一个横排"组盒", 盒内牌正常横向叠放
-   (露牌面点数花色, 比竖列窄条好读得多), 盒下标牌型名; 组盒之间留明显间距、多了自动换行成两三排。
-   点一盒 = 选整组一手打出; 散牌收进末尾一盒逐张点。全部组盒等高(1 张牌高) → 标签天然齐平。 ── */
-.gd-hand.combo{box-sizing:border-box;flex-direction:row;flex-wrap:wrap;align-items:flex-end;align-content:flex-end;justify-content:center;gap:11px 10px;padding:calc(var(--hand-pad,16px) - 3px) 8px 8px;overflow:visible;
-  background:linear-gradient(180deg,rgba(0,229,212,.055),rgba(8,14,26,.36));border:1px solid rgba(0,229,212,.15);border-radius:16px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 10px 24px rgba(0,0,0,.26)}
-.gd-grp{display:flex;flex-direction:column;align-items:center;flex:none}
-/* 成型组盒: 盒内牌底衬一层青色底 + 描边, 让"这是一手完整牌型"一眼读得出(散牌盒不衬) */
-.gd-grp:not(.loose) .gd-grp-cards{padding:3px 5px;margin:-3px -5px;border-radius:11px;background:rgba(0,229,212,.06);box-shadow:inset 0 0 0 1px rgba(0,229,212,.16)}
-.gd-grp.bomb .gd-grp-cards{background:rgba(255,143,58,.08);box-shadow:inset 0 0 0 1px rgba(255,143,58,.28)}
-.gd-grp-cards{display:flex;flex-direction:row;align-items:flex-end}
-.gd-grp-cards .card{margin-left:-19px;cursor:pointer;transition:transform .14s ease,box-shadow .14s,filter .14s;transform-origin:bottom center}
-.gd-grp-cards .card:first-child{margin-left:0}
-.gd-hand.combo.locked .card{cursor:default}
-/* 组盒里选中: 上抬冒头(z-index 盖住右邻), 一眼看清选了这组/这张 */
-.gd-hand.combo .card.sel{transform:translateY(-12px) scale(1.05);box-shadow:0 12px 18px -7px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 12px rgba(0,229,212,.45);z-index:6;filter:brightness(1.04)}
-.gd-hand.combo:not(.locked) .card:hover{transform:translateY(-6px)}
-.gd-col-label{margin-top:6px;font-size:10.5px;font-weight:900;color:var(--accent,#00e5d4);
-  background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.42);border-radius:999px;
-  padding:1.5px 8px;white-space:nowrap;letter-spacing:.02em;line-height:1.3;
-  box-shadow:0 0 8px rgba(0,229,212,.16),0 1px 3px rgba(0,0,0,.35)}
-/* 炸弹/同花顺盒: 烫金胶囊(呼应顶部级牌徽标), 让"手里有炸"一眼扎眼 */
-.gd-col-label.bomb{color:#3a1500;background:linear-gradient(150deg,#ffd76a,#ff8f3a);
-  border-color:rgba(255,143,58,.6);box-shadow:0 0 12px rgba(255,143,58,.5),0 1px 3px rgba(0,0,0,.35)}
-/* 散牌盒标签: 弱化成灰调, 与成型牌型区分 */
-.gd-col-label.loose{color:var(--dim,#498d88);background:rgba(120,150,150,.08);border-color:rgba(120,150,150,.3);box-shadow:none}
-/* 横屏矮且手牌本就上抬贴中央出牌区: 去掉托盘面板框(否则与横幅/座位叠成两层), 以牌桌为背景 */
-.gd-room.is-land .gd-hand.combo{padding:6px 5px 5px;gap:8px 9px;background:none;border:none;border-radius:0;box-shadow:none}
-.gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:4px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
    主人诉求: 浮到【牌的右上角】—— 绝对定位贴 gd-hand-wrap 右上角, 悬在手牌托盘之上。
    手牌底对齐(justify-content:flex-end)+托盘顶留白, 故右上角基本是空区, 只在满牌时轻掠最右一张顶角;
@@ -432,8 +400,8 @@ html[data-mode="day"] .gd-center::before{
 .gd-over.out{animation:gdOverOut .32s cubic-bezier(.4,0,.9,.5) forwards;pointer-events:none}
 @keyframes gdOverOut{from{opacity:1}to{opacity:0;transform:scale(.94) translateY(12px)}}
 /* 提示条放【中央回合横幅之下、手牌托盘之上】的空档: 横幅恒在竖向正中, 旧 top:40% 与它死叠 → 长提示
-   (理牌/拖排引导)糊成一团。下移到 60% 让它落进 felt 下半空档: 既避开横幅+副标题, 又清于最高的竖列组牌
-   托盘顶(单排/两排/竖列三种托盘高度都不相撞), 用不透明底 + 阴影盖住绒面纹理。 */
+   (理牌/拖排引导)糊成一团。下移到 60% 让它落进 felt 下半空档: 既避开横幅+副标题, 又清于手牌托盘顶
+   (单排/两排两种托盘高度都不相撞), 用不透明底 + 阴影盖住绒面纹理。 */
 .gd-toast{position:absolute;top:60%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;line-height:1.5;opacity:0;transition:opacity .2s;z-index:8;pointer-events:none;text-align:center;max-width:86%;box-shadow:0 6px 22px rgba(0,0,0,.5)}
 .gd-toast.show{opacity:1}
 .gd-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:10}
@@ -816,7 +784,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         </div>
       </div>
       <div class="gd-me-row"><div class="gd-me" id="gdMe"></div></div>
-      <div class="gd-hand-wrap"><button class="gd-sort" id="gdSort" aria-label="理牌">🔀 理牌</button><div class="gd-hand" id="gdHand"></div></div>
+      <div class="gd-hand-wrap"><button class="gd-sort" id="gdSort" aria-label="理牌">🔢 按大小</button><div class="gd-hand" id="gdHand"></div></div>
       <div class="gd-foot"><div id="gdCtrl"></div></div>
       <div class="gd-toast" id="gdToast"></div>`;
     mountEl.appendChild(room);
@@ -1017,16 +985,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       return (y < bot.getBoundingClientRect().top) ? rowsEl[0] : bot;
     }
     function handCardAt(x,y){
-      if(els.hand.classList.contains('combo')){
-        // 组盒横排(可换行成多排): 先按 y 锁定手指所在那一排的牌, 排内取 left≤x 的最右张(与横排 x 扫同构)。
-        const cards=[...els.hand.querySelectorAll('.card')]; if(!cards.length) return null;
-        const inRow=cards.filter(k=>{ const r=k.getBoundingClientRect(); return y>=r.top-0.5 && y<=r.bottom+0.5; });
-        const pool=inRow.length?inRow:cards;
-        let pick=null;
-        for(const k of pool){ const r=k.getBoundingClientRect(); if(x>=r.left-0.5){ if(!pick || r.left>pick.getBoundingClientRect().left) pick=k; } }
-        if(!pick) pick=pool[0];   // x 在该排最左牌左侧 → 取该排最左张
-        return pick;
-      }
       const row=rowAt(y); if(!row) return null;
       const kids=row.children, n=kids.length; if(!n) return null;
       let pick=kids[0];
@@ -1079,20 +1037,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
       // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
       if(st.phase!=='play') return;
-      // ── 智能组牌态: 点一个成型组盒 = 选/取消【整组】(一手打出), 散牌盒 = 单张 toggle ──
-      //   组盒本就是"理成一手手打出去"的视图: 点哪盒选哪组, 不必点中具体某张; 且不进划选管道(免手指微动连选一片)。
-      if(els.hand.classList.contains('combo')){
-        const c=handCardAt(e.clientX,e.clientY);
-        if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
-        const box=c.closest('.gd-grp');
-        const isGroup = !!(box && !box.classList.contains('loose'));   // 成型组盒(整组选) vs 散牌盒(单张选)
-        const ids = isGroup ? [...box.querySelectorAll('.card')].map(x=>x.dataset.id) : [c.dataset.id];
-        const allSel = ids.every(id=>selected.has(id));
-        ids.forEach(id=> allSel ? selected.delete(id) : selected.add(id));
-        hintCycle=[]; renderHand(); updatePlayBtn(); sfx('cardsel');
-        try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}   // 吞掉后续 move: 竖列不划选
-        e.preventDefault(); return;
-      }
       const c=handCardAt(e.clientX,e.clientY);
       // 点手牌托盘的空白处(牌与牌之间/两侧留白, 非某张牌)= 取消选牌: 手牌条不在 .gd-felt 里,
       //   felt 的"点绒面取消"覆盖不到这块, 主人点手牌旁边空白收不回选中就是这里漏的。
@@ -1121,24 +1065,23 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // rows=null 时 renderHand 走 Rules.sortHand 自动理牌(全在下排); 非空则按 {top,bot} 两排的 id 顺序摆。
     // 掼蛋手牌多(27 张), 允许上下两排码牌: 拖一张到上方虚线区=分到上排, 拖回下方=下排, 排内按 x 定位插入。
     let rows = null, arrangeMode = false;
-    // 自动理牌模式: 'rank'=按大小一条线(百搭前置) / 'combo'=智能组牌分组分堆(对标腾讯欢乐掼蛋)。
-    //   短按 #gdSort 在两种模式间循环切换; groupStartIds=每组首张 id, 供渲染在组间留白。
+    // 自动理牌模式: 'rank'=按大小(百搭前置, 从大到小一条线) / 'combo'=按牌型(成组的牌挨在一起, 组间留缝)。
+    //   短按 #gdSort 在两种间切换; 两种共用同一套叠牌渲染, 只是顺序不同。groupStartIds=每组首张 id, 供渲染在组间留白。
     let sortMode = 'rank';
     let groupStartIds = new Set();
     let dragCard = null, dragId = null, dragStartX = 0, dragStartY = 0;
     // 组拖(msg3「选三带二能手动理在一起」): 拖的牌若属于当前多张选中集, 整组作为连续块随拖动一起挪、
     //   落位后连排在一起。dragGroup=按 DOM 阅读序(上排左→右, 再下排左→右)的选中 id; dragGroupEls=对应节点。
     let dragGroup = null, dragGroupEls = null;
-    // combo(竖列组牌)可用前提: 有手牌 & AI 分组器在场。进贡/手动排/别家回合的门禁由 renderHand 各自把关,
-    //   这里只兜底基本前提——早先此函数缺失, 一旦 sortMode='combo' 就 ReferenceError, 竖列视图从没真正露出过。
+    // 按牌型(combo)可用前提: 有手牌 & AI 分组器在场。arrangeGroups 缺失时降级为按大小, 不报错。
     function canCombo(){
       const hand = st.players[mySeat] && st.players[mySeat].hand;
       return !!(hand && hand.length && root.EHGuandanAI && typeof root.EHGuandanAI.arrangeGroups === 'function');
     }
-    // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成")
+    // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成"); 直接标当前排序法, 一眼知在哪态。
     function refreshSortBtn(){
       const btn = $('#gdSort'); if(!btn || arrangeMode) return;
-      btn.innerHTML = sortMode==='combo' ? '📚 组牌' : '🔀 理牌';
+      btn.innerHTML = sortMode==='combo' ? '📚 按牌型' : '🔢 按大小';
     }
     function setArrange(on){
       arrangeMode = on;
@@ -1147,24 +1090,16 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖牌自由排序 · 选中一组(如三带二)可整组一起挪、理在一起'); }
       else { refreshSortBtn(); renderHand(); }
     }
-    // 短按理牌 = 在【按大小排】↔【竖列组牌】之间循环切换(对标腾讯欢乐掼蛋一键理牌)。
-    //   主人诉求(msg1): 选理牌要能"自动竖着叠放" → 竖列组牌把每个成型牌型(炸/顺子/连对/三张/对子)竖直叠成一列,
-    //     一眼看清手里有哪些现成组合; 再点回大小排(级牌/王一端, 同点数相邻)。竖列纯展示, 不改出牌自由点选。
-    //   想自己码牌 → 长按进手动拖排。
+    // 短按理牌 = 在【按大小】↔【按牌型】之间来回切(对标欢乐掼蛋一键理牌: 就地重排同一手牌, 不改选牌方式)。
+    //   两种排序都用同一套叠牌单排/两排渲染, 全程点单张选牌 —— 不再有"竖列组盒/散牌盒"那套另类交互
+    //   (主人反馈太复杂不好用)。按牌型只是把成组的牌(炸/顺/连对/钢板/三张/对子)排到一起、组间留缝好辨认。
+    //   想凑一手直接打 → 点"提示"钮自动选好; 想自己码牌 → 长按进手动拖排(小众功能, 不占主循环)。
     function autoSort(){
-      // 短按 = 三态循环: 大小排 → 竖列组牌 → 手动拖排 → 大小排。
-      //   主人诉求: 手动理牌该"集成在理牌里"(此前只有长按能进, 发现性差) → 短按也能循环到手动。长按仍可直达。
-      if(arrangeMode){   // 手动态 → 回大小排(相当于"完成"并继续循环)
-        setArrange(false); sortMode='rank'; rows=null; hintCycle=[]; hintIdx=0;
-        refreshSortBtn(); renderHand(); sfx('cardsel'); toast('已按大小理牌 · 再点切智能组牌'); return;
-      }
-      if(sortMode==='rank'){   // 大小 → 竖列组牌
-        rows=null; sortMode='combo'; hintCycle=[]; hintIdx=0;
-        refreshSortBtn(); renderHand(); sfx('cardsel');
-        toast('已智能组牌 · 每盒一手牌型, 点一盒即选整组 · 再点切手动拖排'); return;
-      }
-      // 竖列 → 手动拖排(setArrange 内含 renderHand + 拖排提示)
-      setArrange(true);
+      if(arrangeMode){ rows=null; setArrange(false); return; }   // 手动态短按 = 完成退出, 回到当前排序
+      rows=null; hintCycle=[]; hintIdx=0;
+      sortMode = sortMode==='combo' ? 'rank' : 'combo';
+      refreshSortBtn(); renderHand(); sfx('cardsel');
+      toast(sortMode==='combo' ? '已按牌型理牌 · 成组的牌挨在一起' : '已按大小理牌 · 从大到小一条线');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1222,7 +1157,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       let pressTimer=null, longFired=false;
       btn.addEventListener('pointerdown', ()=>{ longFired=false; pressTimer=setTimeout(()=>{ longFired=true; setArrange(!arrangeMode); }, 350); });
       const cancel=()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
-      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; autoSort(); });   // 短按统一走 autoSort 三态循环(含手动态→大小)
+      btn.addEventListener('pointerup', ()=>{ cancel(); if(longFired) return; autoSort(); });   // 短按走 autoSort(按大小↔按牌型切换; 手动态则完成退出)
       btn.addEventListener('pointerleave', cancel);
       btn.addEventListener('pointercancel', cancel);
     })();
@@ -1498,9 +1433,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
         return [top, bot];
       }
-      // 手动拖排入场(rows 尚空): 一律按【两排】起手。此前从竖列组牌切进手动时 sortMode 仍是 'combo',
-      //   会命中下方 combo 分支把 27 张全塞进单排 → 每张只露一条、中段点数糊成一团(主人反馈"理牌乱")。
-      //   种子序: 竖列进来沿用组牌序(同型相邻, 微调好挪), 否则大小序; 落两排后玩家再自由拖动。横屏仍单排。
+      // 手动拖排入场(rows 尚空): 一律按【两排】起手。种子序: 当前按牌型态沿用组牌序(同型相邻, 微调好挪),
+      //   否则大小序; 落两排后玩家再自由拖动。横屏仍单排。
       if (arrangeMode){
         let seq;
         if (sortMode==='combo' && canCombo()){
@@ -1522,13 +1456,23 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const wild = [], rest = [];
       for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
       const rankSeq = wild.concat(rest);
-      // 智能组牌(此单排分堆仅作 fallback: 手动排/进贡态下用; 正常组牌态走 renderHand 的竖列分组视图)。
+      const landscape = room.classList.contains('is-land');
+      // 按牌型理牌(对标欢乐掼蛋一键理牌): arrangeGroups 把成组的牌(炸/顺/连对/钢板/三张/对子)排到一起, 散牌随后;
+      //   组间首张给 grp-start → layoutRow 在组之间撑一道小缝, 一眼看清手里有哪些现成牌型。与"按大小"共用同一套叠牌
+      //   单排/两排渲染, 选牌始终点单张(不再有另类"组盒"交互)。手牌多时按【组边界】切两排, 不把一手牌型拆到两排。
       if (sortMode === 'combo' && canCombo()){
         const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
         if (groups.length){
-          const bot = [];
-          groups.forEach(g=>{ if (bot.length) groupStartIds.add(g[0].id); g.forEach(c=>bot.push(c)); });
-          return [[], bot];
+          const seq = [], starts = [];   // starts=各组(除首组)在 seq 的起始下标, 供按边界切两排
+          groups.forEach(g=>{ if (seq.length){ groupStartIds.add(g[0].id); starts.push(seq.length); } g.forEach(c=>seq.push(c)); });
+          if (seq.length >= 15 && !landscape){
+            const half = seq.length/2;
+            let cut = Math.ceil(half), best = Infinity;   // 取最接近正中的组边界; 无边界退化为中点
+            for (const s of starts){ const d = Math.abs(s-half); if (d < best){ best = d; cut = s; } }
+            if (cut<=0 || cut>=seq.length) cut = Math.ceil(half);
+            return [seq.slice(0, cut), seq.slice(cut)];
+          }
+          return [[], seq];
         }
         // 组牌异常空 → 落大小排
       }
@@ -1536,7 +1480,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       //   残局少牌(<15)收一排更紧凑。百搭已在 rankSeq 最前 → 自然落上排头保持醒目。
       //   ★横屏(.is-land)例外: 又宽又矮, 两排手牌(~116px)把牌桌 felt 挤到溢出压座位; 横屏宽度足够(~800px)
       //     单排码 27 张仍清晰, 故横屏一律收单排, 省出竖向空间让牌桌各区不再重叠。
-      const landscape = room.classList.contains('is-land');
       if (rankSeq.length >= 15 && !landscape){
         const half = Math.ceil(rankSeq.length / 2);
         return [rankSeq.slice(0, half), rankSeq.slice(half)];
@@ -1550,20 +1493,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (root.EHTableOrient) root.EHTableOrient.reflect(room);
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const myTribute = myTributeTurn();   // 进贡阶段: 候选牌高亮(build 后 markTribute 补类)
-      // 组牌竖列视图(对标腾讯一键理牌): 仅自动组牌态且非手动排/非进贡时启用; 每组竖直叠成一列。
-      let comboGroups = null;
-      if (sortMode==='combo' && !arrangeMode && !rows && !myTribute && canCombo()){
-        comboGroups = root.EHGuandanAI.arrangeGroups(st.players[mySeat].hand, st.level).filter(g=>g.length);
-        if (!comboGroups.length) comboGroups = null;
-      }
-      const comboView = !!comboGroups;
-      let top = [], bot = [];
-      if (!comboView){ const r = orderedRows(); top = r[0]; bot = r[1]; }
+      const r = orderedRows(); const top = r[0], bot = r[1];   // 按大小/按牌型都走两排叠牌渲染, 只是顺序不同
       // 增量护栏(同斗地主): 手牌结构(排/列 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
       //   免每秒一次重绘的 innerHTML churn + layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
       const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'+sortMode+'|'
-        + (comboView ? 'C'+comboGroups.map(g=>g.map(c=>c.id).join('-')).join('_')
-                     : top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(','));
+        + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
       els.hand.classList.toggle('has-sel', selected.size>0);   // 有选中→压暗未选牌, 让选出的一组跳出来
       if (structSig === lastHandSig){
@@ -1576,44 +1510,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         return;
       }
       lastHandSig = structSig; lastSelSig = selSig;
-      els.hand.className='gd-hand'+(comboView?' combo':'')+(st.phase==='play'||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
+      els.hand.className='gd-hand'+(st.phase==='play'||arrangeMode||myTribute?'':' locked')+(arrangeMode?' arranging':'')+(myTribute?' tribute':'');
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
-      if (comboView){
-        // 每个成型牌型 → 一个横排"组盒"(盒内牌正常横向叠放, 露牌面), 盒下标牌型名; 所有散牌收进末尾一盒。
-        //   成型盒: 点一盒 = 选整组一手打出。散牌盒(.loose): 逐张点单选。
-        const made = [], loose = [];
-        comboGroups.forEach(g=>{
-          const p = g.length >= 2 ? Rules.parse(g, st.level) : null;
-          const lab = p ? (typeLabel(p) || '') : '';
-          if (g.length >= 2 && lab) made.push({ cards:g, label:lab, bomb: Rules.isBomb(p) });
-          else loose.push(...g);
-        });
-        let idx = 0;   // 全局阅读序(盒 by 盒, 盒内左→右): 供划选区间连选按 data-idx 补齐
-        const addBox = (cards, label, opt)=>{
-          opt = opt || {};
-          const box = document.createElement('div');
-          box.className = 'gd-grp' + (opt.bomb ? ' bomb' : '') + (opt.loose ? ' loose' : '');
-          const row = document.createElement('div'); row.className = 'gd-grp-cards';
-          cards.forEach(card=>{
-            const el = cardEl(card, st.level);
-            el.dataset.idx = idx++;
-            if (selected.has(card.id)) el.classList.add('sel');
-            if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
-            row.appendChild(el);
-          });
-          box.appendChild(row);
-          const lb = document.createElement('div');
-          lb.className = 'gd-col-label' + (opt.bomb ? ' bomb' : '') + (opt.loose ? ' loose' : '');
-          lb.textContent = label;
-          box.appendChild(lb);
-          els.hand.appendChild(box);
-        };
-        made.forEach(m=> addBox(m.cards, m.label, { bomb:m.bomb }));
-        if (loose.length) addBox(loose, '散牌 '+loose.length, { loose:true });
-        layoutHand();
-        return;
-      }
       const rowTop = document.createElement('div'); rowTop.className='gd-hand-row top'; rowTop.dataset.row='0';
       const rowBot = document.createElement('div'); rowBot.className='gd-hand-row bot'; rowBot.dataset.row='1';
       els.hand.appendChild(rowTop); els.hand.appendChild(rowBot);
@@ -1622,7 +1521,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         cards.forEach(card=>{
           const el = cardEl(card, st.level);
           el.dataset.idx = idx++;
-          if (groupStartIds.has(card.id)) el.classList.add('grp-start');   // 智能组牌: 每组首张左侧留白
+          if (groupStartIds.has(card.id)) el.classList.add('grp-start');   // 按牌型: 每组首张左侧留缝
           if (selected.has(card.id)) el.classList.add('sel');
           if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
           container.appendChild(el);
@@ -1646,7 +1545,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const n = cards.length; if (!n) return;
       const W = els.hand.clientWidth; if (!W) return;
       const cw = cards[0].offsetWidth || parseFloat(getComputedStyle(room).getPropertyValue('--cw')) || 38;
-      // 每个牌间隙的额外留白: ①智能组牌每组首张左侧留白(分堆可见); ②有选中时在【选中/未选边界】两侧撑开
+      // 每个牌间隙的额外留白: ①按牌型时每组首张左侧留缝(分组可见); ②有选中时在【选中/未选边界】两侧撑开
       //   更大空档 → 被选中的牌落在清空区、绝不横向压住相邻未选牌(主人诉求"选中牌不压未选牌")。
       const hasSel = els.hand.classList.contains('has-sel') && !els.hand.classList.contains('arranging');
       const GRP = cw * 0.34, SELG = cw * 0.62;
@@ -1668,20 +1567,13 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         cards[i].style.marginLeft = i===0 ? '0px' : (ov + gaps[i]).toFixed(2)+'px';
       }
     }
-    // 智能组牌落位: 组盒横排 + 换行 + 盒内牌横向叠放全交给 CSS flex-wrap / 固定负边距, JS 只清掉旧竖列态残留的内联高。
-    //   盒内牌宽窄由 --cw 定, 组盒各自等高(1 张牌), 换行后整体高度由内容撑起, 富余由 .gd-mid(flex:1) 吸收。
-    function layoutCombo(){
-      els.hand.style.height='';
-      els.hand.querySelectorAll('.card').forEach(k=>{ k.style.marginTop=''; });
-    }
     function layoutHand(){
       if (root.EHTableOrient) root.EHTableOrient.reflect(room);
       // 横竖屏切换(⟳/侧持)时手牌排数变(横屏单排/竖屏两排)→ 需整段重建而非只重排; 首次(_lastLand=null)不触发。
       const land = room.classList.contains('is-land');
       if (_lastLand !== null && land !== _lastLand){ _lastLand = land; renderHand(); return; }
       _lastLand = land;
-      if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
-      els.hand.style.height='';   // 退出智能组牌: 清掉组牌态设的自适应高, 恢复 CSS 定高(2.35ch)
+      els.hand.style.height='';   // 清掉可能残留的内联高, 恢复 CSS 定高(2.35ch)
       for (const row of els.hand.children) layoutRow(row);
       applyRowOverlap();
     }
@@ -1986,7 +1878,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         // lastSeat 供提示识别"对家(队友)领出"→ 别压自己人; 有桌面牌且非我出时才带。
         const lastSeat = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.seat : null;
         const ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, lastSeat, handsLeft: st.players.map(p=>p.hand.length) });
-        // ★理牌优先(主人诉求): 已用竖列组牌整理过手牌时, 先把我理出的成型牌型(当前合法者)排到提示最前,
+        // ★理牌优先(主人诉求): 已按牌型理过手牌时, 先把我理出的成型牌型(当前合法者)排到提示最前,
         //   让"理牌"真正指导提示 —— 否则理了牌提示却推荐别的组合, 理牌就失去意义。其余 AI 建议去重后接在后面。
         let cyc = ai;
         // ai 为空且是对家领出 → 提示建议让对家走: 不能靠"理牌优先"把压对家的牌型再塞回来(否则等于教你压自己人)。
