@@ -330,7 +330,7 @@ html[data-mode="day"] .ddz-center::before{
 .ddz-hand .card.sel.hintpop{animation:ddzHintPop .36s cubic-bezier(.2,.85,.3,1);box-shadow:0 10px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent),0 0 16px var(--accent)}
 .ddz-hand:not(.locked) .card:hover{transform:translateY(-8px)}
 .ddz-hand:not(.locked) .card.sel:hover{transform:translateY(-18px)}
-.ddz-hand .card.justdealt{animation:ddzDeal .3s ease}
+.ddz-hand .card.justdealt{animation:ddzDeal .3s ease both}/* both: 配 idx*20ms 错峰延迟, 未轮到的牌须保持起始态(隐藏), 否则先闪现终态再snap回起点=发牌闪跳 */
 @keyframes ddzDeal{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
 /* 斗地主发牌即按大小自动理好(Deck.sortHand), 手牌少且点选直接, 不设手动理牌(与掼蛋不同) */
 /* 操作条 */

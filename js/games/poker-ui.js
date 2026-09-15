@@ -1014,24 +1014,31 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="nm">${escapeHtml(st.players[seat].name)}</div>
         <div class="stk">入座中…</div></div>`;
     }
-    let _lastOppSig='';
+    let _lastOppSig='', _lastOppStruct='';
     function renderOpponents(force){
-      // 对手包统一签名: 座位顺序 + 每人(进座状态/弃牌/全下/筹码肌胉/本街投入/回合长相) + 现任 turn + 横屏态。
-      // 联机时对手行动中或签名跟手上负担都相同 → 整段重建花钱白花。
+      // 签名拆两层(2026-09 性能):
+      //   结构签名 structSig = 座位序 + 每人(进座/弃牌/全下)+ 我的底牌 + 横屏 + 刚入座 + 相位 + 按钮
+      //     —— 变了才【拆节点重建 + positionSeats】(新手/有人弃牌全下/座位变动才会变, 频率低)。
+      //   状态签名 stateSig = structSig + toAct + 每人 stack/street —— 只它变(=下注/跟注/过牌的高频动作)
+      //     走【原地增量】: 只改 .stk 数字、.pk-commit 文本与 zero、turn 高亮, 不拆节点、不重定位。
+      //   此前把 stack/street 并进唯一签名 → 每次下注就整桌 querySelectorAll().remove() 全清重建 + 全量三角定位, 是最重的重渲热点。
       const order = displayOrder();
       const land = root.EHTableOrient ? root.EHTableOrient.reflect(room) : false;
-      const parts = order.slice(1).map(seat=>{
+      const structParts = order.slice(1).map(seat=>{
         const p=st.players[seat]||{};
         if (st.phase==='lobby') return seat+':'+(p.kind||'empty')+':'+(p.name||'');   // 招募态签名跟座位占用走(灵魂入座/请离要重绘)
         const pending = introSeating && arrived && !arrived.has(seat);
-        return seat+':'+(pending?'P':(p.folded?'F':'')+(p.allin?'A':'')+':'+(p.stack||0)+':'+(p.street||0));
+        return seat+':'+(pending?'P':(p.folded?'F':'')+(p.allin?'A':''));             // 数值(stack/street)不进结构签名
       }).join('|');
-      // "我"也画上椭圆底部座位, 故底牌进签名(新发牌/摊牌换牌要重建我的座位面); 弃牌/筹码已在 parts 里没我 → 单列我
       const mp = st.players[mySeat]||{};
-      const myHoleSig = (mp.hole||[]).map(c=>c?(c.suit+''+c.rank):'x').join('')+':'+(mp.folded?'F':'')+(mp.allin?'A':'')+':'+(mp.stack||0)+':'+(mp.street||0);
-      const sig = order.join(',')+'#'+parts+'#ME'+myHoleSig+'#T'+st.toAct+'#'+(land?'L':'P')+'#'+(lastSeated||'')+'#'+st.phase;
-      if(!force && sig===_lastOppSig) return;
-      _lastOppSig=sig;
+      const myStruct = (mp.hole||[]).map(c=>c?(c.suit+''+c.rank):'x').join('')+':'+(mp.folded?'F':'')+(mp.allin?'A':'');
+      const structSig = order.join(',')+'#'+structParts+'#ME'+myStruct+'#'+(land?'L':'P')+'#'+(lastSeated||'')+'#'+st.phase+'#B'+(st.button||0);
+      const stateSig = structSig+'#T'+st.toAct+'#'+order.map(s=>{const p=st.players[s]||{};return (p.stack||0)+'/'+(p.street||0);}).join(',');
+      if(!force && stateSig===_lastOppSig) return;   // 全同 → 免渲
+      _lastOppSig=stateSig;
+      // 结构没变(只数值/轮次变)→ 原地增量, 不拆节点、不重定位
+      if(!force && structSig===_lastOppStruct && st.phase!=='lobby'){ updateSeatsInPlace(order); return; }
+      _lastOppStruct=structSig;
       // 移除旧座位节点(保留 pk-table 内的 center)
       els.table.querySelectorAll('.pk-seat, .pk-commit').forEach(e=>e.remove());
       // 全席(含我 d=0)都画上椭圆: 我在正下方 270°, 对手绕上弧 —— 一桌人围坐, 不再把"我"单独拎到桌外条
@@ -1062,6 +1069,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
         //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
         if (dealAnim && (st.players[mySeat].hole||[]).length>0) runDealAnim();
+      }
+    }
+    // 原地增量: 结构不变、只是筹码/投入/轮次变时, 改文本与 class, 不拆节点、不重跑 positionSeats(座位角度与金额无关)。
+    function updateSeatsInPlace(order){
+      for(const seat of order){
+        const p=st.players[seat]||{};
+        const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
+        if(seatEl){
+          seatEl.classList.toggle('turn', st.toAct===seat && st.phase!=='over');   // 轮到谁高亮
+          const b = seatEl.querySelector('.stk b');                                // 筹码肌胉(非全下席才有 <b>, 全下是结构变已重建)
+          if(b && b.textContent!==String(p.stack)) b.textContent=p.stack;
+        }
+        const commit = els.table.querySelector(`.pk-commit[data-seat="${seat}"]`);
+        if(commit){
+          const street = p.street||0;
+          commit.classList.toggle('zero', !(street>0));
+          if(commit.lastChild && commit.lastChild.nodeType===3){ if(commit.lastChild.nodeValue!==String(street)) commit.lastChild.nodeValue=String(street); }
+          else commit.innerHTML=`<span class="pc"></span>${street}`;
+        }
       }
     }
     // 按真实发牌顺序给底牌挂错峰落座动画: 从庄家下家(SB)起绕圈, 发两轮(每人先落第1张、再落第2张)。
