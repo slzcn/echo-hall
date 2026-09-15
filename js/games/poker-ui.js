@@ -182,7 +182,10 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 @keyframes pkTurnPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.35),0 0 6px rgba(0,229,212,.3);transform:scale(1)}50%{box-shadow:inset 0 0 0 1px rgba(0,229,212,.7),0 0 16px 3px rgba(0,229,212,.55);transform:scale(1.04)}}
 /* 座位(对手, 绝对定位于上弧) */
 .pk-seat{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:var(--seatw,78px);z-index:4}
-.pk-seat.folded{opacity:.4;filter:grayscale(.7)}
+/* 弃牌: 只把"人"(头像/名/筹码)灰掉表示出局, 底牌【保留花色】只压暗——主人: 弃了同花也得看得出,
+   全灰(grayscale)红黑不分就分不清花色了。忠实表现"已弃但仍可辨认弃了什么"。 */
+.pk-seat.folded .pk-avr,.pk-seat.folded .nm,.pk-seat.folded .stk{opacity:.4;filter:grayscale(.7)}
+.pk-seat.folded .card{opacity:.72;filter:none}
 .pk-avr{width:var(--av,44px);height:var(--av,44px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;position:relative;transition:background .15s}
 .pk-seat.turn .pk-avr{background:conic-gradient(from -90deg,var(--accent,#00e5d4) calc(var(--p,360)*1deg),var(--line,rgba(0,229,212,.18)) 0)}
 .pk-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,20px);background:var(--panel-solid,#132a29);border:1.5px solid var(--line2);position:relative}
@@ -1039,7 +1042,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         hole = `<div class="pk-mini-hole">${cs}</div><div class="pk-mini-hn">${escapeHtml(rv.hand||'')}</div>`;
       } else if (seat===mySeat){
         // "我"也坐在椭圆底部(主人诉求"把自己放桌里, 不单独拿出来") → 自己的底牌正面朝上、带花色可读(不走 mini, mini 会藏花色)。
-        //   弃牌后底牌不撤、继续朝上显示, 由座位 .folded 类整体灰掉(opacity+grayscale) —— 主人诉求"自己弃牌牌可继续显示, 灰掉即可"。
+        //   弃牌后底牌不撤、继续朝上显示; 座位 .folded 只灰"人"(头像/名/筹码), 底牌保留花色仅压暗 —— 主人: 弃了同花也要看得出花色。
         const cs = (p.hole||[]).map(c=>cardEl(c,{}).outerHTML).join('');
         hole = `<div class="pk-mini-hole pk-my-hole">${cs}</div>`;
       } else if (!p.folded){
