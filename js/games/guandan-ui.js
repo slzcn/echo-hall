@@ -1123,6 +1123,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let sortMode = 'rank';
     let groupStartIds = new Set();
     let dragCard = null, dragId = null, dragStartX = 0, dragStartY = 0;
+    // 组拖(msg3「选三带二能手动理在一起」): 拖的牌若属于当前多张选中集, 整组作为连续块随拖动一起挪、
+    //   落位后连排在一起。dragGroup=按 DOM 阅读序(上排左→右, 再下排左→右)的选中 id; dragGroupEls=对应节点。
+    let dragGroup = null, dragGroupEls = null;
     // combo(竖列组牌)可用前提: 有手牌 & AI 分组器在场。进贡/手动排/别家回合的门禁由 renderHand 各自把关,
     //   这里只兜底基本前提——早先此函数缺失, 一旦 sortMode='combo' 就 ReferenceError, 竖列视图从没真正露出过。
     function canCombo(){
@@ -1138,7 +1141,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       arrangeMode = on;
       const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); if(on) btn.innerHTML = '✓ 完成'; }
       els.hand.classList.toggle('arranging', on);
-      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖动手牌自由排序 · 上下两排随意挪动 · 选中的牌保留'); }
+      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖牌自由排序 · 选中一组(如三带二)可整组一起挪、理在一起'); }
       else { refreshSortBtn(); renderHand(); }
     }
     // 短按理牌 = 在【按大小排】↔【竖列组牌】之间循环切换(对标腾讯欢乐掼蛋一键理牌)。
@@ -1169,34 +1172,45 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     function startReorder(e){
       const c = handCardAt(e.clientX,e.clientY); if(!c) return;
       dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX; dragStartY = e.clientY;
-      c.classList.add('dragging'); c.style.zIndex='50';   // 叠放态: 抬高被拖牌, 免被下排盖住
+      // 组拖判定: 抓的这张属于当前多张选中集 → 整组一起挪。按 DOM 阅读序取选中牌节点,
+      //   使落位后它们连排的相对次序与眼前一致(不打乱选出的三带二内部顺序)。
+      dragGroup = null; dragGroupEls = null;
+      if(selected.has(dragId) && selected.size>1){
+        const allEls = [...els.hand.querySelectorAll('.card')].filter(el=>selected.has(el.dataset.id));
+        if(allEls.length>1){ dragGroupEls = allEls; dragGroup = allEls.map(el=>el.dataset.id); }
+      }
+      const lift = dragGroupEls || [c];
+      lift.forEach((el,i)=>{ el.classList.add('dragging'); el.style.zIndex = String(50+i); });
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
     }
     function moveReorder(e){
       if(!dragCard) return;
       const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
-      dragCard.style.transform = `translate(${dx}px,${dy-6}px) scale(1.06)`;
+      // 组拖: 整组刚性平移(各牌保持相对位置一起走); 单拖: 只挪被抓的那张。
+      (dragGroupEls || [dragCard]).forEach(el=>{ el.style.transform = `translate(${dx}px,${dy-6}px) scale(1.06)`; });
       e.preventDefault();
     }
     function endReorder(e){
       if(!dragCard) return;
       const dropX = e.clientX, dropY = e.clientY;
+      const moveIds = dragGroup || [dragId];          // 本次要挪的 id 集(组拖=整组, 单拖=一张)
+      const moveSet = new Set(moveIds);
       const cur = domRows();
-      cur.top = cur.top.filter(id=>id!==dragId); cur.bot = cur.bot.filter(id=>id!==dragId);
+      cur.top = cur.top.filter(id=>!moveSet.has(id)); cur.bot = cur.bot.filter(id=>!moveSet.has(id));
       // 目标排: 放下点在"下排上沿"之上 → 上排, 否则下排(上排空时其虚线投放区已占位, 故可拖上去建排)
       const botEl = els.hand.children[1];
       const boundary = botEl ? botEl.getBoundingClientRect().top : dropY;
       const target = dropY < boundary ? 'top' : 'bot';
-      const rowEl = els.hand.children[target==='top'?0:1];
       const arr = target==='top' ? cur.top : cur.bot;
-      const others = [...(rowEl?rowEl.children:[])].filter(c=>c!==dragCard);
+      const rowEl = els.hand.children[target==='top'?0:1];
+      const others = [...(rowEl?rowEl.children:[])].filter(c=>!moveSet.has(c.dataset.id));
       let insert = others.length;
       for(let i=0;i<others.length;i++){ const r=others[i].getBoundingClientRect(); if(dropX < r.left + r.width/2){ insert=i; break; } }
-      arr.splice(insert, 0, dragId);
+      arr.splice(insert, 0, ...moveIds);              // 整组连续插入 → 落位即连排在一起
       rows = { top:cur.top, bot:cur.bot };
-      dragCard.classList.remove('dragging'); dragCard.style.transform=''; dragCard.style.zIndex='';
-      dragCard = null; dragId = null;
+      (dragGroupEls || [dragCard]).forEach(el=>{ el.classList.remove('dragging'); el.style.transform=''; el.style.zIndex=''; });
+      dragCard = null; dragId = null; dragGroup = null; dragGroupEls = null;
       sfx('cardsel'); vibrate(10); renderHand();
     }
     // 短按=一键理牌(或手动模式下=完成退出); 长按≥350ms=切手动理牌模式
