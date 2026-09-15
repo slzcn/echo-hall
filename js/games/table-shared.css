@@ -251,14 +251,17 @@ html.pwa-standalone .pk-bar{
   font-size: 11.5px !important;
 }
 /* 关闭按钮: 更好按 (36px 高, 逼近 44 触控线又不撑高紧凑顶栏) */
-.ddz-x, .gd-x, .pk-x{
+/* ★.pk-x 已改纯图标圆钮(width:36px;padding:0;border-radius:50%), 不再套这条旧"✕ 返回"文字钮规则:
+ *   padding:0 13px 会挤扁 36px 圆盒破坏圆形 + 无底色让它比音乐/横屏钮"空、不饱满"(主人反馈)。
+ *   德州返回钮的饱满玻璃底改由下方玻璃圆盘选择器统一给(含 .pk-x), hover 走 poker-ui.js 内联红调。 */
+.ddz-x, .gd-x{
   height: 36px !important;
   padding: 0 13px !important;
   font-size: 12.5px !important;
   transition: background .14s, border-color .14s;
 }
 @media (hover:hover){
-  .ddz-x:hover, .gd-x:hover, .pk-x:hover{ background: rgba(0, 229, 212, .08); }
+  .ddz-x:hover, .gd-x:hover{ background: rgba(0, 229, 212, .08); }
 }
 
 /* ── E. 座位卡片化 (在原有 conic 高亮环之外补一层玻璃底) ──── */
@@ -447,8 +450,8 @@ html[data-mode="day"] .pk-qbtn{
     0 2px 6px rgba(0,70,64,.14) !important;
   border-color: rgba(0,127,118,.26) !important;
 }
-/* 顶栏圆钮(音乐/记牌器/横屏): 透明描边圆 → 一枚受光玻璃圆盘, 与座位徽章同一材质语言 */
-.ddz-mus, .ddz-cnt, .ddz-rot, .gd-mus, .gd-rot, .pk-mus, .pk-rot{
+/* 顶栏圆钮(音乐/记牌器/横屏/返回): 透明描边圆 → 一枚受光玻璃圆盘, 与座位徽章同一材质语言 */
+.ddz-mus, .ddz-cnt, .ddz-rot, .gd-mus, .gd-rot, .pk-mus, .pk-rot, .pk-x{
   background:
     radial-gradient(circle at 50% 30%, rgba(255,255,255,.10), transparent 62%),
     rgba(255,255,255,.035) !important;
@@ -458,7 +461,7 @@ html[data-mode="day"] .pk-qbtn{
 }
 html[data-mode="day"] .ddz-mus, html[data-mode="day"] .ddz-cnt, html[data-mode="day"] .ddz-rot,
 html[data-mode="day"] .gd-mus, html[data-mode="day"] .gd-rot,
-html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-rot{
+html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-rot, html[data-mode="day"] .pk-x{
   background:
     radial-gradient(circle at 50% 30%, #ffffff, transparent 66%),
     rgba(255,255,255,.6) !important;

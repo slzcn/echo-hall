@@ -346,7 +346,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
  *   状态在"预选条(单行)↔我的回合(两行)↔骨架"之间切换时按钮行不再忽高忽低跳动(主人反馈"按钮高度不一样,来回跳跃")。
  *   长文字靠 flex-center + nowrap 居中不溢出; 主标题字号用 clamp 随按钮宽自适应, 保证"文字长也定宽美观"。 */
 .pk-b{flex:1;min-width:0;max-width:150px;min-height:54px;padding:6px 6px;border-radius:12px;font-weight:800;
-  font-size:clamp(13px,3.7vw,15px);line-height:1.16;cursor:pointer;white-space:nowrap;
+  font-size:clamp(13px,3.7vw,15px);line-height:1.16;cursor:pointer;white-space:nowrap;overflow:hidden;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.03em;transition:.14s}
 .pk-b:active{transform:scale(.96)}
@@ -362,6 +362,12 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-b.raise.confirm{background:var(--magenta,#ff2d8e);border-color:#fff;color:#fff;animation:pkConfirmPulse .6s ease-in-out infinite alternate}
 @keyframes pkConfirmPulse{from{box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 10px rgba(255,45,142,.5)}to{box-shadow:0 0 0 3px rgba(255,255,255,.98),0 0 20px rgba(255,45,142,.85)}}
 .pk-b .bt{font-size:11px;line-height:14px;font-weight:700;opacity:.85;display:block}
+/* 占位/旁观/等待态整行状态条: 不再把长文案("🔭 旁观中 · 已离座"/"已提交 · 等待裁决")硬塞进 1/3 宽的中键
+ *   (nowrap 撑破按钮=主人反馈"按钮文案超了")。改成占满一行的虚线提示条: 语义忠实(它本就不是可点按钮),
+ *   文案可换行居中、任意长度都不溢出。与三键骨架【同高 54px】, 状态切换不跳版。 */
+.pk-waitbar{flex:1;min-height:54px;display:flex;align-items:center;justify-content:center;text-align:center;
+  border-radius:12px;border:1px dashed var(--line2);background:var(--panel);color:var(--sub,#86cbc6);
+  font-weight:700;font-size:13px;line-height:1.3;padding:6px 14px;letter-spacing:.02em}
 /* 预选(pre-action)条: 提示行 + 三键(默认暗态, 选中 .on 高亮) */
 /* ★提示行高度对齐骨架的快捷注行(.pk-quick=38px): 骨架(等待态)与预选条(轮我前)是同为"非我回合"的
  *   两种中间行——骨架用快捷注行、预选条用这条提示行。二者高差 20px 曾让 .pk-acts 在 发牌(seating→preflop)
@@ -585,7 +591,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine: seat===mySeat }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
-      try{ renderActs(true); }catch(_){}
+      // 我离座旁观: 三处一起刷新(操作栏+桌心提示+底部提示), 否则 msg/hint 停在"轮到你/思考中"直到下次
+      //   renderAll(灵魂真实思考要 2~7s)——那段窗口正是"操作栏旁观中↔桌心轮到你"自相矛盾的来源。
+      try{ renderActs(true); if(seat===mySeat){ renderMsg(); renderMe(); } }catch(_){}
     }
     // ── 招募态(lobby): 与斗地主/掼蛋同构 —— 开桌先落真牌桌页(本文件), 6 席里空位可点邀灵魂/真人,
     //   host 满意点「开始 ▶」→ startDeal 就地转正局(同一 room 不重挂)。招募态不产快照(无牌可泄, 见 renderAll onSync 守卫)。
@@ -636,6 +644,19 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const free = BOT_POOL.filter(b=>!used.has(b.name));
       const b = free.length ? free[Math.floor(Math.random()*free.length)] : BOT_POOL[seat % BOT_POOL.length];
       return b;
+    }
+    // 命名统一(主人诉求): 开局/补位兜底名「机器人N」(app.js gtSeatArrays + SQL 的座位号兜底)与手动邀请的花名
+    //   (阿岩/狐狸…)本是两套体系, 同桌并存看着乱。这里把【本机 AI 席】的「机器人N」就地规范成同一套花名,
+    //   让两条路径命名一致。只动本机 AI 兜底名: 灵魂真名 / 真人名 / 远程席一律不碰(状态忠实, 不改别处身份)。
+    //   botIdentityBySeat 缓存每席花名 → 逐手重渲不跳名(同一个"狐狸"不会下一手变"阿岩")。
+    const botIdentityBySeat = {};
+    function normalizeBotNames(){
+      for (let s=0; s<n; s++){
+        if (s===mySeat || isRemote(s) || !isAI[s]) continue;
+        if (!/^机器人\d*$/.test(names[s]||'')) continue;   // 只规范兜底名, 花名/灵魂名不动
+        let id = botIdentityBySeat[s]; if(!id){ id = pickBotIdentity(s); botIdentityBySeat[s]=id; }
+        names[s]=id.name; avatars[s]=id.e;
+      }
     }
     // 本地邀请一个机器人补位(纯本机, 无需 DB): 席位下一手起加入, 全新买入 START。
     //   resume: 停摆桌邀满即续打(默认 true); 批量补位时传 false, 由调用方填完再统一续打, 免逐个触发。
@@ -711,6 +732,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   保留 introSeating 变量(恒 false)以兼容下方 render 的 pending 分支(现均短路不生效)。
     let introSeating = false;
     let arrived = introSeating ? new Set([mySeat]) : null, lastSeated = -1;
+    normalizeBotNames();   // 开局先把兜底名「机器人N」统一成花名, 再据 names 建初始状态
     let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : (introSeating ? waitingState('seating') : newHand()));
 
     function sfx(nm){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(nm); }catch(_){} }
@@ -1374,6 +1396,13 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-b raise" disabled>加注</button>
         </div>`;
     }
+    // 无操作占位态(旁观/等待/已弃/已全下/离线): 与骨架同高, 但用整行状态条承载文案 —— 长文不再撑破 1/3 宽中键。
+    function actsWaitBar(txt){
+      return `
+        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
+        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
+        <div class="pk-row"><div class="pk-waitbar">${txt}</div></div>`;
+    }
     // 招募态操作区: 一键邀请(灵魂补位) / 邀真人 / 开始 ▶ —— 就在打牌页操作按钮位置(与斗地主同构)
     function renderLobbyCtrl(){
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.acts.innerHTML=''; return; }
@@ -1396,7 +1425,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (spectating){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        els.acts.innerHTML = actsSkeleton('🔭 旁观中 · 已离座');
+        els.acts.innerHTML = actsWaitBar('🔭 旁观中 · 已离座 · 灵魂替你行动');
         return;
       }
       const offline = isGuest && connState!=='online';
@@ -1426,7 +1455,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const sig='wait:'+callLbl;
         if(!force && sig===_lastActsSig) return;
         _lastActsSig=sig;
-        els.acts.innerHTML = actsSkeleton(callLbl);
+        els.acts.innerHTML = actsWaitBar(callLbl);
         return;
       }
       // 我的回合: 总重建(含 slider/快捷键链路, 且每次重建重新绑事件) —— 这一枝本就低频, 不护栏
@@ -1549,7 +1578,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           catch(e){ _ehCatch('poker.humanAct.onAction', e); toast('提交失败 · 请重试'); return; }
         }
         awaitingHost=true;
-        els.acts.innerHTML=actsSkeleton('已提交'); els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
+        els.acts.innerHTML=actsWaitBar('已提交 · 等待其他玩家…'); els.msg.className='pk-msg mine'; els.msg.textContent='✅ 已提交 · 等待其他玩家…';
         return;
       }
       try{ var r=Engine.applyAction(st, mySeat, action, amount); }
@@ -1996,6 +2025,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           vacatedUid[s] = null;                     // DB 已把该席腾空 → 之后同一位灵魂也可被重新邀请
         }
       }
+      normalizeBotNames();   // 名册更新后同样统一本机 AI 兜底名为花名
       personaBySeat = names.map((_, seat) => personaFor(seat));
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
     }
@@ -2070,6 +2100,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           if (A.souls) souls[s]=A.souls[s];
         }
         remoteSeats.length=0; (A.remoteSeats||[]).forEach(x=>remoteSeats.push(x));
+        normalizeBotNames();   // startDeal 首发: 兜底名「机器人N」统一成花名
         personaBySeat = names.map((_, seat)=>personaFor(seat));
       }
       // 全新一桌: 筹码/买入/净盈亏/手数/庄位/离场标记全部重置
