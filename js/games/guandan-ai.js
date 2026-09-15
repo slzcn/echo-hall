@@ -387,6 +387,22 @@
         const singles = pool.filter(c => c.parse.type==='single');
         if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
       }
+    } else if (oppMin === 2){
+      // ★对手报双(真对手剩 2 张): 主人反馈"对方剩 2 张多半是对子, 灵魂还领个小对子送他走"。
+      //   掼蛋无公开读牌 → 启发式按"谁能不让他一手出完 2→0"排优先:
+      //   ① ≥3 张牌型: 他 2 张物理上跟不了 → 必被憋住, 牌权不丢, 首选。
+      //   ② 单张: 他至多压 1 张(2→1)出不完, 比对子安全。
+      //   ③ 对子最危险: 他若有更大对子直接 2→0 走完。实在只剩对子可领, 也只领点力最高那副(他多半压不过)。
+      //   对齐斗地主 ddz-ai.js 的报双避让(那边有读牌用 hasHigherPair, 这里无读牌退化成启发式)。
+      const triPlus = pool.filter(c => c.cards.length >= 3);
+      const singles = pool.filter(c => c.parse.type==='single');
+      if (triPlus.length){ pool = triPlus; }
+      else if (singles.length){ pool = singles; }
+      else {
+        const maxKey = Math.max(...pool.map(p => p.parse.key));   // 全是对子 → 领最大那副憋人, 不送小对
+        const bigPairs = pool.filter(p => p.parse.key === maxKey);
+        if (bigPairs.length) pool = bigPairs;
+      }
     }
     // 先按廉价启发式粗排(长牌型清散牌优先), 取前 K 个做手数精算 —— 限流 estTricks/arrangeGroups 调用防卡顿。
     //   ★孤张小单提到长牌型同梯队(rank=0): 否则 single 垫底会被 K 截断挤出精算, leadScore 的早清加成就白加了。
