@@ -135,12 +135,23 @@
       const rate  = sv ? sv.rate  : 1.04 + ((h>>6)%6)*0.035;
       return { voice, pitch, rate };
     }
+    // 报牌/操作语音播放期间压低 BGM(牌桌上"BGM+出牌音效+报牌语音"三条声硬叠 → 报牌被埋、听不清)。
+    //   聊天房的灵魂语音消息(mp3)早有 duck, 唯独牌桌 TTS 报牌漏了 —— 这里补上, 让人声压过背景乐。
+    //   连续报牌(一圈里接连几席出牌)会密集触发, 若每句念完立刻抬回 BGM 会音量忽高忽低; 故念完延迟
+    //   ~800ms 才恢复, 期间又有新句就取消恢复 → 一串报牌全程保持压低, 整串报完才抬回。
+    //   speechSynthesis 的 onend 在部分浏览器会丢失 → 另设按估算时长的超时兜底强制恢复, 绝不把 BGM
+    //   焊死在低音量。AudioEngine.duck 是幂等 fadeTo(不维护本地 ducked 标记, 免与 BGM stop/重启状态打架)。
+    let _saySeq=0, _duckRestoreTimer=null, _duckFailsafeTimer=null;
+    function _bgmDuck(on){ try{ const AE=window.AudioEngine; if(AE&&AE.duck) AE.duck(on); }catch(e){} }
+    function _duckOn(){ if(_duckRestoreTimer){ clearTimeout(_duckRestoreTimer); _duckRestoreTimer=null; } _bgmDuck(true); }
+    function _duckRestoreSoon(){ if(_duckRestoreTimer) clearTimeout(_duckRestoreTimer); _duckRestoreTimer=setTimeout(()=>{ _duckRestoreTimer=null; _bgmDuck(false); }, 800); }
+    function _duckRestoreNow(){ if(_duckRestoreTimer){ clearTimeout(_duckRestoreTimer); _duckRestoreTimer=null; } if(_duckFailsafeTimer){ clearTimeout(_duckFailsafeTimer); _duckFailsafeTimer=null; } _bgmDuck(false); }
     let _lastSayText='', _lastSayAt=0;
     function say(text, who){
       if(!text) return;
       // 静音闸: 报牌/操作语音(TTS)走【独立语音开关】_voiceOn(不再绑 SFX 的 enabled, 也不再绑 BGM)。
-      //   三分开关后: 关音效不影响语音, 关语音不影响音效/BGM。语音关 → 直接静默并清掉在念的队列。
-      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} return; }
+      //   三分开关后: 关音效不影响语音, 关语音不影响音效/BGM。语音关 → 直接静默并清掉在念的队列, 抬回 BGM。
+      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} _duckRestoreNow(); return; }
       // 丝滑: 极短窗内相同文本重复(如一圈里两三席连续"不出", 或同牌型齐发)只念一次。
       //   否则后一句会 speechSynthesis.cancel() 把前一句拦腰砍断 → 听感是"不出—不"的结巴。
       //   纯时间比较、不排队、不依赖 onend, 绝不会卡死后续语音(某些浏览器 onend 会丢失)。
@@ -155,6 +166,16 @@
         const u=new SpeechSynthesisUtterance(String(text));
         u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.9;
         if(p.voice) u.voice=p.voice;
+        // 本句序号: 只有"最新一句"念完才安排抬回 BGM; 被 cancel 打断的旧句(seq 已过期)不触发恢复,
+        //   避免旧句的 onend 在新句正念时把 BGM 抬回。
+        const myId=++_saySeq;
+        _duckOn();
+        u.onend=()=>{ if(myId===_saySeq) _duckRestoreSoon(); };
+        u.onerror=()=>{ if(myId===_saySeq) _duckRestoreSoon(); };
+        // 超时兜底: onend 可能丢失 → 按字数估时长 + 余量强制安排恢复, 防 BGM 永久卡在低音量。
+        if(_duckFailsafeTimer) clearTimeout(_duckFailsafeTimer);
+        const est=Math.min(8000, 600 + String(text).length*260/(u.rate||1));
+        _duckFailsafeTimer=setTimeout(()=>{ _duckFailsafeTimer=null; if(myId===_saySeq) _duckRestoreNow(); }, est+1600);
         try{ speechSynthesis.cancel(); }catch(e){}
         speechSynthesis.speak(u);
       }catch(e){}
@@ -166,7 +187,7 @@
     return {play,playClick,
       setEnabled(v){enabled=!!v; _lsSet('eh_sfx',enabled);},                                  // 音效开关(持久化)
       isEnabled(){return enabled},
-      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }},   // 语音开关(持久化)
+      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} _duckRestoreNow(); }},   // 语音开关(持久化); 关语音顺手抬回被压低的 BGM
       isVoiceOn(){return _voiceOn},
       unlock,say};
   })();
