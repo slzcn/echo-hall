@@ -338,31 +338,35 @@ html[data-mode="day"] .gd-center::before{
 .gd-hand.arranging .gd-hand-row.top:empty{display:flex;align-items:center;justify-content:center;min-height:calc(var(--cw,38px)*1.3);margin:0 10px;border:1.5px dashed var(--line2);border-radius:10px}
 .gd-hand.arranging .gd-hand-row.top:empty::before{content:'⬆ 拖到此处分成上排';color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.03em}
 @keyframes gdDeal{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
-/* ── 智能组牌·竖列分组(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型竖直叠成一列,
-   组内牌上下叠(露顶角点数花色, 底牌露大花色), 多列横向排开底对齐, 列底标牌型名 ── */
-.gd-hand.combo{box-sizing:border-box;flex-direction:row;align-items:flex-end;justify-content:center;flex-wrap:nowrap;gap:0;padding:var(--hand-pad,16px) 6px 9px;overflow:visible;
+/* ── 智能组牌(对标腾讯欢乐掼蛋「一键理牌」): 每个成型牌型收进一个横排"组盒", 盒内牌正常横向叠放
+   (露牌面点数花色, 比竖列窄条好读得多), 盒下标牌型名; 组盒之间留明显间距、多了自动换行成两三排。
+   点一盒 = 选整组一手打出; 散牌收进末尾一盒逐张点。全部组盒等高(1 张牌高) → 标签天然齐平。 ── */
+.gd-hand.combo{box-sizing:border-box;flex-direction:row;flex-wrap:wrap;align-items:flex-end;align-content:flex-end;justify-content:center;gap:11px 10px;padding:calc(var(--hand-pad,16px) - 3px) 8px 8px;overflow:visible;
   background:linear-gradient(180deg,rgba(0,229,212,.055),rgba(8,14,26,.36));border:1px solid rgba(0,229,212,.15);border-radius:16px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 10px 24px rgba(0,0,0,.26)}
-.gd-col{display:flex;flex-direction:column;align-items:center;flex:none}
-.gd-col .card{margin-top:-34px;cursor:pointer;transition:transform .14s ease,box-shadow .14s;transform-origin:center}
-.gd-col .card:first-child{margin-top:0}
+.gd-grp{display:flex;flex-direction:column;align-items:center;flex:none}
+/* 成型组盒: 盒内牌底衬一层青色底 + 描边, 让"这是一手完整牌型"一眼读得出(散牌盒不衬) */
+.gd-grp:not(.loose) .gd-grp-cards{padding:3px 5px;margin:-3px -5px;border-radius:11px;background:rgba(0,229,212,.06);box-shadow:inset 0 0 0 1px rgba(0,229,212,.16)}
+.gd-grp.bomb .gd-grp-cards{background:rgba(255,143,58,.08);box-shadow:inset 0 0 0 1px rgba(255,143,58,.28)}
+.gd-grp-cards{display:flex;flex-direction:row;align-items:flex-end}
+.gd-grp-cards .card{margin-left:-19px;cursor:pointer;transition:transform .14s ease,box-shadow .14s,filter .14s;transform-origin:bottom center}
+.gd-grp-cards .card:first-child{margin-left:0}
 .gd-hand.combo.locked .card{cursor:default}
-/* 竖列里选中: 往左错开+上抬+高层级冒头(直接抬会被下一张压住), 一眼看清选了哪张 */
-.gd-hand.combo .card.sel{transform:translate(-7px,-13px) scale(1.05);box-shadow:0 10px 16px -6px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 11px rgba(0,229,212,.45);z-index:6}
-.gd-hand.combo:not(.locked) .card:hover{transform:translateX(-5px)}
-.gd-col-label{margin-top:5px;font-size:10px;font-weight:900;color:var(--accent,#00e5d4);
+/* 组盒里选中: 上抬冒头(z-index 盖住右邻), 一眼看清选了这组/这张 */
+.gd-hand.combo .card.sel{transform:translateY(-12px) scale(1.05);box-shadow:0 12px 18px -7px rgba(0,0,0,.5),0 0 0 2px var(--accent),0 0 12px rgba(0,229,212,.45);z-index:6;filter:brightness(1.04)}
+.gd-hand.combo:not(.locked) .card:hover{transform:translateY(-6px)}
+.gd-col-label{margin-top:6px;font-size:10.5px;font-weight:900;color:var(--accent,#00e5d4);
   background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.42);border-radius:999px;
-  padding:1.5px 7px;white-space:nowrap;letter-spacing:.02em;line-height:1.3;
+  padding:1.5px 8px;white-space:nowrap;letter-spacing:.02em;line-height:1.3;
   box-shadow:0 0 8px rgba(0,229,212,.16),0 1px 3px rgba(0,0,0,.35)}
-/* 炸弹/同花顺列: 烫金胶囊(呼应顶部级牌徽标), 让"手里有炸"一眼扎眼 */
+/* 炸弹/同花顺盒: 烫金胶囊(呼应顶部级牌徽标), 让"手里有炸"一眼扎眼 */
 .gd-col-label.bomb{color:#3a1500;background:linear-gradient(150deg,#ffd76a,#ff8f3a);
   border-color:rgba(255,143,58,.6);box-shadow:0 0 12px rgba(255,143,58,.5),0 1px 3px rgba(0,0,0,.35)}
-/* 散牌单列的隐形占位: 撑出与成型列同高的标签行, 使全部列的"牌底"齐平(对标腾讯) */
-.gd-col-label.ph{visibility:hidden;box-shadow:none}
-.gd-room.is-land .gd-col .card{margin-top:-30px}
+/* 散牌盒标签: 弱化成灰调, 与成型牌型区分 */
+.gd-col-label.loose{color:var(--dim,#498d88);background:rgba(120,150,150,.08);border-color:rgba(120,150,150,.3);box-shadow:none}
 /* 横屏矮且手牌本就上抬贴中央出牌区: 去掉托盘面板框(否则与横幅/座位叠成两层), 以牌桌为背景 */
-.gd-room.is-land .gd-hand.combo{padding:7px 5px 6px;background:none;border:none;border-radius:0;box-shadow:none}
-.gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:3px}
+.gd-room.is-land .gd-hand.combo{padding:6px 5px 5px;gap:8px 9px;background:none;border:none;border-radius:0;box-shadow:none}
+.gd-room.is-land .gd-col-label{font-size:9px;padding:1px 6px;margin-top:4px}
 /* 理牌: 一键(短按)/手动拖排(长按) 共用一个按钮。
    主人诉求: 浮到【牌的右上角】—— 绝对定位贴 gd-hand-wrap 右上角, 悬在手牌托盘之上。
    手牌底对齐(justify-content:flex-end)+托盘顶留白, 故右上角基本是空区, 只在满牌时轻掠最右一张顶角;
@@ -1014,13 +1018,13 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
     function handCardAt(x,y){
       if(els.hand.classList.contains('combo')){
-        // 竖列分组: 先按 x 取列(取 left≤x 的最右列, 与横排 x 扫同构), 列内按 y 取牌(top≤y 的最下张)
-        const cols=[...els.hand.querySelectorAll('.gd-col')]; if(!cols.length) return null;
-        let col=cols[0];
-        for(const c of cols){ if(x >= c.getBoundingClientRect().left-0.5) col=c; else break; }
-        const kids=[...col.querySelectorAll('.card')]; if(!kids.length) return null;
-        let pick=kids[0];
-        for(const k of kids){ if(y >= k.getBoundingClientRect().top-0.5) pick=k; else break; }
+        // 组盒横排(可换行成多排): 先按 y 锁定手指所在那一排的牌, 排内取 left≤x 的最右张(与横排 x 扫同构)。
+        const cards=[...els.hand.querySelectorAll('.card')]; if(!cards.length) return null;
+        const inRow=cards.filter(k=>{ const r=k.getBoundingClientRect(); return y>=r.top-0.5 && y<=r.bottom+0.5; });
+        const pool=inRow.length?inRow:cards;
+        let pick=null;
+        for(const k of pool){ const r=k.getBoundingClientRect(); if(x>=r.left-0.5){ if(!pick || r.left>pick.getBoundingClientRect().left) pick=k; } }
+        if(!pick) pick=pool[0];   // x 在该排最左牌左侧 → 取该排最左张
         return pick;
       }
       const row=rowAt(y); if(!row) return null;
@@ -1075,15 +1079,14 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
       // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
       if(st.phase!=='play') return;
-      // ── 竖列组牌态: 点一列 = 选/取消【整组】(成型牌型), 散牌列 = 单张 toggle ──
-      //   竖列把一手牌型叠成窄条(6炸/连对能叠 6 张), 逐张精确点必然被胖手指打偏 = 主人"竖列经常选不上"。
-      //   竖列本就是"理成一手手打出去"的视图: 点哪列选哪组, 不必点中具体某张; 且不进划选管道(免手指微动连选一片)。
+      // ── 智能组牌态: 点一个成型组盒 = 选/取消【整组】(一手打出), 散牌盒 = 单张 toggle ──
+      //   组盒本就是"理成一手手打出去"的视图: 点哪盒选哪组, 不必点中具体某张; 且不进划选管道(免手指微动连选一片)。
       if(els.hand.classList.contains('combo')){
         const c=handCardAt(e.clientX,e.clientY);
         if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
-        const col=c.parentElement;
-        const isGroup = !!(col && col.querySelector('.gd-col-label:not(.ph)'));   // 成型列(有牌型名) vs 散牌占位列
-        const ids = isGroup ? [...col.querySelectorAll('.card')].map(x=>x.dataset.id) : [c.dataset.id];
+        const box=c.closest('.gd-grp');
+        const isGroup = !!(box && !box.classList.contains('loose'));   // 成型组盒(整组选) vs 散牌盒(单张选)
+        const ids = isGroup ? [...box.querySelectorAll('.card')].map(x=>x.dataset.id) : [c.dataset.id];
         const allSel = ids.every(id=>selected.has(id));
         ids.forEach(id=> allSel ? selected.delete(id) : selected.add(id));
         hintCycle=[]; renderHand(); updatePlayBtn(); sfx('cardsel');
@@ -1135,7 +1138,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成")
     function refreshSortBtn(){
       const btn = $('#gdSort'); if(!btn || arrangeMode) return;
-      btn.innerHTML = sortMode==='combo' ? '📚 竖列' : '🔀 理牌';
+      btn.innerHTML = sortMode==='combo' ? '📚 组牌' : '🔀 理牌';
     }
     function setArrange(on){
       arrangeMode = on;
@@ -1153,12 +1156,12 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       //   主人诉求: 手动理牌该"集成在理牌里"(此前只有长按能进, 发现性差) → 短按也能循环到手动。长按仍可直达。
       if(arrangeMode){   // 手动态 → 回大小排(相当于"完成"并继续循环)
         setArrange(false); sortMode='rank'; rows=null; hintCycle=[]; hintIdx=0;
-        refreshSortBtn(); renderHand(); sfx('cardsel'); toast('已按大小理牌 · 再点切竖列组牌'); return;
+        refreshSortBtn(); renderHand(); sfx('cardsel'); toast('已按大小理牌 · 再点切智能组牌'); return;
       }
       if(sortMode==='rank'){   // 大小 → 竖列组牌
         rows=null; sortMode='combo'; hintCycle=[]; hintIdx=0;
         refreshSortBtn(); renderHand(); sfx('cardsel');
-        toast('已竖列组牌 · 每列一手牌型, 点列即选 · 再点切手动拖排'); return;
+        toast('已智能组牌 · 每盒一手牌型, 点一盒即选整组 · 再点切手动拖排'); return;
       }
       // 竖列 → 手动拖排(setArrange 内含 renderHand + 拖排提示)
       setArrange(true);
@@ -1577,31 +1580,37 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       els.hand.innerHTML='';
       const deal = dealAnim; dealAnim=false;
       if (comboView){
-        // 每组→渲染列: 成型牌型(能命名)聚成一竖列并标名; 散牌/单张各自单列(同腾讯, 不堆成无名列)。
-        const renderCols = [];
+        // 每个成型牌型 → 一个横排"组盒"(盒内牌正常横向叠放, 露牌面), 盒下标牌型名; 所有散牌收进末尾一盒。
+        //   成型盒: 点一盒 = 选整组一手打出。散牌盒(.loose): 逐张点单选。
+        const made = [], loose = [];
         comboGroups.forEach(g=>{
           const p = g.length >= 2 ? Rules.parse(g, st.level) : null;
           const lab = p ? (typeLabel(p) || '') : '';
-          if (g.length >= 2 && lab) renderCols.push({ cards:g, label:lab, bomb: Rules.isBomb(p) });
-          else g.forEach(c=>renderCols.push({ cards:[c], label:'' }));
+          if (g.length >= 2 && lab) made.push({ cards:g, label:lab, bomb: Rules.isBomb(p) });
+          else loose.push(...g);
         });
-        let idx = 0;   // 全局阅读序(列 by 列, 组内上→下): 供划选区间连选按 data-idx 补齐
-        renderCols.forEach(rc=>{
-          const col = document.createElement('div'); col.className='gd-col';
-          rc.cards.forEach(card=>{
+        let idx = 0;   // 全局阅读序(盒 by 盒, 盒内左→右): 供划选区间连选按 data-idx 补齐
+        const addBox = (cards, label, opt)=>{
+          opt = opt || {};
+          const box = document.createElement('div');
+          box.className = 'gd-grp' + (opt.bomb ? ' bomb' : '') + (opt.loose ? ' loose' : '');
+          const row = document.createElement('div'); row.className = 'gd-grp-cards';
+          cards.forEach(card=>{
             const el = cardEl(card, st.level);
             el.dataset.idx = idx++;
             if (selected.has(card.id)) el.classList.add('sel');
             if (deal){ el.style.animationDelay=((idx-1)*11)+'ms'; el.classList.add('justdealt'); }
-            col.appendChild(el);
+            row.appendChild(el);
           });
-          // 每列都挂标签行: 成型列标牌型(炸弹烫金), 散牌列挂隐形占位 → 全列牌底齐平
-          const lab = document.createElement('div');
-          lab.className = 'gd-col-label' + (rc.label ? (rc.bomb ? ' bomb' : '') : ' ph');
-          lab.textContent = rc.label || '·';
-          col.appendChild(lab);
-          els.hand.appendChild(col);
-        });
+          box.appendChild(row);
+          const lb = document.createElement('div');
+          lb.className = 'gd-col-label' + (opt.bomb ? ' bomb' : '') + (opt.loose ? ' loose' : '');
+          lb.textContent = label;
+          box.appendChild(lb);
+          els.hand.appendChild(box);
+        };
+        made.forEach(m=> addBox(m.cards, m.label, { bomb:m.bomb }));
+        if (loose.length) addBox(loose, '散牌 '+loose.length, { loose:true });
         layoutHand();
         return;
       }
@@ -1659,43 +1668,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         cards[i].style.marginLeft = i===0 ? '0px' : (ov + gaps[i]).toFixed(2)+'px';
       }
     }
-    // 竖列分组落位: 组内竖向叠放(定比露顶, 保证点数花色可读), 列间距按手牌宽度自适应(列多超宽收成负间距略叠)。
+    // 智能组牌落位: 组盒横排 + 换行 + 盒内牌横向叠放全交给 CSS flex-wrap / 固定负边距, JS 只清掉旧竖列态残留的内联高。
+    //   盒内牌宽窄由 --cw 定, 组盒各自等高(1 张牌), 换行后整体高度由内容撑起, 富余由 .gd-mid(flex:1) 吸收。
     function layoutCombo(){
-      const cols=[...els.hand.querySelectorAll('.gd-col')]; if(!cols.length) return;
-      const W=els.hand.clientWidth; if(!W) return;
-      const c0=els.hand.querySelector('.card'); if(!c0) return;
-      const cw=c0.offsetWidth||36, ch=c0.offsetHeight||51;
-      const cs=getComputedStyle(els.hand);
-      // 竖向叠放露顶: 舒适值 ~34%(够露 cn@top2 点数 + cs@top16 花色)。但一列最多 6~8 张(三连对/钢板/炸弹),
-      //   固定露顶会让最高列超出托盘 → 主人反馈"六张牌叠放会超出去"。故托盘高度随【最高列】自适应;
-      //   若舒适露顶下最高列仍超过本屏可给的高度上限, 再把露顶压到恰好塞下(不低于可读下限 14px)。
-      const padTop=parseFloat(cs.paddingTop)||0, padBot=parseFloat(cs.paddingBottom)||0;
-      const labelEl=els.hand.querySelector('.gd-col-label');
-      const labelH=labelEl ? labelEl.offsetHeight+5 : 22;        // 列底组名标签占高
-      const maxCount=cols.reduce((m,c)=>Math.max(m, c.querySelectorAll('.card').length), 1);
-      const comfy=Math.max(Math.round(ch*0.34), 15);
-      const roomH=room.getBoundingClientRect().height || (ch*8);
-      const trayCap=Math.max(ch*2.35, roomH*0.46);              // 托盘高度上限: 不吃掉中央牌桌
-      const bodyCap=trayCap - padTop - padBot - labelH;         // 上限下留给列体(整列叠牌高)的空间
-      let reveal=comfy;
-      if (maxCount>1 && ch+(maxCount-1)*comfy > bodyCap) reveal=Math.max(14, (bodyCap-ch)/(maxCount-1));
-      const bodyH=ch+(maxCount-1)*reveal;
-      const vov=(reveal-ch);
-      cols.forEach(c=>{ const ks=c.querySelectorAll('.card'); ks.forEach((k,i)=>{ k.style.marginTop = i===0?'0px':vov.toFixed(2)+'px'; }); });
-      // 托盘高随最高列自适应(不低于原定 2.35ch, 不高于 trayCap): 六张列也整列可见, 余量由 .gd-mid(flex:1) 吸收。
-      els.hand.style.height=Math.round(Math.min(trayCap, Math.max(ch*2.35, bodyH+labelH+padTop+padBot)))+'px';
-      // 横向: 按各列实际宽(标签可能比牌宽)均摊剩余宽度, 封顶 12px; 列多超宽则收成负间距(列略叠),
-      //   底限叠掉最窄列半宽, 保证整簇不横向溢出手牌带。用内容区宽度(clientWidth 扣左右 padding)。
-      const nCol=cols.length;
-      const avail=(els.hand.clientWidth||W) - (parseFloat(cs.paddingLeft)||0) - (parseFloat(cs.paddingRight)||0);
-      cols.forEach(c=>{ c.style.marginLeft='0px'; });        // 先清零再量自然宽
-      const widths=cols.map(c=>c.getBoundingClientRect().width);
-      const totalCol=widths.reduce((a,b)=>a+b,0);
-      // 列间距只落在 cols[1..](首列 margin=0): 总占用 = totalCol + (nCol-1)*gap。
-      //   gap ≤ (avail-totalCol)/(nCol-1) 时总宽 ≤ avail; 封顶 12px。首列不给负 margin(否则被拽出左沿),
-      //   justify-center 下: 总宽<avail 整簇居中, =avail 铺满不偏 → 恒不横向溢出。列多超宽 gap 自动转负(列略叠)。
-      const gap = nCol>1 ? Math.min(12, (avail - totalCol)/(nCol-1)) : 0;
-      cols.forEach((c,i)=>{ c.style.marginLeft = (i===0 ? 0 : gap).toFixed(2)+'px'; });
+      els.hand.style.height='';
+      els.hand.querySelectorAll('.card').forEach(k=>{ k.style.marginTop=''; });
     }
     function layoutHand(){
       if (root.EHTableOrient) root.EHTableOrient.reflect(room);
@@ -1704,7 +1681,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (_lastLand !== null && land !== _lastLand){ _lastLand = land; renderHand(); return; }
       _lastLand = land;
       if (els.hand.classList.contains('combo')){ layoutCombo(); return; }
-      els.hand.style.height='';   // 退出竖列组牌: 清掉组牌态设的自适应高, 恢复 CSS 定高(2.35ch)
+      els.hand.style.height='';   // 退出智能组牌: 清掉组牌态设的自适应高, 恢复 CSS 定高(2.35ch)
       for (const row of els.hand.children) layoutRow(row);
       applyRowOverlap();
     }
