@@ -116,35 +116,29 @@
    坐在框里而非挂在框沿外。落牌/横幅在椭圆中上部, 这里在其下方留白处, 互不打架。
    半透明毛玻璃底 + pointer-events:none 不挡操作。 */
 .ddz-mult{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
-/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏圆钮 + 返回胶囊, 悬浮青光, 按压回弹; 横屏态 ⟳ 亮青 */
-.ddz-mus,.ddz-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
+   悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
+.ddz-mus,.ddz-rot,.ddz-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;color:var(--sub,#86cbc6);
   border:1px solid var(--line,rgba(0,229,212,.24));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .ddz-mus{margin-left:auto}
+.ddz-ico{width:18px;height:18px;display:block}
 .ddz-mus:hover,.ddz-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
 .ddz-mus:active,.ddz-rot:active,.ddz-x:active{transform:scale(.9)}
 .ddz-mus.muted{color:var(--dim,#498d88);opacity:.8}
 .ddz-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
-.ddz-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
-  border:1px solid var(--line,rgba(0,229,212,.24));
-  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
-  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .ddz-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
-/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给倍数 chip 让位, 杜绝返回钮被挤出屏 */
+/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距, 给倍数 chip 让位(三钮已纯图标, 无需收字) */
 @media (max-width:379px){
   .ddz-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
   .ddz-title{font-size:14px}
   .ddz-mult{font-size:11px}
-  .ddz-x{padding:0 9px}
-  .ddz-x .ddz-xlbl{display:none}
 }
 /* 牌桌绒面 */
 .ddz-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0}
@@ -705,14 +699,20 @@ html[data-mode="day"] .ddz-center::before{
     // 挂载点:优先聊天室 #hall(入室牌桌), 无则退回 body
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
 
+    // 顶栏图标(三游戏统一·图形化): 同族线性 SVG(等大 18px、等粗 1.9), 替 emoji🎵/字符⟳/文字"返回"混搭。与掼蛋/德州同款。
+    const SVG=(p)=>`<svg class="ddz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const ICO_MUS_ON = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/>');
+    const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
+    const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
+    const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
     const room = document.createElement('div'); room.className = 'ddz-room';
     room.innerHTML = `
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
-        <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">🎵</button>
+        <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
         ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
-        <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
-        <button class="ddz-x" id="ddzX" aria-label="返回聊天">✕<span class="ddz-xlbl"> 返回</span></button>
+        <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
+        <button class="ddz-x" id="ddzX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
       ${COUNTER?`<div class="ddz-cntp" id="ddzCntPanel" hidden>
         <div class="cp-hd"><b>🃏 记牌器</b><button class="cp-x" id="ddzCntX" aria-label="关闭">✕</button></div>
@@ -929,7 +929,7 @@ html[data-mode="day"] .ddz-center::before{
     });
     // 牌桌内声音开关(点开三档静音面板 BGM/音效/语音, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#ddzMus');
-    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
 

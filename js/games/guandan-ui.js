@@ -92,35 +92,29 @@
 .gd-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#00e5d4);box-shadow:var(--glow-cyan)}
 .gd-lvl{font-size:12px;color:var(--amber,#ffc24d);font-weight:700;padding:2px 9px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .gd-lvl b{color:#fff}
-/* 顶栏功能钮组(主人诉求·重新设计): 统一磨砂玻璃圆钮(音乐/横屏) + 返回胶囊, 悬浮青光, 按压回弹 */
-.gd-mus,.gd-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+/* 顶栏功能钮组(主人诉求·再统一): 音乐/横屏/返回 三颗同尺寸磨砂圆钮 + 同族线性图标(SVG 等大等粗, 单色跟随 currentColor),
+   告别 emoji🎵/字符⟳/文字"返回"混搭致"元素大小不一"。悬浮青光按压回弹; 返回保留红调、旋转激活亮青。 */
+.gd-mus,.gd-rot,.gd-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;color:var(--sub,#86cbc6);
   border:1px solid var(--line,rgba(0,229,212,.24));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .gd-mus{margin-left:auto}
+.gd-ico{width:18px;height:18px;display:block}
 .gd-mus:hover,.gd-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
 .gd-mus:active,.gd-rot:active,.gd-x:active{transform:scale(.9)}
 .gd-mus.muted{color:var(--dim,#498d88);opacity:.8}
 .gd-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
-.gd-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
-  border:1px solid var(--line,rgba(0,229,212,.24));
-  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
-  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .gd-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
-/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给级牌 chip 让位, 杜绝返回钮被挤出屏 */
+/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距, 给级牌 chip 让位(三钮已是纯图标, 不再需要收字) */
 @media (max-width:379px){
   .gd-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
   .gd-title{font-size:14px}
   .gd-lvl{font-size:11px}
-  .gd-x{padding:0 9px}
-  .gd-x .gd-xlbl{display:none}
 }
 .gd-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;max-width:var(--maxw,none);width:100%;margin:0 auto;box-sizing:border-box}
 .gd-felt.shake{animation:gdShake .42s cubic-bezier(.36,.07,.19,.97)}
@@ -594,6 +588,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
   const NAT_LABEL = {1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
   const CN_NUM = {4:'四',5:'五',6:'六',7:'七',8:'八',9:'九',10:'十'};
   const natName = (r)=> (r==null ? '' : (NAT_LABEL[r] || String(r)));
+  // 报牌行话(主人要求"标准化"): 单点数牌型用民间俗称 —— J=钩 Q=皮蛋 K=老K A=尖(A 自然点可为 1 或 14)。
+  //   数字点(2~10)仍读点数。顺子/连对/钢板等区间不套(读"钩到皮蛋"反而绕), 只在单张/对/三/三带二/炸上用。
+  const NICK = {1:'尖',14:'尖',13:'老K',12:'皮蛋',11:'钩'};
+  const nickName = (r)=> (r==null ? '' : (NICK[r] || natName(r)));
   function spokenLabel(p){
     if(!p) return '';
     switch(p.type){
@@ -602,20 +600,20 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if(dr===17) return '一张大王';
         if(dr===16) return '一张小王';
         if(dr==null) return typeLabel(p);
-        return '一张'+natName(dr===15?2:dr);
+        return '一张'+nickName(dr===15?2:dr);
       }
-      case 'pair':  return p.nat!=null ? '一对'+natName(p.nat) : typeLabel(p);
-      case 'trio':  return p.nat!=null ? '三个'+natName(p.nat) : typeLabel(p);
+      case 'pair':  return p.nat!=null ? '一对'+nickName(p.nat) : typeLabel(p);
+      case 'trio':  return p.nat!=null ? '三个'+nickName(p.nat) : typeLabel(p);
       case 'fullhouse': {
         if(p.trioRank==null||p.pairRank==null) return typeLabel(p);
-        const pr = p.pairRank===17?'大王':(p.pairRank===16?'小王':natName(p.pairRank));   // 带的对子可为王对
-        return '三个'+natName(p.trioRank)+'带一对'+pr;
+        const pr = p.pairRank===17?'大王':(p.pairRank===16?'小王':nickName(p.pairRank));   // 带的对子可为王对
+        return '三个'+nickName(p.trioRank)+'带一对'+pr;
       }
       case 'straight':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'顺子' : typeLabel(p);
       case 'straightflush': return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'同花顺' : typeLabel(p);
       case 'pairline':      return p.topRank!=null ? natName(p.botRank)+'到'+natName(p.topRank)+'连对' : typeLabel(p);
       case 'trioline':      return p.topRank!=null ? natName(p.botRank)+natName(p.topRank)+'钢板' : typeLabel(p);
-      case 'bomb':  return p.nat!=null ? (CN_NUM[p.size]||p.size)+'个'+natName(p.nat)+'炸' : typeLabel(p);
+      case 'bomb':  return p.nat!=null ? (CN_NUM[p.size]||p.size)+'个'+nickName(p.nat)+'炸' : typeLabel(p);
       case 'jokerbomb': return '四大天王';
       default: return typeLabel(p);
     }
@@ -785,14 +783,20 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let aiTimer=null, ringRAF=null, turnStart=0, turnDur=0, turnSeatActive=-1, tributeTimer=null;
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
+    // 顶栏图标(主人诉求·图形化统一): 三颗按钮改用同族线性 SVG(等大 18px、等粗 1.9), 告别 emoji🎵/字符⟳/文字"返回"混搭致大小不一。
+    const SVG=(p)=>`<svg class="gd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const ICO_MUS_ON = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/>');
+    const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
+    const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
+    const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
     const room = document.createElement('div'); room.className='gd-room';
     room.innerHTML = `
       <div class="gd-bar">
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
-        <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">🎵</button>
-        <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
-        <button class="gd-x" id="gdX" aria-label="返回聊天">✕<span class="gd-xlbl"> 返回</span></button>
+        <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
+        <button class="gd-x" id="gdX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
       <div class="gd-felt" id="gdFelt">
         <div class="gd-score" id="gdScore"></div>
@@ -958,7 +962,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     });
     // 牌桌内声音开关(点开三档静音面板 BGM/音效/语音, 因大厅 🎵 被牌桌浮层盖住)
     const musBtn = $('#gdMus');
-    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
 

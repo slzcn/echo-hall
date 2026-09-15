@@ -122,34 +122,28 @@
 .pk-blinds{position:absolute;top:8px;left:max(12px,env(safe-area-inset-left,0px));z-index:0;font-size:12px;letter-spacing:.1em;color:rgba(234,246,255,.32);font-weight:800;white-space:nowrap;pointer-events:none;text-shadow:0 1px 0 rgba(0,0,0,.4)}
 html[data-mode="day"] .pk-blinds{color:rgba(4,54,50,.34);text-shadow:0 1px 0 rgba(255,255,255,.5)}
 .pk-room.is-land .pk-blinds{top:6px;font-size:11px}
-/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏圆钮 + 返回胶囊, 悬浮青光, 按压回弹; 横屏态 ⟳ 亮青 */
-.pk-mus,.pk-rot{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--sub,#86cbc6);
+/* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
+   悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
+.pk-mus,.pk-rot,.pk-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;color:var(--sub,#86cbc6);
   border:1px solid var(--line,rgba(0,229,212,.24));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .pk-mus{margin-left:auto}
+.pk-ico{width:18px;height:18px;display:block}
 .pk-mus:hover,.pk-rot:hover{color:var(--ink,#eaf6ff);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(0,229,212,.35)}
 .pk-mus:active,.pk-rot:active,.pk-x:active{transform:scale(.9)}
 .pk-mus.muted{color:var(--dim,#498d88);opacity:.8}
 .pk-rot.on{color:var(--accent,#00e5d4);border-color:var(--accent,#00e5d4);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px rgba(0,229,212,.5)}
-.pk-x{height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;cursor:pointer;
-  display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub,#86cbc6);
-  border:1px solid var(--line,rgba(0,229,212,.24));
-  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
-  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .pk-x:hover{color:#ff8a94;border-color:rgba(255,93,108,.55);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px rgba(255,93,108,.3)}
-/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距 + 「✕ 返回」收成纯图标, 给盲注 chip 让位, 杜绝返回钮被挤出屏 */
+/* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距, 给盲注 chip 让位(三钮已纯图标, 无需收字) */
 @media (max-width:379px){
   .pk-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
   .pk-title{font-size:14px}
-  .pk-x{padding:0 9px}
-  .pk-x .pk-xlbl{display:none}
 }
 /* 牌桌绒面 */
 .pk-felt{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;max-width:var(--maxw,none);width:100%;margin:0 auto;box-sizing:border-box;overflow:hidden}
@@ -731,13 +725,19 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
+    // 顶栏图标(三游戏统一·图形化): 同族线性 SVG(等大 18px、等粗 1.9), 替 emoji🎵/字符⟳/文字"返回"混搭。与斗地主/掼蛋同款。
+    const SVG=(p)=>`<svg class="pk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const ICO_MUS_ON = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/>');
+    const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
+    const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
+    const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
     const room = document.createElement('div'); room.className='pk-room';
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
-        <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">🎵</button>
-        <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">⟳</button>
-        <button class="pk-x" id="pkX" aria-label="返回聊天">✕<span class="pk-xlbl"> 返回</span></button>
+        <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
+        <button class="pk-x" id="pkX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
       <div class="pk-felt" id="pkFelt">
         <div class="pk-blinds" id="pkBlinds"></div>
@@ -870,7 +870,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     });
     // 牌桌内声音开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里点开三档静音面板(BGM/音效/语音各自独立开关)
     const musBtn = $('#pkMus');
-    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.textContent = any?'🎵':'🔇'; musBtn.classList.toggle('muted', !any); }
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
     window.addEventListener('resize', onResize);
