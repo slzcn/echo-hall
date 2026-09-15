@@ -601,6 +601,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const isHostLobby = !!opts.isHost;
     let lobbyCtx = opts.lobbyCtx || null;                // { souls:[{auth_uid,name,emoji}], actions:{seatSoul,kick,fillSouls,inviteHumans,start} }
     let lobbySeats = Array.isArray(opts.lobbySeats) ? opts.lobbySeats : [];
+    // 招募态本机邀请的机器人登记表(seat→{name,emoji}): DB 名册无它, lobbyState 重建时据此补回,
+    //   免被 setLobby(名册刷新)抹掉; host 请离时清除。
+    const lobbyBots = {};
     const PokerNet = root.EHPokerNet;
     let myHole = [];       // guest: 自己的两张底牌(牌对象), 由 feedHand 注入
     let lastSnap = null;   // guest: 最近一张公共快照
@@ -669,18 +672,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       stacks[seat]=START; buyin[seat]=(buyin[seat]||0)+START; netSettled[seat]=0;
       vacated[seat]=false; vacatedUid[seat]=null;
       personaBySeat[seat]=personaFor(seat);
+      // 招募态: 就地把 st.players[seat] 写成已入座的机器人 + 登记 lobbyBots, 否则座位仍读
+      //   kind==='empty' → 一直画"空位·点击邀请"(主人反馈"邀请后不立即入座"), 且 setLobby 刷新会抹掉。
+      if (st && st.phase==='lobby'){
+        lobbyBots[seat] = { name:b.name, emoji:b.e };
+        if (st.players[seat]){ const p=st.players[seat]; p.kind='bot'; p.name=b.name; p.emoji=b.e; p.isAI=true; p.stack=START; p.start=START; }
+      }
       saveScore();
       try{ closeInviteMenu(); }catch(_){}
       sfx('click');
       try{ emitBeat({ type:'join', actor:b.name, text:'🪑 '+b.name+' 入座补位' }); }catch(_){}
-      // 牌桌因对手离光而停摆(结算态且无自动续手在跑): 邀满 2 人即刻续打; 否则只提示"下一手加入"。
+      // 牌桌因对手离光而停摆(结算态且无自动续手在跑): 邀满 2 人即刻续打; 否则提示"下一手加入"。
       if (resume && st.phase==='over' && !overTimer && aliveSeats().length>=2){
         toast(b.name+' 入座 · 开新一手'); try{ if(curOver&&curOver.parentNode) curOver.remove(); }catch(_){}
         try{ hideWinBanner(); }catch(_){}
         nextHand();
       } else {
-        toast(b.name+' 入座 · 下一手加入');
-        if (!inHand()){ renderOpponents(true); positionSeats(); }
+        toast(b.name + (st.phase==='lobby' ? ' 入座' : ' 入座 · 下一手加入'));
+        // 立即刷新座位: 招募态显示机器人已入座; 局中显示"下一手入座"占位(不再停在"空位"死等下次重渲)。
+        renderOpponents(true); positionSeats();
       }
     }
     // 是否正处于一手进行中(发牌后、未结算): 邀请/离场只在手与手之间真正落地, 绝不打断本手。
@@ -721,9 +731,13 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         currentBet:0, minRaise:bb, aggressor:null, toAct:-1, pot:0, board:[], result:null,
         players: names.map((nm,seat)=>{
           const s = arr[seat] || { seat, kind:'empty' };
-          const kind = s.kind || 'empty';
-          return { seat, dbSeat:(typeof s.seat==='number'?s.seat:seat), kind,
-            name: kind==='empty' ? '' : (s.name||nm||('席'+seat)), emoji: s.emoji||null,
+          const dbSeat = (typeof s.seat==='number'?s.seat:seat);
+          let kind = s.kind || 'empty';
+          let nm2 = kind==='empty' ? '' : (s.name||nm||('席'+seat));
+          let emoji = s.emoji||null;
+          // 本机邀请的机器人: 仅当 DB 该席仍空时补回(真人/灵魂真占座时以 DB 为准, 不覆盖)。
+          if (kind==='empty' && lobbyBots[seat]){ kind='bot'; nm2=lobbyBots[seat].name; emoji=lobbyBots[seat].emoji; }
+          return { seat, dbSeat, kind, name:nm2, emoji,
             isAI: kind!=='human', stack:START, start:START, hole:[], folded:false, allin:false, committed:0, street:0, acted:false };
         }) };
     }
@@ -939,13 +953,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       const isMe = seat===mySeat;
       // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
-      const roleTxt = p.kind==='soul' ? '灵魂' : (p.kind==='clone' ? '分身' : (isMe ? '你' : '玩家'));
+      const roleTxt = p.kind==='soul' ? '灵魂' : (p.kind==='clone' ? '分身' : (p.kind==='bot' ? '机器人' : (isMe ? '你' : '玩家')));
       const canKick = isHostLobby && !isMe && p.dbSeat!==0;
+      // 机器人是本机邀请(不在 DB): 请离走本地 uninviteBot; 真人/灵魂请离走 DB kick。
+      const kickAttr = p.kind==='bot' ? `data-unbot="${seat}"` : `data-kick="${p.dbSeat}"`;
       return `<div class="pk-seat pk-lobby-filled" data-seat="${seat}" style="--p:360">
         <div class="pk-avr"><div class="av">${p.emoji||avatars[seat]||'🙂'}</div></div>
         <div class="nm">${escapeHtml(p.name||'—')}</div>
         <div class="stk pk-lob"><span class="role">${roleTxt}</span></div>
-        ${canKick?`<button class="pk-lob-kick" data-kick="${p.dbSeat}" title="请离">✕</button>`:''}
+        ${canKick?`<button class="pk-lob-kick" ${kickAttr} title="请离">✕</button>`:''}
       </div>`;
     }
     // 招募态: 空位点击邀请 / host 请离(与斗地主 bindLobbySeats 同构)
@@ -956,6 +972,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       room.querySelectorAll('.pk-lob-kick[data-kick]').forEach(b=>{
         b.onclick=(e)=>{ e.stopPropagation(); if(lobbyCtx&&lobbyCtx.actions&&lobbyCtx.actions.kick) lobbyCtx.actions.kick(+b.dataset.kick); };
       });
+      room.querySelectorAll('.pk-lob-kick[data-unbot]').forEach(b=>{
+        b.onclick=(e)=>{ e.stopPropagation(); uninviteBot(+b.dataset.unbot); };
+      });
+    }
+    // 招募态: 撤下本机邀请的机器人 → 清登记 + 就地重建 lobby 名册(该席回落"空位")。
+    function uninviteBot(seat){
+      delete lobbyBots[seat];
+      if (st && st.phase==='lobby'){ st = lobbyState(lobbySeats); renderOpponents(true); positionSeats(); sfx('click'); }
     }
     function _imAway(e){
       const m=room.querySelector('.pk-invite-menu');
@@ -2101,6 +2125,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         }
         remoteSeats.length=0; (A.remoteSeats||[]).forEach(x=>remoteSeats.push(x));
         normalizeBotNames();   // startDeal 首发: 兜底名「机器人N」统一成花名
+        // 招募态本机邀请的机器人: DB 该席仍空(→A 里落成 AI 兜底 bot、无灵魂/真人 uid)时, 沿用邀请时的花名/头像,
+        //   免"招募时看到疯哥, 开局却换个名"的观感跳变。真人/灵魂真占了该席则以 DB 为准, 不覆盖。
+        for (const s in lobbyBots){ const i=+s; if (isAI[i] && !souls[i] && (!ids || !ids[i])){ names[i]=lobbyBots[i].name; avatars[i]=lobbyBots[i].emoji; } }
         personaBySeat = names.map((_, seat)=>personaFor(seat));
       }
       // 全新一桌: 筹码/买入/净盈亏/手数/庄位/离场标记全部重置
