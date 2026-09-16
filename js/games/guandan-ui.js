@@ -989,6 +989,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
 
     // ── 划选: 指针涂抹式多选(按下即选 / 拖过整段连选), 与点选共用 selected ──
     let painting=false, paintMode='select', paintSeen=null, paintLastIdx=null, paintCards=null, paintLastRowEl=null;
+    // 直接长按牌拿起拖动(对标主流掼蛋手动理牌)的待定态: 按下先挂起, 按住≈300ms→拖动, 移动>8px→划选, 快抬→点选。
+    let pendCard=null, pendId=null, pendX=0, pendY=0, lpTimer=null;
     // 手牌现分上/下两排(掼蛋 27 张可码两排)。先按 y 定位命中哪一排, 再在该排里按 x 命中"露出的那张":
     // 左→右叠放后牌盖前牌右半, elementFromPoint 在牌中心会命中右邻牌(漏最左那张) → 改逐张比左沿。
     function rowAt(y){
@@ -1048,28 +1050,48 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       lastSelSig = [...selected].sort().join(',');
       layoutHand();   // 划选/点选 settle 后重排: 撑开选中牌两侧空档 + 拆开两排(选中清空则复原重叠), 选中牌不压未选牌
     }
-    els.hand.addEventListener('pointerdown', (e)=>{
-      if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
-      if(arrangeMode){ startReorder(e); return; }        // 手动理牌: 拖牌重排(暂停划选)
-      // 出牌阶段任何时候都能划选/点选(含别家回合预选好牌, 主人诉求"任何情况可手动选牌理牌");
-      // 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关, 预选不会误出。
-      if(st.phase!=='play') return;
-      const c=handCardAt(e.clientX,e.clientY);
-      // 点手牌托盘的空白处(牌与牌之间/两侧留白, 非某张牌)= 取消选牌: 手牌条不在 .gd-felt 里,
-      //   felt 的"点绒面取消"覆盖不到这块, 主人点手牌旁边空白收不回选中就是这里漏的。
-      if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
+    // ── 手牌手势(对标主流掼蛋手动理牌): 点选 / 划选 / 直接长按牌拿起拖动, 三合一 ──
+    // 起选到某张(或点选单张)复用同一套划选机制(paintTo/endPaint), 保证选中同步/撑缝/音效一致。
+    function startPaintFrom(c){
       painting=true; paintSeen=new Set(); paintLastIdx=null; paintLastRowEl=null;
       paintCards=[...els.hand.querySelectorAll('.card')];   // 全局阅读序(上排→下排), 供区间连选按 data-idx 补齐
-      paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
+      paintMode = (c && selected.has(c.dataset.id)) ? 'deselect' : 'select';
+      if(c) paintTo(c);
+    }
+    const clearPend=()=>{ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } pendCard=null; pendId=null; };
+    els.hand.addEventListener('pointerdown', (e)=>{
+      if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
+      if(arrangeMode){ startReorder(e); return; }         // 显式整理态: 直接拖排(保留, 作双排整理快捷入口)
+      // 出牌阶段任何时候都能划选/点选/拖排(含别家回合预选好牌); 真正出牌仍由 updatePlayBtn(st.turn===mySeat) 把关。
+      if(st.phase!=='play') return;
+      const c=handCardAt(e.clientX,e.clientY);
+      // 点手牌托盘空白处(牌间/两侧留白)= 取消选牌: 手牌条不在 .gd-felt 里, felt 的"点绒面取消"覆盖不到这块。
+      if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
+      // 挂起判定: 300ms 内不动且不抬 → 拿起拖动; 中途移动>8px → 转划选; 快抬 → 点选。
+      pendCard=c; pendId=c.dataset.id; pendX=e.clientX; pendY=e.clientY;
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
-      paintTo(c); e.preventDefault();
+      if(lpTimer) clearTimeout(lpTimer);
+      lpTimer=setTimeout(()=>{ lpTimer=null; const c2=pendCard; pendCard=null; pendId=null; if(c2) startCardDrag(c2, pendX, pendY); }, 300);
+      e.preventDefault();
     });
     els.hand.addEventListener('pointermove', (e)=>{
       if(dragCard){ moveReorder(e); return; }
-      if(painting) paintTo(handCardAt(e.clientX,e.clientY));
+      if(painting){ paintTo(handCardAt(e.clientX,e.clientY)); return; }
+      if(pendCard && (Math.abs(e.clientX-pendX)>8 || Math.abs(e.clientY-pendY)>8)){   // 移动=划选: 从起手牌起选, 延伸到当前
+        const c0=pendCard; clearPend();
+        startPaintFrom(c0); paintTo(handCardAt(e.clientX,e.clientY));
+      }
     });
-    els.hand.addEventListener('pointerup', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
-    els.hand.addEventListener('pointercancel', (e)=>{ if(dragCard) endReorder(e); else endPaint(); });
+    els.hand.addEventListener('pointerup', (e)=>{
+      if(dragCard){ endReorder(e); return; }
+      if(painting){ endPaint(); return; }
+      if(pendCard){ const c0=pendCard; clearPend(); startPaintFrom(c0); endPaint(); }   // 快按快抬 = 点选(复用划选单张逻辑)
+    });
+    els.hand.addEventListener('pointercancel', (e)=>{
+      if(dragCard){ endReorder(e); return; }
+      if(painting){ endPaint(); return; }
+      clearPend();
+    });
     // ── 点空白取消选中(主人诉求): 已选牌时点牌桌绒面(非手牌/按钮/操作条/气泡) → 清空选择, 放下高亮 ──
     if (els.felt) els.felt.addEventListener('pointerdown', (e)=>{
       if(st.phase!=='play' || arrangeMode || painting) return;   // 预选态(含别家回合)点绒面也能收回
@@ -1124,9 +1146,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       return { top:[...(topEl?topEl.children:[])].map(c=>c.dataset.id),
                bot:[...(botEl?botEl.children:[])].map(c=>c.dataset.id) };
     }
-    function startReorder(e){
-      const c = handCardAt(e.clientX,e.clientY); if(!c) return;
-      dragCard = c; dragId = c.dataset.id; dragStartX = e.clientX; dragStartY = e.clientY;
+    // 拿起一张牌开拖(x,y=起手点)。直接长按手牌或显式整理态都走这里。
+    function startCardDrag(c, x, y){
+      dragCard = c; dragId = c.dataset.id; dragStartX = x; dragStartY = y;
       // 组拖判定: 抓的这张属于当前多张选中集 → 整组一起挪。按 DOM 阅读序取选中牌节点,
       //   使落位后它们连排的相对次序与眼前一致(不打乱选出的三带二内部顺序)。
       dragGroup = null; dragGroupEls = null;
@@ -1136,6 +1158,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       }
       const lift = dragGroupEls || [c];
       lift.forEach((el,i)=>{ el.classList.add('dragging'); el.style.zIndex = String(50+i); });
+      vibrate(12);   // 拿起震一下: 长按拖动的触觉反馈(对标主流手感)
+    }
+    function startReorder(e){
+      const c = handCardAt(e.clientX,e.clientY); if(!c) return;
+      startCardDrag(c, e.clientX, e.clientY);
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
     }
