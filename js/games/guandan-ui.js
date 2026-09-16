@@ -1141,6 +1141,21 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const hand = st.players[mySeat] && st.players[mySeat].hand;
       return !!(hand && hand.length && root.EHGuandanAI && typeof root.EHGuandanAI.arrangeGroups === 'function');
     }
+    // 手动理牌后从【玩家排定的顺序】里就地识别成型牌型: 从左往右贪心取最长的连续段, 只要它能被
+    //   Rules.parse 认成合法牌型(对/三/三带二/顺/连对/钢板/炸…)就归成一组, 认不出就当散张单列。
+    //   —— 这样"手动重新组合成其他牌型"(把想打的几张挪到一起)既能在手牌上显出组间留缝(更聚拢),
+    //   又能喂给提示(提示按玩家自己码出的组来推荐), 不再一律用 AI 的自动分组覆盖玩家的意图。
+    function runGroups(cards){
+      const out = []; let i = 0;
+      while (i < cards.length){
+        let best = 1;
+        for (let len = Math.min(cards.length - i, 12); len >= 2; len--){
+          if (Rules.parse(cards.slice(i, i + len), st.level)){ best = len; break; }
+        }
+        out.push(cards.slice(i, i + best)); i += best;
+      }
+      return out;
+    }
     // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成"); 直接标当前排序法, 一眼知在哪态。
     function refreshSortBtn(){
       const btn = $('#gdSort'); if(!btn || arrangeMode) return;
@@ -1499,6 +1514,15 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         let bot = pick(rows.bot);
         const left = hand.filter(c=>!placed.has(c.id));
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
+        // 按牌型态下手动排的两排: 就地识别玩家码出的成型段, 每段(除首段)首张标 grp-start → 显组间留缝,
+        //   让"手动重新组合成的牌型"一眼可见、成组的牌聚拢在一起(大小态纯排序, 不标组避免噪声)。
+        if (sortMode === 'combo' && canCombo()){
+          [top, bot].forEach(rowCards=>{
+            const segs = runGroups(rowCards);
+            let idx = 0;
+            segs.forEach(seg=>{ if (idx > 0 && seg.length) groupStartIds.add(seg[0].id); idx += seg.length; });
+          });
+        }
         return [top, bot];
       }
       // 手动拖排入场(rows 尚空): 一律按【两排】起手。种子序: 当前按牌型态沿用组牌序(同型相邻, 微调好挪),
@@ -1616,7 +1640,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       // 每个牌间隙的额外留白: ①按牌型时每组首张左侧留缝(分组可见); ②有选中时在【选中/未选边界】两侧撑开
       //   更大空档 → 被选中的牌落在清空区、绝不横向压住相邻未选牌(主人诉求"选中牌不压未选牌")。
       const hasSel = els.hand.classList.contains('has-sel') && !els.hand.classList.contains('arranging');
-      const GRP = cw * 0.34, SELG = cw * 0.62;
+      // GRP=组间留缝: 满行时步距按 fill 反算, 缝越大 → 组内牌越叠紧(更聚拢)、组与组分得越开。
+      //   主人诉求"成组的牌型更聚拢一点" → 从 0.34 提到 0.58cw, 一眼看清一手里有几组。
+      const GRP = cw * 0.58, SELG = cw * 0.7;
       const gaps = new Array(n).fill(0); let gapTotal = 0;
       for (let i=1;i<n;i++){
         let g = cards[i].classList.contains('grp-start') ? GRP : 0;
@@ -1958,7 +1984,21 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if (ai.length && sortMode==='combo' && canCombo()){
           const key = g => g.map(c=>c.id).sort().join(',');
           const mine = [];
-          root.EHGuandanAI.arrangeGroups(hand, st.level).forEach(g=>{
+          // 理牌来源: 玩家手动排过(rows 非空)→ 按玩家自己码出的成型段来提示(runGroups 就地识别),
+          //   让"手动重新组合的牌型"真正指导提示; 否则用 AI 自动分组 arrangeGroups。
+          let sourceGroups;
+          if (rows){
+            const byId = new Map(hand.map(c=>[c.id,c]));
+            const ordered = [].concat(
+              (rows.top||[]).map(id=>byId.get(id)).filter(Boolean),
+              (rows.bot||[]).map(id=>byId.get(id)).filter(Boolean));
+            const seen0 = new Set(ordered.map(c=>c.id));
+            hand.forEach(c=>{ if(!seen0.has(c.id)) ordered.push(c); });   // 兜底新牌
+            sourceGroups = runGroups(ordered);
+          } else {
+            sourceGroups = root.EHGuandanAI.arrangeGroups(hand, st.level);
+          }
+          sourceGroups.forEach(g=>{
             if (g.length < 2) return;                            // 单张不算"理出的牌型"
             const p = Rules.parse(g, st.level); if (!p) return;  // 组不成合法牌型的跳过
             if (Rules.isBomb(p)) return;                         // ★炸弹不进"理牌优先"(主人反馈"跟对子却提示先出炸"):
