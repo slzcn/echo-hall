@@ -664,6 +664,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     //   host 侧对远程真人席同理: 连超时到阈值 → 移出 remoteSeats(即刻转 AI 托管)并请 app 落库离座, 防卡死全桌。
     const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
@@ -683,6 +684,22 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
+    }
+    // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
+    //   旁观期间该席由 AI 托管跑 aiTimer; 接管时先归零连超时账、清可能已排的 AI 代打, 再 renderAll 重武装本回合。
+    //   turnSeatActive=-1 强制回合重新起算 → 拿回满额思考时长, 不接 AI 用剩的秒(否则可能秒过)。
+    function resumeSeat(){
+      if (!spectating) return;
+      spectating = false;
+      missStreak[mySeat] = 0;
+      selected = new Set();
+      const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
+      toast('已接管座位 · 重新上场', 2000);
+      try{ emitBeat({ type:'resume', actor:nm, text:'🙋 '+nm+' 回来了 · 接管座位' }); }catch(_){}
+      if (onSeatResume){ try{ onSeatResume(mySeat); }catch(e){ try{ _ehCatch('gd.onSeatResume', e); }catch(__){} } }
+      turnSeatActive = -1;      // 本回合重新起算, 拿满死线
+      try{ clearTimers(); }catch(_){}   // 停掉替我托管的 aiTimer, 防接管瞬间 AI 抢先出牌(renderAll→armTurn 会重排)
+      renderAll();
     }
     const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
     const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
@@ -1684,7 +1701,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
 
     function renderCtrl(){
-      if (spectating){ els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
+      if (spectating){
+        els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn primary" id="gdResume">🙋 我回来了 · 接管座位</button></div>`;
+        const rb=$('#gdResume'); if(rb) rb.addEventListener('click', resumeSeat);
+        return;
+      }
       if (st.phase==='lobby'){ renderLobbyCtrl(); return; }
       if (st.phase==='tribute'){ renderTributeCtrl(); return; }
       if (isGuest && connState!=='online'){
@@ -2343,7 +2364,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
       _forceTimeout:()=>{ if(st.phase==='tribute') onTributeTimeout(); else onHumanTimeout(); }, missOf:s=>missStreak[s]||0,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }

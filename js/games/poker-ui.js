@@ -570,6 +570,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   防一人掉线空等卡死全桌。主动操作(含预选执行)即把该席计数清零。
     const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
@@ -597,6 +598,24 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 我离座旁观: 三处一起刷新(操作栏+桌心提示+底部提示), 否则 msg/hint 停在"轮到你/思考中"直到下次
       //   renderAll(灵魂真实思考要 2~7s)——那段窗口正是"操作栏旁观中↔桌心轮到你"自相矛盾的来源。
       try{ renderActs(true); if(seat===mySeat){ renderMsg(); renderMe(); } }catch(_){}
+    }
+    // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
+    //   德州: idleOut 把我这席置 isAI + 配灵魂人格代打; 接管须逆向(收回 isAI/人格)、归零连超时账、
+    //   清可能已排的 AI 代打, 复位回合起点(拿满死线)后 renderAll。联机的 host 重新入座由 onSeatResume 交 app。
+    function resumeSeat(){
+      if (!spectating) return;
+      spectating = false;
+      missStreak[mySeat] = 0;
+      isAI[mySeat] = false;                  // 收回托管: 该席重新归我(不再走 AI 驱动)
+      personaBySeat[mySeat] = null;
+      preAct = null;
+      const nm = (st.players[mySeat] && st.players[mySeat].name) || names[mySeat] || '我';
+      toast('已接管座位 · 重新上场', 2000);
+      try{ emitBeat({ type:'resume', actor:nm, text:'🙋 '+nm+' 回来了 · 接管座位' }); }catch(_){}
+      if (onSeatResume){ try{ onSeatResume(mySeat, { uid: ids?ids[mySeat]:null }); }catch(e){ _ehCatch('poker.onSeatResume', e); } }
+      turnSeatActive = -1; turnStreetActive = '';   // 本回合重新起算, 拿满死线
+      try{ clearTimers(); }catch(_){}               // 停掉替我托管的定时, 防接管瞬间 AI 抢先行动
+      renderAll();
     }
     // ── 招募态(lobby): 与斗地主/掼蛋同构 —— 开桌先落真牌桌页(本文件), 6 席里空位可点邀灵魂/真人,
     //   host 满意点「开始 ▶」→ startDeal 就地转正局(同一 room 不重挂)。招募态不产快照(无牌可泄, 见 renderAll onSync 守卫)。
@@ -1410,7 +1429,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (meSig === lastMeSig) return;
       lastMeSig = meSig;
       let hint='';
-      if (spectating){ madeStr=''; hint='🔭 已离座旁观 · 灵魂替你行动 · 想重玩点右上角返回再进桌'; }
+      if (spectating){ madeStr=''; hint='🔭 已离座旁观 · 灵魂替你行动 · 点下方"接管座位"随时回来'; }
       else if (st.phase==='seating'){ hint='🪑 等灵魂入座后开牌…'; }
       else if (st.phase==='waiting'){ hint='🎴 等房主发牌…'; }
       else if (st.phase==='over'){
@@ -1488,7 +1507,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (spectating){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        els.acts.innerHTML = actsWaitBar('🔭 旁观中 · 已离座 · 灵魂替你行动');
+        els.acts.innerHTML = `
+        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
+        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
+        <div class="pk-row"><button class="pk-b call" id="pkResume">🙋 我回来了 · 接管座位</button></div>`;
+        const rb=$('#pkResume'); if(rb) rb.addEventListener('click', resumeSeat);
         return;
       }
       const offline = isGuest && connState!=='online';
@@ -2310,7 +2333,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
       _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
       _bustSeat:(seat)=>{ if(st.players[seat]){ st.players[seat].stack=0; } stacks[seat]=0; },  // 测试: 把某席筹码清零(模拟输光)
       _nextHand:()=>nextHand(),              // 测试: 推进到下一手(触发离场/补位落地)

@@ -575,6 +575,7 @@ html[data-mode="day"] .ddz-center::before{
     //   host 侧对远程真人席同理: 连超时到阈值 → 移出 remoteSeats(即刻转 AI 托管)并请 app 落库离座, 防卡死全桌。
     const MAX_MISS = (typeof opts.maxMiss==='number' && opts.maxMiss>0) ? opts.maxMiss : 3;
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
+    const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
     let trustee = false;                    // 托管: 我这席交 AI 代打(叫分/加倍/出牌全自动), 直到手动收回
@@ -597,6 +598,22 @@ html[data-mode="day"] .ddz-center::before{
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
+    }
+    // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
+    //   旁观期间该席由 AI 托管; 接管时归零连超时账、清可能已排的 AI 代打, 再 renderAll 重武装本回合。
+    //   turnSeatActive/turnPhaseActive 复位 → 强制回合重新起算, 拿满额思考时长, 不接 AI 用剩的秒。
+    function resumeSeat(){
+      if (!spectating) return;
+      spectating = false;
+      missStreak[mySeat] = 0;
+      selected = new Set();
+      const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
+      toast('已接管座位 · 重新上场');
+      try{ emitBeat({ type:'resume', actor:nm, text:'🙋 '+nm+' 回来了 · 接管座位' }); }catch(_){}
+      if (onSeatResume){ try{ onSeatResume(mySeat); }catch(e){ try{ _ehCatch('ddz.onSeatResume', e); }catch(__){} } }
+      turnSeatActive = -1; turnPhaseActive = '';   // 本回合重新起算, 拿满死线
+      try{ clearTimers(); }catch(_){}              // 停掉替我托管的定时, 防接管瞬间 AI 抢先出牌
+      renderAll();
     }
     // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
     const lobbyMode = !!opts.lobby;                      // 首帧以招募态开桌(仅 host 走此路)
@@ -1516,7 +1533,11 @@ html[data-mode="day"] .ddz-center::before{
       if (winReveal){ els.ctrl.innerHTML = ''; return; }   // 制胜亮牌过渡: 先不弹"再来一局/收工", 让制胜手安静亮一拍
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'over'){ renderOverCtrl(); return; }
-      if (spectating){ els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost" disabled>🔭 旁观中 · 已离座</button></div>`; return; }
+      if (spectating){
+        els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" id="ddzResume">🙋 我回来了 · 接管座位</button></div>`;
+        const rb=$('#ddzResume'); if(rb) rb.addEventListener('click', resumeSeat);
+        return;
+      }
       // 托管中: 三阶段(叫分/加倍/出牌)统一交 AI, 控制条收成一枚"收回托管"钮(点掉即恢复手动)。
       if (trustee && (st.phase==='bid'||st.phase==='double'||st.phase==='play') && !(isGuest && awaitingHost)){
         els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn ghost trustee-on" id="ddzTrustee">🤖 托管中 · 点此收回</button></div>`;
@@ -2058,7 +2079,7 @@ html[data-mode="day"] .ddz-center::before{
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播脱敏快照(招募态无局可播)
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
       applyMove, setConn, connState:()=>connState,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); },
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
       _forceTimeout:()=>onHumanTimeout(), missOf:s=>missStreak[s]||0,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
