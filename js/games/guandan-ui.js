@@ -731,6 +731,30 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // 座位 isAI 用可变副本(startDeal 换名册要就地改): 灵魂/AI/空位=host 本机 AI 代打, 真人(非我)=远程席。
     let seatIsAI = (opts.isAI || [false,true,true,true]).slice();
 
+    // 命名统一(主人"机器人命名还不是花名, 全都规范一下"): 把【本机 AI 席】的兜底名「机器人N」(app.js
+    //   gtSeatArrays + SQL 座位号兜底)就地规范成一套花名(与 ddz/poker 同款池, 三游戏一致)。只动 AI 兜底名:
+    //   灵魂真名 / 真人名 / 远程席一律不碰(状态忠实)。botIdentityBySeat 缓存每席花名 → 换名册不跳名。
+    const BOT_POOL = [
+      {name:'阿岩',e:'🗿'},{name:'小凶',e:'🔥'},{name:'疯哥',e:'🤪'},{name:'冷面',e:'🥶'},
+      {name:'老练',e:'🧊'},{name:'莽夫',e:'😤'},{name:'狐狸',e:'🦊'},{name:'铁头',e:'🐗'},
+    ];
+    const botIdentityBySeat = {};
+    function normalizeBotNames(){
+      for (let s=0; s<names.length; s++){
+        if (s===mySeat || isRemote(s) || !(seatIsAI && seatIsAI[s])) continue;
+        if (!/^机器人\d*$/.test(names[s]||'')) continue;   // 只规范兜底名, 花名/灵魂名不动
+        let id = botIdentityBySeat[s];
+        if (!id){
+          const used = new Set(names.map((nm,i)=> i!==s ? nm : null).filter(Boolean));
+          const free = BOT_POOL.filter(b=>!used.has(b.name));
+          id = free.length ? free[Math.floor(secureRand()*free.length)] : BOT_POOL[s % BOT_POOL.length];
+          botIdentityBySeat[s]=id;
+        }
+        names[s]=id.name; avatars[s]=id.e;
+      }
+    }
+    normalizeBotNames();   // 开局先把兜底名「机器人N」统一成花名
+
     function newDeal(){
       return Engine.createGame({ isAI: seatIsAI, names,
         teamLevels: matchLevels, dealerTeam: matchDealer,
@@ -2373,6 +2397,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         if (Array.isArray(A.souls)) souls = A.souls.slice();   // 名册重组: 灵魂原型跟着换, 台词/节奏随之
         if (Array.isArray(A.remoteSeats)){ remoteSeats.length=0; A.remoteSeats.forEach(x=>remoteSeats.push(x)); }
       }
+      normalizeBotNames();   // 换名册后同样把本机 AI 兜底名统一成花名
       // 首局: 从头开一整场(保留 teamLevels/dealerTeam 初始化), 不能跳过 newDeal 的赛制逻辑
       dealNo = 0; prevResult = null;
       if (seed!=null) opts.seed = seed;

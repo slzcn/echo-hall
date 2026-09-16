@@ -569,6 +569,30 @@ html[data-mode="day"] .ddz-center::before{
     let counterOn = false;
     let remoteSeats = opts.remoteSeats || [];            // host 视角: 哪些席是远程真人(等其回传, 超时代打)。startDeal 时重赋
     const isRemote = (seat)=> remoteSeats.indexOf(seat) >= 0;
+    // 命名统一(主人诉求"斗地主机器人命名还不是花名, 全都规范一下"): 开局/补位兜底名「机器人N」(app.js
+    //   gtSeatArrays + SQL 的座位号兜底)看着像匿名机器, 与灵魂真名/德州花名不成体系。这里把【本机 AI 席】
+    //   的「机器人N」就地规范成一套花名(与 poker-ui 同款池, 跨游戏一致)。只动本机 AI 兜底名: 灵魂真名 /
+    //   真人名 / 远程席一律不碰(状态忠实, 不改别处身份)。botIdentityBySeat 缓存每席花名 → 换名册不跳名。
+    const BOT_POOL = [
+      {name:'阿岩',e:'🗿'},{name:'小凶',e:'🔥'},{name:'疯哥',e:'🤪'},{name:'冷面',e:'🥶'},
+      {name:'老练',e:'🧊'},{name:'莽夫',e:'😤'},{name:'狐狸',e:'🦊'},{name:'铁头',e:'🐗'},
+    ];
+    const botIdentityBySeat = {};
+    function normalizeBotNames(){
+      for (let s=0; s<names.length; s++){
+        if (s===mySeat || isRemote(s) || !(gameIsAI && gameIsAI[s])) continue;
+        if (!/^机器人\d*$/.test(names[s]||'')) continue;   // 只规范兜底名, 花名/灵魂名不动
+        let id = botIdentityBySeat[s];
+        if (!id){
+          const used = new Set(names.map((nm,i)=> i!==s ? nm : null).filter(Boolean));
+          const free = BOT_POOL.filter(b=>!used.has(b.name));
+          id = free.length ? free[Math.floor(secureRand()*free.length)] : BOT_POOL[s % BOT_POOL.length];
+          botIdentityBySeat[s]=id;
+        }
+        names[s]=id.name; avatars[s]=id.e;
+      }
+    }
+    normalizeBotNames();   // 开局先把兜底名「机器人N」统一成花名, 再据 names 建初始状态
     // ── 多次超时 → 自动离座旁观(主人诉求) ──
     //   真人连续 N 次「超时被代打」(而非主动操作)判定挂机: 自动离座, 该席转本机灵魂/AI 托管,
     //   本人转旁观(仍看牌、无操作)。积分靠 showOver 逐局已入库, 离座不丢分。
@@ -2066,6 +2090,7 @@ html[data-mode="day"] .ddz-center::before{
         if (Array.isArray(A.isAI)) gameIsAI = A.isAI;
         if (Array.isArray(A.remoteSeats)) remoteSeats = A.remoteSeats;
       }
+      normalizeBotNames();   // 换名册后同样把本机 AI 兜底名「机器人N」统一成花名
       closeInviteMenu();
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastLord=null; lastMyTurn=false; justCrowned=false; showOver._done=false;
