@@ -27,26 +27,28 @@ let pass=0,fail=0; const ok=(c,m)=>{ if(c){pass++;console.log('  ✓ '+m);}else{
       names:['你','机器人1','机器人2','机器人3'],avatars:['🙂','🤖','🤖','🤖'],isAI:[false,true,true,true],mySeat:0,onResult(){}}); });
   await page.waitForTimeout(900);
 
-  // 读每席 DOM "剩 N 张" + 是否有 🔔报牌 tag
-  const readSeats = ()=> page.evaluate(()=>{
+  // ★引擎手牌数 + 每席 DOM"剩 N 张"/报牌 tag 必须在【同一次 evaluate】里同步读取:
+  //   AI 由 afterMove 用 timer 自动推进, 若分两次 evaluate 读(引擎一次、DOM 一次),
+  //   两次之间可能恰好走了一手 → DOM 比引擎快一拍 → 假的"DOM显剩22 引擎实27"。
+  //   同帧读取时 DOM 恒等于引擎(渲染就是照 hand.length 出的), 竞态窗口归零。
+  const snapshot = ()=> page.evaluate(()=>{
+    const st=window._G.state();
     const seats=[...document.querySelectorAll('#hall .gd-seat[data-seat]')];
-    const out={};
+    const dom={};
     seats.forEach(s=>{ const seat=+s.dataset.seat; const b=s.querySelector('.cnt b');
       const n = b?parseInt(b.textContent,10):null;
       const alarm = !!s.querySelector('.gd-tag.alarm');
-      out[seat]={ n, alarm }; });
-    return out;
+      dom[seat]={ n, alarm }; });
+    return { phase:st.phase, players: st.players.map(p=>p.hand.length), dom };
   });
-  const engine = ()=> page.evaluate(()=>{ const st=window._G.state();
-    return { phase:st.phase, players: st.players.map(p=>p.hand.length) }; });
 
   // 若不是我的回合, 让 AI 一直走; 是我的回合就自动选提示出牌; 反复推进多手, 每手核对计数
   let mism=0, alarmBad=0, steps=0;
   for(let iter=0; iter<120; iter++){
-    const eng = await engine();
+    const snap = await snapshot();
+    const eng = snap; const dom = snap.dom;
     if(eng.phase!=='play') break;
-    // 核对每席 DOM 数字 vs 引擎
-    const dom = await readSeats();
+    // 核对每席 DOM 数字 vs 引擎(同帧, 无竞态)
     for(let s=0;s<4;s++){
       if(dom[s] && dom[s].n!=null && dom[s].n!==eng.players[s]){ mism++; if(mism<=3) console.log('  ✗ 席'+s+' DOM显剩'+dom[s].n+' 引擎实'+eng.players[s]); }
       const shouldAlarm = eng.players[s]<=2 && eng.players[s]>0;

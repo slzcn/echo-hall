@@ -71,7 +71,12 @@
       for (let size=2; size<=maxSize; size++){
         const wNeed = Math.max(0, size-cs.length);
         if (wNeed>nW) continue;
-        add(cs.slice(0, Math.min(size, cs.length)).concat(useW(wNeed)));
+        const natUse = Math.min(size, cs.length);
+        // ★炸弹(size≥4)必须用光该点数所有自然牌: 手握 5 张同点应整副打 5 炸, 不拆成 4 炸留 1 张孤儿
+        //   (主人反馈"5 张炸提示只让出 4 张, 那张干嘛?"; 且 5 炸本就强于任意 4 炸, 拆分永远更差)。
+        //   对/三(size 2/3)是正常子集(留其余牌另作他用), 不受此限。
+        if (size>=4 && natUse < cs.length) continue;
+        add(cs.slice(0, natUse).concat(useW(wNeed)));
       }
     }
     // 王对(同类两王成对: 双小王力16 / 双大王力17)+ 四大天王(四王齐)
