@@ -75,6 +75,7 @@
 .gd-room.is-land .gd-bar{padding-top:calc(3px + env(safe-area-inset-top,0px));padding-bottom:3px}
 .gd-room.is-land .gd-partner{padding:2px 8px 0}
 .gd-room.is-land #gdP2 .gd-tags{display:none}                 /* 横屏矮: 对家(顶部=必为队友)的标签行会压到中央横幅, 隐掉——顶部位置+名字着色已表意, 左右家的对手标签保留 */
+.gd-room.is-land .gd-peek{display:none}                       /* 横屏矮: "队友的牌"多牌面会压中央区, 横屏不展示(竖屏保留) */
 .gd-room.is-land .gd-mid{align-items:center}                 /* 左右家垂直居中于中段, 与中央出牌区一排, 不再上提到顶角撞手牌头 */
 .gd-room.is-land .gd-side{padding:0 2px}
 .gd-room.is-land .gd-center{min-height:0;padding:0 6px;gap:2px}
@@ -125,6 +126,9 @@
 .gd-partner .gd-avr{width:34px;height:34px;padding:2px}
 .gd-partner .gd-avr .av{font-size:16px}
 .gd-partner .nm{max-width:38vw}
+/* 顶部队友座位是横排 wrap-flex: 让"上一手 chip"与"队友的牌"各占一整行, 不再跟名字/标签挤成一团(残局乱版根因) */
+.gd-partner .gd-seat .gd-lastplay{flex-basis:100%;margin-top:2px}
+.gd-partner .gd-seat .gd-peek{flex-basis:100%}
 .gd-partner .gd-say{top:36px}
 .gd-mid{flex:1;display:flex;align-items:stretch;min-height:0}
 .gd-side{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 4px;flex:none}
@@ -221,12 +225,12 @@ html[data-mode="day"] .gd-center::before{
 .gd-peek .card.mini{margin:0}
 /* 常驻"上一手牌"(对标腾讯): 各席本圈最近出的牌小牌行常驻座位下方, 不用飞回中央才看清谁出了啥;
    "不出"则显灰 chip。桌心清空(新一圈)即整体消失。窄侧席(82px)用密叠, 长牌型不撑爆列。 */
-.gd-lastplay{display:flex;justify-content:center;flex-wrap:nowrap;align-items:center;margin-top:4px;min-height:38px}
-.gd-lastplay .card{width:24px;height:34px;margin-left:-14px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
-.gd-lastplay .card:first-child{margin-left:0}
-.gd-lastplay .card .cn{font-size:11px}.gd-lastplay .card .cs{font-size:8px;top:12px}.gd-lastplay .card .cc{font-size:13px}
-.gd-lastplay.dense .card{margin-left:-17px}
-.gd-lastplay .lp-pass{font-size:10px;font-weight:700;color:var(--sub,#86cbc6);border:1px solid var(--line2);border-radius:8px;padding:1px 8px;background:rgba(0,0,0,.28)}
+.gd-lastplay{display:flex;justify-content:center;align-items:center;margin-top:3px;min-height:20px}
+/* 常驻"上一手"chip: 牌型 + 张数, 一眼可读、不随张数挤成一条; 侧席/顶席窄也不溢 */
+.gd-lastplay .lp-chip{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;color:var(--ink,#eaf6ff);
+  border:1px solid var(--line2,rgba(0,229,212,.4));border-radius:9px;padding:1px 8px;background:rgba(0,0,0,.34);white-space:nowrap;line-height:1.5}
+.gd-lastplay .lp-chip i{font-style:normal;font-size:9px;font-weight:700;color:var(--sub,#86cbc6);font-variant-numeric:tabular-nums}
+.gd-lastplay .lp-chip.pass{color:var(--sub,#86cbc6);font-weight:700;border-color:var(--line,rgba(0,229,212,.24))}
 .gd-lastplay.fresh{animation:gdLpIn .22s ease-out}
 @keyframes gdLpIn{from{opacity:0;transform:translateY(-4px) scale(.92)}to{opacity:1;transform:none}}
 /* 中央 */
@@ -1441,11 +1445,16 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const a = trickActs[seat];
       if (!a) return '';
       const fresh = seat===_trickFresh ? ' fresh' : '';
-      if (a.pass) return `<div class="gd-lastplay${fresh}" data-lp="${seat}"><span class="lp-pass">不出</span></div>`;
+      if (a.pass) return `<div class="gd-lastplay${fresh}" data-lp="${seat}"><span class="lp-chip pass">不出</span></div>`;
       const cards = a.cards.map(findCardById).filter(Boolean);
       if (!cards.length) return '';
-      const dense = cards.length>=5 ? ' dense' : '';
-      return `<div class="gd-lastplay${dense}${fresh}" data-lp="${seat}">${cards.map(c=>cardEl(c, st.level, {mini:true}).outerHTML).join('')}</div>`;
+      // 常驻"上一手"改成【可读牌型 chip】: 旧版在座位下摞真实小牌面, 侧席/顶席窄→挤成 -14~-17px 重叠只露一条
+      //   谁也看不清"打的什么"(主人诉图); 而中央出牌区已把最新一手放大展示带牌型标+飞牌。故座位处只留一枚紧凑
+      //   chip(牌型 + 张数), 每席一眼看清各自本圈动作, 不再乱版/看不清。
+      const p = Rules.parse(cards, st.level);
+      const tl = p ? typeLabel(p) : '';
+      const label = tl || (cards.length + '张');
+      return `<div class="gd-lastplay${fresh}" data-lp="${seat}"><span class="lp-chip"><b>${escapeHtml(label)}</b><i>${cards.length}</i></span></div>`;
     }
     function renderTable(){
       if (counterOn) renderCounter();               // 记牌器开着时随桌面刷新未出张数/出牌历史
