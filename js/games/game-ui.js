@@ -79,9 +79,14 @@
 .ddz-room.is-land .ddz-opps .ddz-seat{flex-direction:row;width:auto;gap:7px;align-items:center;pointer-events:auto}
 .ddz-room.is-land .ddz-opps .ddz-seat .meta{align-items:flex-start;text-align:left}
 .ddz-room.is-land .ddz-center{min-height:0;gap:4px}
-/* 横屏中央区矮(~106px): 底分绝对定位 bottom:18% 会顶到居中的横幅→贴到底边; has-bottom 顶部空档也收薄 */
-.ddz-room.is-land .ddz-center.has-bottom{padding-top:30px}
-.ddz-room.is-land .ddz-mult{bottom:2px}
+/* 横屏中央区仅 ~109px 高, 却要竖叠 底牌(48)+横幅(12)+出牌(56)+底分, 垂直预算超载→三处重叠:
+   横幅压底牌 / 底分胶囊压在出的牌上 / 出牌区溢到"我"的座位行。
+   横屏 felt 是很扁的宽椭圆, 左右大片留白没用上: 把两个次要块从拥挤的中央竖列里抽出——
+   底牌钉左侧竖向居中、底分钉右侧竖向居中(都在对手席下方, 不撞), 中央列只留 横幅+出牌, 各归其位不叠。 */
+.ddz-room.is-land .ddz-center.has-bottom{padding-top:0}
+.ddz-room.is-land .ddz-bottom-cards{top:50%;left:8px;transform:translateY(-50%) scale(.72);transform-origin:left center}
+.ddz-room.is-land .ddz-bottom-cards .bc-lbl{display:none}   /* 横屏侧边: 底牌面朝上+位置已表意, "底牌"字样多余且会蹭到对手席"0分", 隐掉 */
+.ddz-room.is-land .ddz-mult{left:auto;right:12px;top:50%;bottom:auto;transform:translateY(-50%)}
 .ddz-room.is-land .ddz-played{min-height:50px}
 .ddz-room.is-land .ddz-me{padding:0 14px}
 .ddz-room.is-land .ddz-hand{min-height:74px}
