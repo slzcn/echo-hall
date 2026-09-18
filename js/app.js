@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-pk-ios-layout';
+window.__EH_APP_VER = '20260918-audio-exclusive';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -359,7 +359,7 @@ function detachBgmGestureUnlock(){
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
 function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
-function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on){ AudioEngine.stop(); try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} } else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
+function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); } if(!on){ AudioEngine.stop(); try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll('tts'); }catch(e){} } else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
     // 换房触发时先清过期 override（同房再进不清，续播用户生成曲）
@@ -5372,10 +5372,12 @@ function voiceHtml(src){
 let vAudio=null, vPlayEl=null;
 function stopVoice(){
   if(vAudio){ try{vAudio.pause();}catch(e){} vAudio=null; }
+  try{ if(window.EhAudioBus) window.EhAudioBus.release('voice'); }catch(e){}
   try{ if(typeof AudioEngine!=='undefined') AudioEngine.duck(false); }catch(e){} // 恢复 BGM 音量
   stopVoiceAvatarPulse();
   if(vPlayEl){ vPlayEl.classList.remove('playing'); vPlayEl=null; }
 }
+try{ window.stopVoice = stopVoice; }catch(e){}
 // 声波头像: 语音播放时, 把音频接 analyser, 让该消息发送者头像随振幅缩放跳动。
 let _vapRaf=0, _vapAv=null, _vapCtx=null, _vapSrc=null;
 function startVoiceAvatarPulse(wrap, audioEl){
@@ -5414,7 +5416,11 @@ document.addEventListener('click',e=>{
   const btn=wrap.querySelector('.vp-btn');
   if(wrap===vPlayEl){ stopVoice(); return; } // 再点当前正在播的 → 停
   stopVoice();
-  try{ if(typeof AudioEngine!=='undefined'){ AudioEngine.resume(); AudioEngine.duck(true); } }catch(e){} // 激活音频上下文+压低BGM
+  // 人声互斥: 语音消息独占 —— 停 BGM + 压软音效; 与 TTS 不叠
+  try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+  try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll('tts'); }catch(e){}
+  try{ if(window.EhAudioBus) window.EhAudioBus.hold('voice'); }catch(e){}
+  try{ if(typeof AudioEngine!=='undefined'){ AudioEngine.resume(); AudioEngine.duck(true); } }catch(e){}
   const src=(wrap.dataset.src||'').split('#')[0];
   if(!src){ toast(EH_CONFIG.text.err_voiceUrl); return; }
   const a=new Audio(src);
@@ -5423,7 +5429,13 @@ document.addEventListener('click',e=>{
   wrap.classList.add('playing');
   try{ startVoiceAvatarPulse(wrap, a); }catch(e){}   // 声波头像: 发送者头像随振幅跳动
   a.onended=()=>{ if(vPlayEl===wrap) stopVoice(); };
-  a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };   // 仅当仍在播本条才报错; 主动 stopVoice(vPlayEl 已置空)不弹
+  a.onerror=()=>{ if(vPlayEl===wrap){ toast(EH_CONFIG.text.err_voiceLoad); stopVoice(); } };
+  // iOS 部分情况 ended 不触发 → 估时兜底释放人声锁
+  try{
+    const durM=/[#&]dur=(\d+)/.exec(String(wrap.dataset.src||''));
+    const est=((durM && +durM[1]) || 8)*1000+1500;
+    setTimeout(()=>{ if(vPlayEl===wrap) stopVoice(); }, est);
+  }catch(e){}
   a.play().then(()=>{}).catch(err=>{
     // ★ AbortError = 用户主动暂停/切换打断了 play()(stopVoice 里 pause), 非真实失败, 静默; 已被接管(vPlayEl变了)也静默
     if((err&&err.name==='AbortError') || vPlayEl!==wrap) return;
@@ -5874,6 +5886,7 @@ function stopSong(){
   try{ if(typeof stopMasterPreview==='function') stopMasterPreview(); }catch(_){}   // 播真歌/停止时连带停母版前奏预览
   if(!curSong) return;
   AudioEngine.duck(false);   // 恢复官方房 BGM 音量
+  try{ if(window.EhAudioBus) window.EhAudioBus.release('song'); }catch(_){}
   const s=curSong; curSong=null;
   s.timeouts.forEach(clearTimeout);
   s.oscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
@@ -5932,6 +5945,7 @@ function stopMasterPreview(mid){
   const p=_masterPreview; _masterPreview=null;
   try{ const a=p.audioEl; if(a){ a.onended=null; a.ontimeupdate=null; a.pause(); a.src=''; a.load&&a.load(); } }catch(_){}
   try{ AudioEngine.duck(false); }catch(_){}
+  try{ if(window.EhAudioBus) window.EhAudioBus.release('song'); }catch(_){}
   // 卡片去掉"预览中"高亮
   try{ const card=document.querySelector(`.msg[data-mid="${p.mid}"] .song-card`); if(card) card.classList.remove('previewing'); }catch(_){}
 }
@@ -5954,6 +5968,7 @@ function startMasterPreview(mid, masterUrl, introEnd){
     }
     _masterPreview={ audioEl:a, mid:String(mid), token:myToken };
     try{ AudioEngine.duck(true); }catch(_){}
+    try{ if(window.EhAudioBus) window.EhAudioBus.hold('song'); }catch(_){}
     try{ const card=document.querySelector(`.msg[data-mid="${mid}"] .song-card`); if(card) card.classList.add('previewing'); }catch(_){}
     // play() 必须在点击同步链里(sendSong 由发送手势触发) → 不受移动端 autoplay 静音限制
     a.play().then(()=>{}).catch(err=>{
@@ -5992,6 +6007,7 @@ function playSongAI(el, onEnd){
   //   匀速线性, 不硬上逐字。清唱(acapella)另有专属逐字表分支(buildAcapellaOnsets), jazz/gufeng/rnb 走 warp。
   const VOCAL_WARP_STYLES=new Set(['jazz','gufeng','rnb']);
   try{ AudioEngine.duck(true); }catch(_){ _ehCatch('playSongAI',_); }
+  try{ if(window.EhAudioBus) window.EhAudioBus.hold('song'); }catch(_){}
   el.classList.add('loading');
   const a=new Audio();
   a.preload='auto';
@@ -6149,6 +6165,7 @@ async function playSongLegacy(lyric, sid, el, onEnd){
   const chars=[...String(lyric)].filter(c=>c.trim()).slice(0,60);   // 与 encodeSong 上限/卡片渲染字数一致(原30会漏唱后半)
   if(!chars.length){ toast(EH_CONFIG.text.sing_noContent); return; }
   AudioEngine.duck(true);   // 压低官方房 BGM, 突出神曲人声
+  try{ if(window.EhAudioBus) window.EhAudioBus.hold('song'); }catch(_){}
   try{
   const hasTTS = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   const master=ctx.createGain(); master.gain.value=0.85; master.connect(ctx.destination);
@@ -6225,6 +6242,7 @@ async function playSongLegacy(lyric, sid, el, onEnd){
     // 合成/调度中途异常(老旧内核 oscillator 抛错等): 恢复 BGM + 停歌清理, 不让卡片卡在 playing 或 BGM 永久压低
     console.warn('playSongLegacy',err);
     try{ AudioEngine.duck(false); }catch(_){ _ehCatch('playSongLegacy',_); }
+    try{ if(window.EhAudioBus) window.EhAudioBus.release('song'); }catch(_){}
     try{ stopSong(); }catch(_){ _ehCatch('playSongLegacy',_); }
     toast('播放失败');
   }
