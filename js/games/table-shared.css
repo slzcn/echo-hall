@@ -250,18 +250,50 @@ html.pwa-standalone .pk-bar{
   padding: 3px 10px !important;
   font-size: 11.5px !important;
 }
-/* 关闭按钮: 更好按 (36px 高, 逼近 44 触控线又不撑高紧凑顶栏) */
-/* ★.pk-x 已改纯图标圆钮(width:36px;padding:0;border-radius:50%), 不再套这条旧"✕ 返回"文字钮规则:
- *   padding:0 13px 会挤扁 36px 圆盒破坏圆形 + 无底色让它比音乐/横屏钮"空、不饱满"(主人反馈)。
- *   德州返回钮的饱满玻璃底改由下方玻璃圆盘选择器统一给(含 .pk-x), hover 走 poker-ui.js 内联红调。 */
-.ddz-x, .gd-x{
+/* 顶栏功能钮(三游戏统一·对齐德州): 一律 36px 磨砂玻璃圆钮, 不再给 ddz-x/gd-x 文字胶囊 padding */
+.ddz-mus, .ddz-cnt, .ddz-auto, .ddz-rot, .ddz-x,
+.gd-mus, .gd-rot, .gd-x,
+.pk-mus, .pk-rot, .pk-x{
+  width: 36px !important;
   height: 36px !important;
-  padding: 0 13px !important;
-  font-size: 12.5px !important;
-  transition: background .14s, border-color .14s;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  font-size: 14px !important;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--sub, #86cbc6);
+  border: 1px solid var(--line, rgba(0,229,212,.24));
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.10), transparent 62%),
+    rgba(255,255,255,.035) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 2px 6px rgba(0,0,0,.26) !important;
+  transition: transform .14s cubic-bezier(.2,.85,.3,1), color .14s, border-color .14s, box-shadow .14s;
 }
-@media (hover:hover){
-  .ddz-x:hover, .gd-x:hover{ background: rgba(0, 229, 212, .08); }
+/* 顶栏布局: 标题靠左, 功能钮靠右(mus 起 auto 右推) — 三款同一节奏 */
+.ddz-bar, .gd-bar, .pk-bar{
+  gap: 8px !important;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+  padding-bottom: 8px !important;
+}
+.ddz-mus, .gd-mus, .pk-mus{ margin-left: auto !important; }
+html[data-mode="day"] .ddz-mus, html[data-mode="day"] .ddz-cnt, html[data-mode="day"] .ddz-auto,
+html[data-mode="day"] .ddz-rot, html[data-mode="day"] .ddz-x,
+html[data-mode="day"] .gd-mus, html[data-mode="day"] .gd-rot, html[data-mode="day"] .gd-x,
+html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-rot, html[data-mode="day"] .pk-x{
+  background:
+    radial-gradient(circle at 50% 30%, #ffffff, transparent 66%),
+    rgba(255,255,255,.6) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.12) !important;
+  color: #0a3d38;
+  border-color: rgba(0,127,118,.28) !important;
 }
 
 /* ── E. 座位卡片化 (在原有 conic 高亮环之外补一层玻璃底) ──── */
@@ -305,12 +337,65 @@ html[data-mode="day"] .pk-avr .av{
 }
 /* 掼蛋的 gd-tag (队友/等级/警戒) 字号从 9px 提到 10.5px, 更容易识别 */
 .gd-room .gd-tag{ font-size: 10.5px !important; padding: 1px 6px !important; }
-/* 座位下方浮泡的"表情包/话"更"聊天感": 加箭头小三角+微光 */
+/* 说话气泡/下注色块: 夜间不再糊成死黑 —— 提高底色明度与文字对比(主人反馈"太黑看不清字") */
 .ddz-say, .gd-say, .pk-say{
   border-radius: 12px !important;
-  background: rgba(19, 42, 41, .92) !important;
-  border-color: rgba(0, 229, 212, .32) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+  background:
+    linear-gradient(180deg, rgba(48, 86, 80, .94), rgba(28, 54, 52, .90)) !important;
+  color: var(--ink, #eaf6ff) !important;
+  font-weight: 600 !important;
+  border-color: rgba(0, 229, 212, .48) !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .32),
+    inset 0 1px 0 rgba(255,255,255,.10) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.35);
+}
+html[data-mode="day"] .ddz-say,
+html[data-mode="day"] .gd-say,
+html[data-mode="day"] .pk-say{
+  background:
+    linear-gradient(180deg, rgba(236, 250, 247, .96), rgba(210, 236, 230, .92)) !important;
+  color: #062822 !important;
+  border-color: rgba(0, 127, 118, .35) !important;
+  text-shadow: none;
+}
+/* 下注/底池/倍数: 琥珀字 + 可读深金底, 拒绝纯黑块 */
+.pk-pot, .pk-commit, .ddz-mult, .pk-potpart{
+  background:
+    linear-gradient(180deg, rgba(62, 48, 16, .82), rgba(36, 28, 8, .78)) !important;
+  color: var(--amber, #ffc24d) !important;
+  border-color: rgba(255, 194, 77, .48) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 2px 8px rgba(0,0,0,.28) !important;
+}
+html[data-mode="day"] .pk-pot,
+html[data-mode="day"] .pk-commit,
+html[data-mode="day"] .ddz-mult,
+html[data-mode="day"] .pk-potpart{
+  background:
+    linear-gradient(180deg, rgba(255, 244, 210, .95), rgba(255, 230, 170, .9)) !important;
+  color: #5a3c00 !important;
+  border-color: rgba(180, 120, 20, .35) !important;
+  text-shadow: none;
+}
+/* 操作区底: 统一深青玻璃, 不要纯黑幕布 */
+.pk-acts, .ddz-acts, .gd-acts, .ddz-bidbar{
+  background:
+    linear-gradient(180deg, rgba(10, 22, 28, .55), rgba(6, 12, 16, .72)) !important;
+  border-top: 1px solid rgba(0, 229, 212, .14);
+}
+/* 结算遮罩略提亮, 面板文字更清晰 */
+.ddz-over, .gd-over, .pk-over{
+  background: rgba(8, 14, 20, .72) !important;
+}
+.ddz-over-panel, .gd-over-panel, .pk-over-card{
+  background:
+    linear-gradient(180deg, rgba(24, 48, 46, .94), rgba(12, 24, 28, .92)) !important;
+  border: 1px solid rgba(0, 229, 212, .28) !important;
+  color: var(--ink, #eaf6ff) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06) !important;
 }
 
 /* ── F. Conn pill 统一: 圆角一致, 高度对齐 title chip ────── */
@@ -546,3 +631,99 @@ html.pwa-standalone .gt-lobby-bar{ padding-top: max(calc(10px + env(safe-area-in
 /* 招募页里的牌桌卡去掉聊天流里的外边距/入场动画包裹感 */
 .gt-lobby-body .gt-card{ margin: 0 !important; }
 .gt-card-openable{ cursor: pointer; }
+
+/* ══════════════════════════════════════════════════════════════
+   N. 牌桌结构锁定 (主人: 出牌过程中桌面不要跳 · 兼顾横屏)
+   固定 顶栏 / 对手席带 / 操作区 / 手牌托盘 的高度与骨架,
+   标签与「上一手」只改内容不改布局占位。
+   ══════════════════════════════════════════════════════════════ */
+.ddz-bar, .gd-bar, .pk-bar{
+  min-height: calc(52px + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
+  flex-shrink: 0 !important;
+}
+html.pwa-standalone .ddz-bar,
+html.pwa-standalone .gd-bar,
+html.pwa-standalone .pk-bar{
+  min-height: max(calc(52px + env(safe-area-inset-top, 0px)), 58px);
+}
+/* 对手席带: 固定高度, 头像/名字/张数/标签/上一手 各行占位稳定 */
+.ddz-opps, .gd-partner, .gd-mid{
+  flex-shrink: 0;
+}
+.ddz-opps{ min-height: 108px; }
+.gd-partner{ min-height: 96px; }
+.gd-mid{ min-height: 120px; }
+.gd-side{ min-width: 84px; }
+.ddz-seat, .gd-seat, .pk-seat{
+  min-height: 88px;
+  box-sizing: border-box;
+}
+.gd-partner .gd-seat{ min-height: 72px; }
+/* 标签行 / 上一手行: 永远占位, 增删 chip 不再撑跳布局 */
+.gd-tags, .ddz-seat .role{
+  min-height: 16px;
+  line-height: 16px;
+}
+.gd-lastplay, .ddz-seat-reveal, .pk-mini-hole{
+  min-height: 22px;
+  line-height: 20px;
+}
+.pk-mini-hole{ min-height: 34px; }
+.pk-mini-hn{ min-height: 14px; }
+/* 操作区 / 手牌托盘: 底部骨架锁死, 横竖屏切换只换排数不改外框节奏 */
+.ddz-ctrl, #ddzCtrl, .gd-foot, .pk-acts{
+  min-height: 88px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.gd-foot{ min-height: 92px; }
+.ddz-hand-wrap, .gd-hand-wrap{
+  flex-shrink: 0;
+  min-height: 108px;
+  box-sizing: border-box;
+}
+.ddz-room.is-land .ddz-hand-wrap,
+.gd-room.is-land .gd-hand-wrap{
+  min-height: 86px;
+}
+.pk-me, .gd-me-row, .ddz-me{
+  flex-shrink: 0;
+  min-height: 64px;
+}
+/* 选牌一致性(三游戏): 选中抬起量/光晕同一套语言, 理牌后重选也一眼可辨 */
+.ddz-hand .card.sel,
+.gd-hand-row .card.sel,
+.gd-hand .card.sel{
+  transform: translateY(-22px) !important;
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.45),
+    0 0 0 2px var(--accent, #00e5d4),
+    0 0 16px rgba(0,229,212,.55) !important;
+  filter: brightness(1.12);
+  z-index: 5;
+}
+.gd-hand.has-sel .gd-hand-row .card:not(.sel){
+  opacity: .55;
+  filter: saturate(.75) brightness(.85);
+}
+.gd-hand-row .card.sel,
+.ddz-hand .card.sel{
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s;
+}
+/* 提示命中组: 与选中同语言 + 轻微呼吸, 理牌后的「这一组」更醒目 */
+.ddz-hand .card.sel.hintpop,
+.gd-hand .card.sel.hintpop{
+  animation: ehHintPop .34s cubic-bezier(.2,.85,.3,1);
+}
+@keyframes ehHintPop{
+  0%{ transform: translateY(0) scale(1); }
+  45%{ transform: translateY(-26px) scale(1.04); }
+  100%{ transform: translateY(-22px) scale(1); }
+}
+/* 横屏: 座位弧与桌心已由各 UI 几何处理; 这里只保证骨架 min-height 不被 land 媒体查询吃掉 */
+.ddz-room.is-land .ddz-opps{ min-height: 92px; }
+.gd-room.is-land .gd-partner{ min-height: 78px; }
+.gd-room.is-land .gd-mid{ min-height: 100px; }
+.pk-room.is-land .pk-acts{ min-height: 72px; }
+.pk-room.is-land .pk-me{ min-height: 56px; }

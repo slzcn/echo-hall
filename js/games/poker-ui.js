@@ -665,6 +665,55 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;  // 首手庄家在我上家, 我不当第一个庄
 
     function aliveSeats(){ return stacks.map((v,i)=> v>0?i:-1).filter(i=>i>=0); }
+    // ── 每局空位概率补位(主人): 离场空席在开下一手前按概率补上 —— 有灵魂优先灵魂, 否则机器人 ──
+    //   灵魂/机器人视为同一类「对战补位」; 联机 host 有 lobbyCtx.seatSoul 时优先走 DB 灵魂席。
+    const VACANT_FILL_P = 0.48;   // 每空席每局补位概率
+    function vacantSeatsForFill(){
+      const out=[];
+      for (let s=0;s<n;s++){
+        if (s===mySeat) continue;
+        if (isRemote(s)) continue;   // 远程真人席由真人自己回座, 不自动补
+        const vac = vacated[s] || (stacks[s]<=0 && !(st && st.players && st.players[s] && !st.players[s].sitOut && st.players[s].stack>0));
+        const sitOutEmpty = st && st.players && st.players[s] && (st.players[s].sitOut || st.players[s].kind==='empty');
+        if (vac || sitOutEmpty) out.push(s);
+      }
+      return out;
+    }
+    function autoFillVacants(){
+      if (isGuest || !st || st.phase==='lobby') return 0;
+      const empties = vacantSeatsForFill();
+      if (!empties.length) return 0;
+      let filled=0;
+      empties.forEach(seat=>{
+        if (Math.random() > VACANT_FILL_P) return;
+        const free = freeSoulsForSeat();
+        const acts = (lobbyCtx && lobbyCtx.actions) || null;
+        if (free.length && acts && typeof acts.seatSoul==='function'){
+          const s = free[0];
+          try{
+            acts.seatSoul(seat, s.auth_uid);
+            // DB 异步生效前本机先占位(灵魂身份), 名册回来后 updateRoster 以 DB 为准
+            names[seat]=s.name||'灵魂'; avatars[seat]=s.e||s.emoji||'👤';
+            isAI[seat]=true; if(ids) ids[seat]=s.auth_uid;
+            if (souls) souls[seat]={ archetype:null, name:s.name, emoji:s.emoji };
+            stacks[seat]=START; buyin[seat]=(buyin[seat]||0)+START; netSettled[seat]=0;
+            vacated[seat]=false; vacatedUid[seat]=null;
+            personaBySeat[seat]=personaFor(seat);
+            filled++;
+            try{ emitBeat({ type:'join', actor:s.name||'灵魂', text:'🪝 '+(s.name||'灵魂')+' 补位入座' }); }catch(_){}
+            toast((s.name||'灵魂')+' 补位 · 本局入座');
+          }catch(_){ inviteBot(seat, false); filled++; }
+          return;
+        }
+        inviteBot(seat, false);
+        filled++;
+      });
+      if (filled){
+        try{ saveScore(); }catch(_){}
+        try{ renderOpponents(true); positionSeats(); }catch(_){}
+      }
+      return filled;
+    }
 
     // ── 机器人输光离场 + 手动邀请补位(主人诉求) ──────────────────────────────
     //   对手(机器人/灵魂)把筹码输光 → 不再无限自动补带, 而是【离场】: 座位空出、标 vacated,
@@ -1058,25 +1107,45 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.pk-lobby-empty,.pk-vacant'))) closeInviteMenu();
     }
     function closeInviteMenu(){ const m=room.querySelector('.pk-invite-menu'); if(m) m.remove(); document.removeEventListener('click', _imAway, true); }
+    // 灵魂/机器人【同一类对战补位】: 有空闲灵魂且 host 通道可用 → 优先灵魂; 否则本机机器人。
+    //   主人: "不需要分别对待, 有灵魂在的优先灵魂补位"。局中/招募态共用此入口。
+    function freeSoulsForSeat(){
+      const acts = (lobbyCtx && lobbyCtx.actions) || null;
+      if (!acts || typeof acts.seatSoul !== 'function') return [];
+      const all = ((lobbyCtx && lobbyCtx.souls) || []).filter(s => s && s.auth_uid);
+      const used = new Set((ids || []).filter(Boolean));
+      return all.filter(s => !used.has(s.auth_uid));
+    }
+    function fillSeat(dbSeat){
+      const free = freeSoulsForSeat();
+      const acts = (lobbyCtx && lobbyCtx.actions) || null;
+      if (free.length && acts && acts.seatSoul){
+        const s = free[0];
+        try{ acts.seatSoul(dbSeat, s.auth_uid); }catch(e){ inviteBot(dbSeat); return; }
+        try{ closeInviteMenu(); }catch(_){}
+        sfx('click');
+        toast((s.name || '灵魂') + ' 补位 · 下一手入座');
+        return;
+      }
+      inviteBot(dbSeat);
+    }
     function openInviteMenu(dbSeat, anchorEl){
       closeInviteMenu();
       const acts = (lobbyCtx && lobbyCtx.actions) || null;
-      const souls = ((lobbyCtx && lobbyCtx.souls)||[]).filter(s=>s&&s.auth_uid);
+      const free = freeSoulsForSeat();
       const menu=document.createElement('div'); menu.className='pk-invite-menu';
       let html='<div class="im-ttl">邀请入座</div>';
-      html+='<button class="im-item" data-bot="1">🤖 邀请机器人</button>';   // 纯本机, 无需 DB, 下一手加入
+      // 单一补位入口: 有灵魂显「灵魂优先」, 无灵魂显「对战补位」(内部仍走机器人)
+      html += free.length
+        ? `<button class="im-item" data-fill="1">🤝 补位 · 灵魂优先</button>`
+        : `<button class="im-item" data-fill="1">🤖 补位 · 邀请对战</button>`;
       if(acts && acts.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
-      if(acts && acts.seatSoul){
-        html += souls.length ? '<div class="im-sep">灵魂</div>' : '<div class="im-empty">房里暂无灵魂</div>';
-        souls.forEach(s=>{ html+=`<button class="im-item" data-soul="${escapeHtml(s.auth_uid)}">${escapeHtml((s.emoji||'👤')+s.name)}</button>`; });
-      }
       menu.innerHTML=html;
       room.appendChild(menu);
       const rr=room.getBoundingClientRect(), ar=anchorEl.getBoundingClientRect();
       menu.style.left=Math.min(Math.max(8, ar.left-rr.left+ar.width/2-90), Math.max(8, rr.width-188))+'px';
       menu.style.top=Math.min(ar.bottom-rr.top+6, rr.height-60)+'px';
-      const bot=menu.querySelector('[data-bot]'); if(bot) bot.onclick=()=>{ inviteBot(dbSeat); };   // inviteBot 内会 closeInviteMenu
-      menu.querySelectorAll('[data-soul]').forEach(b=> b.onclick=()=>{ if(acts&&acts.seatSoul) acts.seatSoul(dbSeat, b.dataset.soul); closeInviteMenu(); });
+      const fill=menu.querySelector('[data-fill]'); if(fill) fill.onclick=()=>{ fillSeat(dbSeat); };
       const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ if(acts&&acts.inviteHumans) acts.inviteHumans(); closeInviteMenu(); };
       sfx('click');
       setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
@@ -2098,7 +2167,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const invOnBtn = over.querySelector('#pkInviteOn');
       if (invOnBtn) invOnBtn.addEventListener('click', ()=>{ stopAuto();
         st.players.forEach(p=> { if(!p.sitOut) stacks[p.seat]=p.stack; });   // 固化本手结果(我的筹码)
-        for (let s=0;s<n;s++){ if (s!==mySeat && !isRemote(s) && stacks[s]<=0){ vacated[s]=true; inviteBot(s, false); } }  // 先全部补位, 不逐个续打
+        // 每局空位概率补位(灵魂优先→机器人): 不再焊死“一离光就全员机器人”
+        try{ autoFillVacants(); }catch(_){}
+        // 兜底: 仍无人可打时再全量机器人续桌, 免空桌卡死
+        for (let s=0;s<n;s++){ if (s!==mySeat && !isRemote(s) && stacks[s]<=0){ vacated[s]=true; inviteBot(s, false); } }
         if (curOver && curOver.parentNode) curOver.remove();
         try{ hideWinBanner(); }catch(_){}
         if (aliveSeats().length>=2) nextHand();                  // 填完统一开新一手
@@ -2181,11 +2253,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       //   只同步"本手在座(非 sitOut)"席的结果: 空缺席/刚受邀补位席未参与本手, 其筹码以 stacks 为准(0=空 / START=新补位), 不被 st.players 的 0 覆盖。
       st.players.forEach(p=> { if (!p.sitOut) stacks[p.seat]=p.stack; });
       applyPendingRoster();
-      // 对手都离场了(在座不足 2 人): 不强发牌, 停在结算态 —— 台面空位可点邀请补位, 邀满 2 人自动续打(见 inviteBot)。
+      // ★每局空位概率补位(主人): 灵魂优先, 否则机器人 —— 桌面不至于长期空席
+      try{ autoFillVacants(); }catch(_){}
+      // 对手都离场了(在座不足 2 人): 概率补位后仍不够 → 停在结算态等手动/下一轮概率补
       if (aliveSeats().length < 2){
-        try{ toast('桌上没有对手了 · 点空位＋邀请补位', 3200); }catch(_){}
-        renderOpponents(true); positionSeats();
-        return;
+        try{ autoFillVacants(); }catch(_){}
+        if (aliveSeats().length < 2){
+          try{ toast('桌上没有对手了 · 点空位＋邀请补位', 3200); }catch(_){}
+          renderOpponents(true); positionSeats();
+          return;
+        }
       }
       button = (button+1)%n;
       handNo++;
@@ -2353,6 +2430,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
       isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
+      fillSeat, freeSoulsForSeat, autoFillVacants, vacantSeatsForFill,
       _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
       _bustSeat:(seat)=>{ if(st.players[seat]){ st.players[seat].stack=0; } stacks[seat]=0; },  // 测试: 把某席筹码清零(模拟输光)
       _nextHand:()=>nextHand(),              // 测试: 推进到下一手(触发离场/补位落地)

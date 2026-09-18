@@ -340,8 +340,9 @@ assert(/removeChannel\((?:gtChan|leavingGtChan)\)/.test(src) && /_gtTables\.clea
 assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席)');
 assert(/SEAT_L\s*=\s*\(mySeat\+1\)%4/.test(ui) && /SEAT_T\s*=\s*\(mySeat\+2\)%4/.test(ui) && /SEAT_R\s*=\s*\(mySeat\+3\)%4/.test(ui),
   '座位槽位绕 mySeat 相对旋转·顺时针(下家+1 落左/队友+2 上/上家+3 落右)');
-assert(/seatHTML\(SEAT_T\)/.test(ui) && /seatHTML\(SEAT_L\)/.test(ui) && /seatHTML\(SEAT_R\)/.test(ui),
-  'renderSeats 用旋转后槽位(非写死 1/2/3)');
+assert(/SEAT_T/.test(ui) && /SEAT_L/.test(ui) && /SEAT_R/.test(ui) && /seatHTML\(/.test(ui),
+  'renderSeats 用旋转后槽位 SEAT_T/L/R + seatHTML');
+assert(/seatSig|_seatSigs/.test(ui), 'renderSeats 签名增量(出牌过程座位不整段重建跳动)');
 // newDeal 读可变的 seatIsAI(初值 = opts.isAI.slice()); 招募态 startDeal 就地改 seatIsAI 元素 → 换名册后重发牌仍按座位实况标人/机(与斗地主 gameIsAI 同构)。
 assert(/let seatIsAI\s*=\s*\(opts\.isAI/.test(ui), 'seatIsAI 初值取自 opts.isAI(host 按座位实况标人/机)');
 assert(/isAI:\s*seatIsAI/.test(ui), 'newDeal 吃 seatIsAI(可变副本, startDeal 就地换座后重发牌一致)');

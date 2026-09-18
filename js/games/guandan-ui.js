@@ -803,6 +803,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : newDeal());
     let selected = new Set();
     let hintCycle = [], hintIdx = 0;
+    let _lastTapId = null, _lastTapAt = 0;   // 双触选组
 
     function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
     function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
@@ -1100,6 +1101,43 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if(c) paintTo(c);
     }
     const clearPend=()=>{ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } pendCard=null; pendId=null; };
+    // 双击/双触一张牌 → 选中它所在的成型组(理牌后重选极关键)
+    //   优先: 手动 rows→runGroups 排定顺序 → 按牌型 arrangeGroups → 同点数全部
+    function groupOfCard(id){
+      const hand=(st.players[mySeat] && st.players[mySeat].hand) || [];
+      const byId=new Map(hand.map(c=>[c.id,c]));
+      if (!byId.has(id)) return null;
+      let groups=null;
+      if (rows){
+        const ordered=[];
+        (rows.top||[]).concat(rows.bot||[]).forEach(x=>{ if(byId.has(x)) ordered.push(byId.get(x)); });
+        hand.forEach(c=>{ if(!ordered.some(x=>x.id===c.id)) ordered.push(c); });
+        groups=runGroups(ordered);
+      } else if (sortMode==='combo' && canCombo() && root.EHGuandanAI){
+        groups=root.EHGuandanAI.arrangeGroups(hand, st.level);
+      } else {
+        groups=runGroups(Rules.sortHand(hand, st.level));
+      }
+      if (groups){
+        const hit=groups.find(g=>g && g.some(c=>c.id===id));
+        if (hit && hit.length>=2) return hit;
+      }
+      const card=byId.get(id);
+      const same=hand.filter(c=>c.rank===card.rank && !Rules.isWild(c, st.level));
+      return same.length>=2 ? same : null;
+    }
+    function selectGroupOfCard(id){
+      const g=groupOfCard(id);
+      if (!g || !g.length){ sfx('click'); return; }
+      selected=new Set(g.map(c=>c.id));
+      hintCycle=[]; hintIdx=0;
+      if (autoExtendSelection()){}
+      renderHand(); updatePlayBtn(); sfx('cardsel');
+      try{
+        const p=Rules.parse([...selected].map(findCardById).filter(Boolean), st.level);
+        toast(p ? ('已选整组 · '+typeLabel(p)) : '已选同组牌', 1400);
+      }catch(_){}
+    }
     els.hand.addEventListener('pointerdown', (e)=>{
       if(st.phase==='tribute'){ tributeTap(e); return; }  // 手动进贡/还贡: 点候选牌单选
       if(arrangeMode){ startReorder(e); return; }         // 显式整理态: 直接拖排(保留, 作双排整理快捷入口)
@@ -1108,6 +1146,15 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       const c=handCardAt(e.clientX,e.clientY);
       // 点手牌托盘空白处(牌间/两侧留白)= 取消选牌: 手牌条不在 .gd-felt 里, felt 的"点绒面取消"覆盖不到这块。
       if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
+      // 双触选组: 理牌/按牌型后, 一点选整组, 再微调单张 —— 主人诉求"重新选某几张手动理牌要非常易操作"
+      const nowTs=Date.now();
+      if (_lastTapId===c.dataset.id && nowTs-_lastTapAt<340){
+        _lastTapId=null; _lastTapAt=0; clearPend();
+        selectGroupOfCard(c.dataset.id);
+        e.preventDefault();
+        return;
+      }
+      _lastTapId=c.dataset.id; _lastTapAt=nowTs;
       // 挂起判定: 300ms 内不动且不抬 → 拿起拖动; 中途移动>8px → 转划选; 快抬 → 点选。
       pendCard=c; pendId=c.dataset.id; pendX=e.clientX; pendY=e.clientY;
       try{ els.hand.setPointerCapture(e.pointerId); }catch(_){}
@@ -1360,21 +1407,54 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (badge) tags.push(`<span class="gd-tag rank">${badge}</span>`);
       if (alarm) tags.push(`<span class="gd-tag alarm">🔔 报牌</span>`);
       const isWin = st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam;
+      // 结构锁定: tags / lastplay 恒在 DOM(空也占位), 出牌过程中增删标签不撑跳座位
       return `<div class="gd-seat${st.turn===seat&&st.phase!=='over'?' turn':''}${isLast?' last':''}${isMate?' mate':''}${alarm?' alarm':''}${isWin?' win':''}" data-seat="${seat}" style="--p:360">
         <div class="gd-avr"><div class="av">${avatars[seat]||'🤖'}</div><span class="gd-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="cnt">剩 <b>${p.hand.length}</b> 张</div>
         <div class="gd-tags">${tags.join('')}</div>
-        ${lastPlayHTML(seat)}
+        ${lastPlayHTML(seat) || '<div class="gd-lastplay" data-lp="'+seat+'"></div>'}
         <div class="gd-say"></div>
       </div>`;
     }
+    // 座位渲染签名: 内容未变则跳过 innerHTML 重建 —— 出牌过程中对家/侧家不再「跳来跳去」
+    let _seatSigs = Object.create(null);
+    function seatSig(seat){
+      const p = st.players[seat];
+      if (!p) return 'x';
+      const lp = trickActs[seat];
+      const lpKey = !lp ? '' : (lp.pass ? 'P' : (lp.cards||[]).join(','));
+      const win = (st.phase==='over' && st.result && Engine.teamOf(seat)===st.result.winnerTeam) ? 1 : 0;
+      const alarm = (st.phase==='play' && p.hand.length>0 && p.hand.length<=2) ? 1 : 0;
+      return [
+        st.phase, st.level,
+        st.turn===seat ? 1 : 0,
+        p.hand.length,
+        Engine.partnerOf(mySeat)===seat ? 1 : 0,
+        (st.table.lastPlay && st.table.lastPlay.seat===seat) ? 1 : 0,
+        lpKey, win, alarm,
+        finishBadge(seat)||'',
+        lobbyMode ? 'L' : 'P',
+      ].join('|');
+    }
     function renderSeats(){
       room.dataset.phase = st.phase;   // 阶段驱动版面(招募态藏手牌区/理牌钮; CSS 按此响应)
-      els.p2.innerHTML = seatHTML(SEAT_T);   // 对家/队友(上)
-      els.p3.innerHTML = seatHTML(SEAT_L);   // 下家(左) —— 顺时针我的下一手落左侧
-      els.p1.innerHTML = seatHTML(SEAT_R);   // 上家(右)
-      els.me.innerHTML = seatHTML(mySeat);
+      const seats = [
+        { seat: SEAT_T, el: els.p2 },
+        { seat: SEAT_L, el: els.p3 },
+        { seat: SEAT_R, el: els.p1 },
+        { seat: mySeat, el: els.me },
+      ];
+      const nextSig = Object.create(null);
+      seats.forEach(({seat, el})=>{
+        if (!el) return;
+        const sig = seatSig(seat);
+        nextSig[seat] = sig;
+        // 签名未变且节点还在 → 跳过重建(说气泡/倒计时环写在子节点上, 不被吞)
+        if (_seatSigs[seat] === sig && el.querySelector('.gd-seat')) return;
+        el.innerHTML = seatHTML(seat);
+      });
+      _seatSigs = nextSig;
       if (st.phase==='lobby'){
         const nn = st.players.filter(p=>p.kind!=='empty').length;
         els.lvl.innerHTML = `<span class="lv-now">🪑 招募中</span>${nn}/4 席就位`;
@@ -1997,14 +2077,21 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         // best-first: 能一把走完排最前(剩一对提示打对子而非拆单张), 领出走长牌型、跟牌走最小代价
         // lastSeat 供提示识别"对家(队友)领出"→ 别压自己人; 有桌面牌且非我出时才带。
         const lastSeat = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.seat : null;
-        const ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, lastSeat, handsLeft: st.players.map(p=>p.hand.length) });
-        // ★理牌优先(主人诉求): 已按牌型理过手牌时, 先把我理出的成型牌型(当前合法者)排到提示最前,
-        //   让"理牌"真正指导提示 —— 否则理了牌提示却推荐别的组合, 理牌就失去意义。其余 AI 建议去重后接在后面。
+        let ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, lastSeat, handsLeft: st.players.map(p=>p.hand.length) });
+        // ★理牌/已选手牌优先: rows 或按牌型理过时, 我方理出的合法牌型排到提示最前;
+        //   另外: 当前已选手牌与候选重叠越多越靠前 —— 点了半组再点提示, 优先补全/升级这组。
+        const key = g => g.map(c=>c.id).sort().join(',');
+        if (selected.size>=2 && ai.length){
+          const selIds = new Set(selected);
+          ai = ai.slice().sort((a,b)=>{
+            const oa=a.filter(c=>selIds.has(c.id)).length, ob=b.filter(c=>selIds.has(c.id)).length;
+            return ob-oa;
+          });
+        }
         let cyc = ai;
         // ai 为空且是对家领出 → 提示建议让对家走: 不能靠"理牌优先"把压对家的牌型再塞回来(否则等于教你压自己人)。
         //   故仅在 ai 非空时才做理牌优先重排。
-        if (ai.length && sortMode==='combo' && canCombo()){
-          const key = g => g.map(c=>c.id).sort().join(',');
+        if (ai.length && (rows || (sortMode==='combo' && canCombo()))){
           const mine = [];
           // 理牌来源: 玩家手动排过(rows 非空)→ 按玩家自己码出的成型段来提示(runGroups 就地识别),
           //   让"手动重新组合的牌型"真正指导提示; 否则用 AI 自动分组 arrangeGroups。
@@ -2469,6 +2556,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       dealNo = 0; prevResult = null;
       if (seed!=null) opts.seed = seed;
       st = newDeal();
+      _seatSigs = Object.create(null);
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastMyTurn=false; lastFinishedN=0; tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
       sfx('deal');

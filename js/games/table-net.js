@@ -84,10 +84,13 @@
         var b=document.createElement('button'); b.className='gt-mini'; b.textContent='加入';
         b.onclick=function(){ ctx.actions.join(seat.seat); }; div.appendChild(b);
       }
-      // host 招募灵魂
-      if(ctx.status==='lobby' && ctx.isHost && ctx.souls && ctx.souls.length){
+      // host 补位(灵魂/机器人同型, 有灵魂优先): 招募中可选; 德州局中空位也可选灵魂
+      var soulFillOk = ctx.isHost && ctx.actions && ctx.actions.seatSoul
+        && ctx.souls && ctx.souls.length
+        && (ctx.status==='lobby' || (ctx.status==='playing' && ctx.game==='nlhe'));
+      if(soulFillOk){
         var sel=document.createElement('select'); sel.className='gt-soulsel';
-        var opt=document.createElement('option'); opt.value=''; opt.textContent='🤝灵魂'; sel.appendChild(opt);
+        var opt=document.createElement('option'); opt.value=''; opt.textContent='🤝补位'; sel.appendChild(opt);
         ctx.souls.forEach(function(s){ if(!s||!s.auth_uid) return;
           var o=document.createElement('option'); o.value=s.auth_uid; o.textContent=(s.emoji||'👤')+s.name; sel.appendChild(o); });
         sel.onchange=function(){ if(sel.value) ctx.actions.seatSoul(seat.seat, sel.value); };

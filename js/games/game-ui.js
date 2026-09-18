@@ -1907,6 +1907,14 @@ html[data-mode="day"] .ddz-center::before{
       // 领出走长牌型垫单张, 跟牌走最小代价、炸弹垫底(剩一对提示打整对而非拆单张)。
       if (!hintCycle.length){
         hintCycle = AI.hints(hand, target, hintCtx());
+        // 半选再点提示: 与当前选中重叠越多的候选越靠前(贴合玩家意图, 三游戏一致)
+        if (selected.size>=2 && hintCycle.length){
+          const selIds = new Set(selected);
+          hintCycle = hintCycle.slice().sort((a,b)=>{
+            const oa=a.filter(c=>selIds.has(c.id)).length, ob=b.filter(c=>selIds.has(c.id)).length;
+            return ob-oa;
+          });
+        }
         hintIdx = 0;
       }
       if (!hintCycle.length){
