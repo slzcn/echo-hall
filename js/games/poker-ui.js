@@ -52,6 +52,7 @@
   const CSS_ID = 'pk-ui-css';
   function injectCSS(){
     if (document.getElementById(CSS_ID)) return;
+    // journey-exempt: 牌桌 CSS 竖屏贴底/横屏紧凑 — 契约由 scripts/test-pk-layout-contract.js + journey-pk-ios-layout.js 覆盖
     const s = document.createElement('style'); s.id = CSS_ID;
     s.textContent = `
 .pk-room{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;overflow:hidden;
@@ -74,7 +75,7 @@
 .pk-room.is-land .pk-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
 .pk-room.is-land .pk-felt{overflow:visible}
 .pk-room.is-land .pk-table{top:4px;bottom:4px}
-.pk-room.is-land .pk-me{padding:2px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));gap:12px}
+.pk-room.is-land .pk-me{padding:2px max(16px,env(safe-area-inset-left,0px)) calc(2px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));gap:10px}
 /* 横屏动作栏: 左右内边距兜 safe-area(刘海横屏在两侧) —— 否则最外侧按钮会缩进刘海/圆角被切角 */
 .pk-room.is-land .pk-acts{gap:5px;padding:5px max(14px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
 .pk-room.is-land .pk-raise input[type=range]{height:18px}
@@ -102,16 +103,29 @@
 .pk-room.is-land .pk-me-seat{flex-direction:row;align-items:center;gap:9px;width:auto}
 .pk-room.is-land .pk-me-seat .nm{max-width:76px}
 .pk-room.is-land .pk-my-hole{margin-top:0}
-/* 竖屏美化(手机窄屏): 原 .pk-table 用 top/bottom:9px 撑满整列高度, 椭圆被抻成长蛋——
-   上弧座位+公共牌全堆在顶部, 下半个绿肚皮空(因"我"坐在 felt 下方的 pk-me 条, 桌底本无人)。
-   这里把桌面收成一个比例匀称的椭圆并竖直居中(操作钮仍钉底、"我"贴其上), 座位/公共牌走 %
-   定位随桌高等比缩放, 不再被拉长。.pk-room 前缀提特异性以压过后面定义的基础 .pk-table 规则。 */
+/* 竖屏(iOS 手机): 桌面椭圆【贴底铺满 felt】—— 主人反馈"竖屏没占满底部空间"。
+   旧写法 top:50% + 固定 58vh 椭圆居中 → felt 下半空一大块绿皮。
+   现: bottom 贴 felt 底, 高度尽量吃满(min(容器高-边距, 620)), 座位弧仍按 % 随高缩放;
+   我的座位条 + 操作区钉在 felt 下方, safe-area 由 table-shared 补齐。 */
 @media (max-width:599px){
-  /* height 用 min(理想椭圆高, felt高-上下留白): 短屏(小机 + 灵动岛顶栏吃掉 ~107px)时 felt 变矮,
-     原来的定高 clamp 会撑破 felt 顶把上弧座位顶到标题栏底下(=主人反馈的"牌桌顶部遮挡")。
-     min 兜底后桌面永不超出 felt, 居中留出上下等距空隙, 顶座位始终在栏下方有呼吸位。 */
-  .pk-room .pk-table{top:50%;bottom:auto;height:min(clamp(360px,58vh,500px),calc(100% - 20px));transform:translateY(-50%)}
+  .pk-room:not(.is-land) .pk-felt{ justify-content: flex-end; }
+  .pk-room:not(.is-land) .pk-table{
+    top: auto !important;
+    bottom: 0 !important;
+    transform: none !important;
+    height: min(calc(100% - 6px), 620px);
+  }
+  .pk-room:not(.is-land) .pk-me{ padding-top: 2px; }
 }
+/* 横屏乱版修复: 结构锁不再给对手席 88px 硬高; 桌心/操作区沿用既有 is-land 压扁规则 */
+.pk-room.is-land .pk-felt{ overflow: hidden; }
+.pk-room.is-land .pk-table{ top: 6px !important; bottom: 6px !important; height: auto !important; transform: none !important; }
+.pk-room.is-land .pk-center{ top: 52%; }
+.pk-room.is-land .pk-me-seat{ flex-direction: row; align-items: center; gap: 8px; width: auto; }
+/* ⟳ 旋转态(eh-rot)时房间盒被 JS 置换宽高: 再强制一版紧凑变量, 防 iOS 上媒体查询未命中时仍用竖屏大号牌 */
+.pk-room.eh-rot{ --av:36px;--avf:16px;--seatw:70px;--cw:30px;--ch:36px;--cn:10px;--cs:8px;--cc:16px;--bcw:28px;--bch:40px; }
+.pk-room.eh-rot .pk-acts{ min-height: 0 !important; }
+.pk-room.eh-rot .pk-me{ min-height: 0 !important; }
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
@@ -936,7 +950,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearTimeout(overTimer);clearInterval(overTimer);overTimer=null;} try{ hideWinBanner(); }catch(_){} }
     // resize rAF 节流: 旋转/移动端地址栏收放会连发数十个 resize, 每个都全桌重排 —— 合并到每帧一次。
     let _rzRAF=0;
-    const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; positionSeats(); }); };
+    const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; try{ if(root.EHTableOrient) root.EHTableOrient.reflect(room); }catch(_){} positionSeats(); }); };
+    const onOrient = ()=>{ setTimeout(onResize, 120); };
     let _exited=false;
     function close(){ minimized=false; try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove();
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
@@ -1000,6 +1015,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
     window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrient);
 
     // ── 座位渲染: 我固定坐底(在 pk-me 条), 对手沿椭圆上弧分布 ──
     function displayOrder(){                // 从我起, 顺时针一圈的座位号

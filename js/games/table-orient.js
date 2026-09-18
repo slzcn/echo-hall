@@ -28,6 +28,8 @@
     room.style.height = b.w + 'px';
     room.style.transformOrigin = '0 0';
     room.style.transform = 'translateX(' + b.w + 'px) rotate(90deg)';
+    // 立刻 reflect: 旋转后 clientWidth/Height 已是横盒 → 挂 .is-land, 套横屏紧凑布局
+    try{ reflect(room); }catch(_){}
   }
   function isRot(room){ return !!(room && room.classList && room.classList.contains('eh-rot')); }
   // 横屏态识别: 牌桌盒子"宽 > 高且矮"时挂 .is-land, 让各桌套用横屏专属布局。
@@ -43,6 +45,23 @@
     room.classList.toggle('is-land', land);
     return land;
   }
+  function toggle(room){
+    if (!room) return false;
+    if (isRot(room)){ clear(room); reflect(room); return false; }
+    room.classList.add('eh-rot');
+    apply(room);
+    room._ehOrientResize = function(){ if (isRot(room)){ apply(room); } else { reflect(room); } };
+    try{ root.addEventListener('resize', room._ehOrientResize); }catch(_){}
+    try{ root.addEventListener('orientationchange', room._ehOrientResize); }catch(_){}
+    // 物理转屏也会走 resize → apply 内 reflect; 这里再挂一次 orientationchange 兜 iOS
+    try{
+      room._ehOrientOrient = function(){
+        setTimeout(function(){ if (isRot(room)) apply(room); else if (room.classList) reflect(room); }, 80);
+      };
+      root.addEventListener('orientationchange', room._ehOrientOrient);
+    }catch(_){}
+    return true;
+  }
   function clear(room){
     if (!room) return;
     if (room.classList) room.classList.remove('eh-rot');
@@ -51,17 +70,8 @@
     if (room._ehOrientResize){ try{ root.removeEventListener('resize', room._ehOrientResize); }catch(_){}
       try{ root.removeEventListener('orientationchange', room._ehOrientResize); }catch(_){}
       room._ehOrientResize = null; }
-  }
-  // 切换; 返回切换后是否为横屏态。
-  function toggle(room){
-    if (!room) return false;
-    if (isRot(room)){ clear(room); return false; }
-    room.classList.add('eh-rot');
-    apply(room);
-    room._ehOrientResize = function(){ if (isRot(room)) apply(room); };
-    try{ root.addEventListener('resize', room._ehOrientResize); }catch(_){}
-    try{ root.addEventListener('orientationchange', room._ehOrientResize); }catch(_){}
-    return true;
+    if (room._ehOrientOrient){ try{ root.removeEventListener('orientationchange', room._ehOrientOrient); }catch(_){}
+      room._ehOrientOrient = null; }
   }
   root.EHTableOrient = { toggle:toggle, clear:clear, isRot:isRot, reflect:reflect };
 })(typeof window !== 'undefined' ? window : this);

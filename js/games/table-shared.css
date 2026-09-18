@@ -636,6 +636,8 @@ html.pwa-standalone .gt-lobby-bar{ padding-top: max(calc(10px + env(safe-area-in
    N. 牌桌结构锁定 (主人: 出牌过程中桌面不要跳 · 兼顾横屏)
    固定 顶栏 / 对手席带 / 操作区 / 手牌托盘 的高度与骨架,
    标签与「上一手」只改内容不改布局占位。
+   ★横屏(.is-land)必须降级 min-height: 手机横屏总高仅 ~375px,
+     对手席 88px + 操作区 88px 会把椭圆/公共牌挤爆(主人"横屏乱版")。
    ══════════════════════════════════════════════════════════════ */
 .ddz-bar, .gd-bar, .pk-bar{
   min-height: calc(52px + env(safe-area-inset-top, 0px));
@@ -655,27 +657,34 @@ html.pwa-standalone .pk-bar{
 .gd-partner{ min-height: 96px; }
 .gd-mid{ min-height: 120px; }
 .gd-side{ min-width: 84px; }
-.ddz-seat, .gd-seat, .pk-seat{
+.ddz-seat, .gd-seat{
   min-height: 88px;
   box-sizing: border-box;
 }
+.pk-seat{ min-height: 0; box-sizing: border-box; }  /* 德州对手绝对定位椭圆, 不锁 88px */
 .gd-partner .gd-seat{ min-height: 72px; }
 /* 标签行 / 上一手行: 永远占位, 增删 chip 不再撑跳布局 */
 .gd-tags, .ddz-seat .role{
   min-height: 16px;
   line-height: 16px;
 }
-.gd-lastplay, .ddz-seat-reveal, .pk-mini-hole{
+.gd-lastplay, .ddz-seat-reveal{
   min-height: 22px;
   line-height: 20px;
 }
-.pk-mini-hole{ min-height: 34px; }
-.pk-mini-hn{ min-height: 14px; }
-/* 操作区 / 手牌托盘: 底部骨架锁死, 横竖屏切换只换排数不改外框节奏 */
-.ddz-ctrl, #ddzCtrl, .gd-foot, .pk-acts{
+.pk-mini-hole{ min-height: 28px; }
+.pk-mini-hn{ min-height: 12px; }
+/* 操作区 / 手牌托盘: 底部骨架锁死(竖屏); 横屏改矮 */
+.ddz-ctrl, #ddzCtrl, .gd-foot{
   min-height: 88px;
   box-sizing: border-box;
   flex-shrink: 0;
+}
+.pk-acts{
+  min-height: 72px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
 }
 .gd-foot{ min-height: 92px; }
 .ddz-hand-wrap, .gd-hand-wrap{
@@ -683,14 +692,46 @@ html.pwa-standalone .pk-bar{
   min-height: 108px;
   box-sizing: border-box;
 }
-.ddz-room.is-land .ddz-hand-wrap,
-.gd-room.is-land .gd-hand-wrap{
-  min-height: 86px;
+.pk-me{
+  flex-shrink: 0;
+  min-height: 56px;
+  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
 }
-.pk-me, .gd-me-row, .ddz-me{
+.gd-me-row, .ddz-me{
   flex-shrink: 0;
   min-height: 64px;
 }
+/* ── 横屏骨架: 清零/压矮, 留高度给椭圆与操作 ── */
+.ddz-room.is-land .ddz-bar,
+.gd-room.is-land .gd-bar,
+.pk-room.is-land .pk-bar{
+  min-height: 0 !important;
+  padding-top: calc(2px + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: 2px !important;
+}
+.ddz-room.is-land .ddz-opps{ min-height: 0; }
+.gd-room.is-land .gd-partner{ min-height: 0; }
+.gd-room.is-land .gd-mid{ min-height: 0; }
+.ddz-room.is-land .ddz-seat,
+.gd-room.is-land .gd-seat,
+.pk-room.is-land .pk-seat{ min-height: 0 !important; }
+.ddz-room.is-land .ddz-ctrl, .ddz-room.is-land #ddzCtrl,
+.gd-room.is-land .gd-foot,
+.pk-room.is-land .pk-acts{
+  min-height: 0 !important;
+  padding-top: 4px !important;
+  padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.ddz-room.is-land .ddz-hand-wrap,
+.gd-room.is-land .gd-hand-wrap{ min-height: 72px; }
+.pk-room.is-land .pk-me{
+  min-height: 0 !important;
+  padding-bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+}
+.gd-room.is-land .gd-me-row,
+.ddz-room.is-land .ddz-me{ min-height: 0; }
+.gd-room.is-land .gd-tags{ min-height: 0; }
+.gd-room.is-land .gd-lastplay{ min-height: 0; }
 /* 选牌一致性(三游戏): 选中抬起量/光晕同一套语言, 理牌后重选也一眼可辨 */
 .ddz-hand .card.sel,
 .gd-hand-row .card.sel,
@@ -721,9 +762,3 @@ html.pwa-standalone .pk-bar{
   45%{ transform: translateY(-26px) scale(1.04); }
   100%{ transform: translateY(-22px) scale(1); }
 }
-/* 横屏: 座位弧与桌心已由各 UI 几何处理; 这里只保证骨架 min-height 不被 land 媒体查询吃掉 */
-.ddz-room.is-land .ddz-opps{ min-height: 92px; }
-.gd-room.is-land .gd-partner{ min-height: 78px; }
-.gd-room.is-land .gd-mid{ min-height: 100px; }
-.pk-room.is-land .pk-acts{ min-height: 72px; }
-.pk-room.is-land .pk-me{ min-height: 56px; }
