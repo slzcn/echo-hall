@@ -540,6 +540,7 @@ html[data-mode="day"] .ddz-center::before{
   function open(opts){
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
+    // journey-exempt: 座位增量/双触选组 — 契约 journey-games-xdevice.js
     injectCSS(); injectLobbyCSS();
     try{ if(root.EhGameBgm) root.EhGameBgm.enter('ddz'); }catch(_){}   // 进桌切斗地主 BGM
 
@@ -737,6 +738,8 @@ html[data-mode="day"] .ddz-center::before{
     }
     let st = isGuest ? waitingState() : (lobbyMode ? lobbyState(lobbySeats) : newGame());
     let selected = new Set();     // 选中的 card id
+    let _ddzSeatSigs = Object.create(null);   // 座位渲染签名(防出牌过程整段重建抖动)
+    let _lastTapId=null, _lastTapAt=0;        // 双触选同点一组(与掼蛋一致)
     // 本桌累计比分持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
     const SCOREKEY = opts.scoreKey || null;
     // ── 跨桌个人累计分(主人诉求"赢的积分换桌继续保留, 不从零") ──
@@ -955,6 +958,22 @@ html[data-mode="day"] .ddz-center::before{
       //   新 selSig 与陈旧 lastSelSig 可能相等, 增量护栏误判"没变"而跳过落下高亮(点绒面清不掉的真凶)。
       syncSelSig();
     }
+    function selectSameRankGroup(id){
+      const hand=(st.players[mySeat]&&st.players[mySeat].hand)||[];
+      const card=hand.find(c=>c&&c.id===id);
+      if(!card) return false;
+      const same=hand.filter(c=>c&&c.rank===card.rank);
+      if(same.length<2) return false;
+      selected=new Set(same.map(c=>c.id));
+      hintCycle=[]; hintIdx=0;
+      try{ if(typeof autoExtendSelection==='function') autoExtendSelection(); }catch(_){}
+      renderHand(); updatePlayBtn(); sfx('cardsel');
+      try{
+        const p=Rules.parse([...selected].map(id2=>hand.find(c=>c.id===id2)).filter(Boolean));
+        if(p && typeof typeLabel==='function') toast('已选整组 · '+typeLabel(p), 1400);
+      }catch(_){}
+      return true;
+    }
     els.hand.addEventListener('pointerdown', (e)=>{
       // 出牌阶段任何时候都能选牌/预选(含别家回合先把要出的牌选好, 对齐掼蛋"任何情况可手动选牌"):
       //   真正出牌仍由 updatePlayBtn/doPlay 的 st.turn===mySeat 把关, 预选不会误出。旁观/guest待host除外。
@@ -963,6 +982,15 @@ html[data-mode="day"] .ddz-center::before{
       const c=handCardAt(e.clientX,e.clientY);
       // 点手牌托盘空白(牌与牌之间/两侧留白, 非某张牌) = 取消选牌(对齐掼蛋), 免得逐张再点一遍收回。
       if(!c){ if(selected.size){ selected.clear(); hintCycle=[]; renderHand(); updatePlayBtn(); sfx('click'); } return; }
+      // 双触选同点一组(与掼蛋一致): 大小王/炸弹/对子一点选整组, 再微调
+      const nowTs=Date.now();
+      if(_lastTapId===c.dataset.id && nowTs-_lastTapAt<340){
+        _lastTapId=null; _lastTapAt=0;
+        selectSameRankGroup(c.dataset.id);
+        e.preventDefault();
+        return;
+      }
+      _lastTapId=c.dataset.id; _lastTapAt=nowTs;
       painting=true; paintSeen=new Set(); paintLastIdx=null;
       paintMode = selected.has(c.dataset.id) ? 'deselect' : 'select';
       pdX=e.clientX; pdY=e.clientY; pdDragging=false;   // 记落点: 阈值内的抖动不当拖动(见 pointermove)
@@ -1144,8 +1172,37 @@ html[data-mode="day"] .ddz-center::before{
       </div>`;
     }
     function renderSeats(){
-      els.opps.innerHTML = OPP_SEATS.map(seatHTML).join('');
-      els.me.innerHTML = seatHTML(mySeat);
+      // 增量: 内容签名未变则跳过整段 innerHTML(与掼蛋 seatSig 同思路) — 出牌过程中座位不抖
+      const meHost = els.me, oppHost = els.opps;
+      const nextSig = {};
+      let oppDirty = false, meDirty = false;
+      const sigOf = (seat)=>{
+        const p = st.players[seat];
+        if (!p) return 'x';
+        const lp = (typeof trickActs!=='undefined' && trickActs && trickActs[seat]) || null;
+        const lpK = !lp ? '' : (lp.pass?'P':((lp.cards||[]).join(',')));
+        return [
+          st.phase, st.turn===seat?1:0, p.hand.length,
+          st.landlord===seat?1:0,
+          st.phase==='over' && st.result && (st.result.winners||[]).includes(seat)?1:0,
+          st.phase==='over' && !winReveal && seat!==mySeat?1:0,
+          lpK, cumScore[seat]||0, lobbyMode?'L':'P',
+        ].join('|');
+      };
+      OPP_SEATS.forEach(seat=>{
+        const sig = sigOf(seat); nextSig[seat]=sig;
+        const node = oppHost && oppHost.querySelector('.ddz-seat[data-seat="'+seat+'"]');
+        if (_ddzSeatSigs[seat]!==sig || !node) oppDirty = true;
+      });
+      const mSig = sigOf(mySeat); nextSig[mySeat]=mSig;
+      if (_ddzSeatSigs[mySeat]!==mSig || !(meHost && meHost.querySelector('.ddz-seat'))) meDirty = true;
+      if (oppDirty || !oppHost.querySelector('.ddz-seat')){
+        oppHost.innerHTML = OPP_SEATS.map(seatHTML).join('');
+      }
+      if (meDirty){
+        meHost.innerHTML = seatHTML(mySeat);
+      }
+      _ddzSeatSigs = nextSig;
       if (st.phase==='lobby') bindLobbySeats();
       if (st.phase==='over' && !winReveal && st.result) renderSeatReveal();   // 结算: 对手在各自座位下亮出剩牌(自己的剩牌=底部手牌扇)
       // 底牌:未定地主时盖着,定了亮出来。顶部居中 + "底牌"标(对标腾讯的中上底牌位)。

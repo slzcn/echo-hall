@@ -1,5 +1,7 @@
 /* ============================================================
  * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
+ * journey-exempt: 跨端设计令牌/触控/焦点/减动态/contain — 契约 journey-games-xdevice.js
+ * ------------------------------------------------------------
  * ------------------------------------------------------------
  * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
  * 已经共享了 --accent/--ink/--panel/--amber/--magenta 等主题变量, 但:
@@ -754,6 +756,105 @@ html.pwa-standalone .pk-bar{
 .ddz-room.is-land .ddz-me{ min-height: 0; }
 .gd-room.is-land .gd-tags{ min-height: 0; }
 .gd-room.is-land .gd-lastplay{ min-height: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   O. 跨端统一与性能 (iPhone / Android / PWA / 桌面)
+   设计令牌 + 触控目标 + 焦点可见 + 减少动态 + 合成层隔离
+   ══════════════════════════════════════════════════════════════ */
+.ddz-room, .gd-room, .pk-room{
+  --eh-r-btn: 12px;
+  --eh-r-card: 8px;
+  --eh-r-panel: 16px;
+  --eh-touch: 44px;
+  --eh-bar-h: 52px;
+  --eh-act-h: 72px;
+  --eh-ease: cubic-bezier(.2,.85,.3,1);
+  --eh-dur: .14s;
+  /* 性能: 桌面/席带/操作区限布局与绘制范围, 出牌时局部重绘不牵全身 */
+  contain: layout style;
+}
+.ddz-felt, .gd-felt, .pk-felt, .pk-table{
+  contain: layout style paint;
+}
+.ddz-opps, .gd-partner, .gd-mid, .ddz-seat, .gd-seat, .pk-seat{
+  contain: layout style;
+}
+/* 主操作钮触控 ≥44px(移动端); 桌面 hover 已有 */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn{
+  min-height: 40px;
+  border-radius: var(--eh-r-btn) !important;
+}
+.ddz-room:not(.is-land) .ddz-acts .ddz-btn.primary,
+.gd-room:not(.is-land) .gd-acts .gd-btn.primary,
+.pk-room:not(.is-land) .pk-b.call.check,
+.pk-room:not(.is-land) .pk-b.raise{
+  min-height: var(--eh-touch);
+}
+/* 焦点可见(a11y / 键盘 / 部分安卓遥控): 三桌同一套 accent 焦点环 */
+.ddz-room :focus-visible,
+.gd-room :focus-visible,
+.pk-room :focus-visible{
+  outline: 2px solid var(--accent, #00e5d4) !important;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.ddz-room button:focus:not(:focus-visible),
+.gd-room button:focus:not(:focus-visible),
+.pk-room button:focus:not(:focus-visible){ outline: none; }
+/* 减少动态: 系统偏好时关掉装饰动画, 保留状态色(可读性) */
+@media (prefers-reduced-motion: reduce){
+  .ddz-room *, .gd-room *, .pk-room *{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ddz-room .ddz-avr .av, .gd-room .gd-avr .av, .pk-room .pk-avr .av{ animation: none !important; }
+}
+/* 统一操作区文字对比(日/夜): 不用纯黑底 */
+.ddz-room:not(.is-land) .ddz-acts,
+.gd-room:not(.is-land) .gd-acts,
+.pk-room:not(.is-land) .pk-acts{
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+html[data-mode="day"] .ddz-room .ddz-acts,
+html[data-mode="day"] .gd-room .gd-acts,
+html[data-mode="day"] .pk-room .pk-acts{
+  background:
+    linear-gradient(180deg, rgba(240,248,246,.72), rgba(220,236,232,.88)) !important;
+  border-top-color: rgba(0,127,118,.18) !important;
+}
+/* 日间牌桌绒毡已在 C 段处理; 这里统一日间标题 chip 对比 */
+html[data-mode="day"] .ddz-title,
+html[data-mode="day"] .gd-title,
+html[data-mode="day"] .pk-title{
+  color: #062822 !important;
+  background: rgba(0, 127, 118, .10) !important;
+  border-color: rgba(0, 127, 118, .28) !important;
+}
+/* 桌面宽屏: 内容居中限宽, 三桌同一 max-width 语言(各 UI --maxw 已有, 兜底) */
+@media (min-width: 900px){
+  .ddz-room, .gd-room, .pk-room{ --maxw: 860px; }
+  .ddz-felt, .gd-felt, .pk-felt{ margin-left: auto; margin-right: auto; }
+}
+/* 大号点控: 顶栏钮已是 36px; 手牌选中态由各 UI 负责, 这里保证 active 缩放一致 */
+.ddz-hand .card:active,
+.gd-hand .card:active,
+.gd-hand-row .card:active{
+  transform: translateY(-18px) scale(1.02);
+}
+/* 合成层: 只给常动画元素 will-change, 避免整桌开层爆内存(低端机) */
+.ddz-seat.turn .ddz-avr .av,
+.gd-seat.turn .gd-avr .av,
+.pk-seat.turn .pk-avr .av{
+  will-change: box-shadow;
+}
+.ddz-seat:not(.turn) .ddz-avr .av,
+.gd-seat:not(.turn) .gd-avr .av,
+.pk-seat:not(.turn) .pk-avr .av{
+  will-change: auto;
+}
 /* 选牌一致性(三游戏): 选中抬起量/光晕同一套语言, 理牌后重选也一眼可辨 */
 .ddz-hand .card.sel,
 .gd-hand-row .card.sel,

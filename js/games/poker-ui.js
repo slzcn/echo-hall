@@ -546,6 +546,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   function open(opts){
     opts = opts || {};
     if (!Engine || !AI){ console.warn('[pk] engine not loaded'); return null; }
+    // journey-exempt: 座位几何缓存 — 契约 journey-games-xdevice.js
     injectCSS();
     try{ if(root.EhGameBgm) root.EhGameBgm.enter('poker'); }catch(_){}   // 进桌切德州 BGM
 
@@ -1247,6 +1248,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       _lastOppStruct=structSig;
       // 移除旧座位节点(保留 pk-table 内的 center)
       els.table.querySelectorAll('.pk-seat, .pk-commit').forEach(e=>e.remove());
+      positionSeats._force = true;   // 节点重建后必须重算几何
+      positionSeats._key = '';
       // 全席(含我 d=0)都画上椭圆: 我在正下方 270°, 对手绕上弧 —— 一桌人围坐, 不再把"我"单独拎到桌外条
       const startD = 0;
       for (let d=startD; d<order.length; d++){
@@ -1312,6 +1315,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const land = root.EHTableOrient ? root.EHTableOrient.reflect(room) : false;  // 横屏态标记(open/resize/旋转都会过这里)
       const order = displayOrder();
       const lob = st.phase==='lobby';
+      // 几何缓存: 同一桌形(宽高/横竖屏/座位序)只算一次三角 — 每帧/每次 stack 变都跑会强制回流
+      const tr = els.table.getBoundingClientRect();
+      const geoKey = (land?1:0)+'|'+(lob?1:0)+'|'+Math.round(tr.width)+'x'+Math.round(tr.height)+'|'+order.join(',');
+      if (geoKey === positionSeats._key && !positionSeats._force) return;
+      positionSeats._key = geoKey; positionSeats._force = false;
       const N = order.length;                     // 总席数(含我)
       const m = N - 1;                             // 对手数
       // 招募态 & 打牌态一致: 把"我"也摆上椭圆(坐正下方 270°), 对手绕上弧均分 —— 一桌人围坐感,

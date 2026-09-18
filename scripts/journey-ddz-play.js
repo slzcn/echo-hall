@@ -227,7 +227,8 @@ assert(/if \(deal\)\{[\s\S]{0,80}justdealt/.test(ui), '发牌那一帧错峰入�
 // 治"联机把别人座位画在我的位置/手牌数对不上人"。单机 mySeat=0 时旋转恰为 [1,2], 行为不变。
 assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席)');
 assert(/OPP_SEATS\s*=\s*\[\(mySeat\+1\)%3,\s*\(mySeat\+2\)%3\]/.test(ui), '对手槽位绕 mySeat 相对旋转((me+1)/(me+2))');
-assert(/els\.opps\.innerHTML = OPP_SEATS\.map/.test(ui), 'renderSeats 用旋转后对手槽(非写死[1,2])');
+assert(/OPP_SEATS\.map\(seatHTML\)/.test(ui) && /els\.opps|oppHost/.test(ui), 'renderSeats 用旋转后对手槽 OPP_SEATS + seatHTML');
+assert(/_ddzSeatSigs|oppDirty/.test(ui), 'renderSeats 座位增量签名(防抖动)');
 assert(/isAI:\s*gameIsAI/.test(ui), 'createGame 吃 opts.isAI(host 按座位实况标人/机, 含重发/再来一局)');
 
 // ── 步骤10: 斗地主不设手动理牌(与掼蛋不同) ──
