@@ -705,6 +705,18 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       try{ clearTimers(); }catch(_){}   // 停掉替我托管的 aiTimer, 防接管瞬间 AI 抢先出牌(renderAll→armTurn 会重排)
       renderAll();
     }
+    // host 侧: 把超时 idleOut 移出的远程真人席放回 remoteSeats, 停 AI 代打并重武装回合。
+    function resumeRemote(seat){
+      if (isGuest || typeof seat !== 'number' || seat < 0 || seat === mySeat) return false;
+      const nSeats = (st && st.players && st.players.length) || 4;
+      if (seat >= nSeats) return false;
+      if (remoteSeats.indexOf(seat) < 0) remoteSeats.push(seat);
+      missStreak[seat] = 0;
+      turnSeatActive = -1;
+      try{ clearTimers(); }catch(_){}
+      try{ renderAll(); }catch(_){}
+      return true;
+    }
     const onSync   = (typeof opts.onSync==='function')   ? opts.onSync   : null;  // host: 每次状态变更 → 广播快照
     const onAction = (typeof opts.onAction==='function') ? opts.onAction : null;  // guest: 回传我的动作给 host
     const GNet = root.EHGuandanNet;
@@ -712,6 +724,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     let lastSnap = null;    // guest: 最近一张公共快照
     let dealNo = 0;         // 本桌第几副(host 广播随快照带出; guest 据此识别新一副去拉手牌)
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复出牌
+    let lastSnapSeq = undefined; // guest: 最近接受的快照单调 seq
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打(不出/领出)
     const ACT_PLAY_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_PLAY_MS;   // 我方思考时长(可调, 测试可压小)
 
@@ -2112,6 +2125,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     // ── guest: 收到 host 广播的公共快照 → 组伪状态渲染。换副时重置手牌/动画; 终局弹战报。 ──
     function applySnapshot(snap){
       if (!snap || !GNet) return;
+      if (GNet.acceptSeq){
+        const acc = GNet.acceptSeq(snap, lastSnapSeq);
+        if (!acc.ok) return;                 // 迟到旧包: 丢弃
+        lastSnapSeq = acc.seq;
+      }
       const prevPhase = st ? st.phase : null;
       const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || (prevPhase==='over' && snap.phase==='play');
       if (isNewDeal && minimized){ close(); return; }   // 主人诉求: 客人在"返回"(折叠)态下等到房主开新一副 → 到此离场(房主/其余真人继续)
@@ -2465,7 +2483,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
       _forceTimeout:()=>{ if(st.phase==='tribute') onTributeTimeout(); else onHumanTimeout(); }, missOf:s=>missStreak[s]||0,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };
   }

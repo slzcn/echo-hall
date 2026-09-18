@@ -617,6 +617,19 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       try{ clearTimers(); }catch(_){}               // 停掉替我托管的定时, 防接管瞬间 AI 抢先行动
       renderAll();
     }
+    // host 侧: 把超时 idleOut 移出的远程真人席放回 remoteSeats, 停 AI 代打并重武装回合。
+    function resumeRemote(seat){
+      if (isGuest || typeof seat !== 'number' || seat < 0 || seat === mySeat) return false;
+      if (typeof n === 'number' && seat >= n) return false;
+      if (remoteSeats.indexOf(seat) < 0) remoteSeats.push(seat);
+      missStreak[seat] = 0;
+      if (Array.isArray(isAI)) isAI[seat] = false;
+      if (personaBySeat) personaBySeat[seat] = null;
+      turnSeatActive = -1; turnStreetActive = '';
+      try{ clearTimers(); }catch(_){}
+      try{ renderAll(); }catch(_){}
+      return true;
+    }
     // ── 招募态(lobby): 与斗地主/掼蛋同构 —— 开桌先落真牌桌页(本文件), 6 席里空位可点邀灵魂/真人,
     //   host 满意点「开始 ▶」→ startDeal 就地转正局(同一 room 不重挂)。招募态不产快照(无牌可泄, 见 renderAll onSync 守卫)。
     const lobbyMode = !!opts.lobby;
@@ -629,6 +642,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const PokerNet = root.EHPokerNet;
     let myHole = [];       // guest: 自己的两张底牌(牌对象), 由 feedHand 注入
     let lastSnap = null;   // guest: 最近一张公共快照
+    let lastSnapSeq = undefined; // guest: 最近接受的快照单调 seq
 
     const sb = opts.sb || 5, bb = opts.bb || 10;
     const ACT_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_ACT_MS;   // 真人思考时长(可调, 测试可压小)
@@ -2286,6 +2300,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function applySnapshot(snap){
       if (!isGuest || !snap) return;
+      if (root.EHPokerNet && root.EHPokerNet.acceptSeq){
+        const acc = root.EHPokerNet.acceptSeq(snap, lastSnapSeq);
+        if (!acc.ok) return;                 // 迟到旧包: 丢弃
+        lastSnapSeq = acc.seq;
+      }
       awaitingHost=false;
       const prevHand = handNo;
       lastSnap = snap; handNo = snap.handNo || 0;
@@ -2333,7 +2352,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
       _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
       _bustSeat:(seat)=>{ if(st.players[seat]){ st.players[seat].stack=0; } stacks[seat]=0; },  // 测试: 把某席筹码清零(模拟输光)
       _nextHand:()=>nextHand(),              // 测试: 推进到下一手(触发离场/补位落地)

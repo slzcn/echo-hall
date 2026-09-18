@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260917-ddz-land-center';
+window.__EH_APP_VER = '20260918-gt-online-heal';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -874,9 +874,46 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
+let _gtSnapSeq = 0;            // host 广播快照单调序号: guest 侧丢弃重连乱序旧包(见 *-net acceptSeq)
 // (自动开局已撤 2026-09-15: 招募态坐满不再自动起, 房主手动点「开始 ▶」→ gtStart)
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
+// host 发快照前打单调 seq; guest 用 acceptSeq 丢弃更旧的迟到包
+function gtStampSnap(snap){ if(snap && typeof snap==='object'){ try{ snap.seq = ++_gtSnapSeq; }catch(_){} } return snap; }
+// 每次 act 都从 DB 座位现算远程真人席 —— 禁止开桌时固化 A.remoteSeats(中途顶替入座会被误拒)
+function gtLiveSeatArrays(tableId, fallbackRow){
+  try{
+    const r = (tableId && _gtTables.get(tableId)) || fallbackRow;
+    if (!r) return null;
+    return gtSeatArrays(r);
+  }catch(_){ return null; }
+}
+// host 应用远程真人动作: 以 DB 座位为授权源; 引擎侧曾 idleOut 移出 remoteSeats 时先 resumeRemote 再落子
+function gtAcceptRemoteAct(tableId, fallbackRow, seat, move){
+  if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
+  const A = gtLiveSeatArrays(tableId, fallbackRow);
+  if (!A || !Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return;   // 非 DB 上的远程真人席
+  gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳
+  if (typeof _ehGame.resumeRemote === 'function'){
+    try{ _ehGame.resumeRemote(seat); }catch(_){}   // 超时托管中的席: 真人一落子即视为接管回座
+  }
+  const ok = _ehGame.applyMove(seat, move);
+  if (!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照纠偏
+}
+// host 监听客人「接管座位」广播, 把该席放回引擎 remoteSeats
+function gtWireHostResume(chan, tableId, fallbackRow){
+  if (!chan || !chan.on) return chan;
+  chan.on('broadcast',{event:'resume'}, ({payload})=>{
+    if (!_ehGame || !payload || typeof payload.seat !== 'number') return;
+    const A = gtLiveSeatArrays(tableId, fallbackRow);
+    if (!A || !Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat) < 0) return;
+    if (typeof _ehGame.resumeRemote === 'function'){
+      try{ _ehGame.resumeRemote(payload.seat); }catch(_){}
+    }
+    try{ toast((A.names && A.names[payload.seat] || '玩家') + ' 已接管座位'); }catch(_){}
+  });
+  return chan;
+}
 // ─────────── 联机牌桌: 通道状态回灌 + host 心跳 + 后台"轮到我"提醒 ───────────
 // 目的: (1) gt-play 频道断线/重连/超时时, 把状态灌到 UI (banner 前置状态胶囊 + 折叠片后缀), 用户能看见"重连中";
 //       (2) host 每 8s 发一次 host_ping; guest 15s 未收到 → 判定房主离线, 锁 UI 提醒;
@@ -2493,15 +2530,13 @@ function gtLaunchLobbyLocal(row){
 //   hello → 重播当前快照给新上线的客人。座位越权加固见 #61。
 function gtWireHostChannel(tableId){
   const chan=sb.channel('gt-play:'+tableId); _gtPlayChan=chan;
+  const rowRef=()=>_gtTables.get(tableId);
   chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
-      const r=_gtTables.get(tableId); const A=r?gtSeatArrays(r):null;
-      if(!A||!Array.isArray(A.remoteSeats)||A.remoteSeats.indexOf(payload.seat)<0) return;   // 只放行远程真人席动作
-      gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳(否则纯 AI 空转会被当僵尸桌回收)
-      const ok=_ehGame.applyMove(payload.seat, payload.move);
-      if(!ok && _ehGame.resync) _ehGame.resync();
+      if(!payload||typeof payload.seat!=='number') return;
+      gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });
+  gtWireHostResume(chan, tableId, rowRef());
   gtBindConnStatus(chan);
   gtStartHostPing(chan, tableId);
   return chan;
@@ -2523,7 +2558,7 @@ function gtLaunchDdzLobby(row){
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
       gtWriteDdzHands(row.id, state, A);
-      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
     },
     onResult:(res,log,meta)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
@@ -2556,7 +2591,7 @@ function gtLaunchPokerLobby(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
-      try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(_){}
       if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
@@ -2589,7 +2624,7 @@ function gtLaunchGuandanLobby(row){
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人手牌也会自动落库
       gtWriteGuandanHands(row.id, state, A);
-      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
     },
     onResult:(res,log,meta)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
@@ -2655,18 +2690,15 @@ function gtLaunchPoker(row){
   _gtCleanupPlay();
   let lastHandWritten=-1;
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const rowRef=()=>_gtTables.get(row.id)||row;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
-      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
-      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
-      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
-      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
-      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
-      gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳(否则纯 AI 空转会被当僵尸桌回收)
-      const ok=_ehGame.applyMove(payload.seat, payload.move);
-      if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
+      if(!payload||typeof payload.seat!=='number') return;
+      // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
+      // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
+  gtWireHostResume(chan, row.id, rowRef());
   gtBindConnStatus(chan);
   gtStartHostPing(chan, row.id);
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
@@ -2684,7 +2716,7 @@ function gtLaunchPoker(row){
     myStack: _pkMyStack, onWallet: _pkSolo ? pkSetWallet : undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
-      try{ chan.send({type:'broadcast',event:'snap',payload:window.EHPokerNet.snapshot(state,hno)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(_){}
       if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
@@ -2732,6 +2764,7 @@ function gtEnterPoker(row){
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // 客人筹码输光 → 点"离桌"真的从座位表退出(该席变空, host 下一手把它当 AI 顶位继续开)。
     onBust:()=>{ gtLeave(row.id); },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可从卡片"进入牌桌"重进)
@@ -2759,18 +2792,15 @@ function gtLaunchGuandan(row){
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const rowRef=()=>_gtTables.get(row.id)||row;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
-      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
-      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
-      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
-      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
-      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
-      gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳(否则纯 AI 空转会被当僵尸桌回收)
-      const ok=_ehGame.applyMove(payload.seat, payload.move);
-      if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
+      if(!payload||typeof payload.seat!=='number') return;
+      // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
+      // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
+  gtWireHostResume(chan, row.id, rowRef());
   gtBindConnStatus(chan);
   gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
@@ -2781,7 +2811,7 @@ function gtLaunchGuandan(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
       gtWriteGuandanHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(掼蛋出一张变一次)
-      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
     },
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
@@ -2828,6 +2858,7 @@ function gtEnterGuandan(row){
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
   _gtStartTurnAlert();
@@ -2854,18 +2885,15 @@ function gtLaunchDdz(row){
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const rowRef=()=>_gtTables.get(row.id)||row;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.applyMove||!payload||typeof payload.seat!=='number') return;
-      // 座位越权加固(#61): 'act' 只该来自【远程真人席】。host 自己/AI/灵魂席都由本机引擎直接驱动,
-      // 其动作绝不经由线上广播 —— 故凡 payload.seat 不在 remoteSeats 里(客户端伪造 host/AI/灵魂席
-      // 想代人出牌)一律拒。remoteSeats 取自可信 DB 座位行, 不受 payload 摆布, 该判定无法被绕过。
-      // 残余"两个远程真人互相冒名"因广播无服务端可信发送者身份, 留待 phase-2 Edge/RPC 权威闭合。
-      if(!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(payload.seat)<0) return;
-      gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳(否则纯 AI 空转会被当僵尸桌回收)
-      const ok=_ehGame.applyMove(payload.seat, payload.move);
-      if(!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照给客人纠偏
+      if(!payload||typeof payload.seat!=='number') return;
+      // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
+      // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
+  gtWireHostResume(chan, row.id, rowRef());
   gtBindConnStatus(chan);
   gtStartHostPing(chan, row.id);
   _gtActiveTable={id:row.id,host:true};
@@ -2876,7 +2904,7 @@ function gtLaunchDdz(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
       gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
-      try{ chan.send({type:'broadcast',event:'snap',payload:snap}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
     },
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
@@ -2922,6 +2950,7 @@ function gtEnterDdz(row){
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
     onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
   _gtStartTurnAlert();

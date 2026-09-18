@@ -644,6 +644,20 @@ html[data-mode="day"] .ddz-center::before{
       try{ clearTimers(); }catch(_){}              // 停掉替我托管的定时, 防接管瞬间 AI 抢先出牌
       renderAll();
     }
+    // host 侧: 把超时 idleOut 移出的远程真人席放回 remoteSeats, 停掉 AI 代打并重武装回合。
+    //   联机客人点「接管座位」或直接落子时由 app.js 调用; 本席(mySeat)走 resumeSeat, 不走这里。
+    function resumeRemote(seat){
+      if (isGuest || typeof seat !== 'number' || seat < 0 || seat === mySeat) return false;
+      const nSeats = (st && st.players && st.players.length) || 3;
+      if (seat >= nSeats) return false;   // 非法席号: 不得污染 remoteSeats
+      if (remoteSeats.indexOf(seat) < 0) remoteSeats.push(seat);
+      missStreak[seat] = 0;
+      if (Array.isArray(gameIsAI)) gameIsAI[seat] = false;
+      turnSeatActive = -1; turnPhaseActive = '';
+      try{ clearTimers(); }catch(_){}
+      try{ renderAll(); }catch(_){}
+      return true;
+    }
     // ── 招募态(lobby): 开桌先落真牌桌页(本文件), 空位可点邀灵魂/真人, host 满意点「开始 ▶」再 startDeal 就地转正局 ──
     const lobbyMode = !!opts.lobby;                      // 首帧以招募态开桌(仅 host 走此路)
     const isHostLobby = !!opts.isHost;
@@ -656,6 +670,7 @@ html[data-mode="day"] .ddz-center::before{
     let lastSnap = null;    // guest: 最近一张公共快照
     let dealNo = 0;         // 本桌第几局(host 广播随快照带出; guest 据此识别新一局去拉手牌)
     let awaitingHost = false; // guest: 已回传动作, 等 host 裁决快照期间锁 UI 防重复
+    let lastSnapSeq = undefined; // guest: 最近接受的快照单调 seq(丢弃重连乱序旧包)
     const REMOTE_TIMEOUT_MS = HUMAN_PLAY_MS + 8000;      // host 等远程真人回传的宽限, 超时自动代打
     const ACT_PLAY_MS = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_PLAY_MS;   // 我方出牌思考时长(可调, 测试可压小)
     const ACT_BID_MS  = (typeof opts.actMs==='number' && opts.actMs>0) ? opts.actMs : HUMAN_BID_MS;
@@ -2054,6 +2069,11 @@ html[data-mode="day"] .ddz-center::before{
     // ── guest: 收到 host 广播的公共脱敏快照 → 组伪状态渲染。换副/重发时重置手牌与动画; 终局弹战报。 ──
     function applySnapshot(snap){
       if (!snap || !GNet) return;
+      if (GNet.acceptSeq){
+        const acc = GNet.acceptSeq(snap, lastSnapSeq);
+        if (!acc.ok) return;                 // 迟到旧包: 丢弃, 不回退 UI
+        lastSnapSeq = acc.seq;
+      }
       const prevPhase = st ? st.phase : null;
       const isNewDeal = (typeof snap.dealNo==='number' && snap.dealNo!==dealNo) || ((prevPhase==='over'||prevPhase==='wait') && (snap.phase==='play'||snap.phase==='bid'));
       if (isNewDeal && minimized){ close(); return; }   // 主人诉求: 客人在"返回"(折叠)态下等到房主开新一局 → 到此离场(房主/其余真人继续)
@@ -2109,7 +2129,7 @@ html[data-mode="day"] .ddz-center::before{
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播脱敏快照(招募态无局可播)
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
       applyMove, setConn, connState:()=>connState,
-      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat,
+      isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
       _forceTimeout:()=>onHumanTimeout(), missOf:s=>missStreak[s]||0,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,

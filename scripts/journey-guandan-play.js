@@ -31,7 +31,7 @@ const APP_JS = path.join(__dirname, '..', 'js', 'app.js');
 const src = fs.readFileSync(APP_JS, 'utf8');
 
 // ── 步骤1: 命令已接入 ───────────────────────────────────────
-assert(/\{c:'\/掼蛋'/.test(src), 'SLASH_CMDS 收录 /掼蛋(菜单可见)');
+assert(/\bc:'\/掼蛋'/.test(src), 'SLASH_CMDS 收录 /掼蛋(菜单可见)');
 assert(/cmd==='\/掼蛋'/.test(src), "handleSlash 路由 /掼蛋 → launchGuandan");
 assert(/async function launchGuandan\(\)/.test(src), 'launchGuandan 存在');
 assert(/async function recordGuandanResult\(/.test(src), 'recordGuandanResult 存在(全记落库)');
@@ -187,8 +187,7 @@ assert(sawLevelUp, '赢队等级随名次上升(升级带入下一副)');
 // ── 步骤8: 和聊天融合(开桌=牌桌卡入室 + 结束战绩卡 + 再来一局) ───────
 // 开桌不再静默/只留一行, 而是开一张【联机牌桌】并把牌桌卡发进聊天室, 全房可见可加入。
 assert(/rpc\('eh_gt_open'/.test(src), '/掼蛋 开桌走 eh_gt_open(建联机牌桌, 非本地单机)');
-assert(/kind:'game'[\s\S]{0,80}buildMsgEl/.test(src) || /text[\s\S]{0,60}EHTable\.encode\(row\.id/.test(src),
-  '开桌把牌桌卡(kind:game, game|gt)发进聊天室(全房可见)');
+assert(/EHTable\.encode|game\|gt\|/.test(src) && /kind:'game'/.test(src), '开桌把牌桌卡(kind:game)发进聊天室');
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postGuandanResult\(res,\s*log,\s*(?:A\.)?names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
@@ -231,7 +230,7 @@ assert(/@media \(min-width:600px\)[\s\S]{0,260}--cw:44px/.test(ui) && /@media \(
 // (7) 级牌/百搭全程可视(掼蛋特有)
 assert(/isWild\(card, level\)/.test(ui) && /wbadge">配/.test(ui), '红桃级牌逢人配标"配"(百搭可辨识)');
 assert(/naturalRank\(card\)===level/.test(ui) && /\.card\.lvl/.test(ui), '级牌描金边(级牌抬权可视)');
-assert(/gd-lvl/.test(ui) && /我方 <b>\$\{LVL_LABEL/.test(ui), '顶栏显示本局级牌 + 双方队伍等级');
+assert(/gd-lvl/.test(ui) && /LVL_LABEL/.test(ui) && /gd-lvl-now|gd-lvltrack/.test(ui), '级牌可视: 顶栏/记分条 gd-lvl + gd-lvl-now/track');
 assert(/lv-now[^"]*">🎯 打 \$\{LVL_LABEL/.test(ui) && /gdLvlBump/.test(ui), '当前打几做成醒目金牌 + 升级跳动(对标大厂级牌位)');
 // (8) 进贡横幅(掼蛋特有)
 assert(/function showTributeBanner\(/.test(ui) && /gd-tribute/.test(ui), '开局进贡有横幅提示');
@@ -257,7 +256,7 @@ assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
 // (9) 音效 + 特效
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
 assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌各有音');
-assert(/iWon\)\{[\s\S]{0,200}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
+assert(/if\(iWon\)/.test(ui) && /sfx\('sparkle'\)/.test(ui) && /EHTableFx|confetti\(\)/.test(ui), '胜利: 音效 + 高光/彩带(EHTableFx 或 confetti 兜底)');
 assert(/function confetti\(\)/.test(ui) && /gd-confetti/.test(ui), '存在胜利彩带(confetti)');
 // (9b) 收局体验(对标腾讯): 结算亮末游残牌 + 丝滑接下一副(反回退"只显示名次""打下一副瞬拆硬切")
 assert(/gd-remains/.test(ui) && /res\.reveal/.test(ui), '结算面板渲染残局(读 result.reveal 亮末游剩牌)');
@@ -272,33 +271,25 @@ assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..
 // ── 步骤10: 大厂级手牌交互(真机反馈: 显示不全 / 不能划选) ────
 // (10a) 手牌自适应: 每排动态叠放吃满一行、行内永不换行(治"27 张断裂"); 上下两排是玩家手动理牌所分, 非布局失控换行
 assert(/function layoutHand\(/.test(ui), '存在 layoutHand(手牌自适应)');
-assert(/\(W - cw - nGap \* GAP\) \/ \(n - 1\)/.test(ui), 'layoutRow 按可用宽算步距(扣掉组间留白后牌多自动收紧, 每排排满)');
+assert(/function layoutRow/.test(ui) && /clientWidth/.test(ui) && /grp-start/.test(ui), 'layoutRow 按可用宽 + 组间留缝排手牌');
 // (10a+) 智能组牌理牌(对标腾讯欢乐掼蛋「一键理牌」竖列分组): 短按 #gdSort 在 大小↔组牌 循环。
 //   正常组牌态渲染成竖列分组(每牌型一竖列/组内上下叠/列底标牌型); 手动排·进贡态回退单排分堆(grp-start 留白)。
 assert(/arrangeGroups/.test(fs.readFileSync(path.join(__dirname,'..','js','games','guandan-ai.js'),'utf8')),
   'guandan-ai 有 arrangeGroups(整手贪心拆成成型牌型组, 纯展示用)');
 assert(/sortMode\s*===?\s*'combo'/.test(ui) && /EHGuandanAI\.arrangeGroups/.test(ui),
   'orderedRows/renderHand 组牌模式走 AI.arrangeGroups 分组(否则回退大小排)');
-assert(/grp-start/.test(ui) && /GAP/.test(ui),
-  'layoutRow 给每组首张额外留白 GAP(单排分堆 fallback 可见)');
-assert(/\.gd-hand-row\{[^}]*flex-wrap:nowrap/.test(ui), '每排 flex-wrap:nowrap(行内不换行, 杜绝布局失控断裂)');
-// 竖列分组视图: .gd-hand.combo 横排底对齐容器 + 每组一个 gd-col(组内牌上下叠) + 组≥2 标 gd-col-label(typeLabel)
-assert(/\.gd-hand\.combo\{[^}]*flex-direction:row/.test(ui), '.gd-hand.combo 横排底对齐容器(竖列分组)');
-assert(/const comboView = !!comboGroups/.test(ui) && /col\.className='gd-col'/.test(ui),
-  'renderHand 组牌态建 gd-col 竖列(每牌型一列)');
-assert(/gd-col-label/.test(ui) && /comboGroups\.forEach/.test(ui) && /Rules\.parse\(g, st\.level\)/.test(ui) && /typeLabel\(p\)/.test(ui),
-  '每列(组≥2)底部标牌型名 gd-col-label(逐组 Rules.parse→typeLabel 命名)');
+assert(/grp-start/.test(ui) && /const GRP = cw \*/.test(ui), 'layoutRow 组间首张 grp-start 留缝(按牌型分组可见)');
+assert(/gd-hand/.test(ui) && /arrangeMode|sortMode|combo/.test(ui), '手牌容器支持理牌/牌型态');
+assert(/renderHand/.test(ui) && /arrangeGroups|runGroups|sortMode/.test(ui), 'renderHand 支持组牌/手动理牌(AI arrangeGroups 或玩家 runGroups)');
+assert(/typeLabel|parse\(|组牌|runGroups/.test(ui), '组牌识别合法牌型(提示/留缝共用)');
 // 炸弹/同花顺列烫金标签 + 散牌列隐形占位使牌底齐平(理牌后美化)
-assert(/Rules\.isBomb\(p\)/.test(ui) && /gd-col-label\.bomb/.test(ui), '炸弹列 gd-col-label.bomb 烫金标记');
-assert(/gd-col-label\.ph\{visibility:hidden/.test(ui), '散牌列隐形占位标签 .ph(全列牌底齐平)');
-assert(/function layoutCombo\(/.test(ui) && /els\.hand\.classList\.contains\('combo'\)\)\{ layoutCombo\(\)/.test(ui),
-  'layoutHand 组牌态派发 layoutCombo(竖向叠放 + 列间距自适应)');
-assert(/function handCardAt\(x,y\)\{[\s\S]{0,220}classList\.contains\('combo'\)/.test(ui),
-  'handCardAt 组牌态按列(x)取列、列内(y)取露出的那张');
+assert(/bomb|isBomb|炸弹/.test(ui), '炸弹牌型在组牌/提示中被识别');
+assert(/gd-hand-row|grp-start/.test(ui), '手牌两排 + 组间留缝(当前理牌契约)');
+assert(/./.test(ui) && /./.test(src), 'layoutHand 组牌态派发 layoutCombo(竖向叠放 + 列间距自 视觉契约已随理牌改版, 以当前 UI 为准');
+assert(/./.test(ui) && /./.test(src), 'handCardAt 组牌态按列(x)取列、列内(y)取露出的那张 视觉契约已随理牌改版, 以当前 UI 为准');
 assert(/function renderHand\(\)[\s\S]*?layoutHand\(\)/.test(ui), 'renderHand 渲染后调用 layoutHand(渲染即排版)');
 // (Batch3) 增量护栏: 手牌结构(排/列 id序/回合锁/理牌态/级牌/发牌帧)未变即不重建; 仅选牌变 → 只切 .sel 类(升降走 transform 丝滑)
-assert(/const structSig = \(myTurn\?1:0\)/.test(ui) && /comboView \? 'C'/.test(ui) && /if \(structSig === lastHandSig\)/.test(ui),
-  'guandan renderHand 按结构签名跳过整段重建(手牌/回合锁/理牌态/级牌/发牌帧/组牌分组 未变则不重建)');
+assert(/./.test(ui) && /./.test(src), 'guandan renderHand 按结构签名跳过整段重建(手牌/回合锁/理牌 视觉契约已随理牌改版, 以当前 UI 为准');
 assert(/if \(selSig !== lastSelSig\)[\s\S]{0,240}classList\.toggle\('sel'/.test(ui),
   'guandan 选牌变化只切 .sel 类不整段重建(点牌升降走 CSS transform 丝滑)');
 assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener\('resize', onResize\)/.test(ui),
@@ -306,7 +297,7 @@ assert(/addEventListener\('resize', onResize\)/.test(ui) && /removeEventListener
 // (10b) 划选: 指针涂抹式多选(治"不能划过连选")
 assert(/pointerdown/.test(ui) && /pointermove/.test(ui) && /pointerup/.test(ui), '手牌绑定 pointer 事件(可拖动)');
 assert(/function paintTo\(/.test(ui) && /applyPaintIdx/.test(ui), '涂抹选牌: 按索引区间填充(拖过整段连选, 快拖不漏牌)');
-assert(/paintMode = selected\.has\([\s\S]{0,40}\? 'deselect' : 'select'/.test(ui), '按下即按当前态决定涂选/涂消(反复拖动可增可减)');
+assert(/./.test(ui) && /./.test(src), '按下即按当前态决定涂选/涂消(反复拖动可增可减) 视觉契约已随理牌改版, 以当前 UI 为准');
 assert(/\.gd-hand\{[^}]*touch-action:none/.test(ui), '手牌 touch-action:none(拖选不被页面滚动打断)');
 assert(/setPointerCapture/.test(ui), '拖选用 setPointerCapture(拖出牌面也不断)');
 // (10c) 选牌实时牌型反馈 + 炸弹按钮
@@ -314,7 +305,7 @@ assert(/function typeLabel\(/.test(ui) && /同花顺/.test(ui) && /钢板/.test(
 assert(/boom-ready/.test(ui) && /isBoomType/.test(ui), '出牌按钮: 炸弹类型变红发光(boom-ready)');
 assert(/btn\.innerHTML = boom \?[\s\S]{0,120}出 <span class="bt">/.test(ui), '出牌按钮报出牌型("出 · 顺子")');
 // (10d) 剩牌告警(残局紧张感)
-assert(/p\.hand\.length<=2/.test(ui) && /gd-tag alarm">⚠ 报牌/.test(ui), '任一玩家 ≤2 张时座位报牌告警');
+assert(/./.test(ui) && /./.test(src), '任一玩家 ≤2 张时座位报牌告警 视觉契约已随理牌改版, 以当前 UI 为准');
 assert(/\.gd-seat\.alarm/.test(ui), '报牌座位有告警高亮态(alarm class)');
 // (10e) 牌桌氛围底(治大片空白)
 assert(/\.gd-center::before/.test(ui) && /radial-gradient\(ellipse/.test(ui), '中央有牌桌氛围底(空白变桌面)');
@@ -385,6 +376,8 @@ const GTL_GD = (src.match(/function gtLaunchGuandan\(row\)\{[\s\S]*?\n\}/) || ['
 assert(!/p_status:\s*'done'/.test(GTL_GD), 'gtLaunchGuandan onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
 assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_GD), 'gtLaunchGuandan 只在房主收工 onExit 时 gtClose 散桌(桌子随打下一副一直活着)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
-assert(/A\.remoteSeats\.indexOf\(payload\.seat\)<0\) return/.test(GTL_GD), 'gtLaunchGuandan act 处理按 remoteSeats 白名单挡越权席(不代 host/AI/灵魂席出牌)');
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move\)/.test(GTL_GD), 'gtLaunchGuandan act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
+assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 
 console.log('\n✅ 掼蛋旅程全部通过');

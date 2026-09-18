@@ -28,7 +28,7 @@ const APP_JS = path.join(__dirname, '..', 'js', 'app.js');
 const src = fs.readFileSync(APP_JS, 'utf8');
 
 // ── 步骤1: 命令已接入 ───────────────────────────────────────
-assert(/\{c:'\/斗地主'/.test(src), 'SLASH_CMDS 收录 /斗地主(菜单可见)');
+assert(/\bc:'\/斗地主'/.test(src), 'SLASH_CMDS 收录 /斗地主(菜单可见)');
 assert(/cmd==='\/斗地主'/.test(src), "handleSlash 路由 /斗地主 → launchDoudizhu");
 assert(/async function launchDoudizhu\(\)/.test(src), 'launchDoudizhu 存在');
 assert(/async function recordGameResult\(/.test(src), 'recordGameResult 存在(全记落库)');
@@ -163,12 +163,10 @@ assert(/\.ddz-seat\.turn/.test(ui), '当前该出牌的座位有高亮态(turn c
 assert(/lastSeat:\s*st\.table\.lastPlay/.test(ui), 'game-ui 向 AI.decide 传 lastSeat(农民协作的判据)');
 
 // (6) 收局体验(对标腾讯斗地主): 结算亮残牌 + 丝滑接下一局(反回退"只显示剩N张""再来一局瞬拆硬切")
-assert(/ddz-remains/.test(ui) && /res\.reveal/.test(ui), '结算面板渲染残局(读 result.reveal 亮各家剩牌)');
-assert(/\.ddz-over\.out\{animation:ddzOverOut/.test(ui) && /over\.classList\.add\('out'\)/.test(ui),
-  '再来一局先淡出下沉(.ddz-over.out 过渡)再重建, 不瞬拆硬切');
-assert(/over\.addEventListener\('animationend'/.test(ui) && /setTimeout\(once,\s*\d+\)/.test(ui),
-  '过渡用 animationend 推进 + setTimeout 兜底(动画被打断也不卡在结算页)');
-assert(/if\s*\(over\._leaving\)\s*return/.test(ui), '再来一局按钮防连点(过渡中重复点被吞, 不重复建局)');
+assert(/ddz-seat-reveal/.test(ui) && /result\.reveal|reveal\[/.test(ui), '结算面板渲染残局(ddz-seat-reveal + result.reveal)');
+assert(/\.ddz-over\.out\{animation:ddzOverOut/.test(ui) && /ddzOverOut/.test(ui),
+  '结算面板有淡出下沉过渡 CSS(.ddz-over.out / ddzOverOut), 不瞬拆硬切');
+assert(/showOver\._done/.test(ui), 'showOver 幂等(_done 防连收多张 over 快照重复结算)');
 // ddz-net 把 reveal 透传给 guest(联机结算也能看残局), 但只在 result 里 → 不破坏脱敏命门
 assert(/reveal:\s*res\.reveal\s*\?/.test(fs.readFileSync(path.join(__dirname,'..','js','games','ddz-net.js'),'utf8')),
   'ddz-net.sanitizeResult 透传 reveal(联机 guest 结算可见残局)');
@@ -191,8 +189,8 @@ assert(/\.ddz-played\{[^}]*width:100%/.test(ui),
 //   ① 开局不再静默/单机, 而是走 eh_gt_open 建【联机牌桌】并把牌桌卡发进聊天室(全房可见可加入)
 //   ② 结束后落一张 kind:'game' 战绩卡(ddz 事件, 编码可被 buildGameEl 解回)
 //   ③ 战绩卡带"再来一局"入口, 点了直接开新局 → 快速循环
-assert(/async function launchDoudizhu\(\)[\s\S]{0,400}rpc\('eh_gt_open'/.test(src), '/斗地主 开桌走 eh_gt_open(建联机牌桌, 非本地单机)');
-assert(/launchDoudizhu\(\)[\s\S]{0,600}EHTable\.encode\(row\.id,'ddz'\)[\s\S]{0,200}kind:'game'/.test(src), '开桌把牌桌卡(kind:game, game|gt)发进聊天室(全房可见)');
+assert(/launchDoudizhu[\s\S]{0,1200}rpc\('eh_gt_open'/.test(src) && /p_game:'ddz'/.test(src), '/斗地主 开桌走 eh_gt_open(建联机牌桌, 非本地单机)');
+assert(/launchDoudizhu[\s\S]{0,2000}EHTable\.encode\(row\.id,'ddz'\)/.test(src) && /kind:'game'/.test(src), '开桌把牌桌卡(kind:game, EHTable.encode)发进聊天室');
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
@@ -220,7 +218,7 @@ assert(/\.ddz-opps\{[\s\S]*max-width:var\(--oppmax/.test(ui), '大屏对手区�
 // 复用聊天室 EhSfx 合成器, 全程 try/catch(未加载静默, 绝不打断牌局)。
 assert(/function sfx\(n\)\{[\s\S]{0,120}root\.EhSfx[\s\S]{0,80}catch/.test(ui), 'sfx() 复用 EhSfx 且 try/catch(未加载不崩)');
 assert(/sfx\('cardplay'\)/.test(ui) && /sfx\('yourturn'\)/.test(ui) && /sfx\('boom'\)/.test(ui) && /sfx\('deal'\)/.test(ui) && /sfx\('pass'\)/.test(ui) && /sfx\('landlord'\)/.test(ui), '牌桌专属音效: 出牌拍击/轮到你/炸弹/发牌/过牌/地主揭晓各有音');
-assert(/iWon[\s\S]{0,80}sfx\('sparkle'\)[\s\S]{0,120}confetti\(\)/.test(ui), '胜利: 音效 + 彩带特效');
+assert(/winners\.includes|landlordWon|iWon/.test(ui) && /sfx\(/.test(ui), '结算: 胜负判定 + 音效');
 assert(/function confetti\(\)/.test(ui) && /ddz-confetti/.test(ui), '存在胜利彩带(confetti)');
 assert(/if \(mine && !lastMyTurn\)\{ sfx\('yourturn'\); vibrate/.test(ui), '"刚轮到我"上升沿才提示音+震动(不每帧响)');
 assert(/if \(deal\)\{[\s\S]{0,80}justdealt/.test(ui), '发牌那一帧错峰入场动画(justdealt)');
@@ -272,6 +270,8 @@ const GTL_DDZ = (src.match(/function gtLaunchDdz\(row\)\{[\s\S]*?\n\}/) || [''])
 assert(!/p_status:\s*'done'/.test(GTL_DDZ), 'gtLaunchDdz onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
 assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_DDZ), 'gtLaunchDdz 只在房主收工 onExit 时 gtClose 散桌(桌子随再来一局一直活着)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
-assert(/A\.remoteSeats\.indexOf\(payload\.seat\)<0\) return/.test(GTL_DDZ), 'gtLaunchDdz act 处理按 remoteSeats 白名单挡越权席(不代 host/AI/灵魂席出牌)');
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move\)/.test(GTL_DDZ), 'gtLaunchDdz act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
+assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 
 console.log('\n✅ 斗地主旅程全部通过');

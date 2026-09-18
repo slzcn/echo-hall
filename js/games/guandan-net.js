@@ -142,6 +142,14 @@
     return { ok: leaks.length === 0, leaks: leaks };
   }
 
+  // guest 侧乱序丢弃: host 每条广播带单调 seq; 更旧的迟到包直接拒, 无 seq 的旧客户端兼容放行。
+  function acceptSeq(snap, lastSeq){
+    if (!snap || typeof snap !== 'object') return { ok:false, seq:lastSeq };
+    if (typeof snap.seq !== 'number') return { ok:true, seq:lastSeq };
+    if (typeof lastSeq === 'number' && snap.seq < lastSeq) return { ok:false, seq:lastSeq };
+    return { ok:true, seq:snap.seq };
+  }
+
   return {
     snapshot: snapshot,
     pseudoState: pseudoState,
@@ -149,6 +157,7 @@
     sanitizeTribute: sanitizeTribute,
     lastPlayPlain: lastPlayPlain,
     assertNoLeak: assertNoLeak,
+    acceptSeq: acceptSeq,
     cardPlain: cardPlain,
   };
 });

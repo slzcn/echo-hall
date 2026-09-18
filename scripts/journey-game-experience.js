@@ -21,7 +21,7 @@ function assert(ok, msg){ step++; if(!ok){ failed=true; console.error(`✗ [${st
 
 // ── 源码契约：网络心跳、后台提醒、回看整合必须真实存在 ──
 assert(/event:'host_ping'/.test(APP) && /setInterval\(send,\s*8000\)/.test(APP), 'host 每 8 秒广播 host_ping');
-assert(/gap>15000/.test(APP) && /setConn\('host_offline'\)/.test(APP), 'guest 15 秒收不到 host_ping 显示房主离线');
+assert(/gap>45000/.test(APP) && /setConn\('host_offline'\)/.test(APP), 'guest 45 秒收不到 host_ping 显示房主离线(防后台误报)');
 assert(/CHANNEL_ERROR'\|\|status==='TIMED_OUT'\|\|status==='CLOSED/.test(APP) && /setConn\('reconnecting'\)/.test(APP), 'Realtime 错误/超时/关闭进入重连中');
 assert(/document\.hidden[\s\S]{0,220}_isMyTurnInGame/.test(APP) && /new Notification\('🫵 轮到你出牌/.test(APP), '后台轮到我触发标题与已授权桌面通知');
 assert(!/Notification\.requestPermission/.test(APP), '不主动弹通知授权框，只在用户已授权时渐进增强');

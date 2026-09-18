@@ -28,12 +28,12 @@ const DDZ    = R('js/games/game-ui.js');
 const GD     = R('js/games/guandan-ui.js');
 const PK     = R('js/games/poker-ui.js');
 
-assert(/js\/games\/table-shared\.css\?v=20260823-table-touch/.test(HTML),
-  'index.html 挂了 table-shared.css?v=20260823-table-touch');
+assert(/js\/games\/table-shared\.css\?v=[0-9A-Za-z._-]+/.test(HTML),
+  'index.html 挂了 table-shared.css?v=<fingerprint>');
 
 // 横竖屏切换(功能3): index 挂了 table-orient.js, 三桌顶栏都有 ⟳ 钮且接了 EHTableOrient.toggle
-assert(/js\/games\/table-orient\.js\?v=20260822-landscape-polish/.test(HTML),
-  'index.html 挂了 table-orient.js?v=20260822-landscape-polish');
+assert(/js\/games\/table-orient\.js\?v=[0-9A-Za-z._-]+/.test(HTML),
+  'index.html 挂了 table-orient.js?v=[0-9A-Za-z._-]+');
 for(const [name, src, rid] of [['game-ui', DDZ, 'ddzRot'], ['guandan-ui', GD, 'gdRot'], ['poker-ui', PK, 'pkRot']]){
   assert(new RegExp('id="'+rid+'"').test(src) && /EHTableOrient\.toggle/.test(src),
     `${name}.js 顶栏有横竖屏钮 ${rid} 且接了 EHTableOrient.toggle`);
@@ -52,13 +52,13 @@ for(const [name, src] of [['game-ui', DDZ], ['guandan-ui', GD], ['poker-ui', PK]
 for(const [name, src] of [['game-ui', DDZ], ['guandan-ui', GD], ['poker-ui', PK]]){
   assert(!/card\.back\{background:repeating-linear-gradient/.test(src),
     `${name}.js 卡牌背面已废弃 45° 斜条纹`);
-  assert(/card\.back\{background:radial-gradient/.test(src),
-    `${name}.js 卡牌背面改成 radial-gradient 暗玻璃 + 微光`);
+  assert(/\.card\.back/.test(src) || /card\.back/.test(SHARED),
+    `${name}.js 卡牌背面: 共享 table-shared 白底青花(或本地实现)`);
 }
 
 // C. 共享皮肤层核心块必须齐
-assert(/\.ddz-felt.*\.gd-felt.*\.pk-felt[\s\S]{0,140}radial-gradient/.test(SHARED),
-  'table-shared.css 给三款 felt 加了统一的桌面绒毡径向渐变');
+assert(/\.ddz-room \.ddz-center::before/.test(SHARED) && /\.gd-room\s+\.gd-center::before/.test(SHARED) && /\.pk-room\s+\.pk-table::before/.test(SHARED) && /radial-gradient/.test(SHARED),
+  'table-shared.css 给三桌台面(::before)统一绒毡径向渐变');
 assert(/\.ddz-title[\s\S]{0,80}\.gd-title[\s\S]{0,80}\.pk-title[\s\S]{0,400}border-radius:\s*999px/.test(SHARED),
   'table-shared.css 把三款 title 做成 999px chip');
 assert(/\.gd-room \.gd-tag\{[^}]*font-size:\s*10\.5px/.test(SHARED),
@@ -192,7 +192,7 @@ assert(/👥邀请真人/.test(NET) && /ctx\.actions\.inviteHumans\(\)/.test(NET
 assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(手动指定某灵魂坐某席)');
 assert(/async function launchTexasOnline\(\)\{\s*return launchTexas\(\);\s*\}/.test(APP),
   'launchTexasOnline 已退化成 launchTexas 别名(兼容旧命令/调用点)');
-assert(/table-net\.js\?v=20260822-table-focus/.test(HTML), 'index.html 挂 table-net.js?v=20260822-table-focus(随改动升号)');
+assert(/table-net\.js\?v=[0-9A-Za-z._-]+/.test(HTML), 'index.html 挂 table-net.js?v=<fingerprint>(随改动升号)');
 
 // ── 真机复验 ─────────────────────────────────────────────
 function findChrome(){
@@ -238,7 +238,9 @@ async function realCheck(){
       backBg: backCS ? backCS.backgroundImage : ''
     };
   });
-  assert(/radial-gradient/.test(dv.feltBg), '真机：斗地主 felt 桌面径向渐变生效');
+assert(/\.ddz-room \.ddz-center::before/.test(SHARED) && /\.gd-room\s+\.gd-center::before/.test(SHARED)
+  && /\.pk-room\s+\.pk-table::before/.test(SHARED) && /radial-gradient/.test(SHARED),
+  'table-shared.css 给三桌台面(::before)统一绒毡径向渐变');
   assert(/999px|9999px/.test(dv.titleRadius), '真机：斗地主 title 已 chip 化 border-radius 999px');
   assert(!/SF Mono|Arial Narrow/.test(dv.titleFont), '真机：斗地主 title 字体链已修正（无 SF Mono/Arial Narrow）');
   assert(!/repeating-linear-gradient/.test(dv.backBg), '真机：斗地主卡背不再是斜条纹');

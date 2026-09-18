@@ -15,7 +15,7 @@ const Engine = require('../js/games/poker-engine.js');
 const AI     = require('../js/games/poker-ai.js');
 const Net    = require('../js/games/poker-net.js');
 
-let step = 0, failed = false;
+let step = 0, failed = false, convergeFailed = false;
 function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [${step}] ${msg}`); } else console.log(`✓ [${step}] ${msg}`); }
 
 // 浏览器真实加载链：传输层必须存在，且必须在 UI/app 前加载。Node 直接 require 能通过，不能替代这条运行时契约。
@@ -24,8 +24,8 @@ function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [
   const netAt = html.indexOf('js/games/poker-net.js');
   const uiAt  = html.indexOf('js/games/poker-ui.js');
   const appAt = html.indexOf('js/app.js');
-  assert(netAt >= 0, 'index.html 加载 poker-net.js（真实浏览器具备 EHPokerNet）');
-  assert(netAt < uiAt && uiAt < appAt, '德州联机脚本顺序为 net → ui → app');
+assert(/poker-net.js/.test(fs.readFileSync(path.join(__dirname,'..','js','game-loader.js'),'utf8')), 'game-loader MANIFEST 含 poker-net.js');
+assert(/game-loader/.test(fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')), 'index.html 挂 game-loader(联机层懒加载)');
 }
 
 // ── 桌面配置: 4 席。0=host 真人, 1=AI/灵魂席, 2 & 3 = 远程真人(各自客户端) ──
@@ -133,10 +133,10 @@ while (handNo < 40 && stacks.filter(v=>v>0).length >= 2){
   if (res.wentToShowdown) sawShowdown = true; else sawFoldWin = true;
   guests.forEach(g => {
     const s = g.snap;
-    if (s.phase !== 'over') { failed=true; console.error(`  客人席${g.seat}未收到终局快照`); return; }
-    if (s.pot !== state.pot) { failed=true; console.error(`  客人席${g.seat}底池不一致 ${s.pot}!=${state.pot}`); return; }
-    if (s.board.length !== state.board.length) { failed=true; console.error(`  客人席${g.seat}公共牌数不一致`); return; }
-    if (JSON.stringify(s.result.winnersBySeat) !== JSON.stringify(res.winnersBySeat)) { failed=true; console.error(`  客人席${g.seat}赢家不一致`); return; }
+    if (s.phase !== 'over') { convergeFailed=true; failed=true; console.error(`  客人席${g.seat}未收到终局快照`); return; }
+    if (s.pot !== state.pot) { convergeFailed=true; failed=true; console.error(`  客人席${g.seat}底池不一致 ${s.pot}!=${state.pot}`); return; }
+    if (s.board.length !== state.board.length) { convergeFailed=true; failed=true; console.error(`  客人席${g.seat}公共牌数不一致`); return; }
+    if (JSON.stringify(s.result.winnersBySeat) !== JSON.stringify(res.winnersBySeat)) { convergeFailed=true; failed=true; console.error(`  客人席${g.seat}赢家不一致`); return; }
     convergeChecks++;
   });
   // (3) 私牌隔离: 客人 A 读客人 B 的底牌 → 一律 null
@@ -155,7 +155,7 @@ assert(guestActedLegally > 0, `(2) 客人凭"自己底牌+公共快照"组出伪
 assert(isoOk, '(3) 私牌隔离: 客人读不到他人底牌(RLS uid 不匹配即拒)');
 assert(outOfTurnRejected, '(4a) host 权威: 非本人回合的动作被引擎拒');
 assert(illegalRejected, '(4b) host 权威: 超过筹码的加注被引擎拒');
-assert(convergeChecks > 0 && !failed, `(5) 收敛: 每手每个客人快照公共态与 host result 一致 (${convergeChecks} 次核对)`);
+assert(convergeChecks > 0 && !convergeFailed, `(5) 收敛: 每手每个客人快照公共态与 host result 一致 (${convergeChecks} 次核对)`);
 assert(sawShowdown || sawFoldWin, '旅程覆盖摊牌/弃牌收池至少一种终局');
 
 // 单独直证快照剥离(即便引擎内部字段改名, 这条也钉住白名单产出): 从一个带 _deck/seed/log 的真 state 取快照

@@ -95,7 +95,7 @@ const ui  = R('js/games/poker-ui.js');
 const html = R('index.html');
 
 // slash 命令 + 唤起
-assert(/\{c:'\/德州'/.test(src), '/德州 已注册进 SLASH_CMDS(聊天可直接开局)');
+assert(/\bc:'\/德州'/.test(src), '/德州 已注册进 SLASH_CMDS(聊天可直接开局)');
 assert(/cmd==='\/德州'\|\|cmd==='\/texas'\|\|cmd==='\/poker'\|\|cmd==='\/holdem'/.test(src), 'handleSlash 认 /德州·/texas·/poker·/holdem');
 assert(/async function launchTexas\(/.test(src), '存在 launchTexas(开真牌桌)');
 assert(/async function launchTexas\(\)\{[\s\S]*?eh_gt_open[\s\S]*?\n\}/.test(src), 'launchTexas 走 eh_gt_open 开真牌桌(不再另起单机 EHPokerGame 局)');
@@ -109,7 +109,9 @@ assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src
 assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
 const GTL_PK = (src.match(/function gtLaunchPoker\(row\)\{[\s\S]*?\n\}/) || [''])[0];
-assert(/A\.remoteSeats\.indexOf\(payload\.seat\)<0\) return/.test(GTL_PK), 'gtLaunchPoker act 处理按 remoteSeats 白名单挡越权席(不代 host/AI/灵魂席出牌)');
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move\)/.test(GTL_PK), 'gtLaunchPoker act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
+assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 
 // 结束回调 → 战绩卡 + 落库(在 gtLaunchPoker 的 onResult 里, 名册取 A.names/A.avatars)
 assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');
@@ -133,9 +135,8 @@ assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 
 assert(/AI\.personaForSoul\(soul\)\.key/.test(ui), '灵魂原型→打法性格映射(personaForSoul)');
 assert(/function applyMove\(seat, move\)/.test(ui), 'applyMove 就位(供 host 权威应用远程真人动作/测试驱动)');
 // 反回退: 对手须落在【上弧】收在桌内(曾因 ±43% 侧位戳出屏外点不到; 竖屏 felt 收矮后 CY 46→48 让上弧座位下移不戳顶)
-assert(/const RX = land \? 46 : 40, RY = land \? 30 : 34, CY = land \? 42 : 48/.test(ui) &&
-  /const cx = 50 \+ RX\*Math\.cos\(t\)/.test(ui) && /const cy = CY - RY\*Math\.sin\(t\)/.test(ui),
-  '对手沿上弧分布(竖屏横40%/纵34%收桌内, 中心 48% 下移防顶边, 横屏收进46/30弧)——防侧位溢出屏外');
+assert(/const RX = land \? 46 : 40, RY = land \? 41 : 32/.test(ui) && /const CY = lob \? 50 : \(land \? 59 : 46\)/.test(ui),
+  '对手沿上弧椭圆分布(RX/RY/CY 随横竖屏与招募态切换, 收在桌内)');
 assert(/for\(let i=st\.board\.length;i<5;i\+\+\)/.test(ui), '公共牌区恒 5 槽(已发+暗背占位)');
 assert(/function onHumanTimeout\(/.test(ui) && /HUMAN_ACT_MS/.test(ui), '到我行动亮倒计时, 超时自动过牌/弃牌');
 assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80}opts\.onResult\(res, st\.log/.test(ui),
@@ -148,6 +149,7 @@ assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
 
 // ── 摊牌成手提示 + 赢家成手牌高亮(Batch2) ──
 // evaluate 只给档位不给"哪 5 张", 新增 bestFive 返回构成最优成手的实际 5 张牌对象(高亮依据)。
+const loader = fs.readFileSync(path.join(__dirname,'..','js','game-loader.js'),'utf8');
 const Eval = require('../js/games/poker-eval.js');
 assert(typeof Eval.bestFive==='function', 'poker-eval 导出 bestFive(返回最优成手的 5 张实牌)');
 {
@@ -166,7 +168,7 @@ assert(/function best5Set\(seat\)\{[\s\S]*?res\.wentToShowdown[\s\S]*?res\.revea
   'best5Set 仅从 result.reveal+board 算高亮(不读局中快照, 守脱敏命门)');
 assert(/pk-win-card/.test(ui) && /Eval\.bestFive/.test(ui), '赢家成手 5 张镶金框高亮(pk-win-card, 复用 Eval.bestFive)');
 assert(/pk-mini-hn/.test(ui) && /rv\.hand/.test(ui), '摊牌台面直接标各家成手牌型(pk-mini-hn 读 reveal.hand)');
-assert(/poker-eval\.js\?v=/.test(html), 'index.html poker-eval 带 ?v= 指纹(bestFive 改动需刷新缓存)');
+assert(/poker-eval\.js/.test(loader), 'poker-eval 在 game-loader MANIFEST 中懒加载(BUILD_VER 指纹)');
 
 // ── (Batch3) 增量护栏: 公共牌区 / 我的底牌条 按签名跳过重建 ──
 // 街与街之间(等各家行动, 每秒一次重绘)公共牌与底牌都静止, 不必反复 innerHTML 重建; 发新牌/摊牌/需跟额变化才重建。
@@ -178,8 +180,8 @@ assert(/if \(meSig === lastMeSig\) return;/.test(ui) && /const meSig = st\.phase
 assert(!/lastBoardSig[\s\S]{0,400}reveal\[(?!seat)/.test(ui), 'renderBoard 签名不读别家 reveal(守脱敏命门)');
 
 // index.html 已挂 4 个扑克脚本 + 版本指纹
-assert(/poker-eval\.js\?v=/.test(html) && /poker-engine\.js\?v=/.test(html) && /poker-ai\.js\?v=/.test(html) && /poker-ui\.js\?v=/.test(html),
-  'index.html 挂齐 poker-eval/engine/ai/ui 四脚本(带 ?v= 指纹)');
+assert(/poker-eval\.js/.test(loader) && /poker-engine\.js/.test(loader) && /poker-ai\.js/.test(loader) && /poker-ui\.js/.test(loader),
+  'game-loader MANIFEST 懒加载 poker 四件套(eval/engine/ai/ui)');
 
 console.log(`\n德州扑克旅程: 打了 ${handNo} 手, ${step} 步全过${failed ? ' —— 有失败' : ''}`);
 process.exit(failed ? 1 : 0);

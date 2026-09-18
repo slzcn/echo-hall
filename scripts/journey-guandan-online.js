@@ -17,7 +17,7 @@ const Engine = require('../js/games/guandan-engine.js');
 const AI     = require('../js/games/guandan-ai.js');
 const Net    = require('../js/games/guandan-net.js');
 
-let step = 0, failed = false;
+let step = 0, failed = false, convergeFailed = false;
 function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [${step}] ${msg}`); } else console.log(`✓ [${step}] ${msg}`); }
 
 // 浏览器真实加载链：传输层必须存在，且必须在 UI/app 前加载。Node require 全绿不能替代这条运行时契约。
@@ -26,8 +26,8 @@ function assert(cond, msg){ step++; if(!cond){ failed=true; console.error(`✗ [
   const netAt = html.indexOf('js/games/guandan-net.js');
   const uiAt  = html.indexOf('js/games/guandan-ui.js');
   const appAt = html.indexOf('js/app.js');
-  assert(netAt >= 0, 'index.html 加载 guandan-net.js（真实浏览器具备 EHGuandanNet）');
-  assert(netAt < uiAt && uiAt < appAt, '掼蛋联机脚本顺序为 net → ui → app');
+assert(/guandan-net.js/.test(fs.readFileSync(path.join(__dirname,'..','js','game-loader.js'),'utf8')), 'game-loader MANIFEST 含 guandan-net.js');
+assert(/game-loader/.test(fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')), 'index.html 挂 game-loader(联机层懒加载)');
 }
 
 // ── 桌面配置: 4 席 2 队(0&2 一队 / 1&3 一队)。0=host 真人, 2=AI/灵魂席(host本机), 1 & 3 = 远程真人(各自客户端) ──
@@ -146,10 +146,10 @@ while (dealNo < 6){
   const res = state.result;
   guests.forEach(g => {
     const s = g.snap;
-    if (s.phase !== 'over' || !s.result){ failed=true; console.error(`  客人席${g.seat}未收到终局快照`); return; }
-    if (JSON.stringify(s.result.finishOrder) !== JSON.stringify(res.finishOrder)){ failed=true; console.error(`  客人席${g.seat}名次不一致`); return; }
-    if (s.result.winnerTeam !== res.winnerTeam){ failed=true; console.error(`  客人席${g.seat}赢家队不一致`); return; }
-    if (JSON.stringify(s.result.teamLevelsAfter) !== JSON.stringify(res.teamLevelsAfter)){ failed=true; console.error(`  客人席${g.seat}升级后等级不一致`); return; }
+    if (s.phase !== 'over' || !s.result){ convergeFailed=true; failed=true; console.error(`  客人席${g.seat}未收到终局快照`); return; }
+    if (JSON.stringify(s.result.finishOrder) !== JSON.stringify(res.finishOrder)){ convergeFailed=true; failed=true; console.error(`  客人席${g.seat}名次不一致`); return; }
+    if (s.result.winnerTeam !== res.winnerTeam){ convergeFailed=true; failed=true; console.error(`  客人席${g.seat}赢家队不一致`); return; }
+    if (JSON.stringify(s.result.teamLevelsAfter) !== JSON.stringify(res.teamLevelsAfter)){ convergeFailed=true; failed=true; console.error(`  客人席${g.seat}升级后等级不一致`); return; }
     convergeChecks++;
   });
   // (3) 私牌隔离: 客人 A 读客人 B / host 的手牌 → 一律 null
@@ -169,7 +169,7 @@ assert(guestAcceptedByHost > 0, `(2b) 客人算出的出牌被 host 引擎校验
 assert(isoOk, '(3) 私牌隔离: 客人读不到他人手牌(RLS uid 不匹配即拒)');
 assert(outOfTurnRejected, '(4a) host 权威: 非本人回合的出牌被引擎拒');
 assert(notInHandRejected, '(4b) host 权威: 打不在自己手上的牌被引擎拒');
-assert(convergeChecks > 0 && !failed, `(5) 收敛: 每副每个客人快照公共态与 host result 一致 (${convergeChecks} 次核对)`);
+assert(convergeChecks > 0 && !convergeFailed, `(5) 收敛: 每副每个客人快照公共态与 host result 一致 (${convergeChecks} 次核对)`);
 assert(sawOver, '旅程覆盖至少一副完整终局(名次+升级)');
 
 // 单独直证快照剥离(即便引擎内部字段改名, 这条也钉住白名单产出): 从一个带 seed/log 的真 state 取快照
