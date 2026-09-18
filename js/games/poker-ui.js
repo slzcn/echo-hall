@@ -2000,7 +2000,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       saveScore();   // 存本桌累计净盈亏防重进清零
       const won=(res.winnersBySeat||[]).includes(mySeat);
       const my=st.players[mySeat];
-      const delta = my.stack - my.start;
+      // 我这手净变动: 优先引擎 result.delta[mySeat]（含边池，权威）；兜底 stack-start
+      const engDelta = (res && res.delta && typeof res.delta[mySeat]==='number') ? res.delta[mySeat] : null;
+      const delta = (engDelta!=null) ? engDelta : (my.stack - my.start);
+      // 我收池金额（拆分池按人均）: 与「底池总额」区分 —— 底池含自己投入，不能当「赢到手」
+      const potWon = (res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0);
+      const potTotalAll = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
 
       // ── 单机常规手: 去掉结算弹窗, 直接在牌桌上"演赢筹码 + 自动发下一手" ──
       //   (主人: 多个弹窗太复杂, 直接在牌桌上完成下一局; 用动画表示赢走筹码, 再直接进发牌动画)
@@ -2014,21 +2019,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           const champSeat = (res.winnersBySeat||[])[0];
           const champName = (champSeat!=null && st.players[champSeat]) ? st.players[champSeat].name : '赢家';
           const champCount = (res.winnersBySeat||[]).length;
-          const potTotal = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+          const potTotal = potTotalAll;
           const handName = (res.wentToShowdown && res.reveal && champSeat!=null && res.reveal[champSeat]) ? res.reveal[champSeat].hand : '';
-          const line = champCount>1
-            ? `🏆 ${champCount} 家平分 ${potTotal}`
-            : `🏆 ${escapeHtml(champName)} 赢下 ${potTotal}${handName?(' · '+handName):''}`;
+          const cDelta = (champSeat!=null && res.delta && typeof res.delta[champSeat]==='number') ? res.delta[champSeat] : null;
+          const line = won
+            ? `🏆 你收池 ${potWon} · 本手 ${delta>=0?'+':''}${delta} · 桌面 ${my.stack}${handName?(' · '+handName):''}`
+            : (champCount>1
+                ? `🏆 ${champCount} 家平分底池 ${potTotal} · 你 ${delta>=0?'+':''}${delta}`
+                : `🏆 ${escapeHtml(champName)}${cDelta!=null&&cDelta>0?` 净赢 +${cDelta}`:` 收池 ${potTotal}`} · 你 ${delta>=0?'+':''}${delta}`);
           showWinBanner(line, won);
           if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
           if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); vibrate([20,60,30]); pkCelebrate(false); }
           else if(delta<0){ sfx('void'); vibrate(60); }
           emitBeat({ type:'over', actor:champName, big:true,
-            text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
+            text: won
+              ? `🏁 你收池 ${potWon}（净 ${delta>=0?'+':''}${delta}）`
+              : `🏁 ${champName}${cDelta!=null&&cDelta>0?` 净赢 +${cDelta}`:` 收池 ${potTotal}`}${handName?(' · '+handName):''}`,
             quip: beatQuip(champSeat, 'win') });
           if(typeof opts.onResult==='function'){ try{
-            const potWon0=(res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=>a+Math.floor(pt.amount/(pt.winners.length||1)),0);
-            opts.onResult(res, st.log, { mySeat, potWon:potWon0, delta, handName, myStack:my.stack });
+            opts.onResult(res, st.log, { mySeat, potWon, delta, handName, myStack: my.stack });
           }catch(e){ _ehCatch('poker.onResult', e); } }
           emitWallet();
           if (minimized) updateChip();
@@ -2057,7 +2066,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const w=res.winnersBySeat&&res.winnersBySeat[0];
         rowsHtml = `<span class="pk-foldwin">🏆 ${escapeHtml(st.players[w]?st.players[w].name:'赢家')} 收下底池（其余弃牌）</span>`;
       }
-      const potWon = (res.pots||[]).filter(pt=>(pt.winners||[]).includes(mySeat)).reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0);
       // 边池拆分明细(有 all-in 分层时): 逐池列 归属赢家 + 金额(对标德州扑克摊牌结算)
       const potsHtml = (res.pots && res.pots.length>1)
         ? `<div class="pk-pots">${res.pots.map((pt,i)=>{
@@ -2123,12 +2131,23 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 赢家一行(常显): 谁靠什么赢下多少 —— 一眼看清结果, 不必展开摊牌逐行去数。
       const champSeat0 = (res.winnersBySeat||[])[0];
       const champCount = (res.winnersBySeat||[]).length;
-      const potTotalAll = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
       const champNm = (champSeat0!=null && st.players[champSeat0]) ? st.players[champSeat0].name : '赢家';
       const champHnd = (res.wentToShowdown && res.reveal && champSeat0!=null && res.reveal[champSeat0]) ? res.reveal[champSeat0].hand : '';
+      // 赢家展示: 优先「本手净赢」(引擎 delta)；多人平分显示人均收池；避免把含自己投入的底池总额说成「赢下」
+      const champDelta = (champSeat0!=null && res.delta && typeof res.delta[champSeat0]==='number') ? res.delta[champSeat0] : null;
+      const champShare = (champSeat0!=null)
+        ? (res.pots||[]).filter(pt=>(pt.winners||[]).includes(champSeat0))
+            .reduce((a,pt)=> a + Math.floor(pt.amount/(pt.winners.length||1)), 0)
+        : 0;
       const champLine = champCount>1
-        ? `🏆 ${champCount} 家平分 ${potTotalAll}`
-        : `🏆 ${escapeHtml(champNm)} 赢下 ${potTotalAll}${champHnd?(' · '+champHnd):''}`;
+        ? `🏆 ${champCount} 家平分底池 ${potTotalAll}（人均约 ${Math.floor(potTotalAll/champCount)}）`
+        : `🏆 ${escapeHtml(champNm)} ${champDelta!=null && champDelta>0 ? `净赢 +${champDelta}` : `收池 ${champShare||potTotalAll}`}${champHnd?(' · '+champHnd):''}`;
+      // 我方一行(结算tips核心数字): 本手净变动 + 我实际收池 + 当前桌面积分
+      const myLine = (delta>0)
+        ? `你净赢 +${delta} · 收池 ${potWon} · 桌面 ${myStackNow} 筹码`
+        : (delta<0
+            ? `你净亏 ${delta} · 桌面 ${myStackNow} 筹码`
+            : `本手打平 · 桌面 ${myStackNow} 筹码`);
       // 详情(默认折叠): 摊牌逐行(仅摊牌局) + 边池明细 + 本桌累计净盈亏 —— 想细看再点开, 默认不糊一屏。
       const showdownBox = (res.wentToShowdown && res.reveal)
         ? `<div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>` : '';
@@ -2143,8 +2162,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-over-card">
           <h2>${h2}</h2>
           ${subLine}
-          ${dailyLine}
           <div class="pk-champ">${champLine}</div>
+          <div class="pk-mynums">${myLine}</div>
+          ${dailyLine}
           <details class="pk-more">
             <summary>本手详情</summary>
             ${showdownBox}
@@ -2198,15 +2218,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const doneBtn = over.querySelector('#pkDone');
       if (doneBtn) doneBtn.addEventListener('click', ()=>{ stopAuto(); close(); });
 
-      // 直播战报 + 结果回调
-      const champSeat = (res.winnersBySeat||[])[0];
-      const champName = st.players[champSeat] ? st.players[champSeat].name : '赢家';
-      const potTotal = (res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
-      const handName = res.wentToShowdown && res.reveal && champSeat!=null && res.reveal[champSeat] ? res.reveal[champSeat].hand : '';
-      emitBeat({ type:'over', actor:champName, big:true,
-        text: `🏁 ${champName} 赢下 ${potTotal} 底池${handName?(' · '+handName):''}`,
-        quip: beatQuip(champSeat, 'win') });
-      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName, myStack:my.stack }); }catch(e){ _ehCatch('poker.onResult', e); } }
+      // 直播战报 + 结果回调: 用引擎 delta / 我收池, 不把含自己投入的底池总额说成「赢下」
+      const champSeatB = (res.winnersBySeat||[])[0];
+      const champNameB = st.players[champSeatB] ? st.players[champSeatB].name : '赢家';
+      const champDB = (champSeatB!=null && res.delta && typeof res.delta[champSeatB]==='number') ? res.delta[champSeatB] : null;
+      const handNameB = res.wentToShowdown && res.reveal && champSeatB!=null && res.reveal[champSeatB] ? res.reveal[champSeatB].hand : '';
+      emitBeat({ type:'over', actor:champNameB, big:true,
+        text: won
+          ? `🏁 你收池 ${potWon}（净 ${delta>=0?'+':''}${delta}）`
+          : `🏁 ${champNameB}${champDB!=null&&champDB>0?` 净赢 +${champDB}`:` 收池 ${potTotalAll}`}${handNameB?(' · '+handNameB):''}`,
+        quip: beatQuip(champSeatB, 'win') });
+      if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName: handNameB, myStack: myStackNow }); }catch(e){ _ehCatch('poker.onResult', e); } }
       emitWallet();
       if (minimized) updateChip();
     }

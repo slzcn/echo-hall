@@ -3,7 +3,8 @@
  * EhSfx: Web Audio 合成音效，挂载 window.EhSfx
  * ehFx/ehRipple: CSS 动画与涟漪特效，挂载 window.ehFx / window.ehRipple
  * AudioEngine: BGM 引擎，挂载 window.AudioEngine
- * EhAudioBus: 人声(BGM/音效冲突源)互斥总线 —— journey-exempt: probe-audio-exclusive + journey-audio-exclusive
+ * EhAudioBus: 人声(BGM/音效冲突源)互斥总线 — 聊天语音/神曲独占; TTS 报牌不影响 BGM
+ * journey-exempt: probe-sfx-duck + journey-audio-exclusive + journey-gd-joker-size
  */
 
 (function() {
@@ -151,7 +152,7 @@
     let _lastSayText='', _lastSayAt=0, _saySeq=0, _duckFailsafeTimer=null;
     function say(text, who){
       if(!text) return;
-      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ window.EhAudioBus && window.EhAudioBus.release('tts'); }catch(e){} return; }
+      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} return; }
       const _now=Date.now();
       if(String(text)===_lastSayText && _now-_lastSayAt<900) return;
       _lastSayText=String(text); _lastSayAt=_now;
@@ -164,17 +165,15 @@
         u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.95;
         if(p.voice) u.voice=p.voice;
         const myId=++_saySeq;
-        // 连续报牌: replace 保持 busy=true, 不因 releaseAll+hold 短暂抬回 BGM
-        try{ window.EhAudioBus && window.EhAudioBus.replace('tts'); }catch(e){}
-        u.onend=()=>{ if(myId===_saySeq) try{ window.EhAudioBus && window.EhAudioBus.release('tts'); }catch(e){} };
-        u.onerror=()=>{ if(myId===_saySeq) try{ window.EhAudioBus && window.EhAudioBus.release('tts'); }catch(e){} };
-        // 超时兜底: onend 可能丢失 → 按字数估时长强制 release, 绝不把 BGM 焊死在静音
+        // 主人: TTS 报牌【不影响背景音乐】— 不 hold EhAudioBus、不 duck BGM。
+        //   仅把音效稍压软, 让人声相对清楚; BGM 照常播。
+        try{ if(window.EhSfx && window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(true); }catch(e){}
+        u.onend=()=>{ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
+        u.onerror=()=>{ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
         if(_duckFailsafeTimer) clearTimeout(_duckFailsafeTimer);
         const est=Math.min(8000, 600 + String(text).length*260/(u.rate||1));
-        _duckFailsafeTimer=setTimeout(()=>{ _duckFailsafeTimer=null; if(myId===_saySeq) try{ window.EhAudioBus && window.EhAudioBus.release('tts'); }catch(e){} }, est+1200);
+        _duckFailsafeTimer=setTimeout(()=>{ _duckFailsafeTimer=null; if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} }, est+1200);
         try{ speechSynthesis.cancel(); }catch(e){}
-        // 语音进行中: 聊天语音条不应与 TTS 叠播
-        try{ if(typeof window.stopVoice==='function') window.stopVoice(); }catch(e){}
         speechSynthesis.speak(u);
       }catch(e){}
     }
@@ -185,7 +184,7 @@
     return {play,playClick,
       setEnabled(v){enabled=!!v; _lsSet('eh_sfx',enabled);},
       isEnabled(){return enabled},
-      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ window.EhAudioBus&&window.EhAudioBus.releaseAll('tts'); }catch(e){} }},
+      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} }},
       isVoiceOn(){return _voiceOn},
       setSfxSoft,
       unlock,say};
@@ -296,9 +295,7 @@
     function playCfg(cfg){
       if(!cfg||!cfg.url) return;
       ensure(); if(!el) return;
-      // BGM 起播前打断正念的 TTS, 避免"音乐+语音同时响"
-      try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
-      try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll('tts'); }catch(e){}
+      // BGM 起播: 不打断 TTS(主人: 报牌语音不影响背景乐); 仅停聊天语音条避免叠
       try{ if(typeof window.stopVoice==='function') window.stopVoice(); }catch(e){}
       el.loop=(mode==='loop');
       if(cur && cur.url===cfg.url && !el.paused){ fadeTo(VOL_ON,FADE_MS); cur=cfg; return; }

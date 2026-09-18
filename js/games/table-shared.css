@@ -140,6 +140,28 @@
   opacity: .82 !important;
   text-shadow: 0 1px 1px rgba(0, 0, 0, .12);
 }
+/* 大小王与普通牌同盒尺寸: emoji 换成「王」字后, 角标/中心字号与花色牌对齐, mini 同比缩放 */
+.ddz-room .card.joker .cn,
+.gd-room  .card.joker .cn,
+.pk-room  .card.joker .cn{
+  font-size: var(--cn, 13px) !important;
+  font-weight: 900 !important;
+  letter-spacing: -.02em !important;
+}
+.ddz-room .card.joker .cc,
+.gd-room  .card.joker .cc,
+.pk-room  .card.joker .cc{
+  font-size: calc(var(--cc, 21px) * .8) !important;
+  font-weight: 800;
+  opacity: .92 !important;
+  line-height: 1;
+}
+.ddz-room .card.mini.joker .cn,
+.gd-room  .card.mini.joker .cn,
+.pk-room  .card.mini.joker .cn{ font-size: 9px !important; }
+.ddz-room .card.mini.joker .cc,
+.gd-room  .card.mini.joker .cc,
+.pk-room  .card.mini.joker .cc{ font-size: 10px !important; }
 /* 角标: rank 与小花色抱成竖直 index 单元, 花色加重更清晰 */
 .ddz-room .card .cs, .gd-room .card .cs, .pk-room .card .cs{ font-weight: 700; }
 

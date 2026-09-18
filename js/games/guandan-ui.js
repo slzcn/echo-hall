@@ -288,7 +288,7 @@ html[data-mode="day"] .gd-center::before{
 .card .cn{position:absolute;top:2px;left:3px;font-size:var(--cn,13px);font-weight:800;line-height:1}
 .card .cs{position:absolute;top:16px;left:4px;font-size:var(--cs,11px);line-height:1}
 .card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,21px);opacity:.92}
-.card.joker .cc{font-size:calc(var(--cc,21px) * .72)}
+.card.joker .cc{font-size:calc(var(--cc,21px) * .8)}
 .card.joker.big{background:linear-gradient(150deg,#fff,#ffe9b8)}
 .card.joker.small{background:linear-gradient(150deg,#fff,#e8ecff)}
 .card.lvl{box-shadow:0 2px 5px rgba(0,0,0,.35),0 0 0 2px var(--amber,#ffc24d)}
@@ -604,7 +604,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     const isLvl = !card.joker && Rules.naturalRank(card)===level;
     if (card.joker){
       el.classList.add('joker', card.joker==='big'?'big':'small', card.joker==='big'?'red':'blk');
-      el.innerHTML = `<div class="cn">${card.joker==='big'?'大':'小'}</div><div class="cc">🃏</div>`;
+      // 与普通牌同盒尺寸: 中心用「王」字(不用 emoji, 系统字宽不稳导致大小王看着更大/更挤)
+      el.innerHTML = `<div class="cn">${card.joker==='big'?'大':'小'}</div><div class="cc">王</div>`;
     } else {
       const red = (card.suit==='♥'||card.suit==='♦');
       el.classList.add(red?'red':'blk');

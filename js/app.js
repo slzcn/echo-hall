@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-audio-exclusive';
+window.__EH_APP_VER = '20260918-tts-settle-joker';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2602,7 +2602,6 @@ function gtLaunchPokerLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       bumpGameStats('nlhe', res, A);
-      _bankFromPokerResult(meta);
       postTexasResult(res,A.names,meta).catch(()=>{});
       try{ showCareerChip('nlhe', true); refreshCareerChip('nlhe'); }catch(_){}
     },
@@ -2828,7 +2827,6 @@ function gtLaunchPoker(row){
     onResult:(res,log,meta)=>{
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       bumpGameStats('nlhe', res, A);
-      _bankFromPokerResult(meta);
       postTexasResult(res,A.names,meta).catch(()=>{});
       try{ showCareerChip('nlhe', true); refreshCareerChip('nlhe'); }catch(_){}
       // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
@@ -7383,7 +7381,7 @@ function bumpGameStats(game, res, A){
   try{
     const entries=_statEntries(game,res,A);
     if(!entries.length) return;
-    // 本地账本同步累计(临时账号/离线也能看到积分在涨)
+    // 本地账本同步累计(临时账号/离线也能看到积分在涨) —— 每手只记一次
     const mine=entries.filter(e=>e.uid===myUid || (me && e.uid===me.id));
     if(mine.length){
       const e0=mine[0];
@@ -7392,13 +7390,6 @@ function bumpGameStats(game, res, A){
     sb.rpc('eh_stat_bump',{p_game:game,p_entries:entries})
       .then(({error})=>{ if(error){ console.warn('[stat] bump', error.message); return; } try{ refreshCareerChip(game); }catch(_){} }, ()=>{});
   }catch(e){ console.warn('[stat] bump', e&&e.message); }
-}
-// 德州 onResult 兜底: 即使 A.ids 不全, 也按 meta 把我的 delta 记进本地账本
-function _bankFromPokerResult(meta){
-  try{
-    if(!meta || typeof meta.delta!=='number') return;
-    bankBump('nlhe', meta.delta, meta.delta>0);
-  }catch(_){}
 }
 // 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
 async function recordGameResult(game, res, log, names, avatars, souls){

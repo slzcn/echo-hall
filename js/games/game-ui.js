@@ -298,7 +298,7 @@ html[data-mode="day"] .ddz-center::before{
 .card .cn{position:absolute;top:3px;left:4px;font-size:var(--cn,15px);font-weight:800;line-height:1;text-align:center}
 .card .cs{position:absolute;top:18px;left:5px;font-size:var(--cs,12px);line-height:1}
 .card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,25px);opacity:.92}
-.card.joker .cc{font-size:calc(var(--cc,25px) * .76)}
+.card.joker .cc{font-size:calc(var(--cc,25px) * .8)}
 .card.joker.big{background:linear-gradient(150deg,#fff,#ffe9b8)}
 .card.joker.small{background:linear-gradient(150deg,#fff,#e8ecff)}
 .card.back{background:radial-gradient(circle at 30% 22%,rgba(0,229,212,.18),transparent 55%),radial-gradient(circle at 74% 76%,rgba(156,133,255,.16),transparent 60%),linear-gradient(150deg,#182742 0%,#0f1a2c 45%,#0a1220 100%);border:1px solid rgba(0,229,212,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 6px 12px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.45)}
@@ -496,7 +496,7 @@ html[data-mode="day"] .ddz-center::before{
     if (card.joker){
       el.classList.add('joker', card.joker === 'big' ? 'big' : 'small');
       el.classList.add(card.joker === 'big' ? 'red' : 'blk');
-      el.innerHTML = `<div class="cn">${card.joker==='big'?'大':'小'}</div><div class="cc">🃏</div>`;
+      el.innerHTML = `<div class="cn">${card.joker==='big'?'大':'小'}</div><div class="cc">王</div>`;
     } else {
       const red = (card.suit === '♥' || card.suit === '♦');
       el.classList.add(red ? 'red' : 'blk');
