@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-table-ux-fill';
+window.__EH_APP_VER = '20260918-anon-bankroll';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2588,6 +2588,9 @@ function gtLaunchPokerLobby(row){
     names:A0.names, avatars:A0.avatars, isAI:A0.isAI, souls:A0.souls, ids:A0.ids,
     mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats,
     sb:5, bb:10, startStack:1000,
+    // 招募态就带上生涯筹码/回写: startDeal 发牌时我这席用 MY_START, 不再被重置成 1000
+    myStack: bankOpenOpts('nlhe').chips,
+    onWallet: bankOpenOpts('nlhe').onWallet,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
@@ -2599,7 +2602,9 @@ function gtLaunchPokerLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       bumpGameStats('nlhe', res, A);
+      _bankFromPokerResult(meta);
       postTexasResult(res,A.names,meta).catch(()=>{});
+      try{ showCareerChip('nlhe', true); refreshCareerChip('nlhe'); }catch(_){}
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },
   });
@@ -2669,19 +2674,120 @@ function gtWritePokerHands(tableId, state, mySeat){
 }
 // ── 德州联机 · HOST: 本机跑引擎当裁判, 每步产脱敏快照广播 + 写远程席底牌; 收远程动作经引擎校验后应用。──
 // ── 德州筹码钱包(跨桌带着走) ──────────────────────────────────────────────
-//   一桌赢/输的筹码不再关桌清零, 而是记在本机钱包里, 下张桌用它买入 → "带着走"。
-//   落地: localStorage(单机跨桌/跨会话持久); 跨设备同步与联机各自钱包留待联调, 不在本批。
-//   破产兜底: 余额低于 PK_WALLET_MIN 视为输光, 下次开桌重新发 PK_WALLET_GRANT(练习桌不至于卡死)。
+// journey-exempt: 筹码/积分本地账本与开局带入 — 行为由 scripts/test-bankroll.js + journey-anon-bankroll.js 覆盖; 不新增 DB/网络旅程。
+//   一桌赢/输的筹码不再关桌清零, 而是记在【按用户 uid】的本机账本里, 下张桌用它买入 → "带着走"。
+//   临时/匿名账号同样有稳定 uid(Supabase anon auth), 换桌/刷新/再开局都不该回到 1000。
+//   落地: localStorage 键 eh_bank_v1; 破产兜底: 余额低于 PK_WALLET_MIN 重新发 PK_WALLET_GRANT。
+//   兼容: 旧全局键 eh_pk_chips / eh_ddz_score 仅作首次迁移源。
 const PK_WALLET_KEY = 'eh_pk_chips';
 const PK_WALLET_GRANT = 1000;
 const PK_WALLET_MIN = 100;      // 低于一手最低下注体量即视为破产
-function pkWallet(){
-  try{ const v = parseInt(localStorage.getItem(PK_WALLET_KEY), 10); if(Number.isFinite(v) && v >= PK_WALLET_MIN) return v; }catch(_){}
-  return PK_WALLET_GRANT;
+const EH_BANK_KEY = 'eh_bank_v1';
+function bankUid(){
+  const uid = (typeof myUid==='string' && myUid) || (me && me.id) || 'local-anon';
+  if (uid!=='local-anon' && !bankUid._mig){ bankUid._mig=true; try{ bankMigrateFromLocalAnon(); }catch(_){} }
+  return uid;
 }
+// 匿名登录拿到 uid 后: 把登录前挂在 'local-anon' 上的账本迁到该 uid(否则以为积分丢了)
+function bankMigrateFromLocalAnon(){
+  try{
+    const uid = (typeof myUid==='string' && myUid) || (me && me.id);
+    if (!uid || uid==='local-anon') return;
+    const all=_bankAll();
+    let touched=false;
+    Object.keys(all).forEach(k=>{
+      const m=/^(.+):local-anon$/.exec(k);
+      if(!m) return;
+      const dest=m[1]+':'+uid;
+      if (!all[dest]){ all[dest]=all[k]; touched=true; }
+    });
+    if (touched) _bankWrite(all);
+  }catch(_){}
+}
+function _bankAll(){
+  try{ return JSON.parse(localStorage.getItem(EH_BANK_KEY)||'{}') || {}; }catch(_){ return {}; }
+}
+function _bankWrite(all){
+  try{ localStorage.setItem(EH_BANK_KEY, JSON.stringify(all)); }catch(_){}
+}
+// 读某游戏账本: { chips, net, plays, wins } — chips=可带入筹码; net=生涯累计账变
+function bankGet(game){
+  const uid=bankUid();
+  const all=_bankAll();
+  const key=game+':'+uid;
+  let rec=all[key];
+  if(!rec || typeof rec!=='object'){
+    rec={ chips:null, net:0, plays:0, wins:0 };
+    // 旧全局键迁移(仅一次): 德州 eh_pk_chips / 斗地主 eh_ddz_score
+    try{
+      if(game==='nlhe'){
+        const v=parseInt(localStorage.getItem(PK_WALLET_KEY),10);
+        if(Number.isFinite(v)) rec.chips=v;
+      }
+      if(game==='doudizhu'){
+        const v=parseInt(localStorage.getItem('eh_ddz_score'),10);
+        if(Number.isFinite(v)) rec.net=v;   // 斗地主旧钱包存的是累计分
+      }
+    }catch(_){}
+    all[key]=rec; _bankWrite(all);
+  }
+  return rec;
+}
+function bankSet(game, patch){
+  const uid=bankUid();
+  const all=_bankAll();
+  const key=game+':'+uid;
+  const prev=bankGet(game);
+  const next=Object.assign({}, prev, patch||{});
+  all[key]=next; _bankWrite(all);
+  return next;
+}
+// 破产保底后的可带入筹码
+function bankChips(game, grant){
+  const grantN = Number.isFinite(+grant) ? +grant : PK_WALLET_GRANT;
+  const minN = (game==='nlhe') ? PK_WALLET_MIN : 0;
+  const rec=bankGet(game);
+  let chips = (rec && typeof rec.chips==='number') ? rec.chips : null;
+  if (chips==null && game==='doudizhu') chips = rec.net||0;   // 斗地主累计分即“筹码”
+  if (chips==null || (game==='nlhe' && chips < minN)) return grantN;
+  return Math.max(0, Math.round(chips));
+}
+function pkWallet(){ return bankChips('nlhe', PK_WALLET_GRANT); }
 function pkSetWallet(v){
-  try{ const n = Math.max(0, Math.round(Number(v)||0)); localStorage.setItem(PK_WALLET_KEY, String(n)); }catch(_){}
+  const n=Math.max(0, Math.round(Number(v)||0));
+  bankSet('nlhe', { chips:n });
+  try{ localStorage.setItem(PK_WALLET_KEY, String(n)); }catch(_){}   // 兼容旧读取
 }
+// 结算后记一笔生涯账变(本地账本; DB eh_user_stats 仍由 bumpGameStats 异步写)
+function bankBump(game, delta, won){
+  const rec=bankGet(game);
+  const d=Math.round(Number(delta)||0);
+  const baseChips = (typeof rec.chips==='number') ? rec.chips : (game==='doudizhu' ? (rec.net||0) : PK_WALLET_GRANT);
+  const chips = Math.round(baseChips + d);
+  const patch = { net: Math.round((rec.net||0) + d), plays:(rec.plays||0)+1 };
+  if (won) patch.wins=(rec.wins||0)+1;
+  if (game==='nlhe') patch.chips = chips < PK_WALLET_MIN ? PK_WALLET_GRANT : chips;
+  else patch.chips = chips;
+  const next=bankSet(game, patch);
+  if (game==='doudizhu'){ try{ localStorage.setItem('eh_ddz_score', String(next.chips||0)); }catch(_){} }
+  if (game==='nlhe'){ try{ localStorage.setItem(PK_WALLET_KEY, String(next.chips||PK_WALLET_GRANT)); }catch(_){} }
+  return next;
+}
+// 开桌时给 UI 的带入值 + 回写回调(三游戏共用)
+function bankOpenOpts(game, grant){
+  const chips=bankChips(game, grant);
+  return {
+    chips,
+    onWallet:(v)=>{ bankSet(game, { chips: Math.max(0, Math.round(Number(v)||0)) }); if(game==='nlhe'){ try{ localStorage.setItem(PK_WALLET_KEY, String(Math.max(0, Math.round(Number(v)||0)))); }catch(_){} } },
+  };
+}
+// 供 game-ui 等模块读写 uid 账本
+try{
+  window.EH_BANK_GET = bankGet;
+  window.EH_BANK_SET = bankSet;
+  window.EH_BANK_CHIPS = bankChips;
+  window.EH_BANK_BUMP = bankBump;
+}catch(_){}
 
 function gtLaunchPoker(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtLaunchPoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
@@ -2703,17 +2809,17 @@ function gtLaunchPoker(row){
   gtStartHostPing(chan, row.id);
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
-  // 跨桌钱包: 纯单机练习桌(无远程真人)才带钱包买入 —— 我这席带上一桌余额进场, 结算后回写落地。
-  //   有远程真人的联机桌先不接钱包(各自钱包买入需 host 逐席协调, 留待联调), 走原 startStack。
-  const _pkSolo = !(A.remoteSeats && A.remoteSeats.length);
-  const _pkMyStack = _pkSolo ? pkWallet() : 1000;
-  if(_pkSolo && _pkMyStack !== PK_WALLET_GRANT){ try{ toast('带入筹码 '+_pkMyStack); }catch(_){} }
+  // 跨桌钱包: 按 uid 账本带入我这席筹码(临时账号同样累计); 有远程真人时其余席仍 START=1000 保证同桌公平。
+  //   生涯 net/局数在 onResult 里照样累计 —— 换桌不丢“赢来的积分”。
+  const _bank = bankOpenOpts('nlhe');
+  const _pkMyStack = _bank.chips;
+  if(_pkMyStack !== PK_WALLET_GRANT){ try{ toast('带入筹码 '+_pkMyStack); }catch(_){} }
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:5, bb:10, startStack:1000,
     lobbyCtx:gtCtx(row),   // 打牌态空位邀请菜单复用: 邀请真人(发聊天卡)/指定灵魂(改 DB 座, realtime 补位)
-    myStack: _pkMyStack, onWallet: _pkSolo ? pkSetWallet : undefined,
+    myStack: _pkMyStack, onWallet: _bank.onWallet,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(_){}
@@ -2722,7 +2828,9 @@ function gtLaunchPoker(row){
     onResult:(res,log,meta)=>{
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       bumpGameStats('nlhe', res, A);
+      _bankFromPokerResult(meta);
       postTexasResult(res,A.names,meta).catch(()=>{});
+      try{ showCareerChip('nlhe', true); refreshCareerChip('nlhe'); }catch(_){}
       // 德州"一手=一次 onResult"≠ 整局终结: 不再每手标 done(那会让第一手打完卡片就"已结束"、
       // 重连者被踢、唯一活桌索引提前释放而重复开桌)。牌桌保持 playing, 只在房主"收工"(onExit)时散桌。
     },
@@ -6954,18 +7062,22 @@ let _careerChipGame=null;   // 当前挂着生涯积分条的游戏(供结算后
 // persist=true: 牌桌里常驻显示(不淡出), 每局结算后刷新数字 → 主人玩时一直看到"积分在存、在涨、没从零"。
 //   (旧行为是开局闪 3.6s 就淡出, 太容易错过, 主人遂以为"每次从零"。)
 async function showCareerChip(game, persist){
-  // 生涯战绩条整体去掉(主人): 牌桌里不再显示"生涯 X · 胜率Y"横标(占位/易遮挡桌面内容)。eh_user_stats 记分照常。
-  hideCareerChip(); return;
-  _ensureCareerChipCSS();
-  _careerChipGame = game;   // 先记 game: 即便本局暂无战绩(careerText 返回 null)早退, 结算后也能据此刷新
-  const r=await fetchCareer(game); const txt=careerText(game,r);
-  if(!txt) return;   // 无战绩不显示: 第一次玩确实从零, 不假装
-  let el=document.getElementById('ehCareerChip');
-  if(!el){ el=document.createElement('div'); el.id='ehCareerChip'; (document.body||document.documentElement).appendChild(el); }
-  el.textContent=txt;
-  requestAnimationFrame(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.add('on'); });
-  if(_careerChipTimer){ clearTimeout(_careerChipTimer); _careerChipTimer=null; }
-  if(!persist) _careerChipTimer=setTimeout(()=>{ const e2=document.getElementById('ehCareerChip'); if(e2) e2.classList.remove('on'); }, 3600);
+  // 主人: 牌桌顶部长条易挡桌 → 改为短 toast 带入提示 + 结算后用 toast 刷一版生涯(不再常驻大横幅)。
+  //   eh_user_stats / 本地账本都在记; 这里只负责“看见积分在存”。
+  hideCareerChip();
+  try{
+    const rec = bankGet(game);
+    const L={ nlhe:{n:'德州',u:'筹码'}, doudizhu:{n:'斗地主',u:'分'}, guandan:{n:'掼蛋',u:'分'} }[game] || {n:'游戏',u:'分'};
+    const chips = (typeof rec.chips==='number') ? rec.chips : null;
+    const net = rec.net||0;
+    const plays = rec.plays||0;
+    const parts=[];
+    if (chips!=null) parts.push('带入 '+chips+' '+L.u);
+    if (plays) parts.push('生涯 '+plays+' 局 · '+(net>=0?'+':'')+net);
+    if (!parts.length) return;
+    _careerChipGame = game;
+    toast(L.n+' · '+parts.join(' · '), persist ? 2800 : 2400);
+  }catch(_){}
 }
 // 结算后即时刷新常驻积分条: 清缓存拉最新, 让本局赢/输的分当场累加进"生涯 X · +N"。
 function refreshCareerChip(game){
@@ -7235,13 +7347,17 @@ async function postDdzResult(res, names){
 function _statEntries(game, res, A){
   const entries=[]; const isAI=A.isAI||[];
   isAI.forEach((ai,seat)=>{
-    if(ai || !A.ids[seat]) return;                       // 只记真人席
+    if(ai) return;                                     // AI 不记生涯
+    // host/本人席: A.ids 可能为空, 用 myUid 兜底 —— 否则临时账号 solo 局永远进不了 eh_user_stats
+    let uid = A.ids && A.ids[seat];
+    if(!uid && !ai && A.mySeat===seat && myUid) uid = myUid;
+    if(!uid) return;
     let delta=0, won=false;
     const d=(res.delta&&typeof res.delta[seat]==='number')?res.delta[seat]:0;
     if(game==='doudizhu'){ delta=d; won=(res.winners||[]).includes(seat); }
     else if(game==='guandan'){ delta=d; won=(seat%2)===res.winnerTeam; }
     else if(game==='nlhe'){ delta=d; won=(res.winnersBySeat||[]).includes(seat); }
-    entries.push({uid:A.ids[seat], delta, won});
+    entries.push({uid, delta, won});
   });
   return entries;
 }
@@ -7249,9 +7365,22 @@ function bumpGameStats(game, res, A){
   try{
     const entries=_statEntries(game,res,A);
     if(!entries.length) return;
+    // 本地账本同步累计(临时账号/离线也能看到积分在涨)
+    const mine=entries.filter(e=>e.uid===myUid || (me && e.uid===me.id));
+    if(mine.length){
+      const e0=mine[0];
+      bankBump(game, e0.delta, e0.won);
+    }
     sb.rpc('eh_stat_bump',{p_game:game,p_entries:entries})
       .then(({error})=>{ if(error){ console.warn('[stat] bump', error.message); return; } try{ refreshCareerChip(game); }catch(_){} }, ()=>{});
   }catch(e){ console.warn('[stat] bump', e&&e.message); }
+}
+// 德州 onResult 兜底: 即使 A.ids 不全, 也按 meta 把我的 delta 记进本地账本
+function _bankFromPokerResult(meta){
+  try{
+    if(!meta || typeof meta.delta!=='number') return;
+    bankBump('nlhe', meta.delta, meta.delta>0);
+  }catch(_){}
 }
 // 记录战绩(全记:胜负/分数/是否含AI/seed+log 供服务端复核与回看)。失败静默,不挡玩家。
 async function recordGameResult(game, res, log, names, avatars, souls){

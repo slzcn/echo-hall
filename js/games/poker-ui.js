@@ -2274,8 +2274,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     // 单机: 本场结束(真人输光)后从头再来 —— 全员重新带入 START, 从第一手开始
     function resetMatch(){
-      stacks = names.map(()=>START);
-      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }   // 本场重来: 买入基准/净盈亏归零, 离场标记清空
+      // 单机本场重来: 我这席用钱包余额(破产则 app 侧 bank 已回补 GRANT); 对手 START
+      stacks = names.map((_, i) => i === mySeat ? MY_START : START);
+      buyin[mySeat] = MY_START;
+      for(let i=0;i<n;i++){ if(i!==mySeat) buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }   // 本场重来: 买入基准/净盈亏归零, 离场标记清空
       saveScore();
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
@@ -2315,12 +2317,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         personaBySeat = names.map((_, seat)=>personaFor(seat));
       }
       // 全新一桌: 筹码/买入/净盈亏/手数/庄位/离场标记全部重置
-      stacks = names.map(()=>START);
-      for(let i=0;i<n;i++){ buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
+      // ★我这席带生涯钱包入局(opts.myStack), 不再一律 START —— 临时账号/换桌赢来的积分要接着用
+      stacks = names.map((_, i) => (i === mySeat ? MY_START : START));
+      buyin[mySeat] = MY_START;
+      for(let i=0;i<n;i++){ if(i!==mySeat){ buyin[i]=START; } netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
       handNo = 0; button = 0; pendingRoster = null;
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       st = newHand(seed);
       sfx('deal');
+      emitWallet();
       renderAll(); positionSeats();
     }
 

@@ -744,8 +744,25 @@ html[data-mode="day"] .ddz-center::before{
     //   只在单机(无远程真人)且非 guest 时带入 —— 联机桌各自记分不混, guest 只渲染 host 快照不记分。
     const DDZ_WALLET_KEY = 'eh_ddz_score';
     const carryScore = !isGuest && !(Array.isArray(opts.remoteSeats) && opts.remoteSeats.length);
-    function ddzWalletLoad(){ try{ const v=parseInt(localStorage.getItem(DDZ_WALLET_KEY),10); return Number.isFinite(v)?v:0; }catch(_){ return 0; } }
-    function ddzWalletSave(v){ try{ localStorage.setItem(DDZ_WALLET_KEY, String(Math.round(Number(v)||0))); }catch(_){ } }
+    // 与 app.js eh_bank_v1 对齐: 优先读 uid 账本, 兼容旧全局键
+    function ddzWalletLoad(){
+      try{
+        if (typeof root.EH_BANK_GET==='function'){
+          const rec=root.EH_BANK_GET('doudizhu');
+          if (rec && typeof rec.chips==='number') return rec.chips;
+          if (rec && typeof rec.net==='number') return rec.net;
+        }
+        const v=parseInt(localStorage.getItem(DDZ_WALLET_KEY),10);
+        return Number.isFinite(v)?v:0;
+      }catch(_){ return 0; }
+    }
+    function ddzWalletSave(v){
+      try{
+        const n=Math.round(Number(v)||0);
+        if (typeof root.EH_BANK_SET==='function') root.EH_BANK_SET('doudizhu', { chips:n, net:n });
+        localStorage.setItem(DDZ_WALLET_KEY, String(n));
+      }catch(_){ }
+    }
     function saveScore(){ if(SCOREKEY){ try{ localStorage.setItem(SCOREKEY, JSON.stringify(cumScore)); }catch(_){ } } if(carryScore) ddzWalletSave(cumScore[mySeat]); }
     function loadScore(){ if(!SCOREKEY) return null; try{ const v=JSON.parse(localStorage.getItem(SCOREKEY)||'null'); return (Array.isArray(v)&&v.length===3&&v.every(x=>typeof x==='number'))?v:null; }catch(_){ return null; } }
     const _savedScore = loadScore();
