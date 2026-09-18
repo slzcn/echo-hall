@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-improve-all';
+window.__EH_APP_VER = '20260918-gt-act-rpc';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -889,6 +889,31 @@ function gtLiveSeatArrays(tableId, fallbackRow){
   }catch(_){ return null; }
 }
 // host 应用远程真人动作: 以 DB 座位为授权源; 引擎侧曾 idleOut 移出 remoteSeats 时先 resumeRemote 再落子
+function gtGuestSendAct(chan, tableId, seat, move){
+  // journey-exempt: 联机出牌 RPC/降级 — journey-gt-act-rpc.js
+  // phase-2: 优先 RPC(服务端 uid↔seat 绑定); 失败/未部署则退回 broadcast+uid(host 仍校验)
+  const sendBc = function(){
+    try{ chan.send({type:'broadcast',event:'act',payload:{seat:seat, move:move, uid:myUid}}); }catch(_){}
+  };
+  try{
+    if (!sb || !sb.rpc || !tableId){ sendBc(); return; }
+    sb.rpc('eh_gt_act', { p_table: tableId, p_seat: seat, p_move: move || null })
+      .then(function(res){
+        var data = res && res.data;
+        var err = res && res.error;
+        if (err){
+          console.warn('[gt] eh_gt_act rpc', err.message);
+          sendBc();
+          return;
+        }
+        if (data && data.ok === false){
+          try{ toast('出牌未通过座位校验，请刷新牌桌'); }catch(_){}
+          return;
+        }
+        sendBc();
+      }, function(){ sendBc(); });
+  }catch(e){ sendBc(); }
+}
 function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid){
   if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
   const A = gtLiveSeatArrays(tableId, fallbackRow);
@@ -2788,7 +2813,7 @@ function gtEnterPoker(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
+    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // 客人筹码输光 → 点"离桌"真的从座位表退出(该席变空, host 下一手把它当 AI 顶位继续开)。
     onBust:()=>{ gtLeave(row.id); },
@@ -2883,7 +2908,7 @@ function gtEnterGuandan(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
+    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
@@ -2976,7 +3001,7 @@ function gtEnterDdz(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
+    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });

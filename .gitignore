@@ -22,3 +22,4 @@ eh-souls.default.js
 # Python bytecode
 __pycache__/
 *.pyc
+.secrets/
