@@ -271,7 +271,7 @@ const GTL_DDZ = (src.match(/function gtLaunchDdz\(row\)\{[\s\S]*?\n\}/) || [''])
 assert(!/p_status:\s*'done'/.test(GTL_DDZ), 'gtLaunchDdz onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
 assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_DDZ), 'gtLaunchDdz 只在房主收工 onExit 时 gtClose 散桌(桌子随再来一局一直活着)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
-assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move\)/.test(GTL_DDZ), 'gtLaunchDdz act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move/.test(GTL_DDZ), 'gtLaunchDdz act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
 assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
 assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 

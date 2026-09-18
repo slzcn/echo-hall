@@ -2152,10 +2152,18 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         : `🏆 ${escapeHtml(champNm)} ${champDelta!=null && champDelta>0 ? `净赢 +${champDelta}` : `收池 ${champShare||potTotalAll}`}${champHnd?(' · '+champHnd):''}`;
       // 我方一行(结算tips核心数字): 本手净变动 + 我实际收池 + 当前桌面积分
       const myLine = (delta>0)
-        ? `你净赢 +${delta} · 收池 ${potWon} · 桌面 ${myStackNow} 筹码`
+        ? `你净赢 +${delta} · 收池 ${potWon} · 桌面 ${myStackNow} 筹码${careerSuffix()}`
         : (delta<0
-            ? `你净亏 ${delta} · 桌面 ${myStackNow} 筹码`
-            : `本手打平 · 桌面 ${myStackNow} 筹码`);
+            ? `你净亏 ${delta} · 桌面 ${myStackNow} 筹码${careerSuffix()}`
+            : `本手打平 · 桌面 ${myStackNow} 筹码${careerSuffix()}`);
+      function careerSuffix(){
+        try{
+          const rec = (typeof window.EH_BANK_GET==='function') ? window.EH_BANK_GET('nlhe') : null;
+          if (!rec || !rec.plays) return '';
+          const n = rec.net||0;
+          return ` · 生涯 ${(n>=0?'+':'')+n}`;
+        }catch(_){ return ''; }
+      }
       // 详情(默认折叠): 摊牌逐行(仅摊牌局) + 边池明细 + 本桌累计净盈亏 —— 想细看再点开, 默认不糊一屏。
       const showdownBox = (res.wentToShowdown && res.reveal)
         ? `<div class="pk-showbox"><div class="pk-showrows">${rowsHtml}</div></div>` : '';

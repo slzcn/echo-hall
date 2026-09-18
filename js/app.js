@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-games-xdevice';
+window.__EH_APP_VER = '20260918-improve-all';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -889,10 +889,13 @@ function gtLiveSeatArrays(tableId, fallbackRow){
   }catch(_){ return null; }
 }
 // host 应用远程真人动作: 以 DB 座位为授权源; 引擎侧曾 idleOut 移出 remoteSeats 时先 resumeRemote 再落子
-function gtAcceptRemoteAct(tableId, fallbackRow, seat, move){
+function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid){
   if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
   const A = gtLiveSeatArrays(tableId, fallbackRow);
   if (!A || !Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return;   // 非 DB 上的远程真人席
+  // uid 反冒名: 带了 uid 必须与 DB 座位一致; 完全服务端权威见 sql/eh_gt_act.sql(phase-2)
+  const seatUid = A.ids && A.ids[seat];
+  if (payloadUid && seatUid && String(payloadUid) !== String(seatUid)) return;
   gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳
   if (typeof _ehGame.resumeRemote === 'function'){
     try{ _ehGame.resumeRemote(seat); }catch(_){}   // 超时托管中的席: 真人一落子即视为接管回座
@@ -2533,7 +2536,7 @@ function gtWireHostChannel(tableId){
   const rowRef=()=>_gtTables.get(tableId);
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!payload||typeof payload.seat!=='number') return;
-      gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move);
+      gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move, payload.uid);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });
   gtWireHostResume(chan, tableId, rowRef());
@@ -2565,6 +2568,7 @@ function gtLaunchDdzLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       bumpGameStats('doudizhu', res, A);
+      try{ showCareerChip('doudizhu', true); }catch(_){}
       postDdzResult(res, A.names).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
@@ -2635,6 +2639,7 @@ function gtLaunchGuandanLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       bumpGameStats('guandan', res, A);
+      try{ showCareerChip('guandan', true); }catch(_){}
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
@@ -2672,115 +2677,29 @@ function gtWritePokerHands(tableId, state, mySeat){
   sb.rpc('eh_gt_set_hands',{p_table:tableId,p_hands:hands}).then(({error})=>{ if(error) console.warn('[nlhe] set hands', error.message); }, ()=>{});
 }
 // ── 德州联机 · HOST: 本机跑引擎当裁判, 每步产脱敏快照广播 + 写远程席底牌; 收远程动作经引擎校验后应用。──
-// ── 德州筹码钱包(跨桌带着走) ──────────────────────────────────────────────
-// journey-exempt: 筹码/积分本地账本与开局带入 — 行为由 scripts/test-bankroll.js + journey-anon-bankroll.js 覆盖; 不新增 DB/网络旅程。
-//   一桌赢/输的筹码不再关桌清零, 而是记在【按用户 uid】的本机账本里, 下张桌用它买入 → "带着走"。
-//   临时/匿名账号同样有稳定 uid(Supabase anon auth), 换桌/刷新/再开局都不该回到 1000。
-//   落地: localStorage 键 eh_bank_v1; 破产兜底: 余额低于 PK_WALLET_MIN 重新发 PK_WALLET_GRANT。
-//   兼容: 旧全局键 eh_pk_chips / eh_ddz_score 仅作首次迁移源。
+// ── 德州筹码钱包(跨桌带着走) — 实现已迁 js/modules/score.js ────────────────
+// journey-exempt: 本地账本 — test-bankroll.js + journey-anon-bankroll.js
+//   这里只保留兼容别名 + 与 myUid/me 绑定的 uid 源。
 const PK_WALLET_KEY = 'eh_pk_chips';
 const PK_WALLET_GRANT = 1000;
-const PK_WALLET_MIN = 100;      // 低于一手最低下注体量即视为破产
-const EH_BANK_KEY = 'eh_bank_v1';
-function bankUid(){
-  const uid = (typeof myUid==='string' && myUid) || (me && me.id) || 'local-anon';
-  if (uid!=='local-anon' && !bankUid._mig){ bankUid._mig=true; try{ bankMigrateFromLocalAnon(); }catch(_){} }
-  return uid;
-}
-// 匿名登录拿到 uid 后: 把登录前挂在 'local-anon' 上的账本迁到该 uid(否则以为积分丢了)
-function bankMigrateFromLocalAnon(){
-  try{
-    const uid = (typeof myUid==='string' && myUid) || (me && me.id);
-    if (!uid || uid==='local-anon') return;
-    const all=_bankAll();
-    let touched=false;
-    Object.keys(all).forEach(k=>{
-      const m=/^(.+):local-anon$/.exec(k);
-      if(!m) return;
-      const dest=m[1]+':'+uid;
-      if (!all[dest]){ all[dest]=all[k]; touched=true; }
-    });
-    if (touched) _bankWrite(all);
-  }catch(_){}
-}
-function _bankAll(){
-  try{ return JSON.parse(localStorage.getItem(EH_BANK_KEY)||'{}') || {}; }catch(_){ return {}; }
-}
-function _bankWrite(all){
-  try{ localStorage.setItem(EH_BANK_KEY, JSON.stringify(all)); }catch(_){}
-}
-// 读某游戏账本: { chips, net, plays, wins } — chips=可带入筹码; net=生涯累计账变
-function bankGet(game){
-  const uid=bankUid();
-  const all=_bankAll();
-  const key=game+':'+uid;
-  let rec=all[key];
-  if(!rec || typeof rec!=='object'){
-    rec={ chips:null, net:0, plays:0, wins:0 };
-    // 旧全局键迁移(仅一次): 德州 eh_pk_chips / 斗地主 eh_ddz_score
-    try{
-      if(game==='nlhe'){
-        const v=parseInt(localStorage.getItem(PK_WALLET_KEY),10);
-        if(Number.isFinite(v)) rec.chips=v;
-      }
-      if(game==='doudizhu'){
-        const v=parseInt(localStorage.getItem('eh_ddz_score'),10);
-        if(Number.isFinite(v)) rec.net=v;   // 斗地主旧钱包存的是累计分
-      }
-    }catch(_){}
-    all[key]=rec; _bankWrite(all);
-  }
-  return rec;
-}
-function bankSet(game, patch){
-  const uid=bankUid();
-  const all=_bankAll();
-  const key=game+':'+uid;
-  const prev=bankGet(game);
-  const next=Object.assign({}, prev, patch||{});
-  all[key]=next; _bankWrite(all);
-  return next;
-}
-// 破产保底后的可带入筹码
-function bankChips(game, grant){
-  const grantN = Number.isFinite(+grant) ? +grant : PK_WALLET_GRANT;
-  const minN = (game==='nlhe') ? PK_WALLET_MIN : 0;
-  const rec=bankGet(game);
-  let chips = (rec && typeof rec.chips==='number') ? rec.chips : null;
-  if (chips==null && game==='doudizhu') chips = rec.net||0;   // 斗地主累计分即“筹码”
-  if (chips==null || (game==='nlhe' && chips < minN)) return grantN;
-  return Math.max(0, Math.round(chips));
-}
+const PK_WALLET_MIN = 100;
+const _EH_SCORE = (function(){
+  const mod = window.EH_SCORE_MODULE;
+  if (!mod || !mod.createScoreBank) return null;
+  return mod.createScoreBank({
+    getUid: function(){
+      return (typeof myUid === 'string' && myUid) || (me && me.id) || 'local-anon';
+    },
+  });
+})();
+function bankGet(game){ return _EH_SCORE ? _EH_SCORE.get(game) : { chips: PK_WALLET_GRANT, net:0, plays:0, wins:0 }; }
+function bankSet(game, patch){ return _EH_SCORE ? _EH_SCORE.set(game, patch) : bankGet(game); }
+function bankChips(game, grant){ return _EH_SCORE ? _EH_SCORE.chips(game, grant) : PK_WALLET_GRANT; }
+function bankBump(game, delta, won){ return _EH_SCORE ? _EH_SCORE.bump(game, delta, won) : bankGet(game); }
+function bankOpenOpts(game, grant){ return _EH_SCORE ? _EH_SCORE.openOpts(game, grant) : { chips: PK_WALLET_GRANT, onWallet: function(){} }; }
+function bankMigrateFromLocalAnon(){ try{ if(_EH_SCORE) _EH_SCORE.migrateFromLocalAnon(); }catch(_){} }
 function pkWallet(){ return bankChips('nlhe', PK_WALLET_GRANT); }
-function pkSetWallet(v){
-  const n=Math.max(0, Math.round(Number(v)||0));
-  bankSet('nlhe', { chips:n });
-  try{ localStorage.setItem(PK_WALLET_KEY, String(n)); }catch(_){}   // 兼容旧读取
-}
-// 结算后记一笔生涯账变(本地账本; DB eh_user_stats 仍由 bumpGameStats 异步写)
-function bankBump(game, delta, won){
-  const rec=bankGet(game);
-  const d=Math.round(Number(delta)||0);
-  const baseChips = (typeof rec.chips==='number') ? rec.chips : (game==='doudizhu' ? (rec.net||0) : PK_WALLET_GRANT);
-  const chips = Math.round(baseChips + d);
-  const patch = { net: Math.round((rec.net||0) + d), plays:(rec.plays||0)+1 };
-  if (won) patch.wins=(rec.wins||0)+1;
-  if (game==='nlhe') patch.chips = chips < PK_WALLET_MIN ? PK_WALLET_GRANT : chips;
-  else patch.chips = chips;
-  const next=bankSet(game, patch);
-  if (game==='doudizhu'){ try{ localStorage.setItem('eh_ddz_score', String(next.chips||0)); }catch(_){} }
-  if (game==='nlhe'){ try{ localStorage.setItem(PK_WALLET_KEY, String(next.chips||PK_WALLET_GRANT)); }catch(_){} }
-  return next;
-}
-// 开桌时给 UI 的带入值 + 回写回调(三游戏共用)
-function bankOpenOpts(game, grant){
-  const chips=bankChips(game, grant);
-  return {
-    chips,
-    onWallet:(v)=>{ bankSet(game, { chips: Math.max(0, Math.round(Number(v)||0)) }); if(game==='nlhe'){ try{ localStorage.setItem(PK_WALLET_KEY, String(Math.max(0, Math.round(Number(v)||0)))); }catch(_){} } },
-  };
-}
-// 供 game-ui 等模块读写 uid 账本
+function pkSetWallet(v){ bankSet('nlhe', { chips: Math.max(0, Math.round(Number(v)||0)) }); }
 try{
   window.EH_BANK_GET = bankGet;
   window.EH_BANK_SET = bankSet;
@@ -2800,7 +2719,7 @@ function gtLaunchPoker(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());
@@ -2869,7 +2788,7 @@ function gtEnterPoker(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, ids:A.ids, mySeat:A.mySeat,
     sb:5, bb:10, startStack:1000, chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // 客人筹码输光 → 点"离桌"真的从座位表退出(该席变空, host 下一手把它当 AI 顶位继续开)。
     onBust:()=>{ gtLeave(row.id); },
@@ -2903,7 +2822,7 @@ function gtLaunchGuandan(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());
@@ -2922,6 +2841,7 @@ function gtLaunchGuandan(row){
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       bumpGameStats('guandan', res, A);
+      try{ showCareerChip('guandan', true); }catch(_){}
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
@@ -2963,7 +2883,7 @@ function gtEnterGuandan(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });
@@ -2996,7 +2916,7 @@ function gtLaunchDdz(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());
@@ -3015,6 +2935,7 @@ function gtLaunchDdz(row){
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       bumpGameStats('doudizhu', res, A);
+      try{ showCareerChip('doudizhu', true); }catch(_){}
       postDdzResult(res, A.names).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
@@ -3055,7 +2976,7 @@ function gtEnterDdz(row){
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     chat: ehGameChatBridge(),
-    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move}}); }catch(_){} },
+    onAction:(move)=>{ try{ chan.send({type:'broadcast',event:'act',payload:{seat:A.mySeat, move, uid:myUid}}); }catch(_){} },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
   });

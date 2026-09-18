@@ -109,7 +109,7 @@ assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src
 assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
 const GTL_PK = (src.match(/function gtLaunchPoker\(row\)\{[\s\S]*?\n\}/) || [''])[0];
-assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move\)/.test(GTL_PK), 'gtLaunchPoker act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move/.test(GTL_PK), 'gtLaunchPoker act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
 assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
 assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 

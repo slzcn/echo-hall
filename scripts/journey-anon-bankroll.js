@@ -6,13 +6,15 @@
 const fs = require('fs');
 const path = require('path');
 const src = fs.readFileSync(path.join(__dirname,'..','js','app.js'),'utf8');
+const score = fs.readFileSync(path.join(__dirname,'..','js','modules','score.js'),'utf8');
 const pk = fs.readFileSync(path.join(__dirname,'..','js','games','poker-ui.js'),'utf8');
 
 let step=0, failed=false;
 function assert(c,m){ step++; if(!c){ failed=true; console.error('✗ ['+step+'] '+m); } else console.log('✓ ['+step+'] '+m); }
 
-assert(/eh_bank_v1/.test(src) && /function bankBump\(/.test(src), '账本与 bankBump 存在');
-assert(/function bankMigrateFromLocalAnon\(/.test(src), '登录后 local-anon → uid 迁移');
+assert(/eh_bank_v1/.test(score) && /createScoreBank/.test(score), 'score 模块含 eh_bank_v1 账本');
+assert(/function bankBump\(/.test(src) || /bump: bump/.test(score), 'bankBump 经模块导出/别名可用');
+assert(/function bankMigrateFromLocalAnon\(|migrateFromLocalAnon/.test(src+score), '登录后 local-anon → uid 迁移');
 assert(/i === mySeat \? MY_START : START/.test(pk), 'startDeal 我这席带入 MY_START');
 assert(/myStack: bankOpenOpts\('nlhe'\)/.test(src), 'lobby open 带入生涯筹码 + onWallet');
 assert(/_statEntries[\s\S]{0,400}myUid/.test(src) || /A\.mySeat===seat && myUid/.test(src), 'solo 统计用 myUid 兜底');

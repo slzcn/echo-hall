@@ -540,7 +540,7 @@ html[data-mode="day"] .ddz-center::before{
   function open(opts){
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
-    // journey-exempt: 座位增量/双触选组 — 契约 journey-games-xdevice.js
+    // journey-exempt: 座位增量/双触选组/fillSeat — journey-games-xdevice + journey-fill-seat-all
     injectCSS(); injectLobbyCSS();
     try{ if(root.EhGameBgm) root.EhGameBgm.enter('ddz'); }catch(_){}   // 进桌切斗地主 BGM
 
@@ -1257,22 +1257,45 @@ html[data-mode="day"] .ddz-center::before{
       if(m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.ddz-lobby-empty'))) closeInviteMenu();
     }
     function closeInviteMenu(){ const m=room.querySelector('.ddz-invite-menu'); if(m) m.remove(); document.removeEventListener('click', _imAway, true); }
+    function freeSoulsForSeat(){
+      const acts = (lobbyCtx && lobbyCtx.actions) || null;
+      if (!acts || typeof acts.seatSoul !== 'function') return [];
+      const all = ((lobbyCtx && lobbyCtx.souls) || []).filter(s => s && s.auth_uid);
+      const used = new Set((ids || []).filter(Boolean));
+      return all.filter(s => !used.has(s.auth_uid));
+    }
+    function fillSeat(dbSeat){
+      const free = freeSoulsForSeat();
+      const acts = (lobbyCtx && lobbyCtx.actions) || null;
+      if (free.length && acts && acts.seatSoul){
+        const s = free[0];
+        try{ acts.seatSoul(dbSeat, s.auth_uid); }catch(e){ return; }
+        try{ closeInviteMenu(); }catch(_){}
+        sfx('click');
+        toast((s.name || '灵魂') + ' 补位 · 坐好点开始');
+        return;
+      }
+      // 无灵魂: 报提示(斗地主招募以 seatSoul/一键邀请为主, 不像德州有本机 bot 花名池)
+      toast('房里暂无灵魂 · 可用「一键邀请」补位');
+      try{ closeInviteMenu(); }catch(_){}
+    }
     function openInviteMenu(dbSeat, anchorEl){
       closeInviteMenu();
       if(!lobbyCtx || !lobbyCtx.actions){ return; }
-      const souls = (lobbyCtx.souls||[]).filter(s=>s&&s.auth_uid);
+      const free = freeSoulsForSeat();
       const menu=document.createElement('div'); menu.className='ddz-invite-menu';
       let html='<div class="im-ttl">邀请入座</div>';
+      html += free.length
+        ? `<button class="im-item" data-fill="1">🤝 补位 · 灵魂优先</button>`
+        : `<button class="im-item" data-fill="1">🤝 补位</button>`;
       if(lobbyCtx.actions.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
-      html += souls.length ? '<div class="im-sep">灵魂</div>' : '<div class="im-empty">房里暂无灵魂</div>';
-      souls.forEach(s=>{ html+=`<button class="im-item" data-soul="${escapeHtml(s.auth_uid)}">${escapeHtml((s.emoji||'👤')+s.name)}</button>`; });
       menu.innerHTML=html;
       room.appendChild(menu);
       const rr=room.getBoundingClientRect(), ar=anchorEl.getBoundingClientRect();
       menu.style.left=Math.min(Math.max(8, ar.left-rr.left+ar.width/2-90), Math.max(8, rr.width-188))+'px';
       menu.style.top=Math.min(ar.bottom-rr.top+6, rr.height-60)+'px';
-      menu.querySelectorAll('[data-soul]').forEach(b=> b.onclick=()=>{ lobbyCtx.actions.seatSoul(dbSeat, b.dataset.soul); closeInviteMenu(); });
-      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ lobbyCtx.actions.inviteHumans(); closeInviteMenu(); };
+      const fill=menu.querySelector('[data-fill]'); if(fill) fill.onclick=()=>{ fillSeat(dbSeat); };
+      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ lobbyCtx.actions.inviteHumans(dbSeat); closeInviteMenu(); };
       sfx('click');
       setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
     }
