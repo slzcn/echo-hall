@@ -4,7 +4,8 @@
  * ehFx/ehRipple: CSS 动画与涟漪特效，挂载 window.ehFx / window.ehRipple
  * AudioEngine: BGM 引擎，挂载 window.AudioEngine
  * EhAudioBus: 人声(BGM/音效冲突源)互斥总线 — 聊天语音/神曲独占; TTS 报牌不影响 BGM
- * journey-exempt: probe-sfx-duck + journey-audio-exclusive + journey-gd-joker-size
+ * EhAudioUnlock: PWA/iOS 手势/回前台统一唤醒 WebAudio + BGM + TTS
+ * journey-exempt: probe-sfx-duck + journey-audio-exclusive + journey-pwa-audio
  */
 
 (function() {
@@ -89,7 +90,12 @@
       spring(){ tone(659,0,.16,'triangle',.2); tone(880,.1,.18,'sine',.18); tone(1175,.2,.2,'triangle',.16); tone(1568,.3,.24,'sine',.15); tone(2093,.42,.3,'triangle',.13); },
       chip(){ noise(0,.045,.2,5600,1500); tone(2050,0,.035,'triangle',.1); tone(1580,.03,.045,'sine',.085); noise(.05,.04,.14,5000,1300); }
     };
-    function unlock(){ ensure(); }
+    function unlock(){
+      ensure();
+      // PWA/iOS: 同步再试一次 resume; 有的内核要手势链里才给 running
+      try{ if(ctx && ctx.state!=='running') ctx.resume(); }catch(e){}
+      try{ if(window.speechSynthesis && window.speechSynthesis.paused) window.speechSynthesis.resume(); }catch(e){}
+    }
     function play(name){
       if(!enabled) return;
       if(_sfxSoft && name && !SFX_KEEP_WHEN_SPEAKING.has(name)) return;
@@ -98,7 +104,7 @@
       const emit=()=>{ try{fn();}catch(e){} };
       if(ctx.state!=='running'){
         try{ctx.resume();}catch(e){}
-        let n=0;(function wait(){ if(ctx.state==='running'||n++>16) emit(); else setTimeout(wait,18); })();
+        let n=0;(function wait(){ if(ctx.state==='running'||n++>24) emit(); else setTimeout(wait,18); })();
       }else emit();
       try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error','back'].includes(name) && !_sfxSoft) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
     }
@@ -158,6 +164,8 @@
       _lastSayText=String(text); _lastSayAt=_now;
       try{
         if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
+        // PWA/iOS: 队列可能 paused → 先 resume; 声库未就绪时 onvoiceschanged 再念
+        try{ speechSynthesis.resume(); }catch(e){}
         if(!_voiceTried){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;
           try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); _voicePool=buildVoicePool(); }; }catch(e){} }
         const p=voiceProfile(who);
@@ -165,21 +173,47 @@
         u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.95;
         if(p.voice) u.voice=p.voice;
         const myId=++_saySeq;
-        // 主人: TTS 报牌【不影响背景音乐】— 不 hold EhAudioBus、不 duck BGM。
-        //   仅把音效稍压软, 让人声相对清楚; BGM 照常播。
+        const softOff=function(){ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
         try{ if(window.EhSfx && window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(true); }catch(e){}
-        u.onend=()=>{ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
-        u.onerror=()=>{ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
+        u.onend=softOff;
+        u.onerror=softOff;
         if(_duckFailsafeTimer) clearTimeout(_duckFailsafeTimer);
         const est=Math.min(8000, 600 + String(text).length*260/(u.rate||1));
-        _duckFailsafeTimer=setTimeout(()=>{ _duckFailsafeTimer=null; if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} }, est+1200);
+        _duckFailsafeTimer=setTimeout(function(){ _duckFailsafeTimer=null; softOff(); }, est+1200);
         try{ speechSynthesis.cancel(); }catch(e){}
-        speechSynthesis.speak(u);
-      }catch(e){}
+        // iOS PWA: cancel 后立刻 speak 有时被吞 → 下一 tick 再 speak
+        const speakNow=function(){
+          try{ speechSynthesis.speak(u); }catch(e){ softOff(); return; }
+          // 极端: speak 后仍无 onend 且队列空 → 1.8s 再 resume 一次并强制 softOff 兜底
+          setTimeout(function(){
+            try{
+              if (myId===_saySeq && speechSynthesis && !speechSynthesis.speaking && !speechSynthesis.pending){
+                speechSynthesis.resume();
+                softOff();
+              }
+            }catch(e){ softOff(); }
+          }, 1800);
+        };
+        setTimeout(speakNow, 0);
+      }catch(e){
+        try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e2){}
+      }
     }
     try{
-      ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{capture:true,passive:true,once:true}));
-      document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ctx&&ctx.state!=='running') ctx.resume(); },{passive:true});
+      // PWA: once:true 在 standalone 里经常只解锁一次且失败后不再重试 → 改持续监听
+      var _unlock=function(){ unlock(); try{ if(window.AudioEngine && window.AudioEngine.retryPlay) window.AudioEngine.retryPlay(); }catch(e){} };
+      ['pointerdown','touchstart','click','keydown'].forEach(function(ev){
+        document.addEventListener(ev,_unlock,{capture:true,passive:true});
+      });
+      document.addEventListener('visibilitychange',function(){
+        if(!document.hidden){
+          unlock();
+          try{ if(window.speechSynthesis && window.speechSynthesis.paused) window.speechSynthesis.resume(); }catch(e){}
+          try{ if(window.AudioEngine && window.AudioEngine.retryPlay) window.AudioEngine.retryPlay(); }catch(e){}
+        }
+      },{passive:true});
+      // PWA 热启动/从后台恢复
+      window.addEventListener('pageshow',function(){ unlock(); try{ if(window.AudioEngine && window.AudioEngine.retryPlay) window.AudioEngine.retryPlay(); }catch(e){} });
     }catch(e){}
     return {play,playClick,
       setEnabled(v){enabled=!!v; _lsSet('eh_sfx',enabled);},
@@ -191,13 +225,22 @@
   })();
   window.EhSfx=EhSfx;
 
+  // PWA/iOS 统一音频解锁: 手势/回前台时唤醒 WebAudio + BGM 元素 + TTS
+  window.EhAudioUnlock = {
+    all: function(){
+      try{ if(window.EhSfx && window.EhSfx.unlock) window.EhSfx.unlock(); }catch(e){}
+      try{ if(window.speechSynthesis && window.speechSynthesis.paused) window.speechSynthesis.resume(); }catch(e){}
+      try{ if(window.AudioEngine && window.AudioEngine.retryPlay) window.AudioEngine.retryPlay(); }catch(e){}
+    },
+  };
+
   // ── EhAudioBus: 人声(BGM 冲突源)互斥总线 ────────────────────
   // hold(tag)  : 有人声开始 → BGM 暂停 + 音效变软
   // release(tag): 人声结束 → 若无人再 hold, 恢复 BGM/音效
   // releaseAll(tag): 清掉某类人声的所有 hold(如关语音开关时)
   window.EhAudioBus = (function(){
     const tags={};
-    let n=0;
+    let n=0, _watch=null;
     function apply(){
       const busy=n>0;
       try{
@@ -205,6 +248,16 @@
         if(AE&&AE.duck) AE.duck(busy);
         if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(busy);
       }catch(e){}
+      // PWA 看门狗: hold 后 onend 丢失会导致 BGM 永久静音 → 45s 无解则强制清空
+      if (busy){
+        if(_watch) clearTimeout(_watch);
+        _watch=setTimeout(function(){
+          _watch=null;
+          try{ window.EhAudioBus.releaseAll(); }catch(e){}
+        }, 45000);
+      } else if (_watch){
+        clearTimeout(_watch); _watch=null;
+      }
     }
     return {
       hold(tag){
@@ -212,7 +265,6 @@
         tags[tag]=(tags[tag]||0)+1; n++;
         apply();
       },
-      // 同 tag 只保留一路 hold: TTS 连续报牌时替换而非累加, 避免旧句 onend 不来导致永不恢复
       replace(tag){
         tag=tag||'x';
         const prev=tags[tag]||0;
@@ -295,6 +347,7 @@
     function playCfg(cfg){
       if(!cfg||!cfg.url) return;
       ensure(); if(!el) return;
+      try{ el.setAttribute('playsinline',''); el.setAttribute('webkit-playsinline',''); }catch(e){}
       // BGM 起播: 不打断 TTS(主人: 报牌语音不影响背景乐); 仅停聊天语音条避免叠
       try{ if(typeof window.stopVoice==='function') window.stopVoice(); }catch(e){}
       el.loop=(mode==='loop');
@@ -304,36 +357,47 @@
       el.src=cfg.url;
       el.volume=0;
       const pr=el.play();
-      if(pr && pr.catch) pr.catch(()=>{ });
-      // 人声若仍在(busy), 保持静音; 否则正常淡入
+      if(pr && pr.catch) pr.catch(function(){ try{ el._ehNeedGesture=true; }catch(e){} });
       let busy=false; try{ busy=!!(window.EhAudioBus&&window.EhAudioBus.busy()); }catch(e){}
       fadeTo(busy?0:VOL_ON, busy?200:FADE_MS);
     }
+    function retryPlay(){
+      if(!el||!cur) return;
+      try{
+        if(window.EhAudioBus && window.EhAudioBus.busy()) return;
+        if(el._ehNeedGesture || el.paused){
+          el._ehNeedGesture=false;
+          const pr=el.play();
+          if(pr && pr.catch) pr.catch(function(){ try{ el._ehNeedGesture=true; }catch(e){} });
+          if(!el.paused) fadeTo(VOL_ON, 500);
+        }
+      }catch(e){}
+    }
     return {
-      start(cfg){ if(!bgmOn()) return; mode='loop'; chainPool=null; if(el) el.loop=true; playCfg(cfg); },
+      start(cfg){ if(!bgmOn()) return; mode='loop'; chainPool=null; if(el) el.loop=true; playCfg(cfg); try{ retryPlay(); }catch(e){} },
       chain(pool){ if(!bgmOn()) return; mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
         try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
-        if(!(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } },
+        if(!(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } retryPlay(); },
       toChainAfter(pool){ mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
         try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
-        if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } },
+        if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } retryPlay(); },
       stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
       resume(){
         if(!el||!cur) return;
-        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}   // 人声期间不抢播
-        if(el.paused){ try{ const pr=el.play(); if(pr&&pr.catch) pr.catch(()=>{}); }catch(_){} }
+        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
+        retryPlay();
         if(!el.paused) fadeTo(VOL_ON, 400);
       },
       playing(){ return !!(el && cur && !el.paused); },
       curName(){ return cur?cur.name:null; },
       curUrl(){ return cur?cur.url:null; },
-      // 人声互斥: true=静音并暂停 BGM; false=无人声时再淡回
+      retryPlay: retryPlay,
       duck(on){
         if(!el||!cur) return;
         if(on){ fadeTo(0, 180); return; }
         try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
-        if(el.paused){ try{ const pr=el.play(); if(pr&&pr.catch) pr.catch(()=>{}); }catch(_){} }
-        fadeTo(VOL_ON, 600);
+        retryPlay();
+        if(!el.paused) fadeTo(VOL_ON, 600);
       },
     };
   })();

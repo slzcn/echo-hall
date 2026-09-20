@@ -1,6 +1,6 @@
 /* ============================================================
  * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
- * journey-exempt: 跨端设计令牌/触控/焦点/减动态/contain — 契约 journey-games-xdevice.js
+ * journey-exempt: 跨端设计令牌/触控/焦点/减动态/contain/PWA骨架 — journey-games-xdevice + journey-pwa-lobby-btn.js
  * ------------------------------------------------------------
  * ------------------------------------------------------------
  * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
@@ -854,6 +854,87 @@ html[data-mode="day"] .pk-title{
 .gd-seat:not(.turn) .gd-avr .av,
 .pk-seat:not(.turn) .pk-avr .av{
   will-change: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   P. 移动端/PWA 骨架降级 (主人: 开始按钮被挤掉、PWA 结构丑)
+   短屏与招募态必须让位给「操作区可见」——结构锁是手段不是目的。
+   ══════════════════════════════════════════════════════════════ */
+/* 短屏(PWA 刘海机 + 小屏): 总高不够时清零硬 min-height, 交给 flex 分配 */
+@media (max-width: 599px), (max-height: 720px){
+  .ddz-opps, .gd-partner, .gd-mid{ min-height: 0 !important; }
+  .ddz-seat, .gd-seat{ min-height: 0 !important; }
+  .gd-partner .gd-seat{ min-height: 0 !important; }
+  .ddz-hand-wrap, .gd-hand-wrap{ min-height: 72px !important; }
+  .ddz-me, .gd-me-row, .pk-me{ min-height: 0 !important; }
+  .ddz-ctrl, #ddzCtrl, .gd-foot, .pk-acts{ min-height: 0 !important; }
+  .ddz-bar, .gd-bar, .pk-bar{
+    min-height: 0 !important;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: 8px !important;
+  }
+  /* PWA 顶栏不再叠 42px 大地板, 与浏览器态同一节奏(靠 env 自己抬) */
+  html.pwa-standalone .ddz-bar,
+  html.pwa-standalone .gd-bar,
+  html.pwa-standalone .pk-bar{
+    min-height: 0 !important;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+  }
+}
+/* 招募态: 没有手牌压力, 操作区必须钉在底部可见 */
+.ddz-room.is-lobby .ddz-hand-wrap,
+.gd-room[data-phase="lobby"] .gd-hand-wrap{
+  min-height: 0 !important;
+  border-top-color: transparent !important;
+  background: none !important;
+  padding-bottom: 0 !important;
+}
+.ddz-room.is-lobby #ddzCtrl,
+.gd-room[data-phase="lobby"] .gd-foot{
+  min-height: 0 !important;
+  flex-shrink: 0 !important;
+}
+.ddz-lobacts, .gd-lobacts{
+  gap: 10px !important;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  background: linear-gradient(180deg, rgba(8,18,24,.2), rgba(6,12,18,.72)) !important;
+  border-top: 1px solid rgba(0,229,212,.16);
+}
+.ddz-lobbtns, .gd-lobbtns{
+  display: flex !important;
+  gap: 10px !important;
+  width: 100%;
+  justify-content: center;
+}
+.ddz-lobbtns .ddz-btn, .gd-lobbtns .gd-btn{
+  min-height: 44px !important;
+  min-width: 120px !important;
+  max-width: none !important;
+  font-size: 15px !important;
+  flex: 1 1 0;
+}
+.ddz-lobhint, .gd-lobhint{
+  width: 100%;
+  text-align: center;
+  color: var(--sub, #86cbc6);
+  font-size: 12px;
+}
+/* PWA 观感: 顶栏更薄、毛玻璃一致、felt 不再被 contain 卡死布局 */
+html.pwa-standalone .ddz-room,
+html.pwa-standalone .gd-room,
+html.pwa-standalone .pk-room{
+  contain: style;
+}
+html.pwa-standalone .ddz-felt,
+html.pwa-standalone .gd-felt,
+html.pwa-standalone .pk-felt{
+  contain: paint;
+}
+/* 操作区始终在房间 flex 末端且可点(防被 overflow:hidden 裁掉) */
+#ddzCtrl, .gd-foot, .pk-acts{
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0 !important;
 }
 /* 选牌一致性(三游戏): 选中抬起量/光晕同一套语言, 理牌后重选也一眼可辨 */
 .ddz-hand .card.sel,

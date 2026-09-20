@@ -346,6 +346,11 @@ html[data-mode="day"] .ddz-center::before{
    富余空间落在绒面一侧, 操作条恒定贴底——游戏中整桌不再上下跳 */
 #ddzCtrl{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(92px + env(safe-area-inset-bottom,0px))}
 .ddz-room.is-land #ddzCtrl{min-height:calc(70px + env(safe-area-inset-bottom,0px))}
+/* 短屏/招募: 控制区跟内容走, 不硬撑 92px(避免开始钮被挤出 PWA 可视区) */
+@media (max-width:599px), (max-height:720px){
+  #ddzCtrl{ min-height: 0 !important; }
+}
+.ddz-room.is-lobby #ddzCtrl{ min-height: 0 !important; }
 .ddz-acts{display:flex;gap:10px;justify-content:center;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 /* ★等宽+定高+长文字自动缩字号(主人诉求 msg5): min-width:0 让 flex 等分真正生效(不被"要不起/抢地主"等长文
    撑破对不齐); min-height 定高防不同按钮高低差; flex 居中 + gap 让 .bt 副标并排居中(不用 margin 破坏居中);
@@ -540,7 +545,7 @@ html[data-mode="day"] .ddz-center::before{
   function open(opts){
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
-    // journey-exempt: 座位增量/双触选组/fillSeat — journey-games-xdevice + journey-fill-seat-all
+    // journey-exempt: 座位增量/双触选组/fillSeat/lobby骨架 — journey-games-xdevice + journey-pwa-lobby-btn.js
     injectCSS(); injectLobbyCSS();
     try{ if(root.EhGameBgm) root.EhGameBgm.enter('ddz'); }catch(_){}   // 进桌切斗地主 BGM
 
