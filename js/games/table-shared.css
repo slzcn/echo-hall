@@ -1,6 +1,6 @@
 /* ============================================================
  * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
- * journey-exempt: 跨端设计令牌/触控/焦点/减动态/contain/PWA骨架 — journey-games-xdevice + journey-pwa-lobby-btn.js
+ * journey-exempt: 跨端令牌/PWA骨架/台面主题化 — journey-games-xdevice + journey-pwa-lobby-btn + journey-theme-tables
  * ------------------------------------------------------------
  * ------------------------------------------------------------
  * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
@@ -167,54 +167,90 @@
 /* 角标: rank 与小花色抱成竖直 index 单元, 花色加重更清晰 */
 .ddz-room .card .cs, .gd-room .card .cs, .pk-room .card .cs{ font-weight: 700; }
 
-/* ── C. 真牌桌重构 (三款统一"绿呢台面 + 皮革围边") ─────────────
- * 旧版桌面是半透明 radial 叠在纯黑上(.46/.10 alpha) → 稀成一圈青色空心环, 中心发黑, 像线框 demo 而非台面(实拍已证)。
- * 重构口径(对标腾讯欢乐系列真桌感):
- *   1) 台面不透明 + 高饱和翡翠绒: 亮心聚光灯 → 深绿呢 → 边缘暗晕, 一眼是"绿台面"不是"发光的洞"。
- *   2) 皮革围边: 用 box-shadow 叠环模拟"暗皮边 + 顶沿高光 + 底沿阴影"的立体厚度, 取代原来一根扁平青线。
- *   3) 收敛霓虹: 青只留一道极淡外发光当品牌呼吸, 不再让青描边当台面主角。
- *   4) 织纹: 两道±45° 极淡斜纹, 近看有呢子编织感, 远看不脏。
- * 高特异性 .*-room 前缀提权, 稳压各 UI 文件里的 .*-center::before/.pk-table::before 基础规则(同类同伪元素, 靠 link 后置 + 前缀取胜)。 */
+/* ── C. 真牌桌: 主题色绒面(跟随主站 10 套皮肤, 不再写死翡翠绿) ─────
+ * 设计口径(对标主流棋牌游戏质感 + Echo 主题变量):
+ *   台面 = 深色绒底 + --accent 低饱和染色 + 聚光亮心 + 深色围边
+ *   日间 = 浅绒/薄荷纸感 + --accent 淡染, 与奶油/浅 bg 协调
+ *   围边/高光用 --accent 叠透明度, 切换 cyber/vapor/mono/klein… 自动跟随
+ * 高特异性 .*-room 前缀, 稳压各 UI 文件里的本地 felt 规则。 */
 .ddz-room .ddz-center::before,
 .gd-room  .gd-center::before,
 .pk-room  .pk-table::before{
   background-image:
-    repeating-linear-gradient(45deg, rgba(255,255,255,.020) 0 1px, transparent 1px 5px),
-    repeating-linear-gradient(-45deg, rgba(0,0,0,.045) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.022) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,.05) 0 1px, transparent 1px 6px),
+    /* 主题染色层: accent 淡罩在深绒上 → 换皮肤时台面跟着变色相 */
+    radial-gradient(ellipse 80% 70% at 50% 36%,
+      color-mix(in srgb, var(--accent,#00E5D4) 28%, transparent) 0%,
+      color-mix(in srgb, var(--accent,#00E5D4) 10%, transparent) 48%,
+      transparent 72%),
+    /* 深绒底: 亮心 → 中绿 → 近黑边(不抢主题) */
     radial-gradient(ellipse 74% 66% at 50% 36%,
-      #2ba07f 0%, #17805f 34%, #0d5f49 60%, #084036 82%, #052a25 100%) !important;
+      #1f6b58 0%, #145244 32%, #0c3a32 58%, #072620 82%, #041814 100%) !important;
   border: none !important;
   box-shadow:
-    /* 皮革围边: 暗皮基底环 + 极淡青品牌环 */
-    0 0 0 5px #071e1b,
-    0 0 0 6px rgba(0,229,212,.12),
-    /* 台面浮起于背景 */
-    0 18px 44px rgba(0,0,0,.5),
-    0 0 26px rgba(0,229,212,.07),
-    /* 顶沿高光(光自上方) + 底沿暗影 = 立体围边厚度 */
-    inset 0 3px 1px rgba(255,255,255,.11),
-    inset 0 -24px 48px rgba(0,0,0,.42),
-    /* 四周暗晕(vignette): 让边缘沉下去, 中心被聚光灯托起 */
-    inset 0 0 62px rgba(0,0,0,.44) !important;
+    0 0 0 4px color-mix(in srgb, var(--accent,#00E5D4) 22%, #061814),
+    0 0 0 5px color-mix(in srgb, var(--accent,#00E5D4) 45%, transparent),
+    0 18px 44px rgba(0,0,0,.48),
+    0 0 30px color-mix(in srgb, var(--accent,#00E5D4) 18%, transparent),
+    inset 0 3px 0 rgba(255,255,255,.10),
+    inset 0 -24px 48px rgba(0,0,0,.40),
+    inset 0 0 64px rgba(0,0,0,.42) !important;
 }
-/* 日间: 浅底上深绿绒会发灰, 换清透薄荷呢(亮心→淡翡翠边), 皮革边换成浅木沿 + 白高光 */
+/* 无 color-mix 的老内核: 回退到固定深绒 + accent 描边 */
+@supports not (background: color-mix(in srgb, red 50%, blue)){
+  .ddz-room .ddz-center::before,
+  .gd-room  .gd-center::before,
+  .pk-room  .pk-table::before{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.022) 0 1px, transparent 1px 6px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,.05) 0 1px, transparent 1px 6px),
+      radial-gradient(ellipse 74% 66% at 50% 36%,
+        #1f6b58 0%, #145244 32%, #0c3a32 58%, #072620 82%, #041814 100%) !important;
+    box-shadow:
+      0 0 0 4px #061814,
+      0 0 0 5px var(--accent,#00E5D4),
+      0 18px 44px rgba(0,0,0,.48),
+      inset 0 3px 0 rgba(255,255,255,.10),
+      inset 0 0 64px rgba(0,0,0,.42) !important;
+  }
+}
+/* 日间: 浅底上用「主题淡染薄荷纸台」, 不再深绿压奶油底 */
 html[data-mode="day"] .ddz-room .ddz-center::before,
 html[data-mode="day"] .gd-room  .gd-center::before,
 html[data-mode="day"] .pk-room  .pk-table::before{
   background-image:
-    repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 1px, transparent 1px 5px),
-    repeating-linear-gradient(-45deg, rgba(0,90,80,.035) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, rgba(0,90,80,.04) 0 1px, transparent 1px 6px),
+    radial-gradient(ellipse 80% 70% at 50% 36%,
+      color-mix(in srgb, var(--accent,#007f76) 16%, transparent) 0%,
+      color-mix(in srgb, var(--accent,#007f76) 6%, transparent) 50%,
+      transparent 75%),
     radial-gradient(ellipse 74% 66% at 50% 36%,
-      #8fe6cd 0%, #4cc6a7 38%, #16a488 66%, #0a8874 88%, #077062 100%) !important;
-  border: none !important;
+      #d7f0e8 0%, #b7e0d2 34%, #8fc8b8 62%, #6f9e90 88%, #5a8578 100%) !important;
   box-shadow:
-    0 0 0 5px #cfe9e2,
-    0 0 0 6px rgba(0,127,118,.22),
-    0 14px 34px rgba(0,80,74,.22),
-    inset 0 3px 1px rgba(255,255,255,.7),
-    inset 0 -22px 44px rgba(0,70,64,.14),
-    inset 0 0 54px rgba(0,60,54,.12) !important;
+    0 0 0 3px color-mix(in srgb, var(--accent,#007f76) 35%, rgba(0,0,0,.08)),
+    0 10px 28px rgba(0,0,0,.14),
+    inset 0 2px 0 rgba(255,255,255,.65),
+    inset 0 -18px 36px rgba(0,0,0,.08),
+    inset 0 0 40px rgba(0,0,0,.06) !important;
 }
+@supports not (background: color-mix(in srgb, red 50%, blue)){
+  html[data-mode="day"] .ddz-room .ddz-center::before,
+  html[data-mode="day"] .gd-room  .gd-center::before,
+  html[data-mode="day"] .pk-room  .pk-table::before{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 1px, transparent 1px 6px),
+      radial-gradient(ellipse 74% 66% at 50% 36%,
+        #d7f0e8 0%, #b7e0d2 34%, #8fc8b8 62%, #6f9e90 88%, #5a8578 100%) !important;
+    box-shadow:
+      0 0 0 3px var(--accent,#007f76),
+      0 10px 28px rgba(0,0,0,.14),
+      inset 0 2px 0 rgba(255,255,255,.65),
+      inset 0 0 40px rgba(0,0,0,.06) !important;
+  }
+}
+/* 日间: 浅底上深绿绒会发灰, 换清透薄荷呢(亮心→淡翡翠边), 皮革边换成浅木沿 + 白高光 */
 /* ── C2. 日间可读性修复(自检发现的回归) ──────────────────────
  * 台面在日间调亮成薄荷绿后, 直接"印在台面上"的 --sub/--dim 青灰字(座位名/消息/passtag/
  * 底牌 label)对比骤降=青字压青底几乎看不清(德州最重, 全部座位坐在台面上)。
@@ -965,4 +1001,109 @@ html.pwa-standalone .pk-felt{
   0%{ transform: translateY(0) scale(1); }
   45%{ transform: translateY(-26px) scale(1.04); }
   100%{ transform: translateY(-22px) scale(1); }
+}
+
+/* ── R. 主题化 UI(与主站皮肤变量对齐) ──────────────────────── */
+html:not([data-mode="day"]) .ddz-btn.primary,
+html:not([data-mode="day"]) .gd-btn.primary,
+html:not([data-mode="day"]) .pk-b.call.check,
+html:not([data-mode="day"]) .pk-b.raise:not(.confirm):not(.allin){
+  background: var(--accent,#00E5D4) !important;
+  color: var(--bg,#04060c) !important;
+  border-color: var(--accent,#00E5D4) !important;
+  box-shadow: var(--glow-cyan, 0 0 14px rgba(0,229,212,.4)) !important;
+}
+html[data-mode="day"] .ddz-btn.primary,
+html[data-mode="day"] .gd-btn.primary,
+html[data-mode="day"] .pk-b.call.check,
+html[data-mode="day"] .pk-b.raise:not(.confirm):not(.allin){
+  background: var(--accent,#007f76) !important;
+  color: #fff !important;
+  border-color: var(--accent,#007f76) !important;
+  box-shadow: var(--glow-cyan, 0 2px 10px rgba(0,127,118,.25)) !important;
+}
+.ddz-lobbtns .ddz-btn.ghost, .gd-lobbtns .gd-btn.ghost,
+.ddz-btn.ghost, .gd-btn.ghost{
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--line2) !important;
+}
+html:not([data-mode="day"]) .ddz-seat.ddz-lobby-empty .ddz-avr,
+html:not([data-mode="day"]) .gd-seat.gd-lobby-empty .gd-avr,
+html:not([data-mode="day"]) .pk-seat.pk-lobby-empty .pk-avr{
+  border: 1.5px dashed var(--line2) !important;
+  background: color-mix(in srgb, var(--accent,#00E5D4) 8%, transparent) !important;
+}
+html[data-mode="day"] .ddz-seat.ddz-lobby-empty .ddz-avr,
+html[data-mode="day"] .gd-seat.gd-lobby-empty .gd-avr,
+html[data-mode="day"] .pk-seat.pk-lobby-empty .pk-avr{
+  border: 1.5px dashed var(--line2) !important;
+  background: color-mix(in srgb, var(--accent,#007f76) 10%, rgba(255,255,255,.7)) !important;
+}
+html:not([data-mode="day"]) .ddz-seat.ddz-lobby-empty .av,
+html:not([data-mode="day"]) .gd-seat.gd-lobby-empty .av,
+html:not([data-mode="day"]) .pk-seat.pk-lobby-empty .av{
+  background: transparent !important;
+  color: var(--accent,#00E5D4) !important;
+  border: none !important;
+}
+html[data-mode="day"] .ddz-seat.ddz-lobby-empty .av,
+html[data-mode="day"] .gd-seat.gd-lobby-empty .av,
+html[data-mode="day"] .pk-seat.pk-lobby-empty .av{
+  background: #fff !important;
+  color: var(--accent,#007f76) !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06) !important;
+}
+.ddz-lobacts, .gd-lobacts, .pk-acts{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-solid,#132a29) 55%, transparent),
+      color-mix(in srgb, var(--bg2,#0d1524) 88%, transparent)) !important;
+  border-top: 1px solid var(--line) !important;
+}
+html[data-mode="day"] .ddz-lobacts,
+html[data-mode="day"] .gd-lobacts,
+html[data-mode="day"] .pk-acts{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-solid,#fff) 40%, transparent),
+      color-mix(in srgb, var(--bg2,#daf1ef) 90%, #fff)) !important;
+  border-top: 1px solid var(--line) !important;
+}
+.ddz-lobhint, .gd-lobhint{ color: var(--sub) !important; font-size: 12px; }
+.ddz-me, .gd-me-row, .pk-me{
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-solid,#132a29) 70%, transparent),
+    color-mix(in srgb, var(--bg2,#0d1524) 55%, transparent));
+  border-top: 1px solid var(--line);
+}
+html[data-mode="day"] .ddz-me,
+html[data-mode="day"] .gd-me-row,
+html[data-mode="day"] .pk-me{
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-solid,#fff) 75%, transparent),
+    color-mix(in srgb, var(--bg2,#daf1ef) 70%, transparent));
+}
+.ddz-avr .av, .gd-avr .av, .pk-avr .av{
+  border-color: color-mix(in srgb, var(--accent,#00E5D4) 40%, transparent) !important;
+}
+html[data-mode="day"] .ddz-avr .av,
+html[data-mode="day"] .gd-avr .av,
+html[data-mode="day"] .pk-avr .av{
+  border-color: color-mix(in srgb, var(--accent,#007f76) 45%, rgba(0,0,0,.08)) !important;
+}
+.ddz-room.is-lobby .ddz-felt,
+.gd-room[data-phase="lobby"] .gd-felt,
+.pk-room[data-phase="lobby"] .pk-felt{
+  justify-content: flex-start !important;
+}
+
+/* 日间台面 ::after 描边: 主题色细环, 不再死白 */
+html[data-mode="day"] .ddz-room .ddz-center::after,
+html[data-mode="day"] .gd-room  .gd-center::after,
+html[data-mode="day"] .pk-room  .pk-table::after{
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent,#007f76) 30%, rgba(0,0,0,.05)),
+    inset 0 0 0 2px rgba(255,255,255,.4) !important;
 }
