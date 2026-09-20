@@ -448,28 +448,34 @@
       const fa = a.cards.length===handN ? 0:1, fb = b.cards.length===handN ? 0:1;
       if (fa!==fb) return fa-fb;
       if (!target){
-        // 领出: 炸弹垫底(小炸优先), 非炸按 leadScore(少留手数 + 惜控 A/级/王 + 多清散牌)。
         const ba = isB(a)?1:0, bb = isB(b)?1:0;
         if (ba!==bb) return ba-bb;
         if (ba===1) return Rules.bombStrength(a.parse)-Rules.bombStrength(b.parse);
-        return leadSc.get(a) - leadSc.get(b);
+        const la = leadSc.get(a), lb = leadSc.get(b);
+        if (la!==lb) return la-lb;
+        // 同分: 多清散牌优先(更长的一手把碎张带走)
+        return b.cards.length - a.cards.length;
       }
-      // 跟牌: 非炸优先(炸弹垫底), 再按代价最小
+      // 跟牌: 非炸优先, 再最小代价; 同代价时更长一手优先(多清牌)
       const ba = isB(a)?1:0, bb = isB(b)?1:0;
       if (ba!==bb) return ba-bb;
       const ca=playCost(a,hand,level), cb=playCost(b,hand,level);
       if (ca!==cb) return ca-cb;
-      return a.cards.length-b.cards.length;
+      return b.cards.length-a.cards.length;
     });
-    // 残局/报单意识(领出·ctx 带 handsLeft 时): 真对手剩1张 → 多张牌型(他跟不了)提前憋他, 全单张则大单优先。
-    //   只吃公开的各家剩牌数, 不看隐藏手牌 → 公平。稳定排序保多张牌型间既有(清散牌)顺序。
-    if (!target && ctx.handsLeft && minOpponentCards(ctx) === 1){
-      combos.sort((a,b)=>{
-        const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
-        if (ma!==mb) return ma-mb;
-        if (ma===1) return b.parse.key-a.parse.key;
-        return 0;
-      });
+    // 残局/报单报双(领出·ctx 带 handsLeft 时): 真对手剩1/2张 → 多张牌型憋他; 报双时他能压过的对子降级。
+    if (!target && ctx.handsLeft){
+      const oppMin = minOpponentCards(ctx);
+      if (oppMin === 1 || oppMin === 2){
+        combos.sort((a,b)=>{
+          const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
+          if (ma!==mb) return ma-mb;
+          if (oppMin===2 && a.parse.type==='pair' && b.parse.type!=='pair') return 1;   // 报双: 不首推可能被压的对
+          if (oppMin===2 && b.parse.type==='pair' && a.parse.type!=='pair') return -1;
+          if (ma===1) return b.parse.key-a.parse.key;
+          return 0;
+        });
+      }
     }
     // ★队友(对家)协作提示(与 decide 同源): 桌面这手是对家领出的 → 别提示压自己人。
     //   ①能一把走完(含炸) 或 ②残局抢门(我≤3 张且不比对家更远, 只推进不上炸) 才给牌; 否则空 → UI 提示让对家走。

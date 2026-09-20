@@ -499,7 +499,9 @@
       list.sort((a,b)=>{
         const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
         if (fa!==fb) return fa-fb;                                       // ① 走完优先
-        return leadScore(hand,a) - leadScore(hand,b);                    // ② 与灵魂选择同源: 少留手数 + 惜控 + 多清牌
+        const la=leadScore(hand,a), lb=leadScore(hand,b);
+        if (la!==lb) return la-lb;                 // ② 与灵魂选择同源: 少留手数 + 惜控 + 多清牌
+        return b.cards.length - a.cards.length;    // ③ 同分: 多清散牌
       });
       // ④ 领出·真对手低张(报单/报双): 把"他压不过/跟不了的一手"提到最前憋死他。
       //    报单(剩1张): 任何≥2张牌型他都跟不了 → 多张提前, 全单张则大单优先(他压不过)。
@@ -529,8 +531,10 @@
     } else {
       list.sort((a,b)=>{
         const fa=a.cards.length===handN?0:1, fb=b.cards.length===handN?0:1;
-        if (fa!==fb) return fa-fb;                                       // ① 走完优先
-        return playCost(a,hand)-playCost(b,hand);                        // 最小代价
+        if (fa!==fb) return fa-fb;
+        const ca=playCost(a,hand), cb=playCost(b,hand);
+        if (ca!==cb) return ca-cb;
+        return b.cards.length - a.cards.length;         // 同代价多清散牌
       });
     }
     // ★队友协作(提示与 decide 同源): 桌面这手是我队友(同为农民)领出的 → 别提示去压自己人。

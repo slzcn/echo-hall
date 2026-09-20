@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260918-gt-act-rpc';
+window.__EH_APP_VER = '20260918-gt-net-hints';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -874,12 +874,26 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
-let _gtSnapSeq = 0;            // host 广播快照单调序号: guest 侧丢弃重连乱序旧包(见 *-net acceptSeq)
+let _gtSnapSeq = 0;            // 兼容: EH_GT_NET 缺失时的本地序号
+// journey-exempt: 联机纯逻辑迁出 — journey-gt-net-module.js + journey-gt-act-rpc.js
+const _EH_GT_NET = (function(){
+  if (!window.EH_GT_NET_MODULE || !window.EH_GT_NET_MODULE.createGtNet) return null;
+  return window.EH_GT_NET_MODULE.createGtNet({
+    getSeats: function(tableId, fallbackRow){ return gtLiveSeatArrays(tableId, fallbackRow); },
+    markHuman: function(){ gtMarkHumanAct(); },
+    applyMove: function(seat, move){ return _ehGame && _ehGame.applyMove ? _ehGame.applyMove(seat, move) : false; },
+    resumeRemote: function(seat){ if(_ehGame && typeof _ehGame.resumeRemote==='function') _ehGame.resumeRemote(seat); },
+    resync: function(){ if(_ehGame && _ehGame.resync) _ehGame.resync(); },
+    sendBroadcast: function(payload){ /* 由调用方带 chan */ },
+    getUid: function(){ return myUid; },
+    toast: function(m){ try{ toast(m); }catch(_){} },
+  });
+})();
 // (自动开局已撤 2026-09-15: 招募态坐满不再自动起, 房主手动点「开始 ▶」→ gtStart)
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(_){} _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; try{ _gtStopPing(); }catch(_){ } try{ _gtStopTurnAlert(); }catch(_){ } try{ _turnFlashTitle(false); }catch(_){ } }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // host 发快照前打单调 seq; guest 用 acceptSeq 丢弃更旧的迟到包
-function gtStampSnap(snap){ if(snap && typeof snap==='object'){ try{ snap.seq = ++_gtSnapSeq; }catch(_){} } return snap; }
+function gtStampSnap(snap){ if(_EH_GT_NET) return _EH_GT_NET.stamp(snap); if(snap && typeof snap==='object'){ try{ snap.seq = ++_gtSnapSeq; }catch(e){ _ehCatch('gtStampSnap', e); } } return snap; }
 // 每次 act 都从 DB 座位现算远程真人席 —— 禁止开桌时固化 A.remoteSeats(中途顶替入座会被误拒)
 function gtLiveSeatArrays(tableId, fallbackRow){
   try{
@@ -890,11 +904,17 @@ function gtLiveSeatArrays(tableId, fallbackRow){
 }
 // host 应用远程真人动作: 以 DB 座位为授权源; 引擎侧曾 idleOut 移出 remoteSeats 时先 resumeRemote 再落子
 function gtGuestSendAct(chan, tableId, seat, move){
-  // journey-exempt: 联机出牌 RPC/降级 — journey-gt-act-rpc.js
-  // phase-2: 优先 RPC(服务端 uid↔seat 绑定); 失败/未部署则退回 broadcast+uid(host 仍校验)
+  // journey-exempt: 联机出牌 RPC/降级 — journey-gt-act-rpc.js + modules/gt-net.js
   const sendBc = function(){
-    try{ chan.send({type:'broadcast',event:'act',payload:{seat:seat, move:move, uid:myUid}}); }catch(_){}
+    try{ chan.send({type:'broadcast',event:'act',payload:{seat:seat, move:move, uid:myUid}}); }catch(e){ _ehCatch('gtGuestSendAct', e); }
   };
+  if (_EH_GT_NET){
+    _EH_GT_NET.sendAct(chan, tableId, seat, move, myUid, function(tid, st, mv){
+      if (!sb || !sb.rpc) return Promise.reject(new Error('no-rpc'));
+      return sb.rpc('eh_gt_act', { p_table: tid, p_seat: st, p_move: mv || null });
+    }, toast);
+    return;
+  }
   try{
     if (!sb || !sb.rpc || !tableId){ sendBc(); return; }
     sb.rpc('eh_gt_act', { p_table: tableId, p_seat: seat, p_move: move || null })
@@ -917,16 +937,23 @@ function gtGuestSendAct(chan, tableId, seat, move){
 function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid){
   if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
   const A = gtLiveSeatArrays(tableId, fallbackRow);
-  if (!A || !Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return;   // 非 DB 上的远程真人席
-  // uid 反冒名: 带了 uid 必须与 DB 座位一致; 完全服务端权威见 sql/eh_gt_act.sql(phase-2)
-  const seatUid = A.ids && A.ids[seat];
-  if (payloadUid && seatUid && String(payloadUid) !== String(seatUid)) return;
-  gtMarkHumanAct();   // 远程真人出牌 = 真人在玩 → 续桌 DB 心跳
-  if (typeof _ehGame.resumeRemote === 'function'){
-    try{ _ehGame.resumeRemote(seat); }catch(_){}   // 超时托管中的席: 真人一落子即视为接管回座
+  if (!A) return;
+  var chk = _EH_GT_NET
+    ? _EH_GT_NET.acceptMove({ remoteSeats: A.remoteSeats, ids: A.ids }, seat, move, payloadUid)
+    : (function(){
+        if (!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return { ok:false };
+        var uid = A.ids && A.ids[seat];
+        if (payloadUid && uid && String(payloadUid) !== String(uid)) return { ok:false };
+        return { ok:true };
+      })();
+  if (!chk.ok) return;
+  gtMarkHumanAct();
+  if (_EH_GT_NET) _EH_GT_NET.resumeRemote(_ehGame, seat, A.mySeat);
+  else if (typeof _ehGame.resumeRemote === 'function'){
+    try{ _ehGame.resumeRemote(seat); }catch(e){ _ehCatch('resumeRemote', e); }
   }
   const ok = _ehGame.applyMove(seat, move);
-  if (!ok && _ehGame.resync) _ehGame.resync();      // 过时/非法动作 → 重播当前快照纠偏
+  if (!ok && _ehGame.resync) _ehGame.resync();
 }
 // host 监听客人「接管座位」广播, 把该席放回引擎 remoteSeats
 function gtWireHostResume(chan, tableId, fallbackRow){
@@ -2586,7 +2613,7 @@ function gtLaunchDdzLobby(row){
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
       gtWriteDdzHands(row.id, state, A);
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
     onResult:(res,log,meta)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
@@ -2623,7 +2650,7 @@ function gtLaunchPokerLobby(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(e){ _ehCatch('gtSnapSend', e); }
       if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
@@ -2657,7 +2684,7 @@ function gtLaunchGuandanLobby(row){
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人手牌也会自动落库
       gtWriteGuandanHands(row.id, state, A);
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
     onResult:(res,log,meta)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);
@@ -2722,7 +2749,7 @@ function bankSet(game, patch){ return _EH_SCORE ? _EH_SCORE.set(game, patch) : b
 function bankChips(game, grant){ return _EH_SCORE ? _EH_SCORE.chips(game, grant) : PK_WALLET_GRANT; }
 function bankBump(game, delta, won){ return _EH_SCORE ? _EH_SCORE.bump(game, delta, won) : bankGet(game); }
 function bankOpenOpts(game, grant){ return _EH_SCORE ? _EH_SCORE.openOpts(game, grant) : { chips: PK_WALLET_GRANT, onWallet: function(){} }; }
-function bankMigrateFromLocalAnon(){ try{ if(_EH_SCORE) _EH_SCORE.migrateFromLocalAnon(); }catch(_){} }
+function bankMigrateFromLocalAnon(){ try{ if(_EH_SCORE) _EH_SCORE.migrateFromLocalAnon(); }catch(e){ _ehCatch('bankMigrate', e); } }
 function pkWallet(){ return bankChips('nlhe', PK_WALLET_GRANT); }
 function pkSetWallet(v){ bankSet('nlhe', { chips: Math.max(0, Math.round(Number(v)||0)) }); }
 try{
@@ -2765,7 +2792,7 @@ function gtLaunchPoker(row){
     myStack: _pkMyStack, onWallet: _bank.onWallet,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(state,hno)=>{
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(e){ _ehCatch('gtSnapSend', e); }
       if(hno!==lastHandWritten){ lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat); }
     },
     onResult:(res,log,meta)=>{
@@ -2861,7 +2888,7 @@ function gtLaunchGuandan(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
       gtWriteGuandanHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(掼蛋出一张变一次)
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
@@ -2955,7 +2982,7 @@ function gtLaunchDdz(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onSync:(snap,state)=>{
       gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(_){}
+      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
