@@ -647,7 +647,8 @@ html[data-mode="day"] .ddz-center::before{
     const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
-    let trustee = false;                    // 托管: 我这席交 AI 代打(叫分/加倍/出牌全自动), 直到手动收回
+    let trustee = false;                    // 托管: 我这席交 AI 代打(叫分/加倍/出牌全自动)
+    let trusteeAuto = false;                // 连续超时自动开启的托管: 仅本局有效(新局自动收回)
     const TRUSTEE_MS = 650;                 // 托管代打前的短延时(让人看清是自动出的, 不瞬闪)
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function bumpMiss(seat){
@@ -661,8 +662,11 @@ html[data-mode="day"] .ddz-center::before{
       missStreak[seat] = 0;
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 托管
-      if (seat===mySeat){ spectating = true; selected = new Set();
-        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
+      if (seat===mySeat){
+        // ★主人: 多次过牌/超时 → 进自动模式, 【只在一局内有效】; 顶栏托管钮可手动开(跨局保留)
+        if (!trustee){ trustee = true; trusteeAuto = true; try{ paintAuto(); }catch(_){}
+          toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200); }
+      }
       else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
@@ -870,8 +874,8 @@ html[data-mode="day"] .ddz-center::before{
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
         <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
-        ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="ddz-auto" id="ddzAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
+        ${COUNTER?`<button class="ddz-cnt" id="ddzCnt" aria-label="记牌器" title="记牌器/出牌历史">🃏</button>`:''}
         <button class="ddz-rot" id="ddzRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
         <button class="ddz-x" id="ddzX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
@@ -1177,9 +1181,13 @@ html[data-mode="day"] .ddz-center::before{
       on = !!on;
       if (trustee === on) return;
       trustee = on;
+      if (!on) trusteeAuto = false;
       if (on){ toast('🤖 已托管 · AI 替你自动出牌'); }
       else { clearTimers(); toast('已收回托管 · 由你操作'); }
       sfx('click'); paintAuto(); renderAll();
+    }
+    function _clearAutoTrusteeOnNewDeal(){
+      if (trusteeAuto){ trustee=false; trusteeAuto=false; try{ paintAuto(); }catch(_){} try{ renderAll(); }catch(_){} }
     }
     if (autoBtn) autoBtn.addEventListener('click', ()=> setTrustee(!trustee));
     paintAuto();
@@ -1723,6 +1731,7 @@ html[data-mode="day"] .ddz-center::before{
     }
     // 再来一局: 就地重建新局(同一 room 不重挂 → 顺势接发牌入场动画), 复位一局态标志。host 广播新局首帧。
     function startRematch(){
+      _clearAutoTrusteeOnNewDeal();
       if (startRematch._busy) return; startRematch._busy = true;   // 防连点
       showOver._done = false;
       st = Engine.createGame({ isAI: gameIsAI, names, doubling: DOUBLING, firstBidSeat: nextBidLead() });
@@ -2162,7 +2171,7 @@ html[data-mode="day"] .ddz-center::before{
           if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); acted=true; }
         }
       }
-      if (acted) bumpMiss(mySeat);   // 累计我的超时(达阈值→idleOut 离座旁观)
+      if (acted) bumpMiss(mySeat);   // 累计我的超时(达阈值→本局自动托管)
     }
 
     // ── 制胜亮牌过渡(主人反馈"赢的人最后出的什么没看清就赢了"): 终局那一手先以"对局态"留在桌心亮
@@ -2280,6 +2289,7 @@ html[data-mode="day"] .ddz-center::before{
         const d=root.EH_DAILY_PLAYS;
         if (d && d.reached && d.reached()){ try{ toast('今日对局已达 '+(d.max||5)+' 次 · 明天再来'); }catch(_){} return; }
       }
+      _clearAutoTrusteeOnNewDeal();
       if (A){
         if (Array.isArray(A.names)) names = A.names;
         if (Array.isArray(A.avatars)) avatars = A.avatars;
@@ -2305,6 +2315,7 @@ html[data-mode="day"] .ddz-center::before{
       applyMove, setConn, connState:()=>connState,
       isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
       _forceTimeout:()=>onHumanTimeout(), missOf:s=>missStreak[s]||0,
+      isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };

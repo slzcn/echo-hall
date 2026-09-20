@@ -682,25 +682,60 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
     const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
-    let spectating = false;                // 本人(mySeat)是否已离座旁观
+    // ★托管: 顶栏第二钮; 连续超时自动开=仅本局, 手动开=跨局保留(主人诉求)
+    let trustee = false, trusteeAuto = false;
+    const TRUSTEE_MS = 650;
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
+    function paintAuto(){ const b=$('#gdAuto'); if(b) b.classList.toggle('on', !!trustee); }
+    function setTrustee(on){
+      on=!!on; if(trustee===on) return;
+      trustee=on; if(!on) trusteeAuto=false;
+      toast(on?'🤖 已托管 · AI 替你自动出牌':'已收回托管 · 由你操作');
+      sfx('click'); paintAuto(); try{ renderAll(); }catch(_){}
+    }
+    function _clearAutoTrusteeOnNewDeal(){ if(trusteeAuto){ trustee=false; trusteeAuto=false; paintAuto(); } }
     function bumpMiss(seat){
-      if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
-      if (seat===mySeat ? spectating : !isRemote(seat)) return;   // 只盯我(未旁观) 或 在场远程真人席(未转 AI)
+      if (isGuest) return;
+      if (seat===mySeat ? spectating : !isRemote(seat)) return;
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
     function idleOut(seat){
       missStreak[seat] = 0;
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
-      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 托管
-      if (seat===mySeat){ spectating = true; selected = new Set();
-        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
-      else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
+      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
+      if (seat===mySeat){
+        if (!trustee){ trustee=true; trusteeAuto=true; paintAuto();
+          toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200); }
+      } else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
     }
+    function trusteeStep(){
+      if (spectating || !trustee || isGuest) return;
+      if (st.phase==='tribute'){
+        // 托管进贡: 选可进贡的最小牌
+        try{
+          const cand = manualTribute && manualTribute();
+          if (cand && cand.length){ tributeSel = cand[0].id; doTribute(mySeat, tributeSel); }
+        }catch(_){}
+        return;
+      }
+      if (st.phase!=='play' || st.turn!==mySeat) return;
+      const target=(st.table.lastPlay && st.table.lastPlay.seat!==mySeat)?st.table.lastPlay.parse:null;
+      let mv=null;
+      try{
+        mv=AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:target,
+          lastSeat: st.table.lastPlay?st.table.lastPlay.seat:null,
+          finished: st.finished ? st.finished.slice() : [],
+          handsLeft: st.players.map(p=>p.hand.length), level: st.level });
+      }catch(_){}
+      if(!mv) return;
+      if(mv.action==='pass'){ doPass(mySeat); return; }
+      selected=new Set((mv.cards||[]).map(c=>c.id)); doPlay();
+    }
+    let spectating = false;                // 本人(mySeat)是否已离座旁观
     // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   旁观期间该席由 AI 托管跑 aiTimer; 接管时先归零连超时账、清可能已排的 AI 代打, 再 renderAll 重武装本回合。
     //   turnSeatActive=-1 强制回合重新起算 → 拿回满额思考时长, 不接 AI 用剩的秒(否则可能秒过)。
@@ -832,12 +867,14 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
     const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
     const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
+    const ICO_AUTO = SVG('<rect x="4.5" y="8" width="15" height="11" rx="2.4"/><path d="M12 4.2V8"/><circle cx="12" cy="3.4" r="1.1"/><circle cx="9.2" cy="13" r="1.25" fill="currentColor" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="currentColor" stroke="none"/><path d="M9.5 16.4h5"/>');
     const room = document.createElement('div'); room.className='gd-room';
     room.innerHTML = `
       <div class="gd-bar">
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
         <button class="gd-mus" id="gdMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="gd-auto" id="gdAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
         <button class="gd-rot" id="gdRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
         <button class="gd-x" id="gdX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
@@ -1009,6 +1046,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
+    // 托管钮(顶栏第二位)
+    try{ paintAuto(); }catch(_){}
+    const autoBtnGd = $('#gdAuto');
+    if (autoBtnGd) autoBtnGd.addEventListener('click', ()=> setTrustee(!trustee));
 
     // 🃏 记牌器/出牌历史(仅纯单机): 掼蛋两副牌 decks=2; 高亮当前级牌所在 rank(打2→牌面 rank 15)。
     const cntBtn = $('#gdCnt'), cntPanel = $('#gdCntPanel');
@@ -1878,6 +1919,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (isGuest && awaitingHost) return;   // guest 回传后等裁决, 不跑倒计时
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
+      // 托管中: 我这回合短延时后交 AI 代打(与手动 do* 同源)
+      if (trustee && mine && !isGuest && !spectating){
+        if (aiTimer) clearTimeout(aiTimer);
+        aiTimer=setTimeout(()=>{ try{ trusteeStep(); }catch(_){} }, TRUSTEE_MS);
+      }
       // host 视角: 远程真人席只等其回传(宽限 REMOTE_TIMEOUT_MS 后托管); 本机 AI 席走 AI 节奏。
       const remote = !isGuest && isRemote(seat);
       // 倒计时只在【回合真正切换】时重置起点; 同回合重渲(收快照/说话/每帧重绘)保持原起点继续走, 否则对手环被打回满格→"倒计时不动/乱跳"。
@@ -2312,12 +2358,13 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
 
     function onHumanTimeout(){
+      bumpMiss(mySeat);
+      if (trustee){ trusteeStep(); return; }
       if (spectating) return;                // 已离座旁观, 由 AI 托管, 不再走人席超时
       if (st.phase!=='play' || st.turn!==mySeat) return;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
       if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); }
       else { const lead = AI.chooseLead(st.players[mySeat].hand, st.level); toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay(); }
-      bumpMiss(mySeat);                       // 多次超时累计 → 自动离座进旁观
     }
 
     // ── 手动进贡/还贡(仅纯单机): 当前任务的种类 give/return ─────────────
@@ -2497,29 +2544,36 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       //   再来一局后续 renderAll/showTributeBanner 全不执行。改名 rankRows 消除遮蔽。
       const rankRows = res.finishOrder.map((seat,i)=>{
         const mate=Engine.partnerOf(mySeat)===seat, me=seat===mySeat;
-        return `<div class="rank-row${me?' me':''}"><span class="r">${rankNames[i]}</span><span>${escapeHtml(st.players[seat].name)}${me?'（你）':(mate?'（队友）':'')}</span></div>`;
+        return `<div class="eh-rank-row p${i}${me?' me':''}${mate?' mate':''}">`
+          + `<span class="pos">${rankNames[i]}</span>`
+          + `<span class="who">${escapeHtml(st.players[seat].name)}</span>`
+          + `<span class="tag">${me?'你':(mate?'队友':'')}</span></div>`;
       }).join('');
       const lvlFrom=LVL_LABEL(res.teamLevelsBefore[res.winnerTeam]), lvlTo=LVL_LABEL(res.teamLevelsAfter[res.winnerTeam]);
       const winSide = res.winnerTeam===Engine.teamOf(mySeat)?'我方':'对方';
+      const iSideWin = res.winnerTeam===Engine.teamOf(mySeat);
       const lvlLine = res.matchWon
-        ? `🏆 ${winSide}打过 A，通关胜利！`
-        : `${winSide}升级：${lvlFrom} → <b>${lvlTo}</b>（+${res.advance}，${res.doubleDown?'双下':'单下'}）`;
+        ? `🏆 ${winSide}打过 A · 通关`
+        : `${winSide}升级 <b>${lvlFrom} → ${lvlTo}</b>（+${res.advance} · ${res.doubleDown?'双下':'单下'}）`;
       // guest 无权开新一副: 由 host 驱动, 下一副快照到达时 applySnapshot 自动清掉本战报。只留"收工"。
       const againLabel = isGuest ? '等待开新局…' : (res.matchWon?'新对局':'打下一副');
       // 本桌累计: 两队当前等级(取本手后 teamLevelsAfter) + 累计副数(teamWins, 上方守卫已计过本手)
       const myT=Engine.teamOf(mySeat), foeT=1-myT;
       const lvA = res.teamLevelsAfter || st.teamLevels || [2,2];
-      const cumLine = `本桌累计 · <span class="cm mine">我方 打<b>${LVL_LABEL(lvA[myT])}</b> · 胜${teamWins[myT]}副</span><span class="cm foe">对方 打<b>${LVL_LABEL(lvA[foeT])}</b> · 胜${teamWins[foeT]}副</span>`;
       over.innerHTML=`
         <div class="gd-over-panel">
+          <div class="eh-over-kicker">本局战报</div>
           <h2>${iWon?'🎉 胜利':'😵 失败'}</h2>
-          <div class="rank-list">${rankRows}</div>
+          <div class="eh-rank">${rankRows}</div>
           <div class="gd-remains" id="gdRemains"></div>
-          <div class="lvlup">${lvlLine}</div>
-          <div class="gd-cum">${cumLine}</div>
-          <div class="gd-acts" style="margin-top:4px">
+          <div class="eh-lvl-chip${iSideWin||res.matchWon?'':' lose-side'}">${lvlLine}</div>
+          <div class="eh-cum-bar">
+            <span class="eh-cum-chip mine">我方 打<b>${LVL_LABEL(lvA[myT])}</b> · 胜${teamWins[myT]}</span>
+            <span class="eh-cum-chip foe">对方 打<b>${LVL_LABEL(lvA[foeT])}</b> · 胜${teamWins[foeT]}</span>
+          </div>
+          <div class="gd-acts">
             <button class="gd-btn ${isGuest?'':'primary'}" id="gdAgain" ${isGuest?'disabled':''}>${againLabel}</button>
-            <button class="gd-btn ghost" id="gdDone">收工</button>
+            <button class="gd-btn" id="gdDone">收工</button>
           </div>
         </div>`;
       room.appendChild(over);   // ★挂到整个房间(非 felt): 盖满全屏, 不再让底部"我的座位/理牌钮/手牌条"漏在战报下方(治"结算页也乱")
@@ -2573,6 +2627,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
             over.remove();
             st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
             tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
+            _clearAutoTrusteeOnNewDeal();
             sfx('deal'); broadcast(); renderAll(); settleHandLayout(); showTributeBanner();
           };
           let done=false; const once=()=>{ if(done) return; done=true; go(); };
@@ -2619,6 +2674,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       }
       try{ closeInviteMenu(); }catch(_){}
       // names/avatars/remoteSeats 是 const, seatIsAI 是 let — 一律原地改元素, 别重新赋值(gameIsAI 是 seatIsAI 同引用)
+      _clearAutoTrusteeOnNewDeal();
       if (A){
         if (Array.isArray(A.names) && A.names.length===4){ for(let i=0;i<4;i++){ names[i]=A.names[i]; avatars[i]=A.avatars[i]; } }
         if (Array.isArray(A.isAI)) A.isAI.forEach((v,i)=>{ if(i<4) seatIsAI[i]=v; });
@@ -2643,6 +2699,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     if (!lobbyMode) showTributeBanner();
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播(顺带写各远程席初始手牌); lobby 态不发牌不广播
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
+      isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,

@@ -588,14 +588,31 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
+    // ★托管: 顶栏第二钮; 连续超时自动开=仅本局(单机也生效), 手动开=跨局保留
+    let trustee = false, trusteeAuto = false;
+    const TRUSTEE_MS = 650;
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
+    function paintAuto(){ const b=$('#pkAuto'); if(b) b.classList.toggle('on', !!trustee); }
+    function setTrustee(on){
+      on=!!on; if(trustee===on) return;
+      trustee=on; if(!on) trusteeAuto=false;
+      toast(on?'🤖 已托管 · AI 替你自动行动':'已收回托管 · 由你操作');
+      sfx('click'); paintAuto(); try{ renderAll(); }catch(_){}
+    }
+    function _clearAutoTrusteeOnNewDeal(){ if(trusteeAuto){ trustee=false; trusteeAuto=false; paintAuto(); } }
     function bumpMiss(seat){
-      if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
-      // 单机练习桌只我一个真人: 超时已自动过牌/弃牌代打, 再把自己踢下桌旁观毫无意义(没有别人被我拖累),
-      //   还会卡出"轮到你↔旁观中"的矛盾态。故单机桌本人永不离座, 走开回来照样接着打。离座旁观只服务联机(防一人挂机卡死全桌)。
-      if (seat===mySeat && isLocalSolo) return;
-      // 只盯"本该真人推进却没推进"的席: 我(未旁观) 或 仍在场的远程真人席(未转 AI)
-      if (seat===mySeat ? spectating : (isAI[seat] || !isRemote(seat))) return;
+      if (isGuest) return;
+      if (seat===mySeat ? spectating : (isAI[seat] || !isRemote(seat))) {
+        // 单机本人不离座, 但多次超时 → 本局自动托管
+        if (seat===mySeat && isLocalSolo && !trustee){
+          missStreak[seat]=(missStreak[seat]||0)+1;
+          if (missStreak[seat]>=MAX_MISS){
+            missStreak[seat]=0; trustee=true; trusteeAuto=true; paintAuto();
+            toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200);
+          }
+        }
+        return;
+      }
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
@@ -605,14 +622,25 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       isAI[seat] = true;                             // 该席即刻转本机托管(AI 驱动), 不再空等真人
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
       personaBySeat[seat] = personaFor(seat);
-      if (seat===mySeat){ spectating = true; preAct = null;
-        toast('连续超时 '+MAX_MISS+' 次 · 已离座旁观 · 灵魂接手你的座位', 3200); }
+      if (seat===mySeat){
+        if (!trustee){ trustee=true; trusteeAuto=true; preAct=null; paintAuto();
+          toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200); }
+        else { spectating = true; preAct = null; }
+      }
       else { toast(nm+' 连续超时 · 已离座, 灵魂接手'); }
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine: seat===mySeat }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
-      // 我离座旁观: 三处一起刷新(操作栏+桌心提示+底部提示), 否则 msg/hint 停在"轮到你/思考中"直到下次
-      //   renderAll(灵魂真实思考要 2~7s)——那段窗口正是"操作栏旁观中↔桌心轮到你"自相矛盾的来源。
       try{ renderActs(true); if(seat===mySeat){ renderMsg(); renderMe(); } }catch(_){}
+    }
+    function trusteeStep(){
+      if (spectating || !trustee || isGuest) return;
+      if (st.toAct!==mySeat || st.phase==='over') return;
+      const la=Engine.legalActions(st, mySeat);
+      if (!la || !la.toAct) return;
+      let d=null;
+      try{ d=AI.decide(st, mySeat, { persona: personaBySeat[mySeat] || 'tag', samples: 120 }); }catch(e){ d=null; }
+      if(!d){ d = la.canCheck?{action:'check'}:{action:'fold'}; }
+      humanAct(d.action, d.amount, true);
     }
     // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   德州: idleOut 把我这席置 isAI + 配灵魂人格代打; 接管须逆向(收回 isAI/人格)、归零连超时账、
@@ -888,11 +916,13 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
     const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
     const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
+    const ICO_AUTO = SVG('<rect x="4.5" y="8" width="15" height="11" rx="2.4"/><path d="M12 4.2V8"/><circle cx="12" cy="3.4" r="1.1"/><circle cx="9.2" cy="13" r="1.25" fill="currentColor" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="currentColor" stroke="none"/><path d="M9.5 16.4h5"/>');
     const room = document.createElement('div'); room.className='pk-room';
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="pk-auto" id="pkAuto" aria-label="托管开关" title="托管 · AI 替你自动行动">${ICO_AUTO}</button>
         <button class="pk-rot" id="pkRot" aria-label="横竖屏切换" title="横屏/竖屏">${ICO_ROT}</button>
         <button class="pk-x" id="pkX" aria-label="返回聊天" title="返回聊天">${ICO_BACK}</button>
       </div>
@@ -1032,6 +1062,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     if (musBtn) bindTap(musBtn, ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
+    try{ paintAuto(); }catch(_){}
+    const autoBtnPk = $('#pkAuto');
+    if (autoBtnPk) bindTap(autoBtnPk, ()=> setTrustee(!trustee));
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onOrient);
 
@@ -1905,6 +1938,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (mine && preAct){ if (consumePreAction()) return; }
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(18); }
       lastMyTurn=mine;
+      if (trustee && mine && !isGuest && !spectating){
+        if (aiTimer) clearTimeout(aiTimer);
+        aiTimer=setTimeout(()=>{ try{ trusteeStep(); }catch(_){} }, TRUSTEE_MS);
+      }
       // 谁来推进这一步: 我(本地/relay) · AI(本机决策) · 远程真人(等回传, host 侧兜底代打) · guest 观战他人(静态)
       const remote = isRemote(seat);
       const aiSeat = !mine && !remote && !isGuest && isAI[seat];
@@ -2001,6 +2038,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       _rawApply(seat, { action: la.canCheck?'check':'fold' });
     }
     function onHumanTimeout(){
+      bumpMiss(mySeat);   // 超时累计 → 多次后本局自动托管
+      if (trustee){ trusteeStep(); return; }
       if (st.toAct!==mySeat || st.phase==='over' || spectating) return;
       const la=Engine.legalActions(st, mySeat);
       if (la.canCheck){ toast('超时 · 自动过牌'); humanAct('check', undefined, true); }
@@ -2191,6 +2230,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           }</div>`;
       over.innerHTML=`
         <div class="pk-over-card">
+          <div class="eh-over-kicker">本手结算</div>
           <h2>${h2}</h2>
           ${subLine}
           <div class="pk-champ">${champLine}</div>
@@ -2202,7 +2242,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             ${potsHtml}
             ${netsHtml}
           </details>
-          <div class="pk-row" style="margin-top:2px">${footer}</div>
+          <div class="pk-row">${footer}</div>
         </div>`;
       // 推池动画: 底池飞向赢家席位(我方=底部), 浮层延后淡入让筹码在绒面上先跑完
       if ((res.winnersBySeat||[]).length){ over.classList.add('payout-in'); payoutChipsFx(res.winnersBySeat); }
@@ -2346,6 +2386,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     // 单机: 本场结束(真人输光)后从头再来 —— 全员按账本真实筹码重新带入(破产/清零回补 1000)
     function resetMatch(){
+      _clearAutoTrusteeOnNewDeal();
       if (!isGuest && pkLimitReached()){
         showDailyCap();
         return;
@@ -2375,6 +2416,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       startWalkIns();   // 名册刷新后仍在招募态 → 确保路人入座定时器在跑(内部去重, 不会重复排程)
     }
     function startDeal(A, seed){
+      _clearAutoTrusteeOnNewDeal();
       if (st.phase!=='lobby') return;
       // journey-exempt: 每日局数门禁 + seatBuyIn 账本 — journey-chip-authenticity.js
       if (!isGuest && pkLimitReached()){
@@ -2514,6 +2556,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       showDailyCap();
     } else if (introSeating) runSeatingIntro();
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st,
+      isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
       applyMove, resync, applySnapshot, feedHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState,
       isSpectating:()=>spectating, enterSpectator:()=>{ if(!spectating) idleOut(mySeat); }, resumeSeat, resumeRemote,
