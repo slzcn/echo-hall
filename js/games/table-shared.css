@@ -1272,6 +1272,24 @@ html.pwa-standalone .pk-room .pk-felt{
 html.pwa-standalone .ddz-room.is-lobby .ddz-opps{
   padding-top: 2px !important;
 }
+/* — PWA 手机竖屏: 三桌同步放大(主人: 斗地主 PWA 牌桌太小) —
+ * 无地址栏竖向更富裕: 牌面/迷你牌对齐 600px 档, 中央桌心吃满, 与 game-ui 斗地主专项叠加时以更具体的选择器为准。 */
+@media (max-width: 599px){
+  html.pwa-standalone .gd-room:not(.is-land){
+    --cw:44px;--ch:62px;--cn:15px;--cs:12px;--cc:25px;--cmw:26px;--cmh:37px;
+  }
+  html.pwa-standalone .pk-room:not(.is-land){
+    --cw:40px;--ch:56px;--cn:14px;--cs:11px;--cc:21px;--bcw:44px;--bch:62px;
+  }
+  html.pwa-standalone .gd-room:not(.is-land) .gd-center,
+  html.pwa-standalone .pk-room:not(.is-land) .pk-table{
+    min-height: 160px !important;
+  }
+  html.pwa-standalone .gd-room:not(.is-land) .gd-center::before,
+  html.pwa-standalone .pk-room:not(.is-land) .pk-table::before{
+    left: 0; right: 0; top: 2%; bottom: 2%;
+  }
+}
 
 /* 日间台面 ::after 描边: 主题色细环, 不再死白 */
 html[data-mode="day"] .ddz-room .ddz-center::after,

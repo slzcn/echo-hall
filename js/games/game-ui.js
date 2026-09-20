@@ -99,19 +99,43 @@
 .ddz-room.is-land .ddz-bidbtns .ddz-btn{min-height:34px;padding:5px 4px;font-size:12px}
 /* ── 竖屏(手机, <600px)专属美化: 只动竖屏, 横屏(.is-land)与各大屏断点不受影响(用 :not(.is-land) + 窄屏 query 双重隔离) ── */
 @media (max-width:599px){
+  /* ★主人反馈「PWA 牌桌太小」: 手机竖屏整体放大 —— 牌/迷你牌对齐 600px 档, 中央绒面吃满竖向, 头像略收让牌更醒目 */
+  .ddz-room:not(.is-land){
+    --cw:50px;--ch:70px;--cn:17px;--cs:13px;--cc:28px;
+    --cmw:32px;--cmh:45px;
+    --av:48px;--avf:22px;--seatw:100px;
+    --hand-ov:-22px;--hand-pad:20px;--banner:14px;
+  }
   /* 中央区收紧: 上下留白削薄; 绒面椭圆走三游戏统一的翡翠绒(不再是缩小的暗青"落牌盘"), 与掼蛋/德州同材质、同"真牌桌"观感, 只按竖屏收一点 insets */
-  .ddz-room:not(.is-land) .ddz-center{min-height:96px;padding:2px 16px;gap:5px}
+  .ddz-room:not(.is-land) .ddz-center{min-height:150px;padding:4px 10px;gap:6px;flex:1 1 auto}
   /* 手机竖屏上面用了 padding 简写会把顶部空档吃回 2px, 这里高特异性补回底牌空档(仅有底牌态) */
   .ddz-room:not(.is-land) .ddz-center.has-bottom{padding-top:56px}
-  .ddz-room:not(.is-land) .ddz-center::before{left:5%;right:5%;top:8%;bottom:8%}
-  .ddz-room:not(.is-land) .ddz-opps{padding:10px 12px 0}
+  /* 绒面椭圆吃满中央区(主人: 牌桌显得太小) */
+  .ddz-room:not(.is-land) .ddz-center::before{left:0;right:0;top:2%;bottom:2%;border-radius:42%/48%}
+  .ddz-room:not(.is-land) .ddz-opps{padding:6px 10px 0}
   /* 回合提示分层清晰、占位稳定不跳动: 轮次横幅醒目, 上一手信息压一档但恒留位 */
-  .ddz-room:not(.is-land) .ddz-turnbanner{height:26px}
+  .ddz-room:not(.is-land) .ddz-turnbanner{height:28px;font-size:13px}
   .ddz-room:not(.is-land) .ddz-lastwho{min-height:16px;opacity:.92}
   /* 操作区: 按钮等宽整齐, 底部留足 safe-area */
   .ddz-room:not(.is-land) .ddz-acts{gap:12px;padding:10px 18px calc(14px + env(safe-area-inset-bottom,0px))}
   .ddz-room:not(.is-land) .ddz-acts .ddz-btn{flex:1 1 0;max-width:150px}
 }
+/* PWA standalone 竖屏: 无浏览器地址栏, 竖向更富裕 → 再放一档, 牌桌接近平板观感 */
+html.pwa-standalone .ddz-room:not(.is-land){
+  --cw:54px;--ch:76px;--cn:19px;--cs:14px;--cc:31px;
+  --cmw:36px;--cmh:50px;
+  --av:50px;--avf:23px;
+  --hand-pad:18px;
+}
+html.pwa-standalone .ddz-room:not(.is-land) .ddz-center{
+  min-height:180px !important;
+}
+html.pwa-standalone .ddz-room:not(.is-land) .ddz-center::before{
+  left:0;right:0;top:0;bottom:0;
+}
+html.pwa-standalone .ddz-room:not(.is-land) .ddz-played{min-height:72px}
+html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-h{font-size:30px}
+html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:28px}
 @keyframes ddzRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ddz-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,rgba(0,229,212,.24));
   padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
