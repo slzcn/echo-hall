@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-trustee-over';
+window.__EH_APP_VER = '20260920-song-heal';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -5686,8 +5686,32 @@ const SCALE={
 // SONG_STYLES 定义在 EH_CONFIG.songStyles (可后台配置), 这里用 Proxy 封装:
 // 1) 读最新的 EH_CONFIG.songStyles (loadRemoteConfig 后台改配置后无需重启)
 // 2) 把 scale 字符串 key(minP/majP/major/minor) 运行时映射为 SCALE 对象
+// 3) 远程配置为空时回退内置池, 防 parseSong/发送因 styles 空直接崩(主人: 神曲失效)
+const _BUILTIN_SONG_STYLES = [
+  { id:'dj', name:'DJ', emoji:'🕺', color:'#E75F91', bpm:124, scale:'minP', motif:[0,0,3,2,0,0,3,5], chords:[0,0,-2,3], wave:'sawtooth', bass:'square', groove:'four', tts:{rate:1.3,pitch:1.0}, ttsStyle:'high', playRate:1.12, coverPrompt:'EDM, Electronic Dance, Energetic' },
+  { id:'funk', name:'Funk', emoji:'🪩', color:'#56D298', bpm:114, scale:'major', motif:[0,2,4,2,7,4,2,0], chords:[0,5,-3,3], wave:'sawtooth', bass:'triangle', groove:'four', tts:{rate:1.2,pitch:1.1}, ttsStyle:'sweet', playRate:1.1, coverPrompt:'Funk, Groovy, Disco' },
+  { id:'jazz', name:'爵士', emoji:'🎷', color:'#E7BE5F', bpm:92, scale:'major', motif:[0,2,4,3,2,0,2,4], chords:[0,4,5,3], wave:'sine', bass:'triangle', groove:'lofi', tts:{rate:0.92,pitch:0.95}, ttsStyle:'lazy', playRate:0.95, coverPrompt:'Jazz, Smooth' },
+  { id:'gufeng', name:'古风', emoji:'🏮', color:'#C080E5', bpm:78, scale:'majP', motif:[0,2,1,0,2,3,2,0], chords:[0,-3,-5,-3], wave:'sine', bass:'sine', groove:'boom', tts:{rate:0.95,pitch:1.1}, ttsStyle:'gu', playRate:0.96, coverPrompt:'Guofeng, Chinese Traditional' },
+  { id:'acapella', name:'清唱', emoji:'🎤', color:'#8099E5', bpm:80, scale:'major', motif:[0,2,4,2,0,2,4,2], chords:[0,4,5,3], wave:'sine', bass:'sine', groove:'lofi', tts:{rate:1.0,pitch:1.0}, ttsStyle:'lazy', playRate:1.0, coverPrompt:'Acappella, Human Voice' },
+];
 function _resolveScale(s){ return typeof s==='string' ? (SCALE[s]||SCALE.major) : (Array.isArray(s)?s:SCALE.major); }
-function _shimStyles(){ return (EH_CONFIG.songStyles||[]).map(s=>({...s, scale:_resolveScale(s.scale)})); }
+function _shimStyles(){
+  const raw=(EH_CONFIG.songStyles||[]);
+  const src=raw.length?raw:_BUILTIN_SONG_STYLES;
+  return src.map(s=>({...s, scale:_resolveScale(s.scale)}));
+}
+// 默认曲风: 优先「有母版的非清唱」(MiniMax 可生成); 清唱依赖内网 worker, 不作默认(主人: 神曲像失效)
+function defaultSongSid(){
+  try{
+    const styles=_shimStyles();
+    if(!styles.length) return 'dj';
+    const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
+    const hasMaster=(id)=>!items.length || items.some(x=>x&&x.sid===id);
+    for(const s of styles){ if(s.id!=='acapella' && hasMaster(s.id)) return s.id; }
+    for(const s of styles){ if(s.id!=='acapella') return s.id; }
+    return styles[0].id;
+  }catch(_){ return 'dj'; }
+}
 const SONG_STYLES = new Proxy([], {
   get(_t, prop){
     if(prop==='length') return (EH_CONFIG.songStyles||[]).length;
@@ -5707,18 +5731,20 @@ function scaleSemi(scale,deg){ const n=scale.length, oct=Math.floor(deg/n); retu
 // lyric 里若含 | 会做 URL 编码存(encodeURIComponent), 读时 decodeURIComponent 回来
 function parseSong(text){
   const t=String(text||''); const parts=t.split('|');
-  if(parts.length>=2 && SONG_STYLES.some(s=>s.id===parts[0])){
+  const styles=SONG_STYLES;
+  const styleIds=new Set();
+  try{ for(let i=0;i<styles.length;i++){ if(styles[i]&&styles[i].id) styleIds.add(styles[i].id); } }catch(_){}
+  if(parts.length>=2 && styleIds.has(parts[0])){
     const sid=parts[0];
-    // 5 段新格式: sid|enc(lyric)|url|cs|ce; 其余(2~4 段)=老格式/生成中, lyric 是明文(可能自身含 |, 拼回)
     if(parts.length>=5){
       let lyric=parts[1]; try{ lyric=decodeURIComponent(parts[1]); }catch(_){}
       const songUrl=parts[2]||''; const chStart=parseFloat(parts[3]||'0')||0; const chEnd=parseFloat(parts[4]||'0')||0;
       return { sid, lyric, songUrl, chorusStart:chStart, chorusEnd:chEnd, ready:!!songUrl };
     }
-    // 老格式: sid 之后全部当 lyric(含 | 拼回), 无 URL → 未就绪
     return { sid, lyric:parts.slice(1).join('|'), songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
   }
-  return { sid:SONG_STYLES[0].id, lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
+  const fallback = (styles[0]&&styles[0].id) || 'dj';
+  return { sid:fallback, lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
 }
 // 编码回 text 字段(存库/发送用)
 function encodeSong(sid, lyric, songUrl, chStart, chEnd){
@@ -5757,24 +5783,21 @@ function msgPreview(m){
 function songHtml(text){
   const p=parseSong(text);
   const { sid, lyric, songUrl, chorusStart, chorusEnd, ready }=p;
-  const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
-  // 逐字包 span → 播放时卡拉OK高亮
+  const st=(function(){ try{ return SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0]; }catch(_){ return {name:'神曲',emoji:'🎵',color:'#00e5d4'}; } })();
+  const styleName=(st&&st.name)||'神曲';
+  const styleEmoji=(st&&st.emoji)||'🎵';
+  const styleColor=(st&&st.color)||'#00e5d4';
   const chs=[...lyric].map(c=> /\S/.test(c)?`<span class="sl-ch">${esc(c)}</span>`:esc(c)).join('');
-  // AI 模式下的生成中态: 播放按钮变"谱曲中"(跳动音符), 卡片挂 pending class
   const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
-  const pending = singMode==='ai' && !ready;   // legacy 模式下永远是可播放态(本地合成不用等)
+  const pending = singMode==='ai' && !ready;
   const pendCls = pending ? ' pending' : '';
-  // 谱曲中: 跳动音符♪(音乐语义, 非"加载"转圈); 就绪: 播放三角
   const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
-  // 清唱(acapella)走内网 TTS, 实测 5~15s; MiniMax 翻唱 ~40s。文案按曲风给贴合的预期, 别让清唱也报"40 秒"显得慢。
   const btnTip = pending ? (sid==='acapella' ? '清唱谱曲中 · 约 10 秒' : 'AI 谱曲中 · 约 40 秒') : '播放';
-  // 曲风标签色 = 曲风自己的颜色。生成中在曲风名后显示"谱曲中"文字, 明确表达含义(不止一个转圈)
   const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
-  // 就绪的歌: 挂一个隐藏 <audio preload=auto> 预热浏览器缓存, 点播放时音频已缓存→秒播(不再点后干等下载)
   const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
-  return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(st.color)}">
+  return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(styleColor)}">
     <button class="song-play" data-tip="${btnTip}">${btnInner}</button>
-    <span class="song-meta"><span class="song-style">${st.emoji} ${esc(st.name)}
+    <span class="song-meta"><span class="song-style">${styleEmoji} ${esc(styleName)}
       ${metaExtra}</span>
     <span class="song-lyric">${chs}</span></span>${preloadAudio}</span>`;
 }
@@ -6109,7 +6132,7 @@ async function playSong(lyric, sid, el, onEnd){
   if(singMode==='ai' && el && el.dataset && el.dataset.url){
     return playSongAI(el, onEnd);
   }
-  // 否则(legacy 或 AI-未生成好)走本地合成
+  // 无 URL / 清唱服务不可用 / legacy → 本地合成立即出声(主人: 神曲点了没声)
   return playSongLegacy(lyric, sid, el, onEnd);
 }
 
@@ -6411,8 +6434,12 @@ document.addEventListener('click',e=>{
       toast('神曲重新生成中…');
       generateAndPersistSong(String(mid), card.dataset.lyric||'', card.dataset.sid||'', bubble).catch(e=>console.warn('resume song',e));
     };
-    if(genning){ toast('正在生成中,请稍候…'); return; }       // 本端确在生成 → 绝不打断
-    if(failedState){ doRegen(); return; }                      // 明确失败 → 立即重生成
+    if(genning){ toast('正在生成中,请稍候…'); return; }
+    const sidNow=card.dataset.sid||'';
+    if(failedState || card.classList.contains('local-ok')){
+      try{ playSongLegacy(card.dataset.lyric||'', sidNow, card); }catch(_){}
+      return;
+    }
     // 纯 pending: 先探测是否其实已成功(UPDATE 事件可能丢了), 成功则原地救回;
     //   仍未成功且还在正常窗口(未超时)→ 不重来只提示; 已超窗口 → 允许重生成。
     (async()=>{
@@ -6420,6 +6447,7 @@ document.addEventListener('click',e=>{
       try{ healed = mid ? await probeSongReady(String(mid), bubble) : false; }catch(_){ _ehCatch('playSongLegacy',_); }
       if(healed) return;   // 已救回成可播卡, 不再生成
       if(age < SONG_TIMEOUT_MS){ toast('正在生成中,请稍候…'); return; }
+      try{ playSongLegacy(card.dataset.lyric||'', card.dataset.sid||'', card); }catch(_){}
       doRegen();
     })();
     return;
@@ -6719,7 +6747,10 @@ async function sendSong(lyric, sid){
   // 卡片上屏后挂"预览中"高亮(此时卡片必在 DOM; 在 insert 后立即挂会因卡片尚未 append 而落空)
   try{ if(_masterPreview && _masterPreview.mid===String(row.id) && el){ const card=el.querySelector('.song-card'); if(card) card.classList.add('previewing'); } }catch(_){}
   try{ updateSongQueueBar(); }catch(e){}   // 自己发的 pending 歌进队列条监视
-  // 后台生成(不 await, 让用户可以继续聊天/其他操作)。mid 统一 String, 与点击补触发(String(mid))同键防重复生成
+  // ★清唱依赖内网 worker: 未部署/失败时立即本地合成试听
+  if(sid==='acapella'){
+    try{ const card=el&&el.querySelector('.song-card'); if(card) playSongLegacy(lyric, sid, card); }catch(_){}
+  }
   generateAndPersistSong(String(row.id), lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
 }
 
@@ -6837,10 +6868,11 @@ function _ehAcapellaTimeoutMark(mid){
     const stream=document.getElementById('stream'); if(!stream) return;
     const msg=stream.querySelector('.msg[data-mid="'+mid+'"]'); if(!msg) return;
     const card=msg.querySelector('.song-card'); if(!card) return;
-    if(!card.classList.contains('pending')) return;   // 已 ready 或 failed → 不改
-    card.classList.add('timeout');
-    const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱服务暂不可用';
-    const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','清唱服务暂不可用 · 点击重试');
+    if(!card.classList.contains('pending')) return;
+    card.classList.remove('pending');
+    card.classList.add('timeout','local-ok');
+    const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱服务不可用 · 可本地试听';
+    const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱');
   }catch(_){ _ehCatch('generateAndPersistSong',_); }
   finally{ _EH_ACAPELLA_TIMERS.delete(String(mid)); }
 }
@@ -6872,7 +6904,10 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     // 挑一首同曲风母版当参考(整个对象: 可能带预存 featureId/duration 供 Edge 跳过 preprocess 加速)
     let master=null;
     try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pickMasterWeighted(pool)||pool[0]; }catch(_){ _ehCatch('generateAndPersistSong',_); }
-    if(!master){ throw new Error('no master for sid '+sid); }
+    if(!master){
+      // 无母版(配置/manifest 丢失): 降级本地合成, 不让神曲整段失效
+      throw new Error('no master for sid '+sid);
+    }
     const masterUrl=new URL(master.url, location.href).href;
     // 调 Edge Function 生成(37s 左右, 前端 80s 硬超时)。
     // ★带 sid: Edge 按曲风选衬词模板(慢歌不再硬塞"嗨起来")。
@@ -6940,7 +6975,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     console.warn('[song] generate failed/timeout', isTimeout, e);
     toast(isTimeout ? '神曲生成超时,可重试' : (EH_CONFIG.text.err_singSend||'神曲生成失败'));
     // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
-    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.add('failed'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip', isTimeout?'生成超时 · 点击重试':'谱曲失败 · 点击重试'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时':'生成失败'; } }catch(_){ _ehCatch('generateAndPersistSong',_); }
+    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.remove('pending'); card.classList.add('failed','local-ok'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时 · 可本地试听':'生成失败 · 可本地试听'; } }catch(_){ _ehCatch('generateAndPersistSong',_); }
   }finally{
     clearTimeout(_to);
     _EH_SONG_GENERATING.delete(mid);
@@ -6950,7 +6985,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
-let songSel=(SONG_STYLES.find(s=>s.id==='acapella')||SONG_STYLES[0]).id;   // 神曲默认用清唱
+let songSel='';   // 进入神曲模式时再取 defaultSongSid()(依赖 manifest/风格池)
 let songMode=false;
 // 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
 let _cinWasFocused=false;   // 切曲风前输入框是否聚焦(用于切完不改变输入法开/收状态)
@@ -9380,7 +9415,7 @@ $('#plusBtn').onclick=e=>{ e.stopPropagation();
 $('#plusMenu').addEventListener('click',e=>e.stopPropagation());
 $('#pmVoid').onclick=()=>{ closePlusMenu(); setMode('void'); };
 $('#pmVoice').onclick=()=>{ closePlusMenu(); setMode('voice'); };
-$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=(SONG_STYLES.find(s=>s.id==='acapella')||SONG_STYLES[0]).id; setMode('song'); };   // 神曲默认清唱, 换曲风用细色条
+$('#pmSong').onclick=()=>{ closePlusMenu(); songSel=defaultSongSid(); setMode('song'); };   // 默认有母版的曲风, 清唱可再选
 $('#pmBottle') && ($('#pmBottle').onclick=()=>{ closePlusMenu(); setMode('bottle'); });
 document.addEventListener('click',closePlusMenu);
 
