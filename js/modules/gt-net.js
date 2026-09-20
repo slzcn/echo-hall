@@ -31,24 +31,36 @@
       try { return !!game.resumeRemote(seat); } catch (e) { return false; }
     }
     function sendAct(chan, tableId, seat, move, uid, rpc, toast) {
-      var sendBc = function () {
+      var sendBc = function (via) {
         try {
-          chan.send({ type: 'broadcast', event: 'act', payload: { seat: seat, move: move, uid: uid } });
+          chan.send({ type: 'broadcast', event: 'act', payload: { seat: seat, move: move, uid: uid, via: via || 'bc' } });
         } catch (e) {}
       };
       try {
-        if (!rpc || !tableId) { sendBc(); return; }
+        if (!rpc || !tableId) { sendBc('bc'); return; }
         rpc(tableId, seat, move).then(function (res) {
           var data = res && res.data;
           var err = res && res.error;
-          if (err) { sendBc(); return; }
+          if (err) { sendBc('bc'); return; }
           if (data && data.ok === false) {
             if (toast) { try { toast('出牌未通过座位校验，请刷新牌桌'); } catch (e) {} }
             return;
           }
-          sendBc();
-        }, function () { sendBc(); });
-      } catch (e) { sendBc(); }
+          // RPC 成功: 标记 via=rpc, host 可据此收紧密性
+          sendBc('rpc');
+        }, function () { sendBc('bc'); });
+      } catch (e) { sendBc('bc'); }
+    }
+    // host 侧 act 授权(支持 requireViaRpc: 有 via 字段时只认 rpc, 兼容旧客户端无 via)
+    function acceptMove(seats, seat, move, payloadUid, opts) {
+      opts = opts || {};
+      if (!seats || typeof seat !== 'number') return { ok: false, reason: 'bad_seat' };
+      var remote = seats.remoteSeats;
+      if (!Array.isArray(remote) || remote.indexOf(seat) < 0) return { ok: false, reason: 'not_remote' };
+      var seatUid = seats.ids && seats.ids[seat];
+      if (payloadUid && seatUid && String(payloadUid) !== String(seatUid)) return { ok: false, reason: 'uid_mismatch' };
+      if (opts.via && opts.via !== 'rpc' && opts.requireViaRpc) return { ok: false, reason: 'via_not_rpc' };
+      return { ok: true, seat: seat, via: opts.via || 'unknown' };
     }
     return Object.freeze({
       stamp: stamp,

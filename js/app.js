@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-terminal-layout';
+window.__EH_APP_VER = '20260920-chat-core';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -940,12 +940,12 @@ function gtGuestSendAct(chan, tableId, seat, move){
       }, function(){ sendBc(); });
   }catch(e){ sendBc(); }
 }
-function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid){
+function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid, via){
   if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
   const A = gtLiveSeatArrays(tableId, fallbackRow);
   if (!A) return;
   var chk = _EH_GT_NET
-    ? _EH_GT_NET.acceptMove({ remoteSeats: A.remoteSeats, ids: A.ids }, seat, move, payloadUid)
+    ? _EH_GT_NET.acceptMove({ remoteSeats: A.remoteSeats, ids: A.ids }, seat, move, payloadUid, { via: via, requireViaRpc: false })
     : (function(){
         if (!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return { ok:false };
         var uid = A.ids && A.ids[seat];
@@ -1239,7 +1239,9 @@ let _persistSnapT=0;
 function persistRoomSnap(){
   if(!curRoom) return;
   const now=Date.now();
-  if(now-_persistSnapT < 3000) return;   // 节流: 3s 内最多存一次(连发消息不狂写)
+  const _M = (typeof EH_MESSAGES!=='undefined' && EH_MESSAGES) || window.EH_MESSAGES_MODULE;
+  const allow = (_M && _M.shouldPersistSnap) ? _M.shouldPersistSnap(now, _persistSnapT, 3000) : (now-_persistSnapT>=3000);
+  if(!allow) return;
   _persistSnapT=now;
   // ★序列化(outerHTML×30 + JSON.stringify)+同步 localStorage 写较重, 放进空闲期做,
   //   不阻塞消息渲染/滚动帧(多人密集聊天时防掉帧)。
@@ -1814,6 +1816,10 @@ async function joinAsMember(room){
 // 历史 rows 里灵魂投影去重: 灵魂同时发 msg + proj 两条时, 投影 proj 就与 msg 重复,
 // 把这种 proj 标 _skipHist. 真人 broadcastProject 只发 proj 一条(无同内容 msg), 不会被打标, 仍作为历史气泡保留。
 function dedupProjInHistory(rows){
+  try{
+    const M = window.EH_MESSAGES_MODULE;
+    if (M && M.dedupProjInHistory){ M.dedupProjInHistory(rows); return; }
+  }catch(e){ _ehCatch('dedupProj', e); }
   if(!Array.isArray(rows) || rows.length<2) return;
   // 先按 user_id + norm(text) 建包含 msg 的索引(只看非 proj 消息)
   const msgKeys = new Set();
@@ -2594,7 +2600,7 @@ function gtWireHostChannel(tableId){
   const rowRef=()=>_gtTables.get(tableId);
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!payload||typeof payload.seat!=='number') return;
-      gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move, payload.uid);
+      gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });
   gtWireHostResume(chan, tableId, rowRef());
@@ -2777,7 +2783,7 @@ function gtLaunchPoker(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());
@@ -2880,7 +2886,7 @@ function gtLaunchGuandan(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());
@@ -2974,7 +2980,7 @@ function gtLaunchDdz(row){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid);
+      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
     .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
   gtWireHostResume(chan, row.id, rowRef());

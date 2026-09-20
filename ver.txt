@@ -1,1 +1,1 @@
-20260920-terminal-layout
+20260920-chat-core
