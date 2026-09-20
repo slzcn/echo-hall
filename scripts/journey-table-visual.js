@@ -161,7 +161,7 @@ assert(/function gtWireHostChannel\(tableId\)\{[\s\S]*?gt-play:/.test(APP), '有
 assert(/function lobbyState\(seats\)/.test(DDZ) && /phase:'lobby'/.test(DDZ), 'game-ui: 有 lobbyState 招募占位局(phase:lobby)');
 assert(/function startDeal\(A, seed\)[\s\S]*?Engine\.createGame/.test(DDZ), 'game-ui: 有 startDeal 就地发牌(换名册建真局, 不重挂 room)');
 assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(DDZ), 'game-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
-assert(/🤝 一键邀请/.test(DDZ) && /data-lob="fill"/.test(DDZ), '第1条: 招募态操作按钮区有「🤝 一键邀请」(在打牌页出牌键位置)');
+assert(/🤝\s*一键(补满|邀请)/.test(DDZ) && /data-lob="fill"/.test(DDZ), '第1条: 招募态操作按钮区有「🤝 一键补满」(在打牌页出牌键位置)');
 assert(/ddz-lobby-empty[\s\S]*?点击邀请/.test(DDZ) && /function openInviteMenu\(dbSeat/.test(DDZ), '第1条: 空位「点击邀请」弹菜单(单人/灵魂逐位邀请)');
 // 德州(poker)引擎: 招募态占位局 + 就地发牌 + 对外导出, 供 deal-in-place 驱动。
 assert(/function lobbyState\(seats\)/.test(PK) && /phase:'lobby'/.test(PK), 'poker-ui: 有 lobbyState 招募占位局(phase:lobby)');
@@ -171,7 +171,7 @@ assert(/data-lob="fill"/.test(PK) && /pk-lobby-empty|lobby-empty/.test(PK), '第
 assert(/function lobbyState\(seats\)/.test(GD) && /phase:'lobby'/.test(GD), 'guandan-ui: 有 lobbyState 招募占位局(phase:lobby)');
 assert(/function startDeal\(A, seed\)[\s\S]*?st = newDeal\(\)/.test(GD), 'guandan-ui: 有 startDeal 就地发牌(走 newDeal 保 teamLevels/dealerTeam 赛制)');
 assert(/isLobby:\(\)=>st\.phase===.lobby.,\s*setLobby,\s*startDeal/.test(GD), 'guandan-ui: 对外导出 isLobby/setLobby/startDeal(供 app deal-in-place)');
-assert(/🤝 一键邀请/.test(GD) && /data-lob="fill"/.test(GD), '第1条: guandan 招募态操作区有「🤝 一键邀请」');
+assert(/🤝\s*一键(补满|邀请)/.test(GD) && /data-lob="fill"/.test(GD), '第1条: guandan 招募态操作区有「🤝 一键补满」');
 assert(/gd-lobby-empty[\s\S]*?点击邀请/.test(GD) && /function openInviteMenu\(dbSeat/.test(GD), '第1条: guandan 空位「点击邀请」弹菜单');
 // gtRenderCard: 招募态桌行实时变(灵魂入座/真人换座) → 就地招募态 UI 用 setLobby 刷新; 座位页也随行刷新(掼蛋/德州回退路径)。
 const RC = (APP.match(/function gtRenderCard\(row\)\{[\s\S]*?\n\}/) || [''])[0];
@@ -187,8 +187,8 @@ assert(/gtSeatSoulsIntoEmpties/.test(GF) && !/eh_gt_start/.test(GF), 'gtFillSoul
 assert(/async function gtInviteHumans\(id\)/.test(APP) && /eh_messages/.test(APP.match(/async function gtInviteHumans\(id\)\{[\s\S]*?\n\}/)[0]),
   '第1条: 有 gtInviteHumans 一键邀真人(往聊天区发招呼, 房里真人点卡加入)');
 assert(/开始发牌 ▶/.test(NET) && /ctx\.actions\.start\(\)/.test(NET), 'table-net 座位卡有「开始发牌 ▶」→ start(补灵魂+发牌)');
-assert(/🤝一键灵魂/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 座位卡有「🤝一键灵魂」→ fillSouls(只补位不发牌)');
-assert(/👥邀请真人/.test(NET) && /ctx\.actions\.inviteHumans\(\)/.test(NET), 'table-net 座位卡有「👥邀请真人」→ inviteHumans(一键邀真人)');
+assert(/🤝\s*一键(补满|灵魂)/.test(NET) && /ctx\.actions\.fillSouls\(\)/.test(NET), 'table-net 座位卡有「🤝 一键补满」→ fillSouls');
+assert(/👥\s*邀请真人/.test(NET) && /ctx\.actions\.inviteHumans\(\)/.test(NET), 'table-net 座位卡有「👥 邀请真人」→ inviteHumans');
 assert(/gt-soulsel[\s\S]*?ctx\.actions\.seatSoul/.test(NET), 'table-net 每个空位保留「🤝灵魂」下拉(手动指定某灵魂坐某席)');
 assert(/async function launchTexasOnline\(\)\{\s*return launchTexas\(\);\s*\}/.test(APP),
   'launchTexasOnline 已退化成 launchTexas 别名(兼容旧命令/调用点)');

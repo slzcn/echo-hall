@@ -1406,8 +1406,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       sfx('click');
       setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
     }
-    // 招募态操作区(主人诉求: 手动开始, 不坐满自动开): host 有「🤝 一键邀请」(把空位一次补满灵魂, 不发牌)
-    //   + 「开始 ▶」(补满剩余空位灵魂再发牌)。逐位点空位邀请(邀灵魂/真人)仍在, 三者并存, 房主自控开局时机。
+    // 招募态操作区(主人诉求: 手动开始, 不坐满自动开): host「🤝 一键补满」+「开始 ▶」, 提示「还差 N 席 · 点空位邀请补位」
     function renderLobbyCtrl(){
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
       const a = lobbyCtx.actions;

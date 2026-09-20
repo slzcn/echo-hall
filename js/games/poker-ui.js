@@ -1609,17 +1609,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
         <div class="pk-row"><div class="pk-waitbar">${txt}</div></div>`;
     }
-    // 招募态操作区: 一键邀请(灵魂补位) / 邀真人 / 开始 ▶ —— 就在打牌页操作按钮位置(与斗地主同构)
+    // 招募态操作区: 一键补满(灵魂补位) / 开始 ▶ —— 与斗地主/掼蛋同构(提示行+按钮行)
     function renderLobbyCtrl(){
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.acts.innerHTML=''; return; }
       const a = lobbyCtx.actions;
       const btns=[];
-      // 主人诉求(2026-09-15 复位): 招募态给回「🤝 一键邀请」(一次把空位补满灵魂, 不发牌) + 「开始 ▶」(补满剩余空位再发牌)。
-      //   逐位点空位邀灵魂/真人仍在, 三者并存, 房主自控开局时机(不再坐满自动开)。
       const empties = st.players.filter(p=>p.kind==='empty').length;
+      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀请补位` : '座位已满 · 点「开始」发牌';
       if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键补满</button>');
       btns.push('<button class="pk-b call" data-lob="start">开始 ▶</button>');
-      els.acts.innerHTML = `<div class="pk-row pk-lobacts">${btns.join('')}</div>`;
+      els.acts.innerHTML = `<div class="pk-lobacts"><div class="pk-prehint">${hint}</div><div class="pk-row">${btns.join('')}</div></div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
       els.acts.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } }));
     }

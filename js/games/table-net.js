@@ -173,31 +173,29 @@
       if(ctx.isHost){
         var emptyN = seats.filter(function(s){return s.kind==='empty';}).length;
         var hasSouls = !!(ctx.souls && ctx.souls.length);
-        // 去房主·满员自动开局(斗地主/掼蛋): 无「开始发牌」按钮 —— 坐满(无空位)即自动开打;
-        //   想马上玩就点「🤝灵魂坐满」把空位补满灵魂 → 立即触发自动开局。德州座位模型不同, 仍手动开始。
+        // 文案与牌桌内招募态对齐: 空位「邀请补位」/ 补满「🤝 一键补满」/ 开始「点「开始」发牌」
         var autoGame = (ctx.game==='ddz'||ctx.game==='guandan');
         var tip=document.createElement('span'); tip.className='gt-tip';
         if(autoGame){
           tip.textContent = emptyN>0
-            ? ('还差 '+emptyN+' 席 · 点空位邀灵魂/真人，坐满自动开局')
+            ? ('还差 '+emptyN+' 席 · 点空位邀请补位，坐满自动开局')
             : '座位已满 · 即将开局…';
         } else {
           tip.textContent = humans>1
             ? (humans+' 位真人在座 · 空位由灵魂补满后发牌')
-            : (emptyN>0 ? '点空位邀灵魂/真人，或用下方一键补位，满意「开始发牌」' : '座位已满 · 点「开始发牌」开打');
+            : (emptyN>0 ? '还差 '+emptyN+' 席 · 点空位邀请补位' : '座位已满 · 点「开始发牌」开打');
         }
         foot.appendChild(tip);
         var close=document.createElement('button'); close.className='gt-btn ghost'; close.textContent='散桌';
         close.onclick=function(){ ctx.actions.close(); }; foot.appendChild(close);
-        // 「🤝灵魂坐满」: 把空位坐满房里灵魂。斗地主/掼蛋满员即自动开局, 故等同"立即开打"; 德州仅补位不开局。
+        // 补满: 与桌内操作区同字; autoGame 满员即自动开局(title 说明差异)
         if(emptyN>0 && hasSouls){
-          var fill=document.createElement('button'); fill.className='gt-btn go'; fill.textContent=autoGame?'🤝灵魂坐满开打':'🤝一键灵魂';
+          var fill=document.createElement('button'); fill.className='gt-btn go'; fill.textContent='🤝 一键补满';
           fill.title=autoGame?'把空位坐满灵魂→满员自动开局':'把空位坐满房里灵魂(不发牌)';
           fill.onclick=function(){ ctx.actions.fillSouls(); }; foot.appendChild(fill);
         }
-        // 「👥邀请真人」: 一键把牌桌招呼发到聊天区, 房里真人点卡加入(手动逐位邀请仍走各空位的「加入」/🤝灵魂)。
         if(emptyN>0 && ctx.actions.inviteHumans){
-          var inv=document.createElement('button'); inv.className='gt-btn ghost'; inv.textContent='👥邀请真人';
+          var inv=document.createElement('button'); inv.className='gt-btn ghost'; inv.textContent='👥 邀请真人';
           inv.title='把牌桌招呼发到聊天区叫真人来';
           inv.onclick=function(){ ctx.actions.inviteHumans(); }; foot.appendChild(inv);
         }
