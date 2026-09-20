@@ -546,7 +546,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   function open(opts){
     opts = opts || {};
     if (!Engine || !AI){ console.warn('[pk] engine not loaded'); return null; }
-    // journey-exempt: 座位几何缓存 — 契约 journey-games-xdevice.js
+    // journey-exempt: 座位几何缓存/招募椭圆 — journey-games-xdevice + journey-terminal-layout
     injectCSS();
     try{ if(root.EhGameBgm) root.EhGameBgm.enter('poker'); }catch(_){}   // 进桌切德州 BGM
 
@@ -1327,8 +1327,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       //   招募态: 全 n 席等分整椭圆(我在 270°)。打牌态: 我固定 270°, 对手沿"绕开底部我位缺口"的宽弧
       //   (210°左下 → 90°顶 → -30°右下)均分, 底牌正面就在我这张桌底座位上。
       // 横屏: 桌面又宽又矮 → 横向半径放大铺开、竖向半径压扁; 椭圆竖直居中(CY 偏上)让底部我位不溢出。
-      const RX = land ? 46 : 40, RY = land ? 41 : 32;
-      const CY = lob ? 50 : (land ? 59 : 46);
+      // 招募态竖屏: 压扁椭圆 + 中心上移, 座位贴桌、少占竖向
+      const RX = land ? 46 : (lob ? 42 : 40), RY = land ? 41 : (lob ? 24 : 32);
+      const CY = lob ? (land ? 48 : 40) : (land ? 59 : 46);
       const start = 0;                             // 全席含我(d=0, 270°底部), 招募/打牌一致
       for (let d=start; d<N; d++){
         const seat=order[d];

@@ -1,6 +1,6 @@
 /* ============================================================
  * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
- * journey-exempt: 跨端令牌/PWA骨架/台面主题化 — journey-games-xdevice + journey-pwa-lobby-btn + journey-theme-tables
+ * journey-exempt: 跨端令牌/PWA骨架/台面主题/终端结构 — journey-theme-tables + journey-terminal-layout
  * ------------------------------------------------------------
  * ------------------------------------------------------------
  * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
@@ -1097,6 +1097,121 @@ html[data-mode="day"] .pk-avr .av{
 .gd-room[data-phase="lobby"] .gd-felt,
 .pk-room[data-phase="lobby"] .pk-felt{
   justify-content: flex-start !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   S. 终端结构(手机竖屏 / 横屏 / 桌面 / PWA)
+   招募态: 座位贴桌 + 桌心紧凑 + 我方位贴近桌 + 操作区钉底
+   对局态: felt 弹性吃中间, 上对手/下我+手牌, 不留大空洞
+   ══════════════════════════════════════════════════════════════ */
+/* — 手机竖屏招募 — */
+@media (max-width: 599px){
+  .ddz-room.is-lobby .ddz-opps,
+  .gd-room[data-phase="lobby"] .gd-partner,
+  .pk-room[data-phase="lobby"] .pk-felt .pk-table .pk-seat{
+    padding-top: 4px;
+  }
+  .ddz-room.is-lobby .ddz-opps{
+    justify-content: space-evenly !important;
+    padding: 4px 8px 0 !important;
+  }
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    flex: 0 0 auto !important;
+    min-height: 150px !important;
+    margin: 4px 10px 0 !important;
+    padding: 8px 12px !important;
+  }
+  .ddz-room.is-lobby .ddz-center::before,
+  .gd-room[data-phase="lobby"] .gd-center::before{
+    left: 2% !important; right: 2% !important; top: 4% !important; bottom: 4% !important;
+  }
+  .ddz-room.is-lobby .ddz-felt,
+  .gd-room[data-phase="lobby"] .gd-felt{
+    justify-content: flex-start !important;
+  }
+  .ddz-room.is-lobby .ddz-me,
+  .gd-room[data-phase="lobby"] .gd-me-row{
+    margin-top: 2px !important;
+    padding-top: 2px !important;
+  }
+  /* 招募不占手牌带高度, 操作钮贴底 */
+  .ddz-room.is-lobby .ddz-hand-wrap,
+  .ddz-room.is-lobby .ddz-hand,
+  .gd-room[data-phase="lobby"] .gd-hand-wrap,
+  .gd-room[data-phase="lobby"] .gd-hand{
+    min-height: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-top: none !important;
+    background: none !important;
+  }
+  .ddz-room.is-lobby #ddzCtrl,
+  .gd-room[data-phase="lobby"] .gd-foot{
+    margin-top: auto !important;
+  }
+  /* 对局: 中央弹性, 对手席紧凑, 手牌固定托盘 */
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-center{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-opps{
+    padding: 6px 8px 0 !important;
+  }
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-lastplay{
+    min-height: 26px !important;
+    margin-top: 2px !important;
+  }
+  .gd-room:not([data-phase="lobby"]):not(.is-land) .gd-mid{
+    min-height: 0 !important;
+  }
+  .gd-room:not([data-phase="lobby"]):not(.is-land) .gd-partner{
+    padding: 4px 8px 0 !important;
+  }
+  /* 德州招募: 桌区不要太矮, 座位弧贴桌 */
+  .pk-room[data-phase="lobby"] .pk-felt{
+    justify-content: flex-start !important;
+  }
+  .pk-room[data-phase="lobby"] .pk-me{
+    margin-top: 0 !important;
+  }
+}
+/* — 手机横屏: 座位环桌、操作区压扁(已有 is-land) — */
+@media (max-height: 500px) and (min-width: 560px){
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    min-height: 0 !important;
+    margin: 0 8px !important;
+  }
+  .ddz-room.is-lobby .ddz-hand-wrap,
+  .gd-room[data-phase="lobby"] .gd-hand-wrap{
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+}
+/* — 桌面宽屏: 限宽居中, 竖向节奏放松 — */
+@media (min-width: 900px){
+  .ddz-room .ddz-felt, .gd-room .gd-felt, .pk-room .pk-felt{
+    max-width: 900px !important;
+  }
+  .ddz-room .ddz-center, .gd-room .gd-center{
+    max-width: 640px;
+  }
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    min-height: 200px !important;
+  }
+}
+/* — PWA standalone: 顶栏已让开状态栏, felt 顶部再收一点 — */
+html.pwa-standalone .ddz-room .ddz-felt,
+html.pwa-standalone .gd-room .gd-felt,
+html.pwa-standalone .pk-room .pk-felt{
+  padding-top: 0;
+}
+html.pwa-standalone .ddz-room.is-lobby .ddz-opps{
+  padding-top: 2px !important;
 }
 
 /* 日间台面 ::after 描边: 主题色细环, 不再死白 */
