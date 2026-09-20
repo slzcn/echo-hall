@@ -289,8 +289,8 @@ html[data-mode="day"] .gd-center::before{
 .card .cs{position:absolute;top:16px;left:4px;font-size:var(--cs,11px);line-height:1}
 .card .cc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--cc,21px);opacity:.92}
 .card.joker .cc{font-size:calc(var(--cc,21px) * .8)}
-.card.joker.big{background:linear-gradient(150deg,#fff,#ffe9b8)}
-.card.joker.small{background:linear-gradient(150deg,#fff,#e8ecff)}
+.card.joker.big{background:linear-gradient(168deg,#fff8f4,#ffe6dc 44%,#ffd0c0)}
+.card.joker.small{background:linear-gradient(168deg,#f8faff,#e4ebfa 44%,#cfd9f0)}
 .card.lvl{box-shadow:0 2px 5px rgba(0,0,0,.35),0 0 0 2px var(--amber,#ffc24d)}
 .card.wild{box-shadow:0 2px 8px rgba(255,45,142,.5),0 0 0 2px var(--magenta,#ff2d8e)}
 .card .wbadge{position:absolute;bottom:1px;right:2px;font-size:9px;font-weight:800;color:var(--magenta,#ff2d8e);background:rgba(255,255,255,.85);border-radius:4px;padding:0 2px;line-height:1.2}

@@ -142,21 +142,80 @@
   opacity: .82 !important;
   text-shadow: 0 1px 1px rgba(0, 0, 0, .12);
 }
-/* 大小王与普通牌同盒尺寸: emoji 换成「王」字后, 角标/中心字号与花色牌对齐, mini 同比缩放 */
+/* ── 大小王: 纸牌质感重绘(主人: 旧金/蓝渐变丑) ──
+ * 与普通牌同盒: 白纸底 + 红/靛描边框 + 大「王」字 + 角标「大/小」, 不用 emoji。
+ * 大王=朱砂红系, 小王=墨蓝系; 中心王字用宋体更像真牌印刷。 */
+.ddz-room .card.joker.big,
+.gd-room  .card.joker.big,
+.pk-room  .card.joker.big{
+  background: linear-gradient(168deg, #fff8f4 0%, #ffe6dc 44%, #ffd0c0 100%) !important;
+  color: #b91c32 !important;
+}
+.ddz-room .card.joker.small,
+.gd-room  .card.joker.small,
+.pk-room  .card.joker.small{
+  background: linear-gradient(168deg, #f8faff 0%, #e4ebfa 44%, #cfd9f0 100%) !important;
+  color: #1a2744 !important;
+}
 .ddz-room .card.joker .cn,
 .gd-room  .card.joker .cn,
 .pk-room  .card.joker .cn{
   font-size: var(--cn, 13px) !important;
   font-weight: 900 !important;
   letter-spacing: -.02em !important;
+  color: inherit !important;
+  text-shadow: none !important;
 }
 .ddz-room .card.joker .cc,
 .gd-room  .card.joker .cc,
 .pk-room  .card.joker .cc{
-  font-size: calc(var(--cc, 21px) * .8) !important;
-  font-weight: 800;
-  opacity: .92 !important;
+  font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif !important;
+  font-size: calc(var(--cc, 21px) * .92) !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
   line-height: 1;
+  color: inherit !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 0 8px rgba(0,0,0,.06) !important;
+}
+/* 内框细线 + 底部纹章点: 真牌印刷感, 不用重阴影 */
+.ddz-room .card.joker::after,
+.gd-room  .card.joker::after,
+.pk-room  .card.joker::after{
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 5px;
+  border: 1.2px solid currentColor;
+  opacity: .28;
+  pointer-events: none;
+}
+.ddz-room .card.joker.big::before,
+.gd-room  .card.joker.big::before,
+.pk-room  .card.joker.big::before,
+.ddz-room .card.joker.small::before,
+.gd-room  .card.joker.small::before,
+.pk-room  .card.joker.small::before{
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 5px;
+  width: 8px; height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  border: 1.2px solid currentColor;
+  opacity: .35;
+  pointer-events: none;
+}
+/* 纸面同普通牌的轻渐变阴影已在 not(.back) 规则覆盖; 这里仅压掉旧金/蓝上的过重阴影 */
+.ddz-room .card.joker.big,
+.gd-room  .card.joker.big,
+.pk-room  .card.joker.big,
+.ddz-room .card.joker.small,
+.gd-room  .card.joker.small,
+.pk-room  .card.joker.small{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -3px 7px rgba(18,32,52,.055),
+    0 2px 6px rgba(0,0,0,.28) !important;
 }
 .ddz-room .card.mini.joker .cn,
 .gd-room  .card.mini.joker .cn,

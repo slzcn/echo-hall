@@ -18,12 +18,50 @@
 
   function groups(hand, level){
     const wilds=[], jokers=[], byRank=new Map();
+    let levelNats=0;
     for (const c of hand){
       if (Rules.isWild(c, level)) wilds.push(c);
       else if (c.joker) jokers.push(c);
-      else { const r=Rules.naturalRank(c); if(!byRank.has(r)) byRank.set(r,[]); byRank.get(r).push(c); }
+      else {
+        const r=Rules.naturalRank(c);
+        if(r===level) levelNats++;
+        if(!byRank.has(r)) byRank.set(r,[]); byRank.get(r).push(c);
+      }
     }
-    return { wilds, jokers, byRank };
+    return { wilds, jokers, byRank, levelNats };
+  }
+
+  // ★主人反馈: 打级(如打2)时灵魂先打 ♥2(逢人配), 而不是 ♦/♣/♠ 普通级牌。
+  //   根因: 3 普通级+1百搭 被当成级牌炸, 拆普通级罚 +120 > 打百搭 +60 → 反优先。
+  //   修正: 百搭可被同点普通级替代时重罚; 拆「3普通+百搭」级牌炸里的普通级仅轻罚。
+  function wildWastePenalty(play, hand, level){
+    const wildCards = (play.cards||[]).filter(c=>Rules.isWild(c, level));
+    if (!wildCards.length) return 0;
+    const playIds = new Set((play.cards||[]).map(c=>c.id));
+    const spareLevel = hand.filter(c=>
+      !c.joker && !Rules.isWild(c, level) &&
+      Rules.naturalRank(c)===level && !playIds.has(c.id)
+    ).length;
+    const p = play.parse;
+    const isLevelPlay = !!(p && (p.key===15
+      || (typeof p.pairRank==='number' && p.pairRank===level)
+      || (typeof p.trioRank==='number' && p.trioRank===level)));
+    if (isLevelPlay) return spareLevel>0 ? (120 + spareLevel*15) : 70;
+    return spareLevel>0 ? (48 + spareLevel*8) : 22;
+  }
+  function levelBombBreakPen(play, hand, level){
+    if (Rules.isBomb(play.parse)) return 0;
+    const g = groups(hand, level);
+    const wildN = g.wilds.length;
+    let pen = 0;
+    for (const c of (play.cards||[])){
+      if (c.joker || Rules.isWild(c, level)) continue;
+      if (Rules.naturalRank(c) !== level) continue;
+      const have = (g.byRank.get(level)||[]).length;
+      if (have===3 && wildN>=1) pen += 18;   // 拆普通级优先于打百搭(主人策略)
+      else if (have>=4) pen += 40;
+    }
+    return pen;
   }
 
   // 连续段候选(顺/连对/钢板): groupSize=每档张数, groups=档数。返回 {natCards,wildsNeeded,top}[]
@@ -209,17 +247,29 @@
     const playIsBomb = Rules.isBomb(play.parse);           //   出的就是炸时不算拆(否则会误罚打百搭炸本身)
     const rc = {};
     let pen = 0;
+    pen += wildWastePenalty(play, hand, level);            // ★百搭可被普通级替代 → 重罚(先打 ♦/♣/♠ 级牌)
+    pen += levelBombBreakPen(play, hand, level);           // 级牌炸拆普通级: 轻罚(策略上允许且优先)
     for (const c of play.cards){
       if (c.joker){ pen += 30; continue; }                 // 耗王(大小王=最强单张/组王炸的料, 领出别甩)
-      if (Rules.isWild(c, level)){ pen += 24; continue; }  // 耗百搭(逢人配, 补顺/连对/组炸全靠它)
+      if (Rules.isWild(c, level)){ continue; }             // 百搭已在 wildWastePenalty 计
       const r = Rules.naturalRank(c); rc[r] = (rc[r]||0)+1;
     }
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      const isBombRank = have>=4 || (have===3 && wildN>=1);          // 天然炸 或 百搭补齐的炸(主人反馈"四个五+尖却领三个五")
-      if (!playIsBomb && isBombRank && rc[r]<4) pen += 120; // 拆同点炸(领出重罚, 与 playCost 一致; 含百搭补齐的炸)
+      // 级牌炸拆分已由 levelBombBreakPen 处理, 这里跳过 level 点, 免重复重罚
+      if (Number(r)===level) continue;
+      const isBombRank = have>=4;                          // 非级点: 只认天然 4+ 为炸(不再把 3+百搭 误绑到任意点)
+      if (!playIsBomb && isBombRank && rc[r]<4) pen += 120; // 拆同点天然炸
       else if (have===3 && rc[r]<3) pen += 10;             // 拆三条(留三带更值)
       else if (have===2 && rc[r]===1) pen += 4;            // 拆对出单(先出真散张)
+    }
+    // 百搭补齐的非级点炸: play 未含百搭却拆了「3天然+手里有百搭」的潜在炸 — 轻一点, 让普通级优先更显著
+    if (!playIsBomb && wildN>0){
+      for (const r in rc){
+        if (Number(r)===level) continue;
+        const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+        if (have===3 && rc[r]<3) pen += 8;
+      }
     }
     return pen;
   }
@@ -496,18 +546,22 @@
   function playCost(play, hand, level){
     let cost = play.parse.key;
     const g = groups(hand, level);
-    const wildN = g.wilds.length;                          // ★同 leadWaste: 认"3天然+1百搭"的现成炸
-    const playIsBomb = Rules.isBomb(play.parse);
+    cost += wildWastePenalty(play, hand, level);
+    cost += levelBombBreakPen(play, hand, level);
     const rc = {};
-    for (const c of play.cards){ if(Rules.isWild(c,level)){ cost+=60; continue; } const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
-    for (const r in rc){
-      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      const isBombRank = have>=4 || (have===3 && wildN>=1);
-      if (!playIsBomb && isBombRank && rc[r]<4) cost += 120;  // 拆炸(含百搭补齐的炸)
-      else if (have===3 && rc[r]<3) cost += 15;           // 拆三条: 破坏可留的三带
-      else if (have===2 && rc[r]===1) cost += 6;          // 拆对子出单张: 有散张先出散张
+    for (const c of play.cards){
+      if (Rules.isWild(c,level)){ continue; }   // 百搭代价走 wildWastePenalty
+      if (c.joker){ cost += 40; continue; }
+      const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1;
     }
-    for (const c of play.cards) if (c.joker) cost += 40;   // 拆王
+    for (const r in rc){
+      if (Number(r)===level) continue;          // 级点拆分 → levelBombBreakPen
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      const isBombRank = have>=4;
+      if (!Rules.isBomb(play.parse) && isBombRank && rc[r]<4) cost += 120;
+      else if (have===3 && rc[r]<3) cost += 15;
+      else if (have===2 && rc[r]===1) cost += 6;
+    }
     return cost;
   }
 
@@ -522,7 +576,10 @@
     for (const c of play.cards){ if (c.joker || Rules.isWild(c, level)) continue; const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
     for (const r in rc){
       const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
-      if ((have>=4 || (have===3 && wildN>=1)) && rc[r]<4) return true;
+      // ★打级策略: 从「3 普通级 + 百搭」的级牌炸里拆【普通级牌】不算拆炸(主人要先打 ♦/♣/♠ 级)
+      if (Number(r)===level && have===3 && wildN>=1) continue;
+      const isBombRank = have>=4 || (have===3 && wildN>=1);
+      if (isBombRank && rc[r]<4) return true;
     }
     return false;
   }
@@ -540,6 +597,7 @@
 
   return {
     decide, chooseLead, hints, genCombos, allBombs, groups, findLines, arrangeGroups,
-    estTricks, leadScore, setEarlyClear,
+    estTricks, leadScore, setEarlyClear, wildWastePenalty, levelBombBreakPen,
+    playCost, breaksBomb,
   };
 });
