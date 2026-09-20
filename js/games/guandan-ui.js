@@ -1232,28 +1232,43 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       }
       return out;
     }
-    // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成"); 直接标当前排序法, 一眼知在哪态。
+    // 按当前 sortMode 刷新理牌钮文字(手动排态由 setArrange 显 "✓ 完成"); 有手动码牌时标「恢复自动」。
+    function hasManualRows(){
+      return !!(rows && ((rows.top && rows.top.length) || (rows.bot && rows.bot.length)));
+    }
     function refreshSortBtn(){
       const btn = $('#gdSort'); if(!btn || arrangeMode) return;
-      btn.innerHTML = sortMode==='combo' ? '📚 按牌型' : '🔢 按大小';
+      if (hasManualRows()) btn.innerHTML = '↺ 恢复自动';
+      else btn.innerHTML = sortMode==='combo' ? '📚 按牌型' : '🔢 按大小';
     }
     function setArrange(on){
       arrangeMode = on;
       const btn = $('#gdSort'); if(btn){ btn.classList.toggle('active', on); if(on) btn.innerHTML = '✓ 完成'; }
       els.hand.classList.toggle('arranging', on);
-      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖牌自由排序 · 选中一组(如三带二)可整组一起挪、理在一起'); }
+      if(on){ vibrate(15); renderHand(); updatePlayBtn(); toast('拖牌自由排序 · 选中一组可整组挪 · 完成后提示优先你码的组'); }
       else { refreshSortBtn(); renderHand(); }
     }
-    // 短按理牌 = 在【按大小】↔【按牌型】之间来回切(对标欢乐掼蛋一键理牌: 就地重排同一手牌, 不改选牌方式)。
-    //   两种排序都用同一套叠牌单排/两排渲染, 全程点单张选牌 —— 不再有"竖列组盒/散牌盒"那套另类交互
-    //   (主人反馈太复杂不好用)。按牌型只是把成组的牌(炸/顺/连对/钢板/三张/对子)排到一起、组间留缝好辨认。
-    //   想凑一手直接打 → 点"提示"钮自动选好; 想自己码牌 → 长按进手动拖排(小众功能, 不占主循环)。
+    // 短按理牌:
+    //   手动整理中 → 完成退出, 保留玩家码牌(rows), 提示此后按这组推荐;
+    //   已有手动码牌 → 一键「恢复自动」(优先按牌型重组), 方便觉得理得不合理时重来;
+    //   无手动 → 在【按大小】↔【按牌型】间切换。
     function autoSort(){
-      if(arrangeMode){ rows=null; setArrange(false); return; }   // 手动态短按 = 完成退出, 回到当前排序
+      if(arrangeMode){
+        setArrange(false);
+        try{ toast('已保留你的码牌 · 提示优先按这组推荐', 2200); }catch(_){}
+        return;
+      }
+      if(hasManualRows()){
+        rows=null; hintCycle=[]; hintIdx=0;
+        sortMode = canCombo() ? 'combo' : 'rank';
+        refreshSortBtn(); renderHand(); sfx('cardsel');
+        toast(sortMode==='combo' ? '已恢复自动理牌 · 按牌型成组(可长按再手动码)' : '已恢复自动理牌 · 按大小');
+        return;
+      }
       rows=null; hintCycle=[]; hintIdx=0;
       sortMode = sortMode==='combo' ? 'rank' : 'combo';
       refreshSortBtn(); renderHand(); sfx('cardsel');
-      toast(sortMode==='combo' ? '已按牌型理牌 · 成组的牌挨在一起' : '已按大小理牌 · 从大到小一条线');
+      toast(sortMode==='combo' ? '已按牌型理牌 · 成组的牌挨在一起 · 提示优先这组' : '已按大小理牌 · 从大到小一条线');
     }
     // 读当前 DOM 两排的 id 顺序(落位重算的基准)
     function domRows(){
@@ -1308,6 +1323,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       rows = { top:cur.top, bot:cur.bot };
       (dragGroupEls || [dragCard]).forEach(el=>{ el.classList.remove('dragging'); el.style.transform=''; el.style.zIndex=''; });
       dragCard = null; dragId = null; dragGroup = null; dragGroupEls = null;
+      hintCycle=[]; hintIdx=0;   // 码牌变了 → 下次提示按新组重算
       sfx('cardsel'); vibrate(10); renderHand();
     }
     // 短按=一键理牌(或手动模式下=完成退出); 长按≥350ms=切手动理牌模式
@@ -1649,22 +1665,19 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         let bot = pick(rows.bot);
         const left = hand.filter(c=>!placed.has(c.id));
         if (left.length) bot = bot.concat(Rules.sortHand(left, st.level));
-        // 按牌型态下手动排的两排: 就地识别玩家码出的成型段, 每段(除首段)首张标 grp-start → 显组间留缝,
-        //   让"手动重新组合成的牌型"一眼可见、成组的牌聚拢在一起(大小态纯排序, 不标组避免噪声)。
-        if (sortMode === 'combo' && canCombo()){
-          [top, bot].forEach(rowCards=>{
-            const segs = runGroups(rowCards);
-            let idx = 0;
-            segs.forEach(seg=>{ if (idx > 0 && seg.length) groupStartIds.add(seg[0].id); idx += seg.length; });
-          });
-        }
+        // 手动排: 就地识别成型段标组间留缝(不看 sortMode), 玩家码出的组一眼可见
+        [top, bot].forEach(rowCards=>{
+          const segs = runGroups(rowCards);
+          let idx = 0;
+          segs.forEach(seg=>{ if (idx > 0 && seg.length) groupStartIds.add(seg[0].id); idx += seg.length; });
+        });
         return [top, bot];
       }
-      // 手动拖排入场(rows 尚空): 一律按【两排】起手。种子序: 当前按牌型态沿用组牌序(同型相邻, 微调好挪),
-      //   否则大小序; 落两排后玩家再自由拖动。横屏仍单排。
+      // 手动拖排入场(rows 尚空): 一律按【两排】起手。种子序: 优先按牌型组(同型相邻好微调),
+      //   「觉得理得不合理→长按重排」一进来就是可重组的成型组。
       if (arrangeMode){
         let seq;
-        if (sortMode==='combo' && canCombo()){
+        if (canCombo()){
           const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
           seq = groups.length ? [].concat.apply([], groups) : Rules.sortHand(hand, st.level);
         } else {
@@ -1684,12 +1697,19 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       for (const c of sorted){ (Rules.isWild(c, st.level) ? wild : rest).push(c); }
       const rankSeq = wild.concat(rest);
       const landscape = room.classList.contains('is-land');
+      // 大小态也标出「同点聚拢」的组缝(runGroups): 按大小理完后对/三/炸仍成段可见, 提示同源优先
+      {
+        const segs = runGroups(rankSeq);
+        let idx = 0;
+        segs.forEach(seg=>{ if (idx > 0 && seg.length) groupStartIds.add(seg[0].id); idx += seg.length; });
+      }
       // 按牌型理牌(对标欢乐掼蛋一键理牌): arrangeGroups 把成组的牌(炸/顺/连对/钢板/三张/对子)排到一起, 散牌随后;
       //   组间首张给 grp-start → layoutRow 在组之间撑一道小缝, 一眼看清手里有哪些现成牌型。与"按大小"共用同一套叠牌
       //   单排/两排渲染, 选牌始终点单张(不再有另类"组盒"交互)。手牌多时按【组边界】切两排, 不把一手牌型拆到两排。
       if (sortMode === 'combo' && canCombo()){
         const groups = root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
         if (groups.length){
+          groupStartIds = new Set();   // 组牌态用 arrangeGroups 组缝
           const seq = [], starts = [];   // starts=各组(除首组)在 seq 的起始下标, 供按边界切两排
           groups.forEach(g=>{ if (seq.length){ groupStartIds.add(g[0].id); starts.push(seq.length); } g.forEach(c=>seq.push(c)); });
           if (seq.length >= 15 && !landscape){
@@ -1701,7 +1721,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
           }
           return [[], seq];
         }
-        // 组牌异常空 → 落大小排
+        // 组牌异常空 → 落大小排(保留上面 rank 同点组缝)
       }
       // 大小模式: 手牌多时上下分两排(对标腾讯欢乐掼蛋 27 张双排 —— 单排挤 27 张每张只露一条看不清点数);
       //   残局少牌(<15)收一排更紧凑。百搭已在 rankSeq 最前 → 自然落上排头保持醒目。
@@ -2111,9 +2131,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         // lastSeat 供提示识别"对家(队友)领出"→ 别压自己人; 有桌面牌且非我出时才带。
         const lastSeat = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.seat : null;
         let ai = AI.hints({ hand, tableParse:target, level:st.level, seat:mySeat, lastSeat, handsLeft: st.players.map(p=>p.hand.length) });
-        // ★理牌/已选手牌优先: rows 或按牌型理过时, 我方理出的合法牌型排到提示最前;
-        //   另外: 当前已选手牌与候选重叠越多越靠前 —— 点了半组再点提示, 优先补全/升级这组。
         const key = g => g.map(c=>c.id).sort().join(',');
+        const handN = hand.length;
+        const isComplete = g => g && g.length===handN;
+        // 已选半组 → 提示优先补全/升级这组(在非「走完」项里)
         if (selected.size>=2 && ai.length){
           const selIds = new Set(selected);
           ai = ai.slice().sort((a,b)=>{
@@ -2121,37 +2142,51 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
             return ob-oa;
           });
         }
-        let cyc = ai;
-        // ai 为空且是对家领出 → 提示建议让对家走: 不能靠"理牌优先"把压对家的牌型再塞回来(否则等于教你压自己人)。
-        //   故仅在 ai 非空时才做理牌优先重排。
-        if (ai.length && (rows || (sortMode==='combo' && canCombo()))){
-          const mine = [];
-          // 理牌来源: 玩家手动排过(rows 非空)→ 按玩家自己码出的成型段来提示(runGroups 就地识别),
-          //   让"手动重新组合的牌型"真正指导提示; 否则用 AI 自动分组 arrangeGroups。
-          let sourceGroups;
+        // ★理牌优先(主人诉求): 无论按大小/按牌型/手动码牌, 都从【当前视觉理牌序】就地识别成型组,
+        //   提示优先推这些组 —— 不再只在 combo/rows 时才对齐玩家理牌。
+        //   顺序: ①能一把走完 ②理出的合法非炸牌型(更长优先/贴合已选) ③AI best-first 其余 ④炸靠 AI 垫底。
+        const ordered = (()=>{
           if (rows){
-            const byId = new Map(hand.map(c=>[c.id,c]));
-            const ordered = [].concat(
-              (rows.top||[]).map(id=>byId.get(id)).filter(Boolean),
-              (rows.bot||[]).map(id=>byId.get(id)).filter(Boolean));
-            const seen0 = new Set(ordered.map(c=>c.id));
-            hand.forEach(c=>{ if(!seen0.has(c.id)) ordered.push(c); });   // 兜底新牌
-            sourceGroups = runGroups(ordered);
-          } else {
-            sourceGroups = root.EHGuandanAI.arrangeGroups(hand, st.level);
+            const byId=new Map(hand.map(c=>[c.id,c]));
+            const o=[].concat((rows.top||[]).map(id=>byId.get(id)).filter(Boolean),
+                              (rows.bot||[]).map(id=>byId.get(id)).filter(Boolean));
+            const seen0=new Set(o.map(c=>c.id));
+            hand.forEach(c=>{ if(!seen0.has(c.id)) o.push(c); });
+            return o;
           }
-          sourceGroups.forEach(g=>{
-            if (g.length < 2) return;                            // 单张不算"理出的牌型"
-            const p = Rules.parse(g, st.level); if (!p) return;  // 组不成合法牌型的跳过
-            if (Rules.isBomb(p)) return;                         // ★炸弹不进"理牌优先"(主人反馈"跟对子却提示先出炸"):
-            //   arrangeGroups 把炸排最前, 而炸能压任何牌型 → 会抢到提示第一位。炸交回下方 ai(hints)列表,
-            //   那里领出/跟牌都把炸垫底(能一把走完的炸仍会靠 hints 的"整手清"规则排到最前, 不误伤)。
-            if (!target || Rules.beats(p, target, st.level)) mine.push(g);  // 领出全收/跟牌只收能压的
+          if (sortMode==='combo' && canCombo()){
+            const gs=root.EHGuandanAI.arrangeGroups(hand, st.level).filter(g=>g.length);
+            return gs.length ? [].concat.apply([], gs) : Rules.sortHand(hand, st.level);
+          }
+          return Rules.sortHand(hand, st.level);
+        })();
+        let mine = [];
+        {
+          const groups = runGroups(ordered);
+          groups.forEach(g=>{
+            if (!g || g.length<2) return;
+            const p = Rules.parse(g, st.level); if (!p) return;
+            if (Rules.isBomb(p)) return;   // 炸交回 AI 列表(领出/跟牌都垫底; 整手清仍走 isComplete)
+            if (!target || Rules.beats(p, target, st.level)) mine.push(g);
           });
-          if (mine.length){
-            const seen = new Set(mine.map(key));
-            cyc = mine.concat(ai.filter(g=>!seen.has(key(g))));
-          }
+          // 更长的成型组优先; 若已选牌, 重叠多的再靠前
+          const selIds = selected.size ? new Set(selected) : null;
+          mine.sort((a,b)=>{
+            if (selIds){
+              const oa=a.filter(c=>selIds.has(c.id)).length, ob=b.filter(c=>selIds.has(c.id)).length;
+              if (oa!==ob) return ob-oa;
+            }
+            return b.length-a.length;
+          });
+        }
+        let cyc = ai;
+        if (mine.length){
+          const seen=new Set();
+          const complete=[], rest=[];
+          ai.forEach(g=>{ const k=key(g); if(seen.has(k)) return; seen.add(k); (isComplete(g)?complete:rest).push(g); });
+          mine.forEach(g=>{ seen.add(key(g)); });
+          const restFiltered = rest.filter(g=>!mine.some(m=>key(m)===key(g)));
+          cyc = complete.concat(mine, restFiltered);
         }
         hintCycle = cyc; hintIdx=0;
       }
