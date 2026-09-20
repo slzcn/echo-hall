@@ -1,18 +1,33 @@
 /*
- * Echo Hall BGM 模块契约（第 4 阶段）。
- * 迁移期只定义依赖注入边界；播放实现仍由 app.js 提供。
- * 目标：后续迁移时不再让 BGM 直接读取 curRoom、EH_CONFIG、AudioEngine 等隐式全局。
+ * bgm.js — BGM 纯逻辑(第 4 阶段实现)
+ * journey-exempt: journey-auth-bgm-features.js
  */
 (function (root) {
   'use strict';
-
   function required(name, value) {
     if (typeof value !== 'function' && value == null) {
       throw new TypeError('[EH_BGM] missing dependency: ' + name);
     }
     return value;
   }
-
+  function lsBool(key) {
+    try {
+      var v = localStorage.getItem(key);
+      return v === null ? true : v === '1';
+    } catch (e) { return true; }
+  }
+  function bgmOnFrom(key) { return lsBool(key); }
+  function pickRoomTrack(library, roomName, randomFn) {
+    var rnd = typeof randomFn === 'function' ? randomFn : Math.random;
+    var all = (library || []).filter(function (x) { return x && x.url; });
+    if (!all.length) return null;
+    var pool = roomName ? all.filter(function (x) { return x.room_name === roomName; }) : all;
+    if (!pool.length) pool = all;
+    return pool[Math.floor(rnd() * pool.length) % pool.length];
+  }
+  function shouldSkipGen(pending, generating) {
+    return !!(pending || generating);
+  }
   function createBgmController(deps) {
     deps = deps || {};
     return Object.freeze({
@@ -25,8 +40,19 @@
       playAI: required('playAI', deps.playAI),
       playLegacy: required('playLegacy', deps.playLegacy),
       generate: required('generate', deps.generate),
+      bgmOnFrom: bgmOnFrom,
+      pickRoomTrack: pickRoomTrack,
+      shouldSkipGen: shouldSkipGen,
     });
   }
-
-  root.EH_BGM_MODULE = Object.freeze({ createBgmController: createBgmController });
-})(window);
+  var api = Object.freeze({
+    createBgmController: createBgmController,
+    bgmOnFrom: bgmOnFrom,
+    pickRoomTrack: pickRoomTrack,
+    shouldSkipGen: shouldSkipGen,
+    lsBool: lsBool,
+  });
+  if (root) root.EH_BGM_MODULE = api;
+  return api;
+})((typeof window !== 'undefined') ? window : ((typeof globalThis !== 'undefined') ? globalThis : this));
+if (typeof module !== 'undefined' && module.exports) module.exports = (typeof window !== 'undefined' ? window.EH_BGM_MODULE : null) || (typeof globalThis !== 'undefined' ? globalThis.EH_BGM_MODULE : null);

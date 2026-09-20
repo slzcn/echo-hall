@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-chat-core';
+window.__EH_APP_VER = '20260920-auth-bgm';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -258,8 +258,11 @@ async function ensureAuth(){
     // ★ 修正(2026-08-13): 纯临时身份(本来就是随机匿名名)不重掷——保留用户登录前已选中的名字。
     const hadRegIdentity = !!(me && (me.registered || me.username || me.email));
     try{
+      // ★先判是否重掷再清标记: 若先清 registered/username, shouldRerollIdentity 会永远 false, 残留正式名不再重掷
+      const A=(typeof window!=='undefined'&&window.EH_AUTH_MODULE)||null;
+      const reroll=(A&&A.shouldRerollIdentity)?A.shouldRerollIdentity(me):hadRegIdentity;
       if(me){ me.registered=false; me.role='user'; me.username=''; }
-      if(hadRegIdentity){ rollIdentity(); }   // 只在残留正式身份时重掷, 否则保留临时名
+      if(reroll){ rollIdentity(); }   // 只在残留正式身份时重掷
     }catch(e){ _ehCatch('ensureAuth',e); }
   }
   myUid = uid; me.id = uid; saveIdentity(); resyncMsgOwnership();
@@ -316,7 +319,10 @@ const LS_BGM='eh_bgm';
 // 官方房 BGM 氛围 → 引用集中配置 EH_CONFIG(见文件顶部)
 const ROOM_BGM=EH_CONFIG.roomBgm;
 // EH 操作音效：轻量 Web Audio 合成，不依赖外部音频文件；音色偏聊天/空间感，避免 VC 答题那种强游戏化。
-function bgmOn(){ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }
+function bgmOn(){
+  try{ const M=window.EH_BGM_MODULE; if(M && M.bgmOnFrom) return M.bgmOnFrom(LS_BGM); }catch(e){ _ehCatch('bgmOn', e); }
+  const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1';
+}
 // 全部可用 BGM 曲目池(官方房各一首 + 公共/私密 fallback 各一首), 供大厅随机连播
 function bgmPool(){
   try{
@@ -945,7 +951,7 @@ function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid, via){
   const A = gtLiveSeatArrays(tableId, fallbackRow);
   if (!A) return;
   var chk = _EH_GT_NET
-    ? _EH_GT_NET.acceptMove({ remoteSeats: A.remoteSeats, ids: A.ids }, seat, move, payloadUid, { via: via, requireViaRpc: false })
+    ? _EH_GT_NET.acceptMove({ remoteSeats: A.remoteSeats, ids: A.ids }, seat, move, payloadUid, { via: via, requireViaRpc: true })
     : (function(){
         if (!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return { ok:false };
         var uid = A.ids && A.ids[seat];

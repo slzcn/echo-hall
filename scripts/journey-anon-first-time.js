@@ -60,7 +60,9 @@ const ctx = {
     }
     return ctx.me;
   },
-  rollIdentity: function () {
+  EH_AUTH_MODULE: { shouldRerollIdentity: function(me){ return !!(me && (me.registered || me.username || me.email)); } },
+  window: null, // filled below
+    rollIdentity: function () {
     // 模拟：手动换名。显式闭包 ctx，避免跨 VM 的 this 绑定干扰测试结果。
     ctx.rollCallCount++;
     ctx.me = { uid: ctx.me?.uid || 'anon_x', name: '星际饺子_r' + ctx.rollCallCount, color: '#f6f' };
@@ -72,6 +74,8 @@ const ctx = {
   },
   _ehCatch: function () { /* 生产分支 catch 里的错误上报, 测试里做空桩 */ },
 };
+ctx.window = ctx;
+ctx.EH_AUTH_MODULE = ctx.EH_AUTH_MODULE || { shouldRerollIdentity: function(me){ return !!(me && (me.registered || me.username || me.email)); } };
 vm.createContext(ctx);
 
 // —— 旅程步骤 1：首次打开 ——
@@ -141,7 +145,7 @@ assert(
 
 // —— 反证：把生产分支临时变回旧的“无条件重掷”，本旅程必须能抓红 ——
 const oldBugBranch = branchSrc.replace(
-  'if(hadRegIdentity){ rollIdentity(); }',
+  'if(reroll){ rollIdentity(); }',
   'rollIdentity();'
 );
 assert(oldBugBranch !== branchSrc, '反证准备：已构造旧版无条件重掷分支');
