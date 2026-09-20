@@ -1222,3 +1222,21 @@ html[data-mode="day"] .pk-room  .pk-table::after{
     inset 0 0 0 1px color-mix(in srgb, var(--accent,#007f76) 30%, rgba(0,0,0,.05)),
     inset 0 0 0 2px rgba(255,255,255,.4) !important;
 }
+
+
+/* ── Q. 按钮跟手(主人: 点击微弱延迟) ──────────────────────
+ * touch-action:manipulation 去掉双击缩放等待;
+ * 压按动画改 0.08s 且只动 transform, 不拖 color 过渡;
+ * 出牌/开始等主按钮用 pointerup 触发(比 click 早一拍)。 */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn, .ddz-lobbtns button, .gd-lobbtns button{
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s cubic-bezier(.2,.85,.3,1), box-shadow .1s, background .1s, border-color .1s !important;
+}
+.ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
+  transform: scale(.96) !important;
+  transition-duration: .05s !important;
+}
+.ddz-hand .card, .gd-hand .card, .gd-hand-row .card{
+  touch-action: none;
+}

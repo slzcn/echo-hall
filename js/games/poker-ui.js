@@ -29,25 +29,15 @@
   const AI_MIN_MS = 2200, AI_JIT_MS = 4800;
   const STREET_PAUSE_MS = 650;   // 一街下注结束 → 发下一街前的停顿(让筹码归池动画走完)
 
-  // journey-exempt: 单机德州每日输光上限为新增独立功能(localStorage 计数+封盘页), 需连输 5 局才触发,
-  //   现有 journey harness 无法在一趟内造出 5 次真人输光; 防重入守卫(res._bustCounted)是纯幂等保护, 无跨会话旅程。
-  // ── 单机德州每日输光上限(主人要求): 一天最多输光 5 次, 到顶当天不能再玩, 次日自动重置。
-  //   只约束"单机陪玩"(isLocalSolo): 练习桌无限补带太廉价, 加个每日心跳让输赢有分量。
-  //   联机/客人局不受限(真人对局由房主掌控, 破产另有离桌语义)。存 localStorage, 按本地日期归零。
+  // journey-exempt: 每日对局次数门禁读写 localStorage(eh_daily_plays_v1), 与 score.js 同源;
+  //   静态断言见 journey-chip-authenticity.js, 无法在一趟旅程内连打 5 局真人对局。
+  // ── 每日对局上限(主人要求): 一天最多进房玩 5 次, 到顶当天不能再开/进桌, 次日自动重置。
+  //   计数源在 js/modules/score.js(eh_daily_plays_v1); startDeal 落一次, app.js 入口也门禁。
   const PK_DAILY_MAX = 5;
-  const PK_DAILY_KEY = 'eh_pk_daily_bust';
-  function pkToday(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
-  function pkBustsToday(){
-    try{ const o=JSON.parse(localStorage.getItem(PK_DAILY_KEY)||'null');
-      if(o && o.date===pkToday() && typeof o.n==='number') return o.n; }catch(_){}
-    return 0;
-  }
-  function pkAddBust(){
-    const n = pkBustsToday()+1;
-    try{ localStorage.setItem(PK_DAILY_KEY, JSON.stringify({date:pkToday(), n})); }catch(_){}
-    return n;
-  }
-  function pkLimitReached(){ return pkBustsToday() >= PK_DAILY_MAX; }
+  const _daily = () => (root.EH_DAILY_PLAYS || null);
+  function pkPlaysToday(){ const d=_daily(); return (d && typeof d.plays==='function') ? d.plays() : 0; }
+  function pkAddPlay(){ const d=_daily(); return (d && typeof d.bump==='function') ? d.bump() : 0; }
+  function pkLimitReached(){ const d=_daily(); return !!(d && typeof d.reached==='function' && d.reached()); }
 
   const CSS_ID = 'pk-ui-css';
   function injectCSS(){
@@ -544,6 +534,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   }
 
   function open(opts){
+
+    function bindTap(el, fn){
+      if(!el) return;
+      let done=false;
+      const fire=(e)=>{ if(done) return; done=true; try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} } };
+      el.addEventListener('pointerup', (e)=>{ if(e.button!=null && e.button!==0) return; fire(e); });
+      el.addEventListener('click', (e)=>{ /* 兜底(键盘/个别环境) */ fire(e); });
+      el.addEventListener('pointerdown', ()=>{ done=false; });
+    }
+
     opts = opts || {};
     if (!Engine || !AI){ console.warn('[pk] engine not loaded'); return null; }
     // journey-exempt: 座位几何缓存/招募椭圆 — journey-games-xdevice + journey-terminal-layout
@@ -665,7 +665,23 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 跨桌钱包: 我这席的买入可带上一桌的余额进场(opts.myStack), 其余席各自新买入 START。
     //   每次结算/重开后经 opts.onWallet(我的最新筹码)回传 app.js 落地, 下张桌再带着走。
     const MY_START = (typeof opts.myStack === 'number' && opts.myStack > 0) ? Math.round(opts.myStack) : START;
-    let stacks = names.map((_, i) => i === mySeat ? MY_START : START);
+    // 真实筹码: 每席买入优先走 opts.stackFor(灵魂/远程真人按 uid 账本累计), 否则我这席 MY_START、其余 START。
+    // journey-exempt: stackFor 由 app.js 注入 — journey-chip-authenticity.js
+    function seatBuyIn(i){
+      if (typeof opts.stackFor === 'function'){
+        try{
+          const v = opts.stackFor(i, { ids: ids, isAI: isAI, souls: souls, names: names, mySeat: mySeat });
+          if (Number.isFinite(v) && v > 0) return Math.round(v);
+        }catch(_){}
+      }
+      return i === mySeat ? MY_START : START;
+    }
+    function emitStacks(){
+      if (typeof opts.onStacks !== 'function') return;
+      try{ opts.onStacks(stacks.slice(), { ids: ids, isAI: isAI, souls: souls, names: names, mySeat: mySeat }); }
+      catch(e){ _ehCatch('poker.onStacks', e); }
+    }
+    let stacks = names.map((_, i) => seatBuyIn(i));
     // 本桌累计净盈亏(相对买入): buyin[seat]=该席至今累计买入(每破产补带一次 +START); netSettled=上一手结算后的净额(stack-buyin)。
     // 净额只在 showOver 结算时刷新, 故座位徽标不随手内下注抖动(展示"进本手时的本桌战绩")。
     // 持久化: 键随牌桌 id(opts.scoreKey), 重进/刷新同一张桌不清零; 桌真正散了由 app.gtClose 清键。
@@ -711,12 +727,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             names[seat]=s.name||'灵魂'; avatars[seat]=s.e||s.emoji||'👤';
             isAI[seat]=true; if(ids) ids[seat]=s.auth_uid;
             if (souls) souls[seat]={ archetype:null, name:s.name, emoji:s.emoji };
-            stacks[seat]=START; buyin[seat]=(buyin[seat]||0)+START; netSettled[seat]=0;
+            stacks[seat]=seatBuyIn(seat); buyin[seat]=(buyin[seat]||0)+stacks[seat]; netSettled[seat]=0;
             vacated[seat]=false; vacatedUid[seat]=null;
             personaBySeat[seat]=personaFor(seat);
             filled++;
             try{ emitBeat({ type:'join', actor:s.name||'灵魂', text:'🪝 '+(s.name||'灵魂')+' 补位入座' }); }catch(_){}
-            toast((s.name||'灵魂')+' 补位 · 本局入座');
+            toast((s.name||'灵魂')+' 补位 · 等开局', 2000);
           }catch(_){ inviteBot(seat, false); filled++; }
           return;
         }
@@ -1013,7 +1029,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 牌桌内声音开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里点开三档静音面板(BGM/音效/语音各自独立开关)
     const musBtn = $('#pkMus');
     function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
-    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    if (musBtn) bindTap(musBtn, ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
     paintMus();
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onOrient);
@@ -1053,7 +1069,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (p.kind==='empty'){
         return `<div class="pk-seat pk-lobby-empty" data-seat="${seat}" data-invite="${p.dbSeat}" style="--p:360">
           <div class="pk-avr"><div class="av">＋</div></div>
-          <div class="nm">空位</div><div class="stk pk-lob">点击邀请</div></div>`;
+          <div class="nm">空位</div><div class="stk pk-lob">邀请补位</div></div>`;
       }
       const isMe = seat===mySeat;
       // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
@@ -1141,7 +1157,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         try{ acts.seatSoul(dbSeat, s.auth_uid); }catch(e){ inviteBot(dbSeat); return; }
         try{ closeInviteMenu(); }catch(_){}
         sfx('click');
-        toast((s.name || '灵魂') + ' 补位 · 下一手入座');
+        toast((s.name || '灵魂') + ' 补位 · 下一手入座', 2000);
         return;
       }
       inviteBot(dbSeat);
@@ -1155,7 +1171,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 单一补位入口: 有灵魂显「灵魂优先」, 无灵魂显「对战补位」(内部仍走机器人)
       html += free.length
         ? `<button class="im-item" data-fill="1">🤝 补位 · 灵魂优先</button>`
-        : `<button class="im-item" data-fill="1">🤖 补位 · 邀请对战</button>`;
+        : `<button class="im-item" data-fill="1">🤖 补位 · 无灵魂时邀对战</button>`;
       if(acts && acts.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来坐</button>';
       menu.innerHTML=html;
       room.appendChild(menu);
@@ -1176,7 +1192,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         return `<div class="pk-seat pk-vacant${clickable?'':' locked'}" data-seat="${seat}"${clickable?` data-invite="${seat}"`:''} style="--p:360">
           <div class="pk-avr"><div class="av">＋</div></div>
           <div class="nm">空位</div>
-          <div class="stk pk-vac">${clickable?'点击邀请':'空位'}</div>
+          <div class="stk pk-vac">${clickable?'邀请补位':'空位'}</div>
           <div class="pk-mini-hole"></div><div class="pk-say"></div></div>`;
       }
       // 已受邀但本手尚未发牌(引擎坐席仍 sitOut): 画成"入座中·下一手"占位, 不参与本手。
@@ -1601,11 +1617,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 主人诉求(2026-09-15 复位): 招募态给回「🤝 一键邀请」(一次把空位补满灵魂, 不发牌) + 「开始 ▶」(补满剩余空位再发牌)。
       //   逐位点空位邀灵魂/真人仍在, 三者并存, 房主自控开局时机(不再坐满自动开)。
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键邀请</button>');
+      if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键补满</button>');
       btns.push('<button class="pk-b call" data-lob="start">开始 ▶</button>');
       els.acts.innerHTML = `<div class="pk-row pk-lobacts">${btns.join('')}</div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
-      els.acts.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } });
+      els.acts.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } }));
     }
     let _lastActsSig='';
     function renderActs(force){
@@ -1619,7 +1635,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
         <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
         <div class="pk-row"><button class="pk-b call" id="pkResume">🙋 我回来了 · 接管座位</button></div>`;
-        const rb=$('#pkResume'); if(rb) rb.addEventListener('click', resumeSeat);
+        const rb=$('#pkResume'); if(rb) bindTap(rb, resumeSeat);
         return;
       }
       const offline = isGuest && connState!=='online';
@@ -1710,8 +1726,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         let to = q==='min'? min : q==='half'? st.currentBet+Math.round(pot*0.5) : q==='twothird'? st.currentBet+Math.round(pot*2/3) : q==='pot'? st.currentBet+pot : max;
         raiseTo=Math.min(Math.max(to,min),max); if(slider) slider.value=raiseTo; syncAmt(); sfx('cardsel');
       }));
-      $('#pkFold').addEventListener('click', ()=>humanAct('fold'));
-      $('#pkCall').addEventListener('click', ()=>humanAct(la.canCheck?'check':'call'));
+      bindTap($('#pkFold'), ()=>humanAct('fold'));
+      bindTap($('#pkCall'), ()=>humanAct(la.canCheck?'check':'call'));
       if(rb) rb.addEventListener('click', ()=>{
         // 全下(把全部筹码梭进去)要二次确认防误触: 第一次点亮"确认全下", 3.5s 内再点才执行, 逾时/拖离自动撤销。
         if(raiseTo>=max && !allinArmed){
@@ -2095,17 +2111,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (matchOver) over.className = 'pk-over ' + (iBust?'lose':'win');
       else if (iLeaveNow) over.className = 'pk-over lose';
 
-      // 单机真人输光: 计入今日输光次数(res._bustCounted 保证每手只计一次, 防 showOver 重入重复计),
-      //   到每日上限(PK_DAILY_MAX)则不再给"再来一局", 只能收工, 当天封盘。
+      // 单机真人输光/开局次数: 每日对局达上限后只能收工(计数源 score.js EH_DAILY_PLAYS)
       let bustLimit = false;
       if (iBust){
-        if (!res._bustCounted){ res._bustCounted = true; pkAddBust(); }
-        bustLimit = pkBustsToday() >= PK_DAILY_MAX;
+        bustLimit = pkLimitReached();
       }
       const dailyLine = iBust
         ? `<div class="pk-daily ${bustLimit?'cap':''}">${bustLimit
-            ? `今日已输光 ${PK_DAILY_MAX} 次 · 明天再战`
-            : `今日第 ${pkBustsToday()}/${PK_DAILY_MAX} 次输光`}</div>`
+            ? `今日对局已达 ${PK_DAILY_MAX} 次 · 明天再战`
+            : `今日已玩 ${pkPlaysToday()}/${PK_DAILY_MAX} 局`}</div>`
         : '';
 
       // 标题/结算数字
@@ -2247,6 +2261,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         quip: beatQuip(champSeatB, 'win') });
       if(typeof opts.onResult==='function'){ try{ opts.onResult(res, st.log, { mySeat, potWon, delta, handName: handNameB, myStack: myStackNow }); }catch(e){ _ehCatch('poker.onResult', e); } }
       emitWallet();
+      st.players.forEach(p=>{ if(!p.sitOut) stacks[p.seat]=p.stack; });
+      emitStacks();   // 全员真实筹码写回账本(灵魂/远程真人/我)
       if (minimized) updateChip();
     }
 
@@ -2275,7 +2291,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         //   newUid !== vacatedUid: 防 DB 尚未腾空前, 名册仍带着刚离场那位 → 被误当"新人"复活。
         const fillingVacant = vacated[s] && realOccupant && newUid !== vacatedUid[s];
         if (fillingVacant || (!wasHuman && nowHuman)){
-          stacks[s] = START; buyin[s] = START; netSettled[s] = 0;
+          stacks[s] = seatBuyIn(s); buyin[s] = stacks[s]; netSettled[s] = 0;
           vacated[s] = false; vacatedUid[s] = null; saveScore();
         } else if (vacated[s] && !realOccupant){
           vacatedUid[s] = null;                     // DB 已把该席腾空 → 之后同一位灵魂也可被重新邀请
@@ -2310,11 +2326,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       applyPendingRoster();
       // ★每局空位概率补位(主人): 灵魂优先, 否则机器人 —— 桌面不至于长期空席
       try{ autoFillVacants(); }catch(_){}
+      emitStacks();
       // 对手都离场了(在座不足 2 人): 概率补位后仍不够 → 停在结算态等手动/下一轮概率补
       if (aliveSeats().length < 2){
         try{ autoFillVacants(); }catch(_){}
         if (aliveSeats().length < 2){
-          try{ toast('桌上没有对手了 · 点空位＋邀请补位', 3200); }catch(_){}
+          try{ toast('桌上暂时没人 · 点空位邀请补位', 3200); }catch(_){}
           renderOpponents(true); positionSeats();
           return;
         }
@@ -2327,17 +2344,21 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       renderAll(); positionSeats();
     }
 
-    // 单机: 本场结束(真人输光)后从头再来 —— 全员重新带入 START, 从第一手开始
+    // 单机: 本场结束(真人输光)后从头再来 —— 全员按账本真实筹码重新带入(破产/清零回补 1000)
     function resetMatch(){
-      // 单机本场重来: 我这席用钱包余额(破产则 app 侧 bank 已回补 GRANT); 对手 START
-      stacks = names.map((_, i) => i === mySeat ? MY_START : START);
-      buyin[mySeat] = MY_START;
-      for(let i=0;i<n;i++){ if(i!==mySeat) buyin[i]=START; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }   // 本场重来: 买入基准/净盈亏归零, 离场标记清空
+      if (!isGuest && pkLimitReached()){
+        showDailyCap();
+        return;
+      }
+      stacks = names.map((_, i) => seatBuyIn(i));
+      for(let i=0;i<n;i++){ buyin[i]=stacks[i]; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
       saveScore();
       button = (typeof opts.button==='number') ? opts.button : (n - 1) % n;
       handNo = 0;
       st = newHand();
-      emitWallet();   // 本场重来 = 重新补带 START, 钱包同步落地(否则破产后再来的 START 不落库, 关桌又回 0)
+      emitWallet();
+      if (!isGuest) pkAddPlay();
+      emitStacks();
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig='';
       sfx('deal');
       renderAll(); positionSeats();
@@ -2355,9 +2376,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function startDeal(A, seed){
       if (st.phase!=='lobby') return;
+      // journey-exempt: 每日局数门禁 + seatBuyIn 账本 — journey-chip-authenticity.js
+      if (!isGuest && pkLimitReached()){
+        try{ toast('今日对局已达 '+PK_DAILY_MAX+' 次 · 明天再来'); }catch(_){}
+        return;
+      }
       clearWalkIn();   // 转正局: 停"路人入座"
       try{ closeInviteMenu(); }catch(_){}
-      // 名册就地全量生效(与 applyPendingRoster 同语义, 但这是首发, 全员重置买入)
+      // 名册就地全量生效(与 applyPendingRoster 同语义, 但这是首发, 全员按账本买入)
       if (A && Array.isArray(A.names) && A.names.length===n){
         for (let s=0;s<n;s++){
           names[s]=A.names[s]; avatars[s]=A.avatars[s]; isAI[s]=A.isAI[s];
@@ -2371,16 +2397,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         for (const s in lobbyBots){ const i=+s; if (isAI[i] && !souls[i] && (!ids || !ids[i])){ names[i]=lobbyBots[i].name; avatars[i]=lobbyBots[i].emoji; } }
         personaBySeat = names.map((_, seat)=>personaFor(seat));
       }
-      // 全新一桌: 筹码/买入/净盈亏/手数/庄位/离场标记全部重置
-      // ★我这席带生涯钱包入局(opts.myStack), 不再一律 START —— 临时账号/换桌赢来的积分要接着用
-      stacks = names.map((_, i) => (i === mySeat ? MY_START : START));
-      buyin[mySeat] = MY_START;
-      for(let i=0;i<n;i++){ if(i!==mySeat){ buyin[i]=START; } netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
+      // 全新一桌: 筹码按账本真实买入(灵魂/远程真人/我), 买入基准对齐, 离场标记清空
+      // ★我这席带生涯钱包入局(opts.myStack), 其余席 seatBuyIn
+      stacks = names.map((_, i) => seatBuyIn(i));
+      for(let i=0;i<n;i++){ buyin[i]=stacks[i]; netSettled[i]=0; vacated[i]=false; vacatedUid[i]=null; }
       handNo = 0; button = 0; pendingRoster = null;
       lastBoardLen=0; dealAnim=true; lastMyTurn=false; raiseTo=0; preAct=null; animPhase='preflop'; lastPotShown=-1; lastBoardSig=''; lastMeSig=''; myHole=[];
       st = newHand(seed);
       sfx('deal');
       emitWallet();
+      if (!isGuest) pkAddPlay();   // 每日对局计数: host/单机真正发牌时 +1
+      emitStacks();
       renderAll(); positionSeats();
     }
 
@@ -2466,9 +2493,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const over=document.createElement('div'); over.className='pk-over lose';
       over.innerHTML=`
         <div class="pk-over-card">
-          <h2>🛑 今日德州已封盘</h2>
-          <div class="pk-delta down">今天已经输光 ${PK_DAILY_MAX} 次 · 明天再来</div>
-          <div class="pk-daily cap">单机练习每天最多输光 ${PK_DAILY_MAX} 次，手气次日归零</div>
+          <h2>🛑 今日牌桌已封盘</h2>
+          <div class="pk-delta down">今天已经玩了 ${PK_DAILY_MAX} 局 · 明天再来</div>
+          <div class="pk-daily cap">每天最多进房对局 ${PK_DAILY_MAX} 次，次日自动重置</div>
           <div class="pk-row" style="margin-top:2px"><button class="pk-b call" id="pkDone">收工</button></div>
         </div>`;
       els.felt.appendChild(over);
@@ -2481,8 +2508,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 首帧对手位置需等布局稳定
     requestAnimationFrame(positionSeats);
     if (lobbyMode && isHostLobby) startWalkIns();   // 招募态开桌即起"路人不定时入座"(host 没手动邀满时慢慢来人)
-    // 单机今日输光已达上限: 不入座不发牌, 直接封盘页(收工)。否则正常走入座序列。
-    if (isLocalSolo && !lobbyMode && pkLimitReached()){
+    // 今日对局已达上限: 不入座不发牌, 直接封盘页(收工)。否则正常走入座序列。
+    if (!isGuest && !lobbyMode && pkLimitReached()){
       introSeating = false;
       showDailyCap();
     } else if (introSeating) runSeatingIntro();

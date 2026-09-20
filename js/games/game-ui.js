@@ -543,6 +543,16 @@ html[data-mode="day"] .ddz-center::before{
     document.head.appendChild(s);
   }
   function open(opts){
+
+    function bindTap(el, fn){
+      if(!el) return;
+      let done=false;
+      const fire=(e)=>{ if(done) return; done=true; try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} } };
+      el.addEventListener('pointerup', (e)=>{ if(e.button!=null && e.button!==0) return; fire(e); });
+      el.addEventListener('click', (e)=>{ /* 兜底(键盘/个别环境) */ fire(e); });
+      el.addEventListener('pointerdown', ()=>{ done=false; });
+    }
+
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[ddz] engine not loaded'); return null; }
     // journey-exempt: 座位增量/双触选组/fillSeat/lobby骨架 — journey-games-xdevice + journey-pwa-lobby-btn.js
@@ -771,11 +781,33 @@ html[data-mode="day"] .ddz-center::before{
         localStorage.setItem(DDZ_WALLET_KEY, String(n));
       }catch(_){ }
     }
-    function saveScore(){ if(SCOREKEY){ try{ localStorage.setItem(SCOREKEY, JSON.stringify(cumScore)); }catch(_){ } } if(carryScore) ddzWalletSave(cumScore[mySeat]); }
+    function saveScore(){
+      if(SCOREKEY){ try{ localStorage.setItem(SCOREKEY, JSON.stringify(cumScore)); }catch(_){ } }
+      if(carryScore) ddzWalletSave(cumScore[mySeat]);
+      // 灵魂/远程真人: 按 uid 沉淀累计分(再进房带真实数据)
+      if(opts.ids){
+        opts.ids.forEach((id,i)=>{
+          if(!id || i===mySeat) return;
+          try{ if(root.EH_BANK_SET_OF) root.EH_BANK_SET_OF('doudizhu', id, { chips: Math.round(cumScore[i]||0), net: Math.round(cumScore[i]||0) }); }catch(_){}
+        });
+      }
+    }
     function loadScore(){ if(!SCOREKEY) return null; try{ const v=JSON.parse(localStorage.getItem(SCOREKEY)||'null'); return (Array.isArray(v)&&v.length===3&&v.every(x=>typeof x==='number'))?v:null; }catch(_){ return null; } }
     const _savedScore = loadScore();
     const cumScore = _savedScore || [0,0,0];   // 累计比分(按座位号, 跨"再来一局"累加; showOver 里每手计一次)
     if (carryScore && !_savedScore) cumScore[mySeat] = ddzWalletLoad();   // 新桌无本桌存档 → 我这席用跨桌累计分开局(换桌不从零)
+    // 其他席(灵魂/远程真人)同样从账本带入累计分
+    if (!_savedScore && opts.ids){
+      opts.ids.forEach((id,i)=>{
+        if(!id || i===mySeat) return;
+        try{
+          if(root.EH_BANK_CHIPS_OF){
+            const v=root.EH_BANK_CHIPS_OF('doudizhu', id, 0);
+            if(Number.isFinite(v)) cumScore[i]=v;
+          }
+        }catch(_){}
+      });
+    }
     let hintCycle = [];           // 提示循环队列
     let hintIdx = 0;
     // 制胜的最后一手先留在桌心亮一拍再翻结算(主人反馈"赢的人最后出的什么没看清就赢了"):
@@ -1144,7 +1176,7 @@ html[data-mode="day"] .ddz-center::before{
       if (p.kind==='empty'){
         return `<div class="ddz-seat ddz-lobby-empty" data-seat="${seat}" data-invite="${p.dbSeat}">
           <div class="ddz-avr"><div class="av">＋</div></div>
-          <div class="meta"><div class="nm">空位</div><div class="cnt lob">点击邀请</div></div>
+          <div class="meta"><div class="nm">空位</div><div class="cnt lob">邀请补位</div></div>
         </div>`;
       }
       const isMe = seat===mySeat;
@@ -1277,11 +1309,11 @@ html[data-mode="day"] .ddz-center::before{
         try{ acts.seatSoul(dbSeat, s.auth_uid); }catch(e){ return; }
         try{ closeInviteMenu(); }catch(_){}
         sfx('click');
-        toast((s.name || '灵魂') + ' 补位 · 坐好点开始');
+        toast((s.name || '灵魂') + ' 补位 · 等开局', 2000);
         return;
       }
       // 无灵魂: 报提示(斗地主招募以 seatSoul/一键邀请为主, 不像德州有本机 bot 花名池)
-      toast('房里暂无灵魂 · 可用「一键邀请」补位');
+      toast('暂无灵魂 · 可一键补满或邀请真人', 2400);
       try{ closeInviteMenu(); }catch(_){}
     }
     function openInviteMenu(dbSeat, anchorEl){
@@ -1642,15 +1674,15 @@ html[data-mode="day"] .ddz-center::before{
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
       const a = lobbyCtx.actions;
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀，或一键补满` : '座位已满 · 点开始发牌';
+      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀请补位` : '座位已满 · 点「开始」发牌';
       els.ctrl.innerHTML = `<div class="ddz-acts ddz-lobacts">`
         + `<div class="ddz-lobhint">${hint}</div>`
         + `<div class="ddz-lobbtns">`
-        + (empties>0 ? `<button class="ddz-btn ghost" data-lob="fill">🤝 一键邀请</button>` : '')
+        + (empties>0 ? `<button class="ddz-btn ghost" data-lob="fill">🤝 一键补满</button>` : '')
         + `<button class="ddz-btn primary" data-lob="start">开始 ▶</button>`
         + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
-      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
+      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } }));
       fitBtnText(els.ctrl);
     }
     // 结算态操作区(就在打牌页底部按钮位, 不再弹全屏模态): 再来一局(默认高亮) / 收工。
@@ -1660,9 +1692,9 @@ html[data-mode="day"] .ddz-center::before{
         els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" disabled>等待开新局…</button><button class="ddz-btn ghost" id="ddzDone">收工</button></div>`;
       } else {
         els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" id="ddzAgain">再来一局</button><button class="ddz-btn ghost" id="ddzDone">收工</button></div>`;
-        const again = $('#ddzAgain'); if (again) again.addEventListener('click', startRematch);
+        const again = $('#ddzAgain'); if (again) bindTap(again, startRematch);
       }
-      const done = $('#ddzDone'); if (done) done.addEventListener('click', ()=>close());
+      const done = $('#ddzDone'); if (done) bindTap(done, ()=>close());
       fitBtnText(els.ctrl);
     }
     // 再来一局: 就地重建新局(同一 room 不重挂 → 顺势接发牌入场动画), 复位一局态标志。host 广播新局首帧。
@@ -1681,7 +1713,7 @@ html[data-mode="day"] .ddz-center::before{
       if (st.phase === 'over'){ renderOverCtrl(); return; }
       if (spectating){
         els.ctrl.innerHTML = `<div class="ddz-acts"><button class="ddz-btn primary" id="ddzResume">🙋 我回来了 · 接管座位</button></div>`;
-        const rb=$('#ddzResume'); if(rb) rb.addEventListener('click', resumeSeat);
+        const rb=$('#ddzResume'); if(rb) bindTap(rb, resumeSeat);
         return;
       }
       // 托管中: 三阶段(叫分/加倍/出牌)统一交 AI, 控制条收成一枚"收回托管"钮(点掉即恢复手动)。
@@ -1759,9 +1791,9 @@ html[data-mode="day"] .ddz-center::before{
         <button class="ddz-btn ghost" id="ddzHint" ${hintOn?'':'disabled'}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>
       </div>`;
-      $('#ddzPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
-      $('#ddzPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
-      $('#ddzHint').addEventListener('click', doHint);
+      bindTap($('#ddzPass'), ()=>{ resetMiss(mySeat); doPass(mySeat); });
+      bindTap($('#ddzPlay'), ()=>{ resetMiss(mySeat); doPlay(); });
+      bindTap($('#ddzHint'), doHint);
       if (myTurn && plays.length===1 && selected.size===0){
         selected = new Set(plays[0].map(c=>c.id)); renderHand();
       }
@@ -2219,11 +2251,17 @@ html[data-mode="day"] .ddz-center::before{
     }
     // ── 开始发牌(deal-in-place): 招募态 → 用最新名册就地建真局, 同一个 room 不重挂(免二次入场淡入) ──
     function startDeal(A, seed){
+      // journey-exempt: 每日对局次数门禁 — journey-chip-authenticity.js
+      if (!isGuest){
+        const d=root.EH_DAILY_PLAYS;
+        if (d && d.reached && d.reached()){ try{ toast('今日对局已达 '+(d.max||5)+' 次 · 明天再来'); }catch(_){} return; }
+      }
       if (A){
         if (Array.isArray(A.names)) names = A.names;
         if (Array.isArray(A.avatars)) avatars = A.avatars;
         if (Array.isArray(A.isAI)) gameIsAI = A.isAI;
         if (Array.isArray(A.remoteSeats)) remoteSeats = A.remoteSeats;
+        if (Array.isArray(A.ids)) { try{ opts.ids = A.ids.slice(); }catch(_){} }
       }
       normalizeBotNames();   // 换名册后同样把本机 AI 兜底名「机器人N」统一成花名
       closeInviteMenu();
@@ -2231,8 +2269,10 @@ html[data-mode="day"] .ddz-center::before{
       lastLord=null; lastMyTurn=false; justCrowned=false; showOver._done=false;
       st = Engine.createGame({ isAI: gameIsAI, names, seed: (typeof seed!=='undefined' ? seed : opts.seed), firstBidSeat: nextBidLead() });
       sfx('deal');
+      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump(); }
       renderAll();
       broadcast();   // 首帧脱敏快照(此刻 hostChan 已接好, 见 app.gtStart)
+      saveScore();
     }
     // 开局
     renderAll();

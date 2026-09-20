@@ -619,6 +619,16 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
   function cardBack(mini){ const el=document.createElement('div'); el.className='card back'+(mini?' mini':''); return el; }
 
   function open(opts){
+
+    function bindTap(el, fn){
+      if(!el) return;
+      let done=false;
+      const fire=(e)=>{ if(done) return; done=true; try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} } };
+      el.addEventListener('pointerup', (e)=>{ if(e.button!=null && e.button!==0) return; fire(e); });
+      el.addEventListener('click', (e)=>{ /* 兜底(键盘/个别环境) */ fire(e); });
+      el.addEventListener('pointerdown', ()=>{ done=false; });
+    }
+
     // journey-exempt: fillSeat 补位同型 — journey-fill-seat-all.js
     opts = opts || {};
     if (!Deck || !Rules || !Engine || !AI){ console.warn('[gd] engine not loaded'); return null; }
@@ -1328,7 +1338,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (p.kind==='empty'){
         return `<div class="gd-seat gd-lobby-empty" data-seat="${seat}" data-invite="${p.dbSeat}" style="--p:360">
           <div class="gd-avr"><div class="av">＋</div></div>
-          <div class="nm">空位</div><div class="cnt gd-lob">点击邀请</div></div>`;
+          <div class="nm">空位</div><div class="cnt gd-lob">邀请补位</div></div>`;
       }
       const isMe = seat===mySeat;
       const isMate = Engine.partnerOf(mySeat)===seat;
@@ -1370,10 +1380,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         try{ acts.seatSoul(dbSeat, s.auth_uid); }catch(e){ return; }
         try{ closeInviteMenu(); }catch(_){}
         sfx('click');
-        toast((s.name || '灵魂') + ' 补位 · 坐好点开始', 2000);
+        toast((s.name || '灵魂') + ' 补位 · 等开局', 2000);
         return;
       }
-      toast('房里暂无灵魂 · 可用「一键邀请」补位');
+      toast('暂无灵魂 · 可一键补满或邀请真人', 2400);
       try{ closeInviteMenu(); }catch(_){}
     }
     function openInviteMenu(dbSeat, anchorEl){
@@ -1402,15 +1412,15 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       if (!isHostLobby || !lobbyCtx || !lobbyCtx.actions){ els.ctrl.innerHTML=''; return; }
       const a = lobbyCtx.actions;
       const empties = st.players.filter(p=>p.kind==='empty').length;
-      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀，或一键补满` : '座位已满 · 点开始发牌';
+      const hint = empties>0 ? `还差 ${empties} 席 · 点空位邀请补位` : '座位已满 · 点「开始」发牌';
       els.ctrl.innerHTML=`<div class="gd-acts gd-lobacts">`
         + `<div class="gd-lobhint">${hint}</div>`
         + `<div class="gd-lobbtns">`
-        + (empties>0 ? `<button class="gd-btn ghost" data-lob="fill">🤝 一键邀请</button>` : '')
+        + (empties>0 ? `<button class="gd-btn ghost" data-lob="fill">🤝 一键补满</button>` : '')
         + `<button class="gd-btn primary" data-lob="start">开始 ▶</button>`
         + `</div></div>`;
       const map={ fill:a.fillSouls, start:a.start };
-      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> b.onclick=()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } });
+      els.ctrl.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ sfx('click'); f(); } }));
       fitBtnText(els.ctrl);
     }
     function seatHTML(seat, mini){
@@ -1906,7 +1916,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     function renderCtrl(){
       if (spectating){
         els.ctrl.innerHTML=`<div class="gd-acts"><button class="gd-btn primary" id="gdResume">🙋 我回来了 · 接管座位</button></div>`;
-        const rb=$('#gdResume'); if(rb) rb.addEventListener('click', resumeSeat);
+        const rb=$('#gdResume'); if(rb) bindTap(rb, resumeSeat);
         return;
       }
       if (st.phase==='lobby'){ renderLobbyCtrl(); return; }
@@ -1944,9 +1954,9 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
         <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="gd-btn primary" id="gdPlay" disabled>出牌</button>
       </div>`;
-      $('#gdPass').addEventListener('click', ()=>{ resetMiss(mySeat); doPass(mySeat); });
-      $('#gdPlay').addEventListener('click', ()=>{ resetMiss(mySeat); doPlay(); });
-      $('#gdHint').addEventListener('click', doHint);
+      bindTap($('#gdPass'), ()=>{ resetMiss(mySeat); doPass(mySeat); });
+      bindTap($('#gdPlay'), ()=>{ resetMiss(mySeat); doPlay(); });
+      bindTap($('#gdHint'), doHint);
       // 只有唯一合法打法(常见于残局/剩一对) → 直接替玩家选好, 省得一张张点。队友当家不自动选(默认让牌)。
       if (myTurn && !mateLead && plays.length===1 && selected.size===0){
         selected = new Set(plays[0].map(c=>c.id)); renderHand();
@@ -2567,6 +2577,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     }
     function startDeal(A, seed){
       if (st.phase!=='lobby') return;
+      // journey-exempt: 每日对局次数门禁 — journey-chip-authenticity.js
+      if (!isGuest){
+        const d=root.EH_DAILY_PLAYS;
+        if (d && d.reached && d.reached()){ try{ toast('今日对局已达 '+(d.max||5)+' 次 · 明天再来'); }catch(_){} return; }
+      }
       try{ closeInviteMenu(); }catch(_){}
       // names/avatars/remoteSeats 是 const, seatIsAI 是 let — 一律原地改元素, 别重新赋值(gameIsAI 是 seatIsAI 同引用)
       if (A){
@@ -2584,6 +2599,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastMyTurn=false; lastFinishedN=0; tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
       sfx('deal');
+      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump(); }
       renderAll(); settleHandLayout(); showTributeBanner(); broadcast();
     }
 

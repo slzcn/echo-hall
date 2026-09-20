@@ -15,8 +15,8 @@ console.log('\n── 源码契约 ──');
 ok(/eh_bank_v1/.test(score) || /eh_bank_v1/.test(src), '存在按 uid 的 eh_bank_v1 账本');
 ok(/function bankChips\(/.test(src) && /bankBump|bump: bump/.test(score+src), 'bankChips/bankBump 已实现');
 ok(/function bankMigrateFromLocalAnon\(/.test(src), '匿名→uid 账本迁移');
-ok(/stacks = names\.map\(\(_, i\) => \(i === mySeat \? MY_START : START\)\)/.test(pk),
-  'poker startDeal 我这席用 MY_START(不重置 1000)');
+ok(/function seatBuyIn/.test(pk) && /i === mySeat \? MY_START : START/.test(pk) || /stacks = names\.map\(\(_, i\) => \(i === mySeat \? MY_START : START\)\)/.test(pk),
+  'poker startDeal/seatBuyIn 我这席用 MY_START(不重置 1000)');
 ok(/myStack: bankOpenOpts\('nlhe'\)\.chips/.test(src), '招募态 open 传入生涯筹码');
 ok(/bumpGameStats/.test(src), 'onResult 回写本地账本');
 ok(/uid = myUid/.test(src) || /myUid\) uid = myUid/.test(src) || /A\.mySeat===seat && myUid/.test(src),
