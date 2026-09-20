@@ -151,20 +151,34 @@
       const rate  = sv ? sv.rate  : 1.04 + ((h>>6)%6)*0.035;
       return { voice, pitch, rate };
     }
-    // 报牌/操作语音 vs BGM/音效 互斥(主人: 音乐和语音不能一直同时播)。
-    //   EhAudioBus.hold/release 引用计数: 任一「人声」(TTS 报牌/聊天语音消息/神曲人声)在播期间,
-    //   BGM 淡到 0 并 pause, 音效 master 压到很低 —— 人声独占; 全部结束后再恢复 BGM+音效。
-    //   BGM 真正 start/resume 时会 cancel 正在念的 TTS, 避免两边一起响。
+    // 报牌/操作语音 vs BGM/音效(主人: 音乐和语音不能同时响; 神曲/语音播放时勿插报牌)。
+    //   TTS: hold('tts') 压 BGM + 软音效; 念完 release。神曲/聊天语音 busy 时直接 return, 不 cancel 人声队列。
+    //   softOff 尊重总线: 他人声仍忙 → 保持 soft。
     let _lastSayText='', _lastSayAt=0, _saySeq=0, _duckFailsafeTimer=null;
+    function _busBusyExceptTts(){
+      try{
+        const B=window.EhAudioBus;
+        if(!B) return false;
+        if(typeof B.busyExcept==='function') return B.busyExcept('tts');
+        return !!(B.busy && B.busy());
+      }catch(e){ return false; }
+    }
+    function _sfxSoftByBus(){
+      try{
+        const B=window.EhAudioBus;
+        const busy=!!(B && B.busy && B.busy());
+        if(window.EhSfx && window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(busy);
+      }catch(e){}
+    }
     function say(text, who){
       if(!text) return;
-      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} return; }
+      if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} _sfxSoftByBus(); return; }
+      if(_busBusyExceptTts()) return;   // 神曲/语音独占中: 不插报牌、不 cancel
       const _now=Date.now();
       if(String(text)===_lastSayText && _now-_lastSayAt<900) return;
       _lastSayText=String(text); _lastSayAt=_now;
       try{
         if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
-        // PWA/iOS: 队列可能 paused → 先 resume; 声库未就绪时 onvoiceschanged 再念
         try{ speechSynthesis.resume(); }catch(e){}
         if(!_voiceTried){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;
           try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); _voicePool=buildVoicePool(); }; }catch(e){} }
@@ -173,18 +187,21 @@
         u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.95;
         if(p.voice) u.voice=p.voice;
         const myId=++_saySeq;
-        const softOff=function(){ if(myId===_saySeq) try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} };
+        try{ if(window.EhAudioBus && window.EhAudioBus.hold) window.EhAudioBus.hold('tts'); }catch(e){}
         try{ if(window.EhSfx && window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(true); }catch(e){}
+        const softOff=function(){
+          if(myId!==_saySeq) return;
+          try{ if(window.EhAudioBus && window.EhAudioBus.release) window.EhAudioBus.release('tts'); }catch(e){}
+          _sfxSoftByBus();
+        };
         u.onend=softOff;
         u.onerror=softOff;
         if(_duckFailsafeTimer) clearTimeout(_duckFailsafeTimer);
         const est=Math.min(8000, 600 + String(text).length*260/(u.rate||1));
         _duckFailsafeTimer=setTimeout(function(){ _duckFailsafeTimer=null; softOff(); }, est+1200);
         try{ speechSynthesis.cancel(); }catch(e){}
-        // iOS PWA: cancel 后立刻 speak 有时被吞 → 下一 tick 再 speak
         const speakNow=function(){
           try{ speechSynthesis.speak(u); }catch(e){ softOff(); return; }
-          // 极端: speak 后仍无 onend 且队列空 → 1.8s 再 resume 一次并强制 softOff 兜底
           setTimeout(function(){
             try{
               if (myId===_saySeq && speechSynthesis && !speechSynthesis.speaking && !speechSynthesis.pending){
@@ -196,7 +213,8 @@
         };
         setTimeout(speakNow, 0);
       }catch(e){
-        try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e2){}
+        try{ if(window.EhAudioBus && window.EhAudioBus.release) window.EhAudioBus.release('tts'); }catch(e2){}
+        _sfxSoftByBus();
       }
     }
     try{
@@ -218,7 +236,11 @@
     return {play,playClick,
       setEnabled(v){enabled=!!v; _lsSet('eh_sfx',enabled);},
       isEnabled(){return enabled},
-      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(false); }catch(e){} }},
+      setVoice(v){_voiceOn=!!v; _lsSet('eh_voice',_voiceOn); if(!_voiceOn){
+        try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+        try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll('tts'); }catch(e){}
+        try{ if(window.EhSfx) window.EhSfx.setSfxSoft(!!(window.EhAudioBus&&window.EhAudioBus.busy&&window.EhAudioBus.busy())); }catch(e){}
+      }},
       isVoiceOn(){return _voiceOn},
       setSfxSoft,
       unlock,say};
@@ -248,7 +270,6 @@
         if(AE&&AE.duck) AE.duck(busy);
         if(window.EhSfx&&window.EhSfx.setSfxSoft) window.EhSfx.setSfxSoft(busy);
       }catch(e){}
-      // PWA 看门狗: hold 后 onend 丢失会导致 BGM 永久静音 → 45s 无解则强制清空
       if (busy){
         if(_watch) clearTimeout(_watch);
         _watch=setTimeout(function(){
@@ -285,6 +306,14 @@
         apply();
       },
       busy(){ return n>0; },
+      has(tag){ return !!(tags[tag||'x']); },
+      // 是否有「除指定 tag 外」的人声在忙 — TTS 用: 神曲/语音在播时不插报牌
+      busyExcept(){
+        const skip={};
+        for(let i=0;i<arguments.length;i++) skip[arguments[i]||'x']=1;
+        return Object.keys(tags).some(k=>!skip[k] && tags[k]>0);
+      },
+      counts(){ return Object.assign({}, tags); },
     };
   })();
 

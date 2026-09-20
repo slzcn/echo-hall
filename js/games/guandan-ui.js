@@ -1007,6 +1007,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
     const musBtn = $('#gdMus');
     function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
 
     // 🃏 记牌器/出牌历史(仅纯单机): 掼蛋两副牌 decks=2; 高亮当前级牌所在 rank(打2→牌面 rank 15)。

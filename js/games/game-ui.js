@@ -1136,6 +1136,7 @@ html[data-mode="day"] .ddz-center::before{
     const musBtn = $('#ddzMus');
     function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
 
     // 🃏 记牌器/出牌历史(仅纯单机): 切换悬浮面板, 开着时每次出牌后随 renderTable 自动刷新。

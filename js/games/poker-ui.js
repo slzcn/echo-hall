@@ -1030,6 +1030,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const musBtn = $('#pkMus');
     function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
     if (musBtn) bindTap(musBtn, ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onOrient);

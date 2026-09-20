@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-ddz-pwa-size';
+window.__EH_APP_VER = '20260920-audio-turn';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -364,10 +364,22 @@ function detachBgmGestureUnlock(){
 }
 try{ ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,kickBgmOnGesture,{capture:true,passive:true})); }catch(_){ _ehCatch('startRoomBGM',_); }
 // BGM 按钮图标(emoji, 与工具栏其它 emoji 统一): 开=🎵 静音=🔇。大厅/聊天页两个按钮同步。
-function paintBgmBtn(on){ ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } }); }
+// 牌桌 🎵 钮也听 eh:audio-prefs, 三分开关任一变化即刷新(否则大厅静音后牌桌图标仍亮)。
+function paintBgmBtn(on){
+  ['#bgmBtnHall','#bgmBtnLobby'].forEach(sel=>{ const b=$(sel); if(b){ b.classList.toggle('muted',!on); b.textContent=on?'🎵':'🔇'; } });
+  try{ window.dispatchEvent(new CustomEvent('eh:audio-prefs')); }catch(_){}
+}
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); }
   try{ if(window.EhAudioUnlock) window.EhAudioUnlock.all(); }catch(e){}
-  if(!on){ AudioEngine.stop(); try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll('tts'); }catch(e){} try{ if(window.EhSfx) EhSfx.setSfxSoft(false); }catch(e){} }
+  if(!on){
+    // 关 BGM = 停全部音频占用, 防神曲/语音/TTS 总线泄漏导致音效永久被压
+    AudioEngine.stop();
+    try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+    try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll(); }catch(e){}
+    try{ if(window.EhSfx) EhSfx.setSfxSoft(false); }catch(e){}
+    try{ AudioEngine.duck(false); }catch(e){}
+    try{ if(window.stopVoice) window.stopVoice(); }catch(e){}
+  }
   else if(_gameBgmActive) startGameBGM(_gameBgmKind); else if(curRoom) startRoomBGM(curRoom); else startLobbyBGM(); }
 function startRoomBGM(room){
   try{
@@ -1065,8 +1077,9 @@ function gtWatchHostPing(chan, hostUid){
 }
 // wrap _gtCleanupPlay 停心跳(在下一步替换处已合并)
 
-// 后台"轮到我"提醒: title 前置 🫵 每秒闪 + 一次桌面通知 + 一次震动。回前台自动复位。
-let _origTitle=null, _turnTitleT=null, _turnNotified=false;
+// 后台"轮到我"提醒: title 闪烁 + 【桌面弹窗】(Notification) + 震动。回前台/收工自动复位。
+//   主人诉求: 游戏在后台轮到自己时要「弹一下窗口」。权限未授时在开桌时请求一次; 通知 requireInteraction 桌面常驻直到点开。
+let _origTitle=null, _turnTitleT=null, _turnNotified=false, _turnNotifyAt=0;
 function _turnFlashTitle(on){
   if(!on){
     if(_turnTitleT){ clearInterval(_turnTitleT); _turnTitleT=null; }
@@ -1092,24 +1105,59 @@ function _isMyTurnInGame(){
   }catch(_){ }
   return false;
 }
-function gtTickTurnAlert(){
-  const need = document.hidden && _isMyTurnInGame() && _ehGame && _ehGame.state && _ehGame.state().phase!=='over';
-  _turnFlashTitle(need);
-  if(need && !_turnNotified){
-    _turnNotified=true;
-    try{ if(navigator.vibrate) navigator.vibrate([80,40,80]); }catch(_){ }
-    try{ if(typeof Notification!=='undefined' && Notification.permission==='granted'){
-      const n=new Notification('🫵 轮到你出牌 · Echo Hall');
-      n.onclick=()=>{ try{ window.focus(); }catch(_){ } };
-    } }catch(_){ }
-  }
+function _turnGameLabel(){
+  try{
+    const st=_ehGame && _ehGame.state && _ehGame.state();
+    if(!st) return '牌局';
+    if(st.bid) return '斗地主 · 该你叫分';
+    if(typeof st.toAct==='number') return '德州 · 该你行动';
+    if(st.level!=null && st.players && st.players.length===4) return '掼蛋 · 该你出牌';
+    if(st.turn!=null) return '牌局 · 该你出牌';
+  }catch(_){}
+  return '牌局 · 该你出牌';
 }
-// GT turn-alert 已折进上方的 visibilitychange handler(不新增 listener)。2.5s 兜底轮询
+function _notifyMyTurnPopup(){
+  const label=_turnGameLabel();
+  try{ if(navigator.vibrate) navigator.vibrate([80,40,80]); }catch(_){ }
+  try{ if(window.EhSfx && window.EhSfx.play) window.EhSfx.play('yourturn'); }catch(_){ }
+  try{
+    if(typeof Notification==='undefined') return;
+    if(Notification.permission!=='granted') return;
+    // 同一回合只弹一次; 极端长考下 45s 后允许再弹(防通知被系统清掉后彻底失联)
+    const now=Date.now();
+    if(_turnNotified && now-_turnNotifyAt<45000) return;
+    _turnNotified=true; _turnNotifyAt=now;
+    const n=new Notification('🫵 '+label+' · Echo Hall', {
+      body: '点这里回到牌桌出牌',
+      tag: 'eh-turn',
+      requireInteraction: true,
+      silent: false,
+    });
+    n.onclick=()=>{ try{ n.close(); }catch(_){} try{ window.focus(); }catch(_){ } };
+  }catch(_){ }
+}
+function gtTickTurnAlert(){
+  const st=_ehGame && _ehGame.state && _ehGame.state();
+  const over = !st || st.phase==='over';
+  // 页面后台 或 牌桌被折叠(PiP 小窗)且轮到我 → 提醒
+  let pip=false;
+  try{ pip=!!(_ehGame && _ehGame.isMinimized && _ehGame.isMinimized()); }catch(_){}
+  const need = !over && _isMyTurnInGame() && (document.hidden || pip);
+  _turnFlashTitle(need);
+  if(need) _notifyMyTurnPopup();
+}
+// GT turn-alert 已折进上方的 visibilitychange handler(不新增 listener)。1.8s 兜底轮询
 // 只属于活跃牌桌生命周期：开桌启动，收工／散桌／离房统一由 _gtCleanupPlay 停止。
 let _turnAlertT=null;
 function _gtStartTurnAlert(){
+  // 开桌手势上下文: 请求桌面通知权限(仅 default 时弹一次系统框)
+  try{
+    if(typeof Notification!=='undefined' && Notification.permission==='default'){
+      Notification.requestPermission().catch(function(){});
+    }
+  }catch(_){ }
   if(_turnAlertT) return;
-  _turnAlertT=setInterval(()=>{ try{ gtTickTurnAlert(); }catch(_){ } },2500);
+  _turnAlertT=setInterval(()=>{ try{ gtTickTurnAlert(); }catch(_){ } },1800);
 }
 function _gtStopTurnAlert(){
   if(_turnAlertT){ clearInterval(_turnAlertT); _turnAlertT=null; }
