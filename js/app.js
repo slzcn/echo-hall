@@ -3343,7 +3343,7 @@ function markSelfTyping(){
 function updateSongQueueBar(){
   const stream=$('#stream'); if(!stream){ _songGenCount=0; updateSongJump(); return; }
   const pend=[...stream.querySelectorAll('.song-card.pending')];
-  // 超时判定: 神曲发出超 SONG_TIMEOUT_MS(120s)仍 pending → worker 兜底也没救回。
+  // 超时判定: 神曲发出超 SONG_TIMEOUT_MS(120s)仍 pending → 可点重试/本地试听。
   // 分两级: ①自己发的歌 + 没自动重试过 → 静默自动重试一次(只发送者本人这端做, 避免多观看者重复烧额度)
   //         ②非自己发的 / 自动重试也超时(240s) → 标记超时, 显示手动"点击重试"
   const nowMs=Date.now();
@@ -3382,7 +3382,7 @@ function updateSongQueueBar(){
 let _sqbTimer=null;
 let _songGenCount=0;   // 当前 pending(生成中)神曲数, 驱动"神"按钮生成中态
 let _songGenQueue=[], _songGenIdx=0;   // 谱曲中神曲 mid 队列 + 轮转索引(点"神"依次定位)
-const SONG_TIMEOUT_MS=120000;   // 神曲 pending 超 2 分钟(worker 兜底也没救回)→ 标记超时, 可手动重试
+const SONG_TIMEOUT_MS=120000;   // 神曲 pending 超 2 分钟 → 标记超时, 可重试/本地试听
 let _sqbTarget=null;
 (function bindSongQueueBar(){
   // 滚动时刷新(超时判定 + 生成中计数); 顶部浮条已移除, 展示走"神"按钮
@@ -3646,7 +3646,7 @@ function _buildMsgElRaw(m, isHistory){
     if(live && live.name && live.name!==m.name){ m={...m, name:live.name, emoji:live.emoji||m.emoji, color:live.color||m.color}; }
   }
   // 前端纵深防御: 灵魂控制标记([REACT:x]/[SONG:x]/[EMOJI]/[ACT]/[PROJ])万一以文本外泄
-  //(worker 已修但历史库里那条 "[REACT:😏]" 还在), 渲染前清掉, 不让标记字面显示给用户。
+  //(历史库里那条 "[REACT:😏]" 还在), 渲染前清掉, 不让标记字面显示给用户。
   //  只清普通文字消息(kind=msg/无kind); song/voice 的 text 是有意义的编码, 不动。
   if((!m.kind || m.kind==='msg') && typeof m.text==='string' && /\[(REACT:|SONG:|EMOJI|ACT|PROJ)/i.test(m.text)){
     const cleaned=m.text.replace(/\[(SONG:[a-z0-9]+|EMOJI|ACT|PROJ|REACT:[^\]]*)\]/ig,'').trim();
@@ -3672,7 +3672,7 @@ function _buildMsgElRaw(m, isHistory){
     el.innerHTML=`<span class="ix-em">${safeEmoji(ix&&ix.emoji)||'✨'}</span> ${esc(txt)}`;
     return el;
   }
-  // 🐢 海龟汤游戏消息: text = "game|事件|字段…"(worker 端 turtleMsg 编码)。三种事件各自成卡。
+  // 🐢 海龟汤游戏消息: text = "game|事件|字段…"(turtleMsg 编码)。三种事件各自成卡。
   if(m.kind==='game'){
     const el=buildGameEl(m);
     if(el && m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='game'; }   // ★去重键
@@ -5124,7 +5124,7 @@ const _soulQ = [];                        // 待逐条显示的灵魂消息 [{m}
 const _soulQPending = new Set();          // 已入队但尚未进 DOM 的 mid — 两条渲染路径共用此集合去重
 let _soulQFlushing = false;
 function _soulMsgDelay(text){
-  // 条间停顿: 按内容长度给"读+敲"的时间感, 短句快、长句封顶。与 worker 端节拍呼应。
+  // 条间停顿: 按内容长度给"读+敲"的时间感, 短句快、长句封顶。与合成/朗读节拍呼应。
   const n = (text||'').length;
   return 450 + Math.min(n * 34, 1400);
 }
@@ -5451,8 +5451,8 @@ const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
 const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
 let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
 let waveRAF=null, recAnalyser=null;
-// 语音转写: 录音同时用浏览器 SpeechRecognition 把话转成文字, 编码进语音消息, 让 AI 灵魂"听得懂"内容
-// (mify 网关是纯文本且在内网, 无法做云端 STT; 不支持的浏览器→无转写, 灵魂退回"发了一条语音"的旧行为)
+// 语音转写: 录音同时用浏览器 SpeechRecognition 转文字, 编码进语音消息(#tx=), 灵魂可"听得懂"
+// (公网路径=浏览器端 SR; 旧云端 STT 网关在内网, 公网部署不做云端转写; 不支持的浏览器→无转写, 退回"发了一条语音")
 const SR_CLASS = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 let voiceSR=null, srFinal='', srInterim='';
 function startSR(){
@@ -5700,7 +5700,7 @@ function _shimStyles(){
   const src=raw.length?raw:_BUILTIN_SONG_STYLES;
   return src.map(s=>({...s, scale:_resolveScale(s.scale)}));
 }
-// 默认曲风: 优先「有母版的非清唱」(MiniMax 可生成); 清唱依赖内网 worker, 不作默认(主人: 神曲像失效)
+// 默认曲风: 公网清唱(eh-sing-tts)已通, 优先清唱; 其次有母版的 AI 曲风(eh-sing-cover)
 let songSel='';   // 进入神曲模式时再取 defaultSongSid()(优先清唱: 公网 TTS 已接通)
 function defaultSongSid(){
   try{
@@ -5816,8 +5816,25 @@ function ac(){
 let noiseBuf=null;
 function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
-// 公网清唱: Supabase Edge eh-sing-tts(已部署, 不再依赖内网 worker)
+// 公网清唱: Supabase Edge eh-sing-tts
 const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
+// 公网歌曲旁路 worker: Supabase Edge `eh-song-worker`(公网, 非内网); 可选补生成, 非主路径
+const EH_SONG_WORKER_FN = SB_URL + '/functions/v1/eh-song-worker';
+
+// 公网旁路: 超时/失败时可再踢一次 Edge worker(非内网)
+async function ehNudgeSongWorker(mid, lyric, sid){
+  try{
+    const _session=await sb.auth.getSession();
+    const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
+    if(!_token) return false;
+    const r=await fetch(EH_SONG_WORKER_FN,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+_token},
+      body: JSON.stringify({ mid:String(mid), lyric:lyric||'', sid:sid||'' })
+    });
+    return r.ok;
+  }catch(_){ return false; }
+}
 // PCM(s16le) → WAV Blob, 供 <audio> 直接播(公网清唱返回 pcm_s16le 24k mono)
 function ehPcmToWavBlob(audioB64, sampleRate, channels){
   const bin=atob(String(audioB64||''));
@@ -5950,7 +5967,7 @@ function vocalElapsedAt(env, absT){
   return env.cum[idx];
 }
 // ★清唱(acapella)逐字对齐: 从整首解码 buffer 算【人声真实起止 + 尾部长音起点】, 直接给出每字点亮时刻表。
-//   清唱是 worker TTS 干唱显示词一遍(无伴奏/无前奏/无重复/无衬词), 整首 mp3 就是这句词 → 用 VAD 掩码的
+//   清唱是 TTS 干唱显示词一遍(无伴奏/无前奏/无重复/无衬词), 整首音频就是这句词 → 用 VAD 掩码的
 //   首末有声帧当唱词起止, 比"匀速铺 0.97*时长"准得多。实测(5 首真人清唱 vs whisper 逐字真值):
 //     平均误差 0.51s → 0.23s, 崩掉的两首(拖长音/尾巴长)0.51/1.44s → 0.21/0.51s, 脆快句 7/11→11/11。
 //   关键: 尾部长音(finalRun>1.5s)时, 最后一个字应落在【长音起点】而非长音末尾(否则整句被拖后 ~1s);
@@ -6683,7 +6700,7 @@ async function switchMyBgm(title){
   bgmPlayLocal(row);
 }
 // ============ 时间胶囊 ============
-// /胶囊 7天 内容 → 封存一条消息, open_at 到期后由 worker 让房里灵魂在房间念出来。
+// /胶囊 7天 内容 → 封存一条消息, open_at 到期后由公网 eh-soul-tick 让房里灵魂在房间念出来。
 // 呼应"回声厅"命名: 你此刻的声音, 在未来某天回响。
 function parseCapsuleDelay(s){
   const t=String(s||'').trim();
@@ -6763,7 +6780,7 @@ async function sendSong(lyric, sid){
   // ★方向2 母版前奏预览: 立即播该曲风母版 intro(0延迟真乐器), 消解 40s 干等。
   //   必须在 insert(await) 之前的【同步手势链】里 play() —— 否则脱离用户手势, iOS/移动端 autoplay 静音。
   //   此刻还没 mid, 先用占位 'pending' 启动, insert 拿到真 id 后把预览 mid 更新过去(见下)。
-  //   acapella 走内网 TTS worker、无母版, 不预览。
+  //   acapella 无母版前奏(走 eh-sing-tts), 不预览; 其他曲风播母版 intro。
   if(sid!=='acapella'){ const _mp=pickMasterSync(sid); if(_mp){ startMasterPreview('pending', _mp.url, _mp.introEnd); } }
   const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:encodeSong(sid,lyric), kind:'song' };
   const { data:row, error }=await sb.from('eh_messages').insert(payload).select('id').single();
@@ -6788,7 +6805,7 @@ const _EH_SONG_GENERATING=new Set();   // 记录正在生成的 mid, 防重复�
 // 扫已卡住的 pending 神曲(自己发的，上传了但 patch fail 的) → 存储桶中已有 mp3 则直接补回写, 不重调 MiniMax(省额度+快)
 // 点 pending 卡时的"真相探测": 查该消息最新 text 是否其实已就绪(realtime UPDATE 可能丢了),
 //   是→原地重建成可播卡并自动播放, 返回 true(调用方据此不再重新生成)。
-//   否→再 HEAD 探测存储桶(worker 传了桶但 PATCH 没落的边缘情况), 命中则补 PATCH 回写。
+//   否→再 HEAD 探测存储桶(上传了桶但 PATCH 没落的边缘情况), 命中则补 PATCH 回写。
 //   全落空返回 false(真没生成好, 交给调用方按超时判定是否重生成)。不烧任何生成额度。
 async function probeSongReady(mid, bubble){
   if(!mid) return false;
@@ -6815,7 +6832,7 @@ async function probeSongReady(mid, bubble){
       return true;
     };
     if(parseSong(row.text).ready){ toast('已谱好, 帮你补上了'); return applyFresh(row); }
-    // ② 库里还没 url, 但桶里可能已有 mp3(worker 传桶成功但 PATCH 丢): HEAD 探测后补 PATCH
+    // ② 库里还没 url, 但桶里可能已有 mp3(上传成功但 PATCH 丢): HEAD 探测后补 PATCH
     const path=`songs/${curRoom&&curRoom.id}/${mid}.mp3`;
     const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
     let ok=false;
@@ -6890,8 +6907,8 @@ document.addEventListener('visibilitychange', ()=>{
 // pageshow(含 bfcache 恢复, persisted=true 时 visibilitychange 可能不发) + window focus: 多源兜底
 window.addEventListener('pageshow', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('generateAndPersistSong',_); } foregroundResync(); });
 window.addEventListener('focus', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('generateAndPersistSong',_); } foregroundResync(); });
-// 音频域加固批B: 清唱兜底(worker 未回写时 120s 明确降级)
-const _EH_ACAPELLA_TIMERS = new Map();   // mid → timeoutId, 供 worker 回写时清理
+// 音频加固: 清唱/翻唱接口失败时降级本地可听 + 可点重试
+const _EH_ACAPELLA_TIMERS = new Map();   // mid → 超时标记 timer(公网 Edge 失败降级用)
 function _ehAcapellaTimeoutMark(mid){
   try{
     const stream=document.getElementById('stream'); if(!stream) return;
@@ -6908,7 +6925,7 @@ function _ehAcapellaTimeoutMark(mid){
 async function generateAndPersistSong(mid, lyric, sid, el){
   try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
-  // ★清唱: 公网 Supabase eh-sing-tts(已部署), 摆脱内网 worker
+  // ★清唱: 公网 Supabase eh-sing-tts
   if(sid==='acapella'){
     _EH_SONG_GENERATING.add(mid);
     const startRoomId = curRoom && curRoom.id;
@@ -7010,7 +7027,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       const struct=typeof res.structure==='string' ? JSON.parse(res.structure) : (res.structure||{});
       const segs=struct.segments||[];
       // ★只认真正的 chorus 段; 找不到退【全曲】(chS=0), 别退 segs[last]=outro——
-      //   outro 常是纯尾奏/衬音、不含显示词, 高亮会对到没唱那句词的音频上(worker 端同此修)。
+      //   outro 常是纯尾奏/衬音、不含显示词, 高亮会对到没唱那句词的音频上(Edge 端同此修)。
       const chorus=segs.find(x=>String(x.label).toLowerCase().includes('chorus'));
       if(chorus){ chS=chorus.start||0; chE=chorus.end||0; }
     }catch(_){ _ehCatch('generateAndPersistSong',_); }
@@ -7054,6 +7071,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
     const isTimeout = e && (e.name==='AbortError' || _ac.signal.aborted);
     console.warn('[song] generate failed/timeout', isTimeout, e);
     toast(isTimeout ? '神曲生成超时,可重试' : (EH_CONFIG.text.err_singSend||'神曲生成失败'));
+    try{ ehNudgeSongWorker(mid, lyric, sid); }catch(_){}
     // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
     try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.remove('pending'); card.classList.add('failed','local-ok'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时 · 可本地试听':'生成失败 · 可本地试听'; } }catch(_){ _ehCatch('generateAndPersistSong',_); }
   }finally{
@@ -8337,7 +8355,7 @@ async function openGear(){
   const allM=(members||[]); const MAX_SHOW=20;
   const showM=allM.slice(0, MAX_SHOW); const moreN=allM.length-showM.length;
   const memberRows=showM.map(mm=>{
-    const isSoulMem = isSoulUser(mm.user_id, mm.name);   // 灵魂: 踢成员没用(worker会按召唤/@wolf重加), 改走召唤面板"请离开"
+    const isSoulMem = isSoulUser(mm.user_id, mm.name);   // 灵魂: 踢成员没用(召唤/@wolf 可重加), 改走召唤面板"请离开"
     let tail;
     if(mm.role==='owner') tail='<span class="mi-role">房主</span>';
     else if(isSoulMem) tail='<span class="mi-role" style="opacity:.7">灵魂</span>';
