@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-song-heal';
+window.__EH_APP_VER = '20260920-song-public';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -5701,20 +5701,24 @@ function _shimStyles(){
   return src.map(s=>({...s, scale:_resolveScale(s.scale)}));
 }
 // 默认曲风: 优先「有母版的非清唱」(MiniMax 可生成); 清唱依赖内网 worker, 不作默认(主人: 神曲像失效)
+let songSel='';   // 进入神曲模式时再取 defaultSongSid()(优先清唱: 公网 TTS 已接通)
 function defaultSongSid(){
   try{
     const styles=_shimStyles();
-    if(!styles.length) return 'dj';
+    if(!styles.length) return 'acapella';
+    // 公网清唱已走 eh-sing-tts → 可作默认; 其次有母版的 AI 曲风
+    const aca=styles.find(s=>s&&s.id==='acapella');
+    if(aca) return 'acapella';
     const items=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
     const hasMaster=(id)=>!items.length || items.some(x=>x&&x.sid===id);
     for(const s of styles){ if(s.id!=='acapella' && hasMaster(s.id)) return s.id; }
     for(const s of styles){ if(s.id!=='acapella') return s.id; }
     return styles[0].id;
-  }catch(_){ return 'dj'; }
+  }catch(_){ return 'acapella'; }
 }
 const SONG_STYLES = new Proxy([], {
   get(_t, prop){
-    if(prop==='length') return (EH_CONFIG.songStyles||[]).length;
+    if(prop==='length') return _shimStyles().length;
     const shim = _shimStyles();
     if(typeof prop==='string' && /^\d+$/.test(prop)) return shim[+prop];
     if(prop===Symbol.iterator) return shim[Symbol.iterator].bind(shim);
@@ -5792,7 +5796,7 @@ function songHtml(text){
   const pending = singMode==='ai' && !ready;
   const pendCls = pending ? ' pending' : '';
   const btnInner = pending ? '<span class="song-note">♪</span>' : '<span class="pglyph"></span>';
-  const btnTip = pending ? (sid==='acapella' ? '清唱谱曲中 · 约 10 秒' : 'AI 谱曲中 · 约 40 秒') : '播放';
+  const btnTip = pending ? 'AI 谱曲中 · 约 10~40 秒' : '播放';
   const metaExtra = pending ? '<span class="song-composing">谱曲中</span>' : `<span class="song-eq"><i></i><i></i><i></i><i></i></span>`;
   const preloadAudio = (!pending && songUrl) ? `<audio class="song-pre" preload="auto" src="${esc(songUrl.split('#')[0])}" muted></audio>` : '';
   return `<span class="song-card${pendCls}" data-sid="${esc(sid)}" data-lyric="${esc(lyric)}" data-url="${esc(songUrl||'')}" data-cs="${chorusStart||0}" data-ce="${chorusEnd||0}" style="--sc:${safeColor(styleColor)}">
@@ -5812,6 +5816,34 @@ function ac(){
 let noiseBuf=null;
 function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const n=Math.floor(ctx.sampleRate*0.3); noiseBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; } return noiseBuf; }
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
+// 公网清唱: Supabase Edge eh-sing-tts(已部署, 不再依赖内网 worker)
+const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
+// PCM(s16le) → WAV Blob, 供 <audio> 直接播(公网清唱返回 pcm_s16le 24k mono)
+function ehPcmToWavBlob(audioB64, sampleRate, channels){
+  const bin=atob(String(audioB64||''));
+  const len=bin.length;
+  const sr=Number(sampleRate)||24000;
+  const ch=Number(channels)||1;
+  const buf=new ArrayBuffer(44+len);
+  const view=new DataView(buf);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) view.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); view.setUint32(4,36+len,true); w(8,'WAVE'); w(12,'fmt ');
+  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,ch,true);
+  view.setUint32(24,sr,true); view.setUint32(28,sr*ch*2,true);
+  view.setUint16(32,ch*2,true); view.setUint16(34,16,true);
+  w(36,'data'); view.setUint32(40,len,true);
+  for(let i=0;i<len;i++) view.setUint8(44+i, bin.charCodeAt(i));
+  return new Blob([buf],{type:'audio/wav'});
+}
+function ehAudioB64ToBlob(audioB64, fmt, sampleRate, channels){
+  const f=String(fmt||'').toLowerCase();
+  if(/pcm|s16le|raw/.test(f)) return ehPcmToWavBlob(audioB64, sampleRate, channels);
+  const bin=atob(String(audioB64||''));
+  const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  if(/wav/.test(f)) return new Blob([bytes],{type:'audio/wav'});
+  return new Blob([bytes],{type:'audio/mpeg'});
+}
 const EH_MASTER_MANIFEST_URL = 'masters/manifest.json?v=' + (window.__EH_BUILD_VER||'unknown');
 let EH_MASTER_MANIFEST=null;
 async function loadMasterManifest(){
@@ -6747,10 +6779,7 @@ async function sendSong(lyric, sid){
   // 卡片上屏后挂"预览中"高亮(此时卡片必在 DOM; 在 insert 后立即挂会因卡片尚未 append 而落空)
   try{ if(_masterPreview && _masterPreview.mid===String(row.id) && el){ const card=el.querySelector('.song-card'); if(card) card.classList.add('previewing'); } }catch(_){}
   try{ updateSongQueueBar(); }catch(e){}   // 自己发的 pending 歌进队列条监视
-  // ★清唱依赖内网 worker: 未部署/失败时立即本地合成试听
-  if(sid==='acapella'){
-    try{ const card=el&&el.querySelector('.song-card'); if(card) playSongLegacy(lyric, sid, card); }catch(_){}
-  }
+  // 清唱也走公网 Edge 立即生成(不再只本地哼唱垫场)
   generateAndPersistSong(String(row.id), lyric, sid, el).catch(e=>console.warn('generateSong bg',e));
 }
 
@@ -6879,19 +6908,70 @@ function _ehAcapellaTimeoutMark(mid){
 async function generateAndPersistSong(mid, lyric, sid, el){
   try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
-  // 清唱(acapella): 前端连不到内网 TTS 网关, 不走 MiniMax(它不认 acapella)。留 pending, 由内网 worker 用 TTS 补生成回写。
+  // ★清唱: 公网 Supabase eh-sing-tts(已部署), 摆脱内网 worker
   if(sid==='acapella'){
-    try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){ _ehCatch('generateAndPersistSong',_); }
-    try{ toast('谱曲中,由后台生成…'); }catch(_){ _ehCatch('generateAndPersistSong',_); }
-    // 45s 兜底: 清唱合成实测 5~15s(worker 3s 扫 + TTS 合成 + 回写), 45s 足够覆盖 worker 排队/慢网。
-    //   原 120s 太长, 让人干等两分钟。worker 若仍未回写 → 明确降级"清唱服务暂不可用", 允许手动重试。
-    //   注: UPDATE 事件丢失已由 20s 兜底轮询救回(见 refreshSnapshotTail song 分支), 此 timer 只兜"worker 真挂了"。
+    _EH_SONG_GENERATING.add(mid);
+    const startRoomId = curRoom && curRoom.id;
     try{
-      const key=String(mid);
-      if(_EH_ACAPELLA_TIMERS.has(key)) clearTimeout(_EH_ACAPELLA_TIMERS.get(key));
-      const tid=setTimeout(()=>_ehAcapellaTimeoutMark(key), 45000);
-      _EH_ACAPELLA_TIMERS.set(key, tid);
-    }catch(_){ _ehCatch('generateAndPersistSong',_); }
+      try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱谱曲中'; }catch(_){}
+      const _session=await sb.auth.getSession();
+      const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
+      if(!_token) throw new Error('tts auth missing');
+      const resp=await fetch(EH_SING_TTS_FN,{
+        method:'POST',
+        headers:{'Content-Type':'application/json', Authorization:'Bearer '+_token},
+        body: JSON.stringify({ text: lyric, lyric: lyric, sid:'acapella', format:'pcm' })
+      });
+      if(!resp.ok) throw new Error('tts HTTP '+resp.status);
+      const res=await resp.json();
+      const audioB64=res.audio||res.audio_b64||res.mp3_b64||res.wav_b64;
+      if(!audioB64) throw new Error('tts no audio');
+      const fmt=res.format||res.mime||'pcm_s16le';
+      const isPcm=/pcm|s16le|raw/i.test(String(fmt));
+      const blob=ehAudioB64ToBlob(audioB64, fmt, res.sample_rate||24000, res.channels||1);
+      const ext=isPcm?'wav':'mp3';
+      const localUrl=URL.createObjectURL(blob);
+      // 卡片立刻可播(本地 blob)
+      const card=el&&el.querySelector('.song-card')|| (document.querySelector(`.msg[data-mid="${mid}"] .song-card`));
+      if(card){
+        card.dataset.url=localUrl;
+        card.classList.remove('pending','timeout','failed','local-ok');
+        const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','播放');
+        const cm=card.querySelector('.song-composing'); if(cm) cm.remove();
+      }
+      // 上传桶 + 回写消息 → 别人也能听
+      try{
+        const path=`songs/${startRoomId||'unknown'}/${mid}.${ext}`;
+        const up=await sb.storage.from('eh-song').upload(path, blob, {contentType: blob.type||'audio/wav', upsert:true});
+        if(up.error) throw new Error('upload '+up.error.message);
+        const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
+        const songUrl=(pub&&pub.publicUrl?pub.publicUrl:localUrl)+'?t='+Date.now();
+        const newText=encodeSong(sid, lyric, songUrl, 0, 0);
+        const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
+        if(upd.error) console.warn('[song] tts patch', upd.error.message);
+        else if(card){ card.dataset.url=songUrl.split('#')[0]; try{ prefetchSong(card.dataset.url); }catch(_){} }
+      }catch(upErr){
+        console.warn('[song] tts persist fallback local-only', upErr);
+      }
+      _ehDbg('[song tts ready]', mid);
+      try{ if(card) playSong(lyric, sid, card); }catch(_){}
+    }catch(e){
+      console.warn('[song] tts failed', e);
+      try{
+        const card=el&&el.querySelector('.song-card');
+        if(card){
+          card.classList.remove('pending');
+          card.classList.add('failed','local-ok');
+          const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱');
+          const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱接口失败 · 可本地试听';
+        }
+      }catch(_){}
+      try{ toast('清唱生成失败 · 已可本地试听'); }catch(_){}
+      try{ const card=el&&el.querySelector('.song-card'); if(card) playSongLegacy(lyric, sid, card); }catch(_){}
+    }finally{
+      _EH_SONG_GENERATING.delete(mid);
+      try{ const t=_EH_ACAPELLA_TIMERS.get(String(mid)); if(t){ clearTimeout(t); _EH_ACAPELLA_TIMERS.delete(String(mid)); } }catch(_){}
+    }
     return;
   }
   _EH_SONG_GENERATING.add(mid);
@@ -6985,7 +7065,7 @@ async function generateAndPersistSong(mid, lyric, sid, el){
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
-let songSel='';   // 进入神曲模式时再取 defaultSongSid()(依赖 manifest/风格池)
+// songSel / defaultSongSid 已在曲风池处定义(优先公网清唱)
 let songMode=false;
 // 渲染曲风细色条(当前高亮; 点别的即换曲风, 停留在神曲模式)
 let _cinWasFocused=false;   // 切曲风前输入框是否聚焦(用于切完不改变输入法开/收状态)
