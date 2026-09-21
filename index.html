@@ -2099,7 +2099,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260921-song-probe';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260921-minimax-api';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2581,52 +2581,52 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script defer src="./js/config.js?v=20260921-song-probe"></script>
-<script defer src="./js/config-runtime.js?v=20260921-song-probe"></script>
+<script defer src="./js/config.js?v=20260921-minimax-api"></script>
+<script defer src="./js/config-runtime.js?v=20260921-minimax-api"></script>
 <!-- 斗地主小游戏引擎(纯函数内核,客户端与未来 Edge 共用同一份) -->
-<script defer src="./js/games/deck.js?v=20260921-song-probe"></script>
+<script defer src="./js/games/deck.js?v=20260921-minimax-api"></script>
 <!-- 牌桌内嵌聊天坞 + 弹幕(F2 边打边聊): 两桌共用, 须在 game-ui/guandan-ui 之前加载 -->
-<link rel="stylesheet" href="./js/games/table-shared.css?v=20260921-song-probe">
-<script defer src="./js/games/table-chat.js?v=20260921-song-probe"></script>
+<link rel="stylesheet" href="./js/games/table-shared.css?v=20260921-minimax-api">
+<script defer src="./js/games/table-chat.js?v=20260921-minimax-api"></script>
 <!-- 横竖屏切换(仍在聊天室内): 对牌桌浮层做 CSS rotate, 三款 UI 顶栏 ⟳ 钮调用 window.EHTableOrient -->
-<script defer src="./js/games/table-orient.js?v=20260921-song-probe"></script>
+<script defer src="./js/games/table-orient.js?v=20260921-minimax-api"></script>
 <!-- 牌桌高光引擎(三游戏共用分级庆祝): 须先于三款 UI 就绪, UI showOver 读 window.EHTableFx -->
-<script defer src="./js/games/table-fx.js?v=20260921-song-probe"></script>
+<script defer src="./js/games/table-fx.js?v=20260921-minimax-api"></script>
 <!-- 斗地主真人联机传输层(脱敏快照 · 防作弊): 必须先于 game-ui 加载, UI 启动时读 window.EHDdzNet -->
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
-<script defer src="./js/games/table-net.js?v=20260921-song-probe"></script>
-<script defer src="./js/game-loader.js?v=20260921-song-probe"></script>
-<script defer src="./js/sfx-engine.js?v=20260921-song-probe"></script>
-  <script defer src="./js/modules/lobby.js?v=20260921-song-probe"></script>
-  <script defer src="./js/modules/gt-net.js?v=20260921-song-probe"></script>
-  <script defer src="./js/modules/score.js?v=20260921-song-probe"></script>
-<script defer src="./js/modules/auth.js?v=20260921-song-probe"></script>
-<script defer src="./js/modules/bgm.js?v=20260921-song-probe"></script>
-<script defer src="./js/modules/room.js?v=20260921-song-probe"></script>
-<script defer src="./js/modules/messages.js?v=20260921-song-probe"></script>
-<script defer src="./js/app.js?v=20260921-song-probe"></script>
-<script defer src="./js/keyboard.js?v=20260921-song-probe"></script>
-<script defer src="./js/boot.js?v=20260921-song-probe"></script>
-<script defer src="./js/dm.js?v=20260921-song-probe"></script>
+<script defer src="./js/games/table-net.js?v=20260921-minimax-api"></script>
+<script defer src="./js/game-loader.js?v=20260921-minimax-api"></script>
+<script defer src="./js/sfx-engine.js?v=20260921-minimax-api"></script>
+  <script defer src="./js/modules/lobby.js?v=20260921-minimax-api"></script>
+  <script defer src="./js/modules/gt-net.js?v=20260921-minimax-api"></script>
+  <script defer src="./js/modules/score.js?v=20260921-minimax-api"></script>
+<script defer src="./js/modules/auth.js?v=20260921-minimax-api"></script>
+<script defer src="./js/modules/bgm.js?v=20260921-minimax-api"></script>
+<script defer src="./js/modules/room.js?v=20260921-minimax-api"></script>
+<script defer src="./js/modules/messages.js?v=20260921-minimax-api"></script>
+<script defer src="./js/app.js?v=20260921-minimax-api"></script>
+<script defer src="./js/keyboard.js?v=20260921-minimax-api"></script>
+<script defer src="./js/boot.js?v=20260921-minimax-api"></script>
+<script defer src="./js/dm.js?v=20260921-minimax-api"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script defer src="./js/ambient-fx.js?v=20260921-song-probe"></script>
+<script defer src="./js/ambient-fx.js?v=20260921-minimax-api"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- debug-overlay 仍下线（V44 主人验收干净效果），需调试时取消注释
-<script defer src="./js/debug-overlay.js?v=20260921-song-probe"></script>
+<script defer src="./js/debug-overlay.js?v=20260921-minimax-api"></script>
 -->
 <!-- ★键盘诊断浮层放回加载: 内部门禁(仅 ?kbdebug / localStorage / 安卓)才挂, 普通用户无感。
      此前它被整段注释掉 = 无论怎么刷都看不到浮层的真因。 -->
-<script defer src="./js/kbdebug.js?v=20260921-song-probe"></script>
+<script defer src="./js/kbdebug.js?v=20260921-minimax-api"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script defer src="./js/sw-register.js?v=20260921-song-probe"></script>
+<script defer src="./js/sw-register.js?v=20260921-minimax-api"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script defer src="./js/pwa-install.js?v=20260921-song-probe"></script>
+<script defer src="./js/pwa-install.js?v=20260921-minimax-api"></script>
 
-<script defer src="./js/pull-refresh.js?v=20260921-song-probe"></script>
+<script defer src="./js/pull-refresh.js?v=20260921-minimax-api"></script>
 <!-- ★内联键盘探针(双保险): 内联=随导航请求走, 不受外部 js 文件持久缓存影响; 无条件执行, 必然显示。
      ?kbdebug 时在屏幕【顶部】显真机视口信号(键盘盖不到顶); 用于定位主聊天室"输入框被键盘遮"到底差在哪个信号。
      普通访问(无参数)完全不挂, 无感。带 ?nokbdebug 关闭。 -->

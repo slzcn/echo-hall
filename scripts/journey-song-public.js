@@ -30,5 +30,9 @@ caps.forEach(([n,d])=>assert(!!d, `能力: ${n} — ${d}`));
 assert(/旧云端 STT 网关在内网/.test(APP) || /eh-stt/.test(APP), '语音转写: 浏览器 SR + 公网 eh-stt');
 assert(/不调云端\/内网大模型/.test(GAME) || /本地启发式/.test(GAME), '牌局热路径不调内网/云端大模型');
 
+assert(/api\.minimax\.cn/.test(fs.readFileSync(path.join(__dirname,'..','edge-functions/eh-sing-gen/index.ts'),'utf8')), 'eh-sing-gen 使用官方 api.minimax.cn');
+assert(/music-3\.0/.test(fs.readFileSync(path.join(__dirname,'..','edge-functions/eh-sing-gen/index.ts'),'utf8')), '模型对齐 music-3.0/music-cover');
+assert(/playSingingHybrid/.test(APP) || /journey-exempt: 神曲播放兜底/.test(APP), '无副歌时叠母版播放');
+
 console.log('\n'+(failed?'❌ 有失败':'✅ 文字神曲公网部署契约通过'));
 process.exit(failed?1:0);

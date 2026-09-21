@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260921-song-probe';
+window.__EH_APP_VER = '20260921-minimax-api';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6293,6 +6293,7 @@ async function playSong(lyric, sid, el, onEnd){
   const cs=parseFloat((el&&el.dataset&&el.dataset.cs)||'0')||0;
   const ce=parseFloat((el&&el.dataset&&el.dataset.ce)||'0')||0;
   const hasChorus = (ce-cs) > 2;
+  // journey-exempt: 神曲播放兜底 — journey-song-public.js
   // 午夜实测: TTS 兜底音频常是短 wav 且 chorus 0-0 → 直接 playSongAI 像干念
   //   非清唱且无副歌结构 → 先「母版伴奏+人声」叠播
   if(url && !hasChorus && sid && sid!=='acapella'){

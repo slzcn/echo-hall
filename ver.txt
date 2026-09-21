@@ -1,1 +1,1 @@
-20260921-song-probe
+20260921-minimax-api
