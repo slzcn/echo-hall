@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260920-song-public';
+window.__EH_APP_VER = '20260921-song-gen';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -5451,8 +5451,31 @@ const VOICE_URL_PREFIX=SB_URL+'/storage/v1/object/public/'+VOICE_BUCKET+'/';
 const REC_MIME=(window.MediaRecorder && ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t)))||'';
 let recorder=null, recChunks=[], recTimer=null, recSec=0, recWanted=false, recCanceled=false, recActive=false, recStartY=0;
 let waveRAF=null, recAnalyser=null;
-// 语音转写: 录音同时用浏览器 SpeechRecognition 转文字, 编码进语音消息(#tx=), 灵魂可"听得懂"
-// (公网路径=浏览器端 SR; 旧云端 STT 网关在内网, 公网部署不做云端转写; 不支持的浏览器→无转写, 退回"发了一条语音")
+// 语音转写: 录音时浏览器 SpeechRecognition(公网可用); 为空再调公网 eh-stt 兜底
+// (旧云端 STT 网关在内网, 不接入; 公网路径=浏览器 SR + eh-stt)
+const EH_STT_FALLBACK = true;
+async function ehSttFromBlob(blob){
+  try{
+    if(!blob || blob.size<400) return '';
+    const _session=await sb.auth.getSession();
+    const token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
+    if(!token) return '';
+    const buf=await blob.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    let s='';
+    const step=0x8000;
+    for(let i=0;i<bytes.length;i+=step){
+      s+=String.fromCharCode.apply(null, Array.from(bytes.subarray(i,i+step)));
+    }
+    const r=await fetch(EH_STT_FN,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+      body: JSON.stringify({ audio_b64: btoa(s), mime: blob.type||'audio/webm', lang:'zh-CN' })
+    });
+    const j=await r.json();
+    return (j && j.ok && j.text) ? String(j.text).trim() : '';
+  }catch(_){ return ''; }
+}
 const SR_CLASS = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 let voiceSR=null, srFinal='', srInterim='';
 function startSR(){
@@ -5581,9 +5604,20 @@ async function startRec(){
   recorder.onstop=()=>{
     clearInterval(recTimer); recTimer=null;   // ★所有停止路径的共同终点, 在此清计时器: 录音中离房(leaveRoom裸调recorder.stop)也不残留每秒空跑的interval
     stream.getTracks().forEach(t=>t.stop());
-    const tx=stopSR();   // 拿到转写文字(不支持/无语音则空)
+    const tx0=stopSR();   // 浏览器 SR 转写(公网)
     stopWave(); hideRecUI();
-    if(recWanted && !recCanceled && recChunks.length && recSec>=1) sendVoice(new Blob(recChunks,{type:REC_MIME.split(';')[0]}), Math.min(recSec,VOICE_MAX_SEC()), recCanceled?'':tx);
+    if(recWanted && !recCanceled && recChunks.length && recSec>=1){
+      const blob=new Blob(recChunks,{type:REC_MIME.split(';')[0]});
+      const secs=Math.min(recSec,VOICE_MAX_SEC());
+      if(!tx0 && blob.size>0){
+        // 浏览器 SR 为空 → 公网 eh-stt 兜底(仍空则无转写, 灵魂退回"发了一条语音")
+        ehSttFromBlob(blob).then(cloudTx=>{
+          sendVoice(blob, secs, recCanceled?'':(tx0||cloudTx||''));
+        }).catch(()=>{ sendVoice(blob, secs, ''); });
+      } else {
+        sendVoice(blob, secs, recCanceled?'':tx0);
+      }
+    }
     else if(recWanted && !recCanceled && recSec<1) toast(EH_CONFIG.text.err_recTooShort);
     recorder=null; recChunks=[];
   };
@@ -5818,6 +5852,10 @@ function noise(ctx){ if(!noiseBuf||noiseBuf.sampleRate!==ctx.sampleRate){ const 
 const EH_SING_COVER_FN = SB_URL + '/functions/v1/eh-sing-cover';
 // 公网清唱: Supabase Edge eh-sing-tts
 const EH_SING_TTS_FN = SB_URL + '/functions/v1/eh-sing-tts';
+// 公网统一谱曲: MiniMax 优先, 失败退 eh-sing-tts, 传桶+回写 — 全部曲风走这里
+const EH_SING_GEN_FN = SB_URL + '/functions/v1/eh-sing-gen';
+// 公网语音转写兜底: 浏览器 SR 为空时调 eh-stt
+const EH_STT_FN = SB_URL + '/functions/v1/eh-stt';
 // 公网歌曲旁路 worker: Supabase Edge `eh-song-worker`(公网, 非内网); 可选补生成, 非主路径
 const EH_SONG_WORKER_FN = SB_URL + '/functions/v1/eh-song-worker';
 
@@ -6925,161 +6963,64 @@ function _ehAcapellaTimeoutMark(mid){
 async function generateAndPersistSong(mid, lyric, sid, el){
   try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
-  // ★清唱: 公网 Supabase eh-sing-tts
-  if(sid==='acapella'){
-    _EH_SONG_GENERATING.add(mid);
-    const startRoomId = curRoom && curRoom.id;
+  _EH_SONG_GENERATING.add(mid);
+  const startRoomId = curRoom && curRoom.id;
+  const cardOf=()=> (el&&el.querySelector('.song-card')) || document.querySelector('.msg[data-mid="'+mid+'"] .song-card');
+  const markLocalFail=(msg)=>{
     try{
-      try{ const cm=el&&el.querySelector('.song-composing'); if(cm) cm.textContent='清唱谱曲中'; }catch(_){}
-      const _session=await sb.auth.getSession();
-      const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
-      if(!_token) throw new Error('tts auth missing');
-      const resp=await fetch(EH_SING_TTS_FN,{
-        method:'POST',
-        headers:{'Content-Type':'application/json', Authorization:'Bearer '+_token},
-        body: JSON.stringify({ text: lyric, lyric: lyric, sid:'acapella', format:'pcm' })
-      });
-      if(!resp.ok) throw new Error('tts HTTP '+resp.status);
-      const res=await resp.json();
-      const audioB64=res.audio||res.audio_b64||res.mp3_b64||res.wav_b64;
-      if(!audioB64) throw new Error('tts no audio');
-      const fmt=res.format||res.mime||'pcm_s16le';
-      const isPcm=/pcm|s16le|raw/i.test(String(fmt));
-      const blob=ehAudioB64ToBlob(audioB64, fmt, res.sample_rate||24000, res.channels||1);
-      const ext=isPcm?'wav':'mp3';
-      const localUrl=URL.createObjectURL(blob);
-      // 卡片立刻可播(本地 blob)
-      const card=el&&el.querySelector('.song-card')|| (document.querySelector(`.msg[data-mid="${mid}"] .song-card`));
+      const card=cardOf();
       if(card){
-        card.dataset.url=localUrl;
-        card.classList.remove('pending','timeout','failed','local-ok');
+        card.classList.remove('pending');
+        card.classList.add('failed','local-ok');
+        const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱');
+        const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=(msg||'生成失败')+' · 可本地试听';
+      }
+    }catch(_){ _ehCatch('generateAndPersistSong',_); }
+  };
+  try{
+    try{ const cm=cardOf()&&cardOf().querySelector('.song-composing'); if(cm) cm.textContent='谱曲中'; }catch(_){}
+    const _session=await sb.auth.getSession();
+    const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
+    if(!_token) throw new Error('song auth missing');
+    await loadMasterManifest();
+    const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items)||[];
+    const master=pool.filter(x=>x&&x.sid===sid)[Math.floor(Math.random()*Math.max(1,pool.filter(x=>x&&x.sid===sid).length))] || null;
+    const masterUrl=master ? new URL(master.url, location.href).href : '';
+    // ★统一公网谱曲: MiniMax→TTS 由 Edge 兜底, 传桶+回写, 失败率更低
+    const resp=await fetch(EH_SING_GEN_FN,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+_token},
+      body: JSON.stringify({
+        lyric, sid, mid:String(mid), roomId:startRoomId||'',
+        masterUrl, featureId: master&&master.featureId ? String(master.featureId) : '',
+        masterDuration: master&&master.duration ? Number(master.duration) : 0,
+      })
+    });
+    const res=await resp.json().catch(()=>null);
+    if(resp.ok && res && res.ok && res.songUrl){
+      const card=cardOf();
+      if(card){
+        card.dataset.url=String(res.songUrl).split('#')[0];
+        card.dataset.cs=res.chorusStart||0; card.dataset.ce=res.chorusEnd||0;
+        card.classList.remove('pending','failed','timeout','local-ok');
         const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','播放');
         const cm=card.querySelector('.song-composing'); if(cm) cm.remove();
       }
-      // 上传桶 + 回写消息 → 别人也能听
-      try{
-        const path=`songs/${startRoomId||'unknown'}/${mid}.${ext}`;
-        const up=await sb.storage.from('eh-song').upload(path, blob, {contentType: blob.type||'audio/wav', upsert:true});
-        if(up.error) throw new Error('upload '+up.error.message);
-        const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
-        const songUrl=(pub&&pub.publicUrl?pub.publicUrl:localUrl)+'?t='+Date.now();
-        const newText=encodeSong(sid, lyric, songUrl, 0, 0);
-        const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
-        if(upd.error) console.warn('[song] tts patch', upd.error.message);
-        else if(card){ card.dataset.url=songUrl.split('#')[0]; try{ prefetchSong(card.dataset.url); }catch(_){} }
-      }catch(upErr){
-        console.warn('[song] tts persist fallback local-only', upErr);
-      }
-      _ehDbg('[song tts ready]', mid);
-      try{ if(card) playSong(lyric, sid, card); }catch(_){}
-    }catch(e){
-      console.warn('[song] tts failed', e);
-      try{
-        const card=el&&el.querySelector('.song-card');
-        if(card){
-          card.classList.remove('pending');
-          card.classList.add('failed','local-ok');
-          const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱');
-          const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱接口失败 · 可本地试听';
-        }
-      }catch(_){}
-      try{ toast('清唱生成失败 · 已可本地试听'); }catch(_){}
-      try{ const card=el&&el.querySelector('.song-card'); if(card) playSongLegacy(lyric, sid, card); }catch(_){}
-    }finally{
-      _EH_SONG_GENERATING.delete(mid);
-      try{ const t=_EH_ACAPELLA_TIMERS.get(String(mid)); if(t){ clearTimeout(t); _EH_ACAPELLA_TIMERS.delete(String(mid)); } }catch(_){}
+      _ehDbg('[song gen ready]', mid, res.mode);
+      try{ if(cardOf()) playSong(lyric, sid, cardOf()); }catch(_){}
+      return;
     }
-    return;
-  }
-  _EH_SONG_GENERATING.add(mid);
-  const startRoomId = curRoom && curRoom.id;   // 快照房间id, 防生成中途换房污染 path
-  // 音频域加固批B: fetch 加 AbortController 超时(80s), 防 Edge Function 卡住时 _EH_SONG_GENERATING 一直持有 mid, 挡住重试
-  const _ac = new AbortController();
-  const _to = setTimeout(()=>{ try{ _ac.abort('timeout'); }catch(_){ _ehCatch('generateAndPersistSong',_); } }, 80000);
-  try{
-    const st=SONG_STYLES.find(s=>s.id===sid)||SONG_STYLES[0];
-    // 挑一首同曲风母版当参考(整个对象: 可能带预存 featureId/duration 供 Edge 跳过 preprocess 加速)
-    let master=null;
-    try{ await loadMasterManifest(); const pool=(EH_MASTER_MANIFEST&&EH_MASTER_MANIFEST.items||[]).filter(x=>x.sid===sid); if(pool.length) master=pickMasterWeighted(pool)||pool[0]; }catch(_){ _ehCatch('generateAndPersistSong',_); }
-    if(!master){
-      // 无母版(配置/manifest 丢失): 降级本地合成, 不让神曲整段失效
-      throw new Error('no master for sid '+sid);
-    }
-    const masterUrl=new URL(master.url, location.href).href;
-    // 调 Edge Function 生成(37s 左右, 前端 80s 硬超时)。
-    // ★带 sid: Edge 按曲风选衬词模板(慢歌不再硬塞"嗨起来")。
-    // ★带 featureId/masterDuration(若 manifest 已预存): Edge 跳过下载母版+preprocess, 每首快 2~5s。
-    const _payload={ masterUrl, lyric, prompt:st.coverPrompt||'', sid };
-    if(master.featureId){ _payload.featureId=master.featureId; _payload.masterDuration=Number(master.duration)||0; }
-    // ★服务端直传桶: 带 roomId+mid → Edge 生成后自己传桶回 songUrl, 省"2MB base64 回传+atob+浏览器再传"整段(~9s)。
-    //   path 与前端旧逻辑一致(songs/<roomId>/<mid>.mp3), 服务端上传失败会自动退回 base64(见下)。
-    _payload.roomId = startRoomId || 'unknown'; _payload.mid = String(mid);
-    const _session=await sb.auth.getSession();
-    const _token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
-    if(!_token) throw new Error('cover auth missing');
-    const resp=await fetch(EH_SING_COVER_FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+_token},body:JSON.stringify(_payload),signal:_ac.signal});
-    if(!resp.ok) throw new Error('cover HTTP '+resp.status);
-    const res=await resp.json();
-    if(!res.ok || (!res.coverMp3_b64 && !res.songUrl)) throw new Error('cover no audio');
-    // 解析 chorus 段(structure 是 JSON 字符串)
-    let chS=0, chE=0;
-    try{
-      const struct=typeof res.structure==='string' ? JSON.parse(res.structure) : (res.structure||{});
-      const segs=struct.segments||[];
-      // ★只认真正的 chorus 段; 找不到退【全曲】(chS=0), 别退 segs[last]=outro——
-      //   outro 常是纯尾奏/衬音、不含显示词, 高亮会对到没唱那句词的音频上(Edge 端同此修)。
-      const chorus=segs.find(x=>String(x.label).toLowerCase().includes('chorus'));
-      if(chorus){ chS=chorus.start||0; chE=chorus.end||0; }
-    }catch(_){ _ehCatch('generateAndPersistSong',_); }
-    // 兜底: 没有 chorus 时用全歌
-    if(chE<=chS){ chS=0; chE=res.cover_duration||0; }
-    // ★治本: 按 cover 真实时长夹紧 chorus, 别把越界值存进库(修"最后一首歌只响两三秒")。
-    //   后端 structure 的时间戳源自母版(母版~55s), 实际生成的 cover 常更短 → chE 越界。
-    //   有 cover_duration 就以它为准: chE 封顶到整首, 夹后窗口 <8s 则起播点前移保底 8s。
-    const _cd = Number(res.cover_duration)||0;
-    if(_cd>0 && chE>chS){
-      if(chE>_cd) chE=_cd;
-      if(chE-chS < 8) chS=Math.max(0, chE-8);
-    }
-    // ★优先用服务端直传回的 songUrl(省 base64 解码+浏览器再上传整段); 没有则退回老路自己传。
-    let songUrl;
-    if(res.songUrl){
-      songUrl=res.songUrl;
-    } else {
-      // b64 → Blob → 上传 eh-song 桶(服务端未直传时的兜底路径)
-      const bin=atob(res.coverMp3_b64); const bytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-      const blob=new Blob([bytes],{type:'audio/mpeg'});
-      // 固定 path(用初始房间id + mid, 不带 ts) → 重试时会覆盖同文件, 不产生垃圾
-      const path=`songs/${startRoomId||'unknown'}/${mid}.mp3`;
-      const up=await sb.storage.from('eh-song').upload(path, blob, {contentType:'audio/mpeg', upsert:true});
-      if(up.error) throw new Error('upload '+up.error.message);
-      const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
-      // 加 cache-bust 参数防上传后 CDN 拿到旧缓存(覆写同名文件尤需)
-      songUrl=pub.publicUrl + '?t=' + Date.now();
-    }
-    // 回写消息 text 字段 → 带 .select() 看影响行数, RLS 静默拒/0 行会报错而不是假成功
-    const newText=encodeSong(sid, lyric, songUrl, chS, chE);
-    const upd=await sb.from('eh_messages').update({text:newText}).eq('id', mid).select();
-    if(upd.error){ throw new Error('song patch: '+upd.error.message); }
-    if(!upd.data || upd.data.length===0){
-      // 埞尚很容易遇: RLS 静默拒/mid 不匹配/session 失效 → 0 行无错
-      throw new Error('song patch: 0 rows updated (RLS/session or mid mismatch)');
-    }
-    _ehDbg('[song ready]', mid, songUrl, 'chorus', chS, '~', chE);
+    throw new Error((res&&res.error) || ('gen HTTP '+resp.status));
   }catch(e){
-    const isTimeout = e && (e.name==='AbortError' || _ac.signal.aborted);
-    console.warn('[song] generate failed/timeout', isTimeout, e);
-    toast(isTimeout ? '神曲生成超时,可重试' : (EH_CONFIG.text.err_singSend||'神曲生成失败'));
+    console.warn('[song] gen failed', e);
+    markLocalFail('谱曲失败');
+    try{ toast('神曲生成失败 · 已可本地试听'); }catch(_){}
+    try{ const card=cardOf(); if(card) playSongLegacy(lyric, sid, card); }catch(_){}
     try{ ehNudgeSongWorker(mid, lyric, sid); }catch(_){}
-    // 卡片标记失败态: 换提示"点击重试", 与"生成中"区分开(点击仍会重触发生成, 见 song-play click)
-    try{ const card=el&&el.querySelector('.song-card'); if(card){ card.classList.remove('pending'); card.classList.add('failed','local-ok'); const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱'); const cm=card.querySelector('.song-composing'); if(cm) cm.textContent=isTimeout?'生成超时 · 可本地试听':'生成失败 · 可本地试听'; } }catch(_){ _ehCatch('generateAndPersistSong',_); }
   }finally{
-    clearTimeout(_to);
     _EH_SONG_GENERATING.delete(mid);
-    // ★方向2: 生成结束(成功归队 / 失败 / 超时)即停母版前奏预览 —— 否则会一直循环到用户手动点播才停。
-    //   只停 mid 匹配的那条(用户可能已切去别的曲、或又发了新歌启了新预览)。
-    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(mid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
+    try{ const t=_EH_ACAPELLA_TIMERS.get(String(mid)); if(t){ clearTimeout(t); _EH_ACAPELLA_TIMERS.delete(String(mid)); } }catch(_){}
+    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(mid); }catch(_){}
   }
 }
 // 神曲: 点"文字变神曲"直接进模式(默认选中曲风); 换曲风用 composer 上方的细色条
