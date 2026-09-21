@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260921-daily-song';
+window.__EH_APP_VER = '20260921-song-works';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -7076,7 +7076,15 @@ async function generateAndPersistSong(mid, lyric, sid, el){
         const cm=card.querySelector('.song-composing'); if(cm) cm.remove();
       }
       _ehDbg('[song gen ready]', mid, res.mode);
-      try{ if(cardOf()) playSong(lyric, sid, cardOf()); }catch(_){}
+      // mode=voice: MiniMax 未出歌, 前端用「母版伴奏+人声」叠播, 听感更接近唱
+      try{
+        const card2=cardOf();
+        if(card2 && (res.mode==='voice'||res.mode==='edge-tts')){
+          const ok=await playSingingHybrid(lyric, sid, card2);
+          if(ok) return;
+        }
+        if(card2) playSong(lyric, sid, card2);
+      }catch(_){}
       return;
     }
     throw new Error((res&&res.error) || ('gen HTTP '+resp.status));

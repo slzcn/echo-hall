@@ -185,27 +185,26 @@ Deno.serve(async (req) => {
       }
     }
     if (!audio) {
-      // 仅清唱允许 TTS「念」兜底; 其他曲风失败要报错, 勿用念课文冒充唱歌
-      if (sid === 'acapella') {
-        const r = await fetch(sbUrl + '/functions/v1/eh-sing-tts', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: lyric, lyric, sid: 'acapella', format: 'pcm' }),
-        })
-        if (r.ok) {
-          const j = await r.json()
-          if (j && j.audio) {
-            const raw = b64ToBytes(j.audio)
-            const isPcm = /pcm|s16le/i.test(String(j.format || ''))
-            audio = isPcm ? pcmToWav(raw, j.sample_rate || 24000, j.channels || 1) : raw
-            ext = isPcm ? 'wav' : 'mp3'
-            mode = 'voice'
-            duration = lyric.length * 0.32
-          }
+      // 公网兜底(主人: 现在要「能生成成功」): 所有曲风都可退回 TTS 人声,
+      // 真 AI 唱歌仍取决于 MINIMAX_API_KEY 是否为有效 JWT; 密钥无效时至少出声、可播。
+      const r = await fetch(sbUrl + '/functions/v1/eh-sing-tts', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: lyric, lyric, sid: 'acapella', format: 'pcm' }),
+      })
+      if (r.ok) {
+        const j = await r.json()
+        if (j && j.audio) {
+          const raw = b64ToBytes(j.audio)
+          const isPcm = /pcm|s16le/i.test(String(j.format || ''))
+          audio = isPcm ? pcmToWav(raw, j.sample_rate || 24000, j.channels || 1) : raw
+          ext = 'mp3'
+          mode = 'voice'
+          duration = lyric.length * 0.32
         }
       }
     }
-    if (!audio) return json({ ok: false, error: 'sing_unavailable', detail: 'music_generation_no_audio' }, 502)
+    if (!audio) return json({ ok: false, error: 'generate_failed', detail: 'tts_and_music_empty' }, 502)
 
     let chS = 0, chE = 0
     try {
