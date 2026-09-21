@@ -5925,6 +5925,7 @@ const EH_SING_GEN_FN = SB_URL + '/functions/v1/eh-sing-gen';
 const EH_STT_FN = SB_URL + '/functions/v1/eh-stt';
 // 公网歌曲旁路 worker: Supabase Edge `eh-song-worker`(公网, 非内网); 可选补生成, 非主路径
 const EH_SONG_WORKER_FN = SB_URL + '/functions/v1/eh-song-worker';
+let _songToken=0;   // 一次性播放令牌(playSingingHybrid / playSong 共用, 必须先于使用声明)
 
 // 公网旁路: 超时/失败时可再踢一次 Edge worker(非内网)
 async function ehNudgeSongWorker(mid, lyric, sid){
@@ -6182,7 +6183,8 @@ function singVoice(ctx,dest,freq,t,dur,vowel,gain,wave){
 }
 
 let curSong=null;   // {ctx,master,oscs:[],timeouts:[],el,onEnd,token}
-let _songToken=0;   // 一次性播放令牌: 每次 play 递增, 回调比对 curSong.token 判定"是不是我这首歌"(ctx是全局单例, 拿它当身份形同虚设)
+let _songToken2=0; // (旧位保留说明: 令牌已上移到音频常量区, 避免 hybrid 使用前 TDZ)
+void _songToken2;
 function stopSong(){
   try{ if(typeof stopMasterPreview==='function') stopMasterPreview(); }catch(_){}   // 播真歌/停止时连带停母版前奏预览
   if(!curSong) return;
