@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260921-song-works';
+window.__EH_APP_VER = '20260921-song-probe';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -5467,7 +5467,12 @@ async function playSingingHybrid(lyric, sid, card){
     const _session=await sb.auth.getSession();
     const token=_session&&_session.data&&_session.data.session&&_session.data.session.access_token;
     let voiceBlob=null;
-    if(token){
+    // 优先用卡片上已生成音频(短 wav/TTS 人声), 没有再现场 TTS
+    const cardUrl=(card&&card.dataset&&card.dataset.url)?String(card.dataset.url).split('#')[0]:'';
+    if(cardUrl){
+      try{ const r0=await fetch(cardUrl); if(r0.ok) voiceBlob=await r0.blob(); }catch(_){}
+    }
+    if(!voiceBlob && token){
       const r=await fetch(EH_SING_TTS_FN,{
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
@@ -6284,11 +6289,21 @@ function startMasterPreview(mid, masterUrl, introEnd){
 // 神曲播放 dispatcher: 根据 singMode 分发到 legacy(本地合成)/ai(拉URL播高潮)
 async function playSong(lyric, sid, el, onEnd){
   const singMode=(EH_CONFIG.tuning&&EH_CONFIG.tuning.singMode)||'ai';
-  // AI 模式且卡片上有 songUrl → 走服务器音频, 从 chorus 起播
-  if(singMode==='ai' && el && el.dataset && el.dataset.url){
+  const url=(el&&el.dataset&&el.dataset.url)?String(el.dataset.url).split('#')[0]:'';
+  const cs=parseFloat((el&&el.dataset&&el.dataset.cs)||'0')||0;
+  const ce=parseFloat((el&&el.dataset&&el.dataset.ce)||'0')||0;
+  const hasChorus = (ce-cs) > 2;
+  // 午夜实测: TTS 兜底音频常是短 wav 且 chorus 0-0 → 直接 playSongAI 像干念
+  //   非清唱且无副歌结构 → 先「母版伴奏+人声」叠播
+  if(url && !hasChorus && sid && sid!=='acapella'){
+    try{
+      const ok=await playSingingHybrid(lyric, sid, el);
+      if(ok) return;
+    }catch(_){}
+  }
+  if(singMode==='ai' && url){
     return playSongAI(el, onEnd);
   }
-  // 无 URL / 清唱服务不可用 / legacy → 本地合成立即出声(主人: 神曲点了没声)
   return playSongLegacy(lyric, sid, el, onEnd);
 }
 
