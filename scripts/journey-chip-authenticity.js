@@ -26,7 +26,8 @@ assert(/function seatBuyIn/.test(pk) && /opts\.stackFor/.test(pk), 'poker-ui sea
 assert(/function emitStacks/.test(pk) && /opts\.onStacks/.test(pk), 'poker-ui 结算 emitStacks 回写账本');
 assert(/i === mySeat \? MY_START : START/.test(pk), '无 stackFor 时我这席 MY_START 兜底');
 assert(/EH_DAILY_PLAYS/.test(src) && /ehDailyPlayGate/.test(src), 'app.js 每日门禁 EH_DAILY_PLAYS');
-assert(/if\(!ehDailyPlayGate\(\)\) return;/.test(src), '开桌/进桌入口已接门禁');
+assert(/ehDailyPlayGate\('\w+'\)/.test(src), '门禁按游戏分闸');
+assert(/d.reached\('nlhe'\)|reached\('nlhe'\)/.test(pk+src), '德州门禁不锁其他游戏');
 assert(/pkLimitReached/.test(pk) && /pkAddPlay/.test(pk), 'poker-ui 发牌计数+到顶拒发');
 assert(/bumpSeatBanks/.test(src), 'bumpGameStats 经 bumpSeatBanks 沉淀全席(含灵魂)');
 assert(/EH_BANK_SET_OF/.test(ddz) && /EH_BANK_CHIPS_OF/.test(ddz), '斗地主累计分也按 uid 沉淀灵魂/真人');

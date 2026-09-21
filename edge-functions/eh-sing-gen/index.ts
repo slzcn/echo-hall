@@ -33,13 +33,44 @@ function wrapLyric(lyric, sid) {
   const L = String(lyric || '').trim()
   const SHORT = 8
   const styleHint = {
-    dj: 'EDM club drop', funk: 'groovy disco', jazz: 'smooth jazz lounge',
-    gufeng: 'Chinese traditional', rnb: 'slow R&B soul', kid: 'cartoon kids song',
-    acapella: 'human voice',
+    dj: 'EDM club drop with vocals', funk: 'groovy disco funk song with vocals',
+    jazz: 'smooth jazz vocal song', gufeng: 'Chinese traditional vocal ballad',
+    rnb: 'slow R&B soul vocal', kid: 'cartoon kids vocal song',
+    acapella: 'human voice singing acapella',
   }
-  const hint = styleHint[sid] || 'catchy pop hook'
-  const body = L.length < SHORT ? `${L} ${L}` : L
-  return `[Chorus]\n${body}\n(oh yeah)`
+  const hint = styleHint[sid] || 'catchy pop vocal song'
+  const body = L.length < SHORT ? `${L}\n${L}` : L
+  // MiniMax music-1.5 认 [Verse]/[Chorus] 结构; 要唱不要念
+  return `[Verse]\n${body}\n\n[Chorus]\n${body}\n${body}`
+}
+function decodeAudioPayload(raw) {
+  if (!raw) return null
+  const s = String(raw)
+  // hex-encoded mp3/wav
+  if (/^[0-9a-fA-F]+$/.test(s) && s.length > 400 && s.length % 2 === 0) {
+    const out = new Uint8Array(s.length / 2)
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16)
+    return out
+  }
+  // base64
+  try {
+    return b64ToBytes(s)
+  } catch { return null }
+}
+function pickAudio(j) {
+  const d = (j && (j.data || j.audio || j.payload)) || j || {}
+  const nested = d.data || {}
+  const raw = d.audio || d.audio_b64 || d.mp3 || nested.audio || j?.extra_info?.audio || j?.data?.audio
+  const url = d.audio_url || d.url || nested.audio_url || j?.audio_url
+  const bytes = typeof raw === 'string' ? decodeAudioPayload(raw) : null
+  return {
+    bytes: bytes && bytes.length > 200 ? bytes : undefined,
+    url: typeof url === 'string' ? url : undefined,
+    duration: Number(d.duration || nested.duration || j?.duration || 0) || 0,
+    structure: d.structure || nested.structure || j?.structure || null,
+    taskId: d.task_id || d.taskId || j?.task_id || j?.data?.task_id || null,
+    traceId: j?.trace_id || null,
+  }
 }
 async function tryJson(url, headers, body) {
   try {
@@ -52,57 +83,74 @@ async function tryJson(url, headers, body) {
     return { ok: false, status: 0, j: null, text: String(e) }
   }
 }
-function pickAudio(j) {
-  const d = (j && j.data) || (j && j.audio) || j || {}
-  const b64 = d.audio || d.audio_b64 || d.mp3 || j?.extra_info?.audio
-  const url = d.audio_url || d.url || j?.audio_url
-  return {
-    b64: typeof b64 === 'string' && b64.length > 200 ? b64 : undefined,
-    url: typeof url === 'string' ? url : undefined,
-    duration: Number(d.duration || j?.duration || 0) || 0,
-    structure: d.structure || j?.structure || null,
-  }
+async function fetchAudioUrl(url) {
+  const a = await fetch(url)
+  if (!a.ok) return null
+  return new Uint8Array(await a.arrayBuffer())
 }
 async function minimaxGenerate({ apiKey, lyric, sid, masterUrl }) {
   const auth = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-  const prompt = wrapLyric(lyric, sid)
+  const lyrics = wrapLyric(lyric, sid)
+  const genre = ({
+    dj: 'EDM dance club', funk: 'funk disco groove', jazz: 'jazz lounge',
+    gufeng: 'Chinese traditional guzheng', rnb: 'R&B soul', kid: 'kids cartoon',
+    acapella: 'a cappella human voice',
+  })[sid] || 'catchy pop'
   const hosts = ['https://api.minimaxi.chat', 'https://api.minimax.chat']
-  const paths = ['/v1/music_generation', '/v1/t2a_v2', '/v1/text_to_speech']
-  const musicBodies = masterUrl ? [
-    { model: 'music-1.5', stream: false, lyrics: prompt, output_format: 'mp3', reference_audio: masterUrl },
-    { model: 'music-cover', stream: false, lyrics: prompt, master_url: masterUrl, prompt },
-    { model: 'music-1.5', stream: false, lyrics: prompt, prompt },
-  ] : [{ model: 'music-1.5', stream: false, lyrics: prompt, prompt }]
+  const musicBodies = [
+    // 官方 music-1.5: prompt=风格, lyrics=结构化歌词(唱)
+    { model: 'music-1.5', prompt: `${genre}, professional studio, clear lead vocals`, lyrics, stream: false,
+      audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3' } },
+    { model: 'music-1.5', prompt: genre, lyrics, stream: false },
+    // cover 形态
+    masterUrl ? { model: 'music-1.5', prompt: genre, lyrics, stream: false, reference_audio: masterUrl } : null,
+    masterUrl ? { model: 'music-cover', prompt: `${genre}, vocals`, lyrics, master_url: masterUrl, stream: false } : null,
+  ].filter(Boolean)
   const ttsBodies = [{
     model: 'speech-02-hd',
     text: lyric,
-    voice_setting: { voice_id: 'female-yunqi', speed: 1.05, vol: 1.0, pitch: 0 },
+    voice_setting: { voice_id: 'female-yunqi', speed: 0.92, vol: 1.0, pitch: 1.05 },
     audio_setting: { sample_rate: 24000, bitrate: 128000, format: 'mp3' },
   }]
+  const settle = async (p) => {
+    if (!p) return null
+    if (p.bytes) return { audio: p.bytes, ext: 'mp3', duration: p.duration, structure: p.structure, mode: 'sing' }
+    if (p.url) {
+      const b = await fetchAudioUrl(p.url)
+      if (b && b.length > 200) return { audio: b, ext: 'mp3', duration: p.duration, structure: p.structure, mode: 'sing' }
+    }
+    return null
+  }
   for (const h of hosts) {
-    for (const b of musicBodies) {
-      const res = await tryJson(h + '/v1/music_generation', auth, b)
+    for (const body of musicBodies) {
+      const res = await tryJson(h + '/v1/music_generation', auth, body)
       if (!res.ok || !res.j) continue
       const p = pickAudio(res.j)
-      if (p.b64) {
-        const raw = b64ToBytes(p.b64)
-        return { audio: raw, ext: 'mp3', duration: p.duration, structure: p.structure, mode: 'cover' }
-      }
-      if (p.url) {
-        const a = await fetch(p.url)
-        if (a.ok) return { audio: new Uint8Array(await a.arrayBuffer()), ext: 'mp3', duration: p.duration, structure: p.structure, mode: 'cover' }
+      const hit = await settle(p)
+      if (hit) return hit
+      // 异步任务: 轮询结果
+      if (p.taskId) {
+        for (let i = 0; i < 20; i++) {
+          await new Promise(r => setTimeout(r, 2000))
+          const q = await fetch(`${h}/v1/query/video_generation?task_id=${p.taskId}`, { headers: auth }).then(r => r.json()).catch(() => null)
+            || await fetch(`${h}/v1/music_generation/query?task_id=${p.taskId}`, { headers: auth }).then(r => r.json()).catch(() => null)
+          const pq = pickAudio(q)
+          const hit2 = await settle(pq)
+          if (hit2) return hit2
+          if (q && (q.status === 'Fail' || q.status === 'failed')) break
+        }
       }
     }
-    for (const b of ttsBodies) {
+  }
+  // 音乐失败 → 不再用「念课文」冒充唱歌; 只在显式 acapella 时退回 TTS 人声
+  if (sid === 'acapella') {
+    for (const h of hosts) {
       for (const path of ['/v1/t2a_v2', '/v1/text_to_speech']) {
-        const res = await tryJson(h + path, auth, b)
+        const res = await tryJson(h + path, auth, ttsBodies[0])
         if (!res.ok || !res.j) continue
         const p = pickAudio(res.j)
-        if (p.b64) return { audio: b64ToBytes(p.b64), ext: 'mp3', duration: p.duration, mode: 'mm-tts' }
-        if (p.url) {
-          const a = await fetch(p.url)
-          if (a.ok) return { audio: new Uint8Array(await a.arrayBuffer()), ext: 'mp3', duration: p.duration, mode: 'mm-tts' }
-        }
+        const hit = await settle(p)
+        if (hit) return { ...hit, mode: 'voice' }
       }
     }
   }
@@ -137,24 +185,27 @@ Deno.serve(async (req) => {
       }
     }
     if (!audio) {
-      const r = await fetch(sbUrl + '/functions/v1/eh-sing-tts', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: lyric, lyric, sid: 'acapella', format: 'pcm' }),
-      })
-      if (r.ok) {
-        const j = await r.json()
-        if (j && j.audio) {
-          const raw = b64ToBytes(j.audio)
-          const isPcm = /pcm|s16le/i.test(String(j.format || ''))
-          audio = isPcm ? pcmToWav(raw, j.sample_rate || 24000, j.channels || 1) : raw
-          ext = isPcm ? 'wav' : 'mp3'
-          mode = 'edge-tts'
-          duration = lyric.length * 0.32
+      // 仅清唱允许 TTS「念」兜底; 其他曲风失败要报错, 勿用念课文冒充唱歌
+      if (sid === 'acapella') {
+        const r = await fetch(sbUrl + '/functions/v1/eh-sing-tts', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: lyric, lyric, sid: 'acapella', format: 'pcm' }),
+        })
+        if (r.ok) {
+          const j = await r.json()
+          if (j && j.audio) {
+            const raw = b64ToBytes(j.audio)
+            const isPcm = /pcm|s16le/i.test(String(j.format || ''))
+            audio = isPcm ? pcmToWav(raw, j.sample_rate || 24000, j.channels || 1) : raw
+            ext = isPcm ? 'wav' : 'mp3'
+            mode = 'voice'
+            duration = lyric.length * 0.32
+          }
         }
       }
     }
-    if (!audio) return json({ ok: false, error: 'generate_failed' }, 502)
+    if (!audio) return json({ ok: false, error: 'sing_unavailable', detail: 'music_generation_no_audio' }, 502)
 
     let chS = 0, chE = 0
     try {

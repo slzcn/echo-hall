@@ -2690,7 +2690,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-center::before{
       selected.clear(); hintCycle=[]; hintIdx=0; lastShownKey=''; dealAnim=true;
       lastMyTurn=false; lastFinishedN=0; tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
       sfx('deal');
-      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump(); }
+      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump('guandan'); }
       renderAll(); settleHandLayout(); showTributeBanner(); broadcast();
     }
 

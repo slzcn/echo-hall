@@ -129,20 +129,33 @@
       var d = new Date();
       return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
     }
-    function dailyPlays() {
+    // ★主人反馈: 德州打满/输光 5 次后斗地主/掼蛋也被锁 — 每日上限改为【分游戏】独立计数。
+    //   { date, nlhe:n, doudizhu:n, guandan:n }; 兼容旧 {date,n} 视作 nlhe。
+    function _dailyStore() {
       try {
         var o = JSON.parse(localStorage.getItem(DAY_KEY) || 'null');
-        if (o && o.date === dayKey() && typeof o.n === 'number') return o.n;
+        if (o && o.date === dayKey() && typeof o === 'object') return o;
       } catch (e) {}
+      return { date: dayKey() };
+    }
+    function dailyPlays(game) {
+      var o = _dailyStore();
+      var g = game || 'nlhe';
+      if (typeof o[g] === 'number') return o[g];
+      if (typeof o.n === 'number') return o.n;   // 旧全局计数仅归 nlhe
       return 0;
     }
-    function dailyPlayBump() {
-      var n = dailyPlays() + 1;
-      try { localStorage.setItem(DAY_KEY, JSON.stringify({ date: dayKey(), n: n })); } catch (e) {}
+    function dailyPlayBump(game) {
+      var g = game || 'nlhe';
+      var o = _dailyStore();
+      o.date = dayKey();
+      var n = dailyPlays(g) + 1;
+      o[g] = n;
+      try { localStorage.setItem(DAY_KEY, JSON.stringify(o)); } catch (e) {}
       return n;
     }
-    function dailyPlayReached() { return dailyPlays() >= DAY_MAX; }
-    function dailyPlayLeft() { return Math.max(0, DAY_MAX - dailyPlays()); }
+    function dailyPlayReached(game) { return dailyPlays(game) >= DAY_MAX; }
+    function dailyPlayLeft(game) { return Math.max(0, DAY_MAX - dailyPlays(game)); }
     return Object.freeze({
       GRANT: GRANT, PK_MIN: PK_MIN, KEY: KEY, DAY_MAX: DAY_MAX, DAY_KEY: DAY_KEY,
       uid: uid, get: get, set: set, chips: chips, bump: bump, openOpts: openOpts,

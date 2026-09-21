@@ -35,9 +35,9 @@
   //   计数源在 js/modules/score.js(eh_daily_plays_v1); startDeal 落一次, app.js 入口也门禁。
   const PK_DAILY_MAX = 5;
   const _daily = () => (root.EH_DAILY_PLAYS || null);
-  function pkPlaysToday(){ const d=_daily(); return (d && typeof d.plays==='function') ? d.plays() : 0; }
-  function pkAddPlay(){ const d=_daily(); return (d && typeof d.bump==='function') ? d.bump() : 0; }
-  function pkLimitReached(){ const d=_daily(); return !!(d && typeof d.reached==='function' && d.reached()); }
+  function pkPlaysToday(){ const d=_daily(); return (d && typeof d.plays==='function') ? d.plays('nlhe') : 0; }
+  function pkAddPlay(){ const d=_daily(); return (d && typeof d.bump==='function') ? d.bump('nlhe') : 0; }
+  function pkLimitReached(){ const d=_daily(); return !!(d && typeof d.reached==='function' && d.reached('nlhe')); }
 
   const CSS_ID = 'pk-ui-css';
   function injectCSS(){

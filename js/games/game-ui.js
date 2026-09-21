@@ -2304,7 +2304,7 @@ html[data-mode="day"] .ddz-center::before{
       lastLord=null; lastMyTurn=false; justCrowned=false; showOver._done=false;
       st = Engine.createGame({ isAI: gameIsAI, names, seed: (typeof seed!=='undefined' ? seed : opts.seed), firstBidSeat: nextBidLead() });
       sfx('deal');
-      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump(); }
+      if (!isGuest){ const d=root.EH_DAILY_PLAYS; if(d&&d.bump) d.bump('doudizhu'); }
       renderAll();
       broadcast();   // 首帧脱敏快照(此刻 hostChan 已接好, 见 app.gtStart)
       saveScore();
