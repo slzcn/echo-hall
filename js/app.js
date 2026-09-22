@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260921-minimax-api';
+window.__EH_APP_VER = '20260922-eh-polish';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2851,11 +2851,18 @@ function ehDailyPlayGate(game){
   try{
     const g = game || 'nlhe';
     const d=window.EH_DAILY_PLAYS;
+    const name = EH_GAME_LABEL[g] || '该游戏';
     if(d && d.reached && d.reached(g)){
-      const name = EH_GAME_LABEL[g] || '该游戏';
       toast('今日'+name+'对局已达 '+(d.max||5)+' 次 · 明天再来（其他游戏不受影响）');
       return false;
     }
+    // 余额提示: 剩 1~2 次时提前告知, 避免"玩着玩着突然锁"
+    try{
+      const left = d && d.left ? d.left(g) : 99;
+      if (typeof left === 'number' && left >= 0 && left <= 2 && left < (d.max||5)){
+        toast('今日'+name+'还可玩 '+left+' 次');
+      }
+    }catch(_){}
   }catch(_){}
   return true;
 }
@@ -5492,11 +5499,13 @@ async function playSingingHybrid(lyric, sid, card){
     try{ if(window.EhAudioBus) window.EhAudioBus.hold('song'); }catch(_){}
     const myToken=++_songToken;
     const audioEls=[];
+    let bedDur=0;
     if(masterUrl && !/^acapella$/i.test(sid)){
       const bed=new Audio(masterUrl.split('#')[0]);
       bed.preload='auto';
-      try{ bed.volume=0.38; bed.loop=true; }catch(_){}
+      try{ bed.volume=0.38; bed.loop=false; }catch(_){}
       audioEls.push(bed);
+      bedDur = Math.max(0, Number(master && master.duration) || 0);
     }
     if(voiceBlob){
       const v=new Audio(URL.createObjectURL(voiceBlob));
@@ -5508,6 +5517,8 @@ async function playSingingHybrid(lyric, sid, card){
       a.play().then(()=>{}).catch(()=>{});
     }
     curSong={ el:card, token:myToken, audioEls, _hybrid:true };
+    try{ toast('伴奏 + 人声叠播'); }catch(_){}
+    try{ if(card) card.classList.add('hybrid-on'); }catch(_){}
     const cleanup=()=>{
       if(!curSong || curSong.token!==myToken) return;
       audioEls.forEach(a=>{ try{ a.pause(); a.src=''; }catch(_){} });
@@ -5517,8 +5528,10 @@ async function playSingingHybrid(lyric, sid, card){
     };
     const last=audioEls[audioEls.length-1];
     if(last) last.onended=cleanup;
-    // 人声播完后停伴奏(估时)
-    const est=Math.min(12000, 2500+lyric.length*280);
+    // 人声估时 ∪ 母版时长(封顶 40s), 免伴奏被 8s 提前掐断
+    const vEst=Math.min(14000, 2500+String(lyric||'').length*280);
+    const mDur=bedDur>0 ? bedDur*1000 : 0;
+    const est=Math.min(40000, Math.max(vEst, mDur));
     setTimeout(()=>{ if(curSong&&curSong.token===myToken) cleanup(); }, est+400);
     return true;
   }catch(e){ _ehCatch('playSingingHybrid',e); return false; }

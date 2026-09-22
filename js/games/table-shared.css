@@ -1475,3 +1475,6 @@ html[data-mode="day"] .pk-room  .pk-table::after{
 .ddz-hand .card, .gd-hand .card, .gd-hand-row .card{
   touch-action: none;
 }
+
+/* 神曲: 伴奏+人声叠播标识 */
+.song-card.hybrid-on .song-style::after{content:"伴奏+人声";margin-left:6px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(0,229,212,.14);color:var(--accent,#00e5d4);border:1px solid color-mix(in srgb,var(--accent,#00e5d4) 40%,transparent)}

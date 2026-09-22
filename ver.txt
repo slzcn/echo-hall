@@ -1,1 +1,1 @@
-20260921-minimax-api
+20260922-eh-polish
