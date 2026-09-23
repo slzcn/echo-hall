@@ -4,7 +4,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260922-land-fix';
+window.__EH_APP_VER = '20260922-bgm-off';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -352,8 +352,9 @@ function startLobbyBGM(){
 // (进房路径由 startRoomBGM 负责; 这里兜底"停在大厅还没响"的冷启动/自动恢复登录进大厅)
 function kickBgmOnGesture(){
   try{
+    if(!bgmOn()) return;   // ★已关 BGM: 手势只解锁音频, 不得复活背景乐
     AudioEngine.resume();
-    if(bgmOn() && !AudioEngine.playing() && !curRoom && $('#lobby') && $('#lobby').classList.contains('on')){
+    if(!AudioEngine.playing() && !curRoom && $('#lobby') && $('#lobby').classList.contains('on')){
       startLobbyBGM();
       if(AudioEngine.playing()) detachBgmGestureUnlock();
     }
@@ -372,7 +373,9 @@ function paintBgmBtn(on){
 function setBgm(on){ localStorage.setItem(LS_BGM, on?'1':'0'); paintBgmBtn(on); try{ EhSfx.playClick(); }catch(e){ _ehCatch('setBgm',e); }
   try{ if(window.EhAudioUnlock) window.EhAudioUnlock.all(); }catch(e){}
   if(!on){
-    // 关 BGM = 停全部音频占用, 防神曲/语音/TTS 总线泄漏导致音效永久被压
+    // 关 BGM = 立刻停全部音频占用 + 清手动选曲, 防 resume/override 复活
+    _ehBgmOverride = null;
+    try{ if(typeof stopMasterPreview==='function') stopMasterPreview(); }catch(_){}
     AudioEngine.stop();
     try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
     try{ if(window.EhAudioBus) window.EhAudioBus.releaseAll(); }catch(e){}

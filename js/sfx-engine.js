@@ -392,6 +392,7 @@
     }
     function retryPlay(){
       if(!el||!cur) return;
+      try{ if(!bgmEnabled()) return; }catch(e){}
       try{
         if(window.EhAudioBus && window.EhAudioBus.busy()) return;
         if(el._ehNeedGesture || el.paused){
@@ -402,6 +403,13 @@
         }
       }catch(e){}
     }
+    function bgmEnabled(){
+      try{
+        if (window.EH_BGM && typeof window.EH_BGM.on==='function') return !!window.EH_BGM.on();
+        if (window.EH_BGM_MODULE && window.EH_BGM_MODULE.bgmOnFrom) return !!window.EH_BGM_MODULE.bgmOnFrom('eh_bgm');
+      }catch(e){}
+      return true;
+    }
     return {
       start(cfg){ if(!bgmOn()) return; mode='loop'; chainPool=null; if(el) el.loop=true; playCfg(cfg); try{ retryPlay(); }catch(e){} },
       chain(pool){ if(!bgmOn()) return; mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
@@ -410,9 +418,10 @@
       toChainAfter(pool){ mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
         try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
         if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } retryPlay(); },
-      stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } fadeTo(0,700); setTimeout(()=>{cur=null;}, 720); },
+      stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } cur=null; fadeTo(0,80); setTimeout(()=>{ try{ el.pause(); }catch(_){} }, 90); },
       resume(){
         if(!el||!cur) return;
+        if(!bgmEnabled()) return;
         try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
         retryPlay();
         if(!el.paused) fadeTo(VOL_ON, 400);
