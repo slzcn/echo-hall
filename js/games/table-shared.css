@@ -842,11 +842,19 @@ html.pwa-standalone .pk-bar{
   padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
 }
 .ddz-room.is-land .ddz-hand-wrap,
-.gd-room.is-land .gd-hand-wrap{ min-height: 72px; }
+.gd-room.is-land .gd-hand-wrap{ min-height: 64px; }
 .pk-room.is-land .pk-me{
   min-height: 0 !important;
   padding-bottom: calc(0px + env(safe-area-inset-bottom, 0px));
 }
+/* 横屏操作钮: 刘海两侧 safe-area + 不缩进圆角; 手牌/操作条不留空档 */
+.ddz-room.is-land .ddz-acts,
+.gd-room.is-land .gd-acts,
+.pk-room.is-land .pk-acts{
+  padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
+}
+.ddz-room.is-land .ddz-hand-wrap{ padding-top: 2px !important; padding-bottom: 2px !important; }
 .gd-room.is-land .gd-me-row,
 .ddz-room.is-land .ddz-me{ min-height: 0; }
 .gd-room.is-land .gd-tags{ min-height: 0; }
