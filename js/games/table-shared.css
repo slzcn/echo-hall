@@ -1,0 +1,1776 @@
+/* ============================================================
+ * table-shared.css — 三桌（斗地主/掼蛋/德州）共享皮肤层
+ * journey-exempt: 跨端令牌/PWA骨架/台面主题/终端结构 — journey-theme-tables + journey-terminal-layout
+ * ------------------------------------------------------------
+ * ------------------------------------------------------------
+ * 为什么存在: 三款 game UI 各写各的 CSS (ddz- / gd- / pk- 三套前缀),
+ * 已经共享了 --accent/--ink/--panel/--amber/--magenta 等主题变量, 但:
+ *   1) 卡牌 font-family: 'Arial Narrow' 在 Windows/安卓上没字体, 回退丑
+ *   2) 卡牌背面用 45° 斜条纹, 生硬 2018 风
+ *   3) 桌面是纯渐变 bg, 没有绿毡质感
+ *   4) 顶栏是"秃字" (SF Mono 15/800), 没有 chip 化
+ *   5) 聊天坞 / 弹幕层与聊天室 accent 边线呼应不够
+ *
+ * 本文件做四件事(全部通过 .ddz-room/.gd-room/.pk-room 后代选择器命中,
+ * 不需要改三个 UI 的 JS/HTML 结构, 只在 index.html 里加一行 <link>):
+ *   A. 字体链修正: 全场统一 -apple-system,"PingFang SC"...
+ *      卡牌数字/花色用 "SF Pro Rounded","Nunito",... (自带 fallback)
+ *   B. 卡牌背面换成暗玻璃 + 微光斜纹 (无生硬条纹)
+ *   C. 三款桌面共享 "绿绒毡" 径向渐变底 (在 .ddz-felt/.gd-felt/.pk-felt 上)
+ *   D. 顶栏 chip 化: 图标 + 名称 + 局数 + conn pill 抱成一整条
+ *   E. 聊天坞 & 弹幕层升级毛玻璃 + accent 呼应边
+ *
+ * 保守原则: 只补/覆盖视觉相关 CSS, 不改布局/尺寸变量/交互. CI 有专项 journey
+ * 验证三款视觉一致性 + 字体链无 Arial Narrow.
+ * ============================================================ */
+
+/* ── A. 字体链修正 ────────────────────────────────────────── */
+.ddz-room, .gd-room, .pk-room{
+  /* 牌桌只保留一套语义色：青=当前/交互，琥珀=筹码/等级，洋红=危险/全下；
+     各皮肤只提供 accent 等基础变量，牌桌不再各自发明一组近似颜色。 */
+  --table-accent: var(--accent);
+  --table-warm: var(--amber);
+  --table-danger: var(--magenta);
+  --table-surface: var(--panel-solid, #132a29);
+  --table-line: var(--line, color-mix(in srgb, var(--accent) 24%, transparent));
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+               "Segoe UI", "Hiragino Sans GB", sans-serif;
+  /* 触感硬化: 此前只有 PiP chip 关了灰色点按高亮 → 每次点牌/点钮都闪一下系统灰块;
+     长按牌还弹系统"复制/搜索"callout。三桌统一在 room 上关掉, 手感更像原生 App。
+     (不设 user-select:none —— 桌内嵌了聊天面板, 要留住选字复制的能力) */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+/* 卡牌数字/花色: 用圆润无衬线, 数字保留 tabular-nums 对齐 */
+.ddz-room .card, .gd-room .card, .pk-room .card{
+  font-family: "SF Pro Rounded", "SF Pro Display", -apple-system,
+               "PingFang SC", "Segoe UI Emoji", "Helvetica Neue",
+               Arial, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* 顶栏标题/座位名/剩余牌数: 中英一致, 不再落到 SF Mono */
+.ddz-title, .gd-title, .pk-title,
+.ddz-seat .nm, .gd-seat .nm, .pk-seat .nm,
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk,
+.ddz-turnbanner, .gd-banner, .pk-msg, .pk-me .pk-hint{
+  font-family: inherit;
+}
+/* 筹码/局数/剩牌数字保留 tnum 视觉 */
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk, .pk-pot, .pk-me .pk-stk,
+.ddz-turnbanner .clk, .gd-banner .clk, .pk-me .pk-clk{
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* 离座旁观操作栏标签: 与 msg/hint 文案一致(旁观中·已离座) */
+.eh-spectate-tag{font-size:11px;color:var(--sub);margin-right:8px;white-space:nowrap}
+
+/* ── 卡牌主题 token: 正面白纸保留(真牌质感), 背纹/大小王/描边跟主题 ── */
+:root, .ddz-room, .gd-room, .pk-room{
+  --card-face-1:#ffffff;
+  --card-face-2:#fafbfd;
+  --card-face-3:#eceff5;
+  --card-border:color-mix(in srgb, var(--ink, #151a24) 12%, transparent);
+  --card-red:#d81e37;
+  --card-blk:#151a24;
+  --card-back-1:color-mix(in srgb, var(--accent, #10a89b) 100%, #000 0%);
+  --card-back-2:color-mix(in srgb, var(--accent, #0b8f9c) 88%, #000 12%);
+  --card-back-3:color-mix(in srgb, var(--accent, #0a6f9c) 78%, #000 22%);
+  --card-joker-big-1:#fff8f4;
+  --card-joker-big-2:#ffe6dc;
+  --card-joker-big-3:#ffd0c0;
+  --card-joker-big-ink:#b91c32;
+  --card-joker-sm-1:#f8faff;
+  --card-joker-sm-2:#e4ebfa;
+  --card-joker-sm-3:#cfd9f0;
+  --card-joker-sm-ink:#1a2744;
+}
+/* 背纹随主题(青→accent): 各皮肤下牌背成套 */
+.ddz-room, .gd-room, .pk-room{
+  --card-back-1:color-mix(in srgb, var(--accent) 85%, #0a6f9c 15%);
+  --card-back-2:color-mix(in srgb, var(--accent) 70%, #0b8f9c 30%);
+  --card-back-3:color-mix(in srgb, var(--accent) 60%, #0a6f9c 40%);
+}
+/* ── B. 卡牌背面: 与正面同一副牌 ────────────────────────────────
+ * 旧版是整张深蓝 navy 底(#16345a…) → 白色正面 + 深蓝背面, 像两副不同的牌(主人反馈"牌背要和玩家发的牌一样")。
+ * 现在: 卡身用与正面【完全相同】的白纸渐变/边/角/影, 中央嵌一块留白边框的青色斜格花纹面板 ——
+ *       扣着是"白边青花背卡", 翻过来是白牌, 一眼就是同一副牌。(牌背对比见 shot-cardbacks.js) */
+.ddz-room .card.back,
+.gd-room  .card.back,
+.pk-room  .card.back{
+  background: linear-gradient(158deg, var(--card-face-1) 0%, var(--card-face-2) 46%, var(--card-face-3) 100%) !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -3px 7px rgba(18,32,52,.055),
+    0 2px 6px rgba(0,0,0,.34) !important;
+  position: relative;
+  overflow: hidden;
+}
+/* 背纹: 白纸留边内嵌一块青色斜格面板(经典扑克牌背花纹) + 中央一圈柔光菱徽 */
+.ddz-room .card.back::after,
+.gd-room  .card.back::after,
+.pk-room  .card.back::after{
+  content: "";
+  position: absolute;
+  inset: 2px;                              /* 白边收窄(主人反馈"白边太大"): 3px→2px, 青花面板更大 */
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(45deg,  rgba(255,255,255,.22) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.22) 0 1px, transparent 1px 11px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.30), transparent 54%),   /* 中央菱徽放大 44%→54%, 图形元素更醒目 */
+    linear-gradient(150deg, var(--card-back-1) 0%, var(--card-back-2) 55%, var(--card-back-3) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.28),   /* 内白环减弱(.55→.28): 少一圈视觉白边 */
+    inset 0 0 7px rgba(0,0,0,.16);
+  pointer-events: none;
+}
+/* mini 小牌(对手底牌缩略, 德州每人两张牌背最明显): 白边再收到 1px + 图案纹样放大, 让 16×22 小卡上花纹看得清、白边不喧宾夺主 */
+.ddz-room .card.mini.back::after,
+.gd-room  .card.mini.back::after,
+.pk-room  .card.mini.back::after{
+  inset: 1px; border-radius: 2.5px;
+  background:
+    repeating-linear-gradient(45deg,  rgba(255,255,255,.24) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.24) 0 1px, transparent 1px 8px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.34), transparent 60%),
+    linear-gradient(150deg, var(--card-back-1) 0%, var(--card-back-2) 55%, var(--card-back-3) 100%);
+  box-shadow: inset 0 0 4px rgba(0,0,0,.16);   /* mini 去掉内白环, 面板尽量吃满 */
+}
+/* 卡牌正面: 白底不动, 但角标数字更清晰 (稍加对比 + 半衬阴影, 手机上不糊) */
+.ddz-room .card:not(.back) .cn,
+.gd-room  .card:not(.back) .cn,
+.pk-room  .card:not(.back) .cn{
+  font-weight: 900;
+  letter-spacing: -.02em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+.ddz-room .card.red, .gd-room .card.red, .pk-room .card.red{ color:var(--card-red); }
+.ddz-room .card.blk, .gd-room .card.blk, .pk-room .card.blk{ color:var(--card-blk); }
+
+/* ── B2. 卡牌正面"真纸张"质感 ────────────────────────────────
+ * 旧版: 纯白 #fff + 1px 淡边, 硬边白贴纸感, 大花色扁平铺中央 → 廉价。
+ * 重构: 冷白微渐变(顶亮底微灰)模拟卡纸受光 + 顶沿一道纸光高光 + 精致深描边 + 柔投影,
+ *       让每张牌像"印刷卡纸"而非 CSS 白块。中心花色做成浮雕水印, 角标 rank+花色当主读(对标真牌层次)。
+ * 排除 .back(牌背自有暗玻璃配方) 与 .joker(大小王自有金/蓝渐变, 同特异性会被覆盖故显式绕开)。 */
+/* 边框/圆角/投影覆盖所有正面牌(含大小王), 否则大小王留在旧 7px 圆角+淡边, 与邻牌撞样式 */
+.ddz-room .card:not(.back),
+.gd-room  .card:not(.back),
+.pk-room  .card:not(.back){
+  border: 1px solid var(--card-border) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .95),
+    inset 0 -3px 7px rgba(18, 32, 52, .055),
+    0 2px 6px rgba(0, 0, 0, .34) !important;
+}
+/* 纸张渐变底只给普通牌; 大小王保留自有金/蓝渐变(仅继承上面的边/角/影) */
+.ddz-room .card:not(.back):not(.joker),
+.gd-room  .card:not(.back):not(.joker),
+.pk-room  .card:not(.back):not(.joker){
+  background: linear-gradient(158deg, var(--card-face-1) 0%, var(--card-face-2) 46%, var(--card-face-3) 100%) !important;
+}
+/* 中心大花色: 浮雕水印(降透明 + 极淡内阴影), 不再扁平死铺 */
+.ddz-room .card:not(.back) .cc,
+.gd-room  .card:not(.back) .cc,
+.pk-room  .card:not(.back) .cc{
+  opacity: .82 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+}
+/* ── 大小王: 纸牌质感重绘(主人: 旧金/蓝渐变丑) ──
+ * 与普通牌同盒: 白纸底 + 红/靛描边框 + 大「王」字 + 角标「大/小」, 不用 emoji。
+ * 大王=朱砂红系, 小王=墨蓝系; 中心王字用宋体更像真牌印刷。 */
+.ddz-room .card.joker.big,
+.gd-room  .card.joker.big,
+.pk-room  .card.joker.big{
+  background: linear-gradient(168deg, var(--card-joker-big-1) 0%, var(--card-joker-big-2) 44%, var(--card-joker-big-3) 100%) !important;
+  color: var(--card-joker-big-ink) !important;
+}
+.ddz-room .card.joker.small,
+.gd-room  .card.joker.small,
+.pk-room  .card.joker.small{
+  background: linear-gradient(168deg, var(--card-joker-sm-1) 0%, var(--card-joker-sm-2) 44%, var(--card-joker-sm-3) 100%) !important;
+  color: var(--card-joker-sm-ink) !important;
+}
+.ddz-room .card.joker .cn,
+.gd-room  .card.joker .cn,
+.pk-room  .card.joker .cn{
+  font-size: var(--cn, 13px) !important;
+  font-weight: 900 !important;
+  letter-spacing: -.02em !important;
+  color: inherit !important;
+  text-shadow: none !important;
+}
+.ddz-room .card.joker .cc,
+.gd-room  .card.joker .cc,
+.pk-room  .card.joker .cc{
+  font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif !important;
+  /* 大「王」字: 比普通牌花色略大(* 1.15), 不再 * .8 压小(主人: 大王显示过小) */
+  font-size: calc(var(--cc, 21px) * 1.15) !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+  line-height: 1;
+  color: inherit !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 0 8px rgba(0,0,0,.06) !important;
+}
+/* 内框细线 + 底部纹章点: 真牌印刷感, 不用重阴影 */
+.ddz-room .card.joker::after,
+.gd-room  .card.joker::after,
+.pk-room  .card.joker::after{
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 5px;
+  border: 1.2px solid currentColor;
+  opacity: .28;
+  pointer-events: none;
+}
+.ddz-room .card.joker.big::before,
+.gd-room  .card.joker.big::before,
+.pk-room  .card.joker.big::before,
+.ddz-room .card.joker.small::before,
+.gd-room  .card.joker.small::before,
+.pk-room  .card.joker.small::before{
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 5px;
+  width: 8px; height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  border: 1.2px solid currentColor;
+  opacity: .35;
+  pointer-events: none;
+}
+/* 纸面同普通牌的轻渐变阴影已在 not(.back) 规则覆盖; 这里仅压掉旧金/蓝上的过重阴影 */
+.ddz-room .card.joker.big,
+.gd-room  .card.joker.big,
+.pk-room  .card.joker.big,
+.ddz-room .card.joker.small,
+.gd-room  .card.joker.small,
+.pk-room  .card.joker.small{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -3px 7px rgba(18,32,52,.055),
+    0 2px 6px rgba(0,0,0,.28) !important;
+}
+.ddz-room .card.mini.joker .cn,
+.gd-room  .card.mini.joker .cn,
+.pk-room  .card.mini.joker .cn{ font-size: 9px !important; }
+.ddz-room .card.mini.joker .cc,
+.gd-room  .card.mini.joker .cc,
+.pk-room  .card.mini.joker .cc{ font-size: 13px !important; }
+/* 角标: rank 与小花色抱成竖直 index 单元, 花色加重更清晰 */
+.ddz-room .card .cs, .gd-room .card .cs, .pk-room .card .cs{ font-weight: 700; }
+
+/* ── C. 真牌桌: 主题色绒面(跟随主站 10 套皮肤, 不再写死翡翠绿) ─────
+ * 设计口径(对标主流棋牌游戏质感 + Echo 主题变量):
+ *   台面 = 深色绒底 + --accent 低饱和染色 + 聚光亮心 + 深色围边
+ *   日间 = 浅绒/薄荷纸感 + --accent 淡染, 与奶油/浅 bg 协调
+ *   围边/高光用 --accent 叠透明度, 切换 cyber/vapor/mono/klein… 自动跟随
+ * 高特异性 .*-room 前缀, 稳压各 UI 文件里的本地 felt 规则。 */
+.ddz-room .ddz-felt::before,
+.gd-room  .gd-felt::before,
+.pk-room  .pk-table::before{
+  /* 同一桌面配方：只通过 --table-accent 换主题，不再叠加独立青/绿/蓝渐变。 */
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.022) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,.05) 0 1px, transparent 1px 6px),
+    /* 主题染色层: accent 淡罩在深绒上 → 换皮肤时台面跟着变色相 */
+    radial-gradient(ellipse 80% 70% at 50% 36%,
+      color-mix(in srgb, var(--accent) 28%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 10%, transparent) 48%,
+      transparent 72%),
+    /* 深绒底: 亮心 → 中绿 → 近黑边(不抢主题) */
+    radial-gradient(ellipse 74% 66% at 50% 36%,
+      color-mix(in srgb, var(--accent) 42%, #0a2820) 0%,
+      color-mix(in srgb, var(--accent) 26%, #082018) 32%,
+      color-mix(in srgb, var(--accent) 14%, #051410) 58%,
+      color-mix(in srgb, var(--accent) 8%, #03100c) 82%,
+      color-mix(in srgb, var(--accent) 4%, #020a08) 100%) !important;
+  border: none !important;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--accent) 22%, #061814),
+    0 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 18px 44px rgba(0,0,0,.48),
+    0 0 30px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 3px 0 rgba(255,255,255,.10),
+    inset 0 -24px 48px rgba(0,0,0,.40),
+    inset 0 0 64px rgba(0,0,0,.42) !important;
+}
+/* 无 color-mix 的老内核: 回退到固定深绒 + accent 描边 */
+@supports not (background: color-mix(in srgb, red 50%, blue)){
+  .ddz-room .ddz-felt::before,
+  .gd-room  .gd-felt::before,
+  .pk-room  .pk-table::before{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.022) 0 1px, transparent 1px 6px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,.05) 0 1px, transparent 1px 6px),
+      radial-gradient(ellipse 74% 66% at 50% 36%,
+        #1f6b58 0%, #145244 32%, #0c3a32 58%, #072620 82%, #041814 100%) !important;
+    box-shadow:
+      0 0 0 4px #061814,
+      0 0 0 5px var(--accent),
+      0 18px 44px rgba(0,0,0,.48),
+      inset 0 3px 0 rgba(255,255,255,.10),
+      inset 0 0 64px rgba(0,0,0,.42) !important;
+  }
+}
+/* 日间: 浅底上用「主题淡染薄荷纸台」, 不再深绿压奶油底 */
+html[data-mode="day"] .ddz-room .ddz-felt::before,
+html[data-mode="day"] .gd-room  .gd-felt::before,
+html[data-mode="day"] .pk-room  .pk-table::before{
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, rgba(0,90,80,.04) 0 1px, transparent 1px 6px),
+    radial-gradient(ellipse 80% 70% at 50% 36%,
+      color-mix(in srgb, var(--accent) 16%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 6%, transparent) 50%,
+      transparent 75%),
+    radial-gradient(ellipse 74% 66% at 50% 36%,
+      color-mix(in srgb, var(--accent) 22%, #f2faf7) 0%,
+      color-mix(in srgb, var(--accent) 16%, #e2f2ec) 34%,
+      color-mix(in srgb, var(--accent) 11%, #c8e4da) 62%,
+      color-mix(in srgb, var(--accent) 8%, #a8ccc2) 88%,
+      color-mix(in srgb, var(--accent) 6%, #8fb4aa) 100%) !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, rgba(0,0,0,.08)),
+    0 10px 28px rgba(0,0,0,.14),
+    inset 0 2px 0 rgba(255,255,255,.65),
+    inset 0 -18px 36px rgba(0,0,0,.08),
+    inset 0 0 40px rgba(0,0,0,.06) !important;
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)){
+  html[data-mode="day"] .ddz-room .ddz-felt::before,
+  html[data-mode="day"] .gd-room  .gd-felt::before,
+  html[data-mode="day"] .pk-room  .pk-table::before{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 1px, transparent 1px 6px),
+      radial-gradient(ellipse 74% 66% at 50% 36%,
+        #d7f0e8 0%, #b7e0d2 34%, #8fc8b8 62%, #6f9e90 88%, #5a8578 100%) !important;
+    box-shadow:
+      0 0 0 3px var(--accent),
+      0 10px 28px rgba(0,0,0,.14),
+      inset 0 2px 0 rgba(255,255,255,.65),
+      inset 0 0 40px rgba(0,0,0,.06) !important;
+  }
+}
+/* 日间: 浅底上深绿绒会发灰, 换清透薄荷呢(亮心→淡翡翠边), 皮革边换成浅木沿 + 白高光 */
+/* ── C2. 日间可读性修复(自检发现的回归) ──────────────────────
+ * 台面在日间调亮成薄荷绿后, 直接"印在台面上"的 --sub/--dim 青灰字(座位名/消息/passtag/
+ * 底牌 label)对比骤降=青字压青底几乎看不清(德州最重, 全部座位坐在台面上)。
+ * 仅在日间、仅对台面上文字压深 + 白色微光提亮描边; 夜间深台面不动, 台面外(浅页底)的对手名不动。 */
+html[data-mode="day"] .pk-seat .nm,
+html[data-mode="day"] .pk-seat.turn .nm{
+  color: var(--ink) !important;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+html[data-mode="day"] .pk-seat .stk{ color: var(--sub) !important; }
+html[data-mode="day"] .pk-msg:not(.mine){
+  color: var(--ink) !important;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+html[data-mode="day"] .ddz-passtag,
+html[data-mode="day"] .gd-passtag,
+html[data-mode="day"] .ddz-lastwho,
+html[data-mode="day"] .ddz-bottom-cards .bc-lbl{
+  color: var(--sub) !important;
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+/* ── D. 顶栏 chip 化: 让 title + dot + mult/lvl/blinds + conn 抱在一起 ── */
+/* ★顶栏必须让开 iOS/安卓状态栏(时钟/信号/电量): 此前这里的 padding:10px !important 把各 UI 文件里
+   calc(12px + env(safe-area-inset-top)) 一并盖掉 → 顶栏平贴到状态栏, 标题与系统时钟叠字(实拍已证)。
+   这里把 safe-area 收回顶 padding。 */
+.ddz-bar, .gd-bar, .pk-bar{
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px !important;
+  /* 毛玻璃压字(主人: 顶部文案被糊) → 实底+轻模糊, 文案对比稳 */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-solid) 88%, transparent),
+    color-mix(in srgb, var(--panel-solid) 72%, transparent)) !important;
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+}
+/* ★装成 PWA(standalone)时 env(safe-area-inset-top) 在部分安卓/小米机上不可靠会报 0(见项目记忆),
+   给一个 42px 的地板保底: 无论 env 是否生效, standalone 下顶栏都至少让开状态栏, 不再和时钟撞车。
+   浏览器态(有地址栏, 无此 class)保持 10px+env 的紧凑顶栏。 */
+html.pwa-standalone .ddz-bar,
+html.pwa-standalone .gd-bar,
+html.pwa-standalone .pk-bar{
+  padding-top: max(calc(10px + env(safe-area-inset-top, 0px)), 42px) !important;
+}
+.ddz-title, .gd-title, .pk-title{
+  font-size: 14px !important;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--ink) !important;
+  letter-spacing: .05em !important;
+  text-shadow: none;
+}
+.ddz-title .dot, .gd-title .dot, .pk-title .dot{
+  width: 7px !important; height: 7px !important;
+}
+/* 局数/等级/盲注 chip: 三款都是右上角的小 pill, 统一质感 */
+.ddz-mult, .gd-lvl, .pk-blinds{
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  padding: 3px 10px !important;
+  font-size: 11.5px !important;
+}
+/* 顶栏功能钮(三游戏统一): 一律 36px 磨砂玻璃圆钮, 图标同色(currentColor)
+   ★选择器必须含 .gd-auto/.pk-auto — 漏掉会让托管钮走局内旧样式, 颜色/日间与其余三颗不一致 */
+.ddz-mus, .ddz-cnt, .ddz-auto, .ddz-rot, .ddz-x,
+.gd-mus, .gd-auto, .gd-rot, .gd-x,
+.pk-mus, .pk-auto, .pk-rot, .pk-x{
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--ink) 8%, transparent), transparent 62%),
+    color-mix(in srgb, var(--panel-solid) 55%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent),
+    0 2px 6px color-mix(in srgb, var(--ink) 18%, transparent) !important;
+  transition: transform .14s cubic-bezier(.2,.85,.3,1), color .14s, border-color .14s, box-shadow .14s;
+}
+/* 顶栏布局: 标题靠左, 功能钮靠右(mus 起 auto 右推) — 三款同一节奏 */
+.ddz-bar, .gd-bar, .pk-bar{
+  gap: 8px !important;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+  padding-bottom: 8px !important;
+}
+.ddz-mus, .gd-mus, .pk-mus{ margin-left: auto !important; }
+html[data-mode="day"] .ddz-mus, html[data-mode="day"] .ddz-cnt, html[data-mode="day"] .ddz-auto,
+html[data-mode="day"] .ddz-rot, html[data-mode="day"] .ddz-x,
+html[data-mode="day"] .gd-mus, html[data-mode="day"] .gd-auto, html[data-mode="day"] .gd-rot, html[data-mode="day"] .gd-x,
+html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-auto, html[data-mode="day"] .pk-rot, html[data-mode="day"] .pk-x{
+  background:
+    radial-gradient(circle at 50% 30%, #ffffff, transparent 66%),
+    rgba(255,255,255,.6) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.12) !important;
+  color: var(--ink);
+  border-color: var(--line2) !important;
+}
+
+/* ── E. 座位卡片化 (在原有 conic 高亮环之外补一层玻璃底) ──── */
+/* 只给非 turn 态补微弱 chip 底, turn 态本身已很显眼 */
+.ddz-seat .ddz-avr, .gd-seat .gd-avr, .pk-seat .pk-avr{
+  transition: box-shadow .18s, transform .18s;
+}
+/* 座位徽章化: emoji 不再浮在扁平暗圆里, 而是坐在一枚"受光圆章"上——
+   顶亮高光 + 底沿暗影做出圆顶浮凸, 外加柔投影托起。turn/win/allin 态的发光在更高
+   特异性规则里(.*-seat.turn .*-avr .av 等), 会整条覆盖本 box-shadow, 状态高光不受影响。 */
+.ddz-avr .av, .gd-avr .av, .pk-avr .av{
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--ink) 16%, transparent), transparent 58%),
+    radial-gradient(circle at 50% 120%, rgba(0,0,0,.38), transparent 62%),
+    linear-gradient(162deg, color-mix(in srgb, var(--table-accent) 20%, var(--table-surface)), color-mix(in srgb, var(--table-accent) 8%, var(--table-surface)) 52%, var(--table-surface) 100%) !important;
+  border: 1.5px solid color-mix(in srgb, var(--table-accent) 36%, transparent) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.14),
+    inset 0 -4px 7px rgba(0,0,0,.42),
+    0 3px 9px rgba(0,0,0,.42) !important;
+}
+html[data-mode="day"] .ddz-avr .av,
+html[data-mode="day"] .gd-avr .av,
+html[data-mode="day"] .pk-avr .av{
+  background:
+    radial-gradient(circle at 50% 28%, #ffffff, transparent 60%),
+    radial-gradient(circle at 50% 122%, rgba(0,90,82,.16), transparent 62%),
+    linear-gradient(162deg, #f2fbf9 0%, #dcf1ee 100%) !important;
+  border: 1.5px solid color-mix(in srgb, var(--table-accent) 32%, transparent) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.9),
+    inset 0 -3px 6px rgba(0,80,74,.10),
+    0 3px 8px rgba(0,70,64,.18) !important;
+}
+.ddz-seat .nm, .gd-seat .nm, .pk-seat .nm{
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+}
+.ddz-seat .cnt, .gd-seat .cnt, .pk-seat .stk{
+  font-weight: 600;
+}
+/* 掼蛋的 gd-tag (队友/等级/警戒) 字号从 9px 提到 10.5px, 更容易识别 */
+.gd-room .gd-tag{ font-size: 10.5px !important; padding: 1px 6px !important; }
+/* 说话气泡/下注色块: 夜间不再糊成死黑 —— 提高底色明度与文字对比(主人反馈"太黑看不清字") */
+.ddz-say, .gd-say, .pk-say{
+  border-radius: 12px !important;
+  background:
+    linear-gradient(180deg, rgba(48, 86, 80, .94), rgba(28, 54, 52, .90)) !important;
+  color: var(--ink) !important;
+  font-weight: 600 !important;
+  border-color: color-mix(in srgb, var(--table-accent) 48%, transparent) !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .32),
+    inset 0 1px 0 rgba(255,255,255,.10) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.35);
+}
+html[data-mode="day"] .ddz-say,
+html[data-mode="day"] .gd-say,
+html[data-mode="day"] .pk-say{
+  background:
+    linear-gradient(180deg, rgba(236, 250, 247, .96), rgba(210, 236, 230, .92)) !important;
+  color: var(--ink) !important;
+  border-color: var(--line2) !important;
+  text-shadow: none;
+}
+/* 下注/底池/倍数: 琥珀字 + 可读深金底, 拒绝纯黑块 */
+.pk-pot, .pk-commit, .ddz-mult, .pk-potpart{
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) 18%, var(--panel-solid)), color-mix(in srgb, var(--amber) 10%, var(--bg2))) !important;
+  color: var(--amber) !important;
+  border-color: color-mix(in srgb, var(--amber) 48%, transparent) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 2px 8px rgba(0,0,0,.28) !important;
+}
+html[data-mode="day"] .pk-pot,
+html[data-mode="day"] .pk-commit,
+html[data-mode="day"] .ddz-mult,
+html[data-mode="day"] .pk-potpart{
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) 22%, #fff), color-mix(in srgb, var(--amber) 12%, #fff)) !important;
+  color: var(--ink) !important;
+  border-color: color-mix(in srgb, var(--amber) 35%, transparent) !important;
+  text-shadow: none;
+}
+/* 操作区底: 统一深青玻璃, 不要纯黑幕布 */
+.pk-acts, .ddz-acts, .gd-acts, .ddz-bidbar{
+  background:
+    linear-gradient(180deg, rgba(10, 22, 28, .55), rgba(6, 12, 16, .72)) !important;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+}
+/* 结算遮罩略提亮, 面板文字更清晰 */
+.ddz-over, .gd-over, .pk-over{
+  background: rgba(8, 14, 20, .72) !important;
+}
+.ddz-over-panel, .gd-over-panel, .pk-over-card{
+  background:
+    linear-gradient(180deg, rgba(24, 48, 46, .94), rgba(12, 24, 28, .92)) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06) !important;
+}
+
+/* ── F. Conn pill 统一: 圆角一致, 高度对齐 title chip ────── */
+.ddz-conn, .gd-conn, .pk-conn{
+  height: 22px;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center;
+  font-size: 10.5px !important;
+  letter-spacing: .04em !important;
+  vertical-align: middle !important;
+}
+
+/* ── G. 聊天坞 + 弹幕层升级 (与聊天室 accent 呼应) ───────── */
+.ddz-room .tchat-toggle,
+.gd-room  .tchat-toggle,
+.pk-room  .tchat-toggle{
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    rgba(19, 42, 41, .8)) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent) !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .45),
+    0 0 0 1px rgba(255, 255, 255, .04) inset,
+    0 0 14px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  transition: transform .14s, box-shadow .18s;
+}
+@media (hover:hover){
+  .ddz-room .tchat-toggle:hover,
+  .gd-room  .tchat-toggle:hover,
+  .pk-room  .tchat-toggle:hover{
+    transform: translateY(-1px);
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, .5),
+      0 0 20px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  }
+}
+.ddz-room .tchat-panel,
+.gd-room  .tchat-panel,
+.pk-room  .tchat-panel{
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg,
+    rgba(8, 14, 22, .90),
+    rgba(6, 12, 20, .80)) !important;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(255, 255, 255, .04) inset !important;
+}
+.ddz-room .tchat-row .rn,
+.gd-room  .tchat-row .rn,
+.pk-room  .tchat-row .rn{
+  font-weight: 700;
+}
+.ddz-room .tchat-bullet,
+.gd-room  .tchat-bullet,
+.pk-room  .tchat-bullet{
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .35) !important;
+}
+.ddz-room .tchat-bullet.me,
+.gd-room  .tchat-bullet.me,
+.pk-room  .tchat-bullet.me{
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    rgba(6, 34, 32, .7)) !important;
+}
+.ddz-room .tchat-bullet.soul,
+.gd-room  .tchat-bullet.soul,
+.pk-room  .tchat-bullet.soul{
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--magenta) 22%, transparent),
+    rgba(40, 10, 28, .7)) !important;
+}
+
+/* ── H. 折叠 chip (右下角 PiP) 收敛质感 ─────────────────── */
+/* 底/边/字走主题变量(浅紫/日间/各皮肤成套), 不再写死深蓝-青
+   ★右侧 padding ≥ border-radius: 展开钮(ck-x)贴在圆角弧内会被裁/叠边, 主人截图已证 */
+.ddz-chip, .gd-chip, .pk-chip{
+  border-radius: 18px !important;
+  padding: 9px 18px 9px 12px !important;
+  background: var(--panel-solid) !important;
+  border: 1px solid var(--line2) !important;
+  color: var(--ink) !important;
+  overflow: visible !important;
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--ink) 22%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent) inset !important;
+}
+.ddz-chip .ck-x, .gd-chip .ck-x, .pk-chip .ck-x{
+  margin-left: 4px !important;
+  width: 22px !important;
+  height: 22px !important;
+  flex: none !important;
+  overflow: visible !important;
+}
+.ddz-chip .ck-t, .gd-chip .ck-t, .pk-chip .ck-t{ font-size: 12.5px !important; color: var(--ink) !important; }
+.ddz-chip .ck-s, .gd-chip .ck-s, .pk-chip .ck-s{ font-size: 11px !important; color: var(--sub) !important; }
+/* 折叠片 ✕=中途离桌(房主散桌/客人退席); 与展开钮 ↗ 并排, 不占标题行 */
+.ddz-chip .ck-leave, .gd-chip .ck-leave, .pk-chip .ck-leave{
+  margin-left: 2px !important;
+  width: 22px !important; height: 22px !important;
+  flex: none !important;
+  border: none !important; background: transparent !important;
+  color: var(--dim) !important;
+  font-size: 13px !important; line-height: 1 !important;
+  cursor: pointer !important; padding: 0 !important;
+  border-radius: 9px !important;
+}
+.ddz-chip .ck-leave:hover, .gd-chip .ck-leave:hover, .pk-chip .ck-leave:hover{
+  color: var(--magenta) !important;
+  background: color-mix(in srgb, var(--magenta) 14%, transparent) !important;
+}
+/* 顶栏「换肤」🎨: 与 🎵 圆钮同规格, 打牌途中可切主题 */
+.ddz-skin, .gd-skin, .pk-skin, .eh-skin{
+  width: 34px !important; height: 34px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--line) !important;
+  background: var(--panel) !important;
+  color: var(--sub) !important;
+  font-size: 16px !important; line-height: 1 !important;
+  cursor: pointer !important;
+  display: grid !important; place-items: center !important;
+  flex: none !important; padding: 0 !important;
+}
+.ddz-skin:hover, .gd-skin:hover, .pk-skin:hover, .eh-skin:hover{
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+.ddz-skin:active, .gd-skin:active, .pk-skin:active, .eh-skin:active{ transform: scale(.92) !important; }
+/* 顶栏「离桌」: 文字幽灵钮, 与圆钮同高; 全屏态不必先折叠才能散桌 */
+.eh-leave, .ddz-leave, .gd-leave, .pk-leave{
+  flex: none !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--line) !important;
+  background: transparent !important;
+  color: var(--dim) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+}
+.eh-leave:hover, .ddz-leave:hover, .gd-leave:hover, .pk-leave:hover{
+  color: var(--magenta) !important;
+  border-color: var(--magenta) !important;
+  background: color-mix(in srgb, var(--magenta) 12%, transparent) !important;
+}
+
+/* ── I. 操作按钮触感统一 (更 Apple 一点) ─────────────────── */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn{
+  /* 三款字号统一: 原 clamp 13/4vw/16 vs 13/3.7vw/15 不一致 */
+  font-size: clamp(13px, 3.8vw, 15px) !important;
+  transition:
+    transform .12s cubic-bezier(.34, 1.56, .64, 1),
+    box-shadow .16s,
+    background .16s !important;
+}
+@media (hover:hover){
+  .ddz-btn:not(:disabled):hover,
+  .gd-btn:not(:disabled):hover,
+  .pk-b:not(:disabled):hover{
+    transform: translateY(-1px);
+  }
+}
+.ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
+  transform: scale(.95) !important;
+}
+/* ── I2. 收敛"满屏青描边": 中性按钮玻璃化, 顶栏圆钮实体化 ──────
+ * 主人点名整体"赛博线框廉价", 一大来源是所有按钮都是一根扁平青描边。
+ * 只给"中性"按钮(不承载动作语义的)补玻璃受光, 带语义的彩色变体(primary/danger/ghost/
+ * call/raise/allin…)一律不动——它们靠颜色传达"这是主操作/加注/全下", 一刀切会切坏语义。
+ * background-image 走 longhand 叠在各 UI 的 background:var(--panel) 简写之上(简写在前置文件、
+ * 本 longhand 在后置文件, 只覆盖 image 子属性, 保留 --panel 底色 → 自动兼容日/夜)。 */
+.ddz-btn:not(.primary):not(.ghost):not(.danger),
+.gd-btn:not(.primary):not(.ghost),
+.pk-b.fold, .pk-b.call.check, .pk-qbtn{
+  background-image: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 44%, rgba(0,0,0,.12)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -2px 5px rgba(0,0,0,.18),
+    0 2px 7px rgba(0,0,0,.3) !important;
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent) !important;
+}
+html[data-mode="day"] .ddz-btn:not(.primary):not(.ghost):not(.danger),
+html[data-mode="day"] .gd-btn:not(.primary):not(.ghost),
+html[data-mode="day"] .pk-b.fold,
+html[data-mode="day"] .pk-b.call.check,
+html[data-mode="day"] .pk-qbtn{
+  background-image: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.2) 50%, rgba(0,90,82,.05)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.14) !important;
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent) !important;
+}
+/* 顶栏圆钮(音乐/记牌器/横屏/返回): 透明描边圆 → 一枚受光玻璃圆盘, 与座位徽章同一材质语言 */
+.ddz-mus, .ddz-cnt, .ddz-rot, .gd-mus, .gd-rot, .pk-mus, .pk-rot, .pk-x{
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.10), transparent 62%),
+    rgba(255,255,255,.035) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 2px 6px rgba(0,0,0,.26) !important;
+}
+html[data-mode="day"] .ddz-mus, html[data-mode="day"] .ddz-cnt, html[data-mode="day"] .ddz-rot,
+html[data-mode="day"] .gd-mus, html[data-mode="day"] .gd-rot,
+html[data-mode="day"] .pk-mus, html[data-mode="day"] .pk-rot, html[data-mode="day"] .pk-x{
+  background:
+    radial-gradient(circle at 50% 30%, #ffffff, transparent 66%),
+    rgba(255,255,255,.6) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 2px 6px rgba(0,70,64,.12) !important;
+}
+
+/* ── J. 结算面板玻璃化 ────────────────────────────────────── */
+.ddz-over, .gd-over, .pk-over{
+  background: rgba(4, 6, 12, .78) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* ── K. 手牌底部渐隐: 有"托盘"感, 不像悬空贴纸 ─────────── */
+.ddz-hand-wrap, .gd-hand-wrap{
+  /* 底托跟主题底色融合(主人: 牌桌和底部背景突兀) */
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--bg) 35%, transparent) 45%,
+      color-mix(in srgb, var(--bg) 72%, transparent) 100%) !important;
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent) !important;
+}
+
+/* ── L. 横竖屏切换(table-orient.js): 施加 .eh-rot 时牌桌 transform:rotate 成横向,
+   尺寸/位移走内联 px(按 #hall 盒子算), 这里只钉定位与裁剪; 旋转后仍被 #hall 裁在聊天室内。 */
+.ddz-room.eh-rot, .gd-room.eh-rot, .pk-room.eh-rot{
+  position: absolute; top: 0; left: 0;
+  overflow: hidden;
+}
+/* 顶栏「⟳ 横屏」切换钮: 与音乐钮同款圆钮, 横屏态高亮 accent */
+.ddz-rot, .gd-rot, .pk-rot{
+  width: 36px; height: 36px; border-radius: 9px;
+  border: 1px solid var(--line, color-mix(in srgb, var(--accent) 24%, transparent)); background: transparent;
+  color: var(--sub); font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+@media (hover:hover){
+  .ddz-rot:hover, .gd-rot:hover, .pk-rot:hover{ color: var(--ink); border-color: var(--line2, color-mix(in srgb, var(--accent) 40%, transparent)); }
+}
+.ddz-rot.on, .gd-rot.on, .pk-rot.on{
+  color: var(--accent); border-color: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* ── M. 功能2 牌桌招募页(#hall 浮层): 房主开桌直接落这, 页上招募真人/一键灵魂/开始, 更丝滑。
+   聊天里仍有牌桌卡供他人加入 & 房主返回后重开页; 页体复用 gt-card 招募 UI, 只套铺满 #hall 的壳。 */
+.gt-lobby-room{
+  position: absolute; inset: 0; z-index: 21;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+    linear-gradient(180deg, #0b1524 0%, #070d18 100%);
+  overflow: hidden;
+  animation: gt-lobby-in .22s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes gt-lobby-in{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+.gt-lobby-bar{
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  background: linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.04));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+html.pwa-standalone .gt-lobby-bar{ padding-top: max(calc(10px + env(safe-area-inset-top, 0px)), 42px); }
+.gt-lobby-title{
+  font-size: 14px; font-weight: 800; letter-spacing: .05em; color: var(--ink);
+  padding: 4px 12px 4px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.gt-lobby-title .dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.gt-lobby-x{
+  margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--line, color-mix(in srgb, var(--accent) 24%, transparent)); background: transparent;
+  color: var(--sub); font-size: 12.5px; cursor: pointer; transition: all .14s;
+}
+.gt-lobby-x:hover{ color: var(--ink); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.gt-lobby-body{ flex: 1; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; align-items: center; justify-content: center; padding: 18px 14px; }
+.gt-lobby-body .gt-card{ width: 100%; max-width: 460px; }
+/* 招募页里的牌桌卡去掉聊天流里的外边距/入场动画包裹感 */
+.gt-lobby-body .gt-card{ margin: 0 !important; }
+.gt-card-openable{ cursor: pointer; }
+
+/* ══════════════════════════════════════════════════════════════
+   N. 牌桌结构锁定 (主人: 出牌过程中桌面不要跳 · 兼顾横屏)
+   固定 顶栏 / 对手席带 / 操作区 / 手牌托盘 的高度与骨架,
+   标签与「上一手」只改内容不改布局占位。
+   ★横屏(.is-land)必须降级 min-height: 手机横屏总高仅 ~375px,
+     对手席 88px + 操作区 88px 会把椭圆/公共牌挤爆(主人"横屏乱版")。
+   ══════════════════════════════════════════════════════════════ */
+.ddz-bar, .gd-bar, .pk-bar{
+  min-height: calc(52px + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
+  flex-shrink: 0 !important;
+}
+html.pwa-standalone .ddz-bar,
+html.pwa-standalone .gd-bar,
+html.pwa-standalone .pk-bar{
+  min-height: max(calc(52px + env(safe-area-inset-top, 0px)), 58px);
+}
+/* 对手席带: 固定高度, 头像/名字/张数/标签/上一手 各行占位稳定 */
+.ddz-opps, .gd-partner, .gd-mid{
+  flex-shrink: 0;
+}
+.ddz-opps{ min-height: 108px; }
+.gd-partner{ min-height: 96px; }
+.gd-mid{ min-height: 120px; }
+.gd-side{ min-width: 84px; }
+.ddz-seat, .gd-seat{
+  min-height: 88px;
+  box-sizing: border-box;
+}
+.pk-seat{ min-height: 0; box-sizing: border-box; }  /* 德州对手绝对定位椭圆, 不锁 88px */
+.gd-partner .gd-seat{ min-height: 72px; }
+/* 标签行 / 上一手行: 永远占位, 增删 chip 不再撑跳布局 */
+.gd-tags, .ddz-seat .role{
+  min-height: 16px;
+  line-height: 16px;
+}
+.gd-lastplay, .ddz-seat-reveal{
+  min-height: 22px;
+  line-height: 20px;
+}
+.pk-mini-hole{ min-height: 28px; }
+.pk-mini-hn{ min-height: 12px; }
+/* 操作区 / 手牌托盘: 底部骨架锁死(竖屏); 横屏改矮 */
+.ddz-ctrl, #ddzCtrl, .gd-foot{
+  min-height: 100px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.pk-acts{
+  min-height: 140px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.gd-foot{ min-height: 100px; }
+.gd-hand-wrap{ min-height: 190px; }  /* 掼蛋两排牌 */
+/* ── 矮屏兼容(iOS SE 667 / 安卓小屏): 底部栈压高, 否则桌面只剩 ~44% ── */
+@media (max-height: 720px){
+  .ddz-hand-wrap{ min-height: 120px; }
+  .gd-hand-wrap{ min-height: 150px; }
+  .ddz-ctrl, #ddzCtrl, .gd-foot{ min-height: 88px; }
+  .pk-acts{ min-height: 120px; }
+  .gd-me-row, .ddz-me{ height: auto; min-height: 64px; }
+  .pk-me{ height: 56px; min-height: 56px; }
+}
+/* ── 高屏/平板: 底部可再放宽一点, 牌更大气 ── */
+@media (min-height: 900px){
+  .ddz-hand-wrap{ min-height: 160px; }
+  .gd-hand-wrap{ min-height: 200px; }
+}
+.ddz-hand-wrap{
+  flex-shrink: 0;
+  min-height: 150px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+.gd-hand-wrap{
+  flex-shrink: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+.pk-me{
+  flex-shrink: 0;
+  height: 64px;
+  min-height: 64px;
+  box-sizing: border-box;
+  overflow: visible;
+  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+}
+.gd-me-row, .ddz-me{
+  flex-shrink: 0;
+  height: auto;            /* 不锁死: 内容(头像+名+分+徽标)变化时不裁 */
+  min-height: 80px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+/* ── 横屏骨架: 清零/压矮, 留高度给椭圆与操作 ── */
+.ddz-room.is-land .ddz-bar,
+.gd-room.is-land .gd-bar,
+.pk-room.is-land .pk-bar{
+  min-height: 0 !important;
+  padding-top: calc(2px + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: 2px !important;
+}
+.ddz-room.is-land .ddz-opps{ min-height: 0; }
+.gd-room.is-land .gd-partner{ min-height: 0; }
+.gd-room.is-land .gd-mid{ min-height: 0; }
+.ddz-room.is-land .ddz-seat,
+.gd-room.is-land .gd-seat,
+.pk-room.is-land .pk-seat{ min-height: 0 !important; }
+.ddz-room.is-land .ddz-ctrl, .ddz-room.is-land #ddzCtrl,
+.gd-room.is-land .gd-foot,
+.pk-room.is-land .pk-acts{
+  height: auto !important;
+  min-height: 0 !important;
+  padding-top: 4px !important;
+  padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.ddz-room.is-land .ddz-hand-wrap{ min-height: 80px; }
+.gd-room.is-land .gd-hand-wrap{ min-height: 110px; }
+.pk-room.is-land .pk-me{
+  height: auto !important;
+  min-height: 0 !important;
+  padding-bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+}
+/* 横屏操作钮: 刘海两侧 safe-area + 不缩进圆角; 手牌/操作条不留空档 */
+.ddz-room.is-land .ddz-acts,
+.gd-room.is-land .gd-acts,
+.pk-room.is-land .pk-acts{
+  padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
+}
+.ddz-room.is-land .ddz-hand-wrap{ padding-top: 2px !important; padding-bottom: 2px !important; }
+.gd-room.is-land .gd-me-row,
+.ddz-room.is-land .ddz-me{ height: auto; min-height: 40px; overflow: visible; }
+.gd-room.is-land .gd-tags{ min-height: 0; }
+.gd-room.is-land .gd-lastplay{ min-height: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   O. 跨端统一与性能 (iPhone / Android / PWA / 桌面)
+   设计令牌 + 触控目标 + 焦点可见 + 减少动态 + 合成层隔离
+   ══════════════════════════════════════════════════════════════ */
+.ddz-room, .gd-room, .pk-room{
+  --eh-r-btn: 12px;
+  --eh-r-card: 8px;
+  --eh-r-panel: 16px;
+  --eh-touch: 44px;
+  --eh-bar-h: 52px;
+  --eh-act-h: 72px;
+  --eh-ease: cubic-bezier(.2,.85,.3,1);
+  --eh-dur: .14s;
+  /* 性能: 桌面/席带/操作区限布局与绘制范围, 出牌时局部重绘不牵全身 */
+  contain: layout style;
+}
+.ddz-felt, .gd-felt, .pk-felt, .pk-table{
+  contain: layout style paint;
+}
+.ddz-opps, .gd-partner, .gd-mid, .ddz-seat, .gd-seat, .pk-seat{
+  contain: layout style;
+}
+/* 主操作钮触控 ≥44px(移动端); 桌面 hover 已有 */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn{
+  min-height: 40px;
+  border-radius: var(--eh-r-btn) !important;
+}
+.ddz-room:not(.is-land) .ddz-acts .ddz-btn.primary,
+.gd-room:not(.is-land) .gd-acts .gd-btn.primary,
+.pk-room:not(.is-land) .pk-b.call.check,
+.pk-room:not(.is-land) .pk-b.raise{
+  min-height: var(--eh-touch);
+}
+/* 焦点可见(a11y / 键盘 / 部分安卓遥控): 三桌同一套 accent 焦点环 */
+.ddz-room :focus-visible,
+.gd-room :focus-visible,
+.pk-room :focus-visible{
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.ddz-room button:focus:not(:focus-visible),
+.gd-room button:focus:not(:focus-visible),
+.pk-room button:focus:not(:focus-visible){ outline: none; }
+/* 减少动态: 系统偏好时关掉装饰动画, 保留状态色(可读性) */
+@media (prefers-reduced-motion: reduce){
+  .ddz-room *, .gd-room *, .pk-room *{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ddz-room .ddz-avr .av, .gd-room .gd-avr .av, .pk-room .pk-avr .av{ animation: none !important; }
+}
+/* 统一操作区文字对比(日/夜): 不用纯黑底 */
+.ddz-room:not(.is-land) .ddz-acts,
+.gd-room:not(.is-land) .gd-acts,
+.pk-room:not(.is-land) .pk-acts{
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+html[data-mode="day"] .ddz-room .ddz-acts,
+html[data-mode="day"] .gd-room .gd-acts,
+html[data-mode="day"] .pk-room .pk-acts{
+  background:
+    linear-gradient(180deg, rgba(240,248,246,.72), rgba(220,236,232,.88)) !important;
+  border-top-color: color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+/* 日间牌桌绒毡已在 C 段处理; 这里统一日间标题 chip 对比 */
+html[data-mode="day"] .ddz-title,
+html[data-mode="day"] .gd-title,
+html[data-mode="day"] .pk-title{
+  color: var(--ink) !important;
+  background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent) !important;
+}
+/* 桌面宽屏: 内容居中限宽, 三桌同一 max-width 语言(各 UI --maxw 已有, 兜底) */
+@media (min-width: 900px){
+  .ddz-room, .gd-room, .pk-room{ --maxw: 860px; }
+  .ddz-felt, .gd-felt, .pk-felt{ margin-left: auto; margin-right: auto; }
+}
+/* 大号点控: 顶栏钮已是 36px; 手牌选中态由各 UI 负责, 这里保证 active 缩放一致 */
+.ddz-hand .card:active,
+.gd-hand .card:active,
+.gd-hand-row .card:active{
+  transform: translateY(-18px) scale(1.02);
+}
+/* 合成层: 只给常动画元素 will-change, 避免整桌开层爆内存(低端机) */
+.ddz-seat.turn .ddz-avr .av,
+.gd-seat.turn .gd-avr .av,
+.pk-seat.turn .pk-avr .av{
+  will-change: box-shadow;
+}
+.ddz-seat:not(.turn) .ddz-avr .av,
+.gd-seat:not(.turn) .gd-avr .av,
+.pk-seat:not(.turn) .pk-avr .av{
+  will-change: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   P. 移动端/PWA 骨架降级 (主人: 开始按钮被挤掉、PWA 结构丑)
+   短屏与招募态必须让位给「操作区可见」——结构锁是手段不是目的。
+   ══════════════════════════════════════════════════════════════ */
+/* 短屏(PWA 刘海机 + 小屏): 总高不够时清零硬 min-height, 交给 flex 分配 */
+@media (max-width: 599px), (max-height: 720px){
+  .ddz-opps, .gd-partner, .gd-mid{ min-height: 0 !important; }
+  .ddz-seat, .gd-seat{ min-height: 0 !important; }
+  .gd-partner .gd-seat{ min-height: 0 !important; }
+  /* 手牌托盘: 矮屏压扁保桌面, 高屏给足不裁牌 */
+  .ddz-hand-wrap{ min-height: 120px !important; }
+  .gd-hand-wrap{ min-height: 150px !important; }
+  .ddz-me, .gd-me-row, .pk-me{ min-height: 72px !important; height: auto !important; overflow: visible; }
+  .ddz-ctrl, #ddzCtrl, .gd-foot{ min-height: 88px !important; }
+  .pk-acts{ min-height: 110px !important; }
+  .ddz-bar, .gd-bar, .pk-bar{
+    min-height: 0 !important;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: 8px !important;
+  }
+
+/* 高手机/小平板: 牌可更大气 */
+@media (max-width: 599px) and (min-height: 800px){
+  .ddz-hand-wrap{ min-height: 150px !important; }
+  .gd-hand-wrap{ min-height: 190px !important; }
+  .ddz-me, .gd-me-row{ height: auto !important; min-height: 80px !important; }
+  .ddz-ctrl, #ddzCtrl, .gd-foot{ min-height: 96px !important; }
+  .pk-acts{ min-height: 130px !important; }
+}
+  /* PWA 顶栏不再叠 42px 大地板, 与浏览器态同一节奏(靠 env 自己抬) */
+  html.pwa-standalone .ddz-bar,
+  html.pwa-standalone .gd-bar,
+  html.pwa-standalone .pk-bar{
+    min-height: 0 !important;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+  }
+}
+/* 招募态: 没有手牌压力, 操作区必须钉在底部可见 */
+.ddz-room.is-lobby .ddz-hand-wrap,
+.gd-room[data-phase="lobby"] .gd-hand-wrap{
+  min-height: 0 !important;
+  border-top-color: transparent !important;
+  background: none !important;
+  padding-bottom: 0 !important;
+}
+.ddz-room.is-lobby #ddzCtrl,
+.gd-room[data-phase="lobby"] .gd-foot{
+  min-height: 0 !important;
+  flex-shrink: 0 !important;
+}
+.ddz-lobacts, .gd-lobacts{
+  gap: 10px !important;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  background: linear-gradient(180deg, rgba(8,18,24,.2), rgba(6,12,18,.72)) !important;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.ddz-lobbtns, .gd-lobbtns{
+  display: flex !important;
+  gap: 10px !important;
+  width: 100%;
+  justify-content: center;
+}
+.ddz-lobbtns .ddz-btn, .gd-lobbtns .gd-btn{
+  min-height: 44px !important;
+  min-width: 120px !important;
+  max-width: none !important;
+  font-size: 15px !important;
+  flex: 1 1 0;
+}
+.ddz-lobhint, .gd-lobhint{
+  width: 100%;
+  text-align: center;
+  color: var(--sub);
+  font-size: 12px;
+}
+/* PWA 观感: 顶栏更薄、毛玻璃一致、felt 不再被 contain 卡死布局 */
+html.pwa-standalone .ddz-room,
+html.pwa-standalone .gd-room,
+html.pwa-standalone .pk-room{
+  contain: style;
+}
+html.pwa-standalone .ddz-felt,
+html.pwa-standalone .gd-felt,
+html.pwa-standalone .pk-felt{
+  contain: paint;
+}
+/* 操作区始终在房间 flex 末端且可点(防被 overflow:hidden 裁掉) */
+#ddzCtrl, .gd-foot, .pk-acts{
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0 !important;
+}
+/* 选牌一致性(三游戏): 选中抬起量/光晕同一套语言, 理牌后重选也一眼可辨 */
+.ddz-hand .card.sel,
+.gd-hand-row .card.sel,
+.gd-hand .card.sel{
+  transform: translateY(-22px) !important;
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.45),
+    0 0 0 2px var(--accent),
+    0 0 16px color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  filter: brightness(1.12);
+  z-index: 5;
+}
+.gd-hand.has-sel .gd-hand-row .card:not(.sel){
+  /* ★不压暗/不降饱和(主人: 夜间色块丑 + 掼蛋设计本就"选中只靠放大描边, 不虚化其他牌")
+     选中标识交给 .card.sel 的放大+青描边+发光 */
+}
+.gd-hand-row .card.sel,
+.ddz-hand .card.sel{
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s;
+}
+/* 提示命中组: 与选中同语言 + 轻微呼吸, 理牌后的「这一组」更醒目 */
+.ddz-hand .card.sel.hintpop,
+.gd-hand .card.sel.hintpop{
+  animation: ehHintPop .34s cubic-bezier(.2,.85,.3,1);
+}
+@keyframes ehHintPop{
+  0%{ transform: translateY(0) scale(1); }
+  45%{ transform: translateY(-26px) scale(1.04); }
+  100%{ transform: translateY(-22px) scale(1); }
+}
+
+/* ── R. 主题化 UI(与主站皮肤变量对齐) ──────────────────────── */
+html:not([data-mode="day"]) .ddz-btn.primary,
+html:not([data-mode="day"]) .gd-btn.primary,
+html:not([data-mode="day"]) .pk-b.call.check,
+html:not([data-mode="day"]) .pk-b.raise:not(.confirm):not(.allin){
+  background: var(--accent) !important;
+  color: var(--bg,#04060c) !important;
+  border-color: var(--accent) !important;
+  box-shadow: var(--glow-cyan, 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent)) !important;
+}
+html[data-mode="day"] .ddz-btn.primary,
+html[data-mode="day"] .gd-btn.primary,
+html[data-mode="day"] .pk-b.call.check,
+html[data-mode="day"] .pk-b.raise:not(.confirm):not(.allin){
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+  box-shadow: var(--glow-cyan, 0 2px 10px color-mix(in srgb, var(--accent) 25%, transparent)) !important;
+}
+.ddz-lobbtns .ddz-btn.ghost, .gd-lobbtns .gd-btn.ghost,
+.ddz-btn.ghost, .gd-btn.ghost{
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--line2) !important;
+}
+html:not([data-mode="day"]) .ddz-seat.ddz-lobby-empty .ddz-avr,
+html:not([data-mode="day"]) .gd-seat.gd-lobby-empty .gd-avr,
+html:not([data-mode="day"]) .pk-seat.pk-lobby-empty .pk-avr{
+  border: 1.5px dashed var(--line2) !important;
+  background: color-mix(in srgb, var(--accent) 8%, transparent) !important;
+}
+html[data-mode="day"] .ddz-seat.ddz-lobby-empty .ddz-avr,
+html[data-mode="day"] .gd-seat.gd-lobby-empty .gd-avr,
+html[data-mode="day"] .pk-seat.pk-lobby-empty .pk-avr{
+  border: 1.5px dashed var(--line2) !important;
+  background: color-mix(in srgb, var(--accent) 10%, rgba(255,255,255,.7)) !important;
+}
+html:not([data-mode="day"]) .ddz-seat.ddz-lobby-empty .av,
+html:not([data-mode="day"]) .gd-seat.gd-lobby-empty .av,
+html:not([data-mode="day"]) .pk-seat.pk-lobby-empty .av{
+  background: transparent !important;
+  color: var(--accent) !important;
+  border: none !important;
+}
+html[data-mode="day"] .ddz-seat.ddz-lobby-empty .av,
+html[data-mode="day"] .gd-seat.gd-lobby-empty .av,
+html[data-mode="day"] .pk-seat.pk-lobby-empty .av{
+  background: #fff !important;
+  color: var(--accent) !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06) !important;
+}
+.ddz-lobacts, .gd-lobacts, .pk-acts{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-solid,#132a29) 55%, transparent),
+      color-mix(in srgb, var(--bg2,#0d1524) 88%, transparent)) !important;
+  border-top: 1px solid var(--line) !important;
+}
+html[data-mode="day"] .ddz-lobacts,
+html[data-mode="day"] .gd-lobacts,
+html[data-mode="day"] .pk-acts{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-solid,#fff) 40%, transparent),
+      color-mix(in srgb, var(--bg2,#daf1ef) 90%, #fff)) !important;
+  border-top: 1px solid var(--line) !important;
+}
+.ddz-lobhint, .gd-lobhint{ color: var(--sub) !important; font-size: 12px; }
+.ddz-me, .gd-me-row, .pk-me{
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-solid,#132a29) 70%, transparent),
+    color-mix(in srgb, var(--bg2,#0d1524) 55%, transparent));
+  border-top: 1px solid var(--line);
+}
+html[data-mode="day"] .ddz-me,
+html[data-mode="day"] .gd-me-row,
+html[data-mode="day"] .pk-me{
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-solid,#fff) 75%, transparent),
+    color-mix(in srgb, var(--bg2,#daf1ef) 70%, transparent));
+}
+.ddz-avr .av, .gd-avr .av, .pk-avr .av{
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+}
+html[data-mode="day"] .ddz-avr .av,
+html[data-mode="day"] .gd-avr .av,
+html[data-mode="day"] .pk-avr .av{
+  border-color: color-mix(in srgb, var(--accent) 45%, rgba(0,0,0,.08)) !important;
+}
+.ddz-room.is-lobby .ddz-felt,
+.gd-room[data-phase="lobby"] .gd-felt,
+.pk-room[data-phase="lobby"] .pk-felt{
+  justify-content: flex-start !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   S. 终端结构(手机竖屏 / 横屏 / 桌面 / PWA)
+   招募态: 座位贴桌 + 桌心紧凑 + 我方位贴近桌 + 操作区钉底
+   对局态: felt 弹性吃中间, 上对手/下我+手牌, 不留大空洞
+   ══════════════════════════════════════════════════════════════ */
+/* — 手机竖屏招募 — */
+@media (max-width: 599px){
+  .ddz-room.is-lobby .ddz-opps,
+  .gd-room[data-phase="lobby"] .gd-partner,
+  .pk-room[data-phase="lobby"] .pk-felt .pk-table .pk-seat{
+    padding-top: 4px;
+  }
+  .ddz-room.is-lobby .ddz-opps{
+    justify-content: space-evenly !important;
+    padding: 4px 8px 0 !important;
+  }
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    flex: 0 0 auto !important;
+    min-height: 150px !important;
+    margin: 4px 10px 0 !important;
+    padding: 8px 12px !important;
+  }
+  .ddz-room.is-lobby .ddz-felt::before,
+  .gd-room[data-phase="lobby"] .gd-felt::before{
+    left: 2% !important; right: 2% !important; top: 4% !important; bottom: 4% !important;
+  }
+  .ddz-room.is-lobby .ddz-felt,
+  .gd-room[data-phase="lobby"] .gd-felt{
+    justify-content: flex-start !important;
+  }
+  .ddz-room.is-lobby .ddz-me,
+  .gd-room[data-phase="lobby"] .gd-me-row{
+    margin-top: 2px !important;
+    padding-top: 2px !important;
+  }
+  /* 招募不占手牌带高度, 操作钮贴底 */
+  .ddz-room.is-lobby .ddz-hand-wrap,
+  .ddz-room.is-lobby .ddz-hand,
+  .gd-room[data-phase="lobby"] .gd-hand-wrap,
+  .gd-room[data-phase="lobby"] .gd-hand{
+    min-height: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-top: none !important;
+    background: none !important;
+  }
+  .ddz-room.is-lobby #ddzCtrl,
+  .gd-room[data-phase="lobby"] .gd-foot{
+    margin-top: auto !important;
+  }
+  /* 对局: 中央弹性, 对手席紧凑, 手牌固定托盘 */
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-center{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-opps{
+    padding: 6px 8px 0 !important;
+  }
+  .ddz-room:not(.is-lobby):not(.is-land) .ddz-lastplay{
+    min-height: 26px !important;
+    margin-top: 2px !important;
+  }
+  .gd-room:not([data-phase="lobby"]):not(.is-land) .gd-mid{
+    min-height: 0 !important;
+  }
+  .gd-room:not([data-phase="lobby"]):not(.is-land) .gd-partner{
+    padding: 4px 8px 0 !important;
+  }
+  /* 德州招募: 桌区不要太矮, 座位弧贴桌 */
+  .pk-room[data-phase="lobby"] .pk-felt{
+    justify-content: flex-start !important;
+  }
+  .pk-room[data-phase="lobby"] .pk-me{
+    margin-top: 0 !important;
+  }
+}
+/* — 手机横屏: 座位环桌、操作区压扁(已有 is-land) — */
+@media (max-height: 500px) and (min-width: 560px){
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    min-height: 0 !important;
+    margin: 0 8px !important;
+  }
+  .ddz-room.is-lobby .ddz-hand-wrap,
+  .gd-room[data-phase="lobby"] .gd-hand-wrap{
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+}
+/* — 桌面宽屏: 限宽居中, 竖向节奏放松 — */
+@media (min-width: 900px){
+  .ddz-room .ddz-felt, .gd-room .gd-felt, .pk-room .pk-felt{
+    max-width: 900px !important;
+  }
+  .ddz-room .ddz-center, .gd-room .gd-center{
+    max-width: 640px;
+  }
+  .ddz-room.is-lobby .ddz-center,
+  .gd-room[data-phase="lobby"] .gd-center{
+    min-height: 200px !important;
+  }
+}
+/* ── 结算浮层统一升级 ─────────────────────────────────────
+ * 三桌战报共用: 跟主题面板底 + 胜负顶边光 + 名次徽章行 + 统计 chip。
+ * ★不再写死深蓝玻璃: 浅紫/日间/各皮肤下曾又丑又看不清, 一律走 theme token。 */
+.gd-over-panel, .pk-over-card, .ddz-over-card{
+  position: relative;
+  overflow: hidden;
+  background: var(--panel-solid) !important;
+  border: 1px solid var(--line2) !important;
+  box-shadow:
+    0 24px 64px color-mix(in srgb, var(--ink) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent) !important;
+  border-radius: 24px !important;
+  color: var(--ink) !important;
+}
+.gd-over-panel::before, .pk-over-card::before, .ddz-over-card::before{
+  content: "";
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 4%, color-mix(in srgb, var(--accent) 70%, transparent) 50%, transparent 96%);
+  pointer-events: none;
+}
+.gd-over.win .gd-over-panel::before, .pk-over.win .pk-over-card::before, .ddz-over.win .ddz-over-card::before{
+  background: linear-gradient(90deg, transparent 2%, var(--amber) 50%, transparent 98%);
+  height: 3px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--amber) 55%, transparent);
+}
+.gd-over.lose .gd-over-panel::before, .pk-over.lose .pk-over-card::before, .ddz-over.lose .ddz-over-card::before{
+  background: linear-gradient(90deg, transparent 2%, var(--magenta) 50%, transparent 98%);
+  height: 3px;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--magenta) 40%, transparent);
+}
+.gd-over h2, .pk-over h2, .ddz-over h2{
+  position: relative;
+  margin: 2px 0 0 !important;
+  letter-spacing: .1em !important;
+  font-weight: 900 !important;
+}
+.eh-over-kicker{
+  font-size: 11px; font-weight: 800; letter-spacing: .22em; text-indent: .22em;
+  color: var(--sub); opacity: .85;
+}
+/* 名次徽章: 金银铜+末游, 我方行 accent 描边 */
+.eh-rank{ display:flex; flex-direction:column; gap:6px; width:100%; margin:2px 0; }
+.eh-rank-row{
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px;
+  padding: 8px 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  text-align: left;
+}
+.eh-rank-row .pos{
+  min-width: 48px; text-align:center; font-weight:900; font-size:12px; letter-spacing:.04em;
+  padding: 4px 8px; border-radius: 999px; line-height: 1.2;
+}
+.eh-rank-row.p0 .pos{ background:linear-gradient(145deg,var(--amber),color-mix(in srgb,var(--amber) 55%, #000)); color:var(--panel-solid); box-shadow:0 2px 10px color-mix(in srgb,var(--amber) 35%,transparent); }
+.eh-rank-row.p1 .pos{ background:color-mix(in srgb, var(--ink) 18%, var(--panel-solid)); color:var(--ink); }
+.eh-rank-row.p2 .pos{ background:color-mix(in srgb, var(--amber) 40%, var(--panel-solid)); color:var(--ink); }
+.eh-rank-row.p3 .pos{ background:transparent; color:var(--dim); border:1px solid var(--line); }
+.eh-rank-row .who{ font-weight:700; color:var(--ink); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.eh-rank-row .tag{ font-size:11px; font-weight:800; color:var(--sub); letter-spacing:.04em; }
+.eh-rank-row.me{
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+.eh-rank-row.me .who{ color: var(--accent); }
+.eh-rank-row.mate .tag{ color: var(--accent); }
+/* 升级 / 累计: chip 条, 不再裸文本堆叠 */
+.eh-lvl-chip{
+  display:inline-flex; align-items:center; gap:8px; max-width:100%;
+  padding: 9px 16px; border-radius: 999px;
+  font-size: 14px; font-weight: 900; letter-spacing: .02em;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.eh-lvl-chip b{ color: var(--amber); }
+.eh-lvl-chip.lose-side{
+  background: color-mix(in srgb, var(--magenta) 14%, transparent);
+  border-color: color-mix(in srgb, var(--magenta) 35%, transparent);
+}
+.eh-cum-bar{
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;
+  padding: 8px 4px 0;
+  border-top: 1px dashed color-mix(in srgb, var(--ink) 12%, transparent);
+  margin-top: 4px;
+}
+.eh-cum-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding: 6px 11px; border-radius: 10px; font-size: 12px; font-weight: 800;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border:1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--sub);
+}
+.eh-cum-chip.mine{ color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.eh-cum-chip.foe{ color: var(--magenta); border-color: color-mix(in srgb, var(--magenta) 35%, transparent); }
+.eh-cum-chip b{ color: var(--ink); }
+/* 结算按钮: 跟主题, 主按钮 accent 实底 */
+.gd-over .gd-btn, .pk-over .pk-b, .ddz-over .ddz-btn,
+html[data-mode="day"] .gd-over .gd-btn,
+html[data-mode="day"] .pk-over .pk-b,
+html[data-mode="day"] .ddz-over .ddz-btn{
+  background: color-mix(in srgb, var(--ink) 5%, transparent) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line2) !important;
+  box-shadow: none !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: .04em;
+}
+.gd-over .gd-btn.primary, .pk-over .pk-b.call, .ddz-over .ddz-btn.primary,
+html[data-mode="day"] .gd-over .gd-btn.primary,
+html[data-mode="day"] .pk-over .pk-b.call,
+html[data-mode="day"] .ddz-over .ddz-btn.primary{
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--accent) 92%, #fff),
+    color-mix(in srgb, var(--accent) 68%, #000)) !important;
+  color: var(--btn-ink,#04060c) !important;
+  border-color: transparent !important;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+.gd-over .gd-btn:active, .pk-over .pk-b:active, .ddz-over .ddz-btn:active{
+  transform: scale(.97) !important;
+}
+.gd-over-panel .gd-acts, .pk-over-card .pk-row, .ddz-over-card .ddz-acts{
+  width: 100% !important;
+  margin-top: 6px !important;
+  padding: 0 !important;
+  gap: 10px !important;
+  background: transparent !important;
+}
+/* 残局牌区: 跟主题浅底条 */
+.gd-over .gd-remains, .ddz-over .ddz-remains, .pk-over .pk-showbox{
+  width: 100%;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--ink) 5%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent) !important;
+  box-sizing: border-box;
+}
+/* 顶栏托管钮(三桌第二位) — 只补状态色, 外观已由上方统一圆钮规则收口 */
+.gd-auto.on, .pk-auto.on, .ddz-auto.on{
+  color: var(--amber) !important;
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--amber) 45%, transparent) !important;
+}
+.gd-auto:active, .pk-auto:active{ transform:scale(.9); }
+.gd-ico, .pk-ico, .ddz-ico{ width:18px; height:18px; }
+
+/* — PWA standalone: 顶栏已让开状态栏, felt 顶部再收一点 — */
+html.pwa-standalone .ddz-room .ddz-felt,
+html.pwa-standalone .gd-room .gd-felt,
+html.pwa-standalone .pk-room .pk-felt{
+  padding-top: 0;
+}
+html.pwa-standalone .ddz-room.is-lobby .ddz-opps{
+  padding-top: 2px !important;
+}
+/* — PWA 手机竖屏: 三桌同步放大(主人: 斗地主 PWA 牌桌太小) —
+ * 无地址栏竖向更富裕: 牌面/迷你牌对齐 600px 档, 中央桌心吃满, 与 game-ui 斗地主专项叠加时以更具体的选择器为准。 */
+@media (max-width: 599px){
+  html.pwa-standalone .gd-room:not(.is-land){
+    --cw:44px;--ch:62px;--cn:15px;--cs:12px;--cc:25px;--cmw:26px;--cmh:37px;
+  }
+  html.pwa-standalone .pk-room:not(.is-land){
+    --cw:40px;--ch:56px;--cn:14px;--cs:11px;--cc:21px;--bcw:44px;--bch:62px;
+  }
+  html.pwa-standalone .gd-room:not(.is-land) .gd-center,
+  html.pwa-standalone .pk-room:not(.is-land) .pk-table{
+    min-height: 160px !important;
+  }
+  html.pwa-standalone .gd-room:not(.is-land) .gd-felt::before,
+  html.pwa-standalone .pk-room:not(.is-land) .pk-table::before{
+    left: 0; right: 0; top: 2%; bottom: 2%;
+  }
+}
+
+/* 日间台面 ::after 描边: 主题色细环, 不再死白 */
+html[data-mode="day"] .ddz-room .ddz-center::after,
+html[data-mode="day"] .gd-room  .gd-center::after,
+html[data-mode="day"] .pk-room  .pk-table::after{
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, rgba(0,0,0,.05)),
+    inset 0 0 0 2px rgba(255,255,255,.4) !important;
+}
+
+
+/* ── Q. 按钮跟手(主人: 点击微弱延迟) ──────────────────────
+ * touch-action:manipulation 去掉双击缩放等待;
+ * 压按动画改 0.08s 且只动 transform, 不拖 color 过渡;
+ * 出牌/开始等主按钮用 pointerup 触发(比 click 早一拍)。 */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn, .ddz-lobbtns button, .gd-lobbtns button{
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s cubic-bezier(.2,.85,.3,1), box-shadow .1s, background .1s, border-color .1s !important;
+}
+.ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
+  transform: scale(.96) !important;
+  transition-duration: .05s !important;
+}
+.ddz-hand .card, .gd-hand .card, .gd-hand-row .card{
+  touch-action: none;
+}
+
+/* 神曲: 伴奏+人声叠播标识 */
+.song-card.hybrid-on .song-style::after{content:"伴奏+人声";margin-left:6px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:800;background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+
+/* 回合横幅三款统一胶囊(原 pk-msg 方角 12px, 与 ddz/gd 999px 不一致) */
+.ddz-turnbanner, .gd-banner, .pk-msg{
+  border-radius: 999px !important;
+  /* 三款同一响应式字号(原各随 --banner 档位 13/15/17/20 不一致) */
+  font-size: clamp(12px, 3.2vw, 16px) !important;
+  letter-spacing: .05em !important;
+}
+
+/* ── 牌桌顶栏 🎨 浮动换肤面板(与 EhAudioMenu 同级 z-index) ── */
+.eh-theme-menu{
+  position:fixed; z-index:99999; min-width:168px; padding:6px;
+  background:var(--panel-solid); border:1px solid var(--line2); border-radius:14px;
+  box-shadow:0 14px 34px rgba(0,0,0,.28),0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent) inset;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+}
+.eh-theme-menu .tm-hd{ padding:5px 12px 6px; font:800 11px/1 inherit; letter-spacing:.12em; color:var(--sub); }
+.eh-theme-menu .tm-modes{ display:flex; gap:2px; padding:3px; margin:0 6px 6px; background:var(--bg2); border-radius:10px; }
+.eh-theme-menu .tm-mode{
+  flex:1; text-align:center; padding:7px 6px; border:none; cursor:pointer; border-radius:7px;
+  font:600 12px/1 inherit; transition:.15s; background:transparent; color:var(--sub);
+}
+.eh-theme-menu .tm-mode.on{ background:var(--panel-solid); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.15); }
+.eh-theme-menu .tm-theme{
+  display:flex; align-items:center; gap:10px; width:100%; padding:8px 12px; border:none;
+  background:transparent; color:var(--ink); font:600 13px/1.2 inherit; cursor:pointer; border-radius:10px;
+  -webkit-tap-highlight-color:transparent; text-align:left;
+}
+.eh-theme-menu .tm-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+.eh-theme-menu .tm-nm{ flex:1; text-align:left; }
+.eh-theme-menu .tm-ck{ font-size:12px; opacity:0; }
+.eh-theme-menu .tm-ck.on{ opacity:1; }
+
+/* ── 牌桌 🎵 声音三开关面板 ── */
+.eh-audio-menu{
+  position:fixed; z-index:99999; min-width:186px; padding:6px;
+  background:var(--panel-solid); border:1px solid var(--line2); border-radius:14px;
+  box-shadow:0 14px 34px rgba(0,0,0,.28),0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent) inset;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+}
+.eh-audio-menu .am-hd{ padding:5px 12px 6px; font:800 11px/1 inherit; letter-spacing:.12em; color:var(--sub); }
+.eh-audio-menu .am-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%;
+  padding:9px 12px; border:none; background:transparent; color:var(--ink);
+  font:600 13px/1.2 inherit; cursor:pointer; border-radius:10px; -webkit-tap-highlight-color:transparent;
+}
+.eh-audio-menu .am-sw{
+  min-width:44px; text-align:center; padding:3px 0; border-radius:999px;
+  font:800 11px/1 inherit; transition:all .16s;
+}
+.eh-audio-menu .am-sw.on{
+  background:var(--accent); color:var(--panel-solid);
+  box-shadow:0 0 10px color-mix(in srgb,var(--accent) 45%,transparent);
+}
+.eh-audio-menu .am-sw.off{
+  background:transparent; color:var(--dim); border:1px solid var(--line2);
+}
+
+/* ── 顶栏工具钮统一(与聊天室 .tool-btn 同规格 36px 圆角方) + 触感 ── */
+.ddz-mus, .gd-mus, .pk-mus,
+.ddz-skin, .gd-skin, .pk-skin,
+.ddz-auto, .gd-auto,
+.ddz-x, .gd-x, .pk-x{
+  width:44px !important; height:44px !important;
+  border-radius:9px !important;
+  flex:none !important;
+  cursor:pointer !important;
+  padding:0 !important;
+  display:grid !important; place-items:center !important;
+  border:1px solid var(--line) !important;
+  background:var(--panel) !important;
+  color:var(--sub) !important;
+  transition:transform .12s ease, color .12s, border-color .12s, box-shadow .12s !important;
+}
+.ddz-mus:hover, .gd-mus:hover, .pk-mus:hover,
+.ddz-skin:hover, .gd-skin:hover, .pk-skin:hover,
+.ddz-auto:hover, .gd-auto:hover,
+.ddz-x:hover, .gd-x:hover, .pk-x:hover{
+  color:var(--accent) !important; border-color:var(--accent) !important; box-shadow:0 0 16px -4px var(--accent) !important;
+}
+/* 触感: 按下立刻缩 + 0.12s 回弹, 与聊天室 tool-btn:active 同语言 */
+.ddz-mus:active, .gd-mus:active, .pk-mus:active,
+.ddz-skin:active, .gd-skin:active, .pk-skin:active,
+.ddz-auto:active, .gd-auto:active,
+.ddz-x:active, .gd-x:active, .pk-x:active,
+.ddz-btn:active, .gd-btn:active, .pk-b:active, .pk-qbtn:active{
+  transform:scale(.92) !important;
+  transition-duration:.06s !important;
+}
+/* 打牌操作键: 统一触感(按下即反馈, 不拖泥) */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn, .pk-preb{
+  transition:transform .12s ease, filter .12s, box-shadow .12s, background .12s, border-color .12s !important;
+  -webkit-tap-highlight-color:transparent;
+}
+.ddz-btn:disabled, .gd-btn:disabled, .pk-b:disabled, .pk-qbtn:disabled{
+  transform:none !important;
+  opacity:.45 !important;
+}
+
+/* ── 游戏按钮: 点按后不留焦点/选中环(误以为已选中); 键盘 :focus-visible 仍可访问 ── */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn, .pk-preb,
+.ddz-mus, .gd-mus, .pk-mus, .ddz-skin, .gd-skin, .pk-skin,
+.ddz-auto, .gd-auto, .ddz-x, .gd-x, .pk-x, .eh-skin, .eh-leave,
+.gt-btn, .gt-mini, .pk-invite-menu .im-item{
+  outline:none !important;
+  -webkit-tap-highlight-color:transparent;
+}
+.ddz-btn:focus, .gd-btn:focus, .pk-b:focus, .pk-qbtn:focus, .pk-preb:focus,
+.ddz-mus:focus, .gd-mus:focus, .pk-mus:focus, .ddz-skin:focus, .gd-skin:focus, .pk-skin:focus,
+.ddz-auto:focus, .gd-auto:focus, .ddz-x:focus, .gd-x:focus, .pk-x:focus,
+.gt-btn:focus, .gt-mini:focus{
+  outline:none !important;
+}
+/* 仅键盘导航显示焦点环 */
+.ddz-btn:focus-visible, .gd-btn:focus-visible, .pk-b:focus-visible, .pk-qbtn:focus-visible,
+.ddz-mus:focus-visible, .gd-mus:focus-visible, .pk-mus:focus-visible,
+.ddz-skin:focus-visible, .gd-skin:focus-visible, .pk-skin:focus-visible,
+.ddz-x:focus-visible, .gd-x:focus-visible, .pk-x:focus-visible{
+  outline:2px solid var(--accent) !important;
+  outline-offset:2px !important;
+}
+
+/* ── 操作键触控/观感统一(≥44px 命中) ── */
+.ddz-btn, .gd-btn, .pk-b, .pk-qbtn, .pk-preb{
+  min-height:44px !important;
+  min-width:44px !important;
+  border-radius:12px !important;
+  cursor:pointer !important;
+  -webkit-tap-highlight-color:transparent;
+}
+.pk-qbtn{ min-width:44px !important; }
+/* 主按钮轻渐变, 与主题 accent 呼应(不再死平) */
+.pk-b.call, .ddz-btn.primary, .gd-btn.primary{
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, #fff 8%), color-mix(in srgb, var(--accent) 82%, #000 18%)) !important;
+}
+/* 禁用态更明显但仍可读 */
+.pk-b:disabled, .ddz-btn:disabled, .gd-btn:disabled{
+  opacity:.4 !important; filter:saturate(.5) !important;
+}

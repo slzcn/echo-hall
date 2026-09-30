@@ -1,0 +1,628 @@
+// ============================================================
+// guandan-ai.js — 掼蛋启发式 AI（纯手牌+桌面, 不看别家牌 → 公平）
+// ------------------------------------------------------------
+//   · 组合枚举带百搭(红桃级牌)补齐 + 级牌抬权, 全程用 guandan-rules 校验合法。
+//   · 首出: 走长牌型(顺/连对/钢板/三带二)清散牌, 留百搭/炸弹压轴, 不轻易甩王/级。
+//   · 跟牌: 找能压过桌面的最小代价一手; 队友控场则让牌(除非能一把走完)。
+//   · 炸弹: 对手报单/自己快走完时才动; 队友快赢不浪费炸。
+//   全部输出 card 数组(来自传入 hand)或 pass。
+// ============================================================
+(function(root, factory){
+  const mod = factory(
+    (typeof require==='function') ? require('./guandan-rules.js') : (root.EHGuandanRules),
+    (typeof require==='function') ? require('./strategy-core.js') : root.EHStrategy
+  );
+  if (typeof module !== 'undefined' && module.exports) module.exports = mod;
+  if (typeof window !== 'undefined') window.EHGuandanAI = mod;
+})(this, function(Rules, Strategy){
+  'use strict';
+
+  function groups(hand, level){
+    const wilds=[], jokers=[], byRank=new Map();
+    let levelNats=0;
+    for (const c of hand){
+      if (Rules.isWild(c, level)) wilds.push(c);
+      else if (c.joker) jokers.push(c);
+      else {
+        const r=Rules.naturalRank(c);
+        if(r===level) levelNats++;
+        if(!byRank.has(r)) byRank.set(r,[]); byRank.get(r).push(c);
+      }
+    }
+    return { wilds, jokers, byRank, levelNats };
+  }
+
+  // ★主人反馈: 打级(如打2)时灵魂先打 ♥2(逢人配), 而不是 ♦/♣/♠ 普通级牌。
+  //   根因: 3 普通级+1百搭 被当成级牌炸, 拆普通级罚 +120 > 打百搭 +60 → 反优先。
+  //   修正: 百搭可被同点普通级替代时重罚; 拆「3普通+百搭」级牌炸里的普通级仅轻罚。
+  function wildWastePenalty(play, hand, level){
+    const wildCards = (play.cards||[]).filter(c=>Rules.isWild(c, level));
+    if (!wildCards.length) return 0;
+    const playIds = new Set((play.cards||[]).map(c=>c.id));
+    const spareLevel = hand.filter(c=>
+      !c.joker && !Rules.isWild(c, level) &&
+      Rules.naturalRank(c)===level && !playIds.has(c.id)
+    ).length;
+    const p = play.parse;
+    const isLevelPlay = !!(p && (p.key===15
+      || (typeof p.pairRank==='number' && p.pairRank===level)
+      || (typeof p.trioRank==='number' && p.trioRank===level)));
+    if (isLevelPlay) return spareLevel>0 ? (120 + spareLevel*15) : 70;
+    return spareLevel>0 ? (48 + spareLevel*8) : 22;
+  }
+  function levelBombBreakPen(play, hand, level){
+    if (Rules.isBomb(play.parse)) return 0;
+    const g = groups(hand, level);
+    const wildN = g.wilds.length;
+    let pen = 0;
+    for (const c of (play.cards||[])){
+      if (c.joker || Rules.isWild(c, level)) continue;
+      if (Rules.naturalRank(c) !== level) continue;
+      const have = (g.byRank.get(level)||[]).length;
+      if (have===3 && wildN>=1) pen += 18;   // 拆普通级优先于打百搭(主人策略)
+      else if (have>=4) pen += 40;
+    }
+    return pen;
+  }
+
+  // 连续段候选(顺/连对/钢板): groupSize=每档张数, groups=档数。返回 {natCards,wildsNeeded,top}[]
+  function findLines(g, groupSize, nGroups, wildBudget){
+    const res=[];
+    for (let start=1; start+nGroups-1<=14; start++){
+      const picks=[]; let need=0;
+      for (let k=0;k<nGroups;k++){
+        const pos=start+k;
+        const rank = pos===1 ? 14 : pos;     // pos1 由 A 充当低位
+        const avail = g.byRank.get(rank) || [];
+        const use = Math.min(groupSize, avail.length);
+        for (let i=0;i<use;i++) picks.push(avail[i]);
+        need += (groupSize-use);
+      }
+      if (need<=wildBudget && need<=g.wilds.length) res.push({ natCards:picks, wildsNeeded:need, top:start+nGroups-1 });
+    }
+    return res;
+  }
+
+  // 枚举全部合法组合(按 maxWild 限制百搭用量), 每项 {cards,parse}。
+  function genCombos(hand, level, maxWild){
+    const g = groups(hand, level);
+    const W = g.wilds;
+    const nW = Math.min(maxWild, W.length);
+    const combos = [];
+    const seen = new Set();
+    const add = (cards)=>{
+      if (!cards || !cards.length) return;
+      const key = cards.map(c=>c.id).sort().join(',');
+      if (seen.has(key)) return; seen.add(key);
+      const p = Rules.parse(cards, level);
+      if (p) combos.push({ cards, parse:p });
+    };
+    const useW = (n)=> W.slice(0, n);
+
+    // 单张
+    for (const [,cs] of g.byRank) add([cs[0]]);
+    for (const j of g.jokers) add([j]);
+    if (W.length) add([W[0]]);
+
+    // 同点: 对/三/炸(2..张数+百搭)
+    for (const [,cs] of g.byRank){
+      const maxSize = cs.length + nW;
+      for (let size=2; size<=maxSize; size++){
+        const wNeed = Math.max(0, size-cs.length);
+        if (wNeed>nW) continue;
+        const natUse = Math.min(size, cs.length);
+        // ★炸弹(size≥4)必须用光该点数所有自然牌: 手握 5 张同点应整副打 5 炸, 不拆成 4 炸留 1 张孤儿
+        //   (主人反馈"5 张炸提示只让出 4 张, 那张干嘛?"; 且 5 炸本就强于任意 4 炸, 拆分永远更差)。
+        //   对/三(size 2/3)是正常子集(留其余牌另作他用), 不受此限。
+        if (size>=4 && natUse < cs.length) continue;
+        add(cs.slice(0, natUse).concat(useW(wNeed)));
+      }
+    }
+    // 王对(同类两王成对: 双小王力16 / 双大王力17)+ 四大天王(四王齐)
+    const bigs=g.jokers.filter(j=>j.joker==='big'), smalls=g.jokers.filter(j=>j.joker==='small');
+    if (smalls.length>=2) add([smalls[0],smalls[1]]);
+    if (bigs.length>=2)   add([bigs[0],bigs[1]]);
+    if (bigs.length>=2 && smalls.length>=2) add([bigs[0],bigs[1],smalls[0],smalls[1]]);
+
+    // 三带二: 三 a + 对 b (a≠b)
+    const ranks = [...g.byRank.keys()];
+    for (const a of ranks){
+      for (const b of ranks){
+        if (a===b) continue;
+        const ca=g.byRank.get(a), cb=g.byRank.get(b);
+        const wTrio=Math.max(0,3-ca.length), wPair=Math.max(0,2-cb.length);
+        if (wTrio+wPair>nW) continue;
+        const cards = ca.slice(0,Math.min(3,ca.length)).concat(useW(wTrio))
+          .concat(cb.slice(0,Math.min(2,cb.length))).concat(W.slice(wTrio, wTrio+wPair));
+        if (cards.length===5) add(cards);
+      }
+    }
+
+    // 顺子 / 连对 / 钢板
+    findLines(g,1,5,nW).forEach(r=> add(r.natCards.concat(useW(r.wildsNeeded))));
+    findLines(g,2,3,nW).forEach(r=> add(r.natCards.concat(useW(r.wildsNeeded))));
+    findLines(g,3,2,nW).forEach(r=> add(r.natCards.concat(useW(r.wildsNeeded))));
+
+    // 同花顺(每花色找 5 连; 仅♥可用百搭)
+    for (const suit of ['♠','♥','♣','♦']){
+      const gs = { byRank:new Map(), wilds: suit==='♥'?W:[] };
+      for (const [r,cs] of g.byRank){ const sc=cs.filter(c=>c.suit===suit); if(sc.length) gs.byRank.set(r,sc); }
+      const budget = suit==='♥'?nW:0;
+      findLines(gs,1,5,budget).forEach(r=>{
+        const cards = r.natCards.concat((suit==='♥'?W:[]).slice(0,r.wildsNeeded));
+        add(cards);
+      });
+    }
+
+    return combos;
+  }
+
+  function allBombs(hand, level){
+    return genCombos(hand, level, groups(hand,level).wilds.length).filter(c=>Rules.isBomb(c.parse));
+  }
+
+  // ── 理牌·智能组牌(对标腾讯欢乐掼蛋分组显示) ─────────────────────
+  // 把整手牌贪心拆成若干【成型牌型组】(炸/同花顺/顺子/连对/钢板/三张/对子), 供 UI 分组分堆显示,
+  //   一眼看清手里有哪些现成组合。纯展示用: 不影响出牌自由点选, 不看别家牌。
+  //   贪心顺序 = 炸弹最先抽(护炸不被顺子拆散) → 长牌型清散牌 → 三张 → 对子; 单张不成组。
+  //   三带二【不】自动合并(留三张/对子各自成组, 玩家自选如何带), 少用百搭优先(留逢人配灵活)。
+  //   返回 card[][](每组一手成型牌; 末组=剩余散牌, 按大小排; 无散牌则不含末组)。
+  function arrangeGroups(hand, level){
+    if (typeof level !== 'number') level = 2;
+    const KEEP = { jokerbomb:0, bomb:1, straightflush:2, straight:3, pairline:3, trioline:4, trio:6, pair:7 };
+    let pool = hand.slice();
+    const out = [];
+    let guard = 0;
+    while (pool.length && guard++ < 60){
+      const wildBudget = pool.filter(c=>Rules.isWild(c, level)).length;
+      const combos = genCombos(pool, level, wildBudget)
+        .filter(c => c.cards.length >= 2 && KEEP[c.parse.type] !== undefined);
+      if (!combos.length) break;
+      combos.sort((a,b)=>{
+        const pa = KEEP[a.parse.type], pb = KEEP[b.parse.type];
+        if (pa !== pb) return pa - pb;                                   // 炸→长牌型→三张→对子
+        if (b.cards.length !== a.cards.length) return b.cards.length - a.cards.length; // 张多优先(清更多散牌)
+        const wa = a.cards.filter(c=>Rules.isWild(c,level)).length, wb = b.cards.filter(c=>Rules.isWild(c,level)).length;
+        if (wa !== wb) return wa - wb;                                   // 少用百搭优先(留逢人配灵活)
+        // ★连续牌型(顺子/连对/钢板/同花顺)优先用【低窗口】组牌: 把连牌搭在小牌上, 让高牌(如 AA)剩出来
+        //   单独成强对做控场。否则 JJ QQ KK AA 会被组成 QQKKAA 连对而把 JJ 甩成孤对 —— 主人反馈"该是对勾对Q对K"。
+        const lineT = t => t==='straight'||t==='pairline'||t==='trioline'||t==='straightflush';
+        if (lineT(a.parse.type) && lineT(b.parse.type)) return a.parse.key - b.parse.key;  // 连牌: 低窗口在前
+        return b.parse.key - a.parse.key;                               // 其余(对/三/炸): 点力大的组靠前
+      });
+      const pick = combos[0];
+      out.push(Rules.sortHand(pick.cards, level));                      // 组内点力降序(级牌/王在左)
+      const used = new Set(pick.cards.map(c=>c.id));
+      pool = pool.filter(c=>!used.has(c.id));
+    }
+    if (pool.length) out.push(Rules.sortHand(pool, level));             // 剩余散牌垫最后一组
+    return out;
+  }
+
+  function withoutCards(hand, cards){
+    const ids = new Set(cards.map(c=>c.id));
+    return hand.filter(c=>!ids.has(c.id));
+  }
+  // ── 手数估计(estTricks): 把一手牌拆成最少的"出牌手数", 越少越接近赢 ──────────
+  //   复用 arrangeGroups 的贪心分解(炸/同花顺/顺子/连对/钢板/三张/对子已正确摘出, 含级牌/百搭/王),
+  //   记账对齐斗地主 estTricks: 长牌型/对/三各 1 手, 散牌每张 1 手, 三条白吃一翼(带单优先再带对, 不额外计手)。
+  //   —— 这就是掼蛋 AI 过去缺的"全局观": 拆散顺子/连对留孤张的走法手数飙升会被领出评估自然淘汰。
+  function estTricks(hand, level){
+    if (!hand || !hand.length) return 0;
+    const groups = arrangeGroups(hand, level);
+    let longT=0, trios=0, pairs=0, singles=0;
+    for (const g of groups){
+      if (!g || !g.length) continue;
+      const p = g.length>=2 ? Rules.parse(g, level) : null;
+      if (!p){ singles += g.length; }                 // 散牌末组: 每张一手
+      else if (p.type==='trio') trios++;
+      else if (p.type==='pair') pairs++;
+      else longT++;                                   // 炸/同花顺/顺子/连对/钢板/三带二
+    }
+    let tricks = longT + trios;
+    let wings = trios;                                // 每个三条白吃一翼(带单优先清散张, 其次带对)
+    while (wings>0 && singles>0){ singles--; wings--; }
+    while (wings>0 && pairs>0){ pairs--; wings--; }
+    tricks += pairs + singles;
+    return tricks;
+  }
+  // 孤张小单判定: 该自然点在手里仅此 1 张、非王、点力≤阈值 → 注定要单走的废牌(掼蛋无三带一, 消化不掉)。
+  //   领出是甩废牌的最佳时机(不用比大小), 这类牌趁早清; J/Q/K/A/级/王 留作中后期控场, 不算小单。
+  const EARLY_SINGLE_MAX = 10;   // 点力≤10(自然点 2..10)算"小单"
+  let EARLY_CLEAR_ON = true;     // 孤小单早清开关(默认开; 仅供对抗测试临时关闭对比棋力)
+  function setEarlyClear(b){ EARLY_CLEAR_ON = !!b; }
+  function isLoneSmallSingle(hand, card, level){
+    if (!EARLY_CLEAR_ON) return false;
+    if (card.joker) return false;
+    if (Rules.powerOf(card, level) > EARLY_SINGLE_MAX) return false;
+    const nr = Rules.naturalRank(card);
+    return hand.filter(x=>!x.joker && Rules.naturalRank(x)===nr).length === 1;
+  }
+  // 领出护炸/护王/护三(治"AI 打着打着把炸破掉了, 残局剩一堆碎单"——主人反馈): estTricks 里三条白吃一翼
+  //   会掩盖拆炸损失(拆 8888 领单 8 → 剩 888 仍 1 手, 手数不变), 而 leadScore 又不看 playCost → 平局时粗排
+  //   把小点单(常正是炸弹里的一张)当"最小可清"打出, 炸弹就这么被一张张拆没了。炸弹是掼蛋压制命门,
+  //   领出绝不为清散牌拆炸: 显式重罚拆同点炸/耗王/耗百搭, 与 playCost 同量级(拆炸远超任何清牌/早清加成)。
+  function leadWaste(hand, play, level){
+    const g = groups(hand, level);
+    const wildN = g.wilds.length;                          // ★手里可用百搭(逢人配)数 → 认"3天然+1百搭"的现成炸
+    const playIsBomb = Rules.isBomb(play.parse);           //   出的就是炸时不算拆(否则会误罚打百搭炸本身)
+    const rc = {};
+    let pen = 0;
+    pen += wildWastePenalty(play, hand, level);            // ★百搭可被普通级替代 → 重罚(先打 ♦/♣/♠ 级牌)
+    pen += levelBombBreakPen(play, hand, level);           // 级牌炸拆普通级: 轻罚(策略上允许且优先)
+    for (const c of play.cards){
+      if (c.joker){ pen += 30; continue; }                 // 耗王(大小王=最强单张/组王炸的料, 领出别甩)
+      if (Rules.isWild(c, level)){ continue; }             // 百搭已在 wildWastePenalty 计
+      const r = Rules.naturalRank(c); rc[r] = (rc[r]||0)+1;
+    }
+    for (const r in rc){
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      // 级牌炸拆分已由 levelBombBreakPen 处理, 这里跳过 level 点, 免重复重罚
+      if (Number(r)===level) continue;
+      const isBombRank = have>=4;                          // 非级点: 只认天然 4+ 为炸(不再把 3+百搭 误绑到任意点)
+      if (!playIsBomb && isBombRank && rc[r]<4) pen += 120; // 拆同点天然炸
+      else if (have===3 && rc[r]<3) pen += 10;             // 拆三条(留三带更值)
+      else if (have===2 && rc[r]===1) pen += 4;            // 拆对出单(先出真散张)
+    }
+    // 百搭补齐的非级点炸: play 未含百搭却拆了「3天然+手里有百搭」的潜在炸 — 轻一点, 让普通级优先更显著
+    if (!playIsBomb && wildN>0){
+      for (const r in rc){
+        if (Number(r)===level) continue;
+        const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+        if (have===3 && rc[r]<3) pen += 8;
+      }
+    }
+    return pen;
+  }
+  // 领出候选打分(越小越好), chooseLead 与 hints 领出共用 → 灵魂选择与玩家提示同源。
+  //   剩余手数×100(主导) + 惜控×8(别过早花掉 A/级/王这类回手权) − 本手清牌数(同分多清优先) − 孤小单早清加成
+  //   + 护炸/护王/护三(leadWaste: 拆炸重罚, 别为清散牌把炸/王/百搭拆了)。
+  function leadScore(hand, play, level, strategy){
+    const t = estTricks(withoutCards(hand, play.cards), level);
+    const k = play.parse.key, ty = play.parse.type;
+    let ctl = 0;
+    const hasJoker = play.cards.some(c=>c.joker);
+    if (ty==='single'){ if (hasJoker) ctl += 3; else if (k>=14) ctl += 1; }  // 甩王单=丢强回手权; A/级大单略惜
+    else if (ty==='pair' && k>=14) ctl += 2;                                  // A/级大对=强控, 别早拆
+    // ★孤张小单尽早清(治"残局连甩碎牌单张"——主人反馈"出牌逻辑不好, 最后剩下都是碎牌单张"):
+    //   领出免比大小, 趁此把注定单走的孤小单甩掉, 别憋到残局连甩; 保长牌型/大牌到中后期控场。
+    //   与出长牌型一样只减 1 手(孤张在 estTricks 里=独立一手), 不增总手数, 仅把出牌时机前移改善节奏。
+    let earlyClear = 0;
+    if (ty==='single' && isLoneSmallSingle(hand, play.cards[0], level)) earlyClear = 12;
+    const coach = strategy && Strategy && Strategy.score ? Strategy.score('guandan', {cards:play.cards, parse:play.parse, isBomb:Rules.isBomb(play.parse)}, null, strategy) : 0;
+    return t*100 + ctl*8 - Math.min(play.cards.length, 9) - earlyClear + leadWaste(hand, play, level) - coach;
+  }
+
+  // ── 决策 ────────────────────────────────────────────────────
+  // ctx: { seat, hand, tableParse, lastSeat, handsLeft:[4], level }
+  function decide(ctx){
+    const level = ctx.level || 2;
+    const hand = ctx.hand;
+    const target = ctx.tableParse || null;
+    const strategy = ctx.strategy || null;
+    const g = groups(hand, level);
+
+    // ★立即走完(与斗地主同源): 任何一手能【清空整手】且(跟牌时)压得过桌面的出牌(含炸/王炸)一律立刻打出。
+    //   走完 = 名次到手(头游/双下最高分), 无条件最优, 优先于让牌/保牌/垫牌。genCombos 含炸 → 不漏"整手一炸赢"。
+    {
+      const goCand = genCombos(hand, level, g.wilds.length)
+        .filter(c=>c.cards.length===hand.length && (!target || Rules.beats(c.parse, target, level)));
+      if (goCand.length){
+        goCand.sort((a,b)=> playCost(a,hand,level) - playCost(b,hand,level));
+        return { action:'play', cards: goCand[0].cards };
+      }
+    }
+
+    if (!target){
+      return { action:'play', cards: chooseLead(hand, level, ctx, strategy) };
+    }
+
+    // 队友控场: 桌面这手是对家出的 → 让牌(能一把走完已在上面「立即走完」处理, 含炸)
+    if (isTeammateLead(ctx)){
+      // ★残局推进(治"队友能走掉却不出"): 我已进残局(≤3 张)且不比对家更远 → 别再干让,
+      //   出一手非炸的推进牌把自己往走完推(而不是干让, 迟迟推进不了名次)。选"出后剩余手数最少"一手,
+      //   平局挑代价最小; 只压非炸(不拿炸压自己人)。对家比我更近时不触发, 仍让他先走。
+      {
+        const leaderLeft0 = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+        if (hand.length <= 3 && hand.length <= leaderLeft0){
+          let beats = genCombos(hand, level, 0).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+          if (!beats.length && g.wilds.length)
+            beats = genCombos(hand, level, g.wilds.length).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+          if (beats.length){
+            beats.sort((a,b)=>
+              (estTricks(withoutCards(hand,a.cards),level) - estTricks(withoutCards(hand,b.cards),level))
+              || (playCost(a,hand,level) - playCost(b,hand,level)));
+            return { action:'play', cards: beats[0].cards };
+          }
+        }
+      }
+      // ★队友垫牌助攻(治"队友灵魂总不出牌"): 对家领出的是小牌、我手里还多时, 用一手「小而不拆大牌、
+      //   不用百搭/炸」的牌接管这一轮 —— 逼下家对手拿更大的牌来压(帮队友给对手制造难度)+ 清自己散张。
+      //   严设限: 对家快走完(≤2)就让他; 只甩点数不高(≤10)、代价低的天然牌; 自己手牌够多(>4)才垫。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (ctx.coop!==false && hand.length > 4 && leaderLeft >= 3){
+        const cheap = genCombos(hand, level, 0)
+          .filter(c=> !Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level)
+                      && c.parse.key <= 10 && playCost(c,hand,level) < 15)
+          .sort((a,b)=> playCost(a,hand,level)-playCost(b,hand,level) || a.parse.key-b.parse.key)[0];
+        if (cheap) return { action:'play', cards: cheap.cards };
+      }
+      // 对家出的大牌基本稳赢, 让
+      return { action:'pass' };
+    }
+
+    // 跟牌: 找能压过的普通牌(尽量不用百搭)
+    let follow = genCombos(hand, level, 0).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+    if (!follow.length && g.wilds.length)   // 无纯天然可压 → 允许百搭
+      follow = genCombos(hand, level, g.wilds.length).filter(c=>!Rules.isBomb(c.parse) && Rules.beats(c.parse, target, level));
+    // ★别为压一手就拆自己的炸弹(主人反馈"剩4个8+2个2却出888+22, 剩一张单8"): 剔除"拆炸凑出来"的压牌。
+    //   若因此无非炸可压 → 下方"紧迫用真炸 / 否则不出", 两者都远胜拆炸留单张(打普通级时本就走这条,行为正确)。
+    if (follow.length){
+      const clean = follow.filter(c=>!breaksBomb(c, hand, level));
+      follow = clean;   // 全是拆炸压法 → 清空, 交给下方炸弹/pass 逻辑
+    }
+
+    const coopMe = ctx.coop!==false;
+    // 队友(对家)是否已经出完 → 本方已锁头游, 我该全力冲二游拿【双下】(最高分), 别再保守保牌。
+    const partnerOut = coopMe && Array.isArray(ctx.finished) &&
+      ctx.finished.some(s => (s%2)===(ctx.seat%2) && s!==ctx.seat);
+    const oppMin = minOpponentCards(ctx);
+    // ★协作: 对手进残局(≤3)提前视为紧迫; 队友已头游时更要抢着走 → 紧迫阈值放宽。
+    const urgent = oppMin <= 2 || (coopMe && (oppMin <= 3 || partnerOut))
+      || (strategy && strategy.priority === 'block_opponent');
+
+    if (follow.length){
+      // (能一把走完已在上面「立即走完」处理, 含炸/王炸)
+      // ★出后剩余手数(estTricks)为主序、代价(playCost)为次序 —— 与领出 leadScore 的"全局观"一致。
+      //   过去以 playCost 为主序只看 parse.key + 拆炸/三/对, 看不见顺子/连对/钢板: 跟一手小单时会挑
+      //   key 最小的牌, 哪怕它正是顺子中段, 一刀把成型顺子拆成一堆孤张(主人反馈"拆牌不好")。手数才是
+      //   真目标: 拆顺子留孤张的走法手数飙升会被自然淘汰; 手数相同再挑最便宜(低点力/不耗百搭王)的一手。
+      //   预算每候选一次, 避免比较器里重复调用 estTricks/playCost。
+      for (const c of follow){
+        c._trk  = estTricks(withoutCards(hand, c.cards), level);
+        c._cost = playCost(c, hand, level);
+      }
+      follow.sort((a,b)=> (a._trk - b._trk) || (a._cost - b._cost));
+      const best = follow[0];
+      // ★卡报单对手(治"跟牌出最小单张, 正好被剩 1 张的对手反压走脱"——主人反馈"对手剩单张灵魂不卡牌"):
+      //   桌面是单张、某真对手报单(剩 1 张)时, 掼蛋无公开读牌 → 启发式出能压的【最大】单张赌他压不过,
+      //   而不是随手最小单被反压白送他走。只在天然散单里挑(排除拆炸/王的高代价单, 那些留着更值);
+      //   跟牌只能同型, 桌面单张无法改出对子, 卡法就是出大单。报单场景不 pass(否则牌权送出让他领出走掉)。
+      if (target.type==='single' && minOpponentCards(ctx)===1){
+        const singles = follow.filter(p=>p.parse.type==='single');
+        if (singles.length > 1){
+          const cheap = singles.filter(p=> playCost(p,hand,level) < 40);   // 不拆王(+40)/炸(+120)
+          const pickFrom = cheap.length ? cheap : singles;
+          pickFrom.sort((a,b)=> b.parse.key - a.parse.key);                // 最大单优先(最可能憋住报单对手)
+          return { action:'play', cards: pickFrom[0].cards };
+        }
+      }
+      // ★压制对手(协作): 走到这里桌面必是对手领出(对家领出已在上面让牌)。别为保 A/级大单张
+      //   而放对手过牌滚雪球 —— 主动接管牌权打断对手节奏。故协作开启时取消对手领出的保牌 pass。
+      // ★卡对手: 领出这手的真对手快走完(≤4)时别为保 A/级大单而 pass, 主动卡住他。
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (!urgent && !coopMe && leaderLeft>4 && best.parse.type==='single' && best.parse.key>=14 && hand.length>4
+          && !(strategy && strategy.pressure === 'take_control'))
+        return { action:'pass' };
+      return { action:'play', cards: best.cards };
+    }
+
+    // 压不过 → 择机上炸 (队友已头游时也更愿意搏炸冲双下)
+    if (urgent || hand.length<=6 || partnerOut){
+      const bombs = allBombs(hand, level)
+        .filter(c=>Rules.beats(c.parse, target, level))
+        .sort((a,b)=>Rules.bombStrength(a.parse)-Rules.bombStrength(b.parse));
+      if (bombs.length) return { action:'play', cards: bombs[0].cards };
+    }
+    return { action:'pass' };
+  }
+
+  // 首出: 走长牌型清散牌, 留大牌/百搭/炸压轴
+  //   ★残局意识(ctx 可选): 若「对家之外的真对手」已报单(剩 1 张), 领出别甩小单张送他走 ——
+  //     剩 1 张者跟不了任何 ≥2 张牌型(1 张也组不成炸), 优先领非单牌型憋住他;
+  //     实在只有单张可领, 就领最大的单张(他大概率压不过, 只能过)。
+  function chooseLead(hand, level, ctx, strategy){
+    let combos = genCombos(hand, level, 0);
+    if (!combos.length) combos = genCombos(hand, level, groups(hand,level).wilds.length);
+    if (!combos.length) return [hand[hand.length-1]];   // 兜底最小单张
+
+    const fin = combos.find(c=>c.cards.length===hand.length);
+    if (fin) return fin.cards;
+
+    const order = { straight:0, pairline:0, trioline:0, fullhouse:1, trio:2, pair:3, single:4 };
+    const nonBomb = combos.filter(c=>!Rules.isBomb(c.parse));
+    let pool = nonBomb.length ? nonBomb : combos;
+    // ★护炸硬约束(主人反馈"灵魂剩四个五和五个尖, 居然出三个五"): 领出绝不打"拆掉自己炸弹"的牌型
+    //   (天然炸 或 逢人配补齐的炸), 除非全部候选都拆炸才退回。比 leadWaste 软罚更硬 —— 软罚会被
+    //   estTricks 的手数收益(拆炸领三张能少一手)盖过, 于是炸被一张张拆没。整手一炸走完已在上面 fin 处理。
+    const keepsBomb = pool.filter(c => !breaksBomb(c, hand, level));
+    if (keepsBomb.length) pool = keepsBomb;
+
+    // 对手报单: 收窄到多张牌型憋死他; 只有单张时改甩最大单张
+    const oppMin = ctx ? minOpponentCards(ctx) : 99;
+    if (oppMin === 1){
+      const multi = pool.filter(c => c.cards.length >= 2);
+      if (multi.length){ pool = multi; }
+      else {
+        const singles = pool.filter(c => c.parse.type==='single');
+        if (singles.length){ singles.sort((a,b)=> b.parse.key - a.parse.key); return singles[0].cards; }
+      }
+    } else if (oppMin === 2){
+      // ★对手报双(真对手剩 2 张): 主人反馈"对方剩 2 张多半是对子, 灵魂还领个小对子送他走"。
+      //   掼蛋无公开读牌 → 启发式按"谁能不让他一手出完 2→0"排优先:
+      //   ① ≥3 张牌型: 他 2 张物理上跟不了 → 必被憋住, 牌权不丢, 首选。
+      //   ② 单张: 他至多压 1 张(2→1)出不完, 比对子安全。
+      //   ③ 对子最危险: 他若有更大对子直接 2→0 走完。实在只剩对子可领, 也只领点力最高那副(他多半压不过)。
+      //   对齐斗地主 ddz-ai.js 的报双避让(那边有读牌用 hasHigherPair, 这里无读牌退化成启发式)。
+      const triPlus = pool.filter(c => c.cards.length >= 3);
+      const singles = pool.filter(c => c.parse.type==='single');
+      if (triPlus.length){ pool = triPlus; }
+      else if (singles.length){ pool = singles; }
+      else {
+        const maxKey = Math.max(...pool.map(p => p.parse.key));   // 全是对子 → 领最大那副憋人, 不送小对
+        const bigPairs = pool.filter(p => p.parse.key === maxKey);
+        if (bigPairs.length) pool = bigPairs;
+      }
+    }
+    // 先按廉价启发式粗排(长牌型清散牌优先), 取前 K 个做手数精算 —— 限流 estTricks/arrangeGroups 调用防卡顿。
+    //   ★孤张小单提到长牌型同梯队(rank=0): 否则 single 垫底会被 K 截断挤出精算, leadScore 的早清加成就白加了。
+    const rankOf = (c)=> (c.parse.type==='single' && isLoneSmallSingle(hand, c.cards[0], level)) ? 0 : (order[c.parse.type]??9);
+    pool.sort((a,b)=>{
+      const ra=rankOf(a), rb=rankOf(b);
+      if (ra!==rb) return ra-rb;
+      if (b.parse.len!==a.parse.len) return b.parse.len-a.parse.len;   // 清更多牌
+      return a.parse.key-b.parse.key;                                   // 点小优先
+    });
+    // 逐候选按 leadScore 精算(剩余手数主导): 出后手数最少、又不过早花掉 A/级/王回手权者胜出。
+    //   拆散顺子/连对留孤张的选择手数飙升被自然淘汰; 小散单/小对趁早随手清掉。
+    const K = Math.min(pool.length, 14);
+    let best=null, bestS=Infinity;
+    for (let i=0;i<K;i++){ const s=leadScore(hand, pool[i], level, strategy); if (s<bestS){ bestS=s; best=pool[i]; } }
+    return (best || pool[0]).cards;
+  }
+
+  // 提示排序: 产出 best-first 的可打牌序列(每项 card[])。UI 的「提示」直接吃它。
+  // 核心智能: ① 能一把走完的牌型永远排最前(剩一对就提示打对子, 而不是拆成单张一张张出);
+  //           ② 领出时先出长牌型清散牌、单张垫底、不轻易甩大单张/拆炸;
+  //           ③ 跟牌时最小代价的一手优先、炸弹垫底(除非炸弹能一把走完)。
+  function hints(ctx){
+    const level = ctx.level || 2;
+    const hand = ctx.hand || [];
+    const target = ctx.tableParse || null;
+    const g = groups(hand, level);
+    let combos = genCombos(hand, level, g.wilds.length);
+    if (target) combos = combos.filter(c=>Rules.beats(c.parse, target, level));
+    if (!combos.length) return [];
+    const handN = hand.length;
+    const isB = c=>Rules.isBomb(c.parse);
+    // 领出评分预算一次(与灵魂 chooseLead 同源的 leadScore: 剩余手数主导 + 惜控 + 多清); 炸弹不计→垫底。
+    const leadSc = target ? null : new Map();
+    if (leadSc){ for (const c of combos){ if (!isB(c)) leadSc.set(c, leadScore(hand, c, level)); } }
+    combos.sort((a,b)=>{
+      // ① 一把走完 → 最优先(无论领出/跟牌)
+      const fa = a.cards.length===handN ? 0:1, fb = b.cards.length===handN ? 0:1;
+      if (fa!==fb) return fa-fb;
+      if (!target){
+        const ba = isB(a)?1:0, bb = isB(b)?1:0;
+        if (ba!==bb) return ba-bb;
+        if (ba===1) return Rules.bombStrength(a.parse)-Rules.bombStrength(b.parse);
+        const la = leadSc.get(a), lb = leadSc.get(b);
+        if (la!==lb) return la-lb;
+        // 同分: 多清散牌优先(更长的一手把碎张带走)
+        return b.cards.length - a.cards.length;
+      }
+      // 跟牌: 非炸优先, 再最小代价; 同代价时更长一手优先(多清牌)
+      const ba = isB(a)?1:0, bb = isB(b)?1:0;
+      if (ba!==bb) return ba-bb;
+      const ca=playCost(a,hand,level), cb=playCost(b,hand,level);
+      if (ca!==cb) return ca-cb;
+      return b.cards.length-a.cards.length;
+    });
+    // 残局/报单报双(领出·ctx 带 handsLeft 时): 真对手剩1/2张 → 多张牌型憋他; 报双时他能压过的对子降级。
+    if (!target && ctx.handsLeft){
+      const oppMin = minOpponentCards(ctx);
+      if (oppMin === 1 || oppMin === 2){
+        combos.sort((a,b)=>{
+          const ma=a.cards.length>=2?0:1, mb=b.cards.length>=2?0:1;
+          if (ma!==mb) return ma-mb;
+          if (oppMin===2 && a.parse.type==='pair' && b.parse.type!=='pair') return 1;   // 报双: 不首推可能被压的对
+          if (oppMin===2 && b.parse.type==='pair' && a.parse.type!=='pair') return -1;
+          if (ma===1) return b.parse.key-a.parse.key;
+          return 0;
+        });
+      }
+    }
+    // ★队友(对家)协作提示(与 decide 同源): 桌面这手是对家领出的 → 别提示压自己人。
+    //   ①能一把走完(含炸) 或 ②残局抢门(我≤3 张且不比对家更远, 只推进不上炸) 才给牌; 否则空 → UI 提示让对家走。
+    //   缺 lastSeat(doHint 未传时)→ isTeammateLead=false, 退化为旧行为不受影响。
+    if (target && isTeammateLead(ctx)){
+      const goOut = combos.filter(c=>c.cards.length===handN).map(c=>c.cards);
+      if (goOut.length) return goOut;
+      const leaderLeft = (ctx.handsLeft && ctx.lastSeat!=null) ? ctx.handsLeft[ctx.lastSeat] : 99;
+      if (handN <= 3 && handN <= leaderLeft){
+        const adv = combos.filter(c=>!isB(c)).sort((a,b)=> playCost(a,hand,level)-playCost(b,hand,level) || a.parse.key-b.parse.key);
+        if (adv.length) return adv.map(c=>c.cards);
+      }
+      return [];   // 让对家走
+    }
+    return combos.map(c=>c.cards);
+  }
+
+  function playCost(play, hand, level){
+    let cost = play.parse.key;
+    const g = groups(hand, level);
+    cost += wildWastePenalty(play, hand, level);
+    cost += levelBombBreakPen(play, hand, level);
+    // ★拆组合惩罚(主人: 对方出单应从散单选, 别拆对/三/连牌):
+    //   按 arrangeGroups 的最优分解, 找出 play 用到的牌落在哪些"多张组合"里, 组合越大罚越重。
+    //   真散单(分解里未成组)不罚 → 提示/AI 自然优先甩散单。
+    try{
+      const ag = arrangeGroups(hand, level);
+      const usedId = new Set(play.cards.map(c=>c.id));
+      const COMBO_PEN = { pair:22, trio:38, straight:28, pairline:32, trioline:36, straightflush:20, fullhouse:30 };
+      for (const grp of ag){
+        if (!grp || grp.length<2) continue;
+        const p2 = grp.length>=2 ? Rules.parse(grp, level) : null;
+        const isLine = p2 && (p2.type==='straight'||p2.type==='pairline'||p2.type==='trioline'||p2.type==='straightflush');
+        // 整组都打出 = 没拆; 只拆一部分才罚
+        const hit = grp.filter(c=>usedId.has(c.id)).length;
+        if (hit>0 && hit<grp.length){
+          const pen = isLine ? (COMBO_PEN[p2.type]||28) : (COMBO_PEN[p2&&p2.type]||12);
+          cost += pen * Math.min(hit, 2);
+        }
+      }
+    }catch(_){}
+    // 同点散落惩罚(拆对/三出单): 比组合惩罚轻, 兜底无 arrange 时仍不乱拆
+    const rc = {};
+    for (const c of play.cards){
+      if (Rules.isWild(c,level)){ continue; }
+      if (c.joker){ cost += 40; continue; }
+      const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1;
+    }
+    for (const r in rc){
+      if (Number(r)===level) continue;
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      const isBombRank = have>=4;
+      if (!Rules.isBomb(play.parse) && isBombRank && rc[r]<4) cost += 120;
+      else if (have===3 && rc[r]<3) cost += 30;
+      else if (have===2 && rc[r]===1) cost += 14;
+    }
+    return cost;
+  }
+
+  // 这手是否拆了炸弹: 用了某自然点 <4 张, 而手里该点是炸(天然>=4 张, 或 3天然+至少1百搭=逢人配补齐的炸)。
+  //   百搭/王不计入自然点(它们拆没拆王另有惩罚)。用于领出/跟牌路径硬性剔除"拆炸凑出来"的牌。
+  //   出的本身就是炸 → 不算拆(否则打百搭炸会被自己剔掉)。
+  function breaksBomb(play, hand, level){
+    if (Rules.isBomb(play.parse)) return false;
+    const g = groups(hand, level);
+    const wildN = g.wilds.length;
+    const rc = {};
+    for (const c of play.cards){ if (c.joker || Rules.isWild(c, level)) continue; const r=Rules.naturalRank(c); rc[r]=(rc[r]||0)+1; }
+    for (const r in rc){
+      const have = g.byRank.get(Number(r)) ? g.byRank.get(Number(r)).length : 0;
+      // ★打级策略: 从「3 普通级 + 百搭」的级牌炸里拆【普通级牌】不算拆炸(主人要先打 ♦/♣/♠ 级)
+      if (Number(r)===level && have===3 && wildN>=1) continue;
+      const isBombRank = have>=4 || (have===3 && wildN>=1);
+      if (isBombRank && rc[r]<4) return true;
+    }
+    return false;
+  }
+
+  function isTeammateLead(ctx){
+    if (ctx.lastSeat==null) return false;
+    return (ctx.lastSeat%2)===(ctx.seat%2) && ctx.lastSeat!==ctx.seat;
+  }
+  function minOpponentCards(ctx){
+    if (!ctx.handsLeft) return 99;
+    let mn=99;
+    ctx.handsLeft.forEach((n,seat)=>{ if((seat%2)!==(ctx.seat%2) && n>0 && n<mn) mn=n; });
+    return mn;
+  }
+
+  return {
+    decide, chooseLead, hints, genCombos, allBombs, groups, findLines, arrangeGroups,
+    estTricks, leadScore, setEarlyClear, wildWastePenalty, levelBombBreakPen,
+    playCost, breaksBomb,
+  };
+});

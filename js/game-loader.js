@@ -1,0 +1,96 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// 游戏引擎懒加载器 EHGameLoader
+// 目的:大厅首屏只加载 lobby/core,三个游戏引擎(共 15 个文件)延后到"用户点桌开局"那一刻按需加载
+// 收益:弱网首屏减 15 个并行 script 请求(每个游戏 5 个:rules+engine+ai+net+ui)
+// 契约:
+//   window.EHGameLoader.ensure('poker'|'guandan'|'ddz') → Promise<void>,resolve 后全局 EHXxxGame/EHXxxNet 就绪
+//   已加载过的游戏直接 resolve(缓存),同一游戏并发调用共享同一个 Promise
+//   加载失败自动重试一次(切 unpkg 兜底),仍失败 reject(调用方 toast 提示)
+// 时序安全:游戏文件按依赖顺序串行 append,每个脚本 onload 才进下一个,避免依赖未定义
+(function (root) {
+  'use strict';
+  // ★指纹取值时序陷阱(主人"iOS 掼蛋看不到新版"真因): 本 loader 与 app.js 都是 <script defer>,
+  //   defer 按文档顺序执行 → loader 先跑, 此刻 app.js 尚未运行, __EH_APP_VER 还是 undefined →
+  //   旧写法 VER 恒为 'lazy1', 懒加载游戏脚本 ?v=lazy1 指纹被永久冻结, 主版本号再升也不失效,
+  //   JS_CACHE 按 URL 持久缓存 → 永远吃第一次下的旧字节(且壳自愈只查 index/app.js, 察觉不到)。
+  //   改取 __EH_BUILD_VER: 它由 index.html 内联脚本(在 loader 之前、解析即执行)写入, 取值时必已就绪,
+  //   且每次发版随壳变 → 游戏脚本 ?v= 随发版失效, 换版自动拉新。回退链保底不崩。
+  var VER = (root.__EH_BUILD_VER || root.__EH_APP_VER || 'lazy1');
+  var loaded = {};        // {poker: Promise, guandan: Promise, ddz: Promise}
+
+  // 每个游戏依赖的文件(按加载顺序,前提依赖在前)
+  var MANIFEST = {
+    poker:   ['./js/games/strategy-core.js', './js/games/poker-eval.js',     './js/games/poker-engine.js',   './js/games/poker-ai.js',   './js/games/poker-net.js',   './js/games/poker-ui.js'],
+    guandan: ['./js/games/strategy-core.js', './js/games/guandan-rules.js',  './js/games/guandan-engine.js', './js/games/guandan-ai.js', './js/games/guandan-net.js', './js/games/card-counter.js', './js/games/guandan-ui.js'],
+    ddz:     ['./js/games/strategy-core.js', './js/games/ddz-rules.js',      './js/games/ddz-engine.js',     './js/games/ddz-ai.js',     './js/games/ddz-net.js',     './js/games/card-counter.js', './js/games/game-ui.js']
+  };
+
+  // 加载完成后必须存在的全局(用来判断加载是否真成功,防脚本 200 但内容空)
+  var READY_MARK = {
+    poker:   ['EHStrategy', 'EHPokerEval', 'EHPokerEngine', 'EHPokerAI', 'EHPokerNet', 'EHPokerGame'],
+    guandan: ['EHStrategy', 'EHGuandanRules', 'EHGuandanEngine', 'EHGuandanAI', 'EHGuandanNet', 'EHCardCounter', 'EHGuandanGame'],
+    ddz:     ['EHStrategy', 'EHDdzRules', 'EHDdzEngine', 'EHDdzAI', 'EHDdzNet', 'EHCardCounter', 'EHDdzGame']
+  };
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(VER);
+      s.async = false;   // 保加载顺序:多次 append 时按顺序执行(异于 defer)
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('script load failed: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadSequential(list) {
+    var p = Promise.resolve();
+    list.forEach(function (src) { p = p.then(function () { return loadScript(src); }); });
+    return p;
+  }
+
+  function verifyReady(kind) {
+    var marks = READY_MARK[kind] || [];
+    for (var i = 0; i < marks.length; i++) {
+      if (typeof root[marks[i]] === 'undefined') {
+        throw new Error('game ' + kind + ' loaded but global ' + marks[i] + ' missing');
+      }
+    }
+  }
+
+  function ensure(kind) {
+    if (!MANIFEST[kind]) return Promise.reject(new Error('unknown game kind: ' + kind));
+    // 已加载:立即 resolve;并发中:共享同一 Promise
+    if (loaded[kind]) return loaded[kind];
+    loaded[kind] = loadSequential(MANIFEST[kind])
+      .then(function () { verifyReady(kind); })
+      .catch(function (err) {
+        // 失败:清缓存让下次点桌可重试;不做自动重试(避免恶性循环,调用方 toast 引导刷新)
+        delete loaded[kind];
+        throw err;
+      });
+    return loaded[kind];
+  }
+
+  // 便利:一次性判断是否已就绪(同步,给需要"点了就用"的路径快判)
+  function isReady(kind) {
+    var marks = READY_MARK[kind] || [];
+    for (var i = 0; i < marks.length; i++) {
+      if (typeof root[marks[i]] === 'undefined') return false;
+    }
+    return true;
+  }
+
+  // 后台预热(主人诉求"发指令牌桌要秒开"): 首屏空闲后把三个游戏引擎悄悄拉到缓存, 用户点桌时 isReady 已真 → 免网络等待、牌桌即现。
+  //   仍保住懒加载的首屏收益: 只在首屏交互完成后的空闲档触发, 且省流/2G 网络下不预热。
+  //   逐个游戏串行(不并发轰 17 个请求), 单个失败静默跳过(点桌那次会再正常 ensure)。
+  var _warmed = false;
+  function warm(kinds) {
+    if (_warmed) return; _warmed = true;
+    (kinds || ['ddz', 'guandan', 'poker']).reduce(function (p, k) {
+      return p.then(function () { return ensure(k).catch(function () {}); });
+    }, Promise.resolve());
+  }
+
+  root.EHGameLoader = { ensure: ensure, isReady: isReady, warm: warm };
+})(window);

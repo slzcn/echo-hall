@@ -1,0 +1,190 @@
+#!/usr/bin/env node
+'use strict';
+// journey-poker-play.js — 德州扑克「一桌人从坐下到分出胜负」完整旅程
+// 模拟一整场多手牌局(按钮轮转、筹码延续、有人筹码归零即出局), 断言全链路:
+//   开局发牌 → 下盲 → 逐街(翻/转/河)→ 摊牌或弃牌收池 → 筹码转移 → 下一手轮庄。
+// 全程 AI(5 性格轮流)自动决策; 校验每手合法、守恒, 整场收敛出唯一赢家或到手数上限。
+const G = require('../js/games/poker-engine.js');
+const AI = require('../js/games/poker-ai.js');
+
+let step = 0, failed = false;
+function assert(cond, msg){ step++; if (!cond){ failed = true; console.error(`✗ [${step}] ${msg}`); } else { console.log(`✓ [${step}] ${msg}`); } }
+
+// ── 一整场: 4 人, 每人 300, 盲注 5/10, 打到只剩一人或 60 手 ──
+const SEATS = 4;
+let stacks = Array.from({length:SEATS}, () => 300);
+const names = ['你','阿岩','小凶','疯哥'];
+const personaBySeat = ['tag','rock','lag','maniac'];
+const START_TOTAL = stacks.reduce((a, b) => a + b, 0);
+let button = 0;
+let handNo = 0;
+let sawFlop = false, sawTurn = false, sawRiver = false, sawShowdown = false, sawFoldWin = false;
+let anyStackChanged = false;
+
+function aliveSeats(){ return stacks.map((v, i) => v > 0 ? i : -1).filter(i => i >= 0); }
+
+while (aliveSeats().length >= 2 && handNo < 60){
+  handNo++;
+  const alive = aliveSeats();
+  // 只让有筹码的人入座本手(引擎按传入名单坐, 用子集重映射)
+  const seatIdx = alive;                       // 全局座号
+  const subNames = seatIdx.map(i => names[i]);
+  const subStacks = seatIdx.map(i => stacks[i]);
+  // 按钮落在下一个还活着的人身上
+  while (!alive.includes(button)) button = (button + 1) % SEATS;
+  const subButton = seatIdx.indexOf(button);
+
+  const before = subStacks.reduce((a, b) => a + b, 0);
+  let st;
+  try {
+    st = G.createGame({ seed: 40000 + handNo, names: subNames, stacks: subStacks, sb:5, bb:10, button: subButton });
+  } catch(e){ assert(false, `第${handNo}手建局失败: ${e.message}`); break; }
+
+  // 驱动一手到底
+  let guard = 0, illegal = false;
+  while (st.phase !== 'over' && guard++ < 400){
+    const localSeat = st.toAct;
+    const globalSeat = seatIdx[localSeat];
+    const d = AI.decide(st, localSeat, { persona: personaBySeat[globalSeat], samples: 80 });
+    if (!d){ break; }
+    try { G.applyAction(st, localSeat, d.action, d.amount); }
+    catch(e){ illegal = true; console.error(`  非法动作 手${handNo} 座${localSeat}: ${d.action} ${d.amount} — ${e.message}`); break; }
+  }
+  if (illegal){ assert(false, `第${handNo}手出现非法动作`); break; }
+  if (st.phase !== 'over'){ assert(false, `第${handNo}手未走到终局`); break; }
+
+  // 记录见证到的阶段
+  if (st.board.length >= 3) sawFlop = true;
+  if (st.board.length >= 4) sawTurn = true;
+  if (st.board.length >= 5) sawRiver = true;
+  if (st.result.wentToShowdown) sawShowdown = true; else sawFoldWin = true;
+
+  // 本手守恒
+  const after = st.players.reduce((a, p) => a + p.stack, 0);
+  if (after !== before){ assert(false, `第${handNo}手筹码不守恒 ${after}!=${before}`); break; }
+
+  // 写回全局筹码
+  st.players.forEach((p, li) => {
+    if (p.stack !== stacks[seatIdx[li]]) anyStackChanged = true;
+    stacks[seatIdx[li]] = p.stack;
+  });
+
+  button = (button + 1) % SEATS;              // 轮庄
+}
+
+// ── 断言整场旅程 ──
+assert(handNo >= 1, `至少打了 1 手 (实打 ${handNo} 手)`);
+assert(sawFlop, '旅程中出现过翻牌街');
+assert(sawTurn, '旅程中出现过转牌街');
+assert(sawRiver, '旅程中出现过河牌街');
+assert(sawShowdown || sawFoldWin, '旅程中出现过摊牌或弃牌收池');
+assert(anyStackChanged, '筹码在玩家间发生过转移');
+assert(stacks.reduce((a, b) => a + b, 0) === START_TOTAL, `全场筹码守恒 (${stacks.reduce((a,b)=>a+b,0)}==${START_TOTAL})`);
+const alive = aliveSeats();
+assert(alive.length >= 1, `收敛: 剩 ${alive.length} 名幸存者 (${alive.map(i=>names[i]+':'+stacks[i]).join(', ')})`);
+assert(alive.length === 1 || handNo === 60, alive.length === 1 ? `打出唯一赢家 ${names[alive[0]]}` : `到手数上限 60 手仍在博弈`);
+
+// ── 步骤: 聊天融合 + app.js/UI 接入闭环(静态源码断言, 治"引擎能跑但接不进聊天室") ──
+// 编码→解码字段序必须一致(否则战绩卡渲染错乱)。
+// 2026-08-19 单机/联机合一: /德州 只开【真牌桌】(eh_gt_open), 默认停招募中等真人; 开局走 host 引擎路径
+//   gtLaunchPoker —— EHPokerGame.open + 灵魂性格映射 + onResult 战绩卡 都在这里(不再在 launchTexas 里另起单机局)。
+const fs = require('fs'), path = require('path');
+const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const src = R('js/app.js');
+const ui  = R('js/games/poker-ui.js');
+const html = R('index.html');
+
+// slash 命令 + 唤起
+assert(/\bc:'\/德州'/.test(src), '/德州 已注册进 SLASH_CMDS(聊天可直接开局)');
+assert(/cmd==='\/德州'\|\|cmd==='\/texas'\|\|cmd==='\/poker'\|\|cmd==='\/holdem'/.test(src), 'handleSlash 认 /德州·/texas·/poker·/holdem');
+assert(/async function launchTexas\(/.test(src), '存在 launchTexas(开真牌桌)');
+assert(/async function launchTexas\(\)\{[\s\S]*?eh_gt_open[\s\S]*?\n\}/.test(src), 'launchTexas 走 eh_gt_open 开真牌桌(不再另起单机 EHPokerGame 局)');
+// 开局在 host 引擎路径 gtLaunchPoker: EHPokerGame.open + 座位名册来自 gtSeatArrays
+assert(/function gtLaunchPoker\(row\)/.test(src) && /window\.EHPokerGame\.open\(/.test(src), 'gtLaunchPoker 调 EHPokerGame.open 开桌');
+assert(/mySeat:A\.mySeat/.test(src) && /isAI:A\.isAI/.test(src), '座位/mySeat/isAI 由 gtSeatArrays 名册驱动(真人坐人席, 灵魂/空位=AI)');
+assert(/isAI\[i\]=!human/.test(src), 'gtSeatArrays: 非真人席(灵魂/AI/空位)一律标记 AI(host 本机代打)');
+assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
+// 灵魂补位: 指定某席用座位下拉 seatSoul; 点「开始」即由 gtStart→gtSeatSoulsIntoEmpties 把空位补满房里灵魂(灵魂来玩, 非匿名 AI)。
+assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
+assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
+// #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
+const GTL_PK = (src.match(/function gtLaunchPoker\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move/.test(GTL_PK), 'gtLaunchPoker act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
+assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
+assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
+
+// 结束回调 → 战绩卡 + 落库(在 gtLaunchPoker 的 onResult 里, 名册取 A.names/A.avatars)
+assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(不再"打完什么都没留下")');
+assert(/postTexasResult\(res,A\.names,meta\)/.test(src) && /recordTexasResult\(res,log,A\.names,A\.avatars,soulPick,meta\)/.test(src),
+  'onResult 里发战绩卡 + 落库战绩(seed/log 供回看)');
+assert(/async function postTexasResult\(/.test(src), '存在 postTexasResult(发德州战绩卡)');
+// 编码→解码闭环: 生产字段序与 buildGameEl 的 nlhe 分支解码字段序一致
+assert(/\['game','nlhe', outcome, delta, hand\|\|'-', potTotal, champName\]\.join\('\|'\)/.test(src),
+  '战绩卡编码 game|nlhe|outcome|delta|hand|pot|champ(字段序钉死)');
+assert(/postTexasResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/if\(ev==='nlhe'\)/.test(src), 'buildGameEl 有 nlhe 分支(把战绩卡渲染回来)');
+assert(/const champName=esc\(p\.slice\(6\)\.join\('\|'\)\|\|''\)/.test(src), '赢家名取 slice(6).join("|")(兜住名字里的 | 不截断)');
+assert(/data-nlhe-again/.test(src) && /data-nlhe-again[\s\S]{0,220}ehRelaunchGame\('nlhe'\)/.test(src), '战绩卡"再来一局"接 ehRelaunchGame');
+assert(/p\[1\]==='nlhe'[\s\S]{0,160}德州扑克/.test(src), '消息预览把 nlhe 卡显示成"🎰 德州扑克 · 胜/负/平"(不露原始 game|nlhe| 编码)');
+assert(/game:'nlhe'/.test(src) && /from\('eh_game_results'\)\.insert\(row\)/.test(src), '战绩落 eh_game_results(game=nlhe, N 席结构)');
+assert(/\.ddz-room,\s*\.gd-room,\s*\.pk-room/.test(src), '_restoreActiveGameIfAny 认 .pk-room(返回聊天后能折叠回活牌桌)');
+assert(/_restoreActiveGameIfAny\('nlhe'\)/.test(src), '德州入口传目标游戏(换游戏不拉回旧桌)');
+assert(/wantGame !== curGame/.test(src), '异类游戏收掉折叠旧桌放行');
+
+// UI 接线
+assert(/root\.EHPokerGame\s*=\s*\{ open \}/.test(ui), 'poker-ui 导出 EHPokerGame.open');
+assert(/opts\.mySeat/.test(ui), 'mySeat 可由 opts 传入(联机真人坐非 0 席地基)');
+assert(/AI\.personaForSoul\(soul\)\.key/.test(ui), '灵魂原型→打法性格映射(personaForSoul)');
+assert(/function applyMove\(seat, move\)/.test(ui), 'applyMove 就位(供 host 权威应用远程真人动作/测试驱动)');
+// 反回退: 对手须落在【上弧】收在桌内(曾因 ±43% 侧位戳出屏外点不到; 竖屏 felt 收矮后 CY 随招募/对局/横竖屏分档)
+assert(/const RX = land \? 46 : \(lob \? 42 : 40\), RY = land \? 41 : \(lob \? 24 : 32\)/.test(ui)
+  && /const CY = lob \? \(land \? 48 : 36\) : \(land \? 59 : 46\)/.test(ui),
+  '对手沿上弧椭圆分布(招募压扁/对局默认, 收在桌内)');
+assert(/for\(let i=st\.board\.length;i<5;i\+\+\)/.test(ui), '公共牌区恒 5 槽(已发+暗背占位)');
+assert(/function onHumanTimeout\(/.test(ui) && /HUMAN_ACT_MS/.test(ui), '到我行动亮倒计时, 超时自动过牌/弃牌');
+assert(/function showOver\(/.test(ui) && /opts\.onResult==='function'[\s\S]{0,80}opts\.onResult\(res, st\.log/.test(ui),
+  '摊牌结算里回调 onResult(res, log, meta)(把结果交回聊天室)');
+
+// 反回退: 在场发言气泡必须延一帧写(afterAction 里 say() 常在同步 renderAll 之前调用,
+// 而 renderOpponents 会整段 remove/重建 .pk-seat 节点 —— 直接写会被当帧吞掉, 气泡从不显示)。
+assert(/function say\(seat, msg\)\{[\s\S]*?requestAnimationFrame\(/.test(ui),
+  'say() 延一帧写气泡(躲过 renderAll 对 .pk-seat 的整段重建, 灵魂台词才真正上屏)');
+
+// ── 摊牌成手提示 + 赢家成手牌高亮(Batch2) ──
+// evaluate 只给档位不给"哪 5 张", 新增 bestFive 返回构成最优成手的实际 5 张牌对象(高亮依据)。
+const loader = fs.readFileSync(path.join(__dirname,'..','js','game-loader.js'),'utf8');
+const Eval = require('../js/games/poker-eval.js');
+assert(typeof Eval.bestFive==='function', 'poker-eval 导出 bestFive(返回最优成手的 5 张实牌)');
+{
+  // 抽样自测: bestFive 选出的 5 张, 其 evaluate 必与 7 张整体 evaluate 同档同破平序(选对了牌)
+  const suits=['♠','♥','♣','♦']; let mm=0;
+  for(let t=0;t<3000;t++){
+    const d=[]; for(const s of suits) for(let r=2;r<=14;r++) d.push({rank:r,suit:s,id:s+r});
+    for(let i=d.length-1;i>0;i--){ const j=((t*2654435761+i*40503)>>>0)%(i+1); [d[i],d[j]]=[d[j],d[i]]; }
+    const seven=d.slice(0,7), ev=Eval.evaluate(seven), b5=Eval.bestFive(seven), ev5=Eval.evaluate(b5);
+    if(b5.length!==5 || ev5.cat!==ev.cat || JSON.stringify(ev5.tie)!==JSON.stringify(ev.tie)) mm++;
+  }
+  assert(mm===0, 'bestFive 选牌与 evaluate 一致(3000 局零偏差, 高亮的正是构成成手的牌)');
+}
+// UI: 摊牌高亮只取自 result(公开 reveal+board), 不碰局中快照/别家底牌 —— 守脱敏命门
+assert(/function best5Set\(seat\)\{[\s\S]*?res\.wentToShowdown[\s\S]*?res\.reveal\[seat\]\.hole\.concat\(res\.board\)/.test(ui),
+  'best5Set 仅从 result.reveal+board 算高亮(不读局中快照, 守脱敏命门)');
+assert(/pk-win-card/.test(ui) && /Eval\.bestFive/.test(ui), '赢家成手 5 张镶金框高亮(pk-win-card, 复用 Eval.bestFive)');
+assert(/pk-mini-hn/.test(ui) && /rv\.hand/.test(ui), '摊牌台面直接标各家成手牌型(pk-mini-hn 读 reveal.hand)');
+assert(/poker-eval\.js/.test(loader), 'poker-eval 在 game-loader MANIFEST 中懒加载(BUILD_VER 指纹)');
+
+// ── (Batch3) 增量护栏: 公共牌区 / 我的底牌条 按签名跳过重建 ──
+// 街与街之间(等各家行动, 每秒一次重绘)公共牌与底牌都静止, 不必反复 innerHTML 重建; 发新牌/摊牌/需跟额变化才重建。
+assert(/if \(sig === lastBoardSig\) return;/.test(ui) && /const sig = st\.board\.map\(c=>c\.suit\+c\.rank\)/.test(ui),
+  'renderBoard 按签名跳过重建(公共牌 id 序 + 摊牌高亮态未变则不重建, 逐张翻牌/金框不受影响)');
+assert(/if \(meSig === lastMeSig\) return;/.test(ui) && /const meSig = st\.phase\+'\|'\+\(mine\?1:0\)/.test(ui),
+  'renderMe 按签名跳过重建(阶段/轮我/摊牌/弃全下/筹码/庄位/需跟额/发牌帧/底牌 全未变则不重建)');
+// 护栏不得越权: board 签名只读 result.winnersBySeat/board(公开), me 签名只读本人 hole —— 不碰别家底牌/局中快照, 守脱敏命门
+assert(!/lastBoardSig[\s\S]{0,400}reveal\[(?!seat)/.test(ui), 'renderBoard 签名不读别家 reveal(守脱敏命门)');
+
+// index.html 已挂 4 个扑克脚本 + 版本指纹
+assert(/poker-eval\.js/.test(loader) && /poker-engine\.js/.test(loader) && /poker-ai\.js/.test(loader) && /poker-ui\.js/.test(loader),
+  'game-loader MANIFEST 懒加载 poker 四件套(eval/engine/ai/ui)');
+
+console.log(`\n德州扑克旅程: 打了 ${handNo} 手, ${step} 步全过${failed ? ' —— 有失败' : ''}`);
+process.exit(failed ? 1 : 0);

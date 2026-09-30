@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>信号遗址 · Echo Hall Archive</title>
+<meta name="description" content="回声厅归档房间的只读遗址页——废弃信号站风格，展示房间名、存活时长、在线峰值、最后消息与诗意遗言。赛博朋克信号衰减视觉，加载解码动画与分享链接。">
+<meta name="theme-color" content="#05070a">
+<!-- ============================================================
+     room-relic.html — 房间时间胶囊遗址页
+     公开房归档后生成的只读"废弃信号站"页面。
+     读取 ?room_id=xxx → 查询 Supabase 房间 + 最后 10 条消息。
+     视觉：全黑底 + 信号绿 #00FF9C / 警报红 #FF003C，静电噪点 + 故障字体。
+     单文件 HTML，内联 CSS+JS，不依赖外部库（仅 Supabase JS SDK）。
+     ============================================================ -->
+
+<!-- ===== Supabase 配置（与 index.html / admin.html 一致，部署时替换为你自己的） ===== -->
+<script>
+  // SB_URL: 你的 Supabase 项目 URL；SB_ANON: anon 公钥（RLS 保护下可安全公开）。
+  // 与 admin.html 顶部 const SB_URL/SB_ANON 完全一致，复制即可。
+  const SB_URL = 'https://cddkniwbhvcbfgkgomtl.supabase.co';     // ← 替换为你的 Supabase 地址
+  const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZGtuaXdiaHZjYmZna2dvbXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDc2MTMsImV4cCI6MjA5ODAyMzYxM30.1DaEJe4n91CZ0NcXKvyvPVUobPfc8QCePP3EG1aGpnY'; // ← 替换为你的 anon key
+  // Supabase JS SDK 加载地址（与 index.html 同版本，含自愈回退）
+  const SB_LIB_URLS = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'
+  ];
+</script>
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<style>
+/* ============================================================
+   设计令牌：废弃信号站
+   ============================================================ */
+:root{
+  --bg:#05070a;
+  --bg2:#0a0e16;
+  --sig:#00FF9C;        /* 信号绿 */
+  --sig-dim:#0a6b4a;
+  --alert:#FF003C;      /* 警报红 */
+  --alert-dim:#5a0820;
+  --ink:#c8f5e6;
+  --sub:#5a8a78;
+  --dim:#2a4438;
+  --line:rgba(0,255,156,0.18);
+  --panel:rgba(8,18,14,0.72);
+  --scan:rgba(0,255,156,0.04);
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,"Roboto Mono",monospace;
+  --max:760px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+html{background:var(--bg)}
+body{
+  font-family:var(--mono);
+  color:var(--ink);
+  background:var(--bg);
+  min-height:100vh;min-height:100dvh;
+  line-height:1.6;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+}
+
+/* 全局扫描线层（CRT 静态噪点基底） */
+body::before{
+  content:"";position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,255,156,0.05), transparent 70%);
+  mix-blend-mode:screen;
+  animation:scanDrift 8s linear infinite;
+}
+/* 信号衰减闪烁层 */
+body::after{
+  content:"";position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:rgba(0,255,156,0.015);
+  animation:flicker 3.2s steps(2) infinite;
+}
+@keyframes scanDrift{ from{background-position:0 0,0 0} to{background-position:0 3px,0 0} }
+@keyframes flicker{
+  0%,96%{opacity:1} 97%{opacity:.4} 98%{opacity:.9} 99%{opacity:.3} 100%{opacity:1}
+}
+
+/* 移动端滚动条隐藏 */
+body::-webkit-scrollbar{width:6px}
+body::-webkit-scrollbar-thumb{background:var(--sig-dim);border-radius:3px}
+
+/* ============================================================
+   主容器
+   ============================================================ */
+.relic{
+  position:relative;z-index:5;
+  max-width:var(--max);margin:0 auto;
+  padding:28px 20px 120px;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;gap:26px;
+}
+
+/* ============================================================
+   顶部 SIGNAL LOST 标题
+   ============================================================ */
+.beacon{text-align:center;padding:18px 0 6px}
+.beacon-line{
+  font-size:11px;letter-spacing:.42em;color:var(--alert);
+  text-transform:uppercase;opacity:.7;margin-bottom:10px;
+}
+.signal-lost{
+  font-family:var(--mono);font-weight:900;
+  font-size:clamp(30px,9vw,56px);
+  letter-spacing:.12em;
+  color:var(--sig);
+  position:relative;display:inline-block;
+  text-shadow:
+    0 0 18px rgba(0,255,156,0.55),
+    2px 0 0 var(--alert),
+    -2px 0 0 rgba(0,255,156,0.6);
+  animation:signalBlink 1.4s steps(2) infinite, glitchShift 4s infinite;
+}
+.signal-lost::after{
+  content:"SIGNAL LOST";
+  position:absolute;left:2px;top:0;
+  color:var(--alert);opacity:.5;
+  clip-path:inset(20% 0 60% 0);
+  animation:glitchClip 2.3s infinite linear alternate;
+}
+@keyframes signalBlink{
+  0%,70%{opacity:1} 71%,73%{opacity:.2} 74%{opacity:1} 90%,94%{opacity:.6} 95%{opacity:1}
+}
+@keyframes glitchShift{
+  0%,100%{transform:translate(0,0)} 20%{transform:translate(-2px,1px)} 40%{transform:translate(1px,-1px)} 60%{transform:translate(-1px,0)} 80%{transform:translate(2px,1px)}
+}
+@keyframes glitchClip{
+  0%{clip-path:inset(10% 0 80% 0)} 25%{clip-path:inset(50% 0 30% 0)} 50%{clip-path:inset(70% 0 10% 0)} 75%{clip-path:inset(20% 0 60% 0)} 100%{clip-path:inset(40% 0 40% 0)}
+}
+
+/* ============================================================
+   房间信息卡
+   ============================================================ */
+.room-card{
+  position:relative;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-left:3px solid var(--sig);
+  padding:22px 22px 20px;
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+.room-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg, transparent, rgba(0,255,156,0.06), transparent);
+  animation:sweep 5s linear infinite;
+}
+@keyframes sweep{ from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+.room-label{
+  font-size:10px;letter-spacing:.3em;color:var(--sub);
+  text-transform:uppercase;margin-bottom:10px;
+}
+.room-name{
+  font-family:var(--mono);font-weight:800;
+  font-size:clamp(22px,6vw,32px);
+  color:var(--sig);
+  text-shadow:0 0 14px rgba(0,255,156,0.4);
+  position:relative;display:inline-block;
+  word-break:break-all;line-height:1.25;
+  animation:glitchShift 6s infinite;
+}
+.room-name .glyph-fault{
+  position:relative;
+}
+.room-name .glyph-fault::before,
+.room-name .glyph-fault::after{
+  content:attr(data-t);position:absolute;left:0;top:0;width:100%;
+}
+.room-name .glyph-fault::before{color:var(--alert);transform:translate(-1.5px,0);opacity:.55;clip-path:inset(0 0 55% 0);animation:glitchClip 3.1s infinite linear alternate}
+.room-name .glyph-fault::after{color:#00d4ff;transform:translate(1.5px,0);opacity:.4;clip-path:inset(55% 0 0 0);animation:glitchClip 2.7s infinite linear alternate reverse}
+
+.room-topic{
+  margin-top:8px;font-size:12px;color:var(--sub);font-style:italic;
+}
+
+/* 指标网格 */
+.metrics{
+  margin-top:18px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--line);
+  border:1px solid var(--line);
+}
+.metric{
+  background:rgba(5,10,8,0.6);
+  padding:14px 10px;text-align:center;
+}
+.metric .k{font-size:9px;letter-spacing:.2em;color:var(--sub);text-transform:uppercase;margin-bottom:6px}
+.metric .v{font-size:clamp(18px,5vw,24px);font-weight:800;color:var(--sig);text-shadow:0 0 10px rgba(0,255,156,0.3)}
+.metric .v.alert{color:var(--alert);text-shadow:0 0 10px rgba(255,0,60,0.3)}
+.metric .u{font-size:10px;color:var(--dim);margin-top:2px}
+
+/* ============================================================
+   消息日志（信号残片）
+   ============================================================ */
+.section-head{
+  display:flex;align-items:center;gap:10px;
+  font-size:11px;letter-spacing:.25em;color:var(--sig);
+  text-transform:uppercase;margin-bottom:2px;
+}
+.section-head::before{content:"▸";color:var(--alert)}
+.section-head::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+.section-sub{font-size:10px;color:var(--dim);margin-bottom:12px;letter-spacing:.05em}
+
+.log{
+  display:flex;flex-direction:column;gap:10px;
+  border:1px solid var(--line);padding:14px;
+  background:rgba(4,8,6,0.5);
+  position:relative;overflow:hidden;
+}
+/* 消息列表扫描线 */
+.log::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(0deg, rgba(0,255,156,0.025) 0 1px, transparent 1px 4px);
+  animation:scanDrift 6s linear infinite;
+}
+
+.msg{
+  position:relative;z-index:1;
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 8px;border-bottom:1px dashed rgba(0,255,156,0.08);
+}
+.msg:last-child{border-bottom:none}
+.msg .ts{
+  flex-shrink:0;font-size:10px;color:var(--dim);
+  font-variant-numeric:tabular-nums;min-width:54px;padding-top:2px;
+}
+.msg .body-col{flex:1;min-width:0}
+.msg .who{
+  font-size:11px;color:var(--alert);font-weight:700;
+  letter-spacing:.04em;margin-bottom:3px;
+  text-decoration:line-through;text-decoration-color:rgba(255,0,60,0.4);
+}
+.msg .who .ghost{opacity:.7}
+.msg .txt{
+  font-size:13px;color:var(--ink);line-height:1.55;
+  word-break:break-word;position:relative;
+}
+.msg .txt.sung{color:var(--sig);font-style:italic}
+.msg .txt.whispered{color:var(--sub);font-style:italic}
+.msg .txt .kind-tag{
+  display:inline-block;font-size:9px;padding:1px 5px;margin-right:5px;
+  border:1px solid currentColor;border-radius:2px;opacity:.7;vertical-align:middle;
+}
+
+/* 空消息态 */
+.log-empty{
+  text-align:center;padding:30px 10px;color:var(--dim);font-size:13px;font-style:italic;
+}
+
+/* ============================================================
+   诗意遗言
+   ============================================================ */
+.elegy{
+  margin-top:6px;text-align:center;padding:24px 18px;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  position:relative;
+}
+.elegy::before,.elegy::after{
+  content:"❖";position:absolute;color:var(--sig-dim);font-size:14px;top:50%;transform:translateY(-50%);
+}
+.elegy::before{left:4px}
+.elegy::after{right:4px}
+.elegy p{
+  font-size:clamp(14px,4vw,17px);color:var(--sig);
+  line-height:1.8;letter-spacing:.03em;
+  text-shadow:0 0 12px rgba(0,255,156,0.25);
+  font-style:italic;
+}
+.elegy .signoff{
+  margin-top:12px;font-size:10px;letter-spacing:.3em;color:var(--sub);text-transform:uppercase;
+}
+
+/* ============================================================
+   底部操作栏
+   ============================================================ */
+.actions{
+  margin-top:auto;padding-top:20px;
+  display:flex;gap:12px;justify-content:center;flex-wrap:wrap;
+}
+.btn{
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  letter-spacing:.15em;text-transform:uppercase;
+  padding:12px 22px;border:1px solid var(--sig);
+  background:transparent;color:var(--sig);
+  cursor:pointer;position:relative;overflow:hidden;
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  transition:all .2s;
+}
+.btn::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg, transparent, rgba(0,255,156,0.18), transparent);
+  transform:translateX(-100%);transition:transform .4s;
+}
+.btn:hover{background:rgba(0,255,156,0.08);box-shadow:0 0 16px rgba(0,255,156,0.25)}
+.btn:hover::before{transform:translateX(100%)}
+.btn.alert{border-color:var(--alert);color:var(--alert)}
+.btn.alert:hover{background:rgba(255,0,60,0.08);box-shadow:0 0 16px rgba(255,0,60,0.25)}
+
+/* ============================================================
+   加载态（信号接收动画）
+   ============================================================ */
+.loader{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+  padding:30px;text-align:center;
+}
+.loader.hide{opacity:0;pointer-events:none;transition:opacity .6s}
+.loader .ring{
+  width:64px;height:64px;border:2px solid var(--sig-dim);
+  border-top-color:var(--sig);border-right-color:var(--sig);
+  border-radius:50%;animation:spin .9s linear infinite;
+  box-shadow:0 0 24px rgba(0,255,156,0.3);
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader .label{font-size:12px;letter-spacing:.2em;color:var(--sig);text-transform:uppercase}
+.loader .progress{
+  width:min(280px,80vw);height:4px;background:var(--bg2);border:1px solid var(--line);overflow:hidden;
+}
+.loader .progress .bar{
+  height:100%;width:0;background:linear-gradient(90deg,var(--sig-dim),var(--sig));
+  box-shadow:0 0 10px var(--sig);animation:loadbar 2.2s ease-in-out infinite;
+}
+@keyframes loadbar{0%{width:0;margin-left:0}50%{width:60%}100%{width:100%;margin-left:100%}}
+.loader .dots{font-size:11px;color:var(--sub);letter-spacing:.1em}
+.loader .dots .blink{animation:dotsBlink 1.2s steps(3) infinite}
+@keyframes dotsBlink{33%{opacity:.3}66%{opacity:.7}100%{opacity:1}}
+
+/* ============================================================
+   错误态
+   ============================================================ */
+.error-state{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  padding:30px;text-align:center;
+}
+.error-state.show{display:flex}
+.error-state .cross{
+  font-size:64px;color:var(--alert);text-shadow:0 0 24px rgba(255,0,60,0.5);
+  animation:signalBlink 1.6s steps(2) infinite;
+}
+.error-state h2{font-size:18px;letter-spacing:.2em;color:var(--alert);text-transform:uppercase}
+.error-state p{font-size:13px;color:var(--sub);max-width:340px;line-height:1.7}
+.error-state .code{font-size:10px;color:var(--dim);letter-spacing:.2em;margin-top:8px}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width:520px){
+  .relic{padding:20px 14px 90px}
+  .metrics{grid-template-columns:1fr 1fr 1fr}
+  .metric{padding:10px 6px}
+  .msg{flex-direction:column;gap:4px}
+  .msg .ts{min-width:0}
+  .room-card{padding:18px 16px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;animation-duration:.01ms !important}
+  .signal-lost,.room-name{text-shadow:0 0 14px rgba(0,255,156,0.4)}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 加载态：信号接收动画 ===== -->
+<div class="loader" id="loader">
+  <div class="ring"></div>
+  <div class="progress"><div class="bar"></div></div>
+  <div class="label">正在解码存档信号</div>
+  <div class="dots"><span class="blink">...</span></div>
+</div>
+
+<!-- ===== 错误态 ===== -->
+<div class="error-state" id="errorState">
+  <div class="cross">⨯</div>
+  <h2>信号源不存在</h2>
+  <p>该房间不存在、未归档，或信号已彻底消散。归档的公开房才会留下遗址。</p>
+  <div class="code" id="errorCode">ERR · NO_SIGNAL</div>
+</div>
+
+<!-- ===== 主内容 ===== -->
+<main class="relic" id="relic" style="display:none">
+
+  <!-- 顶部信号灯塔 -->
+  <header class="beacon">
+    <div class="beacon-line">// ECHO HALL · ARCHIVE TERMINAL //</div>
+    <h1 class="signal-lost" data-text="SIGNAL LOST">SIGNAL LOST</h1>
+  </header>
+
+  <!-- 房间信息卡 -->
+  <section class="room-card">
+    <div class="room-label">⟁ 归档房号 · ARCHIVED ROOM</div>
+    <h2 class="room-name" id="roomName"><span class="glyph-fault" id="roomNameGlyph" data-t="">--</span></h2>
+    <div class="room-topic" id="roomTopic"></div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="k">存活时长</div>
+        <div class="v" id="mDuration">--</div>
+        <div class="u" id="mDurationU">SIGNAL LIFE</div>
+      </div>
+      <div class="metric">
+        <div class="k">在线峰值</div>
+        <div class="v alert" id="mPeak">--</div>
+        <div class="u">PEAK SOULS</div>
+      </div>
+      <div class="metric">
+        <div class="k">残片</div>
+        <div class="v" id="mMsgs">--</div>
+        <div class="u">FRAGMENTS</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 消息残片 -->
+  <section>
+    <div class="section-head">信号残片 · LAST TRANSMISSIONS</div>
+    <div class="section-sub" id="fragSub">解码归档信道的最后广播记录</div>
+    <div class="log" id="log">
+      <div class="log-empty">信号已衰减，无可解码残片。</div>
+    </div>
+  </section>
+
+  <!-- 诗意遗言 -->
+  <section class="elegy">
+    <p id="elegyText">--</p>
+    <div class="signoff" id="signoff">END OF TRANSMISSION</div>
+  </section>
+
+  <!-- 操作 -->
+  <div class="actions">
+    <button class="btn" id="shareBtn" type="button">⤴ 分享遗址</button>
+    <button class="btn alert" id="backBtn" type="button">⟲ 返回大厅</button>
+  </div>
+
+</main>
+
+<script>
+/* ============================================================
+   room-relic.js — 内联脚本
+   逻辑：读 URL 参数 → 初始化 Supabase → 查房间 + 最后 10 条消息 → 渲染遗址
+   ============================================================ */
+(function(){
+  'use strict';
+
+  // ---- DOM ----
+  var $ = function(id){ return document.getElementById(id); };
+  var loader = $('loader');
+  var errorState = $('errorState');
+  var errorCode = $('errorCode');
+  var relic = $('relic');
+
+  // ---- URL 参数：?room_id=xxx ----
+  var params = new URLSearchParams(location.search);
+  var roomId = (params.get('room_id') || params.get('room') || '').trim();
+
+  // 参数缺失 → 直接报错
+  if(!roomId){
+    return showError('ERR · MISSING_ROOM_ID', '未提供房号参数。请在 URL 中附带 ?room_id=xxx。');
+  }
+
+  // ---- HTML 转义（与 index.html esc() 一致，防注入） ----
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function safeEmoji(e){ return esc(String(e||'').slice(0,8)); }
+
+  // ---- 时间格式化 ----
+  function pad(n){ return n<10?'0'+n:''+n; }
+  function fmtTime(ts){
+    if(!ts) return '--:--';
+    var d = new Date(ts);
+    if(isNaN(d.getTime())) return '--:--';
+    return pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  function fmtDate(ts){
+    if(!ts) return '';
+    var d = new Date(ts);
+    if(isNaN(d.getTime())) return '';
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  // 存活时长：毫秒 → 人类可读
+  function fmtDuration(ms){
+    if(!ms || ms<0) return {short:'--', long:'未知', unit:''};
+    var sec = Math.floor(ms/1000);
+    var days = Math.floor(sec/86400);
+    var hours = Math.floor((sec%86400)/3600);
+    var mins = Math.floor((sec%3600)/60);
+    if(days>0) return {short:days+'d'+hours+'h', long:days+' 天 '+hours+' 小时', unit:'DAYS'};
+    if(hours>0) return {short:hours+'h'+mins+'m', long:hours+' 小时 '+mins+' 分', unit:'HOURS'};
+    if(mins>0) return {short:mins+'m', long:mins+' 分钟', unit:'MINUTES'};
+    return {short:sec+'s', long:sec+' 秒', unit:'SECONDS'};
+  }
+
+  // ---- 错误态 ----
+  function showError(code, msg){
+    loader.classList.add('hide');
+    setTimeout(function(){ loader.style.display='none'; }, 600);
+    errorCode.textContent = code;
+    var p = errorState.querySelector('p');
+    if(p && msg) p.textContent = msg;
+    errorState.classList.add('show');
+  }
+
+  // ---- Supabase SDK 加载（多 CDN 自愈，与 index.html 同策略） ----
+  function loadSbLib(idx){
+    idx = idx||0;
+    if(idx >= SB_LIB_URLS.length){ showError('ERR · SDK_LOAD_FAILED', 'Supabase 库加载失败，请检查网络后刷新。'); return; }
+    var s = document.createElement('script');
+    s.src = SB_LIB_URLS[idx];
+    s.onload = function(){ if(window.supabase && window.supabase.createClient){ initSupabase(); } else { loadSbLib(idx+1); } };
+    s.onerror = function(){ loadSbLib(idx+1); };
+    document.head.appendChild(s);
+  }
+
+  var sb = null;
+  function initSupabase(){
+    if(sb) return;
+    try{
+      sb = window.supabase.createClient(SB_URL, SB_ANON, { auth:{ persistSession:false, autoRefreshToken:false } });
+    }catch(e){
+      showError('ERR · CLIENT_INIT', '客户端初始化失败：'+e.message);
+      return;
+    }
+    fetchRelic();
+  }
+
+  /* ============================================================
+     Supabase 查询逻辑
+     ------------------------------------------------------------
+     房间：eh_rooms 单条查询（select *），筛选 id = roomId。
+       RLS 注意：公开房（kind='public'）的 SELECT 策略应对 anon 可读
+       （与 index.html 大厅列出公开房共用同一策略）。归档后 archived=true。
+       私密房默认 RLS 不对 anon 开放，遗址页只能展示公开归档房。
+     消息：eh_messages 按 room_id 过滤、created_at 倒序取最后 10 条。
+       RLS 注意：公开房消息走 public SELECT 策略（anon 可读）。
+       如项目用 eh_public_recent RPC 做读最近消息，可改为 rpc 调用，
+       此处直接查表以兼容归档房（RPC 可能只返回活跃房）。
+     ============================================================ */
+  async function fetchRelic(){
+    var room, msgs, roomErr, msgErr;
+    try{
+      // 查房间
+      var rres = await sb.from('eh_rooms')
+        .select('id,name,emoji,kind,topic,created_at,archived,archived_at,peak_online')
+        .eq('id', roomId)
+        .limit(1);
+      roomErr = rres.error;
+      room = (rres.data && rres.data[0]) || null;
+      if(roomErr){ console.warn('[relic] room query error', roomErr); }
+    }catch(e){ roomErr = e; }
+
+    try{
+      // 查最后 10 条消息（created_at 倒序，与 index.html 读最近消息一致）
+      var mres = await sb.from('eh_messages')
+        .select('id,room_id,name,emoji,color,kind,body,content,text,created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending:false })
+        .limit(10);
+      msgErr = mres.error;
+      msgs = mres.data || [];
+      if(msgErr){ console.warn('[relic] msg query error', msgErr); }
+    }catch(e){ msgErr = e; msgs = []; }
+
+    // 房间不存在
+    if(!room){
+      showError('ERR · NO_SIGNAL', '该房间不存在或已被永久清除。归档的公开房才会留下遗址。');
+      return;
+    }
+    // 未归档（仍活跃）→ 不是遗址
+    // 兼容 archived(bool) 与 archived_at(timestamp) 两种判定
+    var isArchived = room.archived === true || !!room.archived_at;
+    if(!isArchived){
+      showError('ERR · SIGNAL_ACTIVE', '该房间信号仍在广播，尚未归档。只有归档的房间才会留下遗址。');
+      return;
+    }
+
+    renderRelic(room, msgs || []);
+  }
+
+  // ---- 渲染遗址 ----
+  function renderRelic(room, msgs){
+    // 房间名（故障字体）
+    var name = room.name || '未命名信号站';
+    var glyph = $('roomNameGlyph');
+    glyph.textContent = (room.emoji ? safeEmoji(room.emoji)+' ' : '') + name;
+    glyph.setAttribute('data-t', (room.emoji ? room.emoji+' ' : '') + name);
+
+    // topic
+    if(room.topic){ $('roomTopic').textContent = '◈ ' + room.topic; }
+    else { $('roomTopic').textContent = ''; }
+
+    // 存活时长
+    var createdAt = room.created_at ? new Date(room.created_at) : null;
+    var archivedAt = room.archived_at ? new Date(room.archived_at) : null;
+    var dur = {short:'--', long:'未知', unit:''};
+    if(createdAt && archivedAt && !isNaN(createdAt.getTime()) && !isNaN(archivedAt.getTime())){
+      dur = fmtDuration(archivedAt - createdAt);
+    } else if(createdAt && !isNaN(createdAt.getTime())){
+      // 没有 archived_at 时用"至今"作为下界（仅展示，标注为估计）
+      dur = fmtDuration(Date.now() - createdAt.getTime());
+      dur.long += '（估）';
+    }
+    $('mDuration').textContent = dur.short;
+    $('mDurationU').textContent = dur.unit || 'SIGNAL LIFE';
+
+    // 在线峰值
+    var peak = room.peak_online;
+    if(peak==null || peak===undefined){
+      // 无 peak_online 字段时用消息条数做近似
+      peak = msgs.length;
+      $('mPeak').textContent = peak;
+    } else {
+      $('mPeak').textContent = peak;
+    }
+
+    // 残片数
+    $('mMsgs').textContent = msgs.length;
+
+    // 消息残片列表（倒序 → 正序展示，最后一条在最下）
+    var log = $('log');
+    if(!msgs.length){
+      log.innerHTML = '<div class="log-empty">信号已衰减，无可解码残片。这片虚空里只回荡过寂静。</div>';
+      $('fragSub').textContent = '归档信道无残片记录';
+    } else {
+      var ordered = msgs.slice().reverse(); // 最旧在上，最新在下（自然阅读流）
+      var html = ordered.map(function(m){
+        var body = m.body || m.content || m.text || '';
+        var kind = m.kind || 'text';
+        var cls = '';
+        var tag = '';
+        if(kind==='song'){ cls='sung'; tag='<span class="kind-tag">🎵</span>'; }
+        else if(kind==='voice'){ cls='whispered'; tag='<span class="kind-tag">🎙</span>'; }
+        else if(kind==='whisper'){ cls='whispered'; tag='<span class="kind-tag">🔒</span>'; }
+        // 匿名身份显示为 [已消散]
+        var who = '<span class="ghost">[已消散]</span>';
+        if(m.name){ who = esc(m.name) + ' <span class="ghost">· 已消散</span>'; }
+        return '<div class="msg">'
+          + '<div class="ts">'+fmtTime(m.created_at)+'</div>'
+          + '<div class="body-col">'
+          +   '<div class="who">'+who+'</div>'
+          +   '<div class="txt '+cls+'">'+tag+esc(body)+'</div>'
+          + '</div></div>';
+      }).join('');
+      log.innerHTML = html;
+      $('fragSub').textContent = '解码归档信道的最后 '+msgs.length+' 条广播';
+    }
+
+    // 诗意遗言
+    var elegy = generateElegy(room, msgs, dur, peak);
+    $('elegyText').textContent = elegy.text;
+    $('signoff').textContent = elegy.signoff;
+
+    // 显示主内容
+    loader.classList.add('hide');
+    setTimeout(function(){ loader.style.display='none'; }, 600);
+    relic.style.display = 'flex';
+  }
+
+  // ---- 诗意遗言生成（根据房间数据自动组合） ----
+  function generateElegy(room, msgs, dur, peak){
+    var soulCount = (peak!=null && peak>0) ? peak : (msgs.length || 0);
+    var durLong = dur.long && dur.long!=='未知' ? dur.long : '一段时光';
+    var fragCount = msgs.length;
+    var name = room.name || '这座信号站';
+    // 去掉 emoji 前缀
+    var cleanName = name.replace(/^\S+\s/, '');
+
+    var templates = [
+      '这里曾有 '+soulCount+' 个灵魂同时驻留，信号持续了 '+durLong+' 后归于沉寂。',
+      '信号在 '+durLong+' 后衰减为零。曾有 '+soulCount+' 个灵魂在此交汇，又各自散入虚空。',
+      '「'+cleanName+'」的频率已永远停摆。'+fragCount+' 条残片是它留在宇宙里的最后回声。',
+      '这里曾回荡过 '+fragCount+' 条声音，最高时有 '+soulCount+' 个灵魂在场。如今只剩静电的白噪音。',
+      '一个信号站熄灭了。'+soulCount+' 个灵魂曾在这里相遇，'+durLong+'，然后不再有人说话。',
+      '频率 '+cleanName+' 已归档为遗址。'+soulCount+' 个灵魂的回声仍在噪底里若隐若现。'
+    ];
+    // 用 room id 哈希挑模板，保证同一房间每次生成同一句
+    var pick = 0;
+    var idStr = String(room.id || room.name || '');
+    for(var i=0;i<idStr.length;i++){ pick = (pick*31 + idStr.charCodeAt(i)) >>> 0; }
+    var text = templates[pick % templates.length];
+
+    var signoffs = [
+      'END OF TRANSMISSION',
+      'SIGNAL ARCHIVED',
+      '频率已静默',
+      'RECORD SEALED',
+      '回声厅 · 归档终端'
+    ];
+    var s2 = 0;
+    for(var j=0;j<idStr.length;j++){ s2 = (s2*17 + idStr.charCodeAt(j)) >>> 0; }
+    var signoff = signoffs[s2 % signoffs.length];
+
+    return { text:text, signoff:signoff };
+  }
+
+  // ---- 分享按钮 ----
+  $('shareBtn').addEventListener('click', function(){
+    var url = location.href;
+    var done = function(){ flashBtn('shareBtn','✓ 链接已复制'); };
+    var fail = function(){ flashBtn('shareBtn','⤴ 请手动复制链接'); };
+    if(navigator.share){
+      navigator.share({ title:'信号遗址 · '+ (document.title), url:url })
+        .then(done).catch(function(){ copyText(url).then(done).catch(fail); });
+    } else {
+      copyText(url).then(done).catch(fail);
+    }
+  });
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(t);
+    }
+    return new Promise(function(res,rej){
+      try{
+        var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+        document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');
+        document.body.removeChild(ta); ok?res():rej(new Error('copy failed'));
+      }catch(e){ rej(e); }
+    });
+  }
+  function flashBtn(id,msg){
+    var b=$(id); var old=b.innerHTML; b.innerHTML=msg; b.disabled=true;
+    setTimeout(function(){ b.innerHTML=old; b.disabled=false; }, 1800);
+  }
+
+  // ---- 返回大厅 ----
+  $('backBtn').addEventListener('click', function(){
+    // 优先回上级目录的 index.html
+    var path = location.pathname.replace(/\/room-relic\.html.*$/,'/') || '/';
+    location.href = path + (path.endsWith('/')?'index.html':'');
+  });
+
+  // ---- 启动 ----
+  if(window.supabase && window.supabase.createClient){
+    initSupabase();
+  } else {
+    loadSbLib(0);
+  }
+})();
+</script>
+</body>
+</html>

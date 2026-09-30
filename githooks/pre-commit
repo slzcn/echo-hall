@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Echo pre-commit 钩子：commit 前自动跑 CI 门禁
+# 启用方法（clone 后执行一次）：
+#   git config core.hooksPath githooks
+# 关闭方法（临时紧急提交，慎用）：
+#   git commit --no-verify
+# 完整门禁在 scripts/ci-check.sh
+set -e
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+if [ ! -x scripts/ci-check.sh ]; then
+  echo "⚠ scripts/ci-check.sh 缺失或不可执行，跳过 pre-commit 检查"
+  exit 0
+fi
+echo "▶ 运行 pre-commit: scripts/ci-check.sh"
+if ! bash scripts/ci-check.sh; then
+  echo ""
+  echo "❌ pre-commit 门禁未通过，本次 commit 被阻止。"
+  echo "  修复上述问题后重试，或使用 git commit --no-verify 跳过（紧急情况慎用）。"
+  exit 1
+fi

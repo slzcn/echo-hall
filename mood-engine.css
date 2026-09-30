@@ -1,0 +1,146 @@
+/**
+ * 依赖: 本文件的情绪氛围色已接入 index.html :root 中的 --eh-* 设计 Token
+ * (excited->--eh-accent-2, happy->--eh-warn, tense->--eh-accent-3)。
+ * 主题切换时情绪色自动跟随; melancholy 深蓝(#2A4A6B)为固定语义色暂保留。
+ */
+/**
+ * echo-hall · 房间氛围感知引擎 mood-engine.css
+ * ===========================================================================
+ * 与 mood-engine.js 配套。插入位置: 在 index.html 内现有 mood 相关 CSS
+ * ( .mood-aura / .mood-tint-layer / body.mood-tinted[data-mood="..."] ) 之后,
+ * .bg-orb / .particle / #particles 定义之后。
+ *
+ * <link rel="stylesheet" href="css/mood-engine.css">
+ *
+ * 设计要点:
+ *  - 不覆盖 ambient-fx.js 已有的 moodWeather 规则(excited/caring 的 moodPulse 仍由
+ *    body.hall-on .mood-aura.on.mood-excited 驱动); 这里只新增 5 种 data-mood 的
+ *    --mood-tint 基色、--mood-intensity 联动、mood-busy/mood-quiet 的粒子与霓虹表现。
+ *  - 不破坏 body.deep-night 规则; 深夜优先级最高(.deep-night 在末尾兜底覆盖)。
+ *  - 所有氛围变化用 2s ease 过渡, 避免突兀。
+ *  - 尊重 prefers-reduced-motion: 关闭粒子速度/脉冲动画。
+ * ===========================================================================
+ */
+
+/* ---------------------------------------------------------------------------
+ * 1. 默认变量 + 5 种情绪 --mood-tint 基色
+ *    --mood-tint 由 mood-engine.js 内联写入 documentElement, 这里提供 data-mood
+ *    维度的兜底色(当 JS 未就绪或 reduce 模式时也有合理视觉)。
+ *    --mood-intensity: 0~1, 由 JS 写入, 驱动粒子速度 / 边框亮度 / 光层透明度。
+ * --------------------------------------------------------------------------- */
+:root {
+  --mood-intensity: 0.2;
+  --mood-tint: transparent;
+  --mood-particle-duration: 3.4s;   /* 基准粒子上升时长(与 .particle 原值一致) */
+  --mood-neon-strength: 0.5;         /* 霓虹边框强度倍率 */
+}
+
+/* 5 种情绪对应的氛围色(与 mood-engine.js TINTS 表一致) */
+body[data-mood="excited"]    { --mood-tint: var(--eh-accent-2); }
+body[data-mood="happy"]      { --mood-tint: var(--eh-warn); }
+body[data-mood="calm"]       { --mood-tint: transparent; }   /* 回归房间主题色 */
+body[data-mood="melancholy"] { --mood-tint: #2A4A6B; }
+body[data-mood="tense"]      { --mood-tint: var(--eh-accent-3); }
+
+/* ---------------------------------------------------------------------------
+ * 2. 氛围色层随强度联动
+ *    .mood-tint-layer 由 ambient-fx 定义(opacity .22); 这里用 --mood-intensity
+ *    让强情绪时光雾更浓、平静时更淡。excited/tense 叠加脉冲。
+ * --------------------------------------------------------------------------- */
+body.mood-tinted .mood-tint-layer {
+  opacity: calc(0.12 + 0.32 * var(--mood-intensity));
+  transition: opacity 2s ease, background 2s ease;
+}
+body.mood-tinted[data-mood="excited"] .mood-tint-layer {
+  opacity: calc(0.2 + 0.34 * var(--mood-intensity));
+  animation: moodPulse 2.6s ease-in-out infinite;
+}
+body.mood-tinted[data-mood="tense"] .mood-tint-layer {
+  opacity: calc(0.22 + 0.38 * var(--mood-intensity));
+  animation: moodPulse 1.4s ease-in-out infinite;   /* 紧张 → 更快闪烁 */
+}
+body.mood-tinted[data-mood="melancholy"] .mood-tint-layer {
+  opacity: calc(0.14 + 0.2 * var(--mood-intensity));  /* 冷雨夜, 偏沉静 */
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. 粒子速度 / 数量随频率变化
+ *    .particle 原始: animation: rise 3.4s ease-out forwards
+ *    mood-busy: 缩短 duration → 粒子加速上窜, 热烈感
+ *    mood-quiet: 拉长 duration → 粒子缓飘变稀, 冷清感
+ *    用 var(--mood-particle-duration) 覆盖, 只改时长不动关键帧。
+ * --------------------------------------------------------------------------- */
+.particle {
+  animation-duration: var(--mood-particle-duration);
+  transition: animation-duration 2s ease;
+}
+body.mood-busy {
+  --mood-particle-duration: 1.8s;   /* 加速 ~47% */
+  --mood-neon-strength: 0.9;
+}
+body.mood-quiet {
+  --mood-particle-duration: 6.5s;   /* 减速 ~90%, 缓飘 */
+  --mood-neon-strength: 0.3;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. 霓虹边框 / 辉光随情绪强度加亮
+ *    针对 echo-hall 常见的赛博边框元素(.neon-frame / .stage 边框 / .hall-frame)。
+ *    用 --mood-tint 染色 + --mood-neon-strength 控制亮度, 过渡 2s。
+ *    若项目里选择器名不同, 按需替换; 变量已就位, 不影响逻辑。
+ * --------------------------------------------------------------------------- */
+.neon-frame, .hall-frame, .stage {
+  transition: box-shadow 2s ease, border-color 2s ease, filter 2s ease;
+}
+body.mood-tinted .neon-frame,
+body.mood-tinted .hall-frame {
+  border-color: var(--mood-tint);
+  box-shadow:
+    0 0 calc(8px * var(--mood-neon-strength)) var(--mood-tint),
+    0 0 calc(22px * var(--mood-neon-strength)) color-mix(in srgb, var(--mood-tint) 60%, transparent),
+    inset 0 0 calc(10px * var(--mood-neon-strength)) color-mix(in srgb, var(--mood-tint) 35%, transparent);
+}
+
+/* 顶部 mood-aura 也跟强度走一点, 不覆盖 excited/caring 已有 moodPulse */
+body.mood-tinted[data-mood="tense"] .mood-aura.on {
+  animation: moodPulse 1.2s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. 整体饱和度: quiet / melancholy 降饱和, busy / excited 提饱和
+ *    只作用于 .stage 主舞台, 避免影响输入区可读性。
+ * --------------------------------------------------------------------------- */
+body.mood-quiet .stage,
+body[data-mood="melancholy"] .stage {
+  filter: saturate(0.78) brightness(0.96);
+  transition: filter 2s ease;
+}
+body.mood-busy[data-mood="excited"] .stage,
+body.mood-busy[data-mood="happy"] .stage {
+  filter: saturate(1.18);
+  transition: filter 2s ease;
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. 深夜兜底: body.deep-night 优先级最高, 覆盖 MoodEngine 的降饱和/染色
+ *    (不破坏现有 deep-night 规则, 只确保 MoodEngine 不在深夜抢氛围)
+ * --------------------------------------------------------------------------- */
+body.deep-night .stage {
+  filter: brightness(.9) saturate(.92);   /* 与 ambient-fx deep-night 规则一致, 防覆盖 */
+}
+body.deep-night.mood-busy {
+  --mood-particle-duration: 2.4s;        /* 深夜即便热闹也偏沉, 不至于 1.8s */
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. 无障碍: 减少动效时关闭粒子速度变化与脉冲, 只保留色调(静态氛围)
+ * --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .particle { animation-duration: 3.4s !important; transition: none; }
+  body.mood-tinted[data-mood="excited"] .mood-tint-layer,
+  body.mood-tinted[data-mood="tense"] .mood-tint-layer,
+  body.mood-tinted[data-mood="tense"] .mood-aura.on {
+    animation: none;
+  }
+  .neon-frame, .hall-frame, .stage { transition: none; }
+}
