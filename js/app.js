@@ -11063,3 +11063,609 @@ window.EH_SOFT_REFRESH = async function(){
     return { ok:false, scope:'error' };
   }
 };
+
+// ============================================================
+// v49 趣味性三连: 本局剧情 / 江湖恩怨 / 传说时刻
+// 全部异步、失败静默、有 fallback，不阻塞游戏主流程
+// ============================================================
+(function(){
+'use strict';
+
+// ── CSS 注入 ──
+var CSS_ID='eh-fun-v49';
+if(document.getElementById(CSS_ID)) return;
+var _css=document.createElement('style'); _css.id=CSS_ID;
+_css.textContent=`
+/* === 本局剧情 === */
+.eh-plot-line{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:30;
+  max-width:88%;padding:4px 18px;font-size:13px;line-height:1.5;text-align:center;
+  color:#0ff;text-shadow:0 0 6px rgba(0,255,255,.6),0 0 2px rgba(0,255,255,.9);
+  background:linear-gradient(90deg,transparent,rgba(0,255,255,.09),transparent);
+  border-radius:8px;pointer-events:auto;cursor:pointer;
+  opacity:0;transition:opacity .6s ease;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px}
+.eh-plot-line.eh-show{opacity:1}
+.eh-plot-line::before{content:'◆ ';opacity:.5}
+
+/* === 江湖恩怨宿敌标记 === */
+.eh-rival-badge{position:absolute;top:-4px;right:-4px;z-index:20;
+  width:20px;height:20px;font-size:11px;line-height:20px;text-align:center;
+  border-radius:50%;background:radial-gradient(circle,rgba(255,40,60,.92),rgba(160,0,20,.75));
+  border:1px solid rgba(255,100,120,.6);box-shadow:0 0 8px rgba(255,40,60,.5);
+  cursor:help;user-select:none;animation:ehRivalPulse 2s ease-in-out infinite}
+@keyframes ehRivalPulse{0%,100%{box-shadow:0 0 8px rgba(255,40,60,.5)}50%{box-shadow:0 0 14px rgba(255,40,60,.8)}}
+
+/* === 传说时刻全屏弹窗 === */
+.eh-legend-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.82),rgba(0,0,0,.96));
+  opacity:0;pointer-events:none;transition:opacity .5s ease}
+.eh-legend-overlay.eh-show{opacity:1;pointer-events:auto}
+.eh-legend-text{font-size:26px;line-height:1.5;text-align:center;max-width:82%;padding:20px 40px;
+  background:linear-gradient(135deg,#0ff,#ffd700);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;text-shadow:0 0 20px rgba(0,255,255,.25);
+  filter:blur(10px);transition:filter 1.2s ease;font-weight:700;letter-spacing:1px}
+.eh-legend-overlay.eh-show .eh-legend-text{filter:blur(0)}
+.eh-legend-name{font-size:13px;color:rgba(255,255,255,.35);margin-top:14px;text-align:center;letter-spacing:2px}
+
+/* === 翻盘提示 === */
+.eh-comeback-toast{position:fixed;top:28%;left:50%;transform:translateX(-50%);z-index:9998;
+  padding:10px 28px;font-size:18px;color:#ff4060;text-shadow:0 0 10px rgba(255,64,96,.6);
+  background:rgba(20,0,10,.88);border:1px solid rgba(255,64,96,.4);border-radius:12px;
+  opacity:0;transition:opacity .5s ease;white-space:nowrap;font-weight:600}
+.eh-comeback-toast.eh-show{opacity:1}
+`;
+document.head.appendChild(_css);
+
+// ── 工具: 获取 auth token ──
+async function _ehFunToken(){
+  try{
+    var s=await sb.auth.getSession();
+    if(s&&s.data&&s.data.session&&s.data.session.access_token) return s.data.session.access_token;
+  }catch(_){}
+  return _pagehideAccessToken||SB_ANON;
+}
+
+// ── AI 调用 (复用 eh-poker-ai edge function，新增 plotline/legend type) ──
+async function _ehFunAI(type,data){
+  var fallback=data.fallback||'';
+  try{
+    var token=await _ehFunToken();
+    var ctrl=new AbortController();
+    var timer=setTimeout(function(){ctrl.abort();},9000);
+    var r=await fetch(SB_URL+'/functions/v1/eh-poker-ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+      body:JSON.stringify(Object.assign({type:type},data)),
+      signal:ctrl.signal
+    });
+    clearTimeout(timer);
+    if(!r.ok) return fallback;
+    var j=await r.json();
+    if(j&&j.ok&&j.text) return j.text;
+    return fallback;
+  }catch(_){ return fallback; }
+}
+
+// ============================================================
+// 功能三: 本局剧情 (Every Game Has a Story)
+// ============================================================
+
+// 生成 fallback 文案 — 基于玩家统计数据
+function _ehPlotFallback(statsMap,myUid,historyCount,names){
+  var my=statsMap[myUid]||{plays:0,wins:0,losses:0};
+  if(my.plays===0) return '代号未知的玩家今夜初入江湖';
+  if(historyCount>=3&&my.losses>my.wins) return '上局的败者带着筹码回来了';
+  if(my.wins>=3&&my.wins>=my.losses) return '连胜的赌神，今夜有人要挑战';
+  if(historyCount>=3) return '霓虹深处，老对手再次同桌';
+  return '霓虹灯下，又是一夜的赌局';
+}
+
+// 主函数: 开局时拉取玩家数据 + 调AI生成主题文字 + 展示
+async function ehGamePlotLine(game,names,ids){
+  if(!sb||!myUid||!names||!names.length) return;
+  try{
+    var allUids=[myUid].concat((ids||[]).filter(function(u){return u&&u!==myUid;})).filter(Boolean);
+    // 1. 拉取在场玩家 eh_user_stats
+    var statsMap={};
+    try{
+      var sr=await sb.from('eh_user_stats').select('user_id,game,plays,wins,losses').in('user_id',allUids);
+      (sr.data||[]).forEach(function(s){
+        if(!statsMap[s.user_id]) statsMap[s.user_id]={plays:0,wins:0,losses:0};
+        statsMap[s.user_id].plays+=s.plays||0;
+        statsMap[s.user_id].wins+=s.wins||0;
+        statsMap[s.user_id].losses+=s.losses||0;
+      });
+    }catch(_){}
+    // 2. 查玩家之间历史对局数 (my_uid 查询，粗略统计)
+    var historyCount=0;
+    try{
+      var hc=await sb.from('eh_game_results').select('id',{count:'exact',head:true}).eq('my_uid',myUid);
+      historyCount=(hc.count||0);
+    }catch(_){}
+    // 3. 构建 fallback
+    var fallback=_ehPlotFallback(statsMap,myUid,historyCount,names);
+    // 4. 构建玩家描述给 AI
+    var playerDesc=names.map(function(nm,i){
+      var uid=(ids&&ids[i])||null;
+      var st=statsMap[uid]||{};
+      if(uid===myUid){
+        if(st.plays===0) return nm+'(新人)';
+        if(st.wins>=3) return nm+'('+st.wins+'胜'+st.losses+'负)';
+        return nm+'('+st.plays+'局)';
+      }
+      return nm;
+    }).join('、');
+    // 5. 调 AI 生成
+    var text=await _ehFunAI('plotline',{
+      game:game, players:playerDesc, historyCount:historyCount,
+      myWins:(statsMap[myUid]||{}).wins||0,
+      myPlays:(statsMap[myUid]||{}).plays||0,
+      fallback:fallback
+    });
+    // 6. 展示
+    ehShowPlotLine(text||fallback);
+  }catch(e){ _ehCatch('ehGamePlotLine',e); }
+}
+
+// 展示本局剧情 — 牌桌顶部青色文字，5秒消失
+function ehShowPlotLine(text){
+  if(!text) return;
+  var container=document.querySelector('.pk-room')||document.querySelector('.ddz-room')||document.querySelector('.gd-room')||document.getElementById('hall')||document.body;
+  var old=container.querySelector('.eh-plot-line'); if(old) old.remove();
+  var el=document.createElement('div');
+  el.className='eh-plot-line'; el.textContent=text;
+  el.onclick=function(){ el.classList.remove('eh-show'); setTimeout(function(){el.remove();},600); };
+  container.appendChild(el);
+  requestAnimationFrame(function(){ el.classList.add('eh-show'); });
+  setTimeout(function(){ el.classList.remove('eh-show'); setTimeout(function(){el.remove();},600); },5000);
+}
+
+// ============================================================
+// 功能四: 江湖恩怨 (Rival System)
+// ============================================================
+
+// 查询两人之间的对局统计
+// 返回 {total, myWins, oppWins} 或 null
+async function ehGetRivalInfo(myUid,opponentUid){
+  if(!sb||!myUid||!opponentUid||myUid===opponentUid) return null;
+  try{
+    // 查 my_uid 为我或对手的记录，然后过滤出两人同桌的
+    var res=await sb.from('eh_game_results')
+      .select('my_uid,my_won,my_delta,players')
+      .or('my_uid.eq.'+myUid+',my_uid.eq.'+opponentUid)
+      .order('created_at',{ascending:false})
+      .limit(200);
+    var total=0,myWins=0,oppWins=0;
+    (res.data||[]).forEach(function(r){
+      // 检查 players 数组是否同时包含两个 uid
+      var players=r.players||[];
+      var uids=players.map(function(p){return p&&p.uid;}).filter(Boolean);
+      if(uids.indexOf(myUid)<0||uids.indexOf(opponentUid)<0) return;
+      total++;
+      if(r.my_uid===myUid){
+        if(r.my_won) myWins++; else oppWins++;
+      }else if(r.my_uid===opponentUid){
+        if(r.my_won) oppWins++; else myWins++;
+      }
+    });
+    return {total:total,myWins:myWins,oppWins:oppWins};
+  }catch(e){ _ehCatch('ehGetRivalInfo',e); return null; }
+}
+
+// 开局时检查所有对手的宿敌关系
+async function ehCheckRivals(names,ids){
+  if(!sb||!myUid||!names||!ids) return [];
+  var rivals=[];
+  for(var i=0;i<names.length;i++){
+    var uid=ids[i];
+    if(!uid||uid===myUid) continue;
+    var info=await ehGetRivalInfo(myUid,uid);
+    if(info&&info.total>=3){
+      rivals.push({seat:i,uid:uid,name:names[i],info:info});
+      ehShowRivalBadge(i,info);
+      ehInjectRivalMemory(uid,names[i],info);
+    }
+  }
+  return rivals;
+}
+
+// 在座位头像上显示宿敌标记
+function ehShowRivalBadge(seat,info){
+  try{
+    // 多种选择器覆盖德州/斗地主/掼蛋的座位元素
+    var seats=document.querySelectorAll('[data-seat]');
+    if(!seats.length) seats=document.querySelectorAll('.pk-seat');
+    if(!seats.length) seats=document.querySelectorAll('.seat-avatar,.avatar-wrap');
+    var seatEl=seats[seat]; if(!seatEl) return;
+    // 确保座位元素是相对定位
+    if(getComputedStyle(seatEl).position==='static') seatEl.style.position='relative';
+    var old=seatEl.querySelector('.eh-rival-badge'); if(old) old.remove();
+    var badge=document.createElement('div');
+    badge.className='eh-rival-badge';
+    badge.textContent='⚔';
+    badge.title='你们已交手'+info.total+'次，你赢了'+info.myWins+'次';
+    seatEl.appendChild(badge);
+  }catch(e){ _ehCatch('ehShowRivalBadge',e); }
+}
+
+// 把宿敌关系注入灵魂记忆 (追加到 eh_souls.memory_summary)
+async function ehInjectRivalMemory(soulId,oppName,info){
+  if(!curRoom||!soulId) return;
+  try{
+    var sr=await sb.from('eh_souls').select('memory_summary').eq('auth_uid',soulId).eq('room_id',curRoom.id).maybeSingle();
+    if(!sr.data) return;
+    var rivalNote='[宿敌] '+oppName+'与玩家交手'+info.total+'次('+info.myWins+'胜'+info.oppWins+'负)，是老对手。';
+    var existing=sr.data.memory_summary||'';
+    // 避免重复追加同一对手的宿敌标记
+    if(existing.indexOf('[宿敌] '+oppName)>=0) return;
+    var newSummary=existing? (existing+'\n'+rivalNote) : rivalNote;
+    await sb.from('eh_souls').update({memory_summary:newSummary}).eq('auth_uid',soulId).eq('room_id',curRoom.id);
+  }catch(e){ _ehCatch('ehInjectRivalMemory',e); }
+}
+
+// 翻盘检测: 之前一直输的人这局赢了
+function ehCheckComeback(iWon,rivalInfo){
+  if(!rivalInfo||rivalInfo.total<3) return false;
+  // 之前输多赢少 (oppWins >= myWins+2)，这局赢了 → 翻盘
+  if(iWon&&rivalInfo.oppWins>=rivalInfo.myWins+2){
+    ehShowComeback();
+    return true;
+  }
+  return false;
+}
+
+function ehShowComeback(){
+  try{
+    var old=document.querySelector('.eh-comeback-toast'); if(old) old.remove();
+    var el=document.createElement('div');
+    el.className='eh-comeback-toast';
+    el.textContent='⚡ 翻盘了！江湖再无定数 ⚡';
+    document.body.appendChild(el);
+    requestAnimationFrame(function(){ el.classList.add('eh-show'); });
+    setTimeout(function(){ el.classList.remove('eh-show'); setTimeout(function(){el.remove();},500); },3500);
+  }catch(e){ _ehCatch('ehShowComeback',e); }
+}
+
+// ============================================================
+// 功能五: 传说时刻 (Legend Moment)
+// ============================================================
+
+// 连胜计数器 (内存，按 game+uid 维度)
+var _ehWinStreak={};
+// 缓存近期宿敌信息 (避免重复查询)
+var _ehRivalCache={};
+
+// 传说时刻 fallback 文案
+var _ehLegendFallbacks={
+  royal_flush:function(n){return n+'在霓虹深处亮出同花顺，江湖从此记住了这个名字。';},
+  big_win:function(n){return n+'一把赢走半桌筹码，赌坊为之震动。';},
+  spring:function(n){return n+'以春天之势横扫全场，对手甚至没来得及出牌。';},
+  bombs:function(n){return n+'连掷炸弹，牌桌在爆炸中颤抖。';},
+  win_streak:function(n){return n+'三连胜，名字在这张牌桌上开始流传。';},
+  bust:function(n){return n+'将最后的筹码推入底池，赌注是尊严。';}
+};
+
+// 主函数: 触发传说时刻
+async function ehLegendMoment(uid,name,trigger,game,extra){
+  if(!uid||!name) return;
+  try{
+    var fbFn=_ehLegendFallbacks[trigger]||function(n){return n+'在这张牌桌留下了传说。';};
+    var fallback=fbFn(name).slice(0,40);
+    // 调 AI 生成
+    var text=await _ehFunAI('legend',{
+      uid:uid,name:name,trigger:trigger,game:game,
+      extra:extra||'',fallback:fallback
+    });
+    var finalText=(text||fallback).slice(0,40);
+    // 广播
+    ehLegendBroadcast(uid,name,finalText,trigger);
+    // 本地展示
+    ehLegendMomentShow(uid,name,finalText,trigger);
+    // 存储
+    ehLegendStore(uid,{t:Date.now(),text:finalText,trigger:trigger,game:game});
+  }catch(e){ _ehCatch('ehLegendMoment',e); }
+}
+
+// 广播传说时刻 — 通过现有 room broadcast channel
+function ehLegendBroadcast(uid,name,text,trigger){
+  try{
+    if(_gtPlayChan){
+      _gtPlayChan.send({type:'broadcast',event:'legend_moment',
+        payload:{uid:uid,name:name,text:text,trigger:trigger,ts:Date.now()}});
+    }
+  }catch(_){}
+}
+
+// 全屏展示传说时刻
+function ehLegendMomentShow(uid,name,text,trigger){
+  try{
+    var old=document.querySelector('.eh-legend-overlay'); if(old) old.remove();
+    var overlay=document.createElement('div');
+    overlay.className='eh-legend-overlay';
+    overlay.innerHTML='<div><div class="eh-legend-text">'+text+'</div><div class="eh-legend-name">— '+name+'</div></div>';
+    document.body.appendChild(overlay);
+    overlay.onclick=function(){ overlay.classList.remove('eh-show'); setTimeout(function(){overlay.remove();},400); };
+    requestAnimationFrame(function(){ overlay.classList.add('eh-show'); });
+    // 3秒后自动消失
+    setTimeout(function(){ overlay.classList.remove('eh-show'); setTimeout(function(){overlay.remove();},400); },3000);
+  }catch(e){ _ehCatch('ehLegendMomentShow',e); }
+}
+
+// 存储传说时刻到 eh_soul_state (scope=legend:{uid}, key=moments)
+async function ehLegendStore(uid,moment){
+  if(!sb||!uid) return;
+  try{
+    var scope='legend:'+uid;
+    var key='moments';
+    var dr=await sb.from('eh_soul_state').select('value').eq('scope',scope).eq('key',key).maybeSingle();
+    var arr=Array.isArray(dr.data&&dr.data.value)?dr.data.value:[];
+    arr.push(moment);
+    var trimmed=arr.slice(-10); // 最多保留10条
+    await sb.from('eh_soul_state').upsert({scope:scope,key:key,value:trimmed,updated_at:new Date().toISOString()},{onConflict:'scope,key'});
+  }catch(e){ _ehCatch('ehLegendStore',e); }
+}
+
+// 传说时刻触发检测 — 在游戏结算时调用
+// game: 'nlhe'|'doudizhu'|'guandan'
+// res: 游戏结果对象
+// meta: 额外信息 (poker 有 handName/delta)
+// names: 玩家名数组
+// ids: 玩家 uid 数组
+function ehLegendCheck(game,res,meta,names,ids){
+  if(!res||!names||!names.length) return;
+  try{
+    var mySeat=(meta&&typeof meta.mySeat==='number')?meta.mySeat:0;
+    var myName=names[mySeat]||'玩家';
+    var myUidLocal=(ids&&ids[mySeat])||myUid;
+
+    // ── 德州触发条件 ──
+    if(game==='nlhe'){
+      // 同花顺或更高牌型赢了
+      var handName=(meta&&meta.handName)||'';
+      if(handName&&/同花顺|皇家同花顺|straight.?flush|royal/i.test(handName)){
+        var winners=(res.winnersBySeat||[]);
+        if(winners.indexOf(mySeat)>=0){
+          ehLegendMoment(myUidLocal,myName,'royal_flush',game,{hand:handName});
+          _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+          return;
+        }
+      }
+      // 赢了全桌筹码的50%以上
+      var delta=(meta&&meta.delta)||0;
+      var potTotal=0;
+      (res.pots||[]).forEach(function(p){potTotal+=(p&&p.amount||0);});
+      if(delta>0&&potTotal>0&&delta>=potTotal*0.5){
+        ehLegendMoment(myUidLocal,myName,'big_win',game,{pot:potTotal,delta:delta});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // 输光了 (筹码归零)
+      if(delta<0&&Math.abs(delta)>=5000){
+        ehLegendMoment(myUidLocal,myName,'bust',game,{delta:delta});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,false);
+        return;
+      }
+      // 连胜检测
+      var won=((res.winnersBySeat||[]).indexOf(mySeat)>=0);
+      if(_ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,won)) return;
+    }
+
+    // ── 斗地主触发条件 ──
+    if(game==='doudizhu'){
+      // 春天
+      if(res.spring){
+        var wSeat=(res.winners||[])[0]||0;
+        var wName=names[wSeat]||'玩家';
+        var wUid=(ids&&ids[wSeat])||myUid;
+        ehLegendMoment(wUid,wName,'spring',game,{});
+        return;
+      }
+      // 炸弹 >= 3
+      if((res.bombs||0)>=3){
+        ehLegendMoment(myUidLocal,myName,'bombs',game,{bombs:res.bombs});
+        return;
+      }
+      // 连胜
+      var ddzWon=(res.winners||[]).indexOf(mySeat)>=0;
+      if(_ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,ddzWon)) return;
+    }
+
+    // ── 掼蛋触发条件 ──
+    if(game==='guandan'){
+      // 炸弹 >= 3
+      if((res.bombs||0)>=3){
+        ehLegendMoment(myUidLocal,myName,'bombs',game,{bombs:res.bombs});
+        return;
+      }
+      // 连胜
+      var gdWon=(res.winnerTeam===0); // 0&2 队赢 = 我队赢 (seat 0 = 我)
+      if(_ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,gdWon)) return;
+    }
+  }catch(e){ _ehCatch('ehLegendCheck',e); }
+}
+
+// 连胜计数 + 翻盘检测 (内部函数)
+function _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,won){
+  var winKey=game+':'+myUidLocal;
+  if(won){
+    _ehWinStreak[winKey]=(_ehWinStreak[winKey]||0)+1;
+  }else{
+    _ehWinStreak[winKey]=0;
+  }
+  // 连赢3局
+  if(_ehWinStreak[winKey]>=3){
+    ehLegendMoment(myUidLocal,myName,'win_streak',game,{streak:_ehWinStreak[winKey]});
+    _ehWinStreak[winKey]=0; // 触发后重置
+    return true;
+  }
+  // 翻盘检测 (异步，不阻塞)
+  var rivalInfo=_ehRivalCache[myUidLocal];
+  if(rivalInfo&&won){
+    ehCheckComeback(true,rivalInfo);
+  }
+  return false;
+}
+
+// ── 监听 legend_moment 广播事件 ──
+var _ehLegendChan=null;
+function _ehLegendListen(){
+  // 轮询 _gtPlayChan，注册 legend_moment 监听
+  setInterval(function(){
+    try{
+      if(_gtPlayChan&&_gtPlayChan!==_ehLegendChan){
+        _ehLegendChan=_gtPlayChan;
+        _gtPlayChan.on('broadcast',{event:'legend_moment'},function(p){
+          if(p&&p.payload){
+            ehLegendMomentShow(p.payload.uid,p.payload.name,p.payload.text,p.payload.trigger);
+          }
+        });
+      }
+      if(!_gtPlayChan) _ehLegendChan=null;
+    }catch(_){}
+  },1500);
+}
+
+// ============================================================
+// Hook: 包装游戏 open 函数 — 在首次 onSync 时触发本局剧情 + 宿敌检查
+// ============================================================
+function _ehHookGameOpen(){
+  // 德州
+  if(window.EHPokerGame&&window.EHPokerGame.open&&!window.EHPokerGame._ehHooked){
+    var _pkOpen=window.EHPokerGame.open;
+    window.EHPokerGame.open=function(opts){
+      var origOnSync=opts.onSync;
+      var _triggered=false;
+      opts.onSync=function(state,hno){
+        if(!_triggered&&hno!==undefined){
+          _triggered=true;
+          try{ ehGamePlotLine('nlhe',opts.names||[],opts.ids||[]); }catch(_){}
+          try{ ehCheckRivals(opts.names||[],opts.ids||[]).then(function(rivals){
+            // 缓存宿敌信息供翻盘检测
+            rivals.forEach(function(r){ _ehRivalCache[r.uid]=r.info; });
+          }); }catch(_){}
+        }
+        if(origOnSync) return origOnSync(state,hno);
+      };
+      var ret=_pkOpen.call(this,opts);
+      window.EHPokerGame._ehHooked=true;
+      return ret;
+    };
+    window.EHPokerGame._ehHooked=true;
+  }
+
+  // 斗地主
+  if(window.EHDdzGame&&window.EHDdzGame.open&&!window.EHDdzGame._ehHooked){
+    var _ddzOpen=window.EHDdzGame.open;
+    window.EHDdzGame.open=function(opts){
+      var origOnSync=opts.onSync;
+      var _triggered=false;
+      opts.onSync=function(snap,state){
+        if(!_triggered){
+          _triggered=true;
+          try{ ehGamePlotLine('doudizhu',opts.names||[],opts.ids||[]); }catch(_){}
+          try{ ehCheckRivals(opts.names||[],opts.ids||[]).then(function(rivals){
+            rivals.forEach(function(r){ _ehRivalCache[r.uid]=r.info; });
+          }); }catch(_){}
+        }
+        if(origOnSync) return origOnSync(snap,state);
+      };
+      var ret=_ddzOpen.call(this,opts);
+      window.EHDdzGame._ehHooked=true;
+      return ret;
+    };
+    window.EHDdzGame._ehHooked=true;
+  }
+
+  // 掼蛋
+  if(window.EHGuandanGame&&window.EHGuandanGame.open&&!window.EHGuandanGame._ehHooked){
+    var _gdOpen=window.EHGuandanGame.open;
+    window.EHGuandanGame.open=function(opts){
+      var origOnSync=opts.onSync;
+      var _triggered=false;
+      opts.onSync=function(snap,state){
+        if(!_triggered){
+          _triggered=true;
+          try{ ehGamePlotLine('guandan',opts.names||[],opts.ids||[]); }catch(_){}
+          try{ ehCheckRivals(opts.names||[],opts.ids||[]).then(function(rivals){
+            rivals.forEach(function(r){ _ehRivalCache[r.uid]=r.info; });
+          }); }catch(_){}
+        }
+        if(origOnSync) return origOnSync(snap,state);
+      };
+      var ret=_gdOpen.call(this,opts);
+      window.EHGuandanGame._ehHooked=true;
+      return ret;
+    };
+    window.EHGuandanGame._ehHooked=true;
+  }
+}
+
+// ============================================================
+// Hook: 包装 record*Result — 在结算后检测传说时刻
+// ============================================================
+function _ehHookRecordResults(){
+  // 德州
+  if(typeof recordTexasResult==='function'&&!recordTexasResult._ehHooked){
+    var _origTexas=recordTexasResult;
+    recordTexasResult=async function(res,log,names,avatars,souls,meta){
+      await _origTexas.apply(this,arguments);
+      try{
+        var ids=(souls||[]).map(function(s){return s&&s.user_id;});
+        ids.unshift(myUid); // seat 0 = me (for standalone); online uses meta.mySeat
+        ehLegendCheck('nlhe',res,meta,names,ids);
+      }catch(_){}
+    };
+    recordTexasResult._ehHooked=true;
+  }
+
+  // 斗地主
+  if(typeof recordGameResult==='function'&&!recordGameResult._ehHooked){
+    var _origGame=recordGameResult;
+    recordGameResult=async function(game,res,log,names,avatars,souls){
+      await _origGame.apply(this,arguments);
+      try{
+        var ids=(souls||[]).map(function(s){return s&&s.user_id;});
+        ids.unshift(myUid);
+        ehLegendCheck(game,res,null,names,ids);
+      }catch(_){}
+    };
+    recordGameResult._ehHooked=true;
+  }
+
+  // 掼蛋
+  if(typeof recordGuandanResult==='function'&&!recordGuandanResult._ehHooked){
+    var _origGd=recordGuandanResult;
+    recordGuandanResult=async function(res,log,names,avatars,souls){
+      await _origGd.apply(this,arguments);
+      try{
+        var ids=(souls||[]).map(function(s){return s&&s.user_id;});
+        ids.unshift(myUid);
+        ehLegendCheck('guandan',res,null,names,ids);
+      }catch(_){}
+    };
+    recordGuandanResult._ehHooked=true;
+  }
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+function _ehFunInit(){
+  _ehHookGameOpen();
+  _ehHookRecordResults();
+  _ehLegendListen();
+}
+
+// 延迟初始化 — 等游戏模块加载完
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(_ehFunInit,500); });
+}else{
+  setTimeout(_ehFunInit,500);
+}
+
+// 兜底: 页面加载 3 秒后再尝试一次 hook (确保游戏模块已加载)
+setTimeout(function(){
+  try{ _ehHookGameOpen(); _ehHookRecordResults(); }catch(_){}
+},3000);
+
+})();

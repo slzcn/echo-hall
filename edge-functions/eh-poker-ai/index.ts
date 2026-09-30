@@ -221,5 +221,82 @@ Deno.serve(async (req) => {
     return json({ ok: true, text })
   }
 
+
+  // ── v49: 本局剧情 (max_tokens=150，短文字) ──
+  if (body.type === 'plotline') {
+    const messages = buildPlotlinePrompt(body)
+    const { text: raw, debug } = await callLLM(messages, 150)
+    if (!raw) return json({ ok: false, error: 'llm_timeout', text: '', debug })
+    let text = raw.replace(/^[\s\S]*["'"「『]|[\s\S]*["'"」』]$/g, '').replace(/\n/g, '').trim()
+    if (text.length > 20) text = text.slice(0, 20)
+    return json({ ok: true, text })
+  }
+
+  // ── v49: 传说时刻 (max_tokens=200，传说文字) ──
+  if (body.type === 'legend') {
+    const messages = buildLegendPrompt(body)
+    const { text: raw, debug } = await callLLM(messages, 200)
+    if (!raw) return json({ ok: false, error: 'llm_timeout', text: '', debug })
+    let text = raw.replace(/^[\s\S]*["'"「『]|[\s\S]*["'"」』]$/g, '').replace(/\n/g, '').trim()
+    if (text.length > 40) text = text.slice(0, 40)
+    return json({ ok: true, text })
+  }
+
   return json({ ok: false, error: 'unknown_type' }, 400)
 })
+
+// ============================================================
+// v49 趣味性三连: 本局剧情 + 传说时刻 (新增 type)
+// ============================================================
+
+// ── 本局剧情: 生成20字以内赛博朋克武侠主题 ──
+function buildPlotlinePrompt(req: any): { role: string; content: string }[] {
+  const sys = `你是一个赛博朋克武侠世界的说书人。根据在场玩家的战绩和历史，生成一句20字以内的本局主题文字。
+要求：
+- 中文，赛博朋克+武侠风格
+- 20字以内
+- 不要加引号，直接输出文字
+- 暗示玩家之间的关系或状态`;
+
+  const user = `当前游戏：${req.game || '牌局'}
+在场玩家：${req.players || '未知'}
+历史对局数：${req.historyCount || 0}
+我的战绩：${req.myWins || 0}胜/${req.myPlays || 0}局
+请生成本局主题文字：`;
+
+  return [
+    { role: 'system', content: sys },
+    { role: 'user', content: user },
+  ]
+}
+
+// ── 传说时刻: 生成40字以内武侠/赛博朋克传说文字 ──
+function buildLegendPrompt(req: any): { role: string; content: string }[] {
+  const triggerDesc: Record<string, string> = {
+    royal_flush: '拿到了同花顺赢了这局',
+    big_win: '一把赢了全桌超过一半的筹码',
+    spring: '以春天之势横扫全场（对手一张牌没出）',
+    bombs: '在一局中掷出3个以上炸弹',
+    win_streak: '连续赢了3局',
+    bust: '输光了所有筹码',
+  }
+  const act = triggerDesc[req.trigger] || '在牌桌上留下了传奇时刻'
+
+  const sys = `你是一个赛博朋克武侠世界的传说记录者。用40字以内写出一段传说文字，记录这个玩家的传奇时刻。
+要求：
+- 中文，赛博朋克+武侠风格
+- 40字以内
+- 不要加引号，直接输出文字
+- 提到玩家的名字
+- 有画面感、有江湖气`
+
+  const user = `玩家名：${req.name || '玩家'}
+触发事件：${act}
+${req.extra ? '补充信息：' + req.extra : ''}
+请写出传说文字：`;
+
+  return [
+    { role: 'system', content: sys },
+    { role: 'user', content: user },
+  ]
+}
