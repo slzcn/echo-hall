@@ -1034,6 +1034,14 @@ let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 
 let _gtSnapSeq = 0;            // 兼容: EH_GT_NET 缺失时的本地序号
 // ★v37: 多人德州统一状态机 — 所有状态转换经此对象, DB realtime 据此拦截 away 自动拉回
 var _gtPokerSession = null; // { state, tableId } state: null|'host'|'guest'|'spectator'|'away'
+
+// ★arch-refactor v41: 状态机守卫
+let _gtTakingOver = false;
+function _setPokerState(newState, tableId) {
+  const prev = _gtPokerSession ? _gtPokerSession.state : 'null';
+  _gtPokerSession = newState ? { state: newState, tableId: tableId || (_gtPokerSession && _gtPokerSession.tableId) } : null;
+  console.log('[poker-session]', prev, '->', newState || 'null');
+}
 var _gtPokerUnloadHandler = null; // 非正常离场(beforeunload/pagehide) 处理器引用
 // journey-exempt: 联机纯逻辑迁出 — journey-gt-net-module.js + journey-gt-act-rpc.js
 const _EH_GT_NET = (function(){
@@ -1054,7 +1062,7 @@ const _EH_GT_NET = (function(){
 function _gtRememberGame(id){ try{ if(id) localStorage.setItem('eh_last_game', String(id)); }catch(_){} }
 function _gtForgetGame(){ try{ localStorage.removeItem('eh_last_game'); }catch(_){} }
 function _gtLastGame(){ try{ return localStorage.getItem('eh_last_game') || ''; }catch(_){ return ''; } }
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); if(!_gtPokerSession||_gtPokerSession.state!=='away'){_gtPokerSession=null;} }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ★v37: 非正常离场 — 关闭浏览器/PWA 时用 fetch keepalive 同步标 away, 心跳超时兜底
 function _gtPokerBindUnload(tableId){
@@ -2951,7 +2959,7 @@ function gtEnter(id){
     const _myAway=(row.seats||[]).some(s=>s&&s.kind==='human'&&s.uid===myUid&&s.away);
     if(_myAway){ try{ gtRpc('eh_gt_set_away',{p_table:id, p_away:false}); }catch(_){} }
     // ★v37: 用户主动回来 → 清 session away 状态, 允许重新进桌
-    if(_gtPokerSession&&_gtPokerSession.state==='away'&&_gtPokerSession.tableId===id){ _gtPokerSession=null; }
+    if(_gtPokerSession&&_gtPokerSession.state==='away'&&_gtPokerSession.tableId===id){ _setPokerState(null); }
   }
   // 无房主: 谁是座位最小的真人谁跑引擎(原 host 路径), 其余走观察者(原 guest 路径)
   if(gtEngineHolder(row)===myUid){
@@ -3178,6 +3186,7 @@ function gtCheckAutoStart(row){
 //   此函数仍由 DB realtime 触发, 处理 transfer 广播丢失(网络问题)的兜底场景。
 //   若已通过 transfer 广播接管(_gtActiveTable.host===true), 直接 return 不重复启动。
 function gtCheckEngineTransfer(row){
+  if (_gtTakingOver) return;
   if(!row || row.game!=='nlhe') return;
   if(row.status!=='playing') return;
   if(gtEngineHolder(row)!==myUid) return;
@@ -3466,7 +3475,7 @@ function gtLaunchPoker(row, resumeSnap){
   });
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
-  _gtPokerSession={state:'host',tableId:row.id};
+  _setPokerState('host', row.id);
   // 跨桌钱包: 按 uid 账本带入我这席筹码(临时账号同样累计); 有远程真人时其余席仍 START=1000 保证同桌公平。
   //   生涯 net/局数在 onResult 里照样累计 —— 换桌不丢“赢来的积分”。
   const _bank = bankOpenOpts('nlhe');
@@ -3520,7 +3529,7 @@ function gtLaunchPoker(row, resumeSnap){
         } else {
           // 转旁观模式
           _gtCleanupPlay();
-          _gtPokerSession={state:'spectator',tableId:row.id};
+          _setPokerState('spectator', row.id);
           setTimeout(function(){
             var fresh=_gtTables.get(row.id);
             if(fresh && fresh.status!=='closed'){
@@ -3558,7 +3567,7 @@ function gtLaunchPoker(row, resumeSnap){
       // 2. 标记 away
       try { gtRpc('eh_gt_set_away', { p_table: tableId, p_away: true }); } catch(_) {}
       // ★v37: 设 session=away, 阻止 DB realtime 自动拉回(须在 _gtCleanupPlay 之前设)
-      _gtPokerSession = { state:'away', tableId:tableId };
+      _setPokerState('away', tableId);
       // 3. ★v34: 检查剩余非 away 真人 → 无真人散桌(广播 dissolve), 有真人不用额外处理(引擎转移已在上面)
       const _fr=_gtTables.get(tableId) || row;
       const _rem=(_fr.seats||[]).filter(s=>s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away);
@@ -3578,7 +3587,7 @@ function gtLaunchPoker(row, resumeSnap){
 function gtSpectatePoker(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtSpectatePoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   _gtCleanupPlay();
-  _gtPokerSession={state:'spectator',tableId:row.id};
+  _setPokerState('spectator', row.id);
   const A=gtSeatArrays(row);
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
   // 旁观只收 snap 渲染, 不拉底牌, 不绝 onAction(mySeat=-1 引擎不渲染操作区)
@@ -3766,6 +3775,9 @@ async function _gtEnterPokerV2(row){
   //   只有座位号最小的非 away 真人(gtEngineHolder)才接管, 其余忽略; 多 guest 同时收到不会冲突。
   //   transfer 广播丢失时仍由 DB realtime 触发 gtCheckEngineTransfer 兜底。
   chan.on('broadcast',{event:'transfer'}, ({payload})=>{
+      if (_gtTakingOver) return;
+      _gtTakingOver = true;
+      setTimeout(() => { _gtTakingOver = false; }, 3000);
       if(!payload || !payload.snap) return;
       setTimeout(()=>{
         const fresh=_gtTables.get(row.id);
@@ -3796,7 +3808,7 @@ async function _gtEnterPokerV2(row){
     }
   });
   _gtActiveTable={id:row.id,host:false};
-  _gtPokerSession={state:'guest',tableId:row.id};
+  _setPokerState('guest', row.id);
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
@@ -3822,7 +3834,7 @@ async function _gtEnterPokerV2(row){
           try{ gtClose(tableId); }catch(_){}
         } else {
           _gtCleanupPlay();
-          _gtPokerSession={state:'spectator',tableId:tableId};
+          _setPokerState('spectator', tableId);
           setTimeout(function(){
             var fresh=_gtTables.get(tableId);
             if(fresh && fresh.status!=='closed'){
@@ -3845,7 +3857,7 @@ async function _gtEnterPokerV2(row){
         try{ gtClose(row.id); }catch(_){}
       } else {
         _gtCleanupPlay();
-        _gtPokerSession={state:'spectator',tableId:row.id};
+        _setPokerState('spectator', row.id);
         setTimeout(function(){
           var fresh=_gtTables.get(row.id);
           if(fresh && fresh.status!=='closed'){
@@ -3873,7 +3885,7 @@ async function _gtEnterPokerV2(row){
       }
       try { gtRpc('eh_gt_set_away', { p_table: tableId, p_away: true }); } catch(_) {}
       // ★v37: 设 session=away, 阻止 DB realtime 自动拉回(须在 _gtCleanupPlay 之前设)
-      _gtPokerSession = { state:'away', tableId:tableId };
+      _setPokerState('away', tableId);
       // ★v35: 主动点返回 → 无其他真人散桌; 有真人直接走人不转旁观
       const _fr=_gtTables.get(tableId) || row;
       const _rem=(_fr.seats||[]).filter(s=>s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away);
