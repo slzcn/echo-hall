@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260930-v41';
+window.__EH_APP_VER = '20260930-v42';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -3139,7 +3139,7 @@ function gtLaunchPokerLobby(row){
     lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
     names:A0.names, avatars:A0.avatars, isAI:A0.isAI, souls:A0.souls, ids:A0.ids,
     mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats,
-    sb:50, bb:100, startStack:2000,
+    sb:50, bb:100, startStack:5000,
     // 招募态就带上生涯筹码/回写: startDeal 发牌时我这席用 MY_START, 不再被重置成 1000
     myStack: bankOpenOpts('nlhe').chips,
     onWallet: bankOpenOpts('nlhe').onWallet,
@@ -3340,7 +3340,7 @@ function gtWritePokerHands(tableId, state, mySeat){
 // journey-exempt: 本地账本 — test-bankroll.js + journey-anon-bankroll.js
 //   这里只保留兼容别名 + 与 myUid/me 绑定的 uid 源。
 const PK_WALLET_KEY = 'eh_pk_chips';
-const PK_WALLET_GRANT = 2000;
+const PK_WALLET_GRANT = 5000;
 const PK_WALLET_MIN = 1000;
 const _EH_SCORE = (function(){
   const mod = window.EH_SCORE_MODULE;
@@ -3581,7 +3581,7 @@ function gtLaunchPoker(row, resumeSnap){
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
-    mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:2000,
+    mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:5000,
     resumeSnap: resumeSnap || _gtSnapCache.get(row.id) || null,   // ★v33: 优先用显式传参, 回退到缓存快照(transfer 场景)
     lobbyCtx:gtCtx(row),   // 打牌态空位邀请菜单复用: 邀请真人(发聊天卡)/指定灵魂(改 DB 座, realtime 补位)
     myStack: _pkMyStack, onWallet: _bank.onWallet,
@@ -3730,7 +3730,7 @@ function gtSpectatePoker(row){
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:-1,
-    remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:2000, spectate:true,
+    remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:5000, spectate:true,
     chat: ehGameChatBridge(),
     // 旁观者不绝 onAction → 操作按钮区不出现
     onExit:()=>{ _gtCleanupPlay(); },
@@ -3952,7 +3952,7 @@ async function _gtEnterPokerV2(row){
     remoteSeats:A.remoteSeats,
     // 招募中: 客人也看得到座位/等人入座, 不再空白「等待发牌」干等开局
     lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
-    sb:50, bb:100, startStack:2000,
+    sb:50, bb:100, startStack:5000,
     myStack: bankOpenOpts('nlhe').chips,
     onWallet: bankOpenOpts('nlhe').onWallet,
     chat: ehGameChatBridge(),
@@ -4547,20 +4547,21 @@ function buildGameEl(m, isHistory){
   const ev=p[1];
   const host=esc(m.name||'主持');
   const hostColor=safeColor(m.color, '#00E5D4');
-  // 战绩卡折叠(主人: 战绩卡刷屏盖住聊天): 历史默认收成一行摘要, 点开看全卡; 实时那张仍展开。
-  //   userExpanded=1 幂等: 用户手动展开过就不再折回(realtime 重渲/补拉历史都认)。
+  // 战绩卡折叠(主人: 战绩卡刷屏盖住聊天): 历史默认收成一行摘要, 点开/再点收起双向切换; 实时那张仍展开。
+  //   折叠态由 .collapsed 类驱动, 不写死 userExpanded —— 用户想收就收、想开就开。
   const foldResult = (el, summaryHtml)=>{
     el.classList.add('gc-collapsible');
     el.insertAdjacentHTML('afterbegin', `<div class="gc-collapsed-row">${summaryHtml}<span class="gcs-tail">点击展开</span></div>`);
+    const tail = ()=> el.querySelector('.gcs-tail');
     const wantFold = isHistory && el.dataset.userExpanded !== '1';
-    if (wantFold){
-      el.classList.add('collapsed');
-      el.onclick = (e)=>{                       // 单绑 onclick, 不走 addEventListener(密度门)
-        if (e.target.closest('button')) return;   // 「再来一局」按钮不触发折叠切换
-        el.dataset.userExpanded='1';
-        el.classList.remove('collapsed');
-      };
-    }
+    if (wantFold) el.classList.add('collapsed');
+    el.onclick = (e)=>{                         // 单绑 onclick, 不走 addEventListener(密度门)
+      if (e.target.closest('button')) return;   // 「再来一局」按钮不触发折叠切换
+      const folded = el.classList.toggle('collapsed');
+      el.dataset.userExpanded = folded ? '0' : '1';
+      const t = tail(); if (t) t.textContent = folded ? '点击展开' : '点击收起';
+      try{ if(window.EhSfx&&EhSfx.play) EhSfx.play('click'); }catch(_){}
+    };
     return el;
   };
   // 🎴/🃏 联机牌桌卡: game|gt|<table_id>|<game>。座位以实时 eh_game_tables 行为准(不塞进文本)。
@@ -6939,8 +6940,11 @@ function parseSong(text){
   const styles=SONG_STYLES;
   const styleIds=new Set();
   try{ for(let i=0;i<styles.length;i++){ if(styles[i]&&styles[i].id) styleIds.add(styles[i].id); } }catch(_){}
-  if(parts.length>=2 && styleIds.has(parts[0])){
-    const sid=parts[0];
+  // ★严谨: sid 先做白名单钳定(配置曲风变更/删档后旧消息不许整条 text 含 URL 沦为歌词);
+  //   再按 5 段解出 URL —— URL 一旦解出即 ready, 与 sid 是否认识无关。
+  const clampSid=(raw)=> (raw && styleIds.has(raw)) ? raw : ((styles[0]&&styles[0].id) || 'dj');
+  if(parts.length>=2){
+    const sid=clampSid(parts[0]);
     if(parts.length>=5){
       let lyric=parts[1]; try{ lyric=decodeURIComponent(parts[1]); }catch(_){}
       const songUrl=parts[2]||''; const chStart=parseFloat(parts[3]||'0')||0; const chEnd=parseFloat(parts[4]||'0')||0;
@@ -6948,8 +6952,7 @@ function parseSong(text){
     }
     return { sid, lyric:parts.slice(1).join('|'), songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
   }
-  const fallback = (styles[0]&&styles[0].id) || 'dj';
-  return { sid:fallback, lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
+  return { sid:clampSid(null), lyric:t, songUrl:'', chorusStart:0, chorusEnd:0, ready:false };
 }
 // 编码回 text 字段(存库/发送用)
 function encodeSong(sid, lyric, songUrl, chStart, chEnd){
@@ -8108,7 +8111,7 @@ async function probeSongReady(mid, bubble){
     };
     if(parseSong(row.text).ready){ toast('已谱好, 帮你补上了'); return applyFresh(row); }
     // ② 库里还没 url, 但桶里可能已有 mp3(上传成功但 PATCH 丢): HEAD 探测后补 PATCH
-    const path=`songs/${curRoom&&curRoom.id}/${mid}.mp3`;
+    const path=`songs/${(curRoom&&curRoom.id)||'public'}/${mid}.mp3`;   // 与 Edge 上传路径一致(roomId||'public')
     const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
     let ok=false;
     try{ const r=await fetch(pub.publicUrl,{method:'HEAD'}); ok=r.ok; }catch(_){ ok=false; }
@@ -8129,7 +8132,7 @@ async function resumeStuckPendingSongs(){
     const stuck=rows.filter(m=>{ const t=m.text||''; return t && !t.includes('|http'); });
     if(!stuck.length) return;
     for(const m of stuck){
-      const path=`songs/${curRoom.id}/${m.id}.mp3`;
+      const path=`songs/${curRoom.id||'public'}/${m.id}.mp3`;
       // 先 HEAD 存储: mp3 存在 → 直接补 patch
       const { data:pub }=sb.storage.from('eh-song').getPublicUrl(path);
       let ok=false;
@@ -8233,6 +8236,17 @@ async function generateAndPersistSong(mid, lyric, sid, el){
       })
     });
     const res=await resp.json().catch(()=>null);
+    // ★严谨: 生成成功但 Edge PATCH 回写失败(ok:false 仍带 songUrl) —— 不再一律判失败刷成红卡;
+    //   先本地用上音频, 再由前端补一次 PATCH(双保险), 刷新/其他玩家也拿到 URL。
+    const gotUrl = res && res.songUrl ? String(res.songUrl).split('#')[0] : '';
+    if(gotUrl){
+      if(mid && !String(mid).startsWith('local_')){
+        try{
+          const newText=encodeSong(sid, lyric, gotUrl, (res&&res.chorusStart)||0, (res&&res.chorusEnd)||0);
+          await sb.from('eh_messages').update({text:newText}).eq('id', mid).select('id');
+        }catch(_){ _ehCatch('songPatchRetry',_); }
+      }
+    }
     if(resp.ok && res && res.ok && res.songUrl){
       const card=cardOf();
       if(card){
@@ -8745,6 +8759,17 @@ async function gtSeatSoulsIntoEmpties(row){
 // 兼容旧命令 /德州联机 与既有调用点: 已与 /德州 合并为同一张真牌桌
 async function launchTexasOnline(){ return launchTexas(); }
 // 结束后往聊天室发一张德州战绩卡(kind:'game', nlhe 事件): game|nlhe|<win|lose|even>|<delta>|<成手牌型>|<底池>|<赢家名…>
+// ★战绩卡节流(主人: "启动一个游戏好几张卡, 卡片有点多"): 只发【名场面】+ 冷却内不重发;
+//   普通一手不再进聊天流(结算在牌桌内已就地呈现), 免把聊天记录刷成战绩流水。
+const _resultCardAt = {};   // game → 上次发战绩卡的时间
+function shouldPostResult(game, notable){
+  const now = Date.now();
+  const last = _resultCardAt[game] || 0;
+  if (notable){ _resultCardAt[game] = now; return true; }   // 名场面无视冷却
+  if (now - last < 180000) return false;                    // 3 分钟冷却内不发普通手
+  _resultCardAt[game] = now;
+  return true;
+}
 async function postTexasResult(res, names, meta){
   if(!myUid || !curRoom) return;
   const delta=(meta&&meta.delta)||0;
@@ -8753,6 +8778,10 @@ async function postTexasResult(res, names, meta){
   const champSeat=(res.winnersBySeat||[])[0];
   const champName=names[champSeat]||'';
   const hand=(meta&&meta.handName)||'';
+  // 名场面: 输光 / 通吃 / 大底池(≥20 大盲) / 大牌型(同花顺/四条/葫芦)
+  const notable = (delta<=-2000) || (delta>=2000) || (potTotal>=2000)
+    || /同花顺|四条|葫芦/.test(hand||'');
+  if(!shouldPostResult('nlhe', notable)) return;
   const text=['game','nlhe', outcome, delta, hand||'-', potTotal, champName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -8792,6 +8821,10 @@ async function postDdzResult(res, names){
   const win  = res.winners.includes(0) ? 'win' : 'lose';
   const role = (res.landlord===0) ? 'lord' : 'peasant';
   const lordName = names[res.landlord] || '';
+  // 名场面: 春天/炸弹 ≥2 / 倍数 ≥6 / 输赢大(≥6 分) —— 普通一手不再进聊天流
+  const notable = !!res.spring || (res.bombs||0)>=2 || (res.finalMultiplier||1)>=6
+    || Math.abs(res.delta&&res.delta[0]||0)>=6;
+  if(!shouldPostResult('ddz', notable)) return;
   const text = ['game','ddz', win, role, res.delta[0], res.base, res.finalMultiplier, res.bombs||0, res.spring?1:0, res.landlordWon?1:0, lordName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -8902,6 +8935,9 @@ async function postGuandanResult(res, log, names, meta){
   const fromLvl = res.teamLevelsBefore[res.winnerTeam];
   const toLvl   = res.teamLevelsAfter[res.winnerTeam];
   const mateName = names[(mySeat+2)%4] || '';
+  // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 普通一副不再进聊天流
+  const notable = !!res.matchWon || !!res.doubleDown || (res.bombs||0)>=2 || myRankIdx===0;
+  if(!shouldPostResult('gd', notable)) return;
   const text=['game','gd', win, res.advance, fromLvl, toLvl, res.doubleDown?1:0, res.matchWon?1:0, myRankIdx, res.bombs||0, mateName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});

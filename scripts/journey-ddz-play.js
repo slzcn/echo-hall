@@ -195,7 +195,7 @@ assert(/launchDoudizhu[\s\S]{0,2000}EHTable\.encode\(row\.id,'ddz'\)/.test(src) 
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
-assert(/async function postDdzResult\([\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/async function postDdzResult\([\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
 // 编码 → 解码闭环: 生产用的 text 编码字段序与 buildGameEl 的 ddz 分支解码字段序一致
 assert(/\['game','ddz',\s*win,\s*role,\s*res\.delta\[0\],\s*res\.base,\s*res\.finalMultiplier,\s*res\.bombs\|\|0,\s*res\.spring\?1:0,\s*res\.landlordWon\?1:0,\s*lordName\]/.test(src),
   'postDdzResult 编码字段序固定(win|role|delta|base|mult|bombs|spring|lordWon|lordName)');

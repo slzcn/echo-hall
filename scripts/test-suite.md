@@ -76,6 +76,7 @@
 | 作曲进度 | `test-bgm-progress-title.js` / `journey-bgm-compose.js` | 进度/禁重入 |
 | BGM 鉴权 | `test-bgm-auth.js` | 令牌/401 刷新 |
 | 音频缓存 | `journey-audio-cache-limit.js` | 上限回收 |
+| 神曲链路一致 | `journey-song-chain.js` | 生成/播放/刷新一致性 |
 
 ## 8. UI / 触控 / 主题
 | 用例 | 文件 | 覆盖 |

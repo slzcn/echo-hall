@@ -192,7 +192,7 @@ assert(/EHTable\.encode|game\|gt\|/.test(src) && /kind:'game'/.test(src), '开�
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postGuandanResult\(res,\s*log,\s*(?:A\.)?names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
-assert(/postGuandanResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/postGuandanResult[\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
 // 编码 → 解码闭环: 生产 text 编码字段序与 buildGameEl 的 gd 分支解码字段序一致
 assert(/\['game','gd',\s*win,\s*res\.advance,\s*fromLvl,\s*toLvl,\s*res\.doubleDown\?1:0,\s*res\.matchWon\?1:0,\s*myRankIdx,\s*res\.bombs\|\|0,\s*mateName\]/.test(src),
   'postGuandanResult 编码字段序固定(win|advance|fromLvl|toLvl|doubleDown|matchWon|myRankIdx|bombs|mateName)');

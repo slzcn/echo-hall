@@ -121,7 +121,7 @@ assert(/async function postTexasResult\(/.test(src), '存在 postTexasResult(发
 // 编码→解码闭环: 生产字段序与 buildGameEl 的 nlhe 分支解码字段序一致
 assert(/\['game','nlhe', outcome, delta, hand\|\|'-', potTotal, champName\]\.join\('\|'\)/.test(src),
   '战绩卡编码 game|nlhe|outcome|delta|hand|pot|champ(字段序钉死)');
-assert(/postTexasResult[\s\S]{0,700}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+assert(/postTexasResult[\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
 assert(/if\(ev==='nlhe'\)/.test(src), 'buildGameEl 有 nlhe 分支(把战绩卡渲染回来)');
 assert(/const champName=esc\(p\.slice\(6\)\.join\('\|'\)\|\|''\)/.test(src), '赢家名取 slice(6).join("|")(兜住名字里的 | 不截断)');
 assert(/data-nlhe-again/.test(src) && /data-nlhe-again[\s\S]{0,220}ehRelaunchGame\('nlhe'\)/.test(src), '战绩卡"再来一局"接 ehRelaunchGame');

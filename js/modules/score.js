@@ -8,7 +8,7 @@
   var KEY = 'eh_bank_v1';
   var PK_LEGACY = 'eh_pk_chips';
   var DDZ_LEGACY = 'eh_ddz_score';
-  var GRANT = 2000;
+  var GRANT = 5000;
   var PK_MIN = 1000;
   var DAY_KEY = 'eh_daily_plays_v1';
   var DAY_MAX = 5;

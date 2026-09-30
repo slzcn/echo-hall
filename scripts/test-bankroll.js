@@ -40,15 +40,15 @@ console.log('\n── 账本累计 ──');
   const key=(u,g)=>g+':'+u;
   function bankGet(u,g){
     const k=key(u,g);
-    if(!store[k]) store[k]={chips:2000,net:0,plays:0,wins:0};
+    if(!store[k]) store[k]={chips:5000,net:0,plays:0,wins:0};
     return store[k];
   }
   function bankBump(u,g,delta,won){
     const r=bankGet(u,g);
     r.net+=delta; r.plays++;
     if(won) r.wins++;
-    let chips=Math.round((r.chips||2000)+delta);
-    if(g==='nlhe' && chips<1000) chips=2000; // 破产保底
+    let chips=Math.round((r.chips||5000)+delta);
+    if(g==='nlhe' && chips<1000) chips=5000; // 破产保底
     r.chips=chips;
     return r;
   }
@@ -56,10 +56,10 @@ console.log('\n── 账本累计 ──');
   bankBump(uid,'nlhe',320,true);
   bankBump(uid,'nlhe',150,true);
   const rec=bankGet(uid,'nlhe');
-  ok(rec.chips===2470, `两局赢后 chips=2470 (实 ${rec.chips})`);
+  ok(rec.chips===5470, `两局赢后 chips=5470 (实 ${rec.chips})`);
   ok(rec.net===470 && rec.plays===2 && rec.wins===2, 'net/plays/wins 累计正确');
-  bankBump(uid,'nlhe',-2000,false);
-  ok(bankGet(uid,'nlhe').chips===2000, '输光回补 GRANT=2000');
+  bankBump(uid,'nlhe',-5000,false);   // 5470-5000=470 < PK_MIN(1000) → 真输光回补
+  ok(bankGet(uid,'nlhe').chips===5000, '输光回补 GRANT=5000');
   // 旧键迁移模拟
   store['nlhe:uid-2']=null;
   const legacy=500;

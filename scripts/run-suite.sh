@@ -145,6 +145,7 @@ suite_audio() {
   run "歌曲公开/自愈"      scripts/journey-song-public.js
   run "音频缓存上限"       scripts/journey-audio-cache-limit.js
   run "游戏音频"           scripts/journey-game-audio.js
+  run "神曲链路一致"       scripts/journey-song-chain.js
 }
 
 # ── UI / 触控 / 主题 ──

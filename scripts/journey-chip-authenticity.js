@@ -37,7 +37,7 @@ const store = {};
 function key(g,u){ return g+':'+u; }
 function getOf(g,u){ return store[key(g,u)] || (store[key(g,u)]={chips:null,net:0,plays:0,wins:0}); }
 function chipsOf(g,u,grant){
-  const grantN = grant==null?2000:grant;
+  const grantN = grant==null?5000:grant;
   const rec=getOf(g,u);
   let c = rec.chips;
   if(c==null) return grantN;
@@ -46,20 +46,20 @@ function chipsOf(g,u,grant){
 }
 function bumpOf(g,u,delta){
   const rec=getOf(g,u);
-  const base = rec.chips==null ? 2000 : rec.chips;
+  const base = rec.chips==null ? 5000 : rec.chips;
   let c = Math.round(base + (delta||0));
-  if(g==='nlhe' && c<1000) c=2000;
+  if(g==='nlhe' && c<1000) c=5000;
   rec.chips=c; rec.plays=(rec.plays||0)+1; rec.net=Math.round((rec.net||0)+(delta||0));
   return rec;
 }
 const soul='soul-uid-alpha';
-assert(chipsOf('nlhe', soul)===2000, '新灵魂首次入座 GRANT=2000');
+assert(chipsOf('nlhe', soul)===5000, '新灵魂首次入座 GRANT=5000');
 bumpOf('nlhe', soul, +350);
-assert(chipsOf('nlhe', soul)===2350, '灵魂赢 350 → 2350');
+assert(chipsOf('nlhe', soul)===5350, '灵魂赢 350 → 5350');
 bumpOf('nlhe', soul, -200);
-assert(chipsOf('nlhe', soul)===2150, '再进房仍带 2150(不重置 2000)');
+assert(chipsOf('nlhe', soul)===5150, '再进房仍带 5150(不重置 5000)');
 bumpOf('nlhe', soul, -5000);
-assert(chipsOf('nlhe', soul)===2000, '清零/破产后回补 2000');
+assert(chipsOf('nlhe', soul)===5000, '清零/破产后回补 5000');
 
 const day={n:0,max:5};
 function reached(){ return day.n>=day.max; }

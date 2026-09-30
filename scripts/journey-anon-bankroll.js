@@ -24,19 +24,19 @@ const store = {};
 function uidKey(u,g){ return g+':'+u; }
 function bump(u,g,delta){
   const k=uidKey(u,g);
-  const r=store[k]||(store[k]={chips:2000,net:0,plays:0});
+  const r=store[k]||(store[k]={chips:5000,net:0,plays:0});
   r.net+=delta; r.plays++;
   r.chips=Math.max(0,r.chips+delta);
-  if(g==='nlhe'&&r.chips<1000) r.chips=2000;
+  if(g==='nlhe'&&r.chips<1000) r.chips=5000;
   return r;
 }
 const anon='supabase-anon-uuid';
 const h1=bump(anon,'nlhe',400);
-assert(h1.chips===2400, '旅程1: 赢 400 后带入筹码 2400 (实 '+h1.chips+')');
+assert(h1.chips===5400, '旅程1: 赢 400 后带入筹码 5400 (实 '+h1.chips+')');
 const h2=bump(anon,'nlhe',250);
-assert(h2.chips===2650, '旅程2: 再赢 250 → 2650 (实 '+h2.chips+')');
+assert(h2.chips===5650, '旅程2: 再赢 250 → 5650 (实 '+h2.chips+')');
 bump(anon,'nlhe',-5000);
-assert(store[uidKey(anon,'nlhe')].chips===2000, '旅程3: 破产回补 GRANT 2000');
+assert(store[uidKey(anon,'nlhe')].chips===5000, '旅程3: 破产回补 GRANT 5000');
 assert(store[uidKey(anon,'nlhe')].plays===3, '旅程3: 局数仍累计为 3');
 
 console.log('\n'+(failed?'❌ 有失败':'✅ 临时身份积分跨局旅程通过'));
