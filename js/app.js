@@ -1803,6 +1803,7 @@ function clearLastRoom(){ _lastRoomStore.clear(); }
 // 登录态就绪后恢复现场: 上次在某房间→直接进房(大厅DOM后台备好但不切场景, 免闪首页); 否则进大厅。
 function resumeAfterAuth(){
   try{ ehRefreshDailyPlays(); }catch(_){}   // 登录就绪后灌一次今日输光次数(供门禁)
+  try{ ehRefreshStrategyLimit(); }catch(_){}   // ★刷新 DB 策略限制缓存(权威)
   const r=lastRoom();
   if(r){ _restoreScrollPending=true; renderLobby(true); enterRoom(r); }   // 备好大厅数据供返回时秒显, 但场景直接落在房间; 刷新进房要还原停留位置
   else { if(!cameFromLink) toast(EH_CONFIG.text.ok_welcomeBack); goScene('lobby'); renderLobby(); }
@@ -3413,19 +3414,38 @@ function ehDailyLeftInline(game){
 window.ehDailyLeftTip = ehDailyLeftTip;
 window.ehDailyLeftBadge = ehDailyLeftBadge;
 window.ehDailyLeftInline = ehDailyLeftInline;
+// ★输光限制以 DB(eh_game_strategy_limits)为权威: expires_at > now() = 被限制; 过期/无记录 = 放行。
+//   localStorage 不再作为封禁判断依据, 仅做缓存加速(DB 说放行就放行)。
+window.EH_STRATEGY_LIMITED = false;   // DB 缓存: true=被限制
+async function ehCheckStrategyLimit(){
+  try{
+    if(!sb || !myUid) return false;
+    const { data, error } = await sb.from('eh_game_strategy_limits')
+      .select('expires_at')
+      .eq('uid', myUid)
+      .gt('expires_at', new Date().toISOString());
+    if(error) throw error;
+    const limited = !!(data && data.length > 0);
+    window.EH_STRATEGY_LIMITED = limited;
+    return limited;
+  }catch(_){ _ehCatch('ehCheckStrategyLimit', _); return false; }
+}
+async function ehRefreshStrategyLimit(){ return ehCheckStrategyLimit(); }
+
 // 每日门禁: 德州每天最多【输光 5 次】; 斗地主/掼蛋不设闸。
-// 权威计数在服务端 eh_game_plays(ehRecordPlay 落账, ehRefreshDailyPlays 灌入本地); 本地缓存同步拦截。
+// ★DB 为权威(eh_game_strategy_limits.expires_at > now()); localStorage 不再阻断。
 function ehDailyPlayGate(game){
   try{
     const g = game || 'nlhe';
     // 每日上限只约束德州「输光次数」; 斗地主/掼蛋无筹码, 不设局数闸
     if(g !== 'nlhe') return true;
-    const d = window.EH_DAILY_PLAYS;
-    const name = '德州';
-    if(d && d.reached && d.reached(g)){
-      toast('今日已输光 '+(d.max||5)+' 次 · 明天再来（其他游戏不受影响）');
+    // ★DB 为权威: 查 eh_game_strategy_limits, expires_at > now() 才算被限制
+    ehRefreshStrategyLimit();   // fire-and-forget: 刷新缓存供下次读取
+    if(window.EH_STRATEGY_LIMITED){
+      toast('今日已输光 '+(window.EH_DAILY_PLAYS&&window.EH_DAILY_PLAYS.max||5)+' 次 · 明天再来（其他游戏不受影响）');
       return false;
     }
+    // localStorage 不再阻断 — DB 说放行就放行
   }catch(_){ _ehCatch('ehDailyPlayGate',_); }
   return true;
 }
@@ -3450,6 +3470,9 @@ async function ehRecordBust(game){
     const today = new Date().toISOString().slice(0,10);
     await sb.from('eh_game_plays').insert({ uid: myUid, game: game, day: today });
     ehRefreshDailyPlays();
+    // ★清掉 localStorage 旧封禁标记, 避免 DB 已放行但本地仍残留
+    try{ localStorage.removeItem('eh_daily_plays_v1'); }catch(_){}
+    ehRefreshStrategyLimit();   // 刷新 DB 缓存(eh_game_strategy_limits)
   }catch(_){ _ehCatch('ehRecordBust', _); }
 }
 // journey-exempt: 全员真实筹码账本(灵魂/远程真人/我) — journey-chip-authenticity.js

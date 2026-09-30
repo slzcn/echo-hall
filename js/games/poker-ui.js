@@ -32,12 +32,13 @@
   // journey-exempt: 每日对局次数门禁读写 localStorage(eh_daily_plays_v1), 与 score.js 同源;
   //   静态断言见 journey-chip-authenticity.js, 无法在一趟旅程内连打 5 局真人对局。
   // ── 每日对局上限(主人要求): 一天最多进房玩 5 次, 到顶当天不能再开/进桌, 次日自动重置。
-  //   计数源在 js/modules/score.js(eh_daily_plays_v1); startDeal 落一次, app.js 入口也门禁。
+  //   ★DB 为权威(eh_game_strategy_limits.expires_at > now()); localStorage 仅缓存, 不阻断。
   const PK_DAILY_MAX = 5;
   const _daily = () => (root.EH_DAILY_PLAYS || null);
   function pkPlaysToday(){ const d=_daily(); return (d && typeof d.plays==='function') ? d.plays('nlhe') : 0; }
   function pkAddPlay(){ const d=_daily(); return (d && typeof d.bump==='function') ? d.bump('nlhe') : 0; }
-  function pkLimitReached(){ const d=_daily(); return !!(d && typeof d.reached==='function' && d.reached('nlhe')); }
+  // ★完全依赖 DB: window.EH_STRATEGY_LIMITED 由 app.js ehCheckStrategyLimit() 异步刷新
+  function pkLimitReached(){ return !!(root.EH_STRATEGY_LIMITED); }
 
   const CSS_ID = 'pk-ui-css';
   function injectCSS(){
