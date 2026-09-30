@@ -2433,6 +2433,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     // ── guest: 收到 host 广播的公共快照 → 组伪状态渲染。换副时重置手牌/动画; 终局弹战报。 ──
     function applySnapshot(snap){
       if (!snap || !GNet) return;
+      // ★v43: 收到快照先清旧计时器(rAF/timeout/还贡计时), 防上一副残留计时器与新一帧并存驱动同一徽标 → 倒计时双倍
+      clearTimers();
       if (GNet.acceptSeq){
         const acc = GNet.acceptSeq(snap, lastSnapSeq);
         if (!acc.ok) return;                 // 迟到旧包: 丢弃

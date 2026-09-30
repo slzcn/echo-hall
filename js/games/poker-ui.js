@@ -2816,6 +2816,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function applySnapshot(snap){
       if (!isGuest || !snap) return;
+      // ★v43: 收到快照先清旧计时器(rAF/timeout/结算横幅), 防上一手残留计时器与新一帧并存驱动同一徽标 → 倒计时双倍
+      clearTimers();
       if (root.EHPokerNet && root.EHPokerNet.acceptSeq){
         const acc = root.EHPokerNet.acceptSeq(snap, lastSnapSeq);
         if (!acc.ok) return;                 // 迟到旧包: 丢弃

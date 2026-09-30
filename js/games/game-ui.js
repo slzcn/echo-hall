@@ -2350,6 +2350,8 @@ html[data-mode="day"] .ddz-felt::before{
     // ── guest: 收到 host 广播的公共脱敏快照 → 组伪状态渲染。换副/重发时重置手牌与动画; 终局弹战报。 ──
     function applySnapshot(snap){
       if (!snap || !GNet) return;
+      // ★v43: 收到快照先清旧计时器(rAF/timeout/亮牌过渡), 防上一手残留计时器与新一帧并存驱动同一徽标 → 倒计时双倍
+      clearTimers();
       if (GNet.acceptSeq){
         const acc = GNet.acceptSeq(snap, lastSnapSeq);
         if (!acc.ok) return;                 // 迟到旧包: 丢弃, 不回退 UI
