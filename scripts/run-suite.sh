@@ -74,6 +74,7 @@ suite_multiplayer() {
   run "斗地主/掼蛋升级对齐" scripts/journey-ddz-gd-upgrade.js
   run "斗地主/掼蛋观感一致" scripts/journey-ddz-gd-polish.js
   run "牌桌落点/刷新还原" scripts/journey-table-polish.js
+  run "战绩卡折叠"         scripts/journey-result-card-fold.js
 }
 
 # ── 游戏规则 ──

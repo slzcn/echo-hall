@@ -846,11 +846,12 @@ section "5. 危险 API 使用密度（回归监控）"
 
 python3 - <<'PY'
 import re, pathlib, sys
-# 基线：7/29 审计时点 index.html；8/7 私信模块 dm.js 上线后 rebase innerHTML/addEventListener
+# 基线：7/29 审计时点 index.html；8/7 私信模块 dm.js 上线后 rebase innerHTML/addEventListener。
+# 9/30 v38 断线处理(心跳/away 条/踢出/视觉标记) + v39/v40 牌桌打磨后 re-audit —— 功能性增长, 非爆炸。
 baselines = {
     r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
-    r'\bsetTimeout\s*\(': ('setTimeout', 146, 15),
-    r'\baddEventListener\s*\(': ('addEventListener', 119, 10),
+    r'\bsetTimeout\s*\(': ('setTimeout', 166, 15),
+    r'\baddEventListener\s*\(': ('addEventListener', 132, 10),
     r'\.style\.\w+\s*=': ('element.style=', 131, 15),
 }
 sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]

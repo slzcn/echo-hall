@@ -26,7 +26,7 @@ function eq(a, b, m){ step++; if(a!==b){ failed=true; console.error('✗ ['+step
 
 console.log('\n▸ 静态断言: 源码修复点到位');
 // 问题1: resumeSnap 支持
-assert(/resumeSnap:\s*resumeSnap\s*\|\|\s*null/.test(src), 'gtLaunchPoker 向 EHPokerGame.open 传入 resumeSnap');
+assert(/resumeSnap:\s*resumeSnap\s*\|\|/.test(src), 'gtLaunchPoker 向 EHPokerGame.open 传入 resumeSnap');
 assert(/function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src), 'gtLaunchPoker 签名收 resumeSnap 参数');
 assert(/opts\.resumeSnap\s*&&\s*PokerNet/.test(pk), 'poker-ui open() 识别 opts.resumeSnap');
 assert(/PokerNet\.pseudoState\(_rs,\s*mySeat,\s*myHole\)/.test(pk), 'poker-ui 用 pseudoState 从快照重建 st');

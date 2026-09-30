@@ -49,6 +49,7 @@
 | 斗地主/掼蛋对标德州 | `journey-ddz-gd-upgrade.js` | 让座/单机守卫/空位入座/文案 |
 | 斗地主/掼蛋观感一致 | `journey-ddz-gd-polish.js` | 锁定可发现/提示出处/教练介入/按钮规格 |
 | 牌桌落点/刷新还原 | `journey-table-polish.js` | 下注筹码避公共牌/刷新留在牌局 |
+| 战绩卡折叠 | `journey-result-card-fold.js` | 历史收一行/点展开/三款同款 |
 
 ## 5. 游戏规则
 | 用例 | 文件 | 覆盖 |

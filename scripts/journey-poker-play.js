@@ -100,7 +100,7 @@ assert(/cmd==='\/德州'\|\|cmd==='\/texas'\|\|cmd==='\/poker'\|\|cmd==='\/holde
 assert(/async function launchTexas\(/.test(src), '存在 launchTexas(开真牌桌)');
 assert(/async function launchTexas\(\)\{[\s\S]*?eh_gt_open[\s\S]*?\n\}/.test(src), 'launchTexas 走 eh_gt_open 开真牌桌(不再另起单机 EHPokerGame 局)');
 // 开局在 host 引擎路径 gtLaunchPoker: EHPokerGame.open + 座位名册来自 gtSeatArrays
-assert(/function gtLaunchPoker\(row\)/.test(src) && /window\.EHPokerGame\.open\(/.test(src), 'gtLaunchPoker 调 EHPokerGame.open 开桌');
+assert(/function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src) && /window\.EHPokerGame\.open\(/.test(src), 'gtLaunchPoker 调 EHPokerGame.open 开桌');
 assert(/mySeat:A\.mySeat/.test(src) && /isAI:A\.isAI/.test(src), '座位/mySeat/isAI 由 gtSeatArrays 名册驱动(真人坐人席, 灵魂/空位=AI)');
 assert(/isAI\[i\]=!human/.test(src), 'gtSeatArrays: 非真人席(灵魂/AI/空位)一律标记 AI(host 本机代打)');
 assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里灵魂原型传进 souls(AI 按灵魂性格映射打法)');
@@ -108,7 +108,7 @@ assert(/archetype:\s*soul\.archetype\|\|soul\.soul_archetype/.test(src), '房里
 assert(/async function gtSeatSoulsIntoEmpties\([\s\S]*?eh_gt_seat_soul/.test(src), 'gtSeatSoulsIntoEmpties: 把空位坐满房里灵魂(eh_gt_seat_soul)');
 assert(/async function gtStart\(id\)\{[\s\S]*?gtSeatSoulsIntoEmpties/.test(src), 'gtStart 开局前先灵魂补位(点开始=灵魂来玩, 非匿名机器人)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
-const GTL_PK = (src.match(/function gtLaunchPoker\(row\)\{[\s\S]*?\n\}/) || [''])[0];
+const GTL_PK = (src.match(/function gtLaunchPoker\(row,\s*resumeSnap\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move/.test(GTL_PK), 'gtLaunchPoker act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
 assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
 assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');

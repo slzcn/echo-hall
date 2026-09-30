@@ -928,6 +928,20 @@
   .gt-card.collapsed .gt-head,.gt-card.collapsed .gt-foot{display:none}
   .gt-card.collapsed .gt-collapsed-row{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;color:var(--dim,#498d88);white-space:nowrap;overflow:hidden}
   .gt-card:not(.collapsed) .gt-collapsed-row{display:none}
+  /* ★战绩卡折叠(主人: 战绩卡刷屏盖住聊天): 与散桌卡同款 —— 历史默认收成一行摘要, 点击展开;
+     实时新开的那张仍展开(要看到刚打完的结果), 用户手动展开过则不再折回。 */
+  .game-card.gc-collapsible{cursor:pointer}
+  .game-card.collapsed{overflow:hidden}
+  .game-card.collapsed .gc-head,
+  .game-card.collapsed .ddz-scoreline,
+  .game-card.collapsed .ddz-detail,
+  .game-card.collapsed .ddz-again-row,
+  .game-card.collapsed .gc-tip,
+  .game-card.collapsed .gc-time{display:none}
+  .game-card .gc-collapsed-row{display:none}
+  .game-card.collapsed .gc-collapsed-row{display:flex;align-items:center;gap:8px;padding:7px 11px;font-size:12px;white-space:nowrap;overflow:hidden;
+    color:color-mix(in srgb,var(--gc,var(--accent)) 80%,var(--ink))}
+  .game-card.collapsed .gc-collapsed-row .gcs-tail{margin-left:auto;opacity:.55;flex:none}
   /* ===== 游戏牌桌卡片(gt-card) 布局规范 + 徽章统一 ===== */
   .gt-card .gt-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .gt-card .gt-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:8px;flex-wrap:wrap;align-items:center}
@@ -2237,7 +2251,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20260930-v40';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20260930-v41';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2742,7 +2756,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/bgm.js?v=20260930-v38"></script>
 <script defer src="./js/modules/room.js?v=20260930-v38"></script>
 <script defer src="./js/modules/messages.js?v=20260930-v38"></script>
-<script defer src="./js/app.js?v=20260930-v40"></script>
+<script defer src="./js/app.js?v=20260930-v41"></script>
 <script defer src="./js/keyboard.js?v=20260930-v38"></script>
 <script defer src="./js/boot.js?v=20260930-v38"></script>
 <script defer src="./js/dm.js?v=20260930-v38"></script>
