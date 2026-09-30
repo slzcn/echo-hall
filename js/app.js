@@ -1884,6 +1884,8 @@ async function enterRoom(room){
     // ★keep-alive 贴的是旧 DOM 快照, 跳过了 loadHistory→loadRoomUserIdentity。这里从还原后的 DOM
     //   扫 uid 补一次真人权威身份表, 让离场者改名(如 61女王→热血狼)在秒回房路径也跟随, 不留旧名。
     loadRoomUserIdentity();
+    // 跨场景记忆：进房后为每个灵魂构建记忆摘要并写入 eh_souls.memory_summary
+    try{ if(roomSouls.length && myUid){ roomSouls.forEach(s=>{ if(s&&s.auth_uid){ ehSoulBuildMemoryContext(room.id, s.auth_uid, myUid).catch(()=>{}); } }); } }catch(_){ _ehCatch('enterRoom.mem',_); }
     room.role = memRes?.value?.data?.role || 'member';
     { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
     return;
@@ -1917,6 +1919,8 @@ async function enterRoom(room){
   const memRes = results[1];
   room.role = memRes?.value?.data?.role || 'member';
   { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
+  // 跨场景记忆：进房后为每个灵魂构建记忆摘要并写入 eh_souls.memory_summary
+  try{ if(roomSouls.length && myUid){ roomSouls.forEach(s=>{ if(s&&s.auth_uid){ ehSoulBuildMemoryContext(room.id, s.auth_uid, myUid).catch(()=>{}); } }); } }catch(_){ _ehCatch('enterRoom.mem',_); }
   try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){ _ehCatch('enterRoom',__); } }
   // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
   scheduleDailyTarot(room && room.id);
@@ -5733,6 +5737,133 @@ async function loadRoomSouls(rid){
     applyData(await p);
   }catch(e){ /* 灵魂表未建/无灵魂：静默，聊天照常 */ }
 }
+// ============ 灵魂跨场景记忆系统 (eh_soul_state KV) ============
+// scope=room:{roomId}:soul:{soulId}  key=poker_recent|game_recent|room_events|visitor_context
+// 写入异步、不阻塞游戏逻辑，失败静默忽略；读取带本地缓存(5分钟TTL)。
+// 摘要拼入 eh_souls.memory_summary → 服务端 eh-soul-tick 读该字段注入灵魂 prompt。
+const _soulMemCache = {};            // {scope+key: {data, at}}
+const SOUL_MEM_CACHE_TTL = 5 * 60 * 1000;  // 5 分钟
+
+// 从 DB 读一条灵魂记忆(带本地缓存)。返回 value(jsonb 解析后的对象/数组) 或 null。
+async function ehSoulMemRead(roomId, soulId, key){
+  if(!sb || !roomId || !soulId || !key) return null;
+  const scope = 'room:'+roomId+':soul:'+soulId;
+  const ck = scope+':'+key;
+  const cached = _soulMemCache[ck];
+  if(cached && (Date.now()-cached.at) < SOUL_MEM_CACHE_TTL){
+    return cached.data;
+  }
+  try{
+    const { data, error } = await sb.from('eh_soul_state')
+      .select('value').eq('scope', scope).eq('key', key).maybeSingle();
+    if(error) throw error;
+    const val = (data && data.value) ? data.value : null;
+    _soulMemCache[ck] = { data: val, at: Date.now() };
+    return val;
+  }catch(e){ _ehCatch('ehSoulMemRead', e); return null; }
+}
+
+// 读现有 value → updateFn(oldVal) → 写回 DB(upsert scope+key)。不阻塞调用方。
+async function ehSoulMemWrite(roomId, soulId, key, updateFn){
+  if(!sb || !roomId || !soulId || !key || typeof updateFn!=='function') return;
+  const scope = 'room:'+roomId+':soul:'+soulId;
+  const ck = scope+':'+key;
+  try{
+    const { data } = await sb.from('eh_soul_state')
+      .select('value').eq('scope', scope).eq('key', key).maybeSingle();
+    const oldVal = (data && data.value) ? data.value : null;
+    const newVal = updateFn(oldVal);
+    if(newVal === undefined || newVal === null) return;
+    const { error } = await sb.from('eh_soul_state')
+      .upsert({ scope, key, value: newVal, updated_at: new Date().toISOString() },
+        { onConflict: 'scope,key' });
+    if(error) throw error;
+    _soulMemCache[ck] = { data: newVal, at: Date.now() };
+  }catch(e){ _ehCatch('ehSoulMemWrite', e); }
+}
+
+// 组装记忆摘要字符串(≤200字)，并同步写入 eh_souls.memory_summary 供服务端 tick 注入 prompt。
+// visitorUid 可选：传入时附带该访客的来频/上次到访/互动情绪(warm/rowdy)。
+async function ehSoulBuildMemoryContext(roomId, soulId, visitorUid){
+  if(!roomId || !soulId) return '';
+  try{
+    const [pokerRecent, gameRecent, roomEvents] = await Promise.all([
+      ehSoulMemRead(roomId, soulId, 'poker_recent'),
+      ehSoulMemRead(roomId, soulId, 'game_recent'),
+      ehSoulMemRead(roomId, soulId, 'room_events'),
+    ]);
+    const lines = [];
+    // ① 牌局记忆 —— 德州
+    if(Array.isArray(pokerRecent) && pokerRecent.length){
+      const latest = pokerRecent[pokerRecent.length-1];
+      if(latest){
+        let s = '刚才的德州：'+(latest.result||'');
+        if(latest.pot) s += '，底池'+latest.pot;
+        if(latest.highlight) s += '，'+latest.highlight;
+        if(latest.delta && typeof latest.delta==='object'){
+          const ds = Object.entries(latest.delta).map(([n,d])=>
+            n+':'+(d>0?'赢':'输')+Math.abs(d)).join('，');
+          if(ds) s += '（'+ds+'）';
+        }
+        lines.push(s);
+      }
+    }
+    // ② 牌局记忆 —— 斗地主/掼蛋
+    if(Array.isArray(gameRecent) && gameRecent.length){
+      const latest = gameRecent[gameRecent.length-1];
+      if(latest){
+        let s = '刚才的'+(latest.game||'牌局')+'：'+(latest.result||'');
+        if(latest.highlight) s += '，'+latest.highlight;
+        if(latest.score!=null) s += '，得分'+latest.score;
+        lines.push(s);
+      }
+    }
+    // ③ 房间大事记 —— 今日
+    if(Array.isArray(roomEvents) && roomEvents.length){
+      const today = roomEvents.filter(e=> e && e.t && (Date.now()-e.t*1000)<86400000);
+      if(today.length){
+        lines.push('今日大事：'+today.slice(-3).map(e=>e.text).join('；'));
+      }
+    }
+    // ④ 访客印象
+    if(visitorUid && sb){
+      const { data:v } = await sb.from('eh_soul_memory')
+        .select('visits,last_seen,warm,rowdy').eq('uid', visitorUid).maybeSingle();
+      if(v){
+        let s = '';
+        if(v.visits>1){
+          s += '第'+v.visits+'次来';
+          if(v.last_seen){
+            const days = Math.floor((Date.now()-v.last_seen)/86400000);
+            s += days>0 ? ('，上次'+days+'天前') : '，今天又来了';
+          }
+        }else if(v.visits===1){ s += '第一次来'; }
+        if(v.warm>0) s += '，温暖'+v.warm;
+        if(v.rowdy>0) s += '，闹腾'+v.rowdy;
+        if(s) lines.push(s);
+      }
+    }
+    if(!lines.length) return '';
+    const summary = '[近期记忆]\n'+lines.map(l=>'- '+l).join('\n');
+    // 同步写入 eh_souls.memory_summary —— 服务端 eh-soul-tick 读此字段拼入 system prompt
+    try{
+      await sb.from('eh_souls').update({ memory_summary: summary })
+        .eq('auth_uid', soulId).eq('room_id', roomId);
+    }catch(e){ _ehCatch('ehSoulBuildMemoryContext.update', e); }
+    return summary;
+  }catch(e){ _ehCatch('ehSoulBuildMemoryContext', e); return ''; }
+}
+
+// 遍历本房所有灵魂写记忆(roomSouls 为 [{auth_uid,...}])，fire-and-forget。
+function ehSoulMemWriteAll(roomId, key, updateFn){
+  if(!roomId || !roomSouls || !roomSouls.length) return;
+  roomSouls.forEach(s=>{
+    if(s && s.auth_uid){
+      ehSoulMemWrite(roomId, s.auth_uid, key, updateFn).catch(()=>{});
+    }
+  });
+}
+
 // 进房/续载后, 按历史 rows 里出现过的真人 uid 批量拉 eh_users, 填 roomUserIdentity(权威身份表)。
 //   与 loadRoomSouls 对等——只不过灵魂表整房一次拉全, 真人表按"历史里真出现过的人"增量拉(全站真人几十个,
 //   单房上限也就一二十个, IN 批量一发即回)。拉完就地回补一次已渲染历史, 让离场者的改名也跟随。
@@ -8809,6 +8940,21 @@ async function postTexasResult(res, names, meta){
   const notable = (delta<=-2000) || (delta>=2000) || (potTotal>=2000)
     || /同花顺|四条|葫芦/.test(hand||'');
   if(!shouldPostResult('nlhe', notable)) return;
+  // 跨场景记忆：名场面写入 room_events
+  if(notable){
+    try{
+      ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
+        const arr=Array.isArray(old)?old:[];
+        let evt='';
+        if(delta<=-2000) evt=champName+'让对手输了不少';
+        else if(delta>=2000) evt=champName+'大杀四方';
+        else if(potTotal>=2000) evt='大底池'+potTotal;
+        else if(hand) evt='打出'+hand;
+        if(evt) arr.push({ t:Math.floor(Date.now()/1000), text:evt });
+        return arr.slice(-10);
+      });
+    }catch(_){ _ehCatch('postTexas.evt',_); }
+  }
   const text=['game','nlhe', outcome, delta, hand||'-', potTotal, champName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -8840,6 +8986,20 @@ async function recordTexasResult(res, log, names, avatars, souls, meta){
   };
   try{ await sb.from('eh_game_results').insert(row); }
   catch(e){ console.warn('[nlhe] record result failed', e); }
+  // 跨场景记忆：德州手牌结果写入 poker_recent
+  try{
+    const champSeat=(res.winnersBySeat||[])[0];
+    const champName=names[champSeat]||'';
+    const potTotal=(res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
+    const hand=(meta&&meta.handName)||'';
+    const deltaMap={};
+    names.forEach((nm,seat)=>{ const d=(meta&&typeof meta.delta==='number'&&seat===ms)?meta.delta:0; if(d) deltaMap[nm]=d; });
+    ehSoulMemWriteAll(curRoom.id, 'poker_recent', function(old){
+      const arr=Array.isArray(old)?old:[];
+      arr.push({ t:Math.floor(Date.now()/1000), players:names.slice(), result:champName+'赢', pot:potTotal, highlight:hand||null, delta:deltaMap });
+      return arr.slice(-5);
+    });
+  }catch(_){ _ehCatch('recordTexas.mem',_); }
 }
 // 结束后往聊天室发一张斗地主战绩卡(kind:'game', ddz 事件)。含胜负/角色/得分/倍数/炸弹/春天 + 再来一局入口。
 //   编码见 buildGameEl 的 ddz 分支。走与普通消息同一条本地回显+落库路径(insert 后回填真实 mid 供 realtime 去重)。
@@ -8852,6 +9012,21 @@ async function postDdzResult(res, names){
   const notable = !!res.spring || (res.bombs||0)>=2 || (res.finalMultiplier||1)>=6
     || Math.abs(res.delta&&res.delta[0]||0)>=6;
   if(!shouldPostResult('ddz', notable)) return;
+  // 跨场景记忆：名场面写入 room_events
+  if(notable){
+    try{
+      ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
+        const arr=Array.isArray(old)?old:[];
+        let evt='';
+        if(res.spring) evt='春天！';
+        else if((res.bombs||0)>=2) evt='炸弹'+res.bombs;
+        else if((res.finalMultiplier||1)>=6) evt='倍数'+res.finalMultiplier;
+        else if(Math.abs(res.delta&&res.delta[0]||0)>=6) evt=lordName+(win==='win'?'大赢':'大输');
+        if(evt) arr.push({ t:Math.floor(Date.now()/1000), text:evt });
+        return arr.slice(-10);
+      });
+    }catch(_){ _ehCatch('postDdz.evt',_); }
+  }
   const text = ['game','ddz', win, role, res.delta[0], res.base, res.finalMultiplier, res.bombs||0, res.spring?1:0, res.landlordWon?1:0, lordName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -8915,6 +9090,17 @@ async function recordGameResult(game, res, log, names, avatars, souls){
   };
   try{ await sb.from('eh_game_results').insert(row); }
   catch(e){ console.warn('[ddz] record result failed', e); }
+  // 跨场景记忆：斗地主结果写入 game_recent
+  try{
+    const win = res.winners.includes(0) ? '地主方赢' : '农民方赢';
+    const lordName = names[res.landlord]||'';
+    const highlight = res.spring ? '春天' : ((res.bombs||0)>=2 ? '炸弹'+res.bombs : null);
+    ehSoulMemWriteAll(curRoom.id, 'game_recent', function(old){
+      const arr=Array.isArray(old)?old:[];
+      arr.push({ t:Math.floor(Date.now()/1000), game:'斗地主', result:win, highlight, score:res.score, bombs:res.bombs||0, spring:!!res.spring, landlord:lordName });
+      return arr.slice(-5);
+    });
+  }catch(_){ _ehCatch('recordGame.mem',_); }
 }
 
 // ── 掼蛋:唤起入室牌桌。4 席 2 队(0&2 一队/1&3 一队), 3 家 AI 用房里灵魂命名/头像。──
@@ -8965,6 +9151,21 @@ async function postGuandanResult(res, log, names, meta){
   // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 普通一副不再进聊天流
   const notable = !!res.matchWon || !!res.doubleDown || (res.bombs||0)>=2 || myRankIdx===0;
   if(!shouldPostResult('gd', notable)) return;
+  // 跨场景记忆：名场面写入 room_events
+  if(notable){
+    try{
+      ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
+        const arr=Array.isArray(old)?old:[];
+        let evt='';
+        if(res.matchWon) evt='通关！';
+        else if(res.doubleDown) evt='双下！';
+        else if((res.bombs||0)>=2) evt='炸弹'+res.bombs;
+        else if(myRankIdx===0) evt=names[mySeat]+'头游';
+        if(evt) arr.push({ t:Math.floor(Date.now()/1000), text:evt });
+        return arr.slice(-10);
+      });
+    }catch(_){ _ehCatch('postGuandan.evt',_); }
+  }
   const text=['game','gd', win, res.advance, fromLvl, toLvl, res.doubleDown?1:0, res.matchWon?1:0, myRankIdx, res.bombs||0, mateName].join('|');
   const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
   const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
@@ -8996,6 +9197,16 @@ async function recordGuandanResult(res, log, names, avatars, souls){
   };
   try{ await sb.from('eh_game_results').insert(row); }
   catch(e){ console.warn('[gd] record result failed', e); }
+  // 跨场景记忆：掼蛋结果写入 game_recent
+  try{
+    const winTeam = res.winnerTeam===0 ? '我方赢' : '对方赢';
+    const highlight = res.matchWon ? '通关' : (res.doubleDown ? '双下' : ((res.bombs||0)>=2 ? '炸弹'+res.bombs : null));
+    ehSoulMemWriteAll(curRoom.id, 'game_recent', function(old){
+      const arr=Array.isArray(old)?old:[];
+      arr.push({ t:Math.floor(Date.now()/1000), game:'掼蛋', result:winTeam, highlight, score:res.advance, bombs:res.bombs||0, doubleDown:!!res.doubleDown, matchWon:!!res.matchWon });
+      return arr.slice(-5);
+    });
+  }catch(_){ _ehCatch('recordGuandan.mem',_); }
 }
 
 async function sendSystemAct(text){
