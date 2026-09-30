@@ -253,6 +253,20 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 @keyframes pkSeatWait{0%,100%{opacity:.45}50%{opacity:.9}}
 .pk-seat.pk-justseated{animation:pkSeatPop .42s cubic-bezier(.2,.9,.3,1)}
 @keyframes pkSeatPop{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+/* ★落座光波: 新玩家/灵魂坐下的瞬间, 头像外扩一圈涟漪(对标大厂"有人入座"的仪式感) */
+.pk-seat.pk-justseated .pk-avr::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--accent);animation:pkSeatRing .55s cubic-bezier(.2,.8,.3,1) forwards;pointer-events:none}
+@keyframes pkSeatRing{from{opacity:.85;transform:scale(.55)}to{opacity:0;transform:scale(1.75)}}
+/* ★下注弹跳: 身前筹码金额一变就弹一下 + 亮边, 让"谁下了多少"看得见 */
+.pk-commit.betpop{animation:pkBetPop .38s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pkBetPop{0%{transform:translate(-50%,-50%) scale(.72)}45%{transform:translate(-50%,-50%) scale(1.14)}100%{transform:translate(-50%,-50%) scale(1)}}
+.pk-commit.betpop .pc{animation:pkBetGlow .5s ease}
+@keyframes pkBetGlow{0%,100%{box-shadow:0 0 0 0 transparent}40%{box-shadow:0 0 10px 3px color-mix(in srgb, var(--amber) 70%, transparent)}}
+/* ★发牌拖尾: 底牌飞落时带一道短尾迹(同 pk-dealing 并行), 让"牌从桌面中央发过来"更直观 */
+.pk-seat .pk-mini-hole .card.pk-dealing::after{content:'';position:absolute;inset:2px;border-radius:inherit;
+  background:linear-gradient(180deg,transparent 35%,color-mix(in srgb,var(--accent) 32%,transparent));animation:pkDealTrail .32s ease forwards;pointer-events:none}
+@keyframes pkDealTrail{0%{opacity:.85}100%{opacity:0}}
+.pk-me .pk-hole .card.justdealt::after{content:'';position:absolute;inset:2px;border-radius:inherit;
+  background:linear-gradient(180deg,transparent 35%,color-mix(in srgb,var(--accent) 32%,transparent));animation:pkDealTrail .34s ease forwards;pointer-events:none}
 .pk-cd{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 .pk-mini-hole{display:flex;gap:2px;margin-top:1px;min-height:1px}
 .pk-mini-hole .card{margin:0}
@@ -1396,6 +1410,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="stk">入座中…</div></div>`;
     }
     let _lastOppSig='', _lastOppStruct='', _skipPositionSeats=false;
+    const _seatOcc = {};   // seat → 上次是否有人(空位→有人时触发落座弹入+光波)
     function renderOpponents(force){
       _skipPositionSeats=false;   // 入口重置: 只有本帧亮牌路径才重新置位
       // 签名拆两层(2026-09 性能):
@@ -1475,13 +1490,18 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const pending = introSeating && arrived && !arrived.has(seat);
         wrap.innerHTML = pending ? seatEmptyHTML(seat) : seatHTML(seat);
         const seatEl = wrap.firstElementChild;
-        if (introSeating && arrived && seat===lastSeated) seatEl.classList.add('pk-justseated');
+        // ★落座动效: 招募态 introSeating 序列 + 任何人中途坐下(空位→有人)都弹入+光波
+        const prevP = _seatOcc[seat];
+        const nowOcc = !pending && st.players[seat] && st.players[seat].kind!=='empty';
+        if ((introSeating && arrived && seat===lastSeated) || (nowOcc && prevP===false)) seatEl.classList.add('pk-justseated');
+        _seatOcc[seat]=!!nowOcc;
         els.table.appendChild(seatEl);
         if (pending || st.phase==='lobby') continue;   // 虚位/招募态空位不摆投入筹码
         // 身前投入(本街) 筹码牌
         const commit = document.createElement('div');
         commit.className='pk-commit'+(st.players[seat].street>0?'':' zero');
         commit.dataset.seat=seat;
+        commit.dataset.street=st.players[seat].street||0;
         commit.innerHTML=`<span class="pc"></span>${st.players[seat].street}`;
         els.table.appendChild(commit);
       }
@@ -1511,9 +1531,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const commit = els.table.querySelector(`.pk-commit[data-seat="${seat}"]`);
         if(commit){
           const street = p.street||0;
+          const prev = Number(commit.dataset.street||0);
           commit.classList.toggle('zero', !(street>0));
           if(commit.lastChild && commit.lastChild.nodeType===3){ if(commit.lastChild.nodeValue!==String(street)) commit.lastChild.nodeValue=String(street); }
           else commit.innerHTML=`<span class="pc"></span>${street}`;
+          // ★下注弹跳: 金额一变弹一下 + 亮边(主人: "下注有点安静")
+          if (street>prev){
+            commit.dataset.street=street;
+            commit.classList.remove('betpop'); void commit.offsetWidth; commit.classList.add('betpop');
+          } else {
+            commit.dataset.street=street;
+          }
         }
       }
     }
@@ -1888,21 +1916,31 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const mine = !offline && st.toAct===mySeat && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
       // 非本人行动态: 渲染同高禁用骨架(而非清空塌陷), 三键常驻不跳版
       if (!mine){
-        // ★不再提供「预选」粘性选中 —— 点按钮就是动作, 不留 .on 让下回合当默认
-        //   (主人: 点了像已选中, 程序也真按预选自动出牌)
+        // ★轮到我之前可预选(主人诉求): 还在手牌里且在下注街 → 给「过牌/弃牌 · 过牌 · 跟任意注」三键预选;
+        //   手动点按=动作(不留 .on 粘性), 预选=带 .queued 小标, 轮到我自动执行并按实况复核。
+        const canPre = !offline && !spectating && mySeat>=0 && p && !p.folded && !p.allin
+          && (st.phase==='preflop'||st.phase==='flop'||st.phase==='turn'||st.phase==='river');
+        if (canPre){
+          const sig='pre:'+(preAct||'')+'|'+st.phase+'|'+st.toAct;
+          if(!force && sig===_lastActsSig) return;
+          _lastActsSig=sig;
+          renderPreActBar();
+          return;
+        }
         let callLbl='等待中';
         if (offline) callLbl = (connState==='host_offline'?'对手掉线':'连接中…');
         else if (st.phase==='seating') callLbl='等人入座';
         else if (st.phase==='waiting') callLbl='等待发牌';
         else if (st.phase==='showdown'||st.phase==='over') callLbl='本手结束';
-        else if (p && p.folded) callLbl='已弃牌';
-        else if (p && p.allin) callLbl='已全下';
+        else if (p && p.folded) callLbl='已弃牌 · 观战';
+        else if (p && p.allin) callLbl='已全下 · 等摊牌';
         // 签名护栏: 非我回合 skeleton 文案不变就不重建(等对手时每秒一次的 renderAll 不再白白重建操作区)
         const sig='wait:'+callLbl;
         if(!force && sig===_lastActsSig) return;
         _lastActsSig=sig;
-        // ★三键常驻(禁用) + 中键显示状态 —— 出牌切换不闪不跳版
-        els.acts.innerHTML = actsSkeleton(callLbl);
+        // ★终止/等待态用整行状态条(actsWaitBar): 比三键骨架语义更准 —— 已弃牌/已全下/本手结束
+        //   不该再摆三个假按钮; 且 .pk-waitbar 与 .pk-row 同高 54px, 三态切换 felt 纹丝不动。
+        els.acts.innerHTML = actsWaitBar(callLbl);
         return;
       }
       // ★fix: 我的回合加签名护栏 — 先校正 raiseTo 再算签名, 签名未变则跳过重建,
@@ -2007,7 +2045,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     // 轮到我: 按【当前】合法动作复核已勾预选并执行, 或因实况变化作废。返回 true=已代打(状态已推进)。
     function consumePreAction(){
-      const pa = preAct; preAct = null;   // 预选已下线, 恒 null
+      const pa = preAct; preAct = null;
       if (!pa) return false;
       if (st.toAct!==mySeat || awaitingHost) return false;
       const la = Engine.legalActions(st, mySeat);

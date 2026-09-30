@@ -203,7 +203,7 @@ assert(/if\(ev==='ddz'\)/.test(src), 'buildGameEl 有 ddz 分支(把战绩卡渲
 assert(/data-ddz-again/.test(src), '战绩卡含"再来一局"入口(data-ddz-again)');
 assert(/again\.onclick=[\s\S]{0,160}ehRelaunchGame\('doudizhu'\)/.test(src), '"再来一局"走 ehRelaunchGame(先散旧桌再开新, 不再被"先收工"拦下)');
 // 预览/通知不能露原始编码
-assert(/p\[1\]==='ddz'[\s\S]{0,120}斗地主/.test(src), '消息预览把 ddz 卡显示成"🃏 斗地主 · 胜/负"(不露原始 game|ddz| 编码)');
+assert(/ev==='ddz'[\s\S]{0,120}斗地主/.test(src), '消息预览把 ddz 卡显示成"🃏 斗地主 · 胜/负"(不露原始 game|ddz| 编码)');
 
 // ── 步骤7: 终端自适应(主人反馈:大屏元素不够饱满) ────────────
 // 牌/座位/头像/手牌重叠尺寸全部走 CSS 变量, 且大屏媒体查询把变量整体放大。

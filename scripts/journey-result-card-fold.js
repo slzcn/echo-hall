@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 /* journey-result-card-fold.js — 战绩卡折叠契约(主人: 战绩卡刷屏盖住聊天)
- * 1) 历史战绩卡默认收成一行摘要, 点击展开
+ * 1) 历史战绩卡默认收成一行摘要, 点击展开/再点收起双向切换
  * 2) 实时新开的那张仍展开(要看到刚打完的结果)
- * 3) userExpanded=1 幂等: 手动展开过不折回
+ * 3) userExpanded 跟随折叠态(0/1), 用户想收就收想开就开
  * 4) 「再来一局」按钮不触发折叠切换
  * 5) 三款(斗地主/掼蛋/德州)都走 foldResult
  */
@@ -18,9 +18,12 @@ console.log('\n── 折叠实现 ──');
 ok(/const foldResult = \(el, summaryHtml\)/.test(APP), 'foldResult 统一折叠助手');
 ok(/el\.classList\.add\('gc-collapsible'\)/.test(APP), '打 gc-collapsible 标');
 ok(/gc-collapsed-row/.test(APP) && /gc-collapsed-row/.test(HTML), '一行摘要结构与 CSS 都在');
-ok(/isHistory && el\.dataset\.userExpanded !== '1'/.test(APP), '历史才折叠 + userExpanded 幂等');
+ok(/isHistory && el\.dataset\.userExpanded !== '1'/.test(APP), '历史才折叠(实时展开)');
 ok(/e\.target\.closest\('button'\)/.test(APP), '点按钮不触发折叠切换');
-ok(/el\.dataset\.userExpanded='1'/.test(APP), '点击展开写 userExpanded');
+ok(/shouldPostResult/.test(APP), '战绩卡节流: 名场面才发 + 冷却');
+ok(/notable/.test(APP), '名场面判定(春天/炸弹/大底池/大牌型)');
+ok(/classList\.toggle\('collapsed'\)/.test(APP), '点击双向切换折叠态');
+ok(/点击收起/.test(APP), '尾注随态切换展开/收起');
 
 console.log('\n── 三款战绩卡都接 ──');
 ok(/return foldResult\(el, `🃏 斗地主/.test(APP), '斗地主接 foldResult');

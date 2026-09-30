@@ -199,7 +199,7 @@ assert(/\['game','gd',\s*win,\s*res\.advance,\s*fromLvl,\s*toLvl,\s*res\.doubleD
 assert(/if\(ev==='gd'\)/.test(src), 'buildGameEl 有 gd 分支(把战绩卡渲染回来)');
 assert(/data-gd-again/.test(src), '战绩卡含"再来一局"入口(data-gd-again)');
 assert(/again\.onclick=[\s\S]{0,160}ehRelaunchGame\('guandan'\)/.test(src), '"再来一局"走 ehRelaunchGame(先散旧桌再开新)');
-assert(/p\[1\]==='gd'[\s\S]{0,120}掼蛋/.test(src), '消息预览把 gd 卡显示成"🎴 掼蛋 · 胜/负"(不露原始 game|gd| 编码)');
+assert(/ev==='gd'[\s\S]{0,120}掼蛋/.test(src), '消息预览把 gd 卡显示成"🎴 掼蛋 · 胜/负"(不露原始 game|gd| 编码)');
 
 // ── 步骤9: 牌桌 UX 契约(入室化/倒计时/动效/轮次/级牌百搭/进贡) ─
 const UI_JS = path.join(__dirname, '..', 'js', 'games', 'guandan-ui.js');

@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260930-v45';
+window.__EH_APP_VER = '20260930-v46';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -6971,13 +6971,17 @@ function msgPreview(m){
     case 'song':  return '🎵 '+parseSong(m.text).lyric;
     case 'game': {   // text = game|事件|字段… → 预览别露原始编码
       const p=String(m.text||'').split('|');
-      if(p[1]==='soup')   return '🐢 海龟汤《'+(p[2]||'')+'》开局';
-      if(p[1]==='verdict')return '🐢 主持判定';
-      if(p[1]==='reveal') return '🐢 揭晓汤底';
-      if(p[1]==='ddz'){ const w=p[2]==='win'; const d=parseInt(p[4],10)||0; return '🃏 斗地主 · '+(w?'胜':'负')+' '+(d>=0?'+':'')+d+'分'; }
-      if(p[1]==='gd'){ const w=p[2]==='win'; return '🎴 掼蛋 · '+(w?'胜':'负'); }
-      if(p[1]==='nlhe'){ const o=p[2]; const d=parseInt(p[3],10)||0; return '🎰 德州扑克 · '+(o==='win'?'胜':o==='lose'?'负':'平')+' '+(d>=0?'+':'')+d; }
-      return '🐢 海龟汤';
+      const ev=p[1];
+      // ★联机牌桌卡 game|gt|<id>|<game>: 按第 4 段(游戏)显名, 不再掉到海龟汤兜底(主人反馈"动态复用 bug")
+      if(ev==='gt'){ const g=p[3]; return ({nlhe:'🎰 德州牌桌',guandan:'🎴 掼蛋牌桌',ddz:'🃏 斗地主牌桌',doudizhu:'🃏 斗地主牌桌'}[g])||'🎴 牌桌'; }
+      if(ev==='soup')   return '🐢 海龟汤《'+(p[2]||'')+'》开局';
+      if(ev==='verdict')return '🐢 主持判定';
+      if(ev==='reveal') return '🐢 揭晓汤底';
+      if(ev==='ddz'){ const w=p[2]==='win'; const d=parseInt(p[4],10)||0; return '🃏 斗地主 · '+(w?'胜':'负')+' '+(d>=0?'+':'')+d+'分'; }
+      if(ev==='gd'){ const w=p[2]==='win'; return '🎴 掼蛋 · '+(w?'胜':'负'); }
+      if(ev==='nlhe'){ const o=p[2]; const d=parseInt(p[3],10)||0; return '🎰 德州扑克 · '+(o==='win'?'胜':o==='lose'?'负':'平')+' '+(d>=0?'+':'')+d; }
+      // 未知 game 事件: 中性兜底, 不再假报海龟汤
+      return '🎮 游戏动态';
     }
     case 'interact': {   // text = ixId|targetUid|文案 → 文案本身就是完整友好句, 直接显; 别露原始编码
       const parts=String(m.text||'').split('|'); const ix=_interactions.find(i=>i.id===parts[0]);

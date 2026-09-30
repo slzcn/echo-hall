@@ -54,6 +54,7 @@ suite_identity() {
   run "公开房历史上限"     scripts/journey-public-history-cap.js
   run "私密房邀请码"       scripts/test-private-invite-code.js
   run "冷启动会话"         scripts/journey-cold-start-auth.js
+  run "房卡消息预览"       scripts/test-msg-preview.js
 }
 
 # ── 多人 / 联机 ──

@@ -125,7 +125,7 @@ assert(/postTexasResult[\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:
 assert(/if\(ev==='nlhe'\)/.test(src), 'buildGameEl 有 nlhe 分支(把战绩卡渲染回来)');
 assert(/const champName=esc\(p\.slice\(6\)\.join\('\|'\)\|\|''\)/.test(src), '赢家名取 slice(6).join("|")(兜住名字里的 | 不截断)');
 assert(/data-nlhe-again/.test(src) && /data-nlhe-again[\s\S]{0,220}ehRelaunchGame\('nlhe'\)/.test(src), '战绩卡"再来一局"接 ehRelaunchGame');
-assert(/p\[1\]==='nlhe'[\s\S]{0,160}德州扑克/.test(src), '消息预览把 nlhe 卡显示成"🎰 德州扑克 · 胜/负/平"(不露原始 game|nlhe| 编码)');
+assert(/ev==='nlhe'[\s\S]{0,160}德州扑克/.test(src), '消息预览把 nlhe 卡显示成"🎰 德州扑克 · 胜/负/平"(不露原始 game|nlhe| 编码)');
 assert(/game:'nlhe'/.test(src) && /from\('eh_game_results'\)\.insert\(row\)/.test(src), '战绩落 eh_game_results(game=nlhe, N 席结构)');
 assert(/\.ddz-room,\s*\.gd-room,\s*\.pk-room/.test(src), '_restoreActiveGameIfAny 认 .pk-room(返回聊天后能折叠回活牌桌)');
 assert(/_restoreActiveGameIfAny\('nlhe'\)/.test(src), '德州入口传目标游戏(换游戏不拉回旧桌)');
