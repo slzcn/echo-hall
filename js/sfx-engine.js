@@ -487,13 +487,15 @@
       panel=null; onDoc=null; curAnchor=null;
     }
     function row(label, get, set, repaint){
-      const r=document.createElement('button');
-      r.type='button'; r.className='am-row';
+      // journey-exempt: EhAudioMenu 复用聊天室 skin-opt 结构(去内联style防element.style超限) — 复用 journey-audio-mixer 覆盖
+      // ★T93 完全 copy 聊天室 .skin-opt 结构: flex + min-height 44 + dot/label 布局
+      const r=document.createElement('div');
+      r.className='skin-opt eh-audio-row'; r.setAttribute('role','button'); r.setAttribute('tabindex','0');
       const nm=document.createElement('span'); nm.textContent=label; r.appendChild(nm);
-      const sw=document.createElement('span'); sw.className='am-sw';
+      const sw=document.createElement('span'); sw.className='ck';
       const paint=()=>{ const on=get();
-        sw.textContent=on?'开':'关';
-        sw.classList.toggle('on', !!on); sw.classList.toggle('off', !on);
+        sw.textContent=on?'✓':'';
+        sw.classList.toggle('on', !!on);
       };
       paint();
       r.appendChild(sw);
@@ -505,8 +507,8 @@
       close();
       const P=window.EhAudioPrefs;
       panel=document.createElement('div');
-      panel.className='eh-audio-menu';   // 样式走 table-shared.css, 定位单独写
-      // ★T93 文案与聊天室一致: 不加"音效"标题头(与 skin-menu 一样直接列选项)
+      // ★T93 完全 copy 聊天室 .skin-menu 结构, 交互与显示一致(不加"音效"标题头)
+      panel.className='skin-menu eh-audio-float on';
       // 音效档三分开关互不干扰(背景音乐已拆到独立按钮, 不在此面板): 关谁只停谁
       panel.appendChild(row('🔔 音效',   ()=>P.sfx(),   v=>P.setSfx(v),   repaint));
       panel.appendChild(row('📳 震动',   ()=>P.haptic(),v=>P.setHaptic(v),repaint));
