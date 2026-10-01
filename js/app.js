@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v59';
+window.__EH_APP_VER = '20261001-v60';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1357,6 +1357,7 @@ function gtStartHostPing(chan, tableId){
 function gtWatchHostPing(chan, hostUid, tableId){
   _gtStopPing();
   _gtLastHostAt = Date.now();   // 进场先给一个初值, 避免刚订阅就误报离线
+  _gtLastHumanAct = Date.now();   // ★v60: guest 进桌同样给 _gtLastHumanAct 初值, 否则旧值/0 → 15s 后 idleClose 误杀
   _gtStartIdleClose(tableId);  // guest 侧同样跑 2min 无人操作自动散桌(房主挂机/全员空转时 guest 也能回收)
   chan.on('broadcast',{event:'host_ping'}, ({payload})=>{
     // 无房主: 引擎持有者动态转移, 认任何 host_ping 发送者(同 channel 只有引擎持有者才发 host_ping)
