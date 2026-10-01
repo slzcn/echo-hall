@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v71';
+window.__EH_APP_VER = '20261001-v72';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -3906,6 +3906,16 @@ async function gtLaunchPoker(row, resumeSnap){
       try{ if(_ehGame && _ehGame.setOfflineUids){ _ehGame.setOfflineUids(Array.from(_gtOfflineSeats)); } }catch(_){}
     }
   });
+  // ★fix: 收到 waiting_seat 广播 → 有人等待入座, 立刻处理等待队列(踢 AI 或安排空位)
+  chan.on('broadcast', {event:'waiting_seat'}, function(p){
+    if(p && p.payload && p.payload.tableId===row.id){
+      var uid = p.payload.uid;
+      if(uid && !_gtWaitingHumans.includes(uid)){
+        _gtWaitingHumans.push(uid);
+      }
+      try{ _gtProcessWaitingQueue(_gtTables.get(row.id)||row); }catch(_){}
+    }
+  });
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
   _setPokerState('host', row.id);
@@ -4043,6 +4053,14 @@ async function gtSpectatePoker(row){
       try{ _gtGrabSeat(_gtTables.get(row.id) || row); }catch(_){}
     }
   });
+  // ★fix: 收到 waiting_seat 广播(自己发的) → 确保自己在等待队列里
+  chan.on('broadcast',{event:'waiting_seat'}, function(p){
+    if(p && p.payload && p.payload.uid===myUid){
+      if(!_gtWaitingHumans.includes(myUid)){
+        _gtWaitingHumans.push(myUid);
+      }
+    }
+  });
   // ★v34: 收到散桌广播 → 回聊天室
   chan.on('broadcast',{event:'dissolve'}, ()=>{
     try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
@@ -4176,7 +4194,15 @@ async function _gtGrabSeat(row){
     _gtCleanupPlay();
     _gtTables.set(fresh.id, fresh); gtEnter(fresh.id); return;
   }
-  if(!target){ try{ toast('暂时没有空位，等有人离开再坐'); }catch(_){} return; }
+  if(!target){
+    // ★fix: 满座时加入等待队列并广播 waiting_seat 通知 host 踢 AI 让座
+    if(!_gtWaitingHumans.includes(myUid)){
+      _gtWaitingHumans.push(myUid);
+    }
+    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'waiting_seat', payload:{uid:myUid, tableId:row.id}}); } }catch(_){}
+    try{ toast('暂时没有空位，已排队等座'); }catch(_){}
+    return;
+  }
   if(target.away){ try{ await gtRpc('eh_gt_set_away',{p_table:row.id, p_away:false}); }catch(_){} }
   try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
   _gtCleanupPlay();
@@ -4222,6 +4248,15 @@ async function _gtEnterPokerV2(row){
     const _preA = gtSeatArrays(row);
     if(row.status==='playing' && _preA.mySeat<0){
       try{ toast('当前手牌进行中 · 旁观等下一手再入座', 2500); }catch(_){}
+      // ★fix: 加入等待队列, 确保 host 的 _gtProcessWaitingQueue 知道有人在等
+      if(!_gtWaitingHumans.includes(myUid)){
+        _gtWaitingHumans.push(myUid);
+      }
+      // 广播告知 host 有人在等座(host 收到后触发 _gtProcessWaitingQueue)
+      try{
+        const _waitChan = sb.channel('gt-play:'+row.id);
+        _waitChan.send({type:'broadcast', event:'waiting_seat', payload:{uid:myUid, tableId:row.id}});
+      }catch(_){}
       gtSpectatePoker(row);
       return;
     }
