@@ -85,7 +85,7 @@
       if (self) {
         try {
           if (game === 'doudizhu') localStorage.setItem(DDZ_LEGACY, String(next.chips || 0));
-          if (game === 'nlhe') localStorage.setItem(PK_LEGACY, String(next.chips || GRANT));
+          // ★v57 Bug7: nlhe 筹码改为 Supabase 全局账户(eh_user_stats.chips), 不再写 localStorage eh_pk_chips
         } catch (e) {}
       }
       return next;
@@ -120,7 +120,7 @@
         onWallet: function (v) {
           var n = Math.max(0, Math.round(Number(v) || 0));
           set(game, { chips: n });
-          if (game === 'nlhe') { try { localStorage.setItem(PK_LEGACY, String(n)); } catch (e) {} }
+          // ★v57 Bug7: nlhe 筹码走 Supabase 全局账户(app.js gtSettleChipsToGlobal), 不再写 localStorage eh_pk_chips
           if (game === 'doudizhu') { try { localStorage.setItem(DDZ_LEGACY, String(n)); } catch (e) {} }
         },
       };
