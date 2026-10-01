@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v81';
+window.__EH_APP_VER = '20261001-v82';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -3158,9 +3158,15 @@ function gtCloseSeatingPage(){
 // ★v59: 删除「喊人入桌(发聊天卡)」功能 —— 点空位直接入座取代招募弹窗。相关函数与限流变量已移除。
 async function gtStart(id){
   gtCloseSeatingPage();   // 开始发牌: 关座位页, 下面 gtLaunchLocal 落打牌页
-  // ★开局不阻塞在补灵魂上(主人: 进入要快) —— 自己入座即可开打;
-  //   灵魂按批次规则入座(德州留空位给真人), 到座后 realtime 重组名册
-  try{ const row=_gtTables.get(id); if(row) gtSeatSoulsIntoEmpties(row).catch(()=>{}); }catch(_){}
+  // ★v82 服务端模式(nlhe): eh_gt_seat_soul 仅 lobby 阶段可用, 必须在 eh_gt_start 转 playing 之前
+  //   把灵魂入座, 否则 start_hand 因 <2 入座玩家失败。德州先 await 补灵魂再开局;
+  //   掼蛋/斗地主维持原 fire-and-forget(开局后空位由 eh_gt_start 兜底成机器人)。
+  _gtStarting=true;
+  try{
+    const _r0=_gtTables.get(id);
+    if(_r0 && _r0.game==='nlhe'){ try{ await gtSeatSoulsIntoEmpties(_r0); }catch(_){} }
+    else if(_r0){ try{ gtSeatSoulsIntoEmpties(_r0).catch(()=>{}); }catch(_){} }
+  }finally{ _gtStarting=false; }
   let seed=0; try{ seed=crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed=Math.floor(Math.random()*4294967296); }
   const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
   if(!row) return;
@@ -3551,6 +3557,18 @@ async function _gtEnterPokerServer(row) {
     if (!_ehGame || !_ehGame.applySnapshot || !snap) return;
     try { _ehGame.applySnapshot(snap); } catch(e) { _ehCatch('applySnapshot', e); window.ehReportError('manual', 'snapshot_apply_failed', { error: e && e.message }); }
     try { _gtSnapCacheSet(tableId, snap); } catch(_) {}
+    // ★v82 无房主: 当前手牌结束(showdown/over)后, 由【在座真人】延迟 4s 触发 start_hand 开下一手。
+    //   服务端 start_hand 幂等(已有进行中手牌→hand_in_progress), 多端同时触发只有首个生效, 不重发。
+    if ((snap.phase === 'over' || snap.phase === 'showdown') && !_gtNextHandPending) {
+      _gtNextHandPending = true;
+      var _nhHand = snap.handNo;
+      setTimeout(function() {
+        _gtNextHandPending = false;
+        var _fr2 = _gtTables.get(tableId);
+        if (!_fr2 || _fr2.status !== 'playing') return;
+        sb.functions.invoke('eh-poker-action', { body: { table_id: tableId, action: 'start_hand' } }).catch(function(){});
+      }, 4000);
+    }
     if (snap.handNo !== lastPulled) {
       lastPulled = snap.handNo;
       if (_gtWaitNextHand.has(myUid)) { _gtWaitNextHand.delete(myUid); _gtRemoveAwayBar(); }
@@ -3664,6 +3682,19 @@ async function _gtEnterPokerServer(row) {
   });
   _gtStartTurnAlert();
   _gtPokerBindUnload(tableId);
+  // ★v82 无房主服务端模式: 进桌后触发 start_hand(Edge Function 发牌+广播脱敏快照)。
+  //   服务端 start_hand 幂等: 已有进行中手牌→hand_in_progress(不重复发牌); 当前手牌结束→开新一手。
+  //   need_2_seated(灵魂尚未入座完成)时短延时重试, 其余错误静默(不打扰)。
+  if (row && row.status === 'playing') {
+    (function _tryStartHand(tries){
+      tries = tries || 0;
+      sb.functions.invoke('eh-poker-action', { body: { table_id: tableId, action: 'start_hand' } })
+        .then(function(res){
+          var d = res && res.data, err = (d && d.ok===false) ? d.error : ((res && res.error) ? res.error.message : '');
+          if (err === 'need_2_seated' && tries < 12) { setTimeout(function(){ _tryStartHand(tries+1); }, 400); }
+        }).catch(function(){ /* silent */ });
+    })();
+  }
   setTimeout(pull, 800);
   setTimeout(function() { try { if (_gtPlayChan) _gtPlayChan.send({type:'broadcast', event:'hello', payload:{uid: myUid}}); } catch(_) {} }, 500);
 }
@@ -3672,7 +3703,9 @@ async function _gtEnterPokerServer(row) {
 //   host 离场时原子写 DB 把 host_uid 改成下一个玩家, 对方收 DB realtime 推送后启动引擎。
 //   消除"转移窗口期": DB 写入即生效, 无需广播协商。
 function gtEngineHolder(row){
-  return null;
+  // ★v82 无房主服务端模式: host_uid 仍标记【开局者/驱动者】(发牌/补灵魂/发牌桌卡),
+  //   仅用于前端驱动判断; nlhe 引擎跑在 Edge Function(不在本机跑), ddz/掼蛋仍是本机 host 引擎。
+  return (row && row.host_uid) ? row.host_uid : null;
 }
 // 无房主: 自动开桌 —— 招募态下 ≥2 真人入座时, 引擎持有者延迟 800ms 自动开局(不需要手动点"开始")。
 function gtCheckAutoStart(row){
@@ -3686,6 +3719,7 @@ function gtCheckAutoStart(row){
     setTimeout(()=>{
       const fresh=_gtTables.get(row.id);
       if(!fresh || fresh.status!=='lobby') return;
+      if(_gtStarting) return;   // ★v82 开局中(await 补灵魂)不重复触发
       const oc=(fresh.seats||[]).filter(s=>s && s.kind && s.kind!=='empty').length;
       if(oc>=2) gtStart(row.id);
     },800);
@@ -9468,16 +9502,17 @@ async function launchTexas(){
   //   gtSeatSoulsIntoEmpties 异步批次补灵魂, 第一个灵魂到位自动触发 gtStart 开局。
   //   兜底: 房里没有灵魂时 1.2s 后直接 gtStart(AI 代打空位)。
   if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-    // ★第一时间进桌开打: 不等灵魂补满/不等 1.2s 兜底 —— 自己入座即 gtStart;
-    //   灵魂由批次入场按规则补一部分(不焊死坐满), 后续到座由 updateRoster 并进
+    // ★v82 第一时间进桌开打: gtStart 内部会先 await 补灵魂(lobby)再 eh_gt_start 转 playing,
+    //   再进桌触发 start_hand 发牌。不再单独调用 gtSeatSoulsIntoEmpties(避免与 gtStart 内的补位竞态)。
     gtStart(row.id).catch(()=>{});
-    gtSeatSoulsIntoEmpties(row).catch(()=>{});
   }
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐满 —— 先用房里【真灵魂】一席一位, 灵魂不够时用【灵魂分身】继续补到无空位。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像)填满, 不再是匿名 AI 机器人;分身顶原灵魂头像、名标"原名·分身[序号]"。
 // 静默(不 toast, 不因空手拦截): 无空位/房里真无灵魂时直接返回, 剩余空位才交给 eh_gt_start 兜底成机器人。仅 host 招募中有效。
 let _gtSoulBatchActive=false;   // 防重入: 批次补位进行中时, gtStart(setTimeout 触发)再调本函数直接返回
+let _gtStarting=false;          // ★v82 gtStart 进行中(await 补灵魂+eh_gt_start), gtCheckAutoStart 期间不重复触发
+let _gtNextHandPending=false;   // ★v82 上一手结束→延迟触发下一手 start_hand 的去重锁
 async function gtSeatSoulsIntoEmpties(row){
   // 无房主: 只有引擎持有者(座位最小真人)才补灵魂; 非引擎持有者不操作
   if(!row || row.status!=='lobby' || gtEngineHolder(row)!==myUid) return 0;
@@ -9520,7 +9555,7 @@ async function gtSeatSoulsIntoEmpties(row){
       const bs=Math.min(_pickBatch(remain), remain);
       for(let i=0;i<bs&&ei<empties.length&&ei<souls.length&&ei<soulCap;i++,ei++){
         try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[ei],p_soul:souls[ei].auth_uid}); n++; origins.push(souls[ei].auth_uid);
-          if(!started){ started=true; setTimeout(()=>gtStart(row.id),0); }   // 第一个灵魂到位 → 立即开局(fire-and-forget)
+          // ★v82 不再在此嵌套触发 gtStart: gtStart 已 await 本函数, 嵌套会与 eh_gt_start 竞态锁死 lobby→playing 使后续灵魂无法入座。
         }catch(_){}
         if(i<bs-1) await _sleep(200+Math.random()*300);   // 批次内随机间隔
       }
