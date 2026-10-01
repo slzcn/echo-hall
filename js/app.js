@@ -994,27 +994,25 @@ window.EhThemeMenu = (function(){
     const curTh = (typeof currentTheme==='function') ? currentTheme() : (document.documentElement.getAttribute('data-theme')||'cyber');
     const curMd = (typeof currentMode==='function') ? currentMode() : 'auto';
     panel=document.createElement('div');
-    panel.className='eh-theme-menu';
-    let html='<div class="tm-modes">';
+    // ★T93 完全 copy 聊天室 .skin-menu 结构(.mode-row/.mode-opt/.skin-opt), 交互与显示一致
+    panel.className='skin-menu eh-theme-float on';
+    let html='<div class="mode-row">';
     [['auto','自动'],['day','日间'],['night','夜间']].forEach(function(m){
-      html+='<button type="button" class="tm-mode'+(curMd===m[0]?' on':'')+'" data-mode="'+m[0]+'">'+m[1]+'</button>';
+      html+='<div class="mode-opt'+(curMd===m[0]?' active':'')+'" data-mode="'+m[0]+'" role="button" tabindex="0">'+m[1]+'</div>';
     });
     html+='</div>';
     themes.forEach(function(t){
-      html+='<button type="button" class="tm-theme" data-theme="'+t.id+'">'
-        +'<span class="tm-dot" style="background:'+t.dot+'"></span>'
-        +'<span class="tm-nm">'+t.name+'</span>'
-        +'<span class="tm-ck'+(curTh===t.id?' on':'')+'" style="color:'+t.dot+'">✓</span></button>';
+      html+='<div class="skin-opt'+(curTh===t.id?' active':'')+'" data-theme="'+t.id+'" role="button" tabindex="0"><span class="dot" style="color:'+t.dot+';background:'+t.dot+'"></span>'+t.name+'<span class="ck" style="color:'+t.dot+'">✓</span></div>';
     });
     panel.innerHTML=html;
-    panel.querySelectorAll('.tm-mode').forEach(function(b){
+    panel.querySelectorAll('.mode-opt').forEach(function(b){
       b.addEventListener('click',function(e){
         e.stopPropagation();
         try{ pickMode(b.dataset.mode); }catch(_){}
         close(); if(anchor) open(anchor);
       });
     });
-    panel.querySelectorAll('.tm-theme').forEach(function(b){
+    panel.querySelectorAll('.skin-opt').forEach(function(b){
       b.addEventListener('click',function(e){
         e.stopPropagation();
         try{ pickTheme(b.dataset.theme); }catch(_){}

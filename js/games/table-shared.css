@@ -1643,6 +1643,8 @@ html[data-mode="day"] .pk-room  .pk-table::after{
 }
 
 /* ── 牌桌顶栏 🎨 浮动换肤面板(与 EhAudioMenu 同级 z-index) ── */
+/* ★T93 牌桌浮动主题菜单: 复用聊天室 .skin-menu 样式, 仅补 fixed 定位(牌桌浮层下 absolute 会错位) */
+.eh-theme-float,.eh-bgm-float{position:fixed;z-index:99999;display:flex!important}
 .eh-theme-menu{
   position:fixed; z-index:99999; min-width:168px; padding:6px;
   background:var(--panel-solid); border:1px solid var(--line2); border-radius:14px;
