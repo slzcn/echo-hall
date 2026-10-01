@@ -2260,7 +2260,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         // ★灵魂/AI 席倒计时环与真人同一满格时钟(从 ACT_MS≈满格起走, 不再 1s 闪现)——主人: 灵魂倒计时要从 20s 开始不是从 1s。
         //   环只是展示; 灵魂真正出手在 turnAiAct(人类般 2~7s)到点触发, 通常在环走完前就行动, 环随回合切换自然重置。
         turnDur = mine     ? ACT_MS
-                : isGuest  ? (st.turnDurMs || ACT_MS)               // v52: guest 采纳 host 权威满格时长(含 remote +6s 冗余), 环与 host 完全对齐
+                : isGuest  ? ACT_MS               // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
                 : aiSeat   ? ACT_MS               // 灵魂席: 满格环(与真人一致), 出手时刻另见 turnAiAct
                 : remote   ? (ACT_MS + 6000)       // host 兜底比对端稍长, 留网络冗余; 久不动就代打
                 : 0;
@@ -2282,10 +2282,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           pendingAiDecision = d; pendingAiSeat = seat;
           turnAiAct = aiThinkMs(d, Engine.legalActions(st, seat));
         } else { turnAiAct = 0; pendingAiDecision = null; pendingAiSeat = -1; }
-        // v52: 死线锚定 -- 若 st 带 turnDeadline(guest 来自快照 / host 来自上一帧盖戳), 据 turnDeadline 反推 turnStart,
-        //   使 remain=turnDur-(Date.now()-turnStart)=turnDeadline-Date.now(), host/guest 倒计时完全同源, guest 不再因快照到达延迟而满格重跳。
-        turnStart = (st.turnDeadline && turnDur) ? (st.turnDeadline - turnDur) : Date.now();
-        if (!isGuest && turnDur>0){ try{ st.turnDeadline = turnStart + turnDur; st.turnDurMs = turnDur; }catch(_){} }   // v52: host 盖戳权威死线+满格时长, 随下方 onSync(st) 广播给 guest
+        // ★v51: guest 用快照里的 turnDeadline 反推 turnStart, 保证倒计时与 host 一致
+        if (isGuest){
+          if (lastSnap && lastSnap.turnDeadline && lastSnap.turnDeadline > Date.now()){
+            turnStart = lastSnap.turnDeadline - turnDur;
+          } else {
+            turnDur = 0;   // turnDeadline 不存在或已过期 → 不显示倒计时
+          }
+        } else {
+          turnStart = Date.now();
+        }
       }
       // 我也坐椭圆了 → 我方回合也在自己座位上走圆环+秒数徽标(与对手一致), 不再依赖桌外 #pkClk(已移除)
       const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
@@ -2293,7 +2299,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 行动席头像秒数徽标(含我)
       // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管, 数字才有意义。
       //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳 0 像坏了 → 头像只亮"思考中"💭 脉冲, 不显误导性倒计时(对齐 ddz/掼蛋)。
-      const digitSeat = mine || remote || (isGuest && seat!==mySeat && !isAI[seat]);   // v52: guest 也给远程真人席显数字倒计时(快照已带 turnDeadline, 与 host 同源); AI 席仍只显 💭
+      const digitSeat = mine || remote;
       if (secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       if (turnDur<=0) return;
       // ★折叠(minimized)态: 房 display:none, 环不可见 —— 不再起 rAF 每帧对隐藏节点写 --p(后台自动连打时
@@ -2836,7 +2842,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       armTurn(minimized ? null : onHumanTimeout);
       if (minimized) updateChip();
       // 招募态不产快照(无牌可发/可泄, 与斗地主/掼蛋同构: lobby 不广播, startDeal 转正局后才走 onSync)
-      if (onSync && !isGuest && st.phase!=='lobby'){ try{ onSync(st, handNo); }catch(e){ _ehCatch('poker.onSync', e); } }   // host: 每次状态变更 → 产快照广播 + 写底牌
+      // ★v51: 带 turnDeadline 绝对时间戳, guest 用它驱动倒计时与 host 一致
+      if (onSync && !isGuest && st.phase!=='lobby'){
+        var _td = (turnStart>0 && turnDur>0) ? (turnStart + turnDur) : 0;
+        try{ onSync(st, handNo, _td); }catch(e){ _ehCatch('poker.onSync', e); }
+      }
       renderActs();   // ★fix: 操作区渲染在最后, 确保 onSync/状态更新后再画按钮, 签名护栏挡掉无谓重建, 轮到我时按钮稳定不闪
     }
 
@@ -2878,7 +2888,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       rebuildFromSnap(snap);
       if (snap.phase==='over' && !els.felt.querySelector('.pk-over')) showOver();
     }
-    function resync(){ if (onSync && !isGuest){ try{ onSync(st, handNo); }catch(e){ _ehCatch('poker.resync', e); } } }  // host: 应新客人之请重播当前态
+    function resync(){ if (onSync && !isGuest){ var _td=(turnStart>0&&turnDur>0)?(turnStart+turnDur):0; try{ onSync(st, handNo, _td); }catch(e){ _ehCatch('poker.resync', e); } } }  // host: 应新客人之请重播当前态
 
     // id → card (供摊牌/对手明牌重建)
     const SUIT_OF = { s:'♠', h:'♥', c:'♣', d:'♦' };

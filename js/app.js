@@ -1309,14 +1309,20 @@ function gtWatchHostPing(chan, hostUid, tableId){
     const gap = Date.now() - _gtLastHostAt;
     if(gap>15000){ // v38: 15s 超时(原45s太慢, 断线玩家占座不退); 配合 player_beat 心跳加速检测
       try{ if(_ehGame.setConn) _ehGame.setConn('host_offline'); }catch(_){ }
-      // ★v44: host_ping 超时兜底接管 — host 关浏览器/断网时不会发 transfer/player_away,
-      //   guest 靠 host_ping 超时主动触发 gtCheckEngineTransfer, 不再干等 DB realtime(1-15s 延迟)
-      if(_gtPokerSession && _gtPokerSession.state==='guest' && _gtPokerSession.tableId===tableId && !_gtTakingOver){
-        var _fr=_gtTables.get(tableId);
-        if(_fr && _fr.status==='playing' && gtEngineHolder(_fr)===myUid
-           && (!_gtActiveTable || _gtActiveTable.id!==tableId || !_gtActiveTable.host)){
-          try{ gtCheckEngineTransfer(_fr); }catch(e){ _ehCatch('gtHostPingFallback', e); }
-        }
+      // ★v51 DB 仲裁: host_ping 超时 → 查 DB 确认 host_uid, 若 host 已失联且我应接管, 直接写 DB
+      if(_gtPokerSession && _gtPokerSession.state==='guest' && _gtPokerSession.tableId===tableId){
+        (async function(){
+          try{
+            const {data:tr}=await sb.from('eh_game_tables').select('host_uid,seats,status').eq('id',tableId).maybeSingle();
+            if(!tr || tr.status!=='playing') return;
+            if(tr.host_uid===myUid) return;   // DB 里 host_uid 已是我 → 不用接管
+            // 我是 seat 最小的非 away 真人(排除当前 host) → 直接写 host_uid 为自己
+            const humans=(tr.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&!s.away&&s.uid!==tr.host_uid).sort((a,b)=>a.seat-b.seat);
+            if(humans.length && humans[0].uid===myUid){
+              await sb.from('eh_game_tables').update({host_uid:myUid,updated_at:new Date().toISOString()}).eq('id',tableId);
+            }
+          }catch(e){ _ehCatch('gtHostPingFallback', e); }
+        })();
       }
     }
   }, 3000);
@@ -1369,22 +1375,6 @@ function gtWirePlayerAway(chan, rowRef, tableId){
         _gtTables.set(fr.id, fr);
         try{ gtSurfaceTable(fr); }catch(_){}
         try{ if(_gtActiveTable && _gtActiveTable.id===fr.id && _ehGame && _ehGame.renderAll) _ehGame.renderAll(); }catch(_){}
-      }
-      // host 离场兜底(Bug3): 我是 guest 且将成为新引擎持有者 → 3s 内没收到 transfer 就主动接管
-      if(_gtPokerSession && _gtPokerSession.state==='guest' && _gtPokerSession.tableId===tid && payload.uid!==myUid){
-        if(gtEngineHolder(fr)===myUid){
-          if(_gtTransferWaitT){ clearTimeout(_gtTransferWaitT); _gtTransferWaitT=null; }
-          _gtTransferWaitT = setTimeout(function(){
-            _gtTransferWaitT = null;
-            try{
-              const fresh = _gtTables.get(tid);
-              if(fresh && fresh.status==='playing' && gtEngineHolder(fresh)===myUid
-                 && (!_gtActiveTable || _gtActiveTable.id!==tid || !_gtActiveTable.host)){
-                gtCheckEngineTransfer(fresh);
-              }
-            }catch(e){ _ehCatch('gtTransferFallback', e); window.ehReportError('manual', 'transfer_fallback_failed', { error: e && e.message }); }
-          }, 3000);
-        }
       }
     }catch(e){ _ehCatch('gtPlayerAwayRecv', e); }
   });
@@ -3151,9 +3141,11 @@ function gtLaunchPokerLobby(row){
     stackFor: function(seat, ctx){ return pkSeatStackFor(seat, ctx); },
     onStacks: function(list, ctx){ pkSeatStacksWrite(list, ctx); },
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
-    onSync:(state,hno)=>{
+    onSync:(state,hno,turnDeadline)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(e){ _ehCatch('gtSnapSend', e); }
+      var _snap=gtStampSnap(window.EHPokerNet.snapshot(state,hno));
+      if(turnDeadline) _snap.turnDeadline=turnDeadline;   // ★v51: 带绝对截止时间, guest 用它驱动倒计时
+      try{ chan.send({type:'broadcast',event:'snap',payload:_snap}); }catch(e){ _ehCatch('gtSnapSend', e); }
       if(hno!==lastHandWritten){
         lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat);
         try{ gtRpc('eh_gt_tick_away',{p_table:row.id}); }catch(_){}
@@ -3215,17 +3207,11 @@ function gtLaunchGuandanLobby(row){
   _gtStartTurnAlert();
 }
 
-// 无房主架构: "引擎持有者" = 座位编号最小的真人。谁跑引擎由座位实时决定, 不再依赖 host_uid。
-//   gtEngineHolder(row) === myUid → 我跑引擎(原 host 路径); 否则我是观察者(原 guest 路径)。
-//   引擎持有者随真人离场/入座动态转移: 当前持有者离开 → 下一个 seat 最小的真人自动接管。
+// ★v51 DB 仲裁: host_uid 是唯一权威, 不再靠座位现算引擎持有者。
+//   host 离场时原子写 DB 把 host_uid 改成下一个玩家, 对方收 DB realtime 推送后启动引擎。
+//   消除"转移窗口期": DB 写入即生效, 无需广播协商。
 function gtEngineHolder(row){
-  const seats=(row && row.seats)||[];
-  // ★away 真人不算引擎持有者: 临时离席的引擎持有者让出权威, 由 seat 最小的非 away 真人接管。
-  //   返回 null → 当前无可用引擎持有者(全员 away 或无真人), 桌暂停, 等 away 者回来或 2 轮超时腾席。
-  const humanSeats=seats.filter(s=>s && s.kind==='human' && s.uid && !s.away);
-  if(!humanSeats.length) return null;
-  humanSeats.sort((a,b)=>a.seat-b.seat);
-  return humanSeats[0].uid;
+  return (row && row.host_uid) || null;
 }
 // 无房主: 自动开桌 —— 招募态下 ≥2 真人入座时, 引擎持有者延迟 800ms 自动开局(不需要手动点"开始")。
 function gtCheckAutoStart(row){
@@ -3244,70 +3230,62 @@ function gtCheckAutoStart(row){
     },800);
   }
 }
-// 无房主: 引擎转移 —— 引擎持有者离开了, 座位最小的真人变成新引擎持有者。若该人是我 → 接管。
-//   ★v33 降级为兜底: 主路径已改为 transfer 广播即时交接(onExit 推快照 → guest 200ms 后接管)。
-//   此函数仍由 DB realtime 触发, 处理 transfer 广播丢失(网络问题)的兜底场景。
-//   若已通过 transfer 广播接管(_gtActiveTable.host===true), 直接 return 不重复启动。
-function gtCheckEngineTransfer(row){
-  if (_gtTakingOver) return;
-  if(!row || row.game!=='nlhe') return;
-  if(row.status!=='playing') return;
-  if(gtEngineHolder(row)!==myUid) return;
-  // ★v44: 设互斥锁, 防 DB realtime 多次推送重叠调用; try/finally 保证锁必释放
-  _gtTakingOver = true;
-  var _isRejoin = false;
-  try {
-  if(_gtActiveTable && _gtActiveTable.id===row.id){
-    if(_gtActiveTable.host) return;   // ★v33: 已通过 transfer 广播接管, 不重复启动
-    // 我是本桌 guest, 现在变成持有者 → 拆 guest 实例, 以 host 重挂引擎(牌局状态由快照接续)
-    // ★fix: 接管前先从 guest 实例取最后一帧公共快照, 传给 gtLaunchPoker 用 resumeSnap 恢复(不重新发牌)
-    var _resumeSnap = null;
-    try{ if(_ehGame && typeof _ehGame.lastSnap==='function') _resumeSnap = _ehGame.lastSnap(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
-    try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
-    try{ _gtCleanupPlay(); }catch(_){}
-    _ehGame = null; _gtActiveTable = null;
-    // 静默接管: 引擎在谁本机跑是实现细节, 对玩家不可见
-    try {
-      gtLaunchPoker(row, _resumeSnap);
-      // ★fix/★v43: 接管完成立刻广播一帧快照给所有 guest; 失败有明确提示不静默死
-      try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
-    } catch(e) {
-      console.error('[gt] gtCheckEngineTransfer 接管失败', e && e.message, e);
-      try{ window.ehReportError('manual', 'engine_transfer_failed', { error: e && e.message }); }catch(_){}
-      // ★v44: 接管失败 5s 后重试一次(用缓存快照 resume)
-      setTimeout(function(){
-        try{
-          var _fr=_gtTables.get(row.id);
-          if(_fr && _fr.status==='playing' && gtEngineHolder(_fr)===myUid
-             && (!_gtActiveTable || _gtActiveTable.id!==row.id || !_gtActiveTable.host)){
-            console.log('[gt] 接管重试...');
-            gtLaunchPoker(_fr, _gtSnapCache.get(row.id) || _resumeSnap || null);
-            try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtEngineTakeoverRetry',_); }
-          }
-        }catch(e2){ console.error('[gt] 接管重试失败', e2 && e2.message, e2); try{ window.ehReportError('manual', 'engine_transfer_retry_failed', { error: e2 && e2.message }); }catch(_){} }
-      }, 5000);
-    }
+// ★v51 DB 仲裁: host 离场时直接写 DB 把 host_uid 改成下一个玩家, 不发 transfer 广播。
+//   对方收 DB realtime 推送(host_uid 变成自己)后由 gtCheckEngineTransfer 启动引擎。
+//   散桌条件: seats 里完全没有其他真人(kind==='human' 且 uid!==myUid)才散桌。
+async function _gtHandleHostLeave(tableId, seats, myUid){
+  // 所有其他真人(含 away), 按 seat 升序
+  const otherHumans=(seats||[])
+    .filter(s=>s && s.kind==='human' && s.uid && s.uid!==myUid)
+    .sort((a,b)=>a.seat-b.seat);
+  if(!otherHumans.length){
+    // 完全没有其他真人 → 散桌
+    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
+    try{ gtClose(tableId); }catch(_){}
     return;
   }
-  // 不在桌里(看牌桌卡的人/离场又回来的旧 host) → 以引擎持有者进桌
-  // ★fix: 优先用缓存的最近一帧快照 resume, 避免重新发牌丢牌局状态(host 离场回来 state 连续)
-  _isRejoin = true;
-  try { gtLaunchPoker(row, _gtSnapCache.get(row.id) || null); }
-  catch(e){ console.error('[gt] gtEngineTakeover(rejoin) 失败', e && e.message, e); try{ window.ehReportError('manual', 'engine_transfer_failed', { error: e && e.message }); }catch(_){}
-    // ★v44: rejoin 失败也重试一次
+  // 优先非 away 真人, 没有则取 seat 最小的 away 真人
+  const next=otherHumans.find(s=>!s.away) || otherHumans[0];
+  // 原子写 DB, 把 host_uid 改成下一个玩家; 不需要广播, DB realtime 会通知对方
+  try{
+    await sb.from('eh_game_tables')
+      .update({ host_uid: next.uid, updated_at: new Date().toISOString() })
+      .eq('id', tableId);
+  }catch(e){ _ehCatch('gtHandleHostLeave', e); }
+}
+
+// ★v51 DB 仲裁: 兜底检查 —— DB realtime 推送 host_uid 变化后, 若 host_uid===myUid 且我还没接管, 启动引擎。
+//   不再依赖 transfer 广播, 不再需要 _gtTakingOver 互斥锁(gtLaunchPoker 内部防重入)。
+function gtCheckEngineTransfer(row){
+  if(!row || row.game!=='nlhe') return;
+  if(row.status!=='playing') return;
+  if(gtEngineHolder(row)!==myUid) return;   // host_uid 不是我 → 不接管
+  // 已是 host 且引擎在跑 → 不重复启动
+  if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host) return;
+  // 我是新 host, 用缓存的最近一帧快照 resume, 避免重新发牌丢牌局状态
+  var _resumeSnap = null;
+  try{ if(_ehGame && typeof _ehGame.lastSnap==='function') _resumeSnap = _ehGame.lastSnap(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
+  if(_ehGame){ try{ _ehGame.close(); }catch(_){ _ehCatch('gtEngineTakeover',_); } _ehGame=null; }
+  try{ _gtCleanupPlay(); }catch(_){}
+  _gtActiveTable = null;
+  try {
+    gtLaunchPoker(row, _resumeSnap || _gtSnapCache.get(row.id) || null);
+    try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
+  } catch(e) {
+    console.error('[gt] gtCheckEngineTransfer 接管失败', e && e.message, e);
+    try{ window.ehReportError('manual', 'engine_transfer_failed', { error: e && e.message }); }catch(_){}
+    // 5s 后重试一次
     setTimeout(function(){
       try{
-        var _fr2=_gtTables.get(row.id);
-        if(_fr2 && _fr2.status==='playing' && gtEngineHolder(_fr2)===myUid){
-          console.log('[gt] rejoin 重试...');
-          gtLaunchPoker(_fr2, _gtSnapCache.get(row.id) || null);
+        var _fr=_gtTables.get(row.id);
+        if(_fr && _fr.status==='playing' && gtEngineHolder(_fr)===myUid
+           && (!_gtActiveTable || _gtActiveTable.id!==row.id || !_gtActiveTable.host)){
+          console.log('[gt] 接管重试...');
+          gtLaunchPoker(_fr, _gtSnapCache.get(row.id) || _resumeSnap || null);
+          try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtEngineTakeoverRetry',_); }
         }
-      }catch(e3){ console.error('[gt] rejoin 重试失败', e3 && e3.message, e3); try{ window.ehReportError('manual', 'engine_transfer_retry_failed', { error: e3 && e3.message }); }catch(_){} }
+      }catch(e2){ console.error('[gt] 接管重试失败', e2 && e2.message, e2); }
     }, 5000);
-  }
-  } finally {
-    // ★v44: 3s 后释放锁, 给 DB realtime 兜底留窗口
-    setTimeout(function(){ _gtTakingOver = false; }, 3000);
   }
 }
 // 从 table 行抽出【按座位号索引】的入座数组; 空位/AI/灵魂 → host 本机 AI 驱动, 真人(非我)→ 远程席。
@@ -3615,8 +3593,10 @@ function gtLaunchPoker(row, resumeSnap){
     stackFor: function(seat, ctx){ return pkSeatStackFor(seat, ctx); },
     onStacks: function(list, ctx){ pkSeatStacksWrite(list, ctx); },
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
-    onSync:(state,hno)=>{
-      try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(window.EHPokerNet.snapshot(state,hno))}); }catch(e){ _ehCatch('gtSnapSend', e); }
+    onSync:(state,hno,turnDeadline)=>{
+      var _snap=gtStampSnap(window.EHPokerNet.snapshot(state,hno));
+      if(turnDeadline) _snap.turnDeadline=turnDeadline;   // ★v51: 带绝对截止时间, guest 用它驱动倒计时
+      try{ chan.send({type:'broadcast',event:'snap',payload:_snap}); }catch(e){ _ehCatch('gtSnapSend', e); }
       if(hno!==lastHandWritten){
         lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat);
         try{ gtRpc('eh_gt_tick_away',{p_table:row.id}); }catch(_){}
@@ -3645,33 +3625,19 @@ function gtLaunchPoker(row, resumeSnap){
         try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){}
         // 被强制起身：检查是否还有其他真人
         const _fr2=_gtTables.get(row.id)||row;
-        const _rem2=(_fr2.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&s.uid!==myUid&&!s.away);
-        if(!_rem2.length){
-          try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast',event:'dissolve',payload:{tableId:row.id}}); } }catch(_){}
-          _gtCleanupPlay();
-          try{ gtClose(row.id); }catch(_){}
-        } else {
-          // ★v44: host 被迫起身 → 先推 transfer + player_away 再 cleanup(与 onExit 同序)
-          if (_ehGame && _ehGame.lastSnap && gtEngineHolder(_fr2) === myUid) {
-            try {
-              const snap = _ehGame.lastSnap();
-              if (snap && _gtPlayChan) {
-                _gtPlayChan.send({ type:'broadcast', event:'transfer', payload:{ snap, fromUid:myUid, ts:Date.now() } });
-              }
-            } catch(e) { _ehCatch('onSeatIdle_transfer', e); }
+        const _isHost = gtEngineHolder(_fr2) === myUid;
+        if(_isHost){ _gtHandleHostLeave(row.id, _fr2.seats, myUid); }
+        _gtBroadcastPlayerAway(row.id);
+        // 转旁观模式
+        _gtCleanupPlay();
+        _setPokerState('spectator', row.id);
+        setTimeout(function(){
+          var fresh=_gtTables.get(row.id);
+          if(fresh && fresh.status!=='closed'){
+            try{ gtSpectatePoker(fresh); }catch(e){ _ehCatch('onBust_spectate', e); }
+            _gtShowAwayBar(row.id);
           }
-          _gtBroadcastPlayerAway(row.id);
-          // 转旁观模式
-          _gtCleanupPlay();
-          _setPokerState('spectator', row.id);
-          setTimeout(function(){
-            var fresh=_gtTables.get(row.id);
-            if(fresh && fresh.status!=='closed'){
-              try{ gtSpectatePoker(fresh); }catch(e){ _ehCatch('onBust_spectate', e); }
-              _gtShowAwayBar(row.id);
-            }
-          }, 300);
-        }
+        }, 300);
       }
     },
     // ★v34: 从提示条"坐下"恢复 → 清 away + 广播 seat_taken + 等下一手
@@ -3681,39 +3647,19 @@ function gtLaunchPoker(row, resumeSnap){
       _gtRemoveAwayBar(); _gtShowWaitNextHand();
     },
     // ★原子离场 v33: 引擎持有者点返回 → 先推 transfer 快照给接班人, 再标 away, 再清本地;
-    //   接班人收到 transfer 广播即时接管, 消除 DB realtime 1-15s 窗口期。
-    //   无其他真人 → gtCheckNoHumansThenClose 散桌; away 席位保留 DB, 底牌不丢, 两轮超时腾席。
+    // ★v51 DB 仲裁: host 点返回 → 直接写 DB 把 host_uid 改给下一个玩家, 不发 transfer 广播。
+    //   对方收 DB realtime 推送后由 gtCheckEngineTransfer 启动引擎。无其他真人 → 散桌。
     onExit:()=>{
       const tableId = row.id;
-      // 1. 如果我是引擎持有者, 先推交接快照(有其他非 away 真人才推)
-      if (_ehGame && _ehGame.lastSnap && gtEngineHolder(_gtTables.get(tableId) || row) === myUid) {
-        const seats = (_gtTables.get(tableId) || row).seats || [];
-        const humanSeats = seats.filter(s => s && s.kind === 'human' && s.uid && !s.away && s.uid !== myUid);
-        if (humanSeats.length > 0) {
-          try {
-            const snap = _ehGame.lastSnap();
-            if (snap && _gtPlayChan) {
-              _gtPlayChan.send({ type:'broadcast', event:'transfer', payload:{ snap, fromUid:myUid, ts:Date.now() } });
-            }
-          } catch(e) { _ehCatch('onExit_transfer', e); }
-        }
-      }
-      // ★v43: 主动广播 player_away, 其他客户端立刻清座位 UI(不等 DB realtime 1-15s)。顺序: transfer → player_away → cleanup
-      _gtBroadcastPlayerAway(tableId);
-      // 2. 标记 away
-      try { gtRpc('eh_gt_set_away', { p_table: tableId, p_away: true }); } catch(_) {}
-      // ★v37: 设 session=away, 阻止 DB realtime 自动拉回(须在 _gtCleanupPlay 之前设)
-      _setPokerState('away', tableId);
-      // 3. ★v34: 检查剩余非 away 真人 → 无真人散桌(广播 dissolve), 有真人不用额外处理(引擎转移已在上面)
       const _fr=_gtTables.get(tableId) || row;
-      const _rem=(_fr.seats||[]).filter(s=>s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away);
-      if(!_rem.length){
-        try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
-        _gtCleanupPlay();
-        try{ gtClose(tableId); }catch(_){}
-      } else {
-        _gtCleanupPlay();
-      }
+      const _isHost = gtEngineHolder(_fr) === myUid;
+      _setPokerState('away', tableId);
+      // host 离场: 写 DB 把 host_uid 改给下一个玩家(或散桌)
+      if(_isHost){ _gtHandleHostLeave(tableId, _fr.seats, myUid); }
+      // 广播 player_away + 标 away
+      _gtBroadcastPlayerAway(tableId);
+      try { gtRpc('eh_gt_set_away', { p_table: tableId, p_away: true }); } catch(_) {}
+      _gtCleanupPlay();
     },
   });
   _gtStartTurnAlert();
@@ -3910,52 +3856,7 @@ async function _gtEnterPokerV2(row){
     });
   // ★原子交接 v33: 收到 host 的 transfer 广播 → 用快照即时接管引擎, 消除 DB realtime 窗口期
   //   只有座位号最小的非 away 真人(gtEngineHolder)才接管, 其余忽略; 多 guest 同时收到不会冲突。
-  //   transfer 广播丢失时仍由 DB realtime 触发 gtCheckEngineTransfer 兜底。
-  chan.on('broadcast',{event:'transfer'}, ({payload})=>{
-      if (_gtTakingOver) return;
-      _gtTakingOver = true;
-      // ★v43: try/finally 保证互斥锁必释放(接管失败也不卡死后续兜底); 3s 后解锁给 DB realtime 兜底留窗口
-      try {
-        if(!payload || !payload.snap) return;
-        // ★v43: 收到 transfer 即取消 player_away 的 3s 兜底计时(已收到主动交接, 不必再走兜底)
-        if(_gtTransferWaitT){ clearTimeout(_gtTransferWaitT); _gtTransferWaitT=null; }
-        setTimeout(()=>{
-          try {
-            const fresh=_gtTables.get(row.id);
-            if(!fresh) return;
-            // 已通过其他路径(DB realtime gtCheckEngineTransfer)接管 → 不重复启动
-            if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host) return;
-            if(gtEngineHolder(fresh)!==myUid) return; // 不是我接管
-            // 我是新 host, 用交接快照接管引擎
-            try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
-            _gtCleanupPlay();
-            _ehGame = null; _gtActiveTable = null;
-            _gtSnapCache.set(row.id, payload.snap);
-            gtLaunchPoker(fresh);
-            // ★v43: 接管完成立刻 resync 广播一帧完整快照, 让所有 guest 知道新 host + 当前牌局状态
-            try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtTransferResync', _); }
-          } catch(e) {
-            console.error('[gt] transfer 接管失败', e && e.message, e);
-            try{ window.ehReportError('manual', 'transfer_takeover_failed', { error: e && e.message }); }catch(_){}
-            // ★v44: 接管失败 5s 后重试一次(用 transfer 带来的快照)
-            setTimeout(function(){
-              try{
-                var _fr=_gtTables.get(row.id);
-                if(_fr && _fr.status==='playing' && gtEngineHolder(_fr)===myUid
-                   && (!_gtActiveTable || _gtActiveTable.id!==row.id || !_gtActiveTable.host)){
-                  console.log('[gt] transfer 接管重试...');
-                  _gtSnapCache.set(row.id, payload.snap);
-                  gtLaunchPoker(_fr);
-                  try{ if(_ehGame && typeof _ehGame.resync==='function') _ehGame.resync(); }catch(_){ _ehCatch('gtTransferRetry',_); }
-                }
-              }catch(e2){ console.error('[gt] transfer 接管重试失败', e2 && e2.message, e2); try{ window.ehReportError('manual', 'transfer_takeover_retry_failed', { error: e2 && e2.message }); }catch(_){} }
-            }, 5000);
-          }
-        }, 200);   // 等 200ms 让 DB away 标记同步过来
-      } finally {
-        setTimeout(() => { _gtTakingOver = false; }, 3000);
-      }
-    });
+  // ★v51 DB 仲裁: 不再接收 transfer 广播, host_uid 变化由 DB realtime 推送 → gtCheckEngineTransfer 接管
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   // 无房主: 引擎持有者动态转移, 不再固定 host_uid; gtWatchHostPing 认任何 host_ping 发送者
   gtWatchHostPing(chan, gtEngineHolder(row), row.id);
@@ -3985,87 +3886,55 @@ async function _gtEnterPokerV2(row){
     chat: ehGameChatBridge(),
     onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
-    // 旁观=腾座(不是 AI 代打): 通知 DB 让出座位, 留在房间可点空位再坐
+    // ★v51 DB 仲裁: 旁观=腾座, host 离场直接写 DB
     onSeatIdle:(seat, info)=>{
       if(info && info.vacate && info.mine){
         const tableId=row.id;
-        try{ gtRpc('eh_gt_set_away',{p_table:tableId, p_away:true}); }catch(_){}
-        // ★v44: 主动广播 player_away, 其他客户端立刻清座位 UI
-        _gtBroadcastPlayerAway(tableId);
         const fr=_gtTables.get(tableId)||row;
-        const rem=(fr.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&s.uid!==myUid&&!s.away);
-        if(!rem.length){
-          try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast',event:'dissolve',payload:{tableId}}); } }catch(_){}
-          _gtCleanupPlay();
-          try{ gtClose(tableId); }catch(_){}
-        } else {
-          _gtCleanupPlay();
-          _setPokerState('spectator', tableId);
-          setTimeout(function(){
-            var fresh=_gtTables.get(tableId);
-            if(fresh && fresh.status!=='closed'){
-              try{ gtSpectatePoker(fresh); }catch(e){ _ehCatch('onBust_spectate', e); }
-              _gtShowAwayBar(tableId);
-            }
-          }, 300);
-        }
-      }
-    },
-    onGrabSeat:()=>{ _gtGrabSeat(row); },
-    // 离桌(含输光/主动点离桌) → 腾出席位, AI/灵魂顶上继续打; 本地清场可从卡片重进。
-    onBust:()=>{
-      try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){}
-      // ★v44: 主动广播 player_away, 其他客户端立刻清座位 UI
-      _gtBroadcastPlayerAway(row.id);
-      const _fr2=_gtTables.get(row.id)||row;
-      const _rem2=(_fr2.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&s.uid!==myUid&&!s.away);
-      if(!_rem2.length){
-        try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast',event:'dissolve',payload:{tableId:row.id}}); } }catch(_){}
+        const _isHost=gtEngineHolder(fr)===myUid;
+        try{ gtRpc('eh_gt_set_away',{p_table:tableId, p_away:true}); }catch(_){}
+        if(_isHost){ _gtHandleHostLeave(tableId, fr.seats, myUid); }
+        _gtBroadcastPlayerAway(tableId);
         _gtCleanupPlay();
-        try{ gtClose(row.id); }catch(_){}
-      } else {
-        _gtCleanupPlay();
-        _setPokerState('spectator', row.id);
+        _setPokerState('spectator', tableId);
         setTimeout(function(){
-          var fresh=_gtTables.get(row.id);
+          var fresh=_gtTables.get(tableId);
           if(fresh && fresh.status!=='closed'){
             try{ gtSpectatePoker(fresh); }catch(e){ _ehCatch('onBust_spectate', e); }
-            _gtShowAwayBar(row.id);
+            _gtShowAwayBar(tableId);
           }
         }, 300);
       }
     },
+    onGrabSeat:()=>{ _gtGrabSeat(row); },
+    // ★v51 DB 仲裁: 离桌 → host 离场直接写 DB
+    onBust:()=>{
+      const _fr2=_gtTables.get(row.id)||row;
+      const _isHost=gtEngineHolder(_fr2)===myUid;
+      try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){}
+      if(_isHost){ _gtHandleHostLeave(row.id, _fr2.seats, myUid); }
+      _gtBroadcastPlayerAway(row.id);
+      _gtCleanupPlay();
+      _setPokerState('spectator', row.id);
+      setTimeout(function(){
+        var fresh=_gtTables.get(row.id);
+        if(fresh && fresh.status!=='closed'){
+          try{ gtSpectatePoker(fresh); }catch(e){ _ehCatch('onBust_spectate', e); }
+          _gtShowAwayBar(row.id);
+        }
+      }, 300);
+    },
     onBustCount:()=>{ try{ ehRecordBust('nlhe'); }catch(_){} },
-    // ★原子离场 v33: 同 gtLaunchPoker onExit 逻辑(guest 通常非引擎持有者, transfer 不触发, 但保持安全检查)
+    // ★v51 DB 仲裁: 同 gtLaunchPoker onExit — host 离场直接写 DB, 不发 transfer 广播
     onExit:()=>{
       const tableId = row.id;
-      if (_ehGame && _ehGame.lastSnap && gtEngineHolder(_gtTables.get(tableId) || row) === myUid) {
-        const seats = (_gtTables.get(tableId) || row).seats || [];
-        const humanSeats = seats.filter(s => s && s.kind === 'human' && s.uid && !s.away && s.uid !== myUid);
-        if (humanSeats.length > 0) {
-          try {
-            const snap = _ehGame.lastSnap();
-            if (snap && _gtPlayChan) {
-              _gtPlayChan.send({ type:'broadcast', event:'transfer', payload:{ snap, fromUid:myUid, ts:Date.now() } });
-            }
-          } catch(e) { _ehCatch('onExit_transfer', e); }
-        }
-      }
-      // ★v43: 主动广播 player_away, 其他客户端立刻清座位 UI(不等 DB realtime 1-15s)。顺序: transfer → player_away → cleanup
+      const _fr=_gtTables.get(tableId) || row;
+      const _isHost = gtEngineHolder(_fr) === myUid;
+      _setPokerState('away', tableId);
+      if(_isHost){ _gtHandleHostLeave(tableId, _fr.seats, myUid); }
       _gtBroadcastPlayerAway(tableId);
       try { gtRpc('eh_gt_set_away', { p_table: tableId, p_away: true }); } catch(_) {}
-      // ★v37: 设 session=away, 阻止 DB realtime 自动拉回(须在 _gtCleanupPlay 之前设)
-      _setPokerState('away', tableId);
-      // ★v35: 主动点返回 → 无其他真人散桌; 有真人直接走人不转旁观
-      const _fr=_gtTables.get(tableId) || row;
-      const _rem=(_fr.seats||[]).filter(s=>s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away);
-      if(!_rem.length){
-        try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
-        _gtCleanupPlay();
-        try{ gtClose(tableId); }catch(_){}
-      } else {
-        _gtCleanupPlay();
-      }
+      _gtCleanupPlay();
     },
   });
   _gtStartTurnAlert();
@@ -8325,10 +8194,6 @@ function foregroundResync(){
   if(document.hidden || !curRoom) return;
   if(_fgResyncTimer) return;   // 300ms 去抖: 多源同时触发只跑一批
   _fgResyncTimer = setTimeout(()=>{ _fgResyncTimer = null; }, 300);
-  // v52: 安卓 PWA 后台 WebSocket/realtime 被系统挂起、rAF 被节流 -> 牌桌快照漏投、倒计时环冻结漂移。
-  //   回前台请 host 重播当前态(含 turnDeadline): guest 收到后据 turnDeadline-Date.now() 重锚倒计时, 与 host 同源;
-  //   host 自身也在 'hello' 回调里 resync() 重渲。复用既有 'hello'->resync 通道, 不引入新机制。
-  try{ if(_gtActiveTable && _gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'hello', payload:{uid: myUid, t:Date.now()}}); } }catch(_){ _ehCatch('fgGtResync',_); }
   const fire = ()=>{ try{ if(curRoom && !document.hidden) refreshSnapshotTail(curRoom); }catch(_){} };
   fire();                    // 立即补(realtime 若已重连, 这次就对齐)
   setTimeout(fire, 600);     // 网络重连中途补
@@ -11069,14 +10934,14 @@ window.EH_SOFT_REFRESH = async function(){
 };
 
 // ============================================================
-// v52 host/guest 统一倒计时死线(turnDeadline)+安卓 PWA 回前台快照重锚; v50 修复德州跟注后下一局默认选中过牌的 UI 状态残留 bug
+// v51 host 机制改为 DB 仲裁: host 离场直接写 DB, 去掉广播转移; 快照加 turnDeadline 修复倒计时一致性
 // 全部异步、失败静默、有 fallback，不阻塞游戏主流程
 // ============================================================
 (function(){
 'use strict';
 
 // ── CSS 注入 ──
-var CSS_ID='eh-fun-v52';
+var CSS_ID='eh-fun-v51';
 if(document.getElementById(CSS_ID)) return;
 var _css=document.createElement('style'); _css.id=CSS_ID;
 _css.textContent=`
