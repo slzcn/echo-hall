@@ -2067,6 +2067,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         // 手动点按 = 清掉预选/加注额残留, 免下一回合被当成"已选中"的默认动作
         preAct = null;
         raiseTo = 0;
+        clearHandSelection();   // ★fix(安卓): 点操作按钮后立刻清空操作区状态(_lastActsSig=''+blur), 免合成 click 残留选中过牌
       }
       if (isGuest){
         if(onAction){
@@ -2681,7 +2682,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastPotShown=-1;
       lastBoardSig='';
       lastMeSig='';
-      _lastActsSig='';   // ★fix: 清签名护栏, 免新一手 renderActs 跳过渲染残留上局操作区按钮状态(跟注后下一手过牌误高亮)
+      _lastActsSig='';   // ★fix: 清签名护栏, 免 renderActs 跳过渲染残留上局操作区按钮状态
+      try{ els.acts.querySelectorAll('button').forEach(b=>b.blur()); }catch(_){}   // ★fix(安卓): 清焦点残留, 免合成 click 命中
     }
     function nextHand(){
       // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)
