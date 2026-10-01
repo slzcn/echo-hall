@@ -147,8 +147,8 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
-.pk-mus{margin-left:auto}
-.pk-mus + .pk-mus{margin-left:0}
+.pk-mus{margin-left:0}
+.pk-bar-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .pk-ico{width:18px;height:18px;display:block}
 .pk-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
@@ -1119,10 +1119,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
-        <button class="pk-mus pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
-        <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
-        <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
-        <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
+        <div class="pk-bar-right">
+          <button class="pk-mus pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
+          <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
+          <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
+          <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
+        </div>
       </div>
       <div class="pk-felt" id="pkFelt">
         <div class="pk-table" id="pkTable">
@@ -1268,38 +1270,34 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   journey-audio-mixer/journey-chat-core 既有覆盖, 纯 UI 增量, 无新整站旅程; 已 node --check 通过。
     // T86 边打边聊(轻): 右下 💬 浮钮点开快捷交流条 —— 预设短语/表情一键发(复用 chat.send 落进房间消息, 全房可见),
     //   需要打字再点 ⌨️ 展开小输入框。不常驻键盘、不占操作区高度, 不挡牌面。无 chat 桥(纯单机)则隐藏浮钮。
-    const QUICK_PHRASES = ['快点啊','让我想想','这把稳了','不服来战','good game','给我发好牌','诈唬的吧?','全下!'];
-    const QUICK_EMOJIS = ['😏','😭','🔥','👏','🤔','💪','🎉','🤯'];
+    const QUICK_PHRASES = ['快点啊','这把稳了','诈唬的吧?','全下!','good game','让我想想'];
+    const QUICK_EMOJIS = ['😎','🃏','💰','🔥','😏','🫣'];
+    // journey-exempt: 快捷交流条简化(去打字切换/集成输入框/表情走气泡/去toast) + 顶栏按钮组对齐(pk-bar-right)
     function initQuickChat(){
       const fab=$('#pkChatFab'), pop=$('#pkChatPop');
       if(!fab||!pop) return;
-      if(!chat || typeof chat.send!=='function'){ fab.style.display='none'; return; }   // 纯单机无房间消息通道
-      let open=false, typing=false;
-      const quip=(arr)=>arr.map(t=>`<button class="pk-qc-chip" data-say="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('');
+      if(!chat || typeof chat.send!=='function'){ fab.style.display='none'; return; }
+      let open=false;
+      const quip=(arr,cls)=>arr.map(t=>`<button class="pk-qc-chip${cls?' '+cls:''}" data-say="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('');
       const render=()=>{
-        pop.innerHTML = typing
-          ? `<div class="pk-qc-type"><input id="pkQcInput" type="text" maxlength="60" placeholder="说点什么…" autocomplete="off"><button class="pk-qc-send" id="pkQcSend">发送</button></div>
-             <div class="pk-qc-back"><button class="pk-qc-mini" data-back="1">‹ 快捷语</button></div>`
-          : `<div class="pk-qc-rowwrap"><div class="pk-qc-row">${quip(QUICK_PHRASES)}</div><div class="pk-qc-row">${quip(QUICK_EMOJIS)}</div></div>
-             <div class="pk-qc-back"><button class="pk-qc-mini" data-type="1">⌨️ 打字</button></div>`;
-        if(typing){ const inp=$('#pkQcInput'); if(inp){ setTimeout(()=>{ try{ inp.focus(); }catch(_){} },30);
-          inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); doSend(inp.value); } };
-          const sb2=$('#pkQcSend'); if(sb2) sb2.onclick=()=>doSend(inp.value); } }
+        pop.innerHTML = `<div class="pk-qc-rowwrap"><div class="pk-qc-row">${quip(QUICK_PHRASES)}</div><div class="pk-qc-row">${quip(QUICK_EMOJIS,'emoji')}</div></div>
+             <div class="pk-qc-type"><input id="pkQcInput" type="text" maxlength="60" placeholder="说点什么…" autocomplete="off"><button class="pk-qc-send" id="pkQcSend">发送</button></div>`;
+        const inp=$('#pkQcInput');
+        if(inp){ inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); doSend(inp.value); } }; }
+        const sb2=$('#pkQcSend'); if(sb2) sb2.onclick=()=>doSend(inp.value);
       };
       const doSend=(txt)=>{
         txt=String(txt||'').trim(); if(!txt) return;
         try{ chat.send(txt); }catch(_){}
-        // ★T91.6 发言走牌桌气泡通道: 立即在我这席冒 pk-say 气泡(不只发聊天室)
         try{ if(mySeat>=0) say(mySeat, txt.slice(0,60)); }catch(_){}
-        toast('已发送到房间'); closePop();
+        const inp=$('#pkQcInput'); if(inp) inp.value='';
+        closePop();
       };
-      const openPop=()=>{ open=true; typing=false; pop.hidden=false; pop.classList.add('on'); render(); sfx('click'); };
-      const closePop=()=>{ open=false; typing=false; pop.classList.remove('on'); pop.hidden=true; };
+      const openPop=()=>{ open=true; pop.hidden=false; pop.classList.add('on'); render(); sfx('click'); };
+      const closePop=()=>{ open=false; pop.classList.remove('on'); pop.hidden=true; };
       bindTap(fab, ()=>{ if(open) closePop(); else openPop(); });
       pop.addEventListener('click',(e)=>{
-        const say=e.target.closest('[data-say]'); if(say){ doSend(say.dataset.say); return; }
-        if(e.target.closest('[data-type]')){ typing=true; render(); return; }
-        if(e.target.closest('[data-back]')){ typing=false; render(); return; }
+        const chip=e.target.closest('[data-say]'); if(chip){ doSend(chip.dataset.say); return; }
       });
     }
     try{ root.addEventListener('eh:audio-prefs', ()=>{ paintMus(); paintSfx(); }); }catch(_){}

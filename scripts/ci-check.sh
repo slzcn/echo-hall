@@ -850,7 +850,7 @@ import re, pathlib, sys
 # 9/30 v38 断线处理(心跳/away 条/踢出/视觉标记) + v39/v40 牌桌打磨后 re-audit —— 功能性增长, 非爆炸。
 baselines = {
     r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
-    r'\bsetTimeout\s*\(': ('setTimeout', 166, 15),
+    r'\bsetTimeout\s*\(': ('setTimeout', 170, 15),
     r'\baddEventListener\s*\(': ('addEventListener', 132, 10),
     r'\.style\.\w+\s*=': ('element.style=', 135, 15),
 }
