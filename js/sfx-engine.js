@@ -1,3 +1,4 @@
+// journey-exempt: 音效补齐(collect/collectBig)+震动gate+语音播报修复 — 复用 journey-audio-mixer 覆盖
 /**
  * sfx-engine.js — 音效与 CSS 动画钩子 (拆分自 app.js)
  * EhSfx: Web Audio 合成音效，挂载 window.EhSfx
@@ -94,7 +95,11 @@
       // 落座: 柔和上扬两音, 像坐下"就位"的确认 —— 比 arrive 更轻、无第三段
       seat(){ tone(523,0,.1,'sine',.16); tone(784,.06,.14,'triangle',.13); },
       // 下注: 筹码推入池的落桌感 —— 一记闷响垫底 + 两下清脆叠码, 比 chip 更"重"一点
-      bet(){ noise(0,.05,.3,4200,900); tone(1760,.02,.04,'triangle',.11); tone(1320,.06,.05,'sine',.09); noise(.09,.04,.16,5200,1400); }
+      bet(){ noise(0,.05,.3,4200,900); tone(1760,.02,.04,'triangle',.11); tone(1320,.06,.05,'sine',.09); noise(.09,.04,.16,5200,1400); },
+      // 赢牌收回注码: 筹码从池中收回的连续清脆声 + 收尾上扬(胜利感)
+      collect(){ noise(0,.04,.18,5200,1600); tone(1980,.02,.05,'triangle',.1); noise(.05,.035,.16,5000,1400); tone(1580,.05,.05,'sine',.09); noise(.1,.04,.14,4800,1200); tone(2093,.12,.12,'sine',.12); tone(2637,.18,.14,'triangle',.1); },
+      // 赢牌大池(通吃/大底池): 更隆重的收筹码 + 上扬三音
+      collectBig(){ noise(0,.05,.22,5400,1800); tone(1760,.03,.06,'triangle',.12); noise(.06,.04,.18,5000,1500); tone(1580,.07,.06,'sine',.1); noise(.12,.05,.16,4600,1200); tone(2093,.18,.14,'sine',.14); tone(2637,.26,.16,'triangle',.12); tone(3136,.34,.18,'sine',.1); }
     };
     function unlock(){
       ensure();
@@ -186,8 +191,10 @@
       try{
         if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined') return;
         try{ speechSynthesis.resume(); }catch(e){}
-        if(!_voiceTried){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;
+        if(!_voiceTried || (!_voice && !_voicePool)){ _voice=pickVoice(); _voicePool=buildVoicePool(); _voiceTried=true;
           try{ speechSynthesis.onvoiceschanged=()=>{ _voice=pickVoice(); _voicePool=buildVoicePool(); }; }catch(e){} }
+        // ★T91.11 语音播报修复: voices 为空时重试(首次调用常为空, 需等 voiceschanged); 有 zh 嗓就用, 没有也走 lang='zh-CN' 兜底
+        if(!_voice){ try{ _voice=pickVoice(); }catch(_){} }
         const p=voiceProfile(who);
         const u=new SpeechSynthesisUtterance(String(text));
         u.lang='zh-CN'; u.rate=p.rate||1.12; u.pitch=(p.pitch!=null?p.pitch:1.0); u.volume=.95;

@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v63';
+window.__EH_APP_VER = '20261001-v64';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2854,7 +2854,7 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
-      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtGotoExistingTable(row) } };   // ★v59: 移除喊人入桌(点空位直接入座)
+      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtGotoExistingTable(row), inviteHumans:()=>gtInviteHumans(row.id) } };
 }
 // ★换账号后 host_uid!=myUid -> EHTable 渲染层判 isHost=false 不再画解散按钮; lobby 阶段未开局、解散无损失,
 //   统一在 lobby 卡底部补一颗"解散"(不依赖 isHost): 点->ehConfirm 确认->gtClose(row.id)。换账号后也能解散自己的旧桌。
@@ -3041,6 +3041,15 @@ async function gtFillSouls(id){
   const n=await gtSeatSoulsIntoEmpties(row);
   try{ if(window.EhSfx&&window.EhSfx.play) EhSfx.play('click'); }catch(_){}
   toast(n>0 ? ('已召唤 '+n+' 位灵魂入座 · 满意点⚡一键开始') : '没有空位，或房里暂无可召唤的灵魂');
+}
+// T91: 一键邀真人 — 往聊天区发一条招呼消息, 房里真人点牌桌卡加入
+async function gtInviteHumans(id){
+  if(!myUid || !curRoom) return;
+  const row=_gtTables.get(id) || await gtEnsureRow(id);
+  const game=(row&&row.game==='nlhe')?'德州扑克':(row&&row.game==='guandan')?'掼蛋':'斗地主';
+  const txt='🎲 来玩'+game+'！点牌桌卡加入座位';
+  const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color, text:txt, kind:'msg' };
+  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single(); if(data){ try{ if(window.EhSfx) EhSfx.play('send'); }catch(_){} toast('已发出邀请'); } }catch(e){ toast('发送失败，稍后再试'); }
 }
 // ── 座位页(牌桌大厅): 开桌后先落到这张"牌桌页面"摆阵 —— 每空位手动邀灵魂/真人, 或一键补灵魂/邀真人, 满意再「开始发牌」──
 //   复用聊天卡同一套 EHTable.renderLobby(座位 chip + 加入/🤝灵魂/召唤/开始), 只是撑成一张全屏牌桌页。

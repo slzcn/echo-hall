@@ -1,4 +1,5 @@
 // ============================================================
+// journey-exempt: 体验优化(按钮统一/下注位置/三次不响应转旁观/音效震动/聊天气泡/再来一局直进) — 复用现有 journey 覆盖
 // journey-exempt: pure perf optimization for poker table (resize rAF throttle + render sig guards, no behavior change)
 // poker-ui.js — 德州扑克绒面牌桌 UI（入室牌桌 · 椭圆桌位 · 底池/公共牌 · 全局意识 AI 陪玩）
 // ------------------------------------------------------------
@@ -373,6 +374,10 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 @keyframes pkBlink{50%{opacity:.35}}
 /* 操作区 */
 .pk-acts{display:flex;flex-direction:column;gap:8px;padding:8px 14px calc(6px + env(safe-area-inset-bottom,0px));flex-shrink:0}
+/* ★T91.5 iOS/安卓对齐: 统一圆角/间距/字重, 两端观感一致(iOS Safari 按钮渲染偏扁) */
+.pk-b{border-radius:12px;font-weight:700;letter-spacing:.01em}
+.pk-quick .pk-qbtn{border-radius:10px}
+.pk-raise input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-9px}
 .pk-raise{display:flex;align-items:center;gap:9px}
 .pk-raise.hidden{display:none}
 /* ★.reserved: 灰掉但保留高度 —— 操作条骨架恒定, 滑杆/快捷非我回合时灰掉显示(不可点击), 按钮行不上下跳(主人反馈"按钮别跳来跳去") */
@@ -432,7 +437,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;
   min-height:38px;display:flex;align-items:center;justify-content:center}
 .pk-preb{font-size:13px;padding:10px 0}
-.pk-preb:not(.on){background:var(--panel);color:var(--sub);border-color:var(--line2);box-shadow:none}
+.pk-preb:not(.queued){background:var(--panel);color:var(--ink);border-color:var(--line2);box-shadow:none}
 .pk-preb.queued.fold{background:rgba(255,255,255,.06);color:var(--ink);border-color:var(--line2);box-shadow:inset 0 0 0 1.5px var(--sub)}
 .pk-preb.queued:not(.fold):not(.call){background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)}
 .pk-preb.queued.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
@@ -729,6 +734,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (seat===mySeat){
         // 我的超时 = 起身旁观(让座), 不是 AI 代打
         doEnterSpectator();
+        // ★T91.3 起身后检查: 座位上还有真人 → 牌局继续(可点空位再坐); 没有了 → 自动解散房间
+        checkNoHumansThenDissolve();
         return;
       }
       // 别席超时: 该席交本机 AI 打完本手(不是托管功能, 是不让牌局卡死), 下一手可被补位
@@ -739,6 +746,30 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine: seat===mySeat }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
       try{ renderActs(true); if(seat===mySeat){ renderMsg(); renderMe(); } }catch(_){}
+      // ★T91.3 检查是否还有真人在座
+      checkNoHumansThenDissolve();
+    }
+    // ★T91.3 三次不响应转旁观后的兜底: 座位上没有真人(全是 AI/空位/旁观)→ 自动解散房间, 所有人回聊天室
+    //   还有真人 → 牌局继续(旁观者可点空位, 下一局继续玩)。
+    function checkNoHumansThenDissolve(){
+      try{
+        // 统计在座真人: 有 uid、非 AI、非空位、非旁观(mySeat=-1 时我不占席)
+        let humans = 0;
+        for (let i=0; i<n; i++){
+          if (vacated[i]) continue;
+          const p = st.players[i];
+          if (!p || p.kind==='empty') continue;
+          if (isAI[i]) continue;
+          if (i===mySeat && spectating) continue;
+          // 别席: 是远程真人(remoteSeats 含) 或 非 AI 非 vacated 的真人
+          if (isRemote(i) || (!isAI[i] && p.kind!=='empty')) humans++;
+        }
+        if (humans > 0) return;   // 还有真人 → 继续打
+        // 没真人了 → 自动解散
+        try{ emitBeat({ type:'dissolve', actor:'', text:'🎲 牌局无人响应 · 自动解散, 回到聊天室', big:true }); }catch(_){}
+        if (opts.onDissolve){ try{ opts.onDissolve(); }catch(e){ _ehCatch('poker.onDissolve', e); } }
+        else close();
+      }catch(e){ _ehCatch('checkNoHumansThenDissolve', e); }
     }
 // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   德州: idleOut 把我这席置 isAI + 配灵魂人格代打; 接管须逆向(收回 isAI/人格)、归零连超时账、
@@ -1085,7 +1116,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
-        <button class="pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
+        <button class="pk-mus pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
         <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
         <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
@@ -1255,6 +1286,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const doSend=(txt)=>{
         txt=String(txt||'').trim(); if(!txt) return;
         try{ chat.send(txt); }catch(_){}
+        // ★T91.6 发言走牌桌气泡通道: 立即在我这席冒 pk-say 气泡(不只发聊天室)
+        try{ if(mySeat>=0) say(mySeat, txt.slice(0,60)); }catch(_){}
         toast('已发送到房间'); closePop();
       };
       const openPop=()=>{ open=true; typing=false; pop.hidden=false; pop.classList.add('on'); render(); sfx('click'); };
@@ -1550,7 +1583,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const nowOcc = !pending && st.players[seat] && st.players[seat].kind!=='empty';
         if ((introSeating && arrived && seat===lastSeated) || (nowOcc && prevP===false)) seatEl.classList.add('pk-justseated');
         // 落座音效: 仅"空位→有人"的真实入座上升沿(prevP===false 排除首帧 undefined, 免整桌初次渲染齐响)
-        if (nowOcc && prevP===false){ try{ sfx('seat'); }catch(_){} }
+        if (nowOcc && prevP===false){ try{ sfx('seat'); }catch(_){} try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(8); }catch(_){} }
         _seatOcc[seat]=!!nowOcc;
         els.table.appendChild(seatEl);
         if (pending || st.phase==='lobby') continue;   // 虚位/招募态空位不摆投入筹码
@@ -1597,7 +1630,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             commit.dataset.street=street;
             commit.classList.remove('betpop'); void commit.offsetWidth; commit.classList.add('betpop');
             // 下注音效: 60ms 节流, 免同帧多席筹码归位齐响成"机关枪"
-            try{ const _n=Date.now(); if(_n-(_lastBetSfx||0)>60){ _lastBetSfx=_n; sfx('bet'); } }catch(_){}
+            try{ const _n=Date.now(); if(_n-(_lastBetSfx||0)>60){ _lastBetSfx=_n; sfx('bet'); try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(6); }catch(_){} } }catch(_){}
           } else {
             commit.dataset.street=street;
           }
@@ -1686,26 +1719,33 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
               commitEl.style.left = ccx0+'%'; commitEl.style.top = ccy0+'%';
             }
           } else {
-            // 投入筹码摆各家身前(座位→桌心方向内移)。竖屏公共牌行又宽又居中(cx≈24~76 / cy≈30~47),
-            //   侧席按比例插值会正落在牌行/底池上(主人反馈"下注位置遮挡其他元素")→ 落点若进中央牌区,
-            //   就沿竖向推出牌带(上半席推到牌行上方, 下半席推到牌行下方), 保证不压公共牌/底池。
-            const f = land ? 0.44 : 0.6;
-            let ccx = 50 + (cx-50)*f, ccy = CY + (cy-CY)*f;
-            // 牌带用【实测 board 矩形】定位(旧硬编码 28~50 随版面漂移, 顶部席被误推到 44.4 正压公共牌):
-            //   把牌区(含底池/公共牌)量成 band, 落点进带就向席位方向退出 —— 上席推到带上沿之上, 下席推到带下沿之下。
-            let bandT=28, bandB=50;
-            try{
-              const br = els.board && els.board.getBoundingClientRect();
-              const pr = els.pot && els.pot.getBoundingClientRect();
-              if (br && tr.height){
-                bandT = Math.max(18, ((Math.min(br.top, pr?pr.top:br.top) - tr.top)/tr.height*100) - 2.5);
-                bandB = Math.min(82, ((Math.max(br.bottom, pr?pr.bottom:br.bottom) - tr.top)/tr.height*100) + 2.5);
+            // ★T91.4 对手下注信息移到头像右侧(原来在下方被牌遮挡)。与自己席(d===0)同策略:
+            //   用实测头像矩形定位到右侧, 拿不到时兜底老公式。
+            const avrEl = seatEl.querySelector('.pk-avr');
+            const tr = els.table.getBoundingClientRect();
+            if (avrEl && tr.width && tr.height){
+              const ar = avrEl.getBoundingClientRect();
+              const cw = commitEl.offsetWidth||34;
+              commitEl.style.left = ((ar.right - tr.left + cw/2 + 8)/tr.width*100)+'%';
+              commitEl.style.top  = (((ar.top+ar.bottom)/2 - tr.top)/tr.height*100)+'%';
+            } else {
+              // 兜底: 投入筹码摆各家身前(座位→桌心方向内移), 竖屏避开中央牌区
+              const f = land ? 0.44 : 0.6;
+              let ccx = 50 + (cx-50)*f, ccy = CY + (cy-CY)*f;
+              let bandT=28, bandB=50;
+              try{
+                const br = els.board && els.board.getBoundingClientRect();
+                const pr = els.pot && els.pot.getBoundingClientRect();
+                if (br && tr.height){
+                  bandT = Math.max(18, ((Math.min(br.top, pr?pr.top:br.top) - tr.top)/tr.height*100) - 2.5);
+                  bandB = Math.min(82, ((Math.max(br.bottom, pr?pr.bottom:br.bottom) - tr.top)/tr.height*100) + 2.5);
+                }
+              }catch(_){}
+              if (!land && ccx>16 && ccx<84 && ccy>bandT && ccy<bandB){
+                ccy = (cy < CY) ? (bandT - 3.5) : (bandB + 3.5);
               }
-            }catch(_){}
-            if (!land && ccx>16 && ccx<84 && ccy>bandT && ccy<bandB){
-              ccy = (cy < CY) ? (bandT - 3.5) : (bandB + 3.5);
+              commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
             }
-            commitEl.style.left = ccx+'%'; commitEl.style.top = ccy+'%';
           }
         }
       }
@@ -1798,6 +1838,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 结算: 底池推向赢家(赢家席位, 我方=底部). winners = 座位号数组
     function payoutChipsFx(winners){
       if (!winners || !winners.length) return;
+      // ★T91.12/T91.13 赢牌收回注码: 我赢=collectBig(隆重+强震), 对手赢=collect(轻)
+      const iWon = winners.includes(mySeat);
+      try{ sfx(iWon?'collectBig':'collect'); }catch(_){}
+      try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(iWon?[12,40,8,40,16]:10); }catch(_){}
       const tr = tableRect(); const pot = potCenter(tr);
       winners.forEach(seat=>{
         let tx, ty;
@@ -1948,10 +1992,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const occupied = st.players.filter(p=>p && p.kind && p.kind!=='empty').length;
       // T88: 招募提示(席位进度/今日次数)已移到顶部提示区 renderMsg, 底部操作区只留按钮, 不再混排 prehint
       if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键补满</button>');
+      if (lobbyCtx && lobbyCtx.actions && lobbyCtx.actions.inviteHumans) btns.push('<button class="pk-b fold" data-invite-human="1">👥 邀请真人</button>');
       if (occupied>=2 && typeof a.start === 'function') btns.push('<button class="pk-b call" data-lob="start">▶ 开始</button>');
       els.acts.innerHTML = `<div class="pk-lobacts"><div class="pk-row">${btns.join('')}</div></div>`;
-      const map={ fill:a.fillSouls, start:a.start };   // ★v59: 移除喊人按钮(点空位直接入座取代)
+      const map={ fill:a.fillSouls, start:a.start };
       els.acts.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } }));
+      const ih=els.acts.querySelector('[data-invite-human]'); if(ih) bindTap(ih, ()=>{ try{ lobbyCtx.actions.inviteHumans(); }catch(_){} });
     }
     let _lastActsSig='';
     function renderActs(force){
@@ -2575,7 +2621,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
               ? `<button class="pk-b" id="pkDone">返回房间</button><button class="pk-b" id="pkRestart">重开一桌</button><button class="pk-b call" id="pkInviteOn">邀请对手继续</button>`
               : `<button class="pk-b" id="pkDone">返回房间</button><button class="pk-b call" id="pkRestart">再来一局</button>`);
       } else {
-        footer = `<button class="pk-b" id="pkDone">返回房间</button><button class="pk-b" id="pkNextHand" disabled>下一手 <span id="pkCd" class="pk-cd"></span></button>`;
+        footer = `<button class="pk-b" id="pkDone">返回房间</button><button class="pk-b call" id="pkNextHand">下一手 <span id="pkCd" class="pk-cd"></span></button>`;
       }
       // 赢家一行(常显): 谁靠什么赢下多少 —— 一眼看清结果, 不必展开摊牌逐行去数。
       const champSeat0 = (res.winnersBySeat||[])[0];
