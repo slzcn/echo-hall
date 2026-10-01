@@ -158,7 +158,7 @@ html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:
 .ddz-ico{width:18px;height:18px;display:block}
 .ddz-mus:hover,.ddz-auto:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
-.ddz-mus:active:active,.ddz-x:active,.ddz-auto:active{transform:scale(.9)}
+.ddz-mus:active:active,.ddz-x:active,.ddz-auto:active{transform:scale(.92)}
 .ddz-mus.muted{color:var(--dim);opacity:.8}
 /* 托管开启: 钮体转琥珀高亮 + 轻微呼吸, 一眼可辨"正在托管"(状态忠实映射) */
 .ddz-auto.on{color:var(--amber);border-color:var(--amber);

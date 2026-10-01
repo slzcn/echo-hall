@@ -106,7 +106,7 @@
 .gd-ico{width:18px;height:18px;display:block}
 .gd-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
-.gd-mus:active:active,.gd-x:active{transform:scale(.9)}
+.gd-mus:active:active,.gd-x:active{transform:scale(.92)}
 .gd-mus.muted{color:var(--dim);opacity:.8}
 .gd-rot.on{color:var(--accent);border-color:var(--accent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px color-mix(in srgb, var(--accent) 50%, transparent)}
