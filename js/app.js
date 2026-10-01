@@ -1096,8 +1096,19 @@ const _EH_GT_NET = (function(){
 function _gtRememberGame(id){ try{ if(id) localStorage.setItem('eh_last_game', String(id)); }catch(_){} }
 function _gtForgetGame(){ try{ localStorage.removeItem('eh_last_game'); }catch(_){} }
 function _gtLastGame(){ try{ return localStorage.getItem('eh_last_game') || ''; }catch(_){ return ''; } }
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
+// ★v64: 找下一个非 away 真人 uid 作为 host 转移目标(供 keepalive 离场和主动离场共用)
+function _gtFindNextHost(tableId){
+  try{
+    var _fr = tableId ? _gtTables.get(tableId) : null;
+    if(!_fr) return null;
+    var _others = ((_fr && _fr.seats) || []).filter(function(s){
+      return s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away;
+    }).sort(function(a,b){ return a.seat-b.seat; });
+    return _others.length ? _others[0].uid : null;
+  }catch(_){ return null; }
+}
 // ★v37: 非正常离场 — 关闭浏览器/PWA 时用 fetch keepalive 同步标 away, 心跳超时兜底
 function _gtPokerBindUnload(tableId){
   _gtPokerUnbindUnload();
@@ -1105,19 +1116,16 @@ function _gtPokerBindUnload(tableId){
     try{
       if(_pagehideAccessToken&&tableId){
         // ★v57 Bug2: host 直接关浏览器前立刻把 host_uid 转给下一个在线真人(用 fetch keepalive 发 Supabase RPC),
-        //   guest 不必再等 15s 心跳超时才能接管。
+        //   guest 不必再等 15s 心跳超时才能接管。★v64: 提取为 _gtFindNextHost 共用。
         var _isHost = _gtActiveTable && _gtActiveTable.host && _gtActiveTable.id===tableId;
         if(_isHost){
-          var _fr2 = _gtTables.get(tableId);
-          var _others = ((_fr2 && _fr2.seats) || []).filter(function(s){
-            return s && s.kind==='human' && s.uid && s.uid!==myUid && !s.away;
-          }).sort(function(a,b){ return a.seat-b.seat; });
-          if(_others.length){
+          var _nextUid = _gtFindNextHost(tableId);
+          if(_nextUid){
             try{
               fetch(SB_URL+'/rest/v1/rpc/eh_gt_set_host',{
                 method:'POST', keepalive:true,
                 headers:{ apikey:SB_ANON, Authorization:'Bearer '+_pagehideAccessToken, 'Content-Type':'application/json' },
-                body:JSON.stringify({ p_table_id:tableId, p_new_host_uid:_others[0].uid })
+                body:JSON.stringify({ p_table_id:tableId, p_new_host_uid:_nextUid })
               }).catch(function(){});
             }catch(_){}
           }
@@ -2910,6 +2918,22 @@ function gtHighlightsHtml(highlights){
   if(row.game==='nlhe' && (row.status==='lobby'||row.status==='playing'||row.status==='closed')){ gtRenderPokerEntry(el,row); return; }
   try{ EHTable.renderLobby(el,row,gtCtx(row)); }
   catch(e){ console.warn('[gt] renderLobby 抛错', e); }
+  // ★v64: 斗地主/掼蛋卡片也渲染 highlights 动态带(与德州统一)
+  try{
+    var _hl = gtHighlightsHtml(row.highlights);
+    if(_hl){
+      var _hlOld = el.querySelector('.gt-highlights');
+      if(_hlOld){ _hlOld.outerHTML = _hl; } else { el.insertAdjacentHTML('beforeend', _hl); }
+    }
+  }catch(_){}
+  // ★v64: 旁观等待状态显示
+  try{
+    if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.spectating){
+      var _wHtml = '<div class="gt-waiting-bar" style="padding:6px 10px;background:rgba(0,229,255,.08);border-radius:6px;font-size:12px;color:#00e5ff;text-align:center;margin-top:4px">旁观中 · 等待空位自动入座</div>';
+      var _wOld = el.querySelector('.gt-waiting-bar');
+      if(_wOld){ _wOld.outerHTML = _wHtml; } else { el.insertAdjacentHTML('beforeend', _wHtml); }
+    }
+  }catch(_){}
   // ★换账号后 host_uid!=myUid -> EHTable 判 isHost=false 不再画解散按钮; lobby 未开局、解散无损失, 卡底补一颗"解散"(不依赖 isHost)。
   gtAppendDismiss(el, row);
 }
@@ -2931,6 +2955,9 @@ function gtRenderPokerEntry(el,row){
   else if(playing) tip = iAmIn?'你在这局里 · 点卡回到牌桌':'点卡加入/观战';
   else if(iAmIn) tip = '已入座 · 点卡进牌桌页';
   else tip = humans<2 ? ('再来 '+(2-humans)+' 人自动开始') : '即将自动开始...';
+  // ★v64: 旁观等待状态
+  var _amSpectating = _gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.spectating;
+  if(_amSpectating) tip='旁观中 · 等待空位自动入座';
   el.className='game-card gt-card'; el.dataset.gtId=row.id;
   const closed=(row.status==='closed');
   const badgeCls=closed?'closed':(playing?'playing':'lobby');
@@ -3153,24 +3180,60 @@ async function gtEnsureSeated(row){
   if(A.mySeat>=0) return row;
   const seats=(row.seats||[]).filter(s=>s&&typeof s.seat==='number');
   let tgt=seats.find(s=>s.kind==='empty'||!s.kind);
-  if(!tgt && row.game==='nlhe'){
-    // ★v63 场景2: 德州无空位时, 不直接顶替 AI —— 30% 概率踢走一个非 host 席的 AI/灵魂, 70% 进入旁观等待
-    const aiSeats=seats.filter(s=>s.kind && s.kind!=='human' && s.kind!=='empty' && s.seat!==0);
-    if(aiSeats.length && Math.random()<0.3){
-      tgt=aiSeats[Math.floor(Math.random()*aiSeats.length)];
-      try{ await gtKick(row.id, tgt.seat); }catch(_){}
-    } else {
-      // 70%: 进入旁观状态, 等机器人输光后自动入座
-      try{ toast('等待空位，机器人输光后自动入座', 2500); }catch(_){}
-      return row;
+  if(!tgt){
+    // ★v64: 无空位 → 加入等待队列, 进旁观状态(不再固定 30% 概率踢 AI)
+    if(!_gtWaitingHumans.includes(myUid)){
+      _gtWaitingHumans.push(myUid);
     }
+    try{ toast('等待空位，预计 1-2 局后入座', 2500); }catch(_){}
+    return row;
   }
-  if(!tgt) return row;
+  // 有空位 → 直接落座(并从等待队列移除)
+  if(_gtWaitingHumans.includes(myUid)){
+    _gtWaitingHumans = _gtWaitingHumans.filter(function(u){ return u!==myUid; });
+  }
   try{
     const jr=await gtJoin(row.id, tgt.seat);
     if(jr){ row=jr; _gtTables.set(row.id, row); gtRenderCard(row); }
   }catch(e){ _ehCatch('gtEnsureSeated', e); }
   return row;
+}
+// ★v64: 每手/每局结束时处理等待队列 —— 动态踢 AI 给等待真人让座
+function _gtProcessWaitingQueue(row){
+  try{
+    if(!row || !row.id) return;
+    if(!_gtWaitingHumans.length) return;
+    var seats=(row.seats||[]).filter(function(s){ return s && typeof s.seat==='number'; });
+    var emptySeats = seats.filter(function(s){ return s.kind==='empty' || !s.kind; });
+    var waitingCount = _gtWaitingHumans.length;
+    if(waitingCount > 0 && emptySeats.length > 0){
+      _gtConsecutiveNoSeat = 0;
+      var nextUid = _gtWaitingHumans[0];
+      try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'seat_open', payload:{tableId:row.id, uid:nextUid}}); } }catch(_){}
+      if(nextUid === myUid){
+        _gtWaitingHumans.shift();
+        _gtGrabSeat(row);
+      }
+      return;
+    }
+    if(waitingCount > 0 && emptySeats.length === 0){
+      _gtConsecutiveNoSeat++;
+      var shouldKick = (_gtConsecutiveNoSeat >= 2) || (Math.random() < 0.6);
+      if(shouldKick){
+        var aiSeats = seats.filter(function(s){
+          return s.kind && s.kind!=='human' && s.kind!=='empty' && s.seat!==0;
+        });
+        if(aiSeats.length){
+          var victim = aiSeats[Math.floor(Math.random()*aiSeats.length)];
+          try{ gtKick(row.id, victim.seat); }catch(_){}
+          _gtConsecutiveNoSeat = 0;
+          try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'seat_open', payload:{tableId:row.id}}); } }catch(_){}
+        }
+      }
+      return;
+    }
+    _gtConsecutiveNoSeat = 0;
+  }catch(e){ _ehCatch('gtProcessWaitingQueue', e); }
 }
 function gtEnter(id){
   gtCloseSeatingPage();
@@ -3213,9 +3276,10 @@ async function gtGotoExistingTable(row){
   row = await gtEnsureSeated(row);
   const A=gtSeatArrays(row);
   if(A.mySeat>=0){ try{ toast(row.status==='playing'?'已入座 · 跟上这局':'已入座 · 人齐自动开局', 2000); }catch(_){} gtEnter(row.id); return; }
-  // 满座: 德州可旁观+抢位; 斗地主/掼蛋固定阵型, 给诚实提示
+  // 满座: 德州可旁观+抢位; 斗地主/掼蛋固定阵型, 进旁观等待局间空位
   if(row.game==='nlhe'){ gtSpectatePoker(row); return; }
-  try{ toast('座位已满 · 等有人离开再入座'); }catch(_){}
+  // ★v64: DDZ/Guandan 无座时进旁观等待(已加入 waitingHumans 队列)
+  try{ _gtEnterWaiting(row); }catch(_){}
   gtSurfaceTable(row);
 }
 // ── 招募态就地落牌桌(第1条·主人): 开桌不再弹独立座位页, 直接把【真牌桌 UI】以招募态挂起来 ——
@@ -3285,6 +3349,8 @@ function gtLaunchDdzLobby(row){
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       bumpGameStats('doudizhu', res, A);
       postDdzResult(res, A.names).catch(()=>{});
+      // ★v64: 一局打完处理等待队列——斗地主固定阵型, 只在局间安排落座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
@@ -3331,6 +3397,8 @@ function gtLaunchPokerLobby(row){
       recordTexasResult(res,log,A.names,A.avatars,soulPick,meta).catch(()=>{});
       bumpGameStats('nlhe', res, A);
       postTexasResult(res,A.names,meta).catch(()=>{});
+      // ★v64: 每手结束处理等待队列——动态踢 AI 给等待真人让座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     // ★临时离席: 标记 away 不腾席; 清本地引擎, 还有其他非 away 真人则引擎转移, 没有则散桌。
     onExit:()=>{
@@ -3374,6 +3442,8 @@ function gtLaunchGuandanLobby(row){
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       bumpGameStats('guandan', res, A);
       postGuandanResult(res,log,A.names,meta).catch(()=>{});
+      // ★v64: 一局打完处理等待队列——掼蛋固定阵型, 只在局间安排落座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
@@ -3840,6 +3910,8 @@ async function gtLaunchPoker(row, resumeSnap){
       // 德州"一手=一次 onResult"≠ 整局终结: 牌桌保持 playing。
       // 无房主架构: 每手打完后检查是否还有真人 —— 没有真人了(全是 AI/灵魂)自动解散。
       try{ gtCheckNoHumansThenClose(row); }catch(_){}
+      // ★v64: 每手结束处理等待队列——动态踢 AI 给等待真人让座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     // 对手(机器人/灵魂)输光离场 → 腾空对应 DB 座位(灵魂席解绑), 免 realtime 名册把它当占用回填/复活。
     //   引擎座位号→DB 座位号: 按 seat 排序后的第 seat 个座位行。AI 占位席本就为空, gtKick 无副作用。
@@ -3974,6 +4046,8 @@ function _gtRemoveGrabButton(){
 }
 // ★v34: 被迫起身后两条路径的 UI 和状态
 const _gtWaitNextHand = new Map();   // uid → tableId: 坐下后等下一手才发牌
+let _gtWaitingHumans = [];        // ★v64: 等待入座的真人 uid 队列(动态 AI 让座)
+let _gtConsecutiveNoSeat = 0;     // ★v64: 连续没有空位的手牌数
 function _gtShowAwayBar(tableId){
   _gtRemoveAwayBar();
   var bar=document.createElement('div');
@@ -4282,6 +4356,8 @@ function gtLaunchGuandan(row){
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
       // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
+      // ★v64: 一局打完处理等待队列——掼蛋固定阵型, 只在局间安排落座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
@@ -4289,13 +4365,36 @@ function gtLaunchGuandan(row){
 }
 // ── 掼蛋联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 出牌发回 host 权威校验。──
 //   掼蛋手牌动态: 自己张数一变(发牌/我出牌/进贡) 就重拉; 因写库与广播存在竞态, 拉到的张数对不上时短延时自愈重拉。
+// ★v64: 斗地主/掼蛋无座时的旁观等待 —— 挂通道听 seat_open, 有空位自动抢座
+//   与德州 gtSpectatePoker 不同: DDZ/Guandan 固定阵型, 只在局间(onResult)才安排落座,
+//   onSync 期间不触发(防中途换人破坏牌局)。
+function _gtEnterWaiting(row){
+  try{
+    _gtCleanupPlay();
+    _setPokerState('spectator', row.id);
+    _gtActiveTable={id:row.id,host:false,spectating:true};
+    var chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+    chan.on('broadcast',{event:'seat_open'}, function(p){
+      if(p && p.payload && p.payload.tableId===row.id){
+        try{ _gtGrabSeat(row); }catch(e){ _ehCatch('gtWaitingGrab', e); }
+      }
+    });
+    chan.on('broadcast',{event:'dissolve'}, function(){
+      try{ _gtCleanupPlay(); toast('牌桌已解散'); }catch(_){}
+      try{ _gtHideTableCard(row.id); }catch(_){}
+    });
+    gtBindConnStatus(chan, { onReconnected:function(){ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){} } });
+    try{ toast('旁观中 · 等这局打完后自动入座', 2500); }catch(_){}
+  }catch(e){ _ehCatch('gtEnterWaiting', e); }
+}
+
 async function gtEnterGuandan(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=gtEnterGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!ehDailyPlayGate('guandan')) return;
   // 多人进同一桌: 统一先入座(与德州/斗地主同一条路径)
   row = await gtEnsureSeated(row);
   let A=gtSeatArrays(row);
-  if(A.mySeat<0){ toast('暂时没座，等有人离座再进'); return; }
+  if(A.mySeat<0){ _gtEnterWaiting(row); return; }   // ★v64: 无座进旁观等待, 等局间空位自动入座
   const inLobby = row.status==='lobby';
   _gtCleanupPlay();
   let lastMyCount=-1;
@@ -4383,6 +4482,8 @@ function gtLaunchDdz(row){
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
       // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
+      // ★v64: 一局打完处理等待队列——斗地主固定阵型, 只在局间安排落座
+      try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
     onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
   });
@@ -4396,7 +4497,7 @@ async function gtEnterDdz(row){
   // 多人进同一桌: 统一先入座, 不再「你不在这桌」把人拒之门外
   row = await gtEnsureSeated(row);
   let A=gtSeatArrays(row);
-  if(A.mySeat<0){ toast('暂时没座，等有人离座再进'); return; }
+  if(A.mySeat<0){ _gtEnterWaiting(row); return; }   // ★v64: 无座进旁观等待, 等局间空位自动入座
   const inLobby = row.status==='lobby';
   _gtCleanupPlay();
   let lastMyCount=-1;
