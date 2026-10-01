@@ -897,7 +897,7 @@ function runAILoop(state: GameState, handNum: number, seatsData: any[]): void {
 // ═══════════════════════════════════════════════════════════════
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://cddkniwbhvcbfgkgomtl.supabase.co';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY') || '';
 
 async function verifyUser(req: Request): Promise<{ uid: string | null; error?: string }> {
   const authHeader = req.headers.get('authorization') || '';

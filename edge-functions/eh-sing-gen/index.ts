@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
     if (!lyric) return json({ ok: false, error: 'missing_lyric' }, 400)
 
     const sbUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('SB_URL') || ''
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_KEY') || ''
+    const serviceKey = Deno.env.get('SB_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_KEY') || ''
     if (!sbUrl || !serviceKey) return json({ ok: false, error: 'server_config' }, 500)
 
     const mmKey = Deno.env.get('MINIMAX_API_KEY') || Deno.env.get('MIFY_KEY') || ''
