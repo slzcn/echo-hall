@@ -11065,14 +11065,14 @@ window.EH_SOFT_REFRESH = async function(){
 };
 
 // ============================================================
-// v49 趣味性三连: 本局剧情 / 江湖恩怨 / 传说时刻
+// v50 修复德州跟注后下一局默认选中过牌的 UI 状态残留 bug
 // 全部异步、失败静默、有 fallback，不阻塞游戏主流程
 // ============================================================
 (function(){
 'use strict';
 
 // ── CSS 注入 ──
-var CSS_ID='eh-fun-v49';
+var CSS_ID='eh-fun-v50';
 if(document.getElementById(CSS_ID)) return;
 var _css=document.createElement('style'); _css.id=CSS_ID;
 _css.textContent=`
