@@ -759,19 +759,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     }
     // ★T92 三次不响应后的兜底: 没有真人(全 AI/托管/空位)→ 自动解散, 所有人回聊天室
     function checkNoHumansThenDissolve(){
-      try{
-        if (isGuest) return;   // guest 不裁决
-        let humans = 0;
-        for (let i=0; i<st.players.length; i++){
-          const p = st.players[i]; if (!p || p.kind==='empty') continue;
-          if (isRemote(i)) humans++;
-          else if (i===mySeat && !trustee) humans++;
-        }
-        if (humans > 0) return;
-        try{ emitBeat({ type:'dissolve', big:true, text:'🎲 牌局无人响应 · 自动解散, 回到聊天室' }); }catch(_){}
-        if (opts.onDissolve){ try{ opts.onDissolve(); }catch(e){ try{ _ehCatch('gd.onDissolve', e); }catch(__){} } }
-        else close();
-      }catch(e){ try{ _ehCatch('gd.checkNoHumans', e); }catch(__){} }
+      // v74: 禁用「连续超时后无真人→自动散桌」(超时/状态触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
+      return;
     }
     function trusteeStep(){
       if (spectating || !trustee || isGuest) return;

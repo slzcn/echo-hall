@@ -755,24 +755,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // ★T91.3 三次不响应转旁观后的兜底: 座位上没有真人(全是 AI/空位/旁观)→ 自动解散房间, 所有人回聊天室
     //   还有真人 → 牌局继续(旁观者可点空位, 下一局继续玩)。
     function checkNoHumansThenDissolve(){
-      try{
-        // 统计在座真人: 有 uid、非 AI、非空位、非旁观(mySeat=-1 时我不占席)
-        let humans = 0;
-        for (let i=0; i<n; i++){
-          if (vacated[i]) continue;
-          const p = st.players[i];
-          if (!p || p.kind==='empty') continue;
-          if (isAI[i]) continue;
-          if (i===mySeat && spectating) continue;
-          // 别席: 是远程真人(remoteSeats 含) 或 非 AI 非 vacated 的真人
-          if (isRemote(i) || (!isAI[i] && p.kind!=='empty')) humans++;
-        }
-        if (humans > 0) return;   // 还有真人 → 继续打
-        // 没真人了 → 自动解散
-        try{ emitBeat({ type:'dissolve', actor:'', text:'🎲 牌局无人响应 · 自动解散, 回到聊天室', big:true }); }catch(_){}
-        if (opts.onDissolve){ try{ opts.onDissolve(); }catch(e){ _ehCatch('poker.onDissolve', e); } }
-        else close();
-      }catch(e){ _ehCatch('checkNoHumansThenDissolve', e); }
+      // v74: 禁用「连续超时/起身后无真人→自动散桌」(超时/状态触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
+      return;
     }
 // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   德州: idleOut 把我这席置 isAI + 配灵魂人格代打; 接管须逆向(收回 isAI/人格)、归零连超时账、
@@ -2810,12 +2794,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // ★无真人在玩就自动散桌(主人诉求): 我连续挂机被判离座旁观(spectating)后, 若桌上再无其他远程真人席,
       //   这桌只剩灵魂自娱自乐, 继续连打无意义(还空耗心跳/资源)。到"下一局"这一刻结束整局并解散。
       //   host solo: close→onExit→gtClose 置 closed 散桌; 有其他真人(remoteSeats 非空)照常连打, 不误伤。
-      if (spectating && remoteSeats.length===0){
-        try{ toast('你已离座 · 无真人在玩 · 牌桌自动解散', 3000); }catch(_){}
-        try{ emitBeat({ type:'over', big:true, text:'🪑 无人在玩 · 牌桌自动解散' }); }catch(_){}
-        close();
-        return;
-      }
+      // v74: 禁用「旁观态且无远程真人→自动散桌」(状态自动触发); 散桌只走主动退出/host主动散桌
       // 写回筹码 → (应用中途加入/离座名册变化) → 开新一手
       //   只同步"本手在座(非 sitOut)"席的结果: 空缺席/刚受邀补位席未参与本手, 其筹码以 stacks 为准(0=空 / START=新补位), 不被 st.players 的 0 覆盖。
       st.players.forEach(p=> { if (!p.sitOut) stacks[p.seat]=p.stack; });

@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v73';
+window.__EH_APP_VER = '20261001-v74';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1291,88 +1291,19 @@ function gtMarkHumanAct(){ _gtLastHumanAct=Date.now(); }
 //   是则主动调 gtClose 并 toast 提示。gtMarkHumanAct(真人入座/出牌)会刷新 _gtLastHumanAct, 故真在玩的桌不会被误杀;
 //   纯 AI/灵魂空转或全员挂机的桌 → 2min 后由客户端先行解散, 兜底仍由 eh_gt_reap(5min) 保证。
 function _gtStartIdleClose(tableId){
-  _gtStopIdleClose();
-  _gtIdleCloseT=setInterval(function(){
-    if(!_gtActiveTable){ _gtStopIdleClose(); return; }
-    if(Date.now()-_gtLastHumanAct > GT_IDLE_CLOSE_MS){
-      _gtStopIdleClose();
-      try{ toast('2分钟无人操作，牌桌已自动解散'); }catch(_){}
-      try{ gtClose(tableId||_gtActiveTable.id); }catch(e){ _ehCatch('gtIdleClose',e); }
-    }
-  },15000);
+  // v74: 禁用「2min 无人操作自动散桌」(定时器+空闲检测), 防误触发踢人; 散桌只走主动退出/host主动散桌
+  return;
 }
 function _gtStopIdleClose(){ if(_gtIdleCloseT){ clearInterval(_gtIdleCloseT); _gtIdleCloseT=null; } }
 // 桌上无【在座】真人 → 自动释放(解散), 不留空转房间; away 不算在玩
 function gtCheckNoHumansThenClose(row){
-  const r = (row && _gtTables.get(row.id)) || row;
-  if(!r || r.status==='closed') return;
-  const humans=(r.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
-  if(humans>0) return;
-  // ★v61: 如果有 guest 正在进桌(pokerSession 存在且是 guest 状态), 不触发散桌
-  if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
-  setTimeout(async ()=>{
-    // ★v62 Bug1: 二次检查直接查 DB, 不依赖 _gtTables 缓存——网络慢时缓存可能未更新, 导致误散桌
-    if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
-    let fr=null;
-    try{
-      const { data, error } = await sb.from('eh_game_tables').select('seats,status').eq('id', r.id).maybeSingle();
-      if(!error && data) fr=data;
-    }catch(_){}
-    // DB 查询失败时回退到缓存(宁可漏散不要误散)
-    if(!fr) fr=_gtTables.get(r.id);
-    if(!fr || fr.status==='closed') return;
-    const still=(fr.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
-    // ★v66 Bug2: 除了检查非away的真人, 还要检查是否有任何真人(含away)——新玩家可能临时被标away
-    const anyHuman=(fr.seats||[]).filter(s=>s && s.kind==='human').length;
-    if(still===0 && anyHuman>0) return;  // 有真人(含away)就不散桌
-    if(still===0){
-      // ★v61: 再次检查 pokerSession, 5s 内有人进桌就不散
-      if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
-      // ★v34: 广播 dissolve 让所有在线客户端立刻回聊天室
-      try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
-      try{ toast('桌上没有真人了，牌桌自动解散'); }catch(_){}
-      try{ _gtCleanupPlay(); }catch(_){}
-      try{ _gtHideTableCard(r.id); }catch(_){}
-      try{ gtClose(r.id); }catch(_){}
-    }
-  }, 5000);  // ★v61: 从 1500ms 改为 5000ms，给 DB realtime 足够时间同步新玩家
+  // v74: 禁用「桌上无真人→DB 查询后自动散桌」(DB 查询结果触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
+  return;
 }
 // ★v55: 死房间检测(收紧) —— 全员 away 且 host 不在/away 且心跳超 60s 且无进行中手牌 → 散桌
 function _gtCheckDeadRoom(row){
-  if(!row || !row.id || row.status==='closed') return false;
-  const r = _gtTables.get(row.id) || row;
-  if(!r || r.status==='closed') return false;
-  const seats = r.seats||[];
-  const hostUid = r.host_uid;
-  const lastBeat = _gtLastHostAt;
-  const humans = seats.filter(s=>s&&s.kind==='human');
-  if(!humans.length) return false;                 // 没真人 → 走 gtCheckNoHumansThenClose
-  // ★v55 收紧条件1: 所有真人座位都是 away(没有任何非 away 的真人)
-  if(!humans.every(s=>s.away)) return false;
-  // ★v55 收紧条件2: host_uid 对应的玩家在 seats 里不存在, 或明确标记了 away
-  const hostSeat = seats.find(s=>s&&s.kind==='human'&&s.uid===hostUid);
-  if(hostUid && hostSeat && !hostSeat.away) return false;
-  // ★v55 收紧条件3: 距离上次心跳超过 60s(从 30s 放宽, 避免正常桌被误判)
-  if(lastBeat > 0 && (Date.now() - lastBeat) < 60000) return false;
-  // ★v55 收紧条件4: 当前没有正在进行的手牌(gameState !== 'playing' 或底池为 0)
-  let gameState='idle', pot=0;
-  try{
-    if(_ehGame && _gtActiveTable && _gtActiveTable.id===r.id && _ehGame.state){
-      const st=_ehGame.state();
-      if(st){
-        if(st.phase && st.phase!=='over' && st.phase!=='lobby') gameState='playing';
-        if(typeof st.pot==='number') pot=st.pot;
-      }
-    }
-  }catch(_){}
-  if(gameState==='playing' && pot>0) return false;   // 有进行中且底池>0的手牌 → 绝不散
-  console.warn('[GT] dead room check triggered', { seats, hostUid, lastBeat });
-  try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
-  try{ toast('房间已解散（全员离开过久）'); }catch(_){}
-  try{ _gtCleanupPlay(); }catch(_){}
-  try{ _gtHideTableCard(r.id); }catch(_){}
-  try{ gtClose(r.id); }catch(_){}
-  return true;
+  // v74: 禁用「全员 away + 心跳超 60s → 自动散桌」(心跳超时触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
+  return false;
 }
 // ★v54: 隐藏聊天室里的牌桌卡片（散桌时调用）
 function _gtHideTableCard(tableId){
@@ -1381,25 +1312,8 @@ function _gtHideTableCard(tableId){
 function gtBindHumanActCapture(){
 
 function gtCheckStuckTables(roomId){
-  try{
-    const now=Date.now();
-    _gtTables.forEach((row, id)=>{
-      if(!row || row.status!=='playing'){ _gtStuckSig.delete(id); return; }
-      // 桌上要有真人(无真人另有 gtCheckNoHumansThenClose 处理)
-      const humans=(row.seats||[]).filter(s=>s && s.kind==='human').length;
-      if(humans===0){ _gtStuckSig.delete(id); return; }
-      // 签名: updated_at + 局态关键位(toAct/phase/pot/board 长度)。任一变=有进展, 重新计时。
-      let st=row.state; if(typeof st==='string'){ try{ st=JSON.parse(st); }catch(_){ st=null; } }
-      const sig=[row.updated_at||'', st&&st.toAct, st&&st.phase, st&&st.pot, st&&(st.board&&st.board.length)].join('|');
-      const prev=_gtStuckSig.get(id);
-      if(!prev || prev.sig!==sig){ _gtStuckSig.set(id, { sig, since: now }); return; }
-      if(now - prev.since >= GT_STUCK_MS){
-        _gtStuckSig.delete(id);
-        try{ toast('牌局长时间无进展，已自动解散'); }catch(_){}
-        try{ gtClose(id); }catch(e){ _ehCatch('gtStuckClose', e); }
-      }
-    });
-  }catch(e){ _ehCatch('gtCheckStuckTables', e); }
+  // v74: 禁用「牌局长时间无进展→自动散桌」(定时器+状态检测触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
+  return;
 }  if(_gtHumanActBound) return; _gtHumanActBound=true;
   // 捕获阶段监听: 点到任一游戏动作区(德州.pk-acts / 掼蛋.gd-acts / 斗地主.ddz-acts 内的出牌/跟注/加注等)
   //   即判"真人在动"。三种游戏统一走同一心跳门, 故三种动作区都要认, 否则单机对 AI 的掼蛋/斗地主会被误当空转回收。
@@ -2786,7 +2700,8 @@ async function setupGameTables(room){
   _gtTables.clear();
   // 「5分钟没人玩自动解散」: 进房先回收一次本房陈旧桌, 再每 2min 扫一次。
   //   reap 只关 5min 无活动的僵尸桌(幂等安全), 关掉即经 realtime 把牌桌卡翻成"已散桌"。
-  const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) return sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){ _ehCatch('gtReap',_); } };
+  // v74: 禁用 eh_gt_reap(后端 5min 无更新自动散桌, 由客户端定时器触发) 的客户端调用, 防误触发踢人
+  const reap=()=>{ };
   // ★首刷必须 await: reap 若 fire-and-forget, 下面的初始快照查询会赶在 reap 的 UPDATE 提交前跑,
   //   把本该散掉的陈旧僵尸桌(焊满分身的死德州)当活桌渲染出来 —— 正是"进房还看到焊死德州桌"的真凶。
   //   先 await 掉这一次回收, 陈旧桌已翻 closed, 初始快照(status in lobby/playing)自然不含它。
