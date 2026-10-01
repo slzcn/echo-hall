@@ -438,7 +438,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
   min-height:38px;display:flex;align-items:center;justify-content:center}
 .pk-preb{font-size:13px;padding:10px 0}
 .pk-preb:not(.queued){background:var(--panel);color:var(--ink);border-color:var(--line2);box-shadow:none}
-.pk-preb.queued.fold{background:rgba(255,255,255,.06);color:var(--ink);border-color:var(--line2);box-shadow:inset 0 0 0 1.5px var(--sub)}
+.pk-preb.queued.fold{background:color-mix(in srgb, var(--magenta) 18%, transparent);color:var(--ink);border-color:var(--magenta);box-shadow:0 0 12px color-mix(in srgb, var(--magenta) 35%, transparent),inset 0 0 0 1.5px color-mix(in srgb, var(--magenta) 60%, transparent)}
 .pk-preb.queued:not(.fold):not(.call){background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)}
 .pk-preb.queued.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 /* 结算 */
