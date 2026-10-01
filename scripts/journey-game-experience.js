@@ -56,9 +56,11 @@ async function pokerTrip(browser){
   assert(r.seat===2,'德州 guest 暴露真实非 0 座位 mySeat=2');
   assert(r.conn==='online','德州初始连接状态 online');
   await page.evaluate(()=>__g.setConn('reconnecting'));
-  r=await page.evaluate(()=>({msg:document.querySelector('#pkMsg').textContent,disabled:!!document.querySelector('#pkActs button:disabled')}));
+  // T88 后: 不可行动态(含重连)底部=纯状态区, 不摆假按钮 —— "锁住"表现为【无可点按钮】(而非禁用按钮)
+  r=await page.evaluate(()=>({msg:document.querySelector('#pkMsg').textContent,
+    noActive:document.querySelectorAll('#pkActs button:not(:disabled)').length===0}));
   assert(/重连中/.test(r.msg),'德州牌桌可见“重连中”');
-  assert(r.disabled,'德州重连中锁住操作区');
+  assert(r.noActive,'德州重连中锁住操作区(无可点按钮)');
   await page.evaluate(()=>{__g.minimize();__g.setConn('host_offline');}); await page.waitForTimeout(280);
   r=await page.evaluate(()=>({chip:document.querySelector('.pk-chip .ck-t').textContent,msg:document.querySelector('#pkMsg').textContent}));
   assert(/对手掉线|等待玩家入座|房主离线/.test(r.chip)&&/对手掉线|等待玩家入座|房主离线/.test(r.msg),'德州引擎持有者离线同步到牌桌和折叠片');

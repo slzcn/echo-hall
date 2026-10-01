@@ -195,11 +195,10 @@ assert(/launchDoudizhu[\s\S]{0,2000}EHTable\.encode\(row\.id,'ddz'\)/.test(src) 
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
-assert(/async function postDdzResult\([\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
-// 编码 → 解码闭环: 生产用的 text 编码字段序与 buildGameEl 的 ddz 分支解码字段序一致
-assert(/\['game','ddz',\s*win,\s*role,\s*res\.delta\[0\],\s*res\.base,\s*res\.finalMultiplier,\s*res\.bombs\|\|0,\s*res\.spring\?1:0,\s*res\.landlordWon\?1:0,\s*lordName\]/.test(src),
-  'postDdzResult 编码字段序固定(win|role|delta|base|mult|bombs|spring|lordWon|lordName)');
-assert(/if\(ev==='ddz'\)/.test(src), 'buildGameEl 有 ddz 分支(把战绩卡渲染回来)');
+assert(/async function postDdzResult\([\s\S]{0,2200}pushGameHighlight\(/.test(src), 'T82: 名场面改推 highlights 动态带(pushGameHighlight), 不再插独立战绩卡');
+// T82: 名场面动态带文案含 春天/炸弹/倍数 标签, 地主/农民 + 赢/输
+assert(/pushGameHighlight\(\{[\s\S]{0,200}kind:'ddz'/.test(src), 'postDdzResult 推 ddz 动态(含 kind:ddz 标识)');
+assert(/if\(ev==='ddz'\)/.test(src), 'buildGameEl 保留 ddz 分支(渲染历史战绩卡消息)');
 assert(/data-ddz-again/.test(src), '战绩卡含"再来一局"入口(data-ddz-again)');
 assert(/again\.onclick=[\s\S]{0,160}ehRelaunchGame\('doudizhu'\)/.test(src), '"再来一局"走 ehRelaunchGame(先散旧桌再开新, 不再被"先收工"拦下)');
 // 预览/通知不能露原始编码

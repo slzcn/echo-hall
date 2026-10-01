@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v55';
+window.__EH_APP_VER = '20261001-v56';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1004,6 +1004,39 @@ window.EhThemeMenu = (function(){
   function toggle(anchor){ if(panel && curAnchor===anchor){ close(); } else { open(anchor); } }
   return { open, close, toggle };
 })();
+// 牌桌顶栏 🎵 背景音乐: 与聊天室 bgm 按钮同源(复用 buildBgmMenu 的选曲/自动/关闭全套),
+//   打牌途中的浮层盖住了聊天页的 #bgmBtnHall, 这里用一个浮动菜单把同一套选曲能力挂到牌桌按钮下。
+window.EhBgmMenu = (function(){
+  let panel=null, onDoc=null, curAnchor=null;
+  function close(){
+    if(!panel) return;
+    try{ document.removeEventListener('pointerdown', onDoc, true); }catch(_){}
+    try{ panel.remove(); }catch(_){}
+    panel=null; onDoc=null; curAnchor=null;
+  }
+  function open(anchor){
+    close();
+    try{ AudioEngine.resume(); }catch(_){}
+    // 复用聊天室菜单容器类(.skin-menu.bgm-menu)+ buildBgmMenu 渲染 + 绑定, 定位单独写(浮动锚定按钮下方)
+    panel=document.createElement('div');
+    panel.className='skin-menu bgm-menu eh-bgm-float on';
+    panel._bgmPickCache=null;
+    document.body.appendChild(panel);
+    try{ buildBgmMenu(panel); }catch(e){ _ehCatch('ehBgmFloat', e); }
+    try{ refreshBgmSoulLib(panel); }catch(_){}
+    const ar=anchor.getBoundingClientRect(), pr=panel.getBoundingClientRect();
+    let left=Math.min(ar.right-pr.width, window.innerWidth-pr.width-8);
+    left=Math.max(8,left);
+    let top=ar.bottom+8;
+    if(top+pr.height>window.innerHeight-8) top=Math.max(8, ar.top-pr.height-8);
+    panel.style.cssText='position:fixed;left:'+left+'px;top:'+top+'px;z-index:80';
+    curAnchor=anchor;
+    onDoc=function(e){ if(panel && !panel.contains(e.target) && !(anchor&&anchor.contains(e.target))) close(); };
+    setTimeout(function(){ try{ document.addEventListener('pointerdown', onDoc, true); }catch(_){} },0);
+  }
+  function toggle(anchor, repaint){ if(panel && curAnchor===anchor){ close(); } else { open(anchor); } if(repaint){ try{ repaint(); }catch(_){} } }
+  return { open, close, toggle };
+})();
 function goScene(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $('#'+id).classList.add('on'); document.body.classList.toggle('hall-on', id==='hall');
   // ★lobby-on: 大厅改"整文档滚动"(而非内层容器滚), 让移动浏览器下滑时自动收起顶/底地址栏→真沉浸无黑边。
   //   入口/聊天页仍是固定视口(hall 有固定输入框, 不能整页滚)。切走大厅时把文档滚动位置归零, 防残留。
@@ -1278,6 +1311,33 @@ function _gtCheckDeadRoom(row){
 // ★v54: 隐藏聊天室里的牌桌卡片（散桌时调用）
 function _gtHideTableCard(tableId){
   try{ const card=document.querySelector('[data-gt-id="'+tableId+'"]'); if(card){ card.style.display='none'; } }catch(_){}
+}
+// ★T83 托底自动解散: 客户端在房时检测"卡住的 playing 桌"——
+//   state 快照签名(updated_at + toAct/phase/pot)连续 STUCK_MS 不变 = 没人推进(卡死/全员挂机),
+//   且桌上有真人(无真人走 gtCheckNoHumansThenClose) → 调 gtClose 散掉(放宽后在座真人可散)。
+//   不依赖开桌人在场, 只要"房里有人"跑 reap tick 即可兜底; 比 eh_gt_reap(5min)更快。
+const _gtStuckSig = new Map();   // tableId → { sig, since }
+const GT_STUCK_MS = 100000;      // 100s 无任何局态变化即判卡住(正常对局/心跳会持续改 updated_at)
+function gtCheckStuckTables(roomId){
+  try{
+    const now=Date.now();
+    _gtTables.forEach((row, id)=>{
+      if(!row || row.status!=='playing'){ _gtStuckSig.delete(id); return; }
+      // 桌上要有真人(无真人另有 gtCheckNoHumansThenClose 处理)
+      const humans=(row.seats||[]).filter(s=>s && s.kind==='human').length;
+      if(humans===0){ _gtStuckSig.delete(id); return; }
+      // 签名: updated_at + 局态关键位(toAct/phase/pot/board 长度)。任一变=有进展, 重新计时。
+      let st=row.state; if(typeof st==='string'){ try{ st=JSON.parse(st); }catch(_){ st=null; } }
+      const sig=[row.updated_at||'', st&&st.toAct, st&&st.phase, st&&st.pot, st&&(st.board&&st.board.length)].join('|');
+      const prev=_gtStuckSig.get(id);
+      if(!prev || prev.sig!==sig){ _gtStuckSig.set(id, { sig, since: now }); return; }
+      if(now - prev.since >= GT_STUCK_MS){
+        _gtStuckSig.delete(id);
+        try{ toast('牌局长时间无进展，已自动解散'); }catch(_){}
+        try{ gtClose(id); }catch(e){ _ehCatch('gtStuckClose', e); }
+      }
+    });
+  }catch(e){ _ehCatch('gtCheckStuckTables', e); }
 }
 function gtBindHumanActCapture(){
   if(_gtHumanActBound) return; _gtHumanActBound=true;
@@ -2665,7 +2725,9 @@ async function setupGameTables(room){
   _gtTables.clear();
   // 「5分钟没人玩自动解散」: 进房先回收一次本房陈旧桌, 再每 2min 扫一次。
   //   reap 只关 5min 无活动的僵尸桌(幂等安全), 关掉即经 realtime 把牌桌卡翻成"已散桌"。
-  const reap=()=>{ try{ if(curRoom && curRoom.id===room.id) return sb.rpc('eh_gt_reap',{p_room:room.id}); }catch(_){ _ehCatch('gtReap',_); } };
+  const reap=()=>{
+    try{ if(curRoom && curRoom.id===room.id){ gtCheckStuckTables(room.id); return sb.rpc('eh_gt_reap',{p_room:room.id}); } }catch(_){ _ehCatch('gtReap',_); }
+  };
   // ★首刷必须 await: reap 若 fire-and-forget, 下面的初始快照查询会赶在 reap 的 UPDATE 提交前跑,
   //   把本该散掉的陈旧僵尸桌(焊满分身的死德州)当活桌渲染出来 —— 正是"进房还看到焊死德州桌"的真凶。
   //   先 await 掉这一次回收, 陈旧桌已翻 closed, 初始快照(status in lobby/playing)自然不含它。
@@ -2803,10 +2865,30 @@ function gtRenderInto(el,row){
   catch(e){ console.warn('[gt] renderLobby 抛错', e); }
   // ★换账号后 host_uid!=myUid -> EHTable 判 isHost=false 不再画解散按钮; lobby 未开局、解散无损失, 卡底补一颗"解散"(不依赖 isHost)。
   gtAppendDismiss(el, row);
+  // T82 动态带: ddz/掼蛋卡走 EHTable 渲染(外部模块), 这里非侵入地在卡底补一条 highlights 动态区(有名场面才显)
+  try{
+    const old=el.querySelector('.gt-highlights'); if(old) old.remove();
+    const hh=gtHighlightsHtml(row.highlights);
+    if(hh){ const d=document.createElement('div'); d.innerHTML=hh; const node=d.firstElementChild; if(node) el.appendChild(node); }
+  }catch(_){}
 }
 // 德州轻量入口卡: 只展示标题/开桌人/状态/席位数, 整卡可点 → gtGotoExistingTable(引擎持有者进牌桌页摆阵·客人自动入座进桌)。
 // journey-exempt: 聊天牌桌卡是 app.js 消息流渲染, 无可启动的浏览器旅程 harness(现有 journey 只 boot js/games/*);
 //   真交互(邀请/开始/入座)全在全屏牌桌页 → 已由 poker journey + 本次 _probe-poker-entry 真渲染截图覆盖。
+// T82 动态带: 把牌桌行 highlights(名场面)渲染成卡底一条滚动动态区。空则返回空串(卡不长高)。
+//   内容来自 eh_gt_push_highlight, 随 realtime 广播, 全房一致; 这是"卡片↔动态"的关联呈现, 不占聊天流。
+function gtHighlightsHtml(highlights){
+  let arr=highlights;
+  if(typeof arr==='string'){ try{ arr=JSON.parse(arr); }catch(_){ arr=null; } }
+  if(!Array.isArray(arr)||!arr.length) return '';
+  // 最近的在上, 最多显 3 条(带的高度有限, 全量留在数据里)
+  const rows=arr.slice(-3).reverse().map(h=>{
+    const em=safeEmoji2(h&&h.emoji)||'✨';
+    const tx=esc(String((h&&h.text)||'').slice(0,40));
+    return '<div class="gt-hl-row"><span class="gt-hl-em">'+em+'</span><span class="gt-hl-tx">'+tx+'</span></div>';
+  }).join('');
+  return '<div class="gt-highlights">'+rows+'</div>';
+}
 function gtRenderPokerEntry(el,row){
   // ★v54: 房间已关闭 → 隐藏卡片不显示
   if(row && row.status==='closed'){ try{ el.style.display='none'; }catch(_){} return; }
@@ -2831,7 +2913,8 @@ function gtRenderPokerEntry(el,row){
     +'<div class="gt-head"><span class="ge">🎰</span><span class="gk">德州牌桌</span>'
     +'<span class="gh">'+esc(hostName)+' 开桌 <span class="gt-badge '+badgeCls+'">'+badgeTxt+'</span></span></div>'
     +'<div class="gt-foot"><span class="gt-tip">'+esc(tip)+'</span>'
-    +'<span class="gt-tip" style="flex:0 0 auto;opacity:.75">'+humans+' 真人 / '+empties+' 空位</span></div>';
+    +'<span class="gt-tip" style="flex:0 0 auto;opacity:.75">'+humans+' 真人 / '+empties+' 空位</span></div>'
+    +gtHighlightsHtml(row.highlights);
   // 整卡可点(所有人): 引擎持有者→牌桌页招募态; 客人→自动坐空位/顶替 AI 进桌。onclick 就地绑, 不依赖 realtime 才可点。
   if(!closed){
     el.classList.add('gt-card-openable');
@@ -2895,6 +2978,8 @@ async function gtEnsureRow(id){
 }
 function gtErr(e){ const m=(e&&e.message)||'';
   if(/seat taken/.test(m)) return '这个座位被占了';
+  if(/soul busy/.test(m)) return '这个灵魂正在别桌打牌，换一个吧';
+  if(/nlhe keep seats open/.test(m)) return '德州要给真人留位，不能再补灵魂了';
   if(/host only/.test(m)) return '只有主持牌局的玩家能操作';
   if(/not joinable/.test(m)) return '这局暂时入不了座，下一手或点空位再试';
   if(/already started/.test(m)) return '已经开始啦';
@@ -3506,7 +3591,19 @@ async function ehRecordBust(game){
   }catch(_){ _ehCatch('ehRecordBust', _); }
 }
 // journey-exempt: 全员真实筹码账本(灵魂/远程真人/我) — journey-chip-authenticity.js
-// 牌桌每席买入: 我=本人账本; 有 uid 的灵魂/分身/远程真人=按 uid 累计; 无 id 的匿名机器人=GRANT。
+// ★T84 服务端权威筹码缓存: 开桌/摆阵前 pkPrefetchChips 批量拉一次(eh_chips_get_many), 填进 _pkChipCache。
+//   pkSeatStackFor 是同步(open 时调), 故靠预取缓存给灵魂/远程真人真实持久筹码 —— 不再每次从 GRANT 重来、跨设备一致。
+const _pkChipCache = new Map();   // uid → chips(服务端权威, 本会话缓存)
+async function pkPrefetchChips(ids, game){
+  try{
+    const uids = Array.from(new Set((ids||[]).filter(x=>x && typeof x==='string')));
+    if(!uids.length || !sb) return;
+    const { data, error } = await sb.rpc('eh_chips_get_many', { p_uids: uids, p_game: game||'nlhe' });
+    if(error) throw error;
+    if(data && typeof data==='object'){ Object.keys(data).forEach(u=>{ const v=Number(data[u]); if(Number.isFinite(v)) _pkChipCache.set(u, v); }); }
+  }catch(e){ _ehCatch('pkPrefetchChips', e); }
+}
+// 牌桌每席买入: 我=本人账本; 有 uid 的灵魂/分身/远程真人=服务端权威筹码(缓存); 无 id 的匿名机器人=GRANT。
 function pkSeatStackFor(seat, ctx){
   const GRANT = PK_WALLET_GRANT;
   try{
@@ -3515,6 +3612,9 @@ function pkSeatStackFor(seat, ctx){
     const isMine = (seat === mySeat) || (id && myUid && id === myUid) || (id && me && id === me.id);
     if (isMine) return bankChips('nlhe', GRANT);
     if (!id) return GRANT;
+    // 服务端权威筹码优先(T84): 预取缓存命中即用, 否则退本地账本(并顺手触发一次异步预取补缓存)
+    if (_pkChipCache.has(id)) return Math.max(0, Math.round(_pkChipCache.get(id)));
+    try{ pkPrefetchChips([id], 'nlhe'); }catch(_){}
     return bankChipsOf('nlhe', id, GRANT);
   }catch(_){ return GRANT; }
 }
@@ -3526,9 +3626,16 @@ function pkSeatStacksWrite(list, ctx){
     (list||[]).forEach(function(v,i){
       const n = Math.max(0, Math.round(Number(v)||0));
       const id = ids[i];
-      if (i === mySeat || (id && myUid && id === myUid) || (id && me && id === me.id)) return; // 我走 onWallet
+      if (i === mySeat || (id && myUid && id === myUid) || (id && me && id === me.id)){
+        // 我这席: 本地 onWallet 已存; 另写一份服务端权威(T84 换设备一致)
+        if(myUid){ _pkChipCache.set(myUid, n); try{ sb.rpc('eh_chips_set', { p_uid:myUid, p_game:'nlhe', p_chips:n }); }catch(_){} }
+        return;
+      }
       if (!id) return;
       bankSetOf('nlhe', id, { chips: n });
+      // T84 服务端权威: 灵魂/远程真人筹码写回 eh_chips, 跨桌跨设备一致; 同步更新本会话缓存
+      _pkChipCache.set(id, n);
+      try{ sb.rpc('eh_chips_set', { p_uid:id, p_game:'nlhe', p_chips:n }); }catch(_){}
     });
   }catch(e){ _ehCatch('pkSeatStacksWrite', e); }
 }
@@ -5955,14 +6062,14 @@ function insertAtName(name){
     inp.value=v;
     inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
     syncSendBtn();
-    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+    try{ if(window.EhSfx) EhSfx.buzz(12); }catch(e){}
     return;
   }
   const sep = (cur && !/\s$/.test(cur)) ? ' ' : '';
   inp.value = cur + sep + '@' + name + ' ';
   inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
   syncSendBtn();
-  try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+  try{ if(window.EhSfx) EhSfx.buzz(20); }catch(e){}
 }
 // 头像交互: 点=直接@ TA; 长按(500ms)=弹「对TA」互动菜单。
 //   两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
@@ -6029,6 +6136,10 @@ function openPeerMenu(anchorEl, name, uid){
   if(!isTargetSoul && window.EhDM){
     items.unshift(`<div class="pm-row" data-act="dm">✉️ <span>私信</span></div>`);
   }
+  // T85 赠送筹码: 从自己 nlhe 筹码扣 1000 转给 TA(真人/灵魂都能收, 按 uid 入账)。放互动项之上, 自己不显。
+  if(uid && uid!==myUid){
+    items.unshift(`<div class="pm-row" data-act="gift">💰 <span>赠送筹码 1000</span></div>`);
+  }
   const menu=document.createElement('div'); menu.className='peer-menu'; menu.id='peerMenu';
   menu.innerHTML=`<div class="pm-hd">对 ${esc(name)}</div>`+items.join('');
   document.body.appendChild(menu);
@@ -6049,11 +6160,43 @@ function openPeerMenu(anchorEl, name, uid){
       window.EhDM.open(uid, name, em, col);
       return;
     }
+    if(row.dataset.act==='gift'){ hidePeerMenu(); giftChips(uid, name); return; }
     const ix=_interactions.find(i=>i.id===row.dataset.ix); if(ix) sendInteraction(ix, uid, name);
     hidePeerMenu();
   });
 }
 function hidePeerMenu(){ const m=$('#peerMenu'); if(m) m.remove(); }
+// T85 赠送筹码: 从自己 nlhe 筹码转 1000 给 TA(服务端 eh_chips_gift 原子转账), 成功后广播一条居中系统行(复用互动消息通道, 不占聊天内容)。
+let _giftInFlight=false;
+async function giftChips(toUid, toName, amount){
+  if(!toUid || !myUid || !curRoom){ toast('先登录再赠送'); return; }
+  if(toUid===myUid){ toast('不能赠送给自己'); return; }
+  if(_giftInFlight){ return; }
+  const amt = amount || 1000;
+  _giftInFlight=true;
+  try{
+    const { data, error } = await sb.rpc('eh_chips_gift', { p_to:toUid, p_game:'nlhe', p_amount:amt });
+    if(error){
+      const m=(error&&error.message)||'';
+      if(/insufficient/.test(m)) toast('你的筹码不够 '+amt+' 个');
+      else if(/cannot gift self/.test(m)) toast('不能赠送给自己');
+      else toast('赠送失败，稍后再试');
+      return;
+    }
+    // 更新本会话缓存(自己+对方), 牌桌买入即时反映
+    try{ if(data){ _pkChipCache.set(myUid, Number(data.from_left)); _pkChipCache.set(toUid, Number(data.to_now)); } }catch(_){}
+    // 同步本地账本(自己), 大厅/牌桌钱包一致
+    try{ if(_EH_SCORE && data) _EH_SCORE.set('nlhe', { chips: Number(data.from_left) }); }catch(_){}
+    try{ EhSfx.play('sparkle'); }catch(_){}
+    toast('已赠送 '+amt+' 筹码给 '+(toName||'TA'));
+    // 广播一条居中系统行(kind=interact 通道): "A 赠送 B 1000 筹码 💰"
+    const txt=(me.name||'你')+' 赠送 '+(toName||'TA')+' '+amt+' 筹码 💰';
+    const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
+      text:'gift|'+toUid+'|'+txt, kind:'interact' };
+    try{ await sb.from('eh_messages').insert(payload); }catch(e){ console.warn('giftChips broadcast', e); }
+  }catch(e){ console.warn('giftChips', e); toast('赠送失败，稍后再试'); }
+  finally{ _giftInFlight=false; }
+}
 document.addEventListener('click',e=>{ if(!e.target.closest('#peerMenu') && !e.target.closest('.pav')&&!e.target.closest('.msg .av')) hidePeerMenu(); });
 // 发一个互动: 本地立即演特效 + 写 kind=interact 消息广播给房里所有人
 async function sendInteraction(ix, targetUid, targetName){
@@ -6163,7 +6306,7 @@ function doGuard(){
   if(v && v.count>0){ v.count--; }   // 免这一下
   clearCounter();
   try{ EhSfx.play('receive'); }catch(_){}
-  try{ if(navigator.vibrate) navigator.vibrate(20); }catch(_){}
+  try{ if(window.EhSfx) EhSfx.buzz(20); }catch(_){}
   // 盾光环在自己头像处一闪(取不到则屏幕中下)
   let x=window.innerWidth/2, y=window.innerHeight*0.5;
   const pav=document.querySelector(`#presence .pav[data-uid="${myUid}"]`);
@@ -6178,7 +6321,7 @@ function doGuard(){
 function koFinale(winnerName, loserUid, loserName){
   try{ ixImpactWord('K.O.', '#FFD84D'); }catch(_){}
   try{ EhSfx.play('boom'); }catch(_){}
-  try{ if(navigator.vibrate) navigator.vibrate([60,40,120]); }catch(_){}
+  try{ if(window.EhSfx) EhSfx.buzz([60,40,120]); }catch(_){}
   try{ scheduleEntryFade(sysMsg(`🏆 <b>${esc(winnerName)}</b> 把 <b>${esc(loserName||'对手')}</b> 打出 <b>K.O.</b>！`)); }catch(_){}
   // 给被 KO 者头像挂 💫 转圈(旁人也看得到), 15s 后自动摘
   try{ markKoStun(loserUid); }catch(_){}
@@ -6359,7 +6502,7 @@ function notifyIfMentioned(m, el){
   if(el){ el.classList.add('mentioned-flash'); ehFx(el,'fx-mention',2000); setTimeout(()=>el.classList.remove('mentioned-flash'),2000); }
   try{ EhSfx.play('mention'); }catch(e){}
   // 轻震动(移动端)
-  try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
+  try{ if(window.EhSfx) EhSfx.buzz(80); }catch(e){}
   // 记入@我队列 → 常驻@按钮, 点击可回看(即使被后续消息刷走)
   if(m.id!=null && !String(m.id).startsWith('local_')) pushMention(m.id);
 }
@@ -7599,6 +7742,15 @@ async function playSong(lyric, sid, el, onEnd){
     }catch(_){}
   }
   if(singMode==='ai' && url){
+    // 逐词对齐跨玩家一致: 生成者本会话已把 words 存进 dataset.lrc; 其他玩家/刷新后从 DB 读的卡没有 →
+    //   按 <songUrl>.lrc.json 懒加载一次 sidecar(edge function 生成时同路径写入)。拉不到就退均匀分布, 不挡播放。
+    if(el && !el.dataset.lrc){
+      try{
+        const lrcUrl=url+'.lrc.json';
+        const r=await fetch(lrcUrl);
+        if(r.ok){ const w=await r.json(); if(Array.isArray(w)&&w.length) el.dataset.lrc=JSON.stringify(w); }
+      }catch(_){ /* sidecar 缺失/网络波动: 退均匀分布 */ }
+    }
     return playSongAI(el, onEnd);
   }
   return playSongLegacy(lyric, sid, el, onEnd);
@@ -8860,19 +9012,33 @@ function shouldPostResult(game, notable){
   _resultCardAt[game] = now;
   return true;
 }
+// journey-exempt: 本批为牌桌体验增量(音效按钮拆分/一局一卡动态带/游戏中聊天条/服务端筹码/赠送/托底解散),
+//   均复用已被现有 journey 覆盖的通道(journey-audio-mixer 音频开关、journey-chat-core 聊天发送、
+//   journey-chip-authenticity 筹码、journey-game-action-pending 操作区、牌桌卡线上真库验证);
+//   新增 SQL(eh_chips/highlights/close放宽/一魂一桌)已 Management API 部署并实测, 神曲已端到端探针验证。
+//   纯增量 UI + 服务端 RPC, 无可在现有 harness(只 boot js/games/*)启动的新整站旅程, 故此处豁免。
+// T82 一局一卡: 名场面(好牌/大赢)不再往聊天流插独立战绩卡, 改推进【当前牌桌行的 highlights 动态带】——
+//   同一张牌桌卡滚动翻动态, 不刷屏、不扰聊天; 走 eh_gt_push_highlight(在座真人可写, 随 realtime 广播到各端)。
+//   只在【有活跃联机桌 + 名场面】时推; 普通手既不进聊天也不进动态带(牌桌内已就地结算)。
+async function pushGameHighlight(entry){
+  try{
+    const tid = _gtActiveTable && _gtActiveTable.id;
+    if(!tid || !entry) return;
+    await gtRpc('eh_gt_push_highlight', { p_table: tid, p_entry: entry });
+  }catch(e){ console.warn('[highlight] push failed', e&&e.message); }
+}
 async function postTexasResult(res, names, meta){
   if(!myUid || !curRoom) return;
   const delta=(meta&&meta.delta)||0;
-  const outcome = delta>0?'win':(delta<0?'lose':'even');
   const potTotal=(res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
   const champSeat=(res.winnersBySeat||[])[0];
   const champName=names[champSeat]||'';
   const hand=(meta&&meta.handName)||'';
-  // 名场面: 输光 / 通吃 / 大底池(≥20 大盲) / 大牌型(同花顺/四条/葫芦)
+  // 名场面: 输光 / 通吃 / 大底池 / 大牌型(同花顺/四条/葫芦) —— 只名场面进动态带, 普通手不进
   const notable = (delta<=-2000) || (delta>=2000) || (potTotal>=2000)
     || /同花顺|四条|葫芦/.test(hand||'');
-  if(!shouldPostResult('nlhe', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('nlhe', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友 v55 逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -8887,13 +9053,10 @@ async function postTexasResult(res, names, meta){
       });
     }catch(_){ _ehCatch('postTexas.evt',_); }
   }
-  const text=['game','nlhe', outcome, delta, hand||'-', potTotal, champName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;
-  }catch(e){ console.warn('[nlhe] post result failed', e); }
+  // T82 一局一卡: 名场面推牌桌行 highlights 动态带, 不再插独立战绩卡消息
+  const who = (meta&&meta.mySeat===champSeat) ? (me.name||'你') : (champName||'赢家');
+  const bits=[who]; if(hand && hand!=='-') bits.push(hand); if(potTotal>0) bits.push('底池'+potTotal);
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'nlhe', emoji:'🔥', text:bits.join(' · ') });
 }
 // 记录德州战绩(seed+log 供复核/回看)。N 席结构; 失败静默。
 async function recordTexasResult(res, log, names, avatars, souls, meta){
@@ -8940,11 +9103,11 @@ async function postDdzResult(res, names){
   const win  = res.winners.includes(0) ? 'win' : 'lose';
   const role = (res.landlord===0) ? 'lord' : 'peasant';
   const lordName = names[res.landlord] || '';
-  // 名场面: 春天/炸弹 ≥2 / 倍数 ≥6 / 输赢大(≥6 分) —— 普通一手不再进聊天流
+  // 名场面: 春天/炸弹 ≥2 / 倍数 ≥6 / 输赢大(≥6 分) —— 只名场面进动态带
   const notable = !!res.spring || (res.bombs||0)>=2 || (res.finalMultiplier||1)>=6
     || Math.abs(res.delta&&res.delta[0]||0)>=6;
-  if(!shouldPostResult('ddz', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('ddz', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -8959,13 +9122,11 @@ async function postDdzResult(res, names){
       });
     }catch(_){ _ehCatch('postDdz.evt',_); }
   }
-  const text = ['game','ddz', win, role, res.delta[0], res.base, res.finalMultiplier, res.bombs||0, res.spring?1:0, res.landlordWon?1:0, lordName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;   // 回填真实 id → realtime 回声按 mid 去重, 不重复
-  }catch(e){ console.warn('[ddz] post result failed', e); }
+  // T82 一局一卡: 名场面推 highlights 动态带, 不再插独立战绩卡
+  const tags=[]; if(res.spring) tags.push('春天'); if((res.bombs||0)>=2) tags.push(res.bombs+'炸');
+  if((res.finalMultiplier||1)>=6) tags.push(res.finalMultiplier+'倍');
+  const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+' '+(role==='lord'?'地主':'农民')+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'ddz', emoji:'🃏', text:txt });
 }
 // ── 历史积分累加: host 上报有真实身份的真人与灵魂；匿名机器人和空位不记账。
 //   灵魂虽由 AI 代打，积分仍属于它自己的 uid，不能按 isAI 排除。
@@ -9080,10 +9241,10 @@ async function postGuandanResult(res, log, names, meta){
   const fromLvl = res.teamLevelsBefore[res.winnerTeam];
   const toLvl   = res.teamLevelsAfter[res.winnerTeam];
   const mateName = names[(mySeat+2)%4] || '';
-  // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 普通一副不再进聊天流
+  // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 只名场面进动态带
   const notable = !!res.matchWon || !!res.doubleDown || (res.bombs||0)>=2 || myRankIdx===0;
-  if(!shouldPostResult('gd', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('gd', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -9098,13 +9259,11 @@ async function postGuandanResult(res, log, names, meta){
       });
     }catch(_){ _ehCatch('postGuandan.evt',_); }
   }
-  const text=['game','gd', win, res.advance, fromLvl, toLvl, res.doubleDown?1:0, res.matchWon?1:0, myRankIdx, res.bombs||0, mateName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;
-  }catch(e){ console.warn('[gd] post result failed', e); }
+  // T82 一局一卡: 名场面推 highlights 动态带, 不再插独立战绩卡
+  const tags=[]; if(res.matchWon) tags.push('通关'); if(res.doubleDown) tags.push('双下');
+  if((res.bombs||0)>=2) tags.push(res.bombs+'炸'); if(myRankIdx===0) tags.push('头游');
+  const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+'队'+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'gd', emoji:'🎴', text:txt });
 }
 // 记录掼蛋战绩(seed+log 供复核/回看)。4 席结构; 失败静默。
 async function recordGuandanResult(res, log, names, avatars, souls){
@@ -9234,7 +9393,7 @@ function attachLongPress(el, m){
 // ★ 截屏/切后台时系统 UI 介入会让页面失焦/隐藏 → 取消待弹长按 + 关掉已开的互动环，防“截屏误触菜单”
 window.addEventListener('blur',()=>{ cancelLongPress(); try{ hideActRing(); }catch(_){} },{passive:true});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ cancelLongPress(); try{ hideActRing(); }catch(_){} } });
-function ehLongPressFx(){ try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_){} try{ EhSfx.play('tick'); }catch(e){ _ehCatch('sfxTick', e); } }  // 长按触发统一触感: 震动(安卓)+轻音效(iOS无震动API的补偿)
+function ehLongPressFx(){ try{ if(window.EhSfx) EhSfx.buzz(15); }catch(_){} try{ EhSfx.play('tick'); }catch(e){ _ehCatch('sfxTick', e); } }  // 长按触发统一触感: 震动(安卓)+轻音效(iOS无震动API的补偿)
 function showActRing(x,y,m){
   const ring=$('#actRing');
   // ★去重: 同一次长按, 我们的 480ms touch 定时器 + 浏览器原生 contextmenu(安卓/桌面长按也会发)会各调一次
@@ -9517,7 +9676,7 @@ function playInteractionFx(fx, targetEl){
   const atImpact = fn => { if(IMP) setTimeout(()=>{ try{fn();}catch(_){} }, IMP); else { try{fn();}catch(_){} } };
   // 音效(命中同步)
   if(fx.sfx) atImpact(()=>EhSfx.play(fx.sfx));
-  if(fx.vibrate && navigator.vibrate && !reduce) atImpact(()=>{ try{ navigator.vibrate(fx.vibrate); }catch(_){} });
+  if(fx.vibrate && navigator.vibrate && !reduce) atImpact(()=>{ try{ if(window.EhSfx) EhSfx.buzz(fx.vibrate); }catch(_){} });
   // 全屏闪色(命中同步)
   if(fx.flash) atImpact(()=>{ const f=$('#ixFlash'); if(f){ f.style.background=`radial-gradient(circle at 50% 45%, ${safeColor(fx.flash)}66, transparent 72%)`; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),450); } });
   // 全屏抖动(命中同步)

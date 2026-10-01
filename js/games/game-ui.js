@@ -154,6 +154,7 @@ html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .ddz-mus{margin-left:auto}
+.ddz-mus + .ddz-mus{margin-left:0}
 .ddz-ico{width:18px;height:18px;display:block}
 .ddz-mus:hover:hover,.ddz-auto:hover{color:var(--ink);border-color:var(--accent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
@@ -901,6 +902,9 @@ html[data-mode="day"] .ddz-felt::before{
     const SVG=(p)=>`<svg class="ddz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
     const ICO_MUS_ON = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/>');
     const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
+    // journey-exempt: 顶栏🎵拆背景音乐+音效两颗按钮, 复用 journey-audio-mixer 覆盖, 纯UI增量
+    const ICO_SFX_ON = SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');
+    const ICO_SFX_OFF = SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
     const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
     const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
     // 托管图标(机器人): 与音乐/旋转/返回同款描边圆钮, 放控制角。开启时钮体转琥珀高亮。
@@ -909,7 +913,8 @@ html[data-mode="day"] .ddz-felt::before{
     room.innerHTML = `
       <div class="ddz-bar">
         <div class="ddz-title"><span class="dot"></span>斗地主</div>
-        <button class="ddz-mus" id="ddzMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="ddz-mus" id="ddzMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
+        <button class="ddz-mus" id="ddzSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
         <button class="ddz-skin eh-skin" id="ddzSkin" aria-label="换肤" title="换肤">🎨</button>
         <button class="ddz-auto" id="ddzAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
         <button class="ddz-x" id="ddzX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
@@ -1166,9 +1171,13 @@ html[data-mode="day"] .ddz-felt::before{
     { const sk=$('#ddzSkin'); if(sk) sk.addEventListener('click',(e)=>{ e.stopPropagation(); try{ if(window.EhThemeMenu) EhThemeMenu.toggle(sk); }catch(_){} }); }
     // ⟳ 横竖屏切换(仍在聊天室内): 竖持手机想要横屏视图时点它, 再点复位
     // 牌桌内声音开关(点开三档静音面板 BGM/音效/语音, 因大厅 🎵 被牌桌浮层盖住)
-    const musBtn = $('#ddzMus');
-    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
-    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    const musBtn = $('#ddzMus'), sfxBtn = $('#ddzSfx');
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const on = P?P.bgm():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = on?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !on); }
+    function paintSfx(){ if(!sfxBtn) return; const P=root.EhAudioPrefs; const any = P?P.sfxAnyOn():true; sfxBtn.innerHTML = any?ICO_SFX_ON:ICO_SFX_OFF; sfxBtn.classList.toggle('muted', !any); }
+    if (musBtn) musBtn.addEventListener('click', ()=>{ if(root.EhBgmMenu) root.EhBgmMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    if (sfxBtn) sfxBtn.addEventListener('click', ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(sfxBtn, paintSfx); sfx('click'); });
+    try{ root.addEventListener('eh:audio-prefs', ()=>{ paintMus(); paintSfx(); }); }catch(_){}
+    paintSfx();
     try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
     paintMus();
 

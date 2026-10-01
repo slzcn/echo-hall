@@ -16,7 +16,9 @@
     //   此前音效恒开(无 UI)、语音绑死在 BGM 开关上 → 三者无法分控。现在各读各的 flag, 默认全开。
     function _lsBool(k){ try{ const v=localStorage.getItem(k); return v===null?true:v==='1'; }catch(e){ return true; } }
     function _lsSet(k,v){ try{ localStorage.setItem(k, v?'1':'0'); }catch(e){} }
-    let ctx=null, master=null, enabled=_lsBool('eh_sfx'), _voiceOn=_lsBool('eh_voice'), lastClickAt=0;
+    let ctx=null, master=null, enabled=_lsBool('eh_sfx'), _voiceOn=_lsBool('eh_voice'), _hapticOn=_lsBool('eh_haptic'), lastClickAt=0;
+    // 统一震动出口: 所有 navigator.vibrate 走这里, 受持久开关 eh_haptic 管控(音效面板"震动"档)。
+    function buzz(pattern){ try{ if(_hapticOn && navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
     const VOL=.38;
     // 人声进行中: 音效压到很低, 且跳过非关键音(点按/轮到你/错误仍可轻响)
     let _sfxSoft=false;
@@ -88,7 +90,11 @@
       yourturn(){ tone(784,0,.1,'sine',.16); tone(1175,.07,.17,'triangle',.13); },
       landlord(){ tone(392,0,.16,'sawtooth',.2,392); tone(587,.1,.18,'triangle',.18); tone(784,.22,.26,'sine',.16); tone(1046,.34,.3,'triangle',.13); },
       spring(){ tone(659,0,.16,'triangle',.2); tone(880,.1,.18,'sine',.18); tone(1175,.2,.2,'triangle',.16); tone(1568,.3,.24,'sine',.15); tone(2093,.42,.3,'triangle',.13); },
-      chip(){ noise(0,.045,.2,5600,1500); tone(2050,0,.035,'triangle',.1); tone(1580,.03,.045,'sine',.085); noise(.05,.04,.14,5000,1300); }
+      chip(){ noise(0,.045,.2,5600,1500); tone(2050,0,.035,'triangle',.1); tone(1580,.03,.045,'sine',.085); noise(.05,.04,.14,5000,1300); },
+      // 落座: 柔和上扬两音, 像坐下"就位"的确认 —— 比 arrive 更轻、无第三段
+      seat(){ tone(523,0,.1,'sine',.16); tone(784,.06,.14,'triangle',.13); },
+      // 下注: 筹码推入池的落桌感 —— 一记闷响垫底 + 两下清脆叠码, 比 chip 更"重"一点
+      bet(){ noise(0,.05,.3,4200,900); tone(1760,.02,.04,'triangle',.11); tone(1320,.06,.05,'sine',.09); noise(.09,.04,.16,5200,1400); }
     };
     function unlock(){
       ensure();
@@ -106,7 +112,7 @@
         try{ctx.resume();}catch(e){}
         let n=0;(function wait(){ if(ctx.state==='running'||n++>24) emit(); else setTimeout(wait,18); })();
       }else emit();
-      try{ if(navigator.vibrate && ['enter','send','echo','mention','void','error','back'].includes(name) && !_sfxSoft) navigator.vibrate(name==='error'?[18,30,18]:8); }catch(e){}
+      if(['enter','send','echo','mention','void','error','back'].includes(name) && !_sfxSoft) buzz(name==='error'?[18,30,18]:8);
     }
     function playClick(){ const now=performance.now?performance.now():Date.now(); if(now-lastClickAt<80) return; lastClickAt=now; play('click'); }
     let _voice=null, _voiceTried=false, _voicePool=null;
@@ -242,6 +248,9 @@
         try{ window.EhSfx.setSfxSoft(!!(window.EhAudioBus&&window.EhAudioBus.busy&&window.EhAudioBus.busy())); }catch(e){}
       }},
       isVoiceOn(){return _voiceOn},
+      setHaptic(v){_hapticOn=!!v; _lsSet('eh_haptic',_hapticOn); if(_hapticOn) buzz(12);},
+      isHaptic(){return _hapticOn},
+      buzz,
       setSfxSoft,
       unlock,say};
   })();
@@ -450,8 +459,12 @@
     setSfx(v){ try{ if(window.EhSfx) window.EhSfx.setEnabled(!!v); }catch(e){} },
     voice(){ try{ return window.EhSfx ? window.EhSfx.isVoiceOn() : true; }catch(e){ return true; } },
     setVoice(v){ try{ if(window.EhSfx) window.EhSfx.setVoice(!!v); }catch(e){} },
+    haptic(){ try{ return window.EhSfx ? window.EhSfx.isHaptic() : true; }catch(e){ return true; } },
+    setHaptic(v){ try{ if(window.EhSfx) window.EhSfx.setHaptic(!!v); }catch(e){} },
     // 任一开着即认"有声"(用于牌桌 🎵/🔇 图标: 全关才显 🔇)
     anyOn(){ return this.bgm()||this.sfx()||this.voice(); },
+    // 音效档任一开着(音效/震动/读牌)—— 牌桌"音效"按钮图标: 全关才显静音
+    sfxAnyOn(){ return this.sfx()||this.haptic()||this.voice(); },
   };
 
   // ---- EhAudioMenu: 牌桌 🎵 钮点开的三档静音小面板(BGM/音效/语音各一个开关) ----
@@ -486,12 +499,12 @@
       panel=document.createElement('div');
       panel.className='eh-audio-menu';   // 样式走 table-shared.css, 定位单独写
       const hd=document.createElement('div');
-      hd.textContent='声音'; hd.className='am-hd';
+      hd.textContent='音效'; hd.className='am-hd';
       panel.appendChild(hd);
-      // 三分开关互不干扰: 关谁只停谁(旧版关 BGM 会顺手杀语音)
-      panel.appendChild(row('🎵 背景音乐', ()=>P.bgm(),  v=>P.setBgm(v),  repaint));
-      panel.appendChild(row('🔔 音效',     ()=>P.sfx(),  v=>P.setSfx(v),  repaint));
-      panel.appendChild(row('🗣️ 语音',     ()=>P.voice(),v=>P.setVoice(v),repaint));
+      // 音效档三分开关互不干扰(背景音乐已拆到独立按钮, 不在此面板): 关谁只停谁
+      panel.appendChild(row('🔔 音效',   ()=>P.sfx(),   v=>P.setSfx(v),   repaint));
+      panel.appendChild(row('📳 震动',   ()=>P.haptic(),v=>P.setHaptic(v),repaint));
+      panel.appendChild(row('🗣️ 读牌',   ()=>P.voice(), v=>P.setVoice(v), repaint));
 
       document.body.appendChild(panel);
       // 锚定: 钮正下方右对齐; 越界则贴边

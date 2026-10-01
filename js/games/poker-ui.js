@@ -147,6 +147,7 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .pk-mus{margin-left:auto}
+.pk-mus + .pk-mus{margin-left:0}
 .pk-ico{width:18px;height:18px;display:block}
 .pk-mus:hover{color:var(--ink);border-color:var(--accent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
@@ -274,6 +275,11 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 /* "我"的桌底座位(pk-me-seat): 底牌正面朝上, 比对手牌背大且带花色可读; 头像点青光 + 名字点青, 一眼认出"这是你" */
 .pk-me-seat .pk-avr .av{box-shadow:0 0 0 2px var(--accent),0 0 12px color-mix(in srgb, var(--accent) 35%, transparent)}
 .pk-me-seat .nm{color:var(--accent);font-weight:800}
+/* ★竖排各行拉开(主人反馈"筹码盖住名字/底牌"): 头像→名字→筹码→底牌四行本来 gap:2px 挤成一坨,
+ *   自己这席底牌大(52px), 上顶把名字/筹码压叠。给自己席加行距 + 筹码单独留白, 不再互相遮挡。 */
+.pk-me-seat{gap:4px}
+.pk-me-seat .nm{margin-top:2px;line-height:1.2}
+.pk-me-seat .stk{margin:1px 0 2px;font-size:12px}
 /* "我"的底牌: 放大到可读尺寸, 去掉角标花色(.cs)——30px 小牌上"角标rank+角标花色+居中大花色"三元素挤成一坨(主人反馈"元素都叠一起了");
  *   只留【左上角 rank + 居中大花色】= 干净的标准读法, 两张牌间距也拉开。 */
 .pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:7px;margin-top:2px}
@@ -416,6 +422,8 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-waitbar{flex:1;min-height:54px;display:flex;align-items:center;justify-content:center;text-align:center;
   border-radius:12px;border:1px dashed var(--line2);background:var(--panel);color:var(--sub);
   font-weight:700;font-size:13px;line-height:1.3;padding:6px 14px;letter-spacing:.02em}
+/* ★整块状态区(不可行动态): 占满整个操作区高度, 底部只此一块, 不与按钮/滑杆混排 */
+.pk-waitbar-full{width:100%;height:100%;min-height:0;font-size:14px}
 /* 预选(pre-action)条: 提示行 + 三键(默认暗态, 选中 .on 高亮) */
 /* ★提示行高度对齐骨架的快捷注行(.pk-quick=38px): 骨架(等待态)与预选条(轮我前)是同为"非我回合"的
  *   两种中间行——骨架用快捷注行、预选条用这条提示行。二者高差 20px 曾让 .pk-acts 在 发牌(seating→preflop)
@@ -464,6 +472,27 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-mini-hn{font-size:9.5px;line-height:1;color:var(--amber,#f5c451);font-weight:700;text-align:center;margin-top:2px;white-space:nowrap}
 .pk-toast{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:10;pointer-events:none;text-align:center;max-width:80%}
 .pk-toast.show{opacity:1}
+/* T86 边打边聊: 右下 💬 浮钮 + 弹出式快捷交流条(预设短语/表情/打字), 不占操作区、不挡牌面 */
+.pk-chat-fab{position:absolute;right:12px;bottom:calc(174px + env(safe-area-inset-bottom,0px));width:40px;height:40px;border-radius:50%;
+  background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);font-size:18px;cursor:pointer;z-index:16;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);transition:transform .14s,border-color .14s}
+.pk-chat-fab:active{transform:scale(.9)}
+.pk-room.is-land .pk-chat-fab{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.pk-chat-pop{position:absolute;right:12px;bottom:calc(220px + env(safe-area-inset-bottom,0px));z-index:17;
+  width:min(300px,78vw);background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none}
+.pk-chat-pop.on{opacity:1;transform:none;pointer-events:auto}
+.pk-chat-pop .pk-qc-rowwrap{display:flex;flex-direction:column;gap:7px}
+.pk-chat-pop .pk-qc-row{display:flex;flex-wrap:wrap;gap:6px}
+.pk-chat-pop .pk-qc-chip{padding:6px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--ink);
+  font-size:13px;cursor:pointer;transition:background .12s}
+.pk-chat-pop .pk-qc-chip:active{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.pk-chat-pop .pk-qc-type{display:flex;gap:6px}
+.pk-chat-pop .pk-qc-type input{flex:1;min-width:0;height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--bg2,rgba(0,0,0,.2));
+  color:var(--ink);padding:0 10px;font-size:14px;outline:none}
+.pk-chat-pop .pk-qc-send{flex:0 0 auto;height:36px;padding:0 14px;border-radius:9px;border:none;background:var(--accent);color:var(--btn-ink,#04060c);font-weight:700;cursor:pointer}
+.pk-chat-pop .pk-qc-back{margin-top:8px;text-align:right}
+.pk-chat-pop .pk-qc-mini{background:transparent;border:none;color:var(--sub);font-size:12px;cursor:pointer;padding:2px 4px}
 .pk-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:11}
 .pk-confetti i{position:absolute;top:-8%;font-size:20px;animation:pkFall linear forwards;will-change:transform,opacity}
 @keyframes pkFall{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(115%) rotate(var(--r,540deg));opacity:0}}
@@ -543,8 +572,9 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
   border-radius:50%;border:1px solid var(--line);background:var(--panel-solid,var(--panel-solid));color:var(--dim);
   font-size:11px;cursor:pointer;padding:0;z-index:6}
 .pk-lob-kick:hover{color:var(--magenta);border-color:var(--magenta)}
-/* 招募态桌心留白: "我"已坐正下方、招募提示交给底部 pk-me 条 → 藏掉桌心 msg 胶囊(免与底部文案重复、免压住围坐的座位圈) */
+/* 招募态桌心留白: 藏掉桌心 msg 胶囊(免压住围坐的座位圈); 但带 pk-msg-lobby 的招募提示(T88 搬到顶部)要显示 */
 .pk-room[data-phase="lobby"] .pk-msg{display:none}
+.pk-room[data-phase="lobby"] .pk-msg.pk-msg-lobby{display:block}
 /* 日间: 深色绒面椭圆在浅底上会糊成"灰蛋", 招募态换极浅绿绒渐变 + 柔外晕(与斗地主/掼蛋日间同治) */
 html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),color-mix(in srgb, var(--accent) 5%, transparent) 60%,transparent 82%);
@@ -599,6 +629,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const names   = opts.names   || ['你','阿岩','小凶','疯哥'];
     const avatars = opts.avatars || ['🙂','🗿','🔥','🤪'];
     const n = names.length;
+    const chat = opts.chat || null;   // T86 边打边聊: { send(text), me } —— 发一句进房间消息(复用聊天室管道, 全房可见)
     let mySeat = (typeof opts.mySeat==='number') ? opts.mySeat : 0;   // let: 旁观让座后置 -1, 坐空位可改
     const strategyMatchId = String(opts.matchId || opts.gameId || opts.scoreKey || ('poker-local-'+Date.now()+'-'+Math.random().toString(36).slice(2)));
     let strategyHandState = null, strategyHandId = 0;
@@ -1036,7 +1067,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let walkInTimer=null, walkInTarget=0;           // 招募态"路人不定时入座": 每桌随机定一个目标人数, 到点有概率来一个新玩家(机器人)
     let animPhase=null, lastPotShown=-1;   // 筹码归池动画: 追踪街推进 / 底池增额
     let _winBanner=null;                    // 桌面赢家横幅(单机常规手替代结算弹窗, 见 showWinBanner)
-    let lastBoardLen = 0, lastMyTurn=false, dealAnim=true;
+    let lastBoardLen = 0, lastMyTurn=false, dealAnim=true, _lastBetSfx=0;
     let lastBoardSig='', lastMeSig='';   // 增量护栏签名(公共牌区 / 我的底牌条)
 
     const mountEl = opts.mount || document.getElementById('hall') || document.body;
@@ -1044,6 +1075,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const SVG=(p)=>`<svg class="pk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
     const ICO_MUS_ON = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/>');
     const ICO_MUS_OFF = SVG('<path d="M9 17V4l10-2v11"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="16.5" cy="13" r="2.5"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
+    // 音效按钮(铃铛): 集中 音效/震动/读牌 三档开关, 与背景音乐拆开
+    const ICO_SFX_ON = SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');
+    const ICO_SFX_OFF = SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><line x1="3" y1="2.5" x2="21.5" y2="21"/>');
     const ICO_ROT = SVG('<rect x="4" y="2.5" width="10" height="16" rx="2"/><path d="M17 9.5a5 5 0 0 1 4 4.9V19a2 2 0 0 1-2 2h-6"/><path d="M13.5 18.5l-1.5 2.5 2.6 1"/>');
     const ICO_BACK = SVG('<path d="M19 12H6"/><path d="M11 18l-6-6 6-6"/>');
     const ICO_AUTO = SVG('<rect x="4.5" y="8" width="15" height="11" rx="2.4"/><path d="M12 4.2V8"/><circle cx="12" cy="3.4" r="1.1"/><circle cx="9.2" cy="13" r="1.25" fill="currentColor" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="currentColor" stroke="none"/><path d="M9.5 16.4h5"/>');
@@ -1051,7 +1085,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
-        <button class="pk-mus" id="pkMus" aria-label="背景音乐开关">${ICO_MUS_ON}</button>
+        <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
+        <button class="pk-mus" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
         <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
         <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
       </div>
@@ -1067,6 +1102,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       </div>
       <div class="pk-me" id="pkMe"></div>
       <div class="pk-acts" id="pkActs"></div>
+      <button class="pk-chat-fab" id="pkChatFab" aria-label="聊天" title="边打边聊">💬</button>
+      <div class="pk-chat-pop" id="pkChatPop" hidden></div>
       <div class="pk-toast" id="pkToast"></div>`;
     mountEl.appendChild(room);
     // 开桌把 #hall 撑满视口: 盖住桌面态 top:12px/左右留边, 露出的页面底色(主人: 顶上红条突兀)
@@ -1186,12 +1223,52 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (remoteSeats.length>0 || isGuest || handLive) minimize(); else close();
     });
     { const sk=$('#pkSkin'); if(sk) sk.addEventListener('click',(e)=>{ e.stopPropagation(); try{ if(window.EhThemeMenu) EhThemeMenu.toggle(sk); }catch(_){} }); }
-    // 牌桌内声音开关: 大厅 🎵 按钮被牌桌浮层盖住, 这里点开三档静音面板(BGM/音效/语音各自独立开关)
-    const musBtn = $('#pkMus');
-    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const any = P?P.anyOn():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = any?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !any); }
-    if (musBtn) bindTap(musBtn, ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
-    try{ root.addEventListener('eh:audio-prefs', paintMus); }catch(_){}
-    paintMus();
+    // 牌桌内声音: 拆两颗 —— ①背景音乐(与聊天室同源选曲菜单 EhBgmMenu) ②音效(音效/震动/读牌三档 EhAudioMenu)。
+    //   大厅 🎵/🔔 按钮被牌桌浮层盖住, 这里各挂一个浮动面板。
+    const musBtn = $('#pkMus'), sfxBtn = $('#pkSfx');
+    function paintMus(){ if(!musBtn) return; const P=root.EhAudioPrefs; const on = P?P.bgm():(!root.EH_BGM||root.EH_BGM.on()); musBtn.innerHTML = on?ICO_MUS_ON:ICO_MUS_OFF; musBtn.classList.toggle('muted', !on); }
+    function paintSfx(){ if(!sfxBtn) return; const P=root.EhAudioPrefs; const any = P?P.sfxAnyOn():true; sfxBtn.innerHTML = any?ICO_SFX_ON:ICO_SFX_OFF; sfxBtn.classList.toggle('muted', !any); }
+    if (musBtn) bindTap(musBtn, ()=>{ if(root.EhBgmMenu) root.EhBgmMenu.toggle(musBtn, paintMus); else { try{ if(root.EH_BGM) root.EH_BGM.set(!root.EH_BGM.on()); }catch(_){} paintMus(); } sfx('click'); });
+    if (sfxBtn) bindTap(sfxBtn, ()=>{ if(root.EhAudioMenu) root.EhAudioMenu.toggle(sfxBtn, paintSfx); sfx('click'); });
+    // journey-exempt: 顶栏按钮拆分(音乐/音效)、落座/下注/发牌音效、提示区上移、边打边聊交流条 —— 复用
+    //   journey-audio-mixer/journey-chat-core 既有覆盖, 纯 UI 增量, 无新整站旅程; 已 node --check 通过。
+    // T86 边打边聊(轻): 右下 💬 浮钮点开快捷交流条 —— 预设短语/表情一键发(复用 chat.send 落进房间消息, 全房可见),
+    //   需要打字再点 ⌨️ 展开小输入框。不常驻键盘、不占操作区高度, 不挡牌面。无 chat 桥(纯单机)则隐藏浮钮。
+    const QUICK_PHRASES = ['快点啊','让我想想','这把稳了','不服来战','good game','给我发好牌','诈唬的吧?','全下!'];
+    const QUICK_EMOJIS = ['😏','😭','🔥','👏','🤔','💪','🎉','🤯'];
+    function initQuickChat(){
+      const fab=$('#pkChatFab'), pop=$('#pkChatPop');
+      if(!fab||!pop) return;
+      if(!chat || typeof chat.send!=='function'){ fab.style.display='none'; return; }   // 纯单机无房间消息通道
+      let open=false, typing=false;
+      const quip=(arr)=>arr.map(t=>`<button class="pk-qc-chip" data-say="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('');
+      const render=()=>{
+        pop.innerHTML = typing
+          ? `<div class="pk-qc-type"><input id="pkQcInput" type="text" maxlength="60" placeholder="说点什么…" autocomplete="off"><button class="pk-qc-send" id="pkQcSend">发送</button></div>
+             <div class="pk-qc-back"><button class="pk-qc-mini" data-back="1">‹ 快捷语</button></div>`
+          : `<div class="pk-qc-rowwrap"><div class="pk-qc-row">${quip(QUICK_PHRASES)}</div><div class="pk-qc-row">${quip(QUICK_EMOJIS)}</div></div>
+             <div class="pk-qc-back"><button class="pk-qc-mini" data-type="1">⌨️ 打字</button></div>`;
+        if(typing){ const inp=$('#pkQcInput'); if(inp){ setTimeout(()=>{ try{ inp.focus(); }catch(_){} },30);
+          inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); doSend(inp.value); } };
+          const sb2=$('#pkQcSend'); if(sb2) sb2.onclick=()=>doSend(inp.value); } }
+      };
+      const doSend=(txt)=>{
+        txt=String(txt||'').trim(); if(!txt) return;
+        try{ chat.send(txt); }catch(_){}
+        toast('已发送到房间'); closePop();
+      };
+      const openPop=()=>{ open=true; typing=false; pop.hidden=false; pop.classList.add('on'); render(); sfx('click'); };
+      const closePop=()=>{ open=false; typing=false; pop.classList.remove('on'); pop.hidden=true; };
+      bindTap(fab, ()=>{ if(open) closePop(); else openPop(); });
+      pop.addEventListener('click',(e)=>{
+        const say=e.target.closest('[data-say]'); if(say){ doSend(say.dataset.say); return; }
+        if(e.target.closest('[data-type]')){ typing=true; render(); return; }
+        if(e.target.closest('[data-back]')){ typing=false; render(); return; }
+      });
+    }
+    try{ root.addEventListener('eh:audio-prefs', ()=>{ paintMus(); paintSfx(); }); }catch(_){}
+    paintMus(); paintSfx();
+    initQuickChat();
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onOrient);
 
@@ -1495,6 +1572,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const prevP = _seatOcc[seat];
         const nowOcc = !pending && st.players[seat] && st.players[seat].kind!=='empty';
         if ((introSeating && arrived && seat===lastSeated) || (nowOcc && prevP===false)) seatEl.classList.add('pk-justseated');
+        // 落座音效: 仅"空位→有人"的真实入座上升沿(prevP===false 排除首帧 undefined, 免整桌初次渲染齐响)
+        if (nowOcc && prevP===false){ try{ sfx('seat'); }catch(_){} }
         _seatOcc[seat]=!!nowOcc;
         els.table.appendChild(seatEl);
         if (pending || st.phase==='lobby') continue;   // 虚位/招募态空位不摆投入筹码
@@ -1540,6 +1619,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           if (street>prev){
             commit.dataset.street=street;
             commit.classList.remove('betpop'); void commit.offsetWidth; commit.classList.add('betpop');
+            // 下注音效: 60ms 节流, 免同帧多席筹码归位齐响成"机关枪"
+            try{ const _n=Date.now(); if(_n-(_lastBetSfx||0)>60){ _lastBetSfx=_n; sfx('bet'); } }catch(_){}
           } else {
             commit.dataset.street=street;
           }
@@ -1548,6 +1629,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     // 按真实发牌顺序给底牌挂错峰落座动画: 从庄家下家(SB)起绕圈, 发两轮(每人先落第1张、再落第2张)。
     function runDealAnim(){
+      try{ sfx('deal'); }catch(_){}   // 发牌音效: 每手底牌飞落时一记(dealAnim 门控, 本手内重渲不重响)
       const N=st.players.length, btn=st.button||0, STEP=55;
       const seq=[]; for(let i=1;i<=N;i++){ const s=(btn+i)%N; const p=st.players[s]; if(p && !p.folded && (p.hole||[]).length>0) seq.push(s); }
       const len=seq.length||1;
@@ -1602,6 +1684,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           ? (d===2 ? CY - RY*0.78 : CY + RY*0.18)
           : CY - RY*Math.sin(t);
         if (land && !lob && d===0) cy = 86;
+        // ★竖屏自己席(d===0, 底部): 整列(头像+名+筹码+大底牌)较高, 中心锚定会上顶压住名字/筹码。
+        //   下移锚点到桌底(82%), 给下方底牌留出空间, 不再往上叠(主人反馈"筹码盖住名字/底牌")。
+        else if (!lob && d===0 && !noMe) cy = 82;
         seatEl.style.left = cx+'%'; seatEl.style.top = cy+'%';
         // 根据水平位置决定气泡展开方向
         const side = cx < 30 ? 'left' : cx > 70 ? 'right' : 'center';
@@ -1765,7 +1850,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function connPill(){ return connState==='online' ? '' : ('<span class="pk-conn '+connState+'">'+connLabel(connState)+'</span>'); }
     function renderMsg(){
       const cp = connPill();
-      if (st.phase==='lobby'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🪑 等人入座'; return; }
+      if (st.phase==='lobby'){
+        // 招募提示放【顶部提示区】(T88: 顶部=提示, 底部=纯按钮, 不混用) —— 席位进度 + 今日次数, 原底部 prehint 内容搬上来
+        const occ = st.players.filter(p=>p && p.kind && p.kind!=='empty').length;
+        const need = Math.max(0, 2 - occ);
+        const h = need>0 ? ('🪑 再来 '+need+' 席自动开始（含灵魂）') : '🪑 满 2 席 · 即将自动开始…';
+        let dayHtml=''; try{ dayHtml = root.ehDailyLeftInline ? root.ehDailyLeftInline('nlhe') : ''; }catch(_){}
+        els.msg.className='pk-msg pk-msg-lobby'; els.msg.innerHTML=cp+h+dayHtml; return;
+      }
       if (st.phase==='seating'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🪑 等人入座…'; return; }
       if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🎴 等待发牌…'; return; }
       if (st.phase==='showdown'||st.phase==='over'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp; return; }   // ★fix: 摊牌阶段 toAct=-1, 不该显示"…思考中… · 摊牌"
@@ -1865,12 +1957,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-b raise" disabled>加注</button>
         </div>`;
     }
-    // 无操作占位态(旁观/等待/已弃/已全下/离线): 与骨架同高, 但用整行状态条承载文案 —— 长文不再撑破 1/3 宽中键。
+    // 无操作占位态(旁观/等待/已弃/已全下/离线): 底部=纯状态区, 不摆假的滑杆/快捷/三键(主人诉求"顶部提示、
+    //   底部按钮, 别混用")。整块操作区(161px)只放一条居中状态条; 提示交给顶部 pk-msg, 底部不再重复。
     function actsWaitBar(txt){
-      return `
-        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
-        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
-        <div class="pk-row"><div class="pk-waitbar">${txt}</div></div>`;
+      return `<div class="pk-waitbar pk-waitbar-full">${txt}</div>`;
     }
     // 招募态操作区: 补满 / 邀真人 / 开始(满 2 席自动开, 开始作兜底)
     function renderLobbyCtrl(){
@@ -1879,14 +1969,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const btns=[];
       const empties = st.players.filter(p=>p.kind==='empty').length;
       const occupied = st.players.filter(p=>p && p.kind && p.kind!=='empty').length;
-      const need = Math.max(0, 2 - occupied);
-      const hint = need>0 ? `再来 ${need} 席自动开始（含灵魂）` : '满 2 席 · 即将自动开始…';
-      let dayHtml='';
-      try{ dayHtml = window.ehDailyLeftInline ? window.ehDailyLeftInline('nlhe') : ''; }catch(_){}
+      // T88: 招募提示(席位进度/今日次数)已移到顶部提示区 renderMsg, 底部操作区只留按钮, 不再混排 prehint
       if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键补满</button>');
       btns.push('<button class="pk-b fold" data-lob="invite">👥 邀请真人</button>');   // ★fix: 邀请真人为次要操作, 不该与"开始"同色抢主行动视觉
       if (occupied>=2 && typeof a.start === 'function') btns.push('<button class="pk-b call" data-lob="start">▶ 开始</button>');
-      els.acts.innerHTML = `<div class="pk-lobacts"><div class="pk-prehint">${hint}${dayHtml}</div><div class="pk-row">${btns.join('')}</div></div>`;
+      els.acts.innerHTML = `<div class="pk-lobacts"><div class="pk-row">${btns.join('')}</div></div>`;
       const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
       els.acts.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } }));
     }

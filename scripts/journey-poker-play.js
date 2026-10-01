@@ -118,10 +118,11 @@ assert(/onResult:\(res,log,meta\)=>/.test(src), 'open 传 onResult 结束回调(
 assert(/postTexasResult\(res,A\.names,meta\)/.test(src) && /recordTexasResult\(res,log,A\.names,A\.avatars,soulPick,meta\)/.test(src),
   'onResult 里发战绩卡 + 落库战绩(seed/log 供回看)');
 assert(/async function postTexasResult\(/.test(src), '存在 postTexasResult(发德州战绩卡)');
-// 编码→解码闭环: 生产字段序与 buildGameEl 的 nlhe 分支解码字段序一致
-assert(/\['game','nlhe', outcome, delta, hand\|\|'-', potTotal, champName\]\.join\('\|'\)/.test(src),
-  '战绩卡编码 game|nlhe|outcome|delta|hand|pot|champ(字段序钉死)');
-assert(/postTexasResult[\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
+// T82 一局一卡: postTexasResult 不再往聊天流插 kind:game 独立战绩卡, 改推牌桌行 highlights 动态带(pushGameHighlight)
+assert(/postTexasResult[\s\S]{0,2200}pushGameHighlight\(/.test(src),
+  '名场面改推 highlights 动态带(pushGameHighlight), 不再插独立战绩卡消息');
+assert(/async function pushGameHighlight[\s\S]{0,400}eh_gt_push_highlight/.test(src),
+  'pushGameHighlight 走 eh_gt_push_highlight RPC(写牌桌行, 随 realtime 广播, 全房一致)');
 assert(/if\(ev==='nlhe'\)/.test(src), 'buildGameEl 有 nlhe 分支(把战绩卡渲染回来)');
 assert(/const champName=esc\(p\.slice\(6\)\.join\('\|'\)\|\|''\)/.test(src), '赢家名取 slice(6).join("|")(兜住名字里的 | 不截断)');
 assert(/data-nlhe-again/.test(src) && /data-nlhe-again[\s\S]{0,220}ehRelaunchGame\('nlhe'\)/.test(src), '战绩卡"再来一局"接 ehRelaunchGame');

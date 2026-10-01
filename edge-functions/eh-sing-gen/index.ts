@@ -220,9 +220,12 @@ async function sunoGenerate({ apiKey, lyric, sid }) {
     if (!gr.ok || !Array.isArray(ids) || !ids.length) {
       return { fail: true, debug: 'suno_gen ' + gr.status + ' ' + JSON.stringify(gj).slice(0, 160) }
     }
-    // 轮询第一首(5s×36 ≈ 3min 上限)
-    for (let i = 0; i < 36; i++) {
-      await new Promise(r => setTimeout(r, 5000))
+    // 轮询第一首: /music/task 实测只回 status(processing→completed/failed), 无百分比进度字段。
+    //   旧版硬超时 36×5s=3min → 生成偶尔慢过 3min 就误判 timeout 失败(用户报"无法生成"根因之一)。
+    //   现把上限拉到 6min(72×5s), status 仍 processing 就耐心等, 只有真失败/真超时才退级。
+    const POLL_MS = 5000, POLL_MAX = 72
+    for (let i = 0; i < POLL_MAX; i++) {
+      await new Promise(r => setTimeout(r, POLL_MS))
       const qr = await fetch(BASE + '/music/task?id=' + ids[0], { headers: H })
       const qj = await qr.json().catch(() => null)
       const d = qj && qj.data
@@ -436,6 +439,20 @@ Deno.serve(async (req) => {
     })
     if (!up.ok) {
       return json({ ok: false, error: 'upload_failed', detail: (await up.text()).slice(0, 200) }, 500)
+    }
+    // 逐词对齐 sidecar: 与音频同路径写 <path>.lrc.json —— 消息 text 只存 5 段(URL 等), 逐词时间戳太大不入 text;
+    //   改存桶里, 前端渲染缺 lrc 时按 <songUrl>.lrc.json 懒加载 → 生成者与其他玩家跟唱一致(修显示不一致)。
+    if (wordTimestamps && wordTimestamps.length) {
+      try {
+        await fetch(`${sbUrl}/storage/v1/object/eh-song/${path}.lrc.json`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${serviceKey}`, apikey: serviceKey,
+            'Content-Type': 'application/json', 'x-upsert': 'true',
+          },
+          body: JSON.stringify(wordTimestamps),
+        })
+      } catch (_) { /* sidecar 失败不挡主流程, 前端退均匀分布 */ }
     }
     const songUrl = `${sbUrl}/storage/v1/object/public/eh-song/${path}?t=${Date.now()}`
     if (mid && /^\d+$/.test(mid)) {

@@ -192,11 +192,10 @@ assert(/EHTable\.encode|game\|gt\|/.test(src) && /kind:'game'/.test(src), '开�
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
 assert(/onResult:[\s\S]{0,260}postGuandanResult\(res,\s*log,\s*(?:A\.)?names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
-assert(/postGuandanResult[\s\S]{0,1400}kind:'game'/.test(src), '战绩卡以 kind:game 落库(走消息流, 全房可见)');
-// 编码 → 解码闭环: 生产 text 编码字段序与 buildGameEl 的 gd 分支解码字段序一致
-assert(/\['game','gd',\s*win,\s*res\.advance,\s*fromLvl,\s*toLvl,\s*res\.doubleDown\?1:0,\s*res\.matchWon\?1:0,\s*myRankIdx,\s*res\.bombs\|\|0,\s*mateName\]/.test(src),
-  'postGuandanResult 编码字段序固定(win|advance|fromLvl|toLvl|doubleDown|matchWon|myRankIdx|bombs|mateName)');
-assert(/if\(ev==='gd'\)/.test(src), 'buildGameEl 有 gd 分支(把战绩卡渲染回来)');
+assert(/postGuandanResult[\s\S]{0,2200}pushGameHighlight\(/.test(src), 'T82: 名场面改推 highlights 动态带(pushGameHighlight), 不再插独立战绩卡');
+// T82: 名场面动态带文案含 通关/双下/炸弹/头游 标签
+assert(/pushGameHighlight\(\{[\s\S]{0,200}kind:'gd'/.test(src), 'postGuandanResult 推 gd 动态(含 kind:gd 标识)');
+assert(/if\(ev==='gd'\)/.test(src), 'buildGameEl 保留 gd 分支(渲染历史战绩卡消息)');
 assert(/data-gd-again/.test(src), '战绩卡含"再来一局"入口(data-gd-again)');
 assert(/again\.onclick=[\s\S]{0,160}ehRelaunchGame\('guandan'\)/.test(src), '"再来一局"走 ehRelaunchGame(先散旧桌再开新)');
 assert(/ev==='gd'[\s\S]{0,120}掼蛋/.test(src), '消息预览把 gd 卡显示成"🎴 掼蛋 · 胜/负"(不露原始 game|gd| 编码)');
