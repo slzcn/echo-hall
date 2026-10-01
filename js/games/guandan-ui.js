@@ -349,7 +349,7 @@ html[data-mode="day"] .gd-felt::before{
   border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;letter-spacing:.04em;transition:.14s;touch-action:none;-webkit-user-select:none;user-select:none;
   box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .gd-sort:active{transform:scale(.94)}
-.gd-sort.active{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px color-mix(in srgb, var(--amber) 50%, transparent)}
+.gd-sort.active{background:var(--amber);color:var(--btn-ink,#04060c);border-color:var(--amber);box-shadow:0 0 12px color-mix(in srgb, var(--amber) 50%, transparent)}
 .gd-hand.arranging .card{cursor:grab}
 /* 手动锁定组(选中→🔒锁定): 轻金边, 与自动分组留缝并存 */
 .gd-hand .card.locked-grp{box-shadow:0 2px 5px rgba(0,0,0,.35),0 0 0 1.5px color-mix(in srgb,var(--amber) 70%,transparent)}
