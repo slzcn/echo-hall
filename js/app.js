@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v58';
+window.__EH_APP_VER = '20261001-v59';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2775,8 +2775,7 @@ function gtCtx(row){
   return { myUid, hostName:(seats[0]&&seats[0].name)||'',
     souls:(roomSouls||[]).filter(s=>s&&s.auth_uid).map(s=>({auth_uid:s.auth_uid,name:s.name,emoji:s.emoji})),
     actions:{ join:s=>gtJoin(row.id,s), leave:()=>gtLeave(row.id), seatSoul:(s,u)=>gtSeatSoul(row.id,s,u),
-      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtGotoExistingTable(row),
-      inviteHumans:()=>gtInviteHumans(row.id) } };
+      kick:s=>gtKick(row.id,s), start:()=>gtStart(row.id), fillSouls:()=>gtFillSouls(row.id), close:()=>gtClose(row.id), enter:()=>gtGotoExistingTable(row) } };   // ★v59: 移除喊人入桌(点空位直接入座)
 }
 // ★换账号后 host_uid!=myUid -> EHTable 渲染层判 isHost=false 不再画解散按钮; lobby 阶段未开局、解散无损失,
 //   统一在 lobby 卡底部补一颗"解散"(不依赖 isHost): 点->ehConfirm 确认->gtClose(row.id)。换账号后也能解散自己的旧桌。
@@ -3005,23 +3004,7 @@ function gtCloseSeatingPage(){
   try{ _gtSeatPage.wrap.remove(); }catch(_){}
   _gtSeatPage=null;
 }
-// 「👥邀请真人」: 把牌桌招呼发到聊天区, 房里真人点牌桌卡「加入」即上桌。限流免刷屏。
-let _gtLastInvite=0;
-async function gtInviteHumans(id){
-  const row=_gtTables.get(id) || await gtEnsureRow(id);
-  if(!row || !curRoom){ toast('牌桌信息拿不到，稍后再试'); return; }
-  const now=Date.now();
-  if(now-_gtLastInvite<8000){ toast('刚邀请过了，稍等一下'); return; }
-  _gtLastInvite=now;
-  const meta={nlhe:'德州',guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'牌局';
-  const text=`${me.name} 开了一桌${meta}，往上翻找牌桌卡点「加入」一起玩 🎴`;
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'msg'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const {data}=await sb.from('eh_messages').insert(payload).select('id').single(); if(data && el) el.dataset.mid=data.id; }
-  catch(e){ console.warn('[gt] invite humans failed', e); }
-  toast('已邀请房里真人 · 他们点牌桌卡即可加入');
-}
+// ★v59: 删除「喊人入桌(发聊天卡)」功能 —— 点空位直接入座取代招募弹窗。相关函数与限流变量已移除。
 async function gtStart(id){
   gtCloseSeatingPage();   // 开始发牌: 关座位页, 下面 gtLaunchLocal 落打牌页
   // ★开局不阻塞在补灵魂上(主人: 进入要快) —— 自己入座即可开打;
@@ -3686,7 +3669,7 @@ async function gtLaunchPoker(row, resumeSnap){
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:_pkMyStack,
     resumeSnap: resumeSnap || _gtSnapCache.get(row.id) || null,   // ★v33: 优先用显式传参, 回退到缓存快照(transfer 场景)
-    lobbyCtx:gtCtx(row),   // 打牌态空位邀请菜单复用: 邀请真人(发聊天卡)/指定灵魂(改 DB 座, realtime 补位)
+    lobbyCtx:gtCtx(row),   // 打牌态空位点击直接入座(v59): 指定灵魂补位(改 DB 座, realtime 补位)
     myStack: _pkMyStack, onWallet: function(v){ _gtMyFinalStack=Math.max(0,Math.round(Number(v)||0)); },
     stackFor: function(seat, ctx){ return pkSeatStackFor(seat, ctx); },
     onStacks: function(list, ctx){ pkSeatStacksWrite(list, ctx); },

@@ -1327,7 +1327,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 招募态: 空位点击邀请 / host 请离(与斗地主 bindLobbySeats 同构)
     function bindLobbySeats(){
       room.querySelectorAll('.pk-lobby-empty[data-invite]').forEach(el=>{
-        el.onclick=()=>openInviteMenu(+el.dataset.invite, el);
+        el.onclick=()=>{ if (onGrabSeat){ onGrabSeat(+el.dataset.invite); } else { resumeSeat(+el.dataset.invite); } };   // ★v59: 点空位直接入座, 不再弹邀请菜单
       });
       room.querySelectorAll('.pk-lob-kick[data-kick]').forEach(b=>{
         b.onclick=(e)=>{ e.stopPropagation(); if(lobbyCtx&&lobbyCtx.actions&&lobbyCtx.actions.kick) lobbyCtx.actions.kick(+b.dataset.kick); };
@@ -1402,33 +1402,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       inviteBot(dbSeat);
     }
-    function openInviteMenu(dbSeat, anchorEl){
-      closeInviteMenu();
-      const acts = (lobbyCtx && lobbyCtx.actions) || null;
-      const free = freeSoulsForSeat();
-      const menu=document.createElement('div'); menu.className='pk-invite-menu';
-      let html='<div class="im-ttl">空位</div>';
-      // 旁观中: 首选「我来坐」—— 起身后想玩就坐空位
-      if (spectating) html += `<button class="im-item" data-sit="1">🪑 我来坐这个位</button>`;
-      html += `<button class="im-item" data-fill="1">🤝 邀请灵魂来对战</button>`;
-      if(acts && acts.inviteHumans) html+='<button class="im-item" data-invite-human="1">👥 邀请真人来对战</button>';
-      menu.innerHTML=html;
-      const sitBtn=menu.querySelector('[data-sit]');
-      if(sitBtn) sitBtn.onclick=(e)=>{ e.stopPropagation(); closeInviteMenu(); resumeSeat(); };
-      room.appendChild(menu);
-      const rr=room.getBoundingClientRect(), ar=anchorEl.getBoundingClientRect();
-      menu.style.left=Math.min(Math.max(8, ar.left-rr.left+ar.width/2-110), Math.max(8, rr.width-228))+'px';
-      (function(){
-        const mh = menu.offsetHeight || 120;
-        const topAbove = ar.top - rr.top - mh - 6;
-        const topBelow = ar.bottom - rr.top + 6;
-        menu.style.top = (topAbove >= 8 ? topAbove : Math.min(topBelow, rr.height - mh - 8)) + 'px';
-      })();
-      const fill=menu.querySelector('[data-fill]'); if(fill) fill.onclick=()=>{ fillSeat(dbSeat); };
-      const ih=menu.querySelector('[data-invite-human]'); if(ih) ih.onclick=()=>{ if(acts&&acts.inviteHumans) acts.inviteHumans(); closeInviteMenu(); };
-      sfx('click');
-      setTimeout(()=>document.addEventListener('click', _imAway, true), 0);
-    }
+    // ★v59: 删除 openInviteMenu 招募弹窗 —— 点空位现在直接入座(见 bindLobbySeats / renderOpponents 座位点击)。
+    //   保留 closeInviteMenu/_imAway/fillSeat/freeSoulsForSeat 供 autoFillVacants 与防御性清理复用。
     function seatHTML(seat){
       if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p=st.players[seat];
@@ -1593,7 +1568,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         // 打牌态空位(机器人离场后): 点击 → 邀请补位菜单(机器人/灵魂/真人)
         els.table.querySelectorAll('.pk-vacant[data-invite]').forEach(el=>{
           const s=+el.dataset.invite;
-          el.onclick=()=>{ if (spectating||mySeat<0){ if (onGrabSeat){ onGrabSeat(s); } else { resumeSeat(s); } } else if (!isGuest){ openInviteMenu(s, el); } };   // ★fix: guest 无邀请权限, 不开菜单
+          el.onclick=()=>{ if (onGrabSeat){ onGrabSeat(s); } else { resumeSeat(s); } };   // ★v59: 点空位直接入座, 不再弹邀请菜单
         });
         // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
         //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
@@ -1973,10 +1948,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const occupied = st.players.filter(p=>p && p.kind && p.kind!=='empty').length;
       // T88: 招募提示(席位进度/今日次数)已移到顶部提示区 renderMsg, 底部操作区只留按钮, 不再混排 prehint
       if (empties>0) btns.push('<button class="pk-b fold" data-lob="fill">🤝 一键补满</button>');
-      btns.push('<button class="pk-b fold" data-lob="invite">👥 邀请真人</button>');   // ★fix: 邀请真人为次要操作, 不该与"开始"同色抢主行动视觉
       if (occupied>=2 && typeof a.start === 'function') btns.push('<button class="pk-b call" data-lob="start">▶ 开始</button>');
       els.acts.innerHTML = `<div class="pk-lobacts"><div class="pk-row">${btns.join('')}</div></div>`;
-      const map={ fill:a.fillSouls, invite:a.inviteHumans, start:a.start };
+      const map={ fill:a.fillSouls, start:a.start };   // ★v59: 移除喊人按钮(点空位直接入座取代)
       els.acts.querySelectorAll('[data-lob]').forEach(b=> bindTap(b, ()=>{ const f=map[b.dataset.lob]; if(typeof f==='function'){ closeInviteMenu(); f(); } }));
     }
     let _lastActsSig='';
@@ -2771,7 +2745,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastPotShown=-1;
       lastBoardSig='';
       lastMeSig='';
-      _lastActsSig='';   // ★fix: 清签名护栏, 免 renderActs 跳过渲染残留上局操作区按钮状态
+      setTimeout(() => { _lastActsSig=''; }, 50);   // ★fix(v59安卓): 延迟清签名护栏, 免合成 click 在 clearHandSelection 之后触发又误选过牌
       try{ els.acts.querySelectorAll('button').forEach(b=>b.blur()); }catch(_){}   // ★fix(安卓): 清焦点残留, 免合成 click 命中
     }
     function nextHand(){
