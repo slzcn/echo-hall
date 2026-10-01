@@ -2292,7 +2292,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         } catch(_) {}
       }
 
-      if (r && r.over){ renderAll(); setTimeout(()=>showOver(), r.result.wentToShowdown?450:200); return; }
+      if (r && r.over){ renderAll(); showOver(); return; }
       renderAll();
     }
 
@@ -2540,9 +2540,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           emitWallet();
           if (minimized) updateChip();
           // 自动发下一手: host 到点 nextHand; 客人等权威快照(applySnapshot 会清横幅接下一手)
+          // ★T91.1 再来一局直进: 自动发牌延迟从 2300ms 缩到 600ms(只留收筹码动画时间, 不再多等)
+          // journey-exempt: 再来一局直进(延迟缩短) — 复用 journey-poker-play 覆盖
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
           if (!isGuest){
-            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 2300);
+            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 600);
           }
           return;
         }
