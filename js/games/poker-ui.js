@@ -1270,7 +1270,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   journey-audio-mixer/journey-chat-core 既有覆盖, 纯 UI 增量, 无新整站旅程; 已 node --check 通过。
     // T86 边打边聊(轻): 右下 💬 浮钮点开快捷交流条 —— 预设短语/表情一键发(复用 chat.send 落进房间消息, 全房可见),
     //   需要打字再点 ⌨️ 展开小输入框。不常驻键盘、不占操作区高度, 不挡牌面。无 chat 桥(纯单机)则隐藏浮钮。
-    const QUICK_PHRASES = ['快点啊','这把稳了','诈唬的吧?','全下!','good game','让我想想'];
+    const QUICK_PHRASES = ['快点啊','这把稳了','诈唬?','全下!'];
     const QUICK_EMOJIS = ['😎','🃏','💰','🔥','😏','🫣'];
     // journey-exempt: 快捷交流条简化(去打字切换/集成输入框/表情走气泡/去toast) + 顶栏按钮组对齐(pk-bar-right)
     function initQuickChat(){
