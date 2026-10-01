@@ -1102,8 +1102,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
         <div class="pk-bar-right">
           <button class="pk-mus pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
-          <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
-          <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
+          <button class="pk-mus" id="pkMus" aria-label="氛围音乐" title="氛围音乐">${ICO_MUS_ON}</button>
+          <button class="pk-skin eh-skin" id="pkSkin" aria-label="皮肤" title="皮肤">🎨</button>
           <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
         </div>
       </div>

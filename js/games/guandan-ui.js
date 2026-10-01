@@ -934,8 +934,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
         <div class="gd-lvl" id="gdLvl"></div>
         <div class="gd-bar-right">
           <button class="gd-mus" id="gdSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
-          <button class="gd-mus" id="gdMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
-          <button class="gd-skin eh-skin" id="gdSkin" aria-label="换肤" title="换肤">🎨</button>
+          <button class="gd-mus" id="gdMus" aria-label="氛围音乐" title="氛围音乐">${ICO_MUS_ON}</button>
+          <button class="gd-skin eh-skin" id="gdSkin" aria-label="皮肤" title="皮肤">🎨</button>
           <button class="gd-auto" id="gdAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
           <button class="gd-x" id="gdX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
         </div>
