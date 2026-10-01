@@ -16,6 +16,7 @@
       return snap;
     }
     function resetSeq() { seq = 0; }
+    function setSeq(v) { if (typeof v === 'number' && v > seq) seq = v; }
     // seats: { remoteSeats:[], ids:[], mySeat, names[] }
     function acceptMove(seats, seat, move, payloadUid) {
       if (!seats || typeof seat !== 'number') return { ok: false, reason: 'bad_seat' };
@@ -72,6 +73,7 @@
     return Object.freeze({
       stamp: stamp,
       resetSeq: resetSeq,
+      setSeq: setSeq,
       acceptMove: acceptMove,
       resumeRemote: resumeRemote,
       sendAct: sendAct,
