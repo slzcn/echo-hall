@@ -699,6 +699,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const nm = (st.players[mySeat] && st.players[mySeat].name) || names[mySeat] || '我';
         // 腾出座位: 本地置空 + 通知 app 腾 DB 座(别人可坐 / 空位可再坐)
         const vacatedUid = (ids && ids[mySeat]) || null;
+        selfVacatedAvatar = avatars[mySeat];   // ★T92 存好原头像, 重新落座时恢复
+        selfVacatedName = names[mySeat];
         try{
           if (st.players[mySeat]){ st.players[mySeat].kind='empty'; st.players[mySeat].folded=true; }
           names[mySeat]='空位'; avatars[mySeat]='＋';
@@ -788,8 +790,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       isAI[mySeat] = false;
       if (personaBySeat) personaBySeat[mySeat] = null;
       preAct = null;
-      if (st.players[mySeat]){ st.players[mySeat].kind='human'; st.players[mySeat].folded=false; st.players[mySeat].name = (opts && opts.name) || '你'; }
-      names[mySeat]='你'; avatars[mySeat]=(opts && opts.avatar) || '🙂';
+      if (st.players[mySeat]){ st.players[mySeat].kind='human'; st.players[mySeat].folded=false; st.players[mySeat].name = selfVacatedName || (opts && opts.name) || '你'; }
+      names[mySeat]='你'; avatars[mySeat]=selfVacatedAvatar || (opts && opts.avatar) || '🙂';   // ★T92 优先恢复原头像, 不再用永远 undefined 的 opts.avatar
+      selfVacatedAvatar = null; selfVacatedName = null;
       if (ids) ids[mySeat]=(opts && opts.uid) || ids[mySeat] || myUid;
       stacks[mySeat]=stacks[mySeat]>0?stacks[mySeat]:seatBuyIn(mySeat);
       try{ toast('已入座 · 本手结束后上场', 2000); }catch(_){}
@@ -1967,6 +1970,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   'checkfold'=过牌/弃牌(总执行) · 'check'=只过牌(有人下注则作废) · 'callany'=跟任意注(无注则过牌)。
     let preAct = null;   // null | 'checkfold' | 'check' | 'callany'
     let selfVacatedUid = null;   // 我已让座: 记住原 uid, 名册重组不得把我还原回去
+    let selfVacatedAvatar = null, selfVacatedName = null;   // ★T92 让座前存好原头像/名字, 重新落座时恢复
     // 操作条禁用骨架: 与激活态【同高同结构】——三键禁用 + 滑杆/快捷占位隐藏。中键文案随状态变(等待/已弃牌/已全下/离线/已提交)。
     function actsSkeleton(callLbl){
       return `
