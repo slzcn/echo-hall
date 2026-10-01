@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20260930-v46';
+window.__EH_APP_VER = '20261001-v55';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1238,18 +1238,36 @@ function gtCheckNoHumansThenClose(row){
     }
   }, 1500);
 }
-// ★v54: 死房间检测 —— 所有真人都 away 且 host 心跳超过 30s 未更新 → 散桌
+// ★v55: 死房间检测(收紧) —— 全员 away 且 host 不在/away 且心跳超 60s 且无进行中手牌 → 散桌
 function _gtCheckDeadRoom(row){
   if(!row || !row.id || row.status==='closed') return false;
   const r = _gtTables.get(row.id) || row;
   if(!r || r.status==='closed') return false;
-  const humans=(r.seats||[]).filter(s=>s&&s.kind==='human');
+  const seats = r.seats||[];
+  const hostUid = r.host_uid;
+  const lastBeat = _gtLastHostAt;
+  const humans = seats.filter(s=>s&&s.kind==='human');
   if(!humans.length) return false;                 // 没真人 → 走 gtCheckNoHumansThenClose
-  const allAway=humans.every(s=>s.away);
-  if(!allAway) return false;                       // 有非 away 真人 → 不是死房间
-  // host 心跳超过 30s 未更新 → 判定死房间
-  const gap = Date.now() - _gtLastHostAt;
-  if(_gtLastHostAt > 0 && gap < 30000) return false; // 30s 内有心跳 → 还活着
+  // ★v55 收紧条件1: 所有真人座位都是 away(没有任何非 away 的真人)
+  if(!humans.every(s=>s.away)) return false;
+  // ★v55 收紧条件2: host_uid 对应的玩家在 seats 里不存在, 或明确标记了 away
+  const hostSeat = seats.find(s=>s&&s.kind==='human'&&s.uid===hostUid);
+  if(hostUid && hostSeat && !hostSeat.away) return false;
+  // ★v55 收紧条件3: 距离上次心跳超过 60s(从 30s 放宽, 避免正常桌被误判)
+  if(lastBeat > 0 && (Date.now() - lastBeat) < 60000) return false;
+  // ★v55 收紧条件4: 当前没有正在进行的手牌(gameState !== 'playing' 或底池为 0)
+  let gameState='idle', pot=0;
+  try{
+    if(_ehGame && _gtActiveTable && _gtActiveTable.id===r.id && _ehGame.state){
+      const st=_ehGame.state();
+      if(st){
+        if(st.phase && st.phase!=='over' && st.phase!=='lobby') gameState='playing';
+        if(typeof st.pot==='number') pot=st.pot;
+      }
+    }
+  }catch(_){}
+  if(gameState==='playing' && pot>0) return false;   // 有进行中且底池>0的手牌 → 绝不散
+  console.warn('[GT] dead room check triggered', { seats, hostUid, lastBeat });
   try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
   try{ toast('房间已解散（全员离开过久）'); }catch(_){}
   try{ _gtCleanupPlay(); }catch(_){}
@@ -3698,8 +3716,8 @@ function gtLaunchPoker(row, resumeSnap){
 // ── 旁观者: 满座时以旁观身份进入牌桌, 可看牌局但无操作按钮; 有空位时显示抢位按钮。──
 function gtSpectatePoker(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtSpectatePoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
-  // ★v54: 旁观前也检测死房间
-  if(_gtCheckDeadRoom(row)) return;
+  // ★v55: 旁观进桌瞬间不立刻判死房间(心跳可能还没同步), 10s 后再检测
+  setTimeout(function(){ try{ _gtCheckDeadRoom(row); }catch(_){} }, 10000);
   _gtCleanupPlay();
   _setPokerState('spectator', row.id);
   const A=gtSeatArrays(row);
@@ -3855,8 +3873,8 @@ async function _gtGrabSeat(row){
 async function _gtEnterPokerV2(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=_gtEnterPokerV2; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!ehDailyPlayGate('nlhe')) return;
-  // ★v54: 进桌前检测死房间 —— 全员 away 且 host 30s 无心跳 → 散桌
-  if(_gtCheckDeadRoom(row)) return;
+  // ★v55: 进桌瞬间不立刻判死房间(心跳可能还没同步), 10s 后再检测, 避免正常桌被误散
+  setTimeout(function(){ try{ _gtCheckDeadRoom(row); }catch(_){} }, 10000);
   // ★v54: 进桌时 host_uid 对应玩家 away 且 30s 无心跳 → 立刻接管，不等心跳超时
   try{
     const fr=_gtTables.get(row.id)||row;
