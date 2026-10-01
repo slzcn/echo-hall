@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v65';
+window.__EH_APP_VER = '20261001-v66';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -1096,7 +1096,7 @@ const _EH_GT_NET = (function(){
 function _gtRememberGame(id){ try{ if(id) localStorage.setItem('eh_last_game', String(id)); }catch(_){} }
 function _gtForgetGame(){ try{ localStorage.removeItem('eh_last_game'); }catch(_){} }
 function _gtLastGame(){ try{ return localStorage.getItem('eh_last_game') || ''; }catch(_){ return ''; } }
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
+function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveWaitingBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ★v64: 找下一个非 away 真人 uid 作为 host 转移目标(供 keepalive 离场和主动离场共用)
 function _gtFindNextHost(tableId){
@@ -1268,6 +1268,14 @@ function gtWireHostResume(chan, tableId, fallbackRow){
 let _gtPingT=null, _gtHostAliveT=null, _gtLastHostAt=0, _gtDbKeepT=null, _gtReconnGraceT=null, _gtLastHumanAct=0, _gtIdleCloseT=null;
 let _gtMyBeatTimer=null, _gtBeatCheckTimer=null; const _gtPlayerLastBeat=new Map(); const _gtOfflineSeats=new Set();
 let _gtTransferWaitT=null;let _gtSnapCache=new Map();   // ★fix: tableId → 最近一帧公共快照; 持有者(重新)开桌时用它 resume, 不重新发牌(防 host 离场回来 state 丢失)
+// ★v66 Bug7: _gtSnapCache 大小限制, 防止长期运行积累过多过期快照
+function _gtSnapCacheSet(tableId, snap){
+  if(_gtSnapCache.size>10){   // 超过 10 条 → 清到只留最近 5 条
+    var keys=Array.from(_gtSnapCache.keys());
+    for(var i=0;i<keys.length-5;i++){ _gtSnapCache.delete(keys[i]); }
+  }
+  _gtSnapCache.set(tableId, snap);
+}
 const GT_IDLE_CLOSE_MS=120000;   // 2 分钟无人操作 → 客户端主动散桌(比 eh_gt_reap 5min 更快回收僵尸/空挂桌)
 function _gtStopPing(){ if(_gtPingT){ clearInterval(_gtPingT); _gtPingT=null; } if(_gtHostAliveT){ clearInterval(_gtHostAliveT); _gtHostAliveT=null; } if(_gtDbKeepT){ clearInterval(_gtDbKeepT); _gtDbKeepT=null; } if(_gtReconnGraceT){ clearTimeout(_gtReconnGraceT); _gtReconnGraceT=null; } _gtStopIdleClose(); _gtLastHostAt=0; if(_gtMyBeatTimer){ clearInterval(_gtMyBeatTimer); _gtMyBeatTimer=null; } if(_gtBeatCheckTimer){ clearInterval(_gtBeatCheckTimer); _gtBeatCheckTimer=null; } _gtPlayerLastBeat.clear(); _gtOfflineSeats.clear(); if(_gtTransferWaitT){ clearTimeout(_gtTransferWaitT); _gtTransferWaitT=null; } }
 // 「真人在玩」时间戳: host 本机出牌(点动作区)/ 远程真人 act 都刷新它。gtStartHostPing 的 DB 心跳只在近
@@ -1310,6 +1318,9 @@ function gtCheckNoHumansThenClose(row){
     if(!fr) fr=_gtTables.get(r.id);
     if(!fr || fr.status==='closed') return;
     const still=(fr.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
+    // ★v66 Bug2: 除了检查非away的真人, 还要检查是否有任何真人(含away)——新玩家可能临时被标away
+    const anyHuman=(fr.seats||[]).filter(s=>s && s.kind==='human').length;
+    if(still===0 && anyHuman>0) return;  // 有真人(含away)就不散桌
     if(still===0){
       // ★v61: 再次检查 pokerSession, 5s 内有人进桌就不散
       if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
@@ -2903,7 +2914,8 @@ function gtHighlightsHtml(highlights){
     const wasExpanded = el.dataset.userExpanded === '1';
     el.innerHTML='<div class="gt-collapsed-row">🎴 '+g+' · 已散桌<span style="margin-left:auto;opacity:.6">点击展开</span></div>'
       +'<div class="gt-head"><span class="gk" style="color:var(--dim,#498d88)">🎴 '+g+' · 这桌已散</span></div>'
-      +'<div class="gt-foot"><span class="gt-tip" style="color:var(--dim,#498d88)">牌局已结束，往下发送 /'+(row.game==='nlhe'?'德州':row.game==='guandan'?'掼蛋':'斗地主')+' 可再开一桌</span></div>';
+      +'<div class="gt-foot"><span class="gt-tip" style="color:var(--dim,#498d88)">牌局已结束，往下发送 /'+(row.game==='nlhe'?'德州':row.game==='guandan'?'掼蛋':'斗地主')+' 可再开一桌</span></div>'
+      +(function(){ try{ return gtHighlightsHtml(row.highlights); }catch(_){ return ''; } })();
     if(wasExpanded){
       el.classList.remove('collapsed'); el.onclick=null;
     } else {
@@ -3348,7 +3360,7 @@ function gtLaunchDdzLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       bumpGameStats('doudizhu', res, A);
-      postDdzResult(res, A.names).catch(()=>{});
+      postDdzResult(res, A.names, A.ids).catch(()=>{});
       // ★v64: 一局打完处理等待队列——斗地主固定阵型, 只在局间安排落座
       try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
@@ -3441,7 +3453,7 @@ function gtLaunchGuandanLobby(row){
       const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       bumpGameStats('guandan', res, A);
-      postGuandanResult(res,log,A.names,meta).catch(()=>{});
+      postGuandanResult(res,log,A.names,meta,A.ids).catch(()=>{});
       // ★v64: 一局打完处理等待队列——掼蛋固定阵型, 只在局间安排落座
       try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
@@ -3849,15 +3861,15 @@ async function gtLaunchPoker(row, resumeSnap){
       _gtPlayerLastBeat.set(p.payload.uid, Date.now());
     }
   });
-  // host 每 10 秒检查: 超过 20 秒无心跳 → 标记断线(away) + 广播 player_offline
+  // host 每 10 秒检查: 超过 30 秒无心跳 → 标记断线(away) + 广播 player_offline  ★v66: 20s→30s 避免网络抖动误判
   _gtBeatCheckTimer = setInterval(function(){
     var now = Date.now();
     var fr = _gtTables.get(row.id) || row;
     (fr.seats || []).forEach(function(s){
       if(!s || s.kind!=='human' || !s.uid || s.uid===myUid || s.away) return;
       var last = _gtPlayerLastBeat.get(s.uid);
-      if(last && now - last > 20000){
-        // 超过 20 秒无心跳, 标记断线
+      if(last && now - last > 30000){
+        // 超过 30 秒无心跳, 标记断线
         try{ gtHostMarkAway(row.id, s.uid, true); }catch(_){}
         try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'player_offline', payload:{uid: s.uid, seat: s.seat}}); } }catch(_){}
         _gtPlayerLastBeat.delete(s.uid);
@@ -3984,7 +3996,7 @@ function gtSpectatePoker(row){
   chan.on('broadcast',{event:'snap'}, ({payload})=>{
       if(!_ehGame||!_ehGame.applySnapshot||!payload) return;
       try{ _ehGame.applySnapshot(payload); }catch(e){ _ehCatch('applySnapshot',e); window.ehReportError('manual', 'snapshot_apply_failed', { error: e && e.message }); }
-      try{ _gtSnapCache.set(row.id, payload); }catch(_){}   // ★fix: 旁观者也缓存快照, 坐下接管时用它 resume
+      try{ _gtSnapCacheSet(row.id, payload); }catch(_){}   // ★fix: 旁观者也缓存快照, 坐下接管时用它 resume
     });
   // 收到 seat_taken 广播: 有旁观者入座, 强制刷新座位显示
   chan.on('broadcast',{event:'seat_taken'}, ({payload})=>{
@@ -4078,6 +4090,26 @@ function _gtShowAwayBar(tableId){
 }
 function _gtRemoveAwayBar(){
   var bar=document.getElementById('_gtAwayBar');
+  if(bar){ try{ bar.remove(); }catch(_){} }
+}
+// ★v66 Bug6: 旁观等待持续提示条(类似 away bar)
+function _gtShowWaitingBar(tableId){
+  _gtRemoveWaitingBar();
+  var bar=document.createElement('div');
+  bar.id='_gtWaitingBar';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9998;display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(0,20,40,.92);border-top:1px solid #00e5ff;box-shadow:0 -2px 12px rgba(0,229,255,.3),0 0 24px rgba(0,229,255,.08) inset;';
+  bar.innerHTML='<span style="color:#00e5ff;font-size:14px;font-weight:600;letter-spacing:.5px;text-shadow:0 0 6px rgba(0,229,255,.5)">等待空位中 · 局间自动入座</span>'
+    +'<button id="_gtWaitingBack" style="padding:8px 18px;border:1px solid rgba(0,229,255,.5);border-radius:9px;background:transparent;color:#00e5ff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:background .15s">返回聊天室</button>';
+  document.body.appendChild(bar);
+  var btnBack=document.getElementById('_gtWaitingBack');
+  if(btnBack) btnBack.onclick=function(){
+    _gtRemoveWaitingBar();
+    try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
+    _gtCleanupPlay();
+  };
+}
+function _gtRemoveWaitingBar(){
+  var bar=document.getElementById('_gtWaitingBar');
   if(bar){ try{ bar.remove(); }catch(_){} }
 }
 function _gtShowWaitNextHand(){
@@ -4180,7 +4212,7 @@ async function _gtEnterPokerV2(row){
   chan.on('broadcast',{event:'snap'}, ({payload})=>{
       if(!_ehGame||!_ehGame.applySnapshot||!payload) return;
       try{ _ehGame.applySnapshot(payload); }catch(e){ _ehCatch('applySnapshot',e); window.ehReportError('manual', 'snapshot_apply_failed', { error: e && e.message }); }
-      try{ _gtSnapCache.set(row.id, payload); }catch(_){}   // ★fix: 缓存最近一帧快照, 持有者(重新)开桌时用它 resume
+      try{ _gtSnapCacheSet(row.id, payload); }catch(_){}   // ★fix: 缓存最近一帧快照, 持有者(重新)开桌时用它 resume
       if(payload.handNo!==lastPulled){
         lastPulled=payload.handNo;
         // ★v34: 新手开始 → 清 waitNextHand 状态, 提示条消失
@@ -4352,7 +4384,7 @@ function gtLaunchGuandan(row){
     onResult:(res,log,meta)=>{
       recordGuandanResult(res,log,A.names,A.avatars,soulPick).catch(()=>{});
       bumpGameStats('guandan', res, A);
-      postGuandanResult(res,log,A.names,meta).catch(()=>{});
+      postGuandanResult(res,log,A.names,meta,A.ids).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「打下一副」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
       // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
@@ -4380,11 +4412,13 @@ function _gtEnterWaiting(row){
       }
     });
     chan.on('broadcast',{event:'dissolve'}, function(){
+      try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
       try{ _gtCleanupPlay(); toast('牌桌已解散'); }catch(_){}
       try{ _gtHideTableCard(row.id); }catch(_){}
     });
     gtBindConnStatus(chan, { onReconnected:function(){ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){} } });
     try{ toast('旁观中 · 等这局打完后自动入座', 2500); }catch(_){}
+    try{ _gtShowWaitingBar(row.id); }catch(_){}
   }catch(e){ _ehCatch('gtEnterWaiting', e); }
 }
 
@@ -4478,7 +4512,7 @@ function gtLaunchDdz(row){
     onResult:(res,log,meta)=>{
       recordGameResult('doudizhu', res, log, A.names, A.avatars, soulPick).catch(()=>{});
       bumpGameStats('doudizhu', res, A);
-      postDdzResult(res, A.names).catch(()=>{});
+      postDdzResult(res, A.names, A.ids).catch(()=>{});
       // 三家一致(对齐德州 #58): 一副打完 ≠ 整桌终结 —— 点「再来一局」是本机 newDeal 就地重开同一张桌,
       // 桌子一直活着。若此刻标 done 会释放唯一活桌索引(可重复开桌)且让刷新/重连的 guest 翻到 done 进不来。
       // 牌桌保持 playing, 只在房主「收工」(onExit)时散桌; 房主真弃桌交给陈旧桌自动作废兜底(#59)。
@@ -9315,7 +9349,7 @@ async function recordTexasResult(res, log, names, avatars, souls, meta){
 }
 // 结束后往聊天室发一张斗地主战绩卡(kind:'game', ddz 事件)。含胜负/角色/得分/倍数/炸弹/春天 + 再来一局入口。
 //   编码见 buildGameEl 的 ddz 分支。走与普通消息同一条本地回显+落库路径(insert 后回填真实 mid 供 realtime 去重)。
-async function postDdzResult(res, names){
+async function postDdzResult(res, names, ids){
   if(!myUid || !curRoom) return;
   const win  = res.winners.includes(0) ? 'win' : 'lose';
   const role = (res.landlord===0) ? 'lord' : 'peasant';
@@ -9344,6 +9378,8 @@ async function postDdzResult(res, names){
   if((res.finalMultiplier||1)>=6) tags.push(res.finalMultiplier+'倍');
   const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+' '+(role==='lord'?'地主':'农民')+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
   pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'ddz', emoji:'🃏', text:txt });
+  // ★v66 Bug5: 斗地主结算也调宿敌系统(刷新 rival badge + 记忆注入)
+  try{ if(ids&&ids.length) ehCheckRivals(names,ids).then(function(rivals){ rivals.forEach(function(r){ _ehRivalCache[r.uid]=r.info; }); }); }catch(_){}
 }
 // ── 历史积分累加: host 上报有真实身份的真人与灵魂；匿名机器人和空位不记账。
 //   灵魂虽由 AI 代打，积分仍属于它自己的 uid，不能按 isAI 排除。
@@ -9449,7 +9485,7 @@ async function launchGuandan(){
   }
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
-async function postGuandanResult(res, log, names, meta){
+async function postGuandanResult(res, log, names, meta, ids){
   if(!myUid || !curRoom) return;
   const mySeat=(meta&&meta.mySeat)||0;
   const myTeam=mySeat%2;
@@ -9481,6 +9517,8 @@ async function postGuandanResult(res, log, names, meta){
   if((res.bombs||0)>=2) tags.push(res.bombs+'炸'); if(myRankIdx===0) tags.push('头游');
   const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+'队'+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
   pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'gd', emoji:'🎴', text:txt });
+  // ★v66 Bug5: 掼蛋结算也调宿敌系统(刷新 rival badge + 记忆注入)
+  try{ if(ids&&ids.length) ehCheckRivals(names,ids).then(function(rivals){ rivals.forEach(function(r){ _ehRivalCache[r.uid]=r.info; }); }); }catch(_){}
 }
 // 记录掼蛋战绩(seed+log 供复核/回看)。4 席结构; 失败静默。
 async function recordGuandanResult(res, log, names, avatars, souls){
@@ -9969,7 +10007,7 @@ function ixFloatUp(str, tx, ty){
 
 // ============ toast ============
 let toastT=null;
-function toast(msg){ const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(String(msg||''))){ try{ EhSfx.play('error'); }catch(e){} } t.textContent=String(msg==null?"":msg); t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+function toast(msg, dur){ const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(String(msg||''))){ try{ EhSfx.play('error'); }catch(e){} } t.textContent=String(msg==null?"":msg); t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'), dur||2600); }
 // 后端错误 → 友好中文: 只在后端返回的是中文说明时采用它, 否则用 fallback。防原始英文码
 // (unauthorized/forbidden/not_found 等)直接弹给用户(见截图)。
 function friendlyErr(raw, fallback){ return (raw && /[一-龥]/.test(String(raw))) ? String(raw) : (fallback||'操作失败，请重试'); }
@@ -11671,6 +11709,8 @@ async function ehLegendMoment(uid,name,trigger,game,extra){
     ehLegendMomentShow(uid,name,finalText,trigger);
     // 存储
     ehLegendStore(uid,{t:Date.now(),text:finalText,trigger:trigger,game:game});
+    // ★v66 Bug4: 传说时刻也推进牌桌 highlights 动态带, 确保持久化
+    try{ pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'legend', emoji:'🌟', text:'传说 · '+finalText }); }catch(_){}
   }catch(e){ _ehCatch('ehLegendMoment',e); }
 }
 
