@@ -2734,6 +2734,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
         });
       }
       if(iWon){ const big=res.matchWon||res.doubleDown; sfx('sparkle'); setTimeout(()=>sfx(big?'spring':'bloom'),220);
+        // ★T92 赢牌震动: 与德州 collect 一致(我赢=强震, 对手赢=轻震)
+        try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(big?[12,40,8,40,16]:10); }catch(_){}
         // 分级高光: 通关(打过A)/双下=名场面(tier3+横幅) · 连升2级=大牌型(tier2) · 常规=轻彩带(tier1)
         if (window.EHTableFx){
           let tier=1, label='', sub='';

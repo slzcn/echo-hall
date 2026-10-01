@@ -2333,6 +2333,8 @@ html[data-mode="day"] .ddz-felt::before{
       // 胜负音效 + 彩带
       if (iWon){
         sfx('sparkle'); setTimeout(()=>sfx(res.spring?'spring':'bloom'), 220);
+        // ★T92 赢牌震动: 与德州 collect 一致
+        try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(res.spring?[12,40,8,40,16]:10); }catch(_){}
         // 分级高光: 春天/反春天=名场面(tier3+横幅) · 炸弹翻倍/高倍=大牌型(tier2) · 常规=轻彩带(tier1) · 连胜叠加升档
         if (window.EHTableFx){
           let tier=1, label='', sub='';
