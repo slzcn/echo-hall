@@ -964,7 +964,7 @@
   .gt-badge.closed{background:color-mix(in srgb,var(--line2) 16%,transparent);color:var(--dim,#4b5563);border:1px solid color-mix(in srgb,var(--line2) 30%,transparent)}
   /* 卡片时间戳: 与文字气泡对齐语义, 块卡右下角、verdict 小卡单独一行居中, 一律极淡不抢内容 */
   .game-card .gc-time{margin-top:8px;text-align:right;font-size:10.5px;color:var(--dim);opacity:.7;letter-spacing:.3px}
-  /* ★v67 Bug12: 手机上 gt-card/game-card 宽度撑满聊天区域, 不要多余的左右 margin */
+  /* ★v66 Bug12: 手机上 gt-card/game-card 宽度撑满聊天区域, 不要多余的左右 margin */
   @media (max-width: 520px){
     .gt-card, .game-card{ margin-left:0 !important; margin-right:0 !important; }
   }
@@ -2185,6 +2185,107 @@
 </style>
 </head>
 <body>
+<!-- ===== eh-splash: 进站 logo 呼吸展开动画(v68) =====
+     浏览器直接访问时: 先放一段 logo 呼吸展开(放大+淡入→轻微缩小→展开到正常),
+     再上移淡出, 同时登录卡片从下方淡入, 约 2.3s。点击任意处可跳过。
+     PWA standalone 模式由 #pwaSplash 接管, 这里跳过避免重复遮罩。 -->
+<div id="eh-splash" aria-hidden="true">
+  <div class="eh-splash-logo">
+    <div class="eh-splash-emoji">🦊</div>
+    <div class="eh-splash-word">回声厅</div>
+  </div>
+</div>
+<style>
+  /* eh-splash: 进站 logo 呼吸展开动画 */
+  #eh-splash{position:fixed;inset:0;z-index:99990;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;cursor:pointer;
+    background:var(--bg,#070a12);opacity:1;transition:opacity .45s ease}
+  #eh-splash.eh-hide{opacity:0;pointer-events:none}
+  /* 动画期间禁止滚动 */
+  body.eh-splashing{overflow:hidden;height:100%;touch-action:none}
+  /* 底层登录区初始隐藏, 呼吸结束才淡入, 避免与开屏叠画 */
+  body.eh-splashing #enter .glass.enter-card{opacity:0}
+  .eh-splash-logo{display:flex;flex-direction:column;align-items:center;gap:14px;
+    animation:eh-breathe 1.8s cubic-bezier(.2,.8,.2,1) both}
+  #eh-splash.eh-rise .eh-splash-logo{animation:eh-logo-rise .5s cubic-bezier(.3,.8,.3,1) forwards}
+  .eh-splash-emoji{font-size:68px;line-height:1;
+    filter:drop-shadow(0 0 20px color-mix(in srgb,var(--cyan) 60%,transparent))}
+  .eh-splash-word{font-size:36px;font-weight:900;letter-spacing:7px;text-indent:7px;
+    background:linear-gradient(110deg,var(--cyan) 0%,#eafcff 18%,var(--magenta) 42%,var(--violet) 60%,var(--cyan) 82%,#eafcff 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 26px color-mix(in srgb,var(--cyan) 45%,transparent)}
+  /* 呼吸: 缩小淡入 → 略放大 → 轻微缩小(呼气) → 展开到正常 */
+  @keyframes eh-breathe{
+    0%{transform:scale(.7);opacity:0}
+    35%{transform:scale(1.05);opacity:1}
+    55%{transform:scale(.95);opacity:1}
+    100%{transform:scale(1);opacity:1}
+  }
+  /* 呼吸完成: logo 向上移动淡出, 让位给登录区 */
+  @keyframes eh-logo-rise{
+    0%{transform:translateY(0);opacity:1}
+    100%{transform:translateY(-60px);opacity:0}
+  }
+  /* 登录卡片从下方淡入 */
+  #enter.enter-reveal .glass.enter-card{animation:eh-login-fadein .5s ease both}
+  @keyframes eh-login-fadein{
+    0%{opacity:0;transform:translateY(30px)}
+    100%{opacity:1;transform:none}
+  }
+  /* 日间模式: 开屏底色由主题变量决定, 自动浅底 */
+  html[data-mode="day"] #eh-splash{background:var(--bg,#eef1f6)}
+  /* 尊重 reduced-motion: 跳过开屏动画, 直接进登录 */
+  @media(prefers-reduced-motion:reduce){
+    #eh-splash{display:none!important}
+    body.eh-splashing{overflow:auto;height:auto;touch-action:auto}
+    body.eh-splashing #enter .glass.enter-card{opacity:1}
+  }
+</style>
+<script>
+  (function(){
+    try{
+      var s=document.getElementById('eh-splash'); if(!s) return;
+      /* PWA standalone 由 #pwaSplash 接管, 直接移除 eh-splash 避免叠遮罩
+         (此处本脚本先于 pwaSplash 脚本执行, 故自行判 standalone 而非读 class) */
+      var standalone=(window.matchMedia&&matchMedia('(display-mode:standalone)').matches)
+        || window.navigator.standalone===true
+        || document.referrer.indexOf('android-app://')===0;
+      if(standalone){ s.remove(); return; }
+      var reduced=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if(reduced) return;  /* CSS 已隐藏 splash, 直接走正常登录 */
+      /* 动画期间禁止滚动; 此时 #enter 可能尚未解析, 用 CSS 兜底隐藏其卡片 */
+      document.body.classList.add('eh-splashing');
+      var done=false, risen=false, tRise, tEnd;
+      /* 1.8s 呼吸结束: logo 上移淡出 + splash 整体淡出 + 登录卡片从下方淡入 */
+      function reveal(){
+        if(risen) return; risen=true;
+        s.classList.add('eh-rise');    /* logo 向上移动淡出 */
+        s.classList.add('eh-hide');    /* splash 整体淡出, 露出底层登录区 */
+        var enter=document.getElementById('enter');
+        if(enter) enter.classList.add('enter-reveal');
+      }
+      /* 2.3s 后(或点击跳过): 恢复滚动并移除遮罩节点 */
+      function end(){
+        if(done) return; done=true;
+        clearTimeout(tRise); clearTimeout(tEnd);
+        if(!risen) reveal();          /* 跳过时确保登录区已显出 */
+        document.body.classList.remove('eh-splashing');
+        setTimeout(function(){ try{ s.remove(); }catch(_){} }, 500);
+      }
+      /* 点击/触屏任意处可跳过动画, 直接进入登录界面 */
+      s.addEventListener('click', end, {once:true});
+      s.addEventListener('touchstart', end, {once:true, passive:true});
+      tRise=setTimeout(reveal, 1800);
+      tEnd=setTimeout(end, 2300);
+      /* 安全兜底: 异常未移除则 4s 强制清 */
+      setTimeout(function(){ if(!done) end(); }, 4000);
+    }catch(e){
+      /* 任何异常都不挡登录: 强制移除遮罩 */
+      try{ var s=document.getElementById('eh-splash'); if(s) s.remove();
+        document.body.classList.remove('eh-splashing'); }catch(_){}
+    }
+  })();
+</script>
   <!-- ===== PWA 进站开屏(仅 standalone 装成 App 时显示; 浏览器直接开不显, 避免每次刷新都挡一下) =====
        ★直接用主 logo 图片(app 图标本体 icon-512.png), 保证开屏 logo 与桌面图标像素级完全一致;
        叠加动画: 整体呼吸缩放 + 图标下青色辉光脉冲发散(呼应"回声波纹")。~1.4s 后淡出。
@@ -2276,7 +2377,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20261001-v67';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20261001-v68';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2755,52 +2856,52 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script defer src="./js/config.js?v=20261001-v67"></script>
-<script defer src="./js/config-runtime.js?v=20261001-v67"></script>
+<script defer src="./js/config.js?v=20261001-v68"></script>
+<script defer src="./js/config-runtime.js?v=20261001-v68"></script>
 <!-- 斗地主小游戏引擎(纯函数内核,客户端与未来 Edge 共用同一份) -->
-<script defer src="./js/games/deck.js?v=20261001-v67"></script>
+<script defer src="./js/games/deck.js?v=20261001-v68"></script>
 <!-- 牌桌内嵌聊天坞 + 弹幕(F2 边打边聊): 两桌共用, 须在 game-ui/guandan-ui 之前加载 -->
-<link rel="stylesheet" href="./js/games/table-shared.css?v=20261001-v67">
-<script defer src="./js/games/table-chat.js?v=20261001-v67"></script>
+<link rel="stylesheet" href="./js/games/table-shared.css?v=20261001-v68">
+<script defer src="./js/games/table-chat.js?v=20261001-v68"></script>
 <!-- 横竖屏切换(仍在聊天室内): 对牌桌浮层做 CSS rotate, 三款 UI 顶栏 ⟳ 钮调用 window.EHTableOrient -->
-<script defer src="./js/games/table-orient.js?v=20261001-v67"></script>
+<script defer src="./js/games/table-orient.js?v=20261001-v68"></script>
 <!-- 牌桌高光引擎(三游戏共用分级庆祝): 须先于三款 UI 就绪, UI showOver 读 window.EHTableFx -->
-<script defer src="./js/games/table-fx.js?v=20261001-v67"></script>
+<script defer src="./js/games/table-fx.js?v=20261001-v68"></script>
 <!-- 斗地主真人联机传输层(脱敏快照 · 防作弊): 必须先于 game-ui 加载, UI 启动时读 window.EHDdzNet -->
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
-<script defer src="./js/games/table-net.js?v=20261001-v67"></script>
-<script defer src="./js/game-loader.js?v=20261001-v67"></script>
-<script defer src="./js/sfx-engine.js?v=20261001-v67"></script>
-  <script defer src="./js/modules/lobby.js?v=20261001-v67"></script>
-  <script defer src="./js/modules/gt-net.js?v=20261001-v67"></script>
-  <script defer src="./js/modules/score.js?v=20261001-v67"></script>
-<script defer src="./js/modules/auth.js?v=20261001-v67"></script>
-<script defer src="./js/modules/bgm.js?v=20261001-v67"></script>
-<script defer src="./js/modules/room.js?v=20261001-v67"></script>
-<script defer src="./js/modules/messages.js?v=20261001-v67"></script>
-<script defer src="./js/app.js?v=20261001-v67"></script>
-<script defer src="./js/keyboard.js?v=20261001-v67"></script>
-<script defer src="./js/boot.js?v=20261001-v67"></script>
-<script defer src="./js/dm.js?v=20261001-v67"></script>
+<script defer src="./js/games/table-net.js?v=20261001-v68"></script>
+<script defer src="./js/game-loader.js?v=20261001-v68"></script>
+<script defer src="./js/sfx-engine.js?v=20261001-v68"></script>
+  <script defer src="./js/modules/lobby.js?v=20261001-v68"></script>
+  <script defer src="./js/modules/gt-net.js?v=20261001-v68"></script>
+  <script defer src="./js/modules/score.js?v=20261001-v68"></script>
+<script defer src="./js/modules/auth.js?v=20261001-v68"></script>
+<script defer src="./js/modules/bgm.js?v=20261001-v68"></script>
+<script defer src="./js/modules/room.js?v=20261001-v68"></script>
+<script defer src="./js/modules/messages.js?v=20261001-v68"></script>
+<script defer src="./js/app.js?v=20261001-v68"></script>
+<script defer src="./js/keyboard.js?v=20261001-v68"></script>
+<script defer src="./js/boot.js?v=20261001-v68"></script>
+<script defer src="./js/dm.js?v=20261001-v68"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script defer src="./js/ambient-fx.js?v=20261001-v67"></script>
+<script defer src="./js/ambient-fx.js?v=20261001-v68"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- debug-overlay 仍下线（V44 主人验收干净效果），需调试时取消注释
-<script defer src="./js/debug-overlay.js?v=20261001-v67"></script>
+<script defer src="./js/debug-overlay.js?v=20261001-v68"></script>
 -->
 <!-- ★键盘诊断浮层放回加载: 内部门禁(仅 ?kbdebug / localStorage / 安卓)才挂, 普通用户无感。
      此前它被整段注释掉 = 无论怎么刷都看不到浮层的真因。 -->
-<script defer src="./js/kbdebug.js?v=20261001-v67"></script>
+<script defer src="./js/kbdebug.js?v=20261001-v68"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script defer src="./js/sw-register.js?v=20261001-v67"></script>
+<script defer src="./js/sw-register.js?v=20261001-v68"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script defer src="./js/pwa-install.js?v=20261001-v67"></script>
+<script defer src="./js/pwa-install.js?v=20261001-v68"></script>
 
-<script defer src="./js/pull-refresh.js?v=20261001-v67"></script>
+<script defer src="./js/pull-refresh.js?v=20261001-v68"></script>
 <!-- ★内联键盘探针(双保险): 内联=随导航请求走, 不受外部 js 文件持久缓存影响; 无条件执行, 必然显示。
      ?kbdebug 时在屏幕【顶部】显真机视口信号(键盘盖不到顶); 用于定位主聊天室"输入框被键盘遮"到底差在哪个信号。
      普通访问(无参数)完全不挂, 无感。带 ?nokbdebug 关闭。 -->
