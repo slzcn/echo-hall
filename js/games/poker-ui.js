@@ -141,23 +141,19 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
 .pk-acts>.pk-row>.pk-b{height:54px;min-height:54px;box-sizing:border-box}
 /* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
    悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
-.pk-mus,.pk-x{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
-  display:flex;align-items:center;justify-content:center;color:var(--sub);
-  border:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
-  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
-  transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
-.pk-mus{margin-left:0}
-.pk-bar-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
+/* ★T93 完全 copy 聊天室 .tool-btn 风格(交互/显示一致): 44×44 圆角12 + panel底 + hover/active/active态 */
+.pk-mus,.pk-x,.pk-skin{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
+  display:grid;place-items:center;color:var(--sub);font-size:16px;user-select:none;
+  border:1px solid var(--line);background:var(--panel);transition:.18s}
+.pk-bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .pk-ico{width:18px;height:18px;display:block}
-.pk-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
-.pk-mus:active:active,.pk-x:active{transform:scale(.92)}
-.pk-mus.muted{color:var(--dim);opacity:.8}
-.pk-rot.on{color:var(--accent);border-color:var(--accent);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px color-mix(in srgb, var(--accent) 50%, transparent)}
-.pk-x:hover{color:var(--magenta);border-color:color-mix(in srgb,var(--magenta) 55%,transparent);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--magenta) 30%, transparent)}
+.pk-mus:hover,.pk-x:hover,.pk-skin:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));box-shadow:0 0 16px -4px var(--accent,var(--cyan))}
+.pk-mus:active,.pk-x:active,.pk-skin:active{transform:scale(.92)}
+.pk-mus.muted{opacity:.55;filter:grayscale(.4)}
+/* BGM 按钮: 开=轻微呼吸, 静音=灰淡(与聊天室 bgm-btn 同款) */
+.pk-mus:not(.muted){animation:pkBgmBreath 2.4s ease-in-out infinite}
+@keyframes pkBgmBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.pk-rot.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 /* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距, 给盲注 chip 让位(三钮已纯图标, 无需收字) */
 @media (max-width:379px){
   .pk-bar{gap:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
@@ -194,7 +190,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-board{display:flex;gap:5px;min-height:var(--ch,48px);align-items:center;justify-content:center;flex-wrap:wrap}
 .pk-board .card.flip-in{animation:pkFlip .34s cubic-bezier(.2,.9,.3,1) both}
 @keyframes pkFlip{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
-.pk-msg{font-size:var(--banner,13px);color:var(--sub);min-height:16px;text-align:center}
+.pk-msg{font-size:var(--banner,13px);color:var(--sub);min-height:16px;text-align:center;padding:8px 16px}
 .pk-msg.mine{color:var(--ink);font-weight:800;text-shadow:0 0 8px color-mix(in srgb, var(--accent) 75%, transparent);border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb, var(--accent) 26%, transparent),color-mix(in srgb, var(--accent) 5%, transparent));animation:pkTurnPulse 1.05s ease-in-out infinite}
 /* 轮到自己行动: 提示条化作发光脉冲胶囊(halo+微缩放, 纯 box-shadow/transform 不改盒模型→不引入跳动) */
 @keyframes pkTurnPulse{0%,100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent),0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}50%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 70%,transparent),0 0 16px 3px color-mix(in srgb,var(--accent) 55%,transparent)}}
@@ -345,7 +341,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-room .pk-board .card.back.dim{opacity:.6}
 .card.dim{opacity:.5}
 /* 我的座位条 */
-.pk-me{display:flex;align-items:center;justify-content:center;gap:12px;padding:4px 16px 0;flex-shrink:0}  /* 居中 */
+.pk-me{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px 4px;flex-shrink:0}  /* 居中 */
 .pk-me .pk-hole{display:flex;gap:6px}
 .pk-me .pk-hole .card.justdealt{animation:pkDeal .34s ease both}
 @keyframes pkDeal{from{transform:translateY(30px) scale(.7);opacity:0}to{transform:none;opacity:1}}
@@ -358,7 +354,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-me .pk-nm{font-size:14px;font-weight:800;color:var(--ink);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-me .pk-nm.turn{color:var(--accent)}
 .pk-me .pk-stk{font-size:13px;color:var(--amber);font-weight:800;font-variant-numeric:tabular-nums}
-.pk-me .pk-hint{font-size:11px;color:var(--sub);min-height:14px}
+.pk-me .pk-hint{font-size:11px;color:var(--sub);min-height:14px;line-height:1.5;padding:2px 0}
 .pk-me .pk-hint b{color:var(--accent)}
 .pk-spectate-tag{font-size:11px;color:var(--sub);margin-right:8px;white-space:nowrap}
 /* 旁观态: 收掉 pk-me; 操作区保持与打牌态同高(三键常驻), 不闪不跳 */
@@ -1284,6 +1280,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       pop.addEventListener('click',(e)=>{
         const chip=e.target.closest('[data-say]'); if(chip){ doSend(chip.dataset.say); return; }
       });
+      // ★T93 点操作区(按钮/输入框/交流条自身)保持打开, 方便随时聊天; 点非按钮区域(桌面/座位/空白)则关闭
+      room.addEventListener('pointerdown',(e)=>{
+        if(!open) return;
+        const inPop = pop.contains(e.target);
+        const inFab = fab.contains(e.target);
+        const inActs = e.target.closest('.pk-acts button, .pk-acts input, .pk-me button, .pk-chat-pop, .pk-chat-fab');
+        if(inPop || inFab || inActs) return;   // 点按钮区/交流条: 保持打开
+        closePop();
+      }, true);
     }
     try{ root.addEventListener('eh:audio-prefs', ()=>{ paintMus(); paintSfx(); }); }catch(_){}
     paintMus(); paintSfx();
@@ -2030,18 +2035,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           renderPreActBar();
           return;
         }
-        let callLbl='等待中';
-        if (offline) callLbl = (connState==='host_offline'?'对手掉线':'连接中…');
-        else if (st.phase==='seating') callLbl='等人入座';
-        else if (st.phase==='waiting') callLbl='等待发牌';
-        else if (st.phase==='showdown'||st.phase==='over') callLbl='本手结束';
-        else if (p && p.folded) callLbl='已弃牌 · 观战';
-        else if (p && p.allin) callLbl='已全下 · 等摊牌';
-        // 签名护栏: 非我回合 skeleton 文案不变就不重建(等对手时每秒一次的 renderAll 不再白白重建操作区)
-        const sig='wait:'+callLbl;
+        // ★T93 提示统一到顶部: 底部只放高度占位, 不再重复状态文案(已弃牌/全下/等待等)
+        const sig='wait:'+(p&&p.folded?'f':p&&p.allin?'a':'w')+st.phase+offline;
         if(!force && sig===_lastActsSig) return;
         _lastActsSig=sig;
-        // ★T92 提示统一到顶部: 底部只放高度占位, 不再重复状态文案
         els.acts.innerHTML = actsWaitBar();
         return;
       }

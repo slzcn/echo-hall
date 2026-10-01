@@ -81,9 +81,9 @@ assert(/\.pk-over \.pk-showbox\{[^}]*border-top/.test(PK), '结算摊牌区上�
 assert(/#hall:has\(\.pk-room:not\(\[style\*="display: none"\]\)\)[\s\S]{0,400}\.song-jump\{display:none/.test(HTML),
   'index.html 用 :has() 在牌桌展开时隐藏 to-latest/mention-jump/song-jump');
 // C5. 三桌顶栏都有牌桌内背景音乐开关按钮(大厅 🎵 被浮层盖住, 打牌时也要能开关 BGM)
-assert(/id="pkMus"/.test(PK) && /\.pk-mus\{/.test(PK), '德州顶栏有 BGM 开关 pkMus');
-assert(/id="gdMus"/.test(GD) && /\.gd-mus\{/.test(GD), '掼蛋顶栏有 BGM 开关 gdMus');
-assert(/id="ddzMus"/.test(DDZ) && /\.ddz-mus\{/.test(DDZ), '斗地主顶栏有 BGM 开关 ddzMus');
+assert(/id="pkMus"/.test(PK) && /\.pk-mus[,{]/.test(PK), '德州顶栏有 BGM 开关 pkMus');
+assert(/id="gdMus"/.test(GD) && /\.gd-mus[,{]/.test(GD), '掼蛋顶栏有 BGM 开关 gdMus');
+assert(/id="ddzMus"/.test(DDZ) && /\.ddz-mus[,{]/.test(DDZ), '斗地主顶栏有 BGM 开关 ddzMus');
 for(const [name, src] of [['poker', PK], ['guandan', GD], ['ddz', DDZ]]){
   assert(/root\.EH_BGM/.test(src), `${name} BGM 开关复用 EH_BGM 控制器(不另造音频实现)`);
 }

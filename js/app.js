@@ -995,7 +995,7 @@ window.EhThemeMenu = (function(){
     const curMd = (typeof currentMode==='function') ? currentMode() : 'auto';
     panel=document.createElement('div');
     panel.className='eh-theme-menu';
-    let html='<div class="tm-hd">外观</div><div class="tm-modes">';
+    let html='<div class="tm-modes">';
     [['auto','自动'],['day','日间'],['night','夜间']].forEach(function(m){
       html+='<button type="button" class="tm-mode'+(curMd===m[0]?' on':'')+'" data-mode="'+m[0]+'">'+m[1]+'</button>';
     });

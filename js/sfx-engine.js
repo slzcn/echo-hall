@@ -506,9 +506,7 @@
       const P=window.EhAudioPrefs;
       panel=document.createElement('div');
       panel.className='eh-audio-menu';   // 样式走 table-shared.css, 定位单独写
-      const hd=document.createElement('div');
-      hd.textContent='音效'; hd.className='am-hd';
-      panel.appendChild(hd);
+      // ★T93 文案与聊天室一致: 不加"音效"标题头(与 skin-menu 一样直接列选项)
       // 音效档三分开关互不干扰(背景音乐已拆到独立按钮, 不在此面板): 关谁只停谁
       panel.appendChild(row('🔔 音效',   ()=>P.sfx(),   v=>P.setSfx(v),   repaint));
       panel.appendChild(row('📳 震动',   ()=>P.haptic(),v=>P.setHaptic(v),repaint));
