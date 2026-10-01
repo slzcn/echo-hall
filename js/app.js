@@ -10941,7 +10941,7 @@ window.EH_SOFT_REFRESH = async function(){
 'use strict';
 
 // ── CSS 注入 ──
-var CSS_ID='eh-fun-v51';
+var CSS_ID='eh-fun-v53';
 if(document.getElementById(CSS_ID)) return;
 var _css=document.createElement('style'); _css.id=CSS_ID;
 _css.textContent=`
