@@ -147,7 +147,7 @@ html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:
 .ddz-mult{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);z-index:0;font-size:12px;color:var(--amber);font-weight:700;padding:2px 12px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:rgba(4,12,16,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
 /* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
    悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
-.ddz-mus,.ddz-x,.ddz-auto{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+.ddz-mus,.ddz-x,.ddz-auto{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;color:var(--sub);
   border:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
@@ -156,7 +156,7 @@ html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:
 .ddz-mus{margin-left:auto}
 .ddz-mus + .ddz-mus{margin-left:0}
 .ddz-ico{width:18px;height:18px;display:block}
-.ddz-mus:hover:hover,.ddz-auto:hover{color:var(--ink);border-color:var(--accent);
+.ddz-mus:hover,.ddz-auto:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
 .ddz-mus:active:active,.ddz-x:active,.ddz-auto:active{transform:scale(.9)}
 .ddz-mus.muted{color:var(--dim);opacity:.8}
@@ -699,6 +699,23 @@ html[data-mode="day"] .ddz-felt::before{
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, AI 接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
+      // ★T92 无人解散兜底: 起身后桌上没真人(全 AI/托管)→ 自动解散房间
+      checkNoHumansThenDissolve();
+    }
+    // ★T92 三次不响应后的兜底: 没有真人(全 AI/托管/空位)→ 自动解散, 所有人回聊天室
+    function checkNoHumansThenDissolve(){
+      try{
+        if (isGuest) return;   // guest 不裁决
+        let humans = 0;
+        for (let i=0; i<nSeats; i++){
+          if (isRemote(i)) humans++;
+          else if (i===mySeat && !trustee) humans++;
+        }
+        if (humans > 0) return;
+        try{ emitBeat({ type:'dissolve', big:true, text:'🎲 牌局无人响应 · 自动解散, 回到聊天室' }); }catch(_){}
+        if (opts.onDissolve){ try{ opts.onDissolve(); }catch(e){ try{ _ehCatch('ddz.onDissolve', e); }catch(__){} } }
+        else close();
+      }catch(e){ try{ _ehCatch('ddz.checkNoHumans', e); }catch(__){} }
     }
     // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   旁观期间该席由 AI 托管; 接管时归零连超时账、清可能已排的 AI 代打, 再 renderAll 重武装本回合。
@@ -2430,6 +2447,8 @@ html[data-mode="day"] .ddz-felt::before{
     renderAll();
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播脱敏快照(招募态无局可播)
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
+      // ★T92 聊天气泡: 按名字找座位冒气泡(斗地主无 uid 数组, 用 name 匹配)
+      sayByUid:(uid, msg, name)=>{ try{ if(!msg) return false; const nm=String(name||''); for(let i=0;i<st.players.length;i++){ const p=st.players[i]; if(p && nm && p.name===nm){ say(i, String(msg).slice(0,60)); return true; } } }catch(_){} return false; },
       applyMove, setConn, connState:()=>connState,
       isSpectating:()=>spectating,
       // 主动离座旁观: 必须真进 spectating(旧实现只 idleOut→trustee, resumeSeat 永不触发 onSeatResume)

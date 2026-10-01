@@ -9006,10 +9006,10 @@ function feedGameRoomMsg(m){
     if(!curRoom || curRoom.id !== rid) return;
     // 当前牌桌所属房(_gtActiveTable.id)与消息房不符 → 旧房残留消息, 丢弃
     if(typeof _gtActiveTable!=='undefined' && _gtActiveTable && _gtActiveTable.id && _gtActiveTable.id !== rid) return;
-    // T89.2 牌桌发言气泡: 真人/灵魂的普通文字(msg)在牌桌对应座位冒 pk-say 气泡, 游戏内也看得到聊天。
-    //   互动/游戏/语音等非纯文本不冒; 自己发的也冒(反馈"已说出")。按发送者 uid 找座位。
+    // T89.2/T92 牌桌发言气泡: 真人/灵魂的普通文字(msg)在牌桌对应座位冒 pk-say 气泡, 游戏内也看得到聊天。
+    //   互动/游戏/语音等非纯文本不冒; 自己发的也冒(反馈"已说出")。按发送者 uid/name 找座位(掼蛋/斗地主用 name)。
     if(m.kind==='msg' && m.text && _ehGame.sayByUid){
-      try{ _ehGame.sayByUid(m.user_id, m.text); }catch(_){}
+      try{ _ehGame.sayByUid(m.user_id, m.text, m.name); }catch(_){}
     }
     if(_ehGame.onRoomMsg) _ehGame.onRoomMsg(m);
   }catch(_){}

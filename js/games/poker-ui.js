@@ -415,7 +415,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-b.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 /* 过牌(不下注的被动动作): 不该顶满彩色主键(日间暗调 accent 会糊成脏橄榄——主人反馈)。走 accent 描边淡底, 干净且语义"温和"; 跟注/下注(真花钱)才留亮色主键。 */
 .pk-b.call.check{background:transparent;color:var(--ink);border-color:var(--line2);box-shadow:none;font-weight:700}
-.pk-b.raise{background:var(--amber);color:#04060c;border-color:var(--amber);box-shadow:0 0 12px color-mix(in srgb, var(--amber) 50%, transparent)}
+.pk-b.raise{background:var(--amber);color:var(--btn-ink,#04060c);border-color:var(--amber);box-shadow:0 0 12px color-mix(in srgb, var(--amber) 50%, transparent)}
 .pk-b.raise.allin{background:var(--magenta);border-color:var(--magenta);color:#fff;box-shadow:var(--glow-mag,0 0 12px color-mix(in srgb, var(--magenta) 60%, transparent))}
 /* 全下二次确认态: 第一次点"全下"进此态(需再点一次才真梭哈), 白描边+脉冲提示"这步会梭全部筹码, 别误触" */
 .pk-b.raise.confirm{background:var(--magenta);border-color:#fff;color:#fff;animation:pkConfirmPulse .6s ease-in-out infinite alternate}
@@ -1198,7 +1198,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const q = rand(QUIP[kind]||[]); if(!q) return null; say(seat, q); return q;
     }
 
-    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearTimeout(overTimer);clearInterval(overTimer);overTimer=null;} try{ hideWinBanner(); }catch(_){} }
+    function clearTimers(){ if(aiTimer){clearTimeout(aiTimer);aiTimer=null;} if(ringRAF){cancelAnimationFrame(ringRAF);ringRAF=null;} if(streetTimer){clearTimeout(streetTimer);streetTimer=null;} if(overTimer){clearTimeout(overTimer);clearInterval(overTimer);overTimer=null;} if(awaitingHostT){clearTimeout(awaitingHostT);awaitingHostT=null;} try{ hideWinBanner(); }catch(_){} }
     // resize rAF 节流: 旋转/移动端地址栏收放会连发数十个 resize, 每个都全桌重排 —— 合并到每帧一次。
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; try{ if(root.EHTableOrient) root.EHTableOrient.reflect(room); }catch(_){} positionSeats(); }); };

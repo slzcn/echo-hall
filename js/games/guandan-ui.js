@@ -95,7 +95,7 @@
 .gd-lvl b{color:#fff}
 /* 顶栏功能钮组(主人诉求·再统一): 音乐/横屏/返回 三颗同尺寸磨砂圆钮 + 同族线性图标(SVG 等大等粗, 单色跟随 currentColor),
    告别 emoji🎵/字符⟳/文字"返回"混搭致"元素大小不一"。悬浮青光按压回弹; 返回保留红调、旋转激活亮青。 */
-.gd-mus,.gd-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+.gd-mus,.gd-x{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;color:var(--sub);
   border:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
@@ -104,7 +104,7 @@
 .gd-mus{margin-left:auto}
 .gd-mus + .gd-mus{margin-left:0}
 .gd-ico{width:18px;height:18px;display:block}
-.gd-mus:hover:hover{color:var(--ink);border-color:var(--accent);
+.gd-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
 .gd-mus:active:active,.gd-x:active{transform:scale(.9)}
 .gd-mus.muted{color:var(--dim);opacity:.8}
@@ -754,6 +754,24 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, AI 接手' }); }catch(_){}
       if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
+      // ★T92 无人解散兜底: 起身后桌上没真人(全 AI/托管)→ 自动解散房间
+      checkNoHumansThenDissolve();
+    }
+    // ★T92 三次不响应后的兜底: 没有真人(全 AI/托管/空位)→ 自动解散, 所有人回聊天室
+    function checkNoHumansThenDissolve(){
+      try{
+        if (isGuest) return;   // guest 不裁决
+        let humans = 0;
+        for (let i=0; i<st.players.length; i++){
+          const p = st.players[i]; if (!p || p.kind==='empty') continue;
+          if (isRemote(i)) humans++;
+          else if (i===mySeat && !trustee) humans++;
+        }
+        if (humans > 0) return;
+        try{ emitBeat({ type:'dissolve', big:true, text:'🎲 牌局无人响应 · 自动解散, 回到聊天室' }); }catch(_){}
+        if (opts.onDissolve){ try{ opts.onDissolve(); }catch(e){ try{ _ehCatch('gd.onDissolve', e); }catch(__){} } }
+        else close();
+      }catch(e){ try{ _ehCatch('gd.checkNoHumans', e); }catch(__){} }
     }
     function trusteeStep(){
       if (spectating || !trustee || isGuest) return;
@@ -2818,6 +2836,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     if (!lobbyMode) showTributeBanner();
     if (!isGuest && !lobbyMode) broadcast();   // host: 开局首帧即广播(顺带写各远程席初始手牌); lobby 态不发牌不广播
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
+      // ★T92 聊天气泡: 按名字找座位冒气泡(掼蛋无 uid 数组, 用 name 匹配; 与德州 sayByUid 同效果)
+      sayByUid:(uid, msg, name)=>{ try{ if(!msg) return false; const nm=String(name||''); for(let i=0;i<st.players.length;i++){ const p=st.players[i]; if(p && nm && p.name===nm){ say(i, String(msg).slice(0,60)); return true; } } }catch(_){} return false; },
       isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
