@@ -1233,9 +1233,33 @@ function gtCheckNoHumansThenClose(row){
       try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
       try{ toast('桌上没有真人了，牌桌自动解散'); }catch(_){}
       try{ _gtCleanupPlay(); }catch(_){}
+      try{ _gtHideTableCard(r.id); }catch(_){}
       try{ gtClose(r.id); }catch(_){}
     }
   }, 1500);
+}
+// ★v54: 死房间检测 —— 所有真人都 away 且 host 心跳超过 30s 未更新 → 散桌
+function _gtCheckDeadRoom(row){
+  if(!row || !row.id || row.status==='closed') return false;
+  const r = _gtTables.get(row.id) || row;
+  if(!r || r.status==='closed') return false;
+  const humans=(r.seats||[]).filter(s=>s&&s.kind==='human');
+  if(!humans.length) return false;                 // 没真人 → 走 gtCheckNoHumansThenClose
+  const allAway=humans.every(s=>s.away);
+  if(!allAway) return false;                       // 有非 away 真人 → 不是死房间
+  // host 心跳超过 30s 未更新 → 判定死房间
+  const gap = Date.now() - _gtLastHostAt;
+  if(_gtLastHostAt > 0 && gap < 30000) return false; // 30s 内有心跳 → 还活着
+  try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
+  try{ toast('房间已解散（全员离开过久）'); }catch(_){}
+  try{ _gtCleanupPlay(); }catch(_){}
+  try{ _gtHideTableCard(r.id); }catch(_){}
+  try{ gtClose(r.id); }catch(_){}
+  return true;
+}
+// ★v54: 隐藏聊天室里的牌桌卡片（散桌时调用）
+function _gtHideTableCard(tableId){
+  try{ const card=document.querySelector('[data-gt-id="'+tableId+'"]'); if(card){ card.style.display='none'; } }catch(_){}
 }
 function gtBindHumanActCapture(){
   if(_gtHumanActBound) return; _gtHumanActBound=true;
@@ -1319,7 +1343,7 @@ function gtWatchHostPing(chan, hostUid, tableId){
             // 我是 seat 最小的非 away 真人(排除当前 host) → 直接写 host_uid 为自己
             const humans=(tr.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&!s.away&&s.uid!==tr.host_uid).sort((a,b)=>a.seat-b.seat);
             if(humans.length && humans[0].uid===myUid){
-              await sb.from('eh_game_tables').update({host_uid:myUid,updated_at:new Date().toISOString()}).eq('id',tableId);
+              await sb.rpc('eh_gt_set_host', { p_table_id: tableId, p_new_host_uid: myUid });
             }
           }catch(e){ _ehCatch('gtHostPingFallback', e); }
         })();
@@ -2649,6 +2673,7 @@ async function setupGameTables(room){
       gtCheckAutoStart(row);
       gtCheckEngineTransfer(row);
       try{ gtCheckNoHumansThenClose(row); }catch(_){}
+      try{ _gtCheckDeadRoom(row); }catch(_){}
       // ── 无房主自动开桌(2026-09-29): 德州招募态 ≥2 真人入座即自动开局(gtCheckAutoStart), 不需要手动点开始。
       //   斗地主/掼蛋仍保留手动开始按钮; 德州不再有「开始 ▶」按钮。 ──
       // 本人在座且桌在 playing 且我还没进这桌(且我不是引擎持有者) → 自动进牌桌(guest 路径)。
@@ -2662,6 +2687,9 @@ async function setupGameTables(room){
       }
       // 桌散了(→closed): 我正开着牌桌浮层(guest 侧) → 拆场退回, 别卡在死局里
       //   无房主: 引擎持有者(host)退出只清本地(gtLaunchPoker onExit), 散桌由 onResult 无真人检查或 eh_gt_reap 处理。
+      if(row.status==='closed'){
+        try{ _gtHideTableCard(row.id); }catch(_){}
+      }
       if(row.status==='closed' && _gtActiveTable && _gtActiveTable.id===row.id){
         try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){ _ehCatch('gtCloseGame',_); }
         _gtCleanupPlay();
@@ -2762,6 +2790,8 @@ function gtRenderInto(el,row){
 // journey-exempt: 聊天牌桌卡是 app.js 消息流渲染, 无可启动的浏览器旅程 harness(现有 journey 只 boot js/games/*);
 //   真交互(邀请/开始/入座)全在全屏牌桌页 → 已由 poker journey + 本次 _probe-poker-entry 真渲染截图覆盖。
 function gtRenderPokerEntry(el,row){
+  // ★v54: 房间已关闭 → 隐藏卡片不显示
+  if(row && row.status==='closed'){ try{ el.style.display='none'; }catch(_){} return; }
   try{ if(window.EHTable&&EHTable.ensureCSS) EHTable.ensureCSS(); }catch(_){}
   const seats=(row.seats||[]).slice().sort((a,b)=>a.seat-b.seat);
   const humans=seats.filter(s=>s&&s.kind==='human').length;
@@ -3080,6 +3110,7 @@ function gtWireHostChannel(tableId){
     .on('broadcast',{event:'dissolve'}, ()=>{ // ★v34: 收到散桌广播 → 立刻回聊天室
       try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
       _gtCleanupPlay(); try{ toast('牌桌已解散'); }catch(_){}
+      try{ _gtHideTableCard(tableId); }catch(_){}
     });
   gtWireHostResume(chan, tableId, rowRef());
   gtBindConnStatus(chan);
@@ -3241,16 +3272,15 @@ async function _gtHandleHostLeave(tableId, seats, myUid){
   if(!otherHumans.length){
     // 完全没有其他真人 → 散桌
     try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
+    try{ _gtHideTableCard(tableId); }catch(_){}
     try{ gtClose(tableId); }catch(_){}
     return;
   }
   // 优先非 away 真人, 没有则取 seat 最小的 away 真人
   const next=otherHumans.find(s=>!s.away) || otherHumans[0];
-  // 原子写 DB, 把 host_uid 改成下一个玩家; 不需要广播, DB realtime 会通知对方
+  // ★v54 DB 仲裁: 调 eh_gt_set_host RPC (SECURITY DEFINER 绕 RLS) 把 host_uid 改成下一个玩家
   try{
-    await sb.from('eh_game_tables')
-      .update({ host_uid: next.uid, updated_at: new Date().toISOString() })
-      .eq('id', tableId);
+    await sb.rpc('eh_gt_set_host', { p_table_id: tableId, p_new_host_uid: next.uid });
   }catch(e){ _ehCatch('gtHandleHostLeave', e); }
 }
 
@@ -3668,6 +3698,8 @@ function gtLaunchPoker(row, resumeSnap){
 // ── 旁观者: 满座时以旁观身份进入牌桌, 可看牌局但无操作按钮; 有空位时显示抢位按钮。──
 function gtSpectatePoker(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtSpectatePoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  // ★v54: 旁观前也检测死房间
+  if(_gtCheckDeadRoom(row)) return;
   _gtCleanupPlay();
   _setPokerState('spectator', row.id);
   const A=gtSeatArrays(row);
@@ -3696,6 +3728,7 @@ function gtSpectatePoker(row){
   chan.on('broadcast',{event:'dissolve'}, ()=>{
     try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
     _gtCleanupPlay(); try{ toast('牌桌已解散'); }catch(_){}
+    try{ _gtHideTableCard(row.id); }catch(_){}
   });
   gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
   gtWirePlayerAway(chan, function(){ return _gtTables.get(row.id)||row; }, row.id);   // ★v43: 收 player_away 立刻清座
@@ -3822,6 +3855,18 @@ async function _gtGrabSeat(row){
 async function _gtEnterPokerV2(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=_gtEnterPokerV2; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!ehDailyPlayGate('nlhe')) return;
+  // ★v54: 进桌前检测死房间 —— 全员 away 且 host 30s 无心跳 → 散桌
+  if(_gtCheckDeadRoom(row)) return;
+  // ★v54: 进桌时 host_uid 对应玩家 away 且 30s 无心跳 → 立刻接管，不等心跳超时
+  try{
+    const fr=_gtTables.get(row.id)||row;
+    if(fr && fr.status==='playing' && fr.host_uid){
+      const hostSeat=(fr.seats||[]).find(s=>s&&s.kind==='human'&&s.uid===fr.host_uid);
+      if(hostSeat && hostSeat.away && _gtLastHostAt>0 && (Date.now()-_gtLastHostAt)>30000){
+        if(gtEngineHolder(fr)!==myUid){ try{ gtCheckEngineTransfer(fr); }catch(_){} }
+      }
+    }
+  }catch(_){}
   // ★多人进同一桌: 统一先入座, 不再「你不在这桌」把人拒之门外
   row = await gtEnsureSeated(row);
   let A=gtSeatArrays(row);
