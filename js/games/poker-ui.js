@@ -3040,7 +3040,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, lastSnap:()=>lastSnap,
       // T89.2 牌桌显示发言气泡: 按 uid 找座位冒气泡(房间消息 realtime 到达时 app.js 调用, 让游戏内也看得到聊天)
-      sayByUid:(uid, msg)=>{ try{ if(!uid||!msg||!ids) return false; for(let i=0;i<ids.length;i++){ if(ids[i]===uid){ say(i, String(msg).slice(0,60)); return true; } } }catch(_){} return false; },
+      sayByUid:(uid, msg, name)=>{ try{ if(!msg) return false; if(uid&&ids){ for(let i=0;i<ids.length;i++){ if(ids[i]===uid){ say(i, String(msg).slice(0,60)); return true; } } } const nm=String(name||''); if(nm){ for(let i=0;i<st.players.length;i++){ const p=st.players[i]; if(p&&p.name===nm){ say(i, String(msg).slice(0,60)); return true; } } } }catch(_){} return false; },
       applyMove, resync, applySnapshot, feedHand, needsHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState, setOfflineUids,
       isSpectating:()=>spectating,
