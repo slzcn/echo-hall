@@ -1882,10 +1882,18 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       if (st.phase==='seating'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🪑 等人入座…'; return; }
       if (st.phase==='waiting'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🎴 等待发牌…'; return; }
-      if (st.phase==='showdown'||st.phase==='over'){ els.msg.className='pk-msg'; els.msg.innerHTML=cp; return; }   // ★fix: 摊牌阶段 toAct=-1, 不该显示"…思考中… · 摊牌"
+      if (st.phase==='showdown'||st.phase==='over'){
+        // ★T92 提示统一到顶部: 摊牌/结算态不再空着, 顶部承载"本手结束/谁赢"
+        const won=(st.result&&st.result.winnersBySeat||[]).includes(mySeat);
+        els.msg.className='pk-msg'; els.msg.innerHTML=cp+(won?'🏆 这手你赢了':'🏁 本手结束'); return;
+      }
       const seat=st.toAct;
       // 旁观中: msg 标出旁观态, 同时保留「轮到谁/谁思考中」跟上牌局节奏
       const specTag = (spectating||mySeat<0) ? '🔭 旁观中 · ' : '';
+      // ★T92 提示统一到顶部: 我已弃牌/已全下 的状态在顶部说一次(底部不再重复 waitbar 文案)
+      const meP=(mySeat>=0)?st.players[mySeat]:null;
+      if(meP && meP.folded){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+specTag+'🏳️ 已弃牌 · 观战中'; return; }
+      if(meP && meP.allin){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+specTag+'💎 已全下 · 等摊牌'; return; }
       if (seat===mySeat){ els.msg.className='pk-msg mine'; els.msg.innerHTML=cp+specTag+'🫵 轮到你 · '+streetName(); }
       else { els.msg.className='pk-msg'; els.msg.innerHTML=cp+specTag+(st.players[seat]?escapeHtml(st.players[seat].name):'…')+' 思考中… · '+streetName(); }
     }
@@ -1929,15 +1937,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (meSig === lastMeSig) return;
       lastMeSig = meSig;
       let hint='';
-      if (spectating){ madeStr=''; hint='🔭 旁观中 · 座位已让出 · 点空位可再坐'; }
-      else if (st.phase==='seating'){ hint='🪑 等人入座…'; }
-      else if (st.phase==='waiting'){ hint='🎴 等待发牌'; }
-      else if (st.phase==='over'){
-        const won=(st.result.winnersBySeat||[]).includes(mySeat);
-        hint = won ? '🏆 这手你赢了' : (p.folded?'已弃牌':'本手结束');
-      } else if (p.folded){ hint='已弃牌'; }
-      else if (p.allin){ hint='已全下'; }
-      else if (mine){
+      // journey-exempt: 提示文案统一顶部(弃牌/全下/结算不再重复), 全下读牌改all in — 复用 journey-poker-play 覆盖
+      if (spectating){ madeStr=''; els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 旁观提示已在顶部, 底部留空
+      if (st.phase==='seating'){ els.me.innerHTML=''; lastMeSig=meSig; return; }
+      if (st.phase==='waiting'){ els.me.innerHTML=''; lastMeSig=meSig; return; }
+      if (st.phase==='over' || p.folded || p.allin){ els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 弃牌/全下/结算提示已统一顶部
+      if (mine){
         const la=Engine.legalActions(st, mySeat);
         hint = la.toCall>0 ? `需跟注 <b>${la.callAmount}</b>` : '可过牌或下注';
         // 单机练习桌: 给真人和 AI 同等的数值辅助 —— 蒙特卡洛胜率 + 底池赔率(要赢多少才不亏)。
@@ -1950,7 +1955,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             if (la.toCall>0){ const odds=la.toCall/((st.pot||0)+la.toCall); hint += ` · 需赢 ${Math.round(odds*100)}%`; }
           }catch(e){ _ehCatch('poker.equityHint', e); }
         }
-      } else { hint='等待中'; }
+      } else { els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 等待中提示已在顶部, 底部留空
       // "我"的头像/名字/筹码/底牌(正面)已画在椭圆底部座位(见 seatHTML 的 pk-me-seat 分支), 倒计时走座位环。
       //   这条桌外 pk-me 只留一行操作提示(需跟注/可过牌/胜率/当前成手), 紧贴下方操作按钮, 不再重复展示我的信息。
       els.me.innerHTML = `
@@ -1980,10 +1985,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-b raise" disabled>加注</button>
         </div>`;
     }
-    // 无操作占位态(旁观/等待/已弃/已全下/离线): 底部=纯状态区, 不摆假的滑杆/快捷/三键(主人诉求"顶部提示、
-    //   底部按钮, 别混用")。整块操作区(161px)只放一条居中状态条; 提示交给顶部 pk-msg, 底部不再重复。
-    function actsWaitBar(txt){
-      return `<div class="pk-waitbar pk-waitbar-full">${txt}</div>`;
+    // 无操作占位态(旁观/等待/已弃/已全下/离线): 底部=纯操作区, 不放提示文案。
+    //   提示统一由顶部 pk-msg 承载(T88/T92: 顶部=提示, 底部=按钮/占位, 不混用不重复)。
+    //   仍保留 54px 高度占位, 三态切换 felt 纹丝不动。
+    function actsWaitBar(){
+      return `<div class="pk-waitbar pk-waitbar-full"></div>`;
     }
     // 招募态操作区: 补满 / 邀真人 / 开始(满 2 席自动开, 开始作兜底)
     function renderLobbyCtrl(){
@@ -2011,7 +2017,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (spectating || mySeat<0){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        // 单一横条 bar: 左"🔭 旁观中 · 已让座" + 右"坐下"按钮; 与打牌态同结构三键(旁观时禁用)
+        // ★T92 提示统一到顶部: 底部只放按钮(坐下), 不再重复"旁观中"文案
         els.acts.innerHTML = `
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
         <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
@@ -2019,8 +2025,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           <button class="pk-b fold" disabled>弃牌</button>
           <button class="pk-b call" id="pkResume">🪑 坐下</button>
           <button class="pk-b raise" disabled>加注</button>
-        </div>
-        <div class="pk-hint" style="text-align:center;width:100%">🔭 旁观中 · 已让座</div>`;
+        </div>`;
         const rb=$('#pkResume'); if(rb) bindTap(rb, ()=>{ if (onGrabSeat){ onGrabSeat(); } else { resumeSeat(); } });
         return;
       }
@@ -2050,9 +2055,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const sig='wait:'+callLbl;
         if(!force && sig===_lastActsSig) return;
         _lastActsSig=sig;
-        // ★终止/等待态用整行状态条(actsWaitBar): 比三键骨架语义更准 —— 已弃牌/已全下/本手结束
-        //   不该再摆三个假按钮; 且 .pk-waitbar 与 .pk-row 同高 54px, 三态切换 felt 纹丝不动。
-        els.acts.innerHTML = actsWaitBar(callLbl);
+        // ★T92 提示统一到顶部: 底部只放高度占位, 不再重复状态文案
+        els.acts.innerHTML = actsWaitBar();
         return;
       }
       // ★fix: 我的回合加签名护栏 — 先校正 raiseTo 再算签名, 签名未变则跳过重建,
@@ -2252,7 +2256,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     function afterAction(seat, action, amount, r){
       // 音效 + 台词
-      sayOp(seat, ({ fold:'弃牌', check:'过', call:'跟注', bet:'下注', raise:'加注', allin:'全下' })[action] || '');
+      sayOp(seat, ({ fold:'弃牌', check:'过', call:'跟注', bet:'下注', raise:'加注', allin:'all in' })[action] || '');
       if (action==='fold'){ if(seat!==mySeat){ sfx('pass'); beatQuip(seat,'fold'); } else sfx('pass'); }
       else if (action==='check'){ sfx('click'); }
       else if (action==='call'){ sfx('chip'); if(seat!==mySeat) beatQuip(seat,'call'); }
