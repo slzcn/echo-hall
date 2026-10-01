@@ -676,16 +676,12 @@
   #hall{position:fixed;top:12px;left:0;right:0;bottom:auto;z-index:2;flex-direction:column;width:min(var(--content-max),calc(100vw - 2*var(--hall-px)));max-height:min(92vh,900px);max-height:min(92dvh,900px);height:calc(100dvh - 24px);margin:0 auto;overflow:hidden;padding:0}
   /* 牌桌打开: PC 保持原宽度(全屏按钮太远), 只把周边底色融成牌桌底色 — 不再露突兀色块 */
   html.game-on, html.game-on body{background:var(--bg2,#0d1524)}  /* 与牌桌顶渐变同色, 顶缝融掉 */
-  /* v65: 游戏进行中无条件全屏覆盖。原规则只写在 @media(max-width:599px) 内,
-     横屏(iPhone 横屏宽>599)或部分设备视口计算不同时漏命中 → #hall 保留桌面态居中卡片
-     (width:min(--content-max,..)、margin:0 auto)→ 右侧出现明显空白。
-     改为无条件应用, !important 压过桌面态 #hall 居中卡片与移动端 max-height 上限。
-     .pk-room/.ddz-room/.gd-room 均为 position:absolute;inset:0 相对 #hall, 故 #hall 撑满即三桌撑满。 */
+  /* v65: 游戏进行中高度撑满, 宽度与聊天室一致(--content-max 居中), 不再无条件全屏覆盖。 */
   #hall.game-on, html.game-on #hall{
     top:0!important;left:0!important;right:0!important;bottom:0!important;
-    width:100vw!important;max-width:none!important;
+    width:min(var(--content-max),calc(100vw - 2*var(--hall-px)))!important;max-width:var(--content-max)!important;
     height:100dvh!important;max-height:none!important;
-    border-radius:0!important;margin:0!important;
+    border-radius:0!important;margin:0 auto!important;
   }
   /* ★分隔线内缩(全站规范B): 线不再贴屏幕边, 而是与本区文字内容同走 --hall-px 左右留白。
      用 absolute ::after 画内缩线(替代满宽 border-bottom), 两端 = max(--hall-px,safe)与内容左右沿齐平。 */
