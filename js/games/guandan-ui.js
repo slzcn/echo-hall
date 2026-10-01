@@ -102,7 +102,7 @@
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(0,0,0,.28);
   transition:transform .14s cubic-bezier(.2,.85,.3,1),color .14s,border-color .14s,box-shadow .14s}
 .gd-mus{margin-left:0}
-.gd-bar-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.gd-bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .gd-ico{width:18px;height:18px;display:block}
 .gd-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
