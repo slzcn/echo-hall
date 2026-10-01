@@ -191,7 +191,7 @@ assert(/rpc\('eh_gt_open'/.test(src), '/掼蛋 开桌走 eh_gt_open(建联机牌
 assert(/EHTable\.encode|game\|gt\|/.test(src) && /kind:'game'/.test(src), '开桌把牌桌卡(kind:game)发进聊天室');
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postGuandanResult\(/.test(src), '存在 postGuandanResult(结束后发战绩卡)');
-assert(/onResult:[\s\S]{0,260}postGuandanResult\(res,\s*log,\s*(?:A\.)?names,\s*meta\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
+assert(/onResult:[\s\S]{0,260}postGuandanResult\(res,\s*log,\s*(?:A\.)?names,\s*meta(?:\s*,\s*(?:A\.)?ids)?\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
 assert(/postGuandanResult[\s\S]{0,2200}pushGameHighlight\(/.test(src), 'T82: 名场面改推 highlights 动态带(pushGameHighlight), 不再插独立战绩卡');
 // T82: 名场面动态带文案含 通关/双下/炸弹/头游 标签
 assert(/pushGameHighlight\(\{[\s\S]{0,200}kind:'gd'/.test(src), 'postGuandanResult 推 gd 动态(含 kind:gd 标识)');

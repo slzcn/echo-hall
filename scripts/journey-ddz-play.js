@@ -194,7 +194,7 @@ assert(/launchDoudizhu[\s\S]{0,1200}rpc\('eh_gt_open'/.test(src) && /p_game:'ddz
 assert(/launchDoudizhu[\s\S]{0,2000}EHTable\.encode\(row\.id,'ddz'\)/.test(src) && /kind:'game'/.test(src), '开桌把牌桌卡(kind:game, EHTable.encode)发进聊天室');
 assert(/rpc\('eh_gt_set_msg'/.test(src), '回填牌桌卡消息 id(eh_gt_set_msg, 供定位刷新)');
 assert(/async function postDdzResult\(/.test(src), '存在 postDdzResult(结束后发战绩卡)');
-assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
+assert(/onResult:[\s\S]{0,260}postDdzResult\(res,\s*(?:A\.)?names(?:\s*,\s*(?:A\.)?ids)?\)/.test(src), 'onResult 结束回调里发战绩卡(不再"什么都没留下")');
 assert(/async function postDdzResult\([\s\S]{0,2200}pushGameHighlight\(/.test(src), 'T82: 名场面改推 highlights 动态带(pushGameHighlight), 不再插独立战绩卡');
 // T82: 名场面动态带文案含 春天/炸弹/倍数 标签, 地主/农民 + 赢/输
 assert(/pushGameHighlight\(\{[\s\S]{0,200}kind:'ddz'/.test(src), 'postDdzResult 推 ddz 动态(含 kind:ddz 标识)');

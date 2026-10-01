@@ -3350,6 +3350,7 @@ function gtLaunchDdzLobby(row){
     names:A0.names, avatars:A0.avatars, isAI:A0.isAI, ids:A0.ids, souls:A0.souls,
     mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
       gtWriteDdzHands(row.id, state, A);
@@ -3392,6 +3393,8 @@ function gtLaunchPokerLobby(row){
     stackFor: function(seat, ctx){ return pkSeatStackFor(seat, ctx); },
     onStacks: function(list, ctx){ pkSeatStacksWrite(list, ctx); },
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    // ★T92 无人解散回调: 三游戏 checkNoHumansThenDissolve 调用, 散桌回聊天室
+    onDissolve:()=>{ try{ if(row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(state,hno,turnDeadline)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人底牌也会自动落库
       var _snap=gtStampSnap(window.EHPokerNet.snapshot(state,hno));
@@ -3443,6 +3446,7 @@ function gtLaunchGuandanLobby(row){
     names:A0.names, avatars:A0.avatars, isAI:A0.isAI, souls:A0.souls, ids:A0.ids,
     mySeat:(A0.mySeat<0?0:A0.mySeat), remoteSeats:A0.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
       const A=gtSeatArrays(_gtTables.get(row.id)||row);   // 实时名册: 中途换座的新真人手牌也会自动落库
       gtWriteGuandanHands(row.id, state, A);
@@ -3905,6 +3909,8 @@ async function gtLaunchPoker(row, resumeSnap){
     stackFor: function(seat, ctx){ return pkSeatStackFor(seat, ctx); },
     onStacks: function(list, ctx){ pkSeatStacksWrite(list, ctx); },
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    // ★T92 无人解散回调: 三游戏 checkNoHumansThenDissolve 调用, 散桌回聊天室
+    onDissolve:()=>{ try{ if(row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(state,hno,turnDeadline)=>{
       var _snap=gtStampSnap(window.EHPokerNet.snapshot(state,hno));
       if(turnDeadline) _snap.turnDeadline=turnDeadline;   // ★v51: 带绝对截止时间, guest 用它驱动倒计时
@@ -4032,6 +4038,7 @@ function gtSpectatePoker(row){
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:-1,
     remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:5000, spectate:true,
     chat: ehGameChatBridge(),
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     // 旁观者不绝 onAction → 操作按钮区不出现
     onExit:()=>{ _gtCleanupPlay(); },
     // 旁观时点空位/底部"坐下" → 走 app 级抢位(DB join + 重入为玩家), 不走引擎本地 resume(guest 无引擎权威)
@@ -4276,6 +4283,7 @@ async function _gtEnterPokerV2(row){
     myStack: _pkMyStack,
     onWallet: function(v){ _gtMyFinalStack=Math.max(0,Math.round(Number(v)||0)); },
     chat: ehGameChatBridge(),
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // ★v51 DB 仲裁: 旁观=腾座, host 离场直接写 DB
@@ -4377,6 +4385,7 @@ function gtLaunchGuandan(row){
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
       gtWriteGuandanHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(掼蛋出一张变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
@@ -4456,6 +4465,7 @@ async function gtEnterGuandan(row){
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
     lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
     chat: ehGameChatBridge(),
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // 旁观=腾座(不是 AI 代打): 通知 DB 让出座位, 留在房间可点空位再坐
@@ -4505,6 +4515,7 @@ function gtLaunchDdz(row){
     names:A.names, avatars:A.avatars, isAI:A.isAI, ids:A.ids, souls:A.souls,
     mySeat:A.mySeat, remoteSeats:A.remoteSeats, seed:row.seed||undefined,
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
       gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
@@ -4558,6 +4569,7 @@ async function gtEnterDdz(row){
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
     lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
     chat: ehGameChatBridge(),
+    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
     onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
     // 旁观=腾座(不是 AI 代打): 通知 DB 让出座位, 留在房间可点空位再坐

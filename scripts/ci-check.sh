@@ -852,7 +852,7 @@ baselines = {
     r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
     r'\bsetTimeout\s*\(': ('setTimeout', 166, 15),
     r'\baddEventListener\s*\(': ('addEventListener', 132, 10),
-    r'\.style\.\w+\s*=': ('element.style=', 134, 15),
+    r'\.style\.\w+\s*=': ('element.style=', 135, 15),
 }
 sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]
 src = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in sources if p.exists())
