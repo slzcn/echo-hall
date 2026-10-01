@@ -246,7 +246,7 @@ html.pwa-standalone .ddz-room:not(.is-land) .ddz-overbanner .ov-delta{font-size:
 .ddz-cum.zero{color:var(--dim);border-color:var(--line)}
 .ddz-me .ddz-cum{margin-top:0}
 .ddz-say{position:absolute;top:56px;font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));
-  border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
+  border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:min(130px,38vw);opacity:0;transition:opacity .2s;pointer-events:none;z-index:4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ddz-say.show{opacity:1}
 /* 叫/抢地主印章(对标腾讯: 头像上啪一枚醒目图章, 比气泡更有仪式感) */
 .ddz-stamp{position:absolute;top:30px;left:50%;font-size:14px;font-weight:900;letter-spacing:.06em;

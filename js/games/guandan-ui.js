@@ -202,7 +202,7 @@ html[data-mode="day"] .gd-felt::before{
   75%{opacity:1}100%{opacity:0;transform:translate(-50%,-6px) rotate(-13deg) scale(1)}}
 .gd-seat.alarm .cnt b{color:var(--magenta)}
 .gd-seat.alarm .gd-avr .av{border-color:var(--magenta);box-shadow:0 0 10px color-mix(in srgb, var(--magenta) 50%, transparent)}
-.gd-say{position:absolute;top:48px;font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:130px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:4}
+.gd-say{position:absolute;top:48px;font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:min(130px,38vw);opacity:0;transition:opacity .2s;pointer-events:none;z-index:4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gd-say.show{opacity:1}
 .gd-mini-hand{display:flex;margin-top:3px}
 .gd-mini-hand .card.mini{margin-left:-16px}.gd-mini-hand .card.mini:first-child{margin-left:0}

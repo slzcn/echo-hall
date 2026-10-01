@@ -283,13 +283,13 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-my-hole .card{box-shadow:0 3px 8px rgba(0,0,0,.5)}
 .pk-my-hole .card .cn{top:3px;left:5px}
 .pk-my-hole .card .cs{display:none}
-.pk-say{position:absolute;top:calc(var(--av,44px) + 2px);left:50%;transform:translateX(-50%);font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:140px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pk-seat[data-side="left"] .pk-say{left:0;transform:none}
-.pk-seat[data-side="right"] .pk-say{right:0;left:auto;transform:none}
+.pk-say{position:absolute;top:calc(var(--av,44px) + 2px);left:50%;transform:translateX(-50%);font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:min(140px,42vw);opacity:0;transition:opacity .2s;pointer-events:none;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-seat[data-side="left"] .pk-say{left:0;right:auto;transform:none;max-width:min(140px,38vw)}
+.pk-seat[data-side="right"] .pk-say{right:0;left:auto;transform:none;max-width:min(140px,38vw)}
 .pk-say.show{opacity:1}
-/* 身前投入筹码(朝中央) */
+/* 身前投入筹码(朝中央) —— ★T93 手机端不超出显示区: max-width + 省略号 */
 .pk-commit{position:absolute;transform:translate(-50%,-50%);z-index:3;display:flex;align-items:center;gap:4px;
-  font-size:11px;font-weight:800;color:var(--ink);background:rgba(4,10,14,.6);border:1px solid color-mix(in srgb, var(--amber) 40%, transparent);border-radius:999px;padding:1px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  font-size:11px;font-weight:800;color:var(--ink);background:rgba(4,10,14,.6);border:1px solid color-mix(in srgb, var(--amber) 40%, transparent);border-radius:999px;padding:1px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(120px,32vw);font-variant-numeric:tabular-nums}
 .pk-commit .pc{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020)}
 .pk-commit.zero{display:none}
 /* 飞行筹码(街结束身前筹码扫入底池 / 结算底池归赢家) —— 对标大厂"筹码归池/推池"手感 */
