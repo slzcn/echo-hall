@@ -580,10 +580,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
   function open(opts){
 
+    let _lastFireTs=0;   // ★fix(安卓): pointerup 已触发后 Chrome 合成 click 命中新按钮 → 误触
     function bindTap(el, fn){
       if(!el) return;
       let done=false;
-      const fire=(e)=>{ if(done) return; done=true; try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} }
+      const fire=(e)=>{ if(done) return; done=true; _lastFireTs=Date.now(); try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} }
         try{ el.blur(); }catch(_){} };   // 点完去焦点, 不留"选中"视觉
       el.addEventListener('pointerup', (e)=>{ if(e.button!=null && e.button!==0) return; fire(e); });
       el.addEventListener('click', (e)=>{ /* 兜底(键盘/个别环境) */ fire(e); });
@@ -1078,6 +1079,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#pkFelt'), table:$('#pkTable'), board:$('#pkBoard'), pot:$('#pkPot'),
       msg:$('#pkMsg'), me:$('#pkMe'), acts:$('#pkActs'), blinds:$('#pkBlinds'), toast:$('#pkToast') };
+    // ★fix(安卓): Chrome pointerup 替换 DOM 后合成 click 可能命中新渲染按钮(过牌) → 误触
+    //   捕获阶段拦截: pointerup 后 500ms 内的 click 视为合成残留, 丢弃
+    if (els.acts) els.acts.addEventListener('click', (e)=>{
+      if (Date.now()-_lastFireTs<500){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+    }, true);
 
     function toast(m, ms){ els.toast.textContent=m; els.toast.classList.add('show');
       clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1300); }
@@ -2673,6 +2679,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastBoardSig='';
       lastMeSig='';
       _lastActsSig='';   // ★fix: 清签名护栏, 免新一手 renderActs 跳过渲染残留上局操作区按钮状态(跟注后下一手过牌误高亮)
+      try{ els.acts.querySelectorAll('button').forEach(b=>b.blur()); }catch(_){}   // ★fix(安卓): 清焦点残留
     }
     function nextHand(){
       // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)
