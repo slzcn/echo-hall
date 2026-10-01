@@ -84,6 +84,8 @@
     var snap = {
       v: 'nlhe',
       handNo: (typeof handNo === 'number') ? handNo : 0,
+      turnDeadline: (typeof state.turnDeadline === 'number') ? state.turnDeadline : 0,   // v52: 绝对死线时间戳; host armTurn 盖戳, guest 据 turnDeadline-Date.now() 驱动倒计时 -> host/guest 同源零漂移
+      turnDurMs: (typeof state.turnDurMs === 'number') ? state.turnDurMs : 0,             // v52: host 本回合满格时长(含 remote +6s 冗余), guest 采纳以对齐环满格
       phase: state.phase, street: state.street,
       n: state.n, button: state.button, sb: state.sb, bb: state.bb,
       sbSeat: state.sbSeat, bbSeat: state.bbSeat,   // 权威盲位席号(公开信息, 客人角标直接用, 无需底牌)
@@ -121,6 +123,7 @@
       sbSeat: snap.sbSeat, bbSeat: snap.bbSeat,
       currentBet: snap.currentBet, minRaise: snap.minRaise, aggressor: snap.aggressor,
       toAct: snap.toAct, pot: snap.pot,
+      turnDeadline: snap.turnDeadline || 0, turnDurMs: snap.turnDurMs || 0,               // v52: 透传死线+满格时长, guest armTurn 据 turnDeadline 反推 turnStart
       board: (snap.board || []).map(cardFull),
       players: (snap.players || []).map(function(p){ return Object.assign({}, p, { hole: [] }); }),
       result: snap.result || null,

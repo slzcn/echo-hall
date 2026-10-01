@@ -580,11 +580,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
   function open(opts){
 
-    let _lastFireTs=0;   // ★fix(安卓): pointerup 已触发后 Chrome 合成 click 命中新按钮 → 误触
     function bindTap(el, fn){
       if(!el) return;
       let done=false;
-      const fire=(e)=>{ if(done) return; done=true; _lastFireTs=Date.now(); try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} }
+      const fire=(e)=>{ if(done) return; done=true; try{ fn(e); }catch(err){ try{ _ehCatch('bindTap', err); }catch(_){} }
         try{ el.blur(); }catch(_){} };   // 点完去焦点, 不留"选中"视觉
       el.addEventListener('pointerup', (e)=>{ if(e.button!=null && e.button!==0) return; fire(e); });
       el.addEventListener('click', (e)=>{ /* 兜底(键盘/个别环境) */ fire(e); });
@@ -1079,11 +1078,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const $ = sel => room.querySelector(sel);
     const els = { felt:$('#pkFelt'), table:$('#pkTable'), board:$('#pkBoard'), pot:$('#pkPot'),
       msg:$('#pkMsg'), me:$('#pkMe'), acts:$('#pkActs'), blinds:$('#pkBlinds'), toast:$('#pkToast') };
-    // ★fix(安卓): Chrome pointerup 替换 DOM 后合成 click 可能命中新渲染按钮(过牌) → 误触
-    //   捕获阶段拦截: pointerup 后 500ms 内的 click 视为合成残留, 丢弃
-    if (els.acts) els.acts.addEventListener('click', (e)=>{
-      if (Date.now()-_lastFireTs<500){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
-    }, true);
 
     function toast(m, ms){ els.toast.textContent=m; els.toast.classList.add('show');
       clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1300); }
@@ -2266,7 +2260,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         // ★灵魂/AI 席倒计时环与真人同一满格时钟(从 ACT_MS≈满格起走, 不再 1s 闪现)——主人: 灵魂倒计时要从 20s 开始不是从 1s。
         //   环只是展示; 灵魂真正出手在 turnAiAct(人类般 2~7s)到点触发, 通常在环走完前就行动, 环随回合切换自然重置。
         turnDur = mine     ? ACT_MS
-                : isGuest  ? ACT_MS               // guest 看别人回合: 纯展示, 给人类时长让环正常走(原为 0 → 徽标从不更新/空白)
+                : isGuest  ? (st.turnDurMs || ACT_MS)               // v52: guest 采纳 host 权威满格时长(含 remote +6s 冗余), 环与 host 完全对齐
                 : aiSeat   ? ACT_MS               // 灵魂席: 满格环(与真人一致), 出手时刻另见 turnAiAct
                 : remote   ? (ACT_MS + 6000)       // host 兜底比对端稍长, 留网络冗余; 久不动就代打
                 : 0;
@@ -2288,7 +2282,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           pendingAiDecision = d; pendingAiSeat = seat;
           turnAiAct = aiThinkMs(d, Engine.legalActions(st, seat));
         } else { turnAiAct = 0; pendingAiDecision = null; pendingAiSeat = -1; }
-        turnStart = Date.now();
+        // v52: 死线锚定 -- 若 st 带 turnDeadline(guest 来自快照 / host 来自上一帧盖戳), 据 turnDeadline 反推 turnStart,
+        //   使 remain=turnDur-(Date.now()-turnStart)=turnDeadline-Date.now(), host/guest 倒计时完全同源, guest 不再因快照到达延迟而满格重跳。
+        turnStart = (st.turnDeadline && turnDur) ? (st.turnDeadline - turnDur) : Date.now();
+        if (!isGuest && turnDur>0){ try{ st.turnDeadline = turnStart + turnDur; st.turnDurMs = turnDur; }catch(_){} }   // v52: host 盖戳权威死线+满格时长, 随下方 onSync(st) 广播给 guest
       }
       // 我也坐椭圆了 → 我方回合也在自己座位上走圆环+秒数徽标(与对手一致), 不再依赖桌外 #pkClk(已移除)
       const seatEl = els.table.querySelector(`.pk-seat[data-seat="${seat}"]`);
@@ -2296,7 +2293,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const secEl = seatEl && seatEl.querySelector('.pk-sec');   // 行动席头像秒数徽标(含我)
       // 数字倒计时只给【有真死线】的席位(我 / host 视角下的远程真人): 到点真会被托管, 数字才有意义。
       //   本机 AI(灵魂)没有硬死线, 秒数从 2 跳 0 像坏了 → 头像只亮"思考中"💭 脉冲, 不显误导性倒计时(对齐 ddz/掼蛋)。
-      const digitSeat = mine || remote;
+      const digitSeat = mine || remote || (isGuest && seat!==mySeat && !isAI[seat]);   // v52: guest 也给远程真人席显数字倒计时(快照已带 turnDeadline, 与 host 同源); AI 席仍只显 💭
       if (secEl && !digitSeat){ secEl.textContent='💭'; secEl.classList.add('think'); secEl.classList.remove('urgent'); }
       if (turnDur<=0) return;
       // ★折叠(minimized)态: 房 display:none, 环不可见 —— 不再起 rAF 每帧对隐藏节点写 --p(后台自动连打时
@@ -2679,7 +2676,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastBoardSig='';
       lastMeSig='';
       _lastActsSig='';   // ★fix: 清签名护栏, 免新一手 renderActs 跳过渲染残留上局操作区按钮状态(跟注后下一手过牌误高亮)
-      try{ els.acts.querySelectorAll('button').forEach(b=>b.blur()); }catch(_){}   // ★fix(安卓): 清焦点残留
     }
     function nextHand(){
       // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)

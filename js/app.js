@@ -8325,6 +8325,10 @@ function foregroundResync(){
   if(document.hidden || !curRoom) return;
   if(_fgResyncTimer) return;   // 300ms 去抖: 多源同时触发只跑一批
   _fgResyncTimer = setTimeout(()=>{ _fgResyncTimer = null; }, 300);
+  // v52: 安卓 PWA 后台 WebSocket/realtime 被系统挂起、rAF 被节流 -> 牌桌快照漏投、倒计时环冻结漂移。
+  //   回前台请 host 重播当前态(含 turnDeadline): guest 收到后据 turnDeadline-Date.now() 重锚倒计时, 与 host 同源;
+  //   host 自身也在 'hello' 回调里 resync() 重渲。复用既有 'hello'->resync 通道, 不引入新机制。
+  try{ if(_gtActiveTable && _gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'hello', payload:{uid: myUid, t:Date.now()}}); } }catch(_){ _ehCatch('fgGtResync',_); }
   const fire = ()=>{ try{ if(curRoom && !document.hidden) refreshSnapshotTail(curRoom); }catch(_){} };
   fire();                    // 立即补(realtime 若已重连, 这次就对齐)
   setTimeout(fire, 600);     // 网络重连中途补
@@ -11065,14 +11069,14 @@ window.EH_SOFT_REFRESH = async function(){
 };
 
 // ============================================================
-// v50 修复德州跟注后下一局默认选中过牌的 UI 状态残留 bug
+// v52 host/guest 统一倒计时死线(turnDeadline)+安卓 PWA 回前台快照重锚; v50 修复德州跟注后下一局默认选中过牌的 UI 状态残留 bug
 // 全部异步、失败静默、有 fallback，不阻塞游戏主流程
 // ============================================================
 (function(){
 'use strict';
 
 // ── CSS 注入 ──
-var CSS_ID='eh-fun-v50';
+var CSS_ID='eh-fun-v52';
 if(document.getElementById(CSS_ID)) return;
 var _css=document.createElement('style'); _css.id=CSS_ID;
 _css.textContent=`
