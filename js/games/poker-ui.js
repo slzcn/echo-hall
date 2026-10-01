@@ -1472,8 +1472,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // ★v38: 断线玩家视觉标记 — 灰色遮罩 + "断线"小标签
       const seatUid = ids ? ids[seat] : null;
       const isOffline = seatUid && offlineUids.has(seatUid);
+      // ★T89.1 牌桌座位头像长按互动: 非我方、有 uid(真人/灵魂)的座位加 data-atname/data-uid, 让 app.js headEl 认到
+      const uidAttr = (seat !== mySeat && seatUid) ? ` data-atname="${escapeHtml(p.name)}" data-uid="${seatUid}"` : '';
       return `<div class="pk-seat${seat===mySeat?' pk-me-seat':''}${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}${isOffline?' offline':''}" data-seat="${seat}" style="--p:360">
-        <div class="pk-avr"${isOffline?' style="filter:grayscale(1) opacity(0.5)':''}"><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}${isOffline?'<span class="pk-offline-tag">断线</span>':''}<span class="pk-sec"></span></div>
+        <div class="pk-avr"${isOffline?' style="filter:grayscale(1) opacity(0.5)':''}${uidAttr}><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}${isOffline?'<span class="pk-offline-tag">断线</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
         ${hole}
@@ -3015,6 +3017,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       return myHole.length === 0;
     }
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, lastSnap:()=>lastSnap,
+      // T89.2 牌桌显示发言气泡: 按 uid 找座位冒气泡(房间消息 realtime 到达时 app.js 调用, 让游戏内也看得到聊天)
+      sayByUid:(uid, msg)=>{ try{ if(!uid||!msg||!ids) return false; for(let i=0;i<ids.length;i++){ if(ids[i]===uid){ say(i, String(msg).slice(0,60)); return true; } } }catch(_){} return false; },
       applyMove, resync, applySnapshot, feedHand, needsHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState, setOfflineUids,
       isSpectating:()=>spectating,

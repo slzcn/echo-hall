@@ -6039,9 +6039,17 @@ function insertAtName(name){
   try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
 }
 // 头像交互: 点=直接@ TA; 长按(500ms)=弹「对TA」互动菜单。
-//   两处入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname]
+//   入口:①在线光墙 .pav ②消息里的头像 .msg .av[data-atname] ③牌桌座位头像 .pk-avr[data-atname]
 let _hlTimer=null, _hlFired=false, _hlStart=null;
-function headEl(t){ const pav=t.closest('#presence .pav[data-atname]'); return pav||t.closest('.msg .av[data-atname]'); }
+function headEl(t){
+  const pav=t.closest('#presence .pav[data-atname]');
+  if(pav) return pav;
+  const msgAv=t.closest('.msg .av[data-atname]');
+  if(msgAv) return msgAv;
+  // T89.1 牌桌座位头像长按互动: 认 .pk-avr[data-atname](非我方真人/灵魂座位已加该属性)
+  const pkAv=t.closest('.pk-avr[data-atname]');
+  return pkAv || null;
+}
 document.addEventListener('pointerdown',e=>{
   const el=headEl(e.target); if(!el) return;
   const nm=el.dataset.atname; const uid=el.dataset.uid||''; if(!nm) return;
@@ -6052,7 +6060,8 @@ document.addEventListener('pointermove',e=>{ if(_hlTimer && _hlStart && (Math.ab
 document.addEventListener('pointerup',e=>{
   if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; }
   const el=headEl(e.target);
-  if(el && !_hlFired){ const nm=el.dataset.atname; if(nm) insertAtName(nm); }   // 未触发长按 → 点=@
+  // ★T89.1 牌桌座位头像点击不插@(牌桌无输入框): 只在聊天室头像(.pav/.msg .av)点=@, 牌桌(.pk-avr)长按即菜单
+  if(el && !_hlFired && !el.classList.contains('pk-avr')){ const nm=el.dataset.atname; if(nm) insertAtName(nm); }
   _hlStart=null;
 });
 document.addEventListener('pointercancel',()=>{ if(_hlTimer){ clearTimeout(_hlTimer); _hlTimer=null; } _hlStart=null; });
@@ -8668,16 +8677,20 @@ function ehGameChatBridge(){ return { send: ehTableChatSend, me: { uid:myUid, na
 // 把一条房间消息喂给当前活跃牌局(弹幕 + 坞列表); 无活跃牌局或不支持则忽略。
 function feedGameRoomMsg(m){
   try{
-    if(!_ehGame || !_ehGame.onRoomMsg) return;
+    if(!_ehGame) return;
     if(!m || !m.room_id) return;
-    // ★房间隔离铁律(8/22 修): 只有 m.room_id == curRoom.id == _ehGame._roomId 三者一致才喂。
-    //   旧 bug: 无校验时切房后 _ehGame 未及时销毁, 旧房(如海龟汤)realtime 消息会灌进
-    //   新房(如斗地主)牙桌聊天坤 → 现象: 斗地主房显示海龟汤的聊天记录。
+    // ★房间隔离铁律(8/22 修): 只有 m.room_id == curRoom.id 一致才喂。
+    //   旧 bug: 无校验时切房后 _ehGame 未及时销毁, 旧房(如海龟汤)realtime 消息会灌进新房牌桌。
     var rid = m.room_id;
     if(!curRoom || curRoom.id !== rid) return;
-    // 当前牙桌所属房(_gtActiveTable.id)与消息房不符 → 旧房残留消息, 丢弃
+    // 当前牌桌所属房(_gtActiveTable.id)与消息房不符 → 旧房残留消息, 丢弃
     if(typeof _gtActiveTable!=='undefined' && _gtActiveTable && _gtActiveTable.id && _gtActiveTable.id !== rid) return;
-    _ehGame.onRoomMsg(m);
+    // T89.2 牌桌发言气泡: 真人/灵魂的普通文字(msg)在牌桌对应座位冒 pk-say 气泡, 游戏内也看得到聊天。
+    //   互动/游戏/语音等非纯文本不冒; 自己发的也冒(反馈"已说出")。按发送者 uid 找座位。
+    if(m.kind==='msg' && m.text && _ehGame.sayByUid){
+      try{ _ehGame.sayByUid(m.user_id, m.text); }catch(_){}
+    }
+    if(_ehGame.onRoomMsg) _ehGame.onRoomMsg(m);
   }catch(_){}
 }
 // F3 牌局直播: 把牌桌高光瞬间(定地主/炸弹/报单/头游/终局升级)以【本地临时行】播到聊天流 ——

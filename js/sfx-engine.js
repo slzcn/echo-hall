@@ -396,14 +396,14 @@
       el.volume=0;
       const pr=el.play();
       if(pr && pr.catch) pr.catch(function(){ try{ el._ehNeedGesture=true; }catch(e){} });
-      let busy=false; try{ busy=!!(window.EhAudioBus&&window.EhAudioBus.busy()); }catch(e){}
-      fadeTo(busy?0:VOL_ON, busy?200:FADE_MS);
+      // ★BGM 与人声解耦: 起播不再检查 busy, 直接拉满音量(人声不闪避 BGM)
+      fadeTo(VOL_ON, FADE_MS);
     }
     function retryPlay(){
       if(!el||!cur) return;
       try{ if(!bgmEnabled()) return; }catch(e){}
       try{
-        if(window.EhAudioBus && window.EhAudioBus.busy()) return;
+        // ★BGM 与人声解耦: retryPlay 不再检查 busy, 人声在播时 BGM 也正常运行
         if(el._ehNeedGesture || el.paused){
           el._ehNeedGesture=false;
           const pr=el.play();
@@ -422,16 +422,16 @@
     return {
       start(cfg){ if(!bgmOn()) return; mode='loop'; chainPool=null; if(el) el.loop=true; playCfg(cfg); try{ retryPlay(); }catch(e){} },
       chain(pool){ if(!bgmOn()) return; mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
-        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
+        // ★BGM 与人声解耦: chain 不再检查 busy, 人声在播时也切歌
         if(!(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } retryPlay(); },
       toChainAfter(pool){ mode='chain'; chainPool=pool||[]; if(el) el.loop=false;
-        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
+        // ★BGM 与人声解耦: toChainAfter 不再检查 busy
         if(bgmOn() && !(el && cur && !el.paused)){ const nx=pickNext(chainPool); if(nx) playCfg(nx); } retryPlay(); },
       stop(){ mode='loop'; chainPool=null; if(!el) { cur=null; return; } cur=null; fadeTo(0,80); setTimeout(()=>{ try{ el.pause(); }catch(_){} }, 90); },
       resume(){
         if(!el||!cur) return;
         if(!bgmEnabled()) return;
-        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
+        // ★BGM 与人声解耦: resume 不再检查 busy, 人声在播时也恢复 BGM
         retryPlay();
         if(!el.paused) fadeTo(VOL_ON, 400);
       },
@@ -439,12 +439,13 @@
       curName(){ return cur?cur.name:null; },
       curUrl(){ return cur?cur.url:null; },
       retryPlay: retryPlay,
+      // ★BGM 与人声解耦(主人反馈"BGM 被音效/语音中断或变小"): 背景音乐是纯器乐底, 不再因人声 duck 到 0/暂停。
+      //   人声(TTS 报牌/语音/神曲)直接叠在 BGM 上播; BGM 全程稳定不中断、不压低。duck 保留接口但不动 BGM。
       duck(on){
         if(!el||!cur) return;
-        if(on){ fadeTo(0, 180); return; }
-        try{ if(window.EhAudioBus&&window.EhAudioBus.busy()) return; }catch(e){}
-        retryPlay();
-        if(!el.paused) fadeTo(VOL_ON, 600);
+        // 不压不停: 仅在被意外静音(volume≈0 且非用户关 BGM)时拉回, 保证 BGM 始终可闻
+        try{ if(!on && el.paused && bgmEnabled()){ retryPlay(); } }catch(e){}
+        try{ if(el && el.volume < VOL_ON - 0.01 && bgmEnabled()) fadeTo(VOL_ON, 400); }catch(e){}
       },
     };
   })();
