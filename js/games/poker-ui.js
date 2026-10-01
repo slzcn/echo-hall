@@ -140,7 +140,7 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
 .pk-acts>.pk-row>.pk-b{height:54px;min-height:54px;box-sizing:border-box}
 /* 顶栏功能钮组(三游戏统一·磨砂玻璃圆钮): 音乐/横屏/返回 三颗同尺寸圆钮 + 同族线性 SVG 图标(等大等粗单色),
    悬浮青光按压回弹; 横屏态 ⟳ 亮青, 返回保留红调。告别 emoji/字符/文字混搭致大小不一。 */
-.pk-mus,.pk-x{width:36px;height:36px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+.pk-mus,.pk-x{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;color:var(--sub);
   border:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
@@ -149,9 +149,9 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
 .pk-mus{margin-left:auto}
 .pk-mus + .pk-mus{margin-left:0}
 .pk-ico{width:18px;height:18px;display:block}
-.pk-mus:hover{color:var(--ink);border-color:var(--accent);
+.pk-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
-.pk-mus:active:active,.pk-x:active{transform:scale(.9)}
+.pk-mus:active:active,.pk-x:active{transform:scale(.92)}
 .pk-mus.muted{color:var(--dim);opacity:.8}
 .pk-rot.on{color:var(--accent);border-color:var(--accent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px color-mix(in srgb, var(--accent) 50%, transparent)}
@@ -1085,8 +1085,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     room.innerHTML = `
       <div class="pk-bar">
         <div class="pk-title"><span class="dot"></span>德州扑克</div>
+        <button class="pk-sfx" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
         <button class="pk-mus" id="pkMus" aria-label="背景音乐" title="背景音乐">${ICO_MUS_ON}</button>
-        <button class="pk-mus" id="pkSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
         <button class="pk-skin eh-skin" id="pkSkin" aria-label="换肤" title="换肤">🎨</button>
         <button class="pk-x" id="pkX" aria-label="返回房间" title="返回房间（牌局后台继续）">${ICO_BACK}</button>
       </div>

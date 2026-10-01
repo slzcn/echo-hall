@@ -5,7 +5,11 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
+<<<<<<< HEAD
 window.__EH_APP_VER = '20261001-v60';
+=======
+window.__EH_APP_VER = '20261001-v59';
+>>>>>>> 3ad5272 (fix(v59): 抢救恢复 rebase 丢失改动 + 统一牌桌顶栏按钮)
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -945,6 +949,39 @@ function initThemeUI(){
   initBgmUI();
   loadRemoteConfig();   // 异步拉取后台配置覆盖(完成后重注入主题变量)
 }
+// 牌桌顶栏 🎵 背景音乐: 复用聊天室 buildBgmMenu 选曲菜单, 可换歌
+window.EhBgmMenu = (function(){
+  let panel=null, onDoc=null, curAnchor=null;
+  function close(){
+    if(!panel) return;
+    try{ document.removeEventListener('pointerdown', onDoc, true); }catch(_){}
+    try{ panel.remove(); }catch(_){}
+    panel=null; onDoc=null; curAnchor=null;
+  }
+  function open(anchor){
+    close();
+    try{ AudioEngine.resume(); }catch(_){}
+    // 复用聊天室菜单容器类(.skin-menu.bgm-menu)+ buildBgmMenu 渲染 + 绑定, 定位单独写(浮动锚定按钮下方)
+    panel=document.createElement('div');
+    panel.className='skin-menu bgm-menu eh-bgm-float on';
+    panel._bgmPickCache=null;
+    document.body.appendChild(panel);
+    try{ buildBgmMenu(panel); }catch(e){ _ehCatch('ehBgmFloat', e); }
+    try{ refreshBgmSoulLib(panel); }catch(_){}
+    const ar=anchor.getBoundingClientRect(), pr=panel.getBoundingClientRect();
+    let left=Math.min(ar.right-pr.width, window.innerWidth-pr.width-8);
+    left=Math.max(8,left);
+    let top=ar.bottom+8;
+    if(top+pr.height>window.innerHeight-8) top=Math.max(8, ar.top-pr.height-8);
+    panel.style.cssText='position:fixed;left:'+left+'px;top:'+top+'px;z-index:80';
+    curAnchor=anchor;
+    onDoc=function(e){ if(panel && !panel.contains(e.target) && !(anchor&&anchor.contains(e.target))) close(); };
+    setTimeout(function(){ try{ document.addEventListener('pointerdown', onDoc, true); }catch(_){} },0);
+  }
+  function toggle(anchor, repaint){ if(panel && curAnchor===anchor){ close(); } else { open(anchor); } if(repaint){ try{ repaint(); }catch(_){} } }
+  return { open, close, toggle };
+})();
+
 // 牌桌顶栏 🎨: 与大厅/聊天页同一套换肤(浮动面板), 打牌途中也能切主题/日夜
 window.EhThemeMenu = (function(){
   let panel=null, onDoc=null, curAnchor=null;
@@ -1299,7 +1336,28 @@ function _gtHideTableCard(tableId){
   try{ const card=document.querySelector('[data-gt-id="'+tableId+'"]'); if(card){ card.style.display='none'; } }catch(_){}
 }
 function gtBindHumanActCapture(){
-  if(_gtHumanActBound) return; _gtHumanActBound=true;
+
+function gtCheckStuckTables(roomId){
+  try{
+    const now=Date.now();
+    _gtTables.forEach((row, id)=>{
+      if(!row || row.status!=='playing'){ _gtStuckSig.delete(id); return; }
+      // 桌上要有真人(无真人另有 gtCheckNoHumansThenClose 处理)
+      const humans=(row.seats||[]).filter(s=>s && s.kind==='human').length;
+      if(humans===0){ _gtStuckSig.delete(id); return; }
+      // 签名: updated_at + 局态关键位(toAct/phase/pot/board 长度)。任一变=有进展, 重新计时。
+      let st=row.state; if(typeof st==='string'){ try{ st=JSON.parse(st); }catch(_){ st=null; } }
+      const sig=[row.updated_at||'', st&&st.toAct, st&&st.phase, st&&st.pot, st&&(st.board&&st.board.length)].join('|');
+      const prev=_gtStuckSig.get(id);
+      if(!prev || prev.sig!==sig){ _gtStuckSig.set(id, { sig, since: now }); return; }
+      if(now - prev.since >= GT_STUCK_MS){
+        _gtStuckSig.delete(id);
+        try{ toast('牌局长时间无进展，已自动解散'); }catch(_){}
+        try{ gtClose(id); }catch(e){ _ehCatch('gtStuckClose', e); }
+      }
+    });
+  }catch(e){ _ehCatch('gtCheckStuckTables', e); }
+}  if(_gtHumanActBound) return; _gtHumanActBound=true;
   // 捕获阶段监听: 点到任一游戏动作区(德州.pk-acts / 掼蛋.gd-acts / 斗地主.ddz-acts 内的出牌/跟注/加注等)
   //   即判"真人在动"。三种游戏统一走同一心跳门, 故三种动作区都要认, 否则单机对 AI 的掼蛋/斗地主会被误当空转回收。
   //   托管(auto)代打不点按钮 → 不续命, 正合"没人真玩就销毁"。
@@ -2794,7 +2852,19 @@ function gtAppendDismiss(el, row){
   foot.appendChild(btn);
 }
 function gtRenderInto(el,row){
-  // ★closed 终态守卫: 牌桌卡是一条【持久聊天消息】, 刷新/翻历史都会重渲。gtEnsureRow 按 id 取行
+
+function gtHighlightsHtml(highlights){
+  let arr=highlights;
+  if(typeof arr==='string'){ try{ arr=JSON.parse(arr); }catch(_){ arr=null; } }
+  if(!Array.isArray(arr)||!arr.length) return '';
+  // 最近的在上, 最多显 3 条(带的高度有限, 全量留在数据里)
+  const rows=arr.slice(-3).reverse().map(h=>{
+    const em=safeEmoji2(h&&h.emoji)||'✨';
+    const tx=esc(String((h&&h.text)||'').slice(0,40));
+    return '<div class="gt-hl-row"><span class="gt-hl-em">'+em+'</span><span class="gt-hl-tx">'+tx+'</span></div>';
+  }).join('');
+  return '<div class="gt-highlights">'+rows+'</div>';
+}  // ★closed 终态守卫: 牌桌卡是一条【持久聊天消息】, 刷新/翻历史都会重渲。gtEnsureRow 按 id 取行
   //   不带 status 过滤 → 已散的死桌照样被捞回, 若直接 renderLobby 就画成"满座带顶替按钮的活招募卡"
   //   (焊死分身德州复活的真凶, 与设备/缓存/reap 无关)。散桌一律画成不可交互的"已散桌"终态, 绝不复活。
   if(row && row.status && row.status!=='lobby' && row.status!=='playing'){
@@ -3535,8 +3605,19 @@ async function ehRecordBust(game){
     ehRefreshStrategyLimit();   // 刷新 DB 缓存(eh_game_strategy_limits)
   }catch(_){ _ehCatch('ehRecordBust', _); }
 }
-// journey-exempt: 全员真实筹码账本(灵魂/远程真人/我) — journey-chip-authenticity.js
-// 牌桌每席买入: 我=本人账本; 有 uid 的灵魂/分身/远程真人=按 uid 累计; 无 id 的匿名机器人=GRANT。
+// ★T84 服务端权威筹码缓存: 开桌/摆阵前 pkPrefetchChips 批量拉一次(eh_chips_get_many), 填进 _pkChipCache。
+//   pkSeatStackFor 是同步(open 时调), 故靠预取缓存给灵魂/远程真人真实持久筹码 —— 不再每次从 GRANT 重来、跨设备一致。
+const _pkChipCache = new Map();   // uid → chips(服务端权威, 本会话缓存)
+async function pkPrefetchChips(ids, game){
+  try{
+    const uids = Array.from(new Set((ids||[]).filter(x=>x && typeof x==='string')));
+    if(!uids.length || !sb) return;
+    const { data, error } = await sb.rpc('eh_chips_get_many', { p_uids: uids, p_game: game||'nlhe' });
+    if(error) throw error;
+    if(data && typeof data==='object'){ Object.keys(data).forEach(u=>{ const v=Number(data[u]); if(Number.isFinite(v)) _pkChipCache.set(u, v); }); }
+  }catch(e){ _ehCatch('pkPrefetchChips', e); }
+}
+// 牌桌每席买入: 我=本人账本; 有 uid 的灵魂/分身/远程真人=服务端权威筹码(缓存); 无 id 的匿名机器人=GRANT。
 function pkSeatStackFor(seat, ctx){
   const GRANT = PK_WALLET_GRANT;
   try{
@@ -3545,10 +3626,13 @@ function pkSeatStackFor(seat, ctx){
     const isMine = (seat === mySeat) || (id && myUid && id === myUid) || (id && me && id === me.id);
     if (isMine) return bankChips('nlhe', GRANT);
     if (!id) return GRANT;
+    // 服务端权威筹码优先(T84): 预取缓存命中即用, 否则退本地账本(并顺手触发一次异步预取补缓存)
+    if (_pkChipCache.has(id)) return Math.max(0, Math.round(_pkChipCache.get(id)));
+    try{ pkPrefetchChips([id], 'nlhe'); }catch(_){}
     return bankChipsOf('nlhe', id, GRANT);
   }catch(_){ return GRANT; }
 }
-// 结算后写回全席筹码: 存真实值; ★v58 不再有买入量, 全部筹码带入/带出。
+// 结算后写回全席筹码: 存真实值; chipsOf 读到 <买入门槛 时回补 1000(清零后从1000开始)。
 function pkSeatStacksWrite(list, ctx){
   try{
     const mySeat = ctx && ctx.mySeat;
@@ -3556,9 +3640,16 @@ function pkSeatStacksWrite(list, ctx){
     (list||[]).forEach(function(v,i){
       const n = Math.max(0, Math.round(Number(v)||0));
       const id = ids[i];
-      if (i === mySeat || (id && myUid && id === myUid) || (id && me && id === me.id)) return; // 我走 onWallet
+      if (i === mySeat || (id && myUid && id === myUid) || (id && me && id === me.id)){
+        // 我这席: 本地 onWallet 已存; 另写一份服务端权威(T84 换设备一致)
+        if(myUid){ _pkChipCache.set(myUid, n); try{ sb.rpc('eh_chips_set', { p_uid:myUid, p_game:'nlhe', p_chips:n }); }catch(_){} }
+        return;
+      }
       if (!id) return;
       bankSetOf('nlhe', id, { chips: n });
+      // T84 服务端权威: 灵魂/远程真人筹码写回 eh_chips, 跨桌跨设备一致; 同步更新本会话缓存
+      _pkChipCache.set(id, n);
+      try{ sb.rpc('eh_chips_set', { p_uid:id, p_game:'nlhe', p_chips:n }); }catch(_){}
     });
   }catch(e){ _ehCatch('pkSeatStacksWrite', e); }
 }
@@ -6082,7 +6173,38 @@ const _ixCooldown=new Map();   // interactionId → 上次发的时间戳(本地
 const isSoulUid=(uid)=>soulUidSet && soulUidSet.has(uid);
 // 点头像弹出「对TA」小菜单: @TA + 各互动
 function openPeerMenu(anchorEl, name, uid){
-  hidePeerMenu();
+
+async function giftChips(toUid, toName, amount){
+  if(!toUid || !myUid || !curRoom){ toast('先登录再赠送'); return; }
+  if(toUid===myUid){ toast('不能赠送给自己'); return; }
+  if(_giftInFlight){ return; }
+  const amt = amount || 1000;
+  _giftInFlight=true;
+  try{
+    const { data, error } = await sb.rpc('eh_chips_gift', { p_to:toUid, p_game:'nlhe', p_amount:amt });
+    if(error){
+      const m=(error&&error.message)||'';
+      if(/insufficient/.test(m)) toast('你的筹码不够 '+amt+' 个');
+      else if(/cannot gift self/.test(m)) toast('不能赠送给自己');
+      else toast('赠送失败，稍后再试');
+      return;
+    }
+    // 更新本会话缓存(自己+对方), 牌桌买入即时反映
+    try{ if(data){ _pkChipCache.set(myUid, Number(data.from_left)); _pkChipCache.set(toUid, Number(data.to_now)); } }catch(_){}
+    // 同步本地账本(自己), 大厅/牌桌钱包一致
+    try{ if(_EH_SCORE && data) _EH_SCORE.set('nlhe', { chips: Number(data.from_left) }); }catch(_){}
+    try{ EhSfx.play('sparkle'); }catch(_){}
+    toast('已赠送 '+amt+' 筹码给 '+(toName||'TA'));
+    // 广播一条居中系统行(kind=interact 通道): "A 赠送 B 1000 筹码 💰"
+    const txt=(me.name||'你')+' 赠送 '+(toName||'TA')+' '+amt+' 筹码 💰';
+    const payload={ room_id:curRoom.id, user_id:myUid, name:me.name, emoji:me.emoji, color:me.color,
+      text:'gift|'+toUid+'|'+txt, kind:'interact' };
+    try{ await sb.from('eh_messages').insert(payload); }catch(e){ console.warn('giftChips broadcast', e); }
+  }catch(e){ console.warn('giftChips', e); toast('赠送失败，稍后再试'); }
+  finally{ _giftInFlight=false; }
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('#peerMenu') && !e.target.closest('.pav')&&!e.target.closest('.msg .av')) hidePeerMenu(); });
+// 发一个互动: 本地立即演特效 + 写 kind=interact 消息广播给房里所有人  hidePeerMenu();
   // ★用 isSoulUser(uid,name) 而非 isSoulUid(uid): 漫游进房的灵魂只写 presence、不入 eh_room_souls,
   //   soulUidSet 里没它 → isSoulUid 会判成真人 → "发私信"入口漏出 + 互动误放行。按名字/花名册兜底根治。
   const isTargetSoul=isSoulUser(uid, name);
@@ -8931,19 +9053,28 @@ function shouldPostResult(game, notable){
   _resultCardAt[game] = now;
   return true;
 }
+// T82 一局一卡: 名场面(好牌/大赢)不再往聊天流插独立战绩卡, 改推进【当前牌桌行的 highlights 动态带】——
+//   同一张牌桌卡滚动翻动态, 不刷屏、不扰聊天; 走 eh_gt_push_highlight(在座真人可写, 随 realtime 广播到各端)。
+//   只在【有活跃联机桌 + 名场面】时推; 普通手既不进聊天也不进动态带(牌桌内已就地结算)。
+async function pushGameHighlight(entry){
+  try{
+    const tid = _gtActiveTable && _gtActiveTable.id;
+    if(!tid || !entry) return;
+    await gtRpc('eh_gt_push_highlight', { p_table: tid, p_entry: entry });
+  }catch(e){ console.warn('[highlight] push failed', e&&e.message); }
+}
 async function postTexasResult(res, names, meta){
   if(!myUid || !curRoom) return;
   const delta=(meta&&meta.delta)||0;
-  const outcome = delta>0?'win':(delta<0?'lose':'even');
   const potTotal=(res.pots||[]).reduce((a,pt)=>a+pt.amount,0);
   const champSeat=(res.winnersBySeat||[])[0];
   const champName=names[champSeat]||'';
   const hand=(meta&&meta.handName)||'';
-  // 名场面: 输光 / 通吃 / 大底池(≥20 大盲) / 大牌型(同花顺/四条/葫芦)
+  // 名场面: 输光 / 通吃 / 大底池 / 大牌型(同花顺/四条/葫芦) —— 只名场面进动态带, 普通手不进
   const notable = (delta<=-2000) || (delta>=2000) || (potTotal>=2000)
     || /同花顺|四条|葫芦/.test(hand||'');
-  if(!shouldPostResult('nlhe', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('nlhe', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友 v55 逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -8958,13 +9089,10 @@ async function postTexasResult(res, names, meta){
       });
     }catch(_){ _ehCatch('postTexas.evt',_); }
   }
-  const text=['game','nlhe', outcome, delta, hand||'-', potTotal, champName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;
-  }catch(e){ console.warn('[nlhe] post result failed', e); }
+  // T82 一局一卡: 名场面推牌桌行 highlights 动态带, 不再插独立战绩卡消息
+  const who = (meta&&meta.mySeat===champSeat) ? (me.name||'你') : (champName||'赢家');
+  const bits=[who]; if(hand && hand!=='-') bits.push(hand); if(potTotal>0) bits.push('底池'+potTotal);
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'nlhe', emoji:'🔥', text:bits.join(' · ') });
 }
 // 记录德州战绩(seed+log 供复核/回看)。N 席结构; 失败静默。
 async function recordTexasResult(res, log, names, avatars, souls, meta){
@@ -9011,11 +9139,11 @@ async function postDdzResult(res, names){
   const win  = res.winners.includes(0) ? 'win' : 'lose';
   const role = (res.landlord===0) ? 'lord' : 'peasant';
   const lordName = names[res.landlord] || '';
-  // 名场面: 春天/炸弹 ≥2 / 倍数 ≥6 / 输赢大(≥6 分) —— 普通一手不再进聊天流
+  // 名场面: 春天/炸弹 ≥2 / 倍数 ≥6 / 输赢大(≥6 分) —— 只名场面进动态带
   const notable = !!res.spring || (res.bombs||0)>=2 || (res.finalMultiplier||1)>=6
     || Math.abs(res.delta&&res.delta[0]||0)>=6;
-  if(!shouldPostResult('ddz', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('ddz', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -9030,13 +9158,11 @@ async function postDdzResult(res, names){
       });
     }catch(_){ _ehCatch('postDdz.evt',_); }
   }
-  const text = ['game','ddz', win, role, res.delta[0], res.base, res.finalMultiplier, res.bombs||0, res.spring?1:0, res.landlordWon?1:0, lordName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;   // 回填真实 id → realtime 回声按 mid 去重, 不重复
-  }catch(e){ console.warn('[ddz] post result failed', e); }
+  // T82 一局一卡: 名场面推 highlights 动态带, 不再插独立战绩卡
+  const tags=[]; if(res.spring) tags.push('春天'); if((res.bombs||0)>=2) tags.push(res.bombs+'炸');
+  if((res.finalMultiplier||1)>=6) tags.push(res.finalMultiplier+'倍');
+  const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+' '+(role==='lord'?'地主':'农民')+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'ddz', emoji:'🃏', text:txt });
 }
 // ── 历史积分累加: host 上报有真实身份的真人与灵魂；匿名机器人和空位不记账。
 //   灵魂虽由 AI 代打，积分仍属于它自己的 uid，不能按 isAI 排除。
@@ -9151,10 +9277,10 @@ async function postGuandanResult(res, log, names, meta){
   const fromLvl = res.teamLevelsBefore[res.winnerTeam];
   const toLvl   = res.teamLevelsAfter[res.winnerTeam];
   const mateName = names[(mySeat+2)%4] || '';
-  // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 普通一副不再进聊天流
+  // 名场面: 通关 / 双下 / 炸弹 ≥2 / 头游 —— 只名场面进动态带
   const notable = !!res.matchWon || !!res.doubleDown || (res.bombs||0)>=2 || myRankIdx===0;
-  if(!shouldPostResult('gd', notable)) return;
-  // 跨场景记忆：名场面写入 room_events
+  if(!notable || !shouldPostResult('gd', true)) return;
+  // 跨场景记忆: 名场面写入 room_events(灵魂记忆, 保留队友逻辑)
   if(notable){
     try{
       ehSoulMemWriteAll(curRoom.id, 'room_events', function(old){
@@ -9169,13 +9295,11 @@ async function postGuandanResult(res, log, names, meta){
       });
     }catch(_){ _ehCatch('postGuandan.evt',_); }
   }
-  const text=['game','gd', win, res.advance, fromLvl, toLvl, res.doubleDown?1:0, res.matchWon?1:0, myRankIdx, res.bombs||0, mateName].join('|');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data && el) el.dataset.mid=data.id;
-  }catch(e){ console.warn('[gd] post result failed', e); }
+  // T82 一局一卡: 名场面推 highlights 动态带, 不再插独立战绩卡
+  const tags=[]; if(res.matchWon) tags.push('通关'); if(res.doubleDown) tags.push('双下');
+  if((res.bombs||0)>=2) tags.push(res.bombs+'炸'); if(myRankIdx===0) tags.push('头游');
+  const txt=(win==='win'?'🏆 ':'')+(me.name||'你')+'队'+(win==='win'?'赢':'输')+(tags.length?' · '+tags.join(' '):'');
+  pushGameHighlight({ t:Math.floor(Date.now()/1000), kind:'gd', emoji:'🎴', text:txt });
 }
 // 记录掼蛋战绩(seed+log 供复核/回看)。4 席结构; 失败静默。
 async function recordGuandanResult(res, log, names, avatars, souls){
