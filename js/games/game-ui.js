@@ -900,7 +900,7 @@ html[data-mode="day"] .ddz-felt::before{
 
     // ── 音效 + 触感(复用聊天室 EhSfx 合成器; 未加载则静默, 全程 try/catch 不打断牌局) ──
     function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
-    function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
+    function vibrate(ms){ try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(ms); else if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     let dealAnim = true;          // 下一次 renderHand 播发牌错峰入场(开局/重发/再来一局各触发一次)
     let lastLord = null;          // 地主揭晓上升沿(null→定人)一次性音效
     let justCrowned = false;      // 本次重绘是否播放"定地主"动画(皇冠砸落 + 底牌翻面)

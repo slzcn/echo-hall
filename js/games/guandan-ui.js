@@ -920,7 +920,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     let _sortGuideShown = false;             // 理牌/锁定首用引导只弹一次
 
     function sfx(n){ try{ if(root.EhSfx && root.EhSfx.play) root.EhSfx.play(n); }catch(_){} }
-    function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
+    function vibrate(ms){ try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(ms); else if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     let dealAnim = true, lastMyTurn = false, lastFinishedN = 0, _justFinishedFlash = false;
     let lastSelTick = 0;
     sfx('arrive'); if(!isGuest && !lobbyMode) sfx('deal');   // guest 未拿到手牌前不响发牌音; 招募态未发牌不响

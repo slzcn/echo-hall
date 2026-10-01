@@ -1079,7 +1079,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function whoOf(seat){ if(typeof seat!=='number' || !st || !st.players || !st.players[seat]) return null;
       const ai=!!isAI[seat], nm=st.players[seat].name; return { name:nm, key:nm, isSoul:ai, isHuman:!ai }; }
     function sayOp(seat, text){ try{ if(text && root.EhSfx && root.EhSfx.say) root.EhSfx.say(text, whoOf(seat)); }catch(_){} }
-    function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
+    function vibrate(ms){ try{ if(root.EhSfx&&root.EhSfx.buzz) root.EhSfx.buzz(ms); else if(navigator.vibrate) navigator.vibrate(ms); }catch(_){} }
     sfx('arrive'); if(!lobbyMode) sfx('deal');
 
     let aiTimer=null, ringRAF=null, streetTimer=null, overTimer=null, turnStart=0, turnDur=0, turnAiAct=0, turnSeatActive=-1, turnStreetActive='';
