@@ -4048,9 +4048,18 @@ async function gtSpectatePoker(row){
       try{ if(_ehGame && _ehGame.renderAll) _ehGame.renderAll(); }catch(_){}
     });
   // ★v63 场景2: 收到 seat_open 广播(机器人输光离场) → 自动抢座
+  //   ★T92 只有被点名的 uid(或广播未带 uid 且我还没入座)才抢; 已在座的人忽略, 防误弹"入不了座"/拆桌重进
+  // journey-exempt: seat_open 广播校验uid+已在座不拆桌重进 — 复用 journey-gt-net-module 覆盖
   chan.on('broadcast',{event:'seat_open'}, (p)=>{
     if(p && p.payload && p.payload.tableId===row.id){
-      try{ _gtGrabSeat(_gtTables.get(row.id) || row); }catch(_){}
+      const _tuid=p.payload.uid;
+      if(_tuid && _tuid!==myUid) return;   // 点名别人, 我不抢
+      try{
+        const _fr=_gtTables.get(row.id)||row;
+        const _mine=(_fr.seats||[]).find(s=>s&&s.kind==='human'&&s.uid===myUid&&!s.away);
+        if(_mine) return;   // 我已在座, 别拆桌重进
+        _gtGrabSeat(_fr);
+      }catch(_){}
     }
   });
   // ★fix: 收到 waiting_seat 广播(自己发的) → 确保自己在等待队列里
@@ -4187,9 +4196,10 @@ async function _gtGrabSeat(row){
   var seats=(fresh.seats||[]);
   var target=seats.find(function(s){ return s && (s.kind==='empty'||!s.kind) && typeof s.seat==='number'; });
   if(!target) target=seats.find(function(s){ return s && s.kind==='human' && s.away && typeof s.seat==='number'; });
-  // 已在座: 直接进桌, 不必再 join
+  // 已在座: 已在打就什么都不做(不拆桌重进); 没在打才进桌
   var mine=seats.find(function(s){ return s && s.kind==='human' && s.uid===myUid && !s.away; });
   if(mine){
+    if(_gtActiveTable && _gtActiveTable.id===fresh.id && _ehGame){ return; }   // ★T92 已在局中, 别 close+重进(会拆掉进行中的牌局)
     try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
     _gtCleanupPlay();
     _gtTables.set(fresh.id, fresh); gtEnter(fresh.id); return;
