@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v56';
+window.__EH_APP_VER = '20261001-v58';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -3401,22 +3401,20 @@ function gtWritePokerHands(tableId, state, mySeat){
 const PK_WALLET_KEY = 'eh_pk_chips';
 const PK_WALLET_GRANT = 5000;
 const PK_WALLET_MIN = 1000;
-const PK_BUY_IN = 1000;            // ★v57 Bug7: 落座买入量(从全局筹码账户扣除), 离桌结算差值
-let _gtMyFinalStack = PK_BUY_IN;  // ★v57 Bug7: 本桌我的实时筹码快照(离桌时结算回全局账户)
+// ★v58: 不再有"买入量"概念 — 落座带全部全局筹码入桌(RPC 取筹码后账户清零), 离桌把剩余全部写回
+let _gtMyFinalStack = 0;  // ★v58: 本桌我的实时筹码快照(离桌时结算回全局账户)
 
-// ★v57 Bug7: 全局筹码账户(Supabase eh_user_stats.chips) —— 落座取筹码+扣买入, 离桌结算回写
+// ★v58: 全局筹码账户(Supabase eh_user_stats.chips) —— 落座取走全部筹码(RPC 内清零), 离桌把剩余全部写回
 async function gtFetchGlobalChips(){
   try{
     const {data,error}=await sb.rpc('eh_get_or_refill_chips',{p_uid:myUid});
     if(error){ _ehCatch('gtGetChips',error); return PK_WALLET_GRANT; }
-    return (typeof data==='number') ? data : PK_WALLET_GRANT;
+    // 前端兜底: 返回 0 / 无记录 → 默认 5000(RPC 已处理, 这里再兜一层)
+    return (typeof data==='number' && data>0) ? data : PK_WALLET_GRANT;
   }catch(e){ _ehCatch('gtGetChips',e); return PK_WALLET_GRANT; }
 }
-async function gtDeductBuyIn(){
-  try{ await sb.rpc('eh_update_chips',{p_uid:myUid, p_delta:-PK_BUY_IN}); }catch(e){ _ehCatch('gtBuyIn',e); }
-}
 function gtSettleChipsToGlobal(finalStack){
-  // 离桌: 把桌上剩余筹码加回全局账户(带入时已扣 buyIn, 净值 = finalStack - buyIn)
+  // ★v58: 离桌把桌上剩余筹码全部加回全局账户(带入时账户已清零, 净值即盈亏)
   const n=Math.max(0, Math.round(Number(finalStack)||0));
   _gtMyFinalStack=n;
   try{ sb.rpc('eh_update_chips',{p_uid:myUid, p_delta:n}).then(function(){}, function(){}); }catch(e){ _ehCatch('gtSettleChips',e); }
@@ -3566,7 +3564,7 @@ function pkSeatStackFor(seat, ctx){
     return bankChipsOf('nlhe', id, GRANT);
   }catch(_){ return GRANT; }
 }
-// 结算后写回全席筹码: 存真实值; chipsOf 读到 <买入门槛 时回补 1000(清零后从1000开始)。
+// 结算后写回全席筹码: 存真实值; ★v58 不再有买入量, 全部筹码带入/带出。
 function pkSeatStacksWrite(list, ctx){
   try{
     const mySeat = ctx && ctx.mySeat;
@@ -3674,21 +3672,19 @@ async function gtLaunchPoker(row, resumeSnap){
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
   _gtActiveTable={id:row.id,host:true};
   _setPokerState('host', row.id);
-  // ★v57 Bug7: 落座前从 Supabase 全局筹码账户取筹码(不足自动补满到 5000), 扣除买入 1000, 带入桌上。
-  //   离桌(onExit)把剩余筹码加回全局账户; 不再读写 localStorage 的 eh_pk_chips。
-  let _pkMyStack = PK_BUY_IN;
+  // ★v58: 落座带全部全局筹码入桌(RPC 取筹码后账户清零), 离桌(onExit)把剩余全部写回; 不再有买入量概念。
+  let _pkMyStack = PK_WALLET_GRANT;
   try{
     const _gchips = await gtFetchGlobalChips();
-    if(_gchips < PK_BUY_IN){ try{ toast('全局筹码不足，无法入座'); }catch(_){} _gtCleanupPlay(); return; }
-    await gtDeductBuyIn();
-    _pkMyStack = PK_BUY_IN;
-    try{ toast('买入 '+PK_BUY_IN+' · 全局余额 '+_gchips, 1800); }catch(_){}
+    if(_gchips <= 0){ try{ toast('全局筹码不足，无法入座'); }catch(_){} _gtCleanupPlay(); return; }
+    _pkMyStack = _gchips;   // ★v58: 全部全局筹码作为 startStack
+    try{ toast('入座 '+_gchips+' 筹码(全部带入)', 1800); }catch(_){}
   }catch(e){ _ehCatch('gtBuyInFlow',e); }
   _gtMyFinalStack = _pkMyStack;
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
-    mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:PK_BUY_IN,
+    mySeat:A.mySeat, remoteSeats:A.remoteSeats, sb:50, bb:100, startStack:_pkMyStack,
     resumeSnap: resumeSnap || _gtSnapCache.get(row.id) || null,   // ★v33: 优先用显式传参, 回退到缓存快照(transfer 场景)
     lobbyCtx:gtCtx(row),   // 打牌态空位邀请菜单复用: 邀请真人(发聊天卡)/指定灵魂(改 DB 座, realtime 补位)
     myStack: _pkMyStack, onWallet: function(v){ _gtMyFinalStack=Math.max(0,Math.round(Number(v)||0)); },
@@ -4001,13 +3997,12 @@ async function _gtEnterPokerV2(row){
   });
   _gtActiveTable={id:row.id,host:false};
   _setPokerState('guest', row.id);
-  // ★v57 Bug7: guest 落座前同样从全局账户取筹码+扣买入, 离桌结算回写
-  let _pkMyStack = PK_BUY_IN;
+  // ★v58: guest 落座同样带全部全局筹码入桌(RPC 取筹码后账户清零), 离桌结算回写
+  let _pkMyStack = PK_WALLET_GRANT;
   try{
     const _gchips = await gtFetchGlobalChips();
-    if(_gchips < PK_BUY_IN){ try{ toast('全局筹码不足，无法入座'); }catch(_){} gtSpectatePoker(row); return; }
-    await gtDeductBuyIn();
-    _pkMyStack = PK_BUY_IN;
+    if(_gchips <= 0){ try{ toast('全局筹码不足，无法入座'); }catch(_){} gtSpectatePoker(row); return; }
+    _pkMyStack = _gchips;   // ★v58: 全部全局筹码作为 startStack
   }catch(e){ _ehCatch('gtGuestBuyIn',e); }
   _gtMyFinalStack = _pkMyStack;
   _ehGame = window.EHPokerGame.open({
@@ -4016,7 +4011,7 @@ async function _gtEnterPokerV2(row){
     remoteSeats:A.remoteSeats,
     // 招募中: 客人也看得到座位/等人入座, 不再空白「等待发牌」干等开局
     lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
-    sb:50, bb:100, startStack:PK_BUY_IN,
+    sb:50, bb:100, startStack:_pkMyStack,
     myStack: _pkMyStack,
     onWallet: function(v){ _gtMyFinalStack=Math.max(0,Math.round(Number(v)||0)); },
     chat: ehGameChatBridge(),
