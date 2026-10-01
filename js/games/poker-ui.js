@@ -2672,6 +2672,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastPotShown=-1;
       lastBoardSig='';
       lastMeSig='';
+      _lastActsSig='';   // ★fix: 清签名护栏, 免新一手 renderActs 跳过渲染残留上局操作区按钮状态(跟注后下一手过牌误高亮)
     }
     function nextHand(){
       // 折叠(返回)态下不开新局: 当前这手已打完, 到此离场(见 leaveAfterReturn)
