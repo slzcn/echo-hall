@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261001-v62';
+window.__EH_APP_VER = '20261001-v63';
 const SB_URL  = 'https://cddkniwbhvcbfgkgomtl.supabase.co';
 // 私密房可召唤灵魂白名单(前端骨架直接显示用, 与后端 eh-admin-api SUMMONABLE 保持同步)
 const EH_SUMMONABLES_FALLBACK = [
@@ -2940,11 +2940,22 @@ function gtRenderPokerEntry(el,row){
     +'<div class="gt-head"><span class="ge">🎰</span><span class="gk">德州牌桌</span>'
     +'<span class="gh">'+esc(hostName)+' 开桌 <span class="gt-badge '+badgeCls+'">'+badgeTxt+'</span></span></div>'
     +'<div class="gt-foot"><span class="gt-tip">'+esc(tip)+'</span>'
-    +'<span class="gt-tip" style="flex:0 0 auto;opacity:.75">'+humans+' 真人 / '+empties+' 空位</span></div>';
+    +'<span class="gt-tip" style="flex:0 0 auto;opacity:.75">'+humans+' 真人 / '+empties+' 空位</span></div>'
+    // ★v63 场景5: 渲染牌桌动态带(谁赢了/谁输光了/传说时刻)
+    + (function(){ try { return gtHighlightsHtml(row.highlights); } catch(_) { return ''; } })();
   // 整卡可点(所有人): 引擎持有者→牌桌页招募态; 客人→自动坐空位/顶替 AI 进桌。onclick 就地绑, 不依赖 realtime 才可点。
   if(!closed){
     el.classList.add('gt-card-openable');
     el.onclick=(e)=>{ if(e.target.closest('button')) return; gtGotoExistingTable(row); };
+    // ★v63 场景1: 落座动画 — 座位数变化时加 seat-new class, 200ms 后移除
+    try{
+      const prevHumans = el.dataset.prevHumans ? parseInt(el.dataset.prevHumans) : -1;
+      if(prevHumans >= 0 && humans > prevHumans){
+        el.classList.add('seat-new');
+        setTimeout(function(){ try{ el.classList.remove('seat-new'); }catch(_){} }, 200);
+      }
+      el.dataset.prevHumans = String(humans);
+    }catch(_){}
   } else {
     // 已散桌: 默认折叠摘要(点击展开), 幂等——用户手动展开过则不再折叠。
     if(el.dataset.userExpanded === '1'){ el.classList.remove('collapsed'); el.onclick=null; }
@@ -3133,7 +3144,18 @@ async function gtEnsureSeated(row){
   if(A.mySeat>=0) return row;
   const seats=(row.seats||[]).filter(s=>s&&typeof s.seat==='number');
   let tgt=seats.find(s=>s.kind==='empty'||!s.kind);
-  if(!tgt && row.game==='nlhe') tgt=seats.find(s=>s.kind!=='human');   // 德州可顶替灵魂/分身/AI
+  if(!tgt && row.game==='nlhe'){
+    // ★v63 场景2: 德州无空位时, 不直接顶替 AI —— 30% 概率踢走一个非 host 席的 AI/灵魂, 70% 进入旁观等待
+    const aiSeats=seats.filter(s=>s.kind && s.kind!=='human' && s.kind!=='empty' && s.seat!==0);
+    if(aiSeats.length && Math.random()<0.3){
+      tgt=aiSeats[Math.floor(Math.random()*aiSeats.length)];
+      try{ await gtKick(row.id, tgt.seat); }catch(_){}
+    } else {
+      // 70%: 进入旁观状态, 等机器人输光后自动入座
+      try{ toast('等待空位，机器人输光后自动入座', 2500); }catch(_){}
+      return row;
+    }
+  }
   if(!tgt) return row;
   try{
     const jr=await gtJoin(row.id, tgt.seat);
@@ -3727,7 +3749,13 @@ async function gtLaunchPoker(row, resumeSnap){
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
       gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
-    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync){ _ehGame.resync(); } else { _gtPendingHello=true; } });  // ★v62 Bug3: _ehGame null 时延迟 resync
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync){ _ehGame.resync(); } else { _gtPendingHello=true; } })  // ★v62 Bug3: _ehGame null 时延迟 resync
+    .on('broadcast',{event:'dissolve'}, ()=>{ // ★v63 场景4: 收到散桌广播 → 立刻回聊天室
+      try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
+      try{ _ehGame=null; }catch(_){}
+      _gtCleanupPlay(); try{ toast('牌桌已解散'); }catch(_){}
+      try{ _gtHideTableCard(row.id); }catch(_){}
+    });
   gtWireHostResume(chan, row.id, rowRef());
   gtWirePlayerAway(chan, rowRef, row.id);   // ★v43: 收 player_away 立刻清座
   gtBindConnStatus(chan);
@@ -3810,6 +3838,8 @@ async function gtLaunchPoker(row, resumeSnap){
       try{ const r=_gtTables.get(row.id)||row; const arr=(r.seats||[]).slice().filter(s=>s&&typeof s.seat==='number').sort((a,b)=>a.seat-b.seat);
         const ds=arr[seat]; if(ds && ds.kind && ds.kind!=='empty' && ds.kind!=='human') gtKick(row.id, ds.seat);
       }catch(_){}
+      // ★v63 场景2: 空位出现后广播 seat_open, 等待的真人自动入座
+      try{ chan.send({type:'broadcast', event:'seat_open', payload:{seat:seat, tableId:row.id}}); }catch(_){}
     },
     onBustCount:()=>{ try{ ehRecordBust('nlhe'); }catch(_){} },
     // ★v34: 多次不操作被迫起身(doEnterSpectator) → 标 away + 显示离席提示条
@@ -3889,6 +3919,12 @@ function gtSpectatePoker(row){
       }
       try{ if(_ehGame && _ehGame.renderAll) _ehGame.renderAll(); }catch(_){}
     });
+  // ★v63 场景2: 收到 seat_open 广播(机器人输光离场) → 自动抢座
+  chan.on('broadcast',{event:'seat_open'}, (p)=>{
+    if(p && p.payload && p.payload.tableId===row.id){
+      try{ _gtGrabSeat(row); }catch(_){}
+    }
+  });
   // ★v34: 收到散桌广播 → 回聊天室
   chan.on('broadcast',{event:'dissolve'}, ()=>{
     try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
@@ -4074,6 +4110,19 @@ async function _gtEnterPokerV2(row){
   chan.on('broadcast',{event:'seat_taken'}, ({payload})=>{
       try{ if(_ehGame && _ehGame.renderAll) _ehGame.renderAll(); }catch(_){}
     });
+  // ★v63 场景2: 收到 seat_open 广播(机器人输光离场) → 自动抢座(只在旁观态生效, 已入座时忽略)
+  chan.on('broadcast',{event:'seat_open'}, (p)=>{
+    if(p && p.payload && p.payload.tableId===row.id){
+      try{ _gtGrabSeat(row); }catch(_){}
+    }
+  });
+  // ★v63 场景4: 收到散桌广播 → 立刻回聊天室(host 散桌时 guest 也收到)
+  chan.on('broadcast',{event:'dissolve'}, ()=>{
+    try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
+    try{ _ehGame=null; }catch(_){}
+    _gtCleanupPlay(); try{ toast('牌桌已解散'); }catch(_){}
+    try{ _gtHideTableCard(row.id); }catch(_){}
+  });
   // ★原子交接 v33: 收到 host 的 transfer 广播 → 用快照即时接管引擎, 消除 DB realtime 窗口期
   //   只有座位号最小的非 away 真人(gtEngineHolder)才接管, 其余忽略; 多 guest 同时收到不会冲突。
   // ★v51 DB 仲裁: 不再接收 transfer 广播, host_uid 变化由 DB realtime 推送 → gtCheckEngineTransfer 接管

@@ -2223,7 +2223,21 @@
   min-height:44px; min-width:44px;
 }
 .modal .opt:active, .mode-opt:active{ transform:scale(.96); }
-  </style>
+  
+/* ★v63 场景1: 落座动画 — 新座位出现时 fadeIn */
+.seat-new, .game-card.seat-new {
+  animation: gt-seat-enter 200ms ease-out;
+}
+@keyframes gt-seat-enter {
+  0%   { opacity: 0.4; transform: translateY(6px); }
+  100% { opacity: 1;   transform: translateY(0); }
+}
+/* ★v63 场景5: 牌桌动态带样式 */
+.gt-highlights { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.gt-hl-row { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.8; }
+.gt-hl-em { font-size: 13px; }
+.gt-hl-tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
   <script>
     /* 只在 standalone(装成App)显示开屏; 浏览器里不显。尽早跑, 不等后面的大 script。 */
     (function(){try{
@@ -2756,7 +2770,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/bgm.js?v=20261001-v61"></script>
 <script defer src="./js/modules/room.js?v=20261001-v61"></script>
 <script defer src="./js/modules/messages.js?v=20261001-v61"></script>
-<script defer src="./js/app.js?v=20261001-v62"></script>
+<script defer src="./js/app.js?v=20261001-v63"></script>
 <script defer src="./js/keyboard.js?v=20261001-v61"></script>
 <script defer src="./js/boot.js?v=20261001-v61"></script>
 <script defer src="./js/dm.js?v=20261001-v61"></script>
