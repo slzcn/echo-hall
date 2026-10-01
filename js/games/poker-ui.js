@@ -354,7 +354,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-me .pk-nm{font-size:14px;font-weight:800;color:var(--ink);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-me .pk-nm.turn{color:var(--accent)}
 .pk-me .pk-stk{font-size:13px;color:var(--amber);font-weight:800;font-variant-numeric:tabular-nums}
-.pk-me .pk-hint{font-size:11px;color:var(--sub);min-height:14px;line-height:1.5;padding:2px 0}
+.pk-me .pk-hint{font-size:11px;color:var(--sub);min-height:18px;line-height:18px;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-me .pk-hint b{color:var(--accent)}
 .pk-spectate-tag{font-size:11px;color:var(--sub);margin-right:8px;white-space:nowrap}
 /* 旁观态: 收掉 pk-me; 操作区保持与打牌态同高(三键常驻), 不闪不跳 */
@@ -1978,9 +1978,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     // 无操作占位态(旁观/等待/已弃/已全下/离线): 底部=纯操作区, 不放提示文案。
     //   提示统一由顶部 pk-msg 承载(T88/T92: 顶部=提示, 底部=按钮/占位, 不混用不重复)。
-    //   仍保留 54px 高度占位, 三态切换 felt 纹丝不动。
+    //   ★T93 与骨架/激活态【同高同结构】三行(raise+quick+row), 切换 felt 纹丝不动, 不再抖版。
     function actsWaitBar(){
-      return `<div class="pk-waitbar pk-waitbar-full"></div>`;
+      return `
+        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
+        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
+        <div class="pk-row">
+          <button class="pk-b fold" disabled>弃牌</button>
+          <button class="pk-b call" disabled></button>
+          <button class="pk-b raise" disabled>加注</button>
+        </div>`;
     }
     // 招募态操作区: 补满 / 邀真人 / 开始(满 2 席自动开, 开始作兜底)
     function renderLobbyCtrl(){
