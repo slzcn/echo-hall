@@ -640,6 +640,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let strategyHandState = null, strategyHandId = 0;
     function strategyFor(seat, tableParse){
       if(!root.EHStrategy) return null;
+      if(typeof seat!=='number' || !st || !st.players || !st.players[seat]) return null;   // ★T93 空值守卫
       // 引擎换局即清理旧请求；牌桌仍在，但上一手建议不可跨局沿用。
       if(strategyHandState!==st){ root.EHStrategy.clear(strategyMatchId); strategyHandState=st; strategyHandId++; }
       const input={seat, hand:st.players[seat].hole, board:st.board,
@@ -1441,6 +1442,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function seatHTML(seat){
       if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p=st.players[seat];
+      if(!p) return seatEmptyHTML(seat);   // ★T93 空值守卫: 座位不存在时退占位, 防 p.folded/p.hole 崩
       // 空位(机器人输光离场 / 旁观让座 / 满座旁观者看到的空椅): 画成"＋ 可坐/可邀"占位 —— 旁观时点空位直接坐下。
       if (seat!==mySeat && (vacated[seat] || (p && p.kind==='empty'))){
         const spect = spectating || mySeat<0;
