@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261002-v90';
+window.__EH_APP_VER = '20261002-v91';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -9528,33 +9528,41 @@ async function launchDoudizhu(){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=launchDoudizhu; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('doudizhu')) return;
-  let row=null;
-  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'ddz',p_name:me.name,p_emoji:me.emoji});
-    if(error) throw error; row=data; }
-  catch(e){ toast('开桌失败，稍后再试'); return; }
-  if(!row){ toast('开桌失败'); return; }
-  // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌, 给明确去向
-  if(row.game && row.game!=='ddz' && row.game!=='doudizhu'){
-    const g={nlhe:'德州',guandan:'掼蛋'}[row.game]||'其他牌局';
-    toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开斗地主');
-    await gtGotoExistingTable(row); return;
-  }
-  _gtTables.set(row.id,row);
-  // 大结构(与德州一致·主人): 点入口=进【全屏牌桌页·招募态】, 不自动发牌 —— 房主先邀真人/灵魂,
-  //   看座位满意再点「开始 ▶」(gtStart 补满灵魂+发牌); 真人凑满 3 席经 realtime 自动开局(见上游 2179)。
-  if(row.host_uid===myUid && row.status==='lobby') gtLaunchDdzLobby(row);
-  // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); 已有卡则静默复用。
-  if(row.host_uid===myUid && !row.msg_id){
-    const text=window.EHTable ? EHTable.encode(row.id,'ddz') : ('game|gt|'+row.id+'|ddz');
-    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-    if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
-    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
-    }catch(e){ console.warn('[gt] post table card failed', e); }
-  } else if(row.host_uid!==myUid || row.status==='playing'){
-    await gtGotoExistingTable(row);
-  }
+  // ★v91 防重入: 连点 /斗地主 只跑一次, 避免竞态贴多张牌桌卡
+  if(_gtLaunching) return;
+  _gtLaunching=true;
+  try{
+    try{ toast('正在开桌…', 1200); }catch(_){}
+    let row=null;
+    try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'ddz',p_name:me.name,p_emoji:me.emoji});
+      if(error) throw error; row=data; }
+    catch(e){ toast('开桌失败，稍后再试'); return; }
+    if(!row){ toast('开桌失败'); return; }
+    // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌, 给明确去向
+    if(row.game && row.game!=='ddz' && row.game!=='doudizhu'){
+      const g={nlhe:'德州',guandan:'掼蛋'}[row.game]||'其他牌局';
+      toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开斗地主');
+      await gtGotoExistingTable(row); return;
+    }
+    _gtTables.set(row.id,row);
+    // 大结构(与德州一致·主人): 点入口=进【全屏牌桌页·招募态】, 不自动发牌 —— 房主先邀真人/灵魂,
+    //   看座位满意再点「开始 ▶」(gtStart 补满灵魂+发牌); 真人凑满 3 席经 realtime 自动开局(见上游 2179)。
+    if(row.host_uid===myUid && row.status==='lobby') gtLaunchDdzLobby(row);
+    // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); ★v91 已有同 table_id 卡则跳过(幂等)
+    if(row.host_uid===myUid && !row.msg_id){
+      if(!document.querySelector('[data-gt-id="'+row.id+'"]')){
+        const text=window.EHTable ? EHTable.encode(row.id,'ddz') : ('game|gt|'+row.id+'|ddz');
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+        if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
+        try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+          if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+        }catch(e){ console.warn('[gt] post table card failed', e); }
+      }
+    } else if(row.host_uid!==myUid || row.status==='playing'){
+      await gtGotoExistingTable(row);
+    }
+  }finally{ _gtLaunching=false; }
 }
 // ── 德州扑克(无房主架构): 开一张【真牌桌】贴进聊天室, 停在招募中(lobby)等真人入座 ——
 //    2人自动开桌(gtCheckAutoStart), 不需要任何人点"开始"按钮。无房主概念, 所有人地位平等。
@@ -9567,39 +9575,53 @@ async function launchTexas(){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=launchTexas; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('nlhe')) return;
-  let row=null;
-  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'nlhe',p_name:me.name,p_emoji:me.emoji});
-    if(error) throw error; row=data; }
-  catch(e){ toast('开桌失败，稍后再试'); return; }
-  if(!row){ toast('开桌失败'); return; }
-  // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌
-  if(row.game && row.game!=='nlhe'){
-    const g={guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'其他牌局';
-    toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开德州');
-    await gtGotoExistingTable(row); return;
-  }
-  _gtTables.set(row.id,row);
-  // 无房主: 本房已有一桌 → 带我进桌(gtGotoExistingTable 用 gtEngineHolder 判断角色), 不重复开
-  if(row.msg_id || gtEngineHolder(row)!==myUid){
-    await gtGotoExistingTable(row);
-    return;
-  }
-  // 贴牌桌卡到聊天室(留档 + 供房里其他真人点卡加入); 德州空座不焊死, 真人可随时坐空位中途进桌。
-  const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
-  const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-  const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-  if(el){ $('#stream').appendChild(el); scrollStream(); }
-  try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-    if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
-  }catch(e){ console.warn('[gt] post table card failed', e); }
-  // 无房主: 点/德州入口=直接补灵魂+开局, 跳过招募态等待页, 进去就是打牌页。
-  //   gtSeatSoulsIntoEmpties 异步批次补灵魂, 第一个灵魂到位自动触发 gtStart 开局。
-  //   兜底: 房里没有灵魂时 1.2s 后直接 gtStart(AI 代打空位)。
-  if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-    // ★v82 第一时间进桌开打: gtStart 内部会先 await 补灵魂(lobby)再 eh_gt_start 转 playing,
-    //   再进桌触发 start_hand 发牌。不再单独调用 gtSeatSoulsIntoEmpties(避免与 gtStart 内的补位竞态)。
-    gtStart(row.id).catch(()=>{});
-  }
+  // ★v91 防重入: 连点 /德州 期间只跑一次, 避免 eh_gt_open 幂等返回同一桌(row.msg_id 尚未回填)时
+  //   多次乐观贴卡 → 聊天室出现多条牌桌卡。锁在本函数所有后台任务派发后即释放。
+  if(_gtLaunching) return;
+  _gtLaunching=true;
+  try{
+    try{ toast('正在开桌…', 1200); }catch(_){}   // ★v91 立即视觉反馈(<100ms), 不等 RPC
+    let row=null;
+    try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'nlhe',p_name:me.name,p_emoji:me.emoji});
+      if(error) throw error; row=data; }
+    catch(e){ toast('开桌失败，稍后再试'); return; }
+    if(!row){ toast('开桌失败'); return; }
+    // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌
+    if(row.game && row.game!=='nlhe'){
+      const g={guandan:'掼蛋',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'其他牌局';
+      toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开德州');
+      await gtGotoExistingTable(row); return;
+    }
+    _gtTables.set(row.id,row);
+    // 无房主: 本房已有一桌 → 带我进桌(gtGotoExistingTable 用 gtEngineHolder 判断角色), 不重复开
+    if(row.msg_id || gtEngineHolder(row)!==myUid){
+      await gtGotoExistingTable(row);
+      return;
+    }
+    if(gtEngineHolder(row)===myUid && row.status==='lobby'){
+      // ★v91 乐观进入(Bug2): 立即进牌桌 UI(招募态), 不等贴卡 / 补灵魂 / eh_gt_start。
+      //   _gtPokerEnter 内部 async: gtEnsureSeated(本机已入座→no-op) + 读筹码后 EHPokerGame.open
+      //   挂起招募态牌桌 UI(约 300ms), 用户点击后即时看到牌桌而非长时间空白。
+      //   eh_gt_open 已把开桌者入座 seat0(kind=human), gtEnsureSeated 不会与本桌补灵魂竞态。
+      try{ _gtPokerEnter(row); }catch(e){ _ehCatch('gtEarlyEnter', e); }
+      // 后台贴牌桌卡(留档 + 供房里其他真人点卡加入)。★v91 卡片幂等: 同 table_id 已有卡则跳过,
+      //   防止任何竞态/重入产生第二条卡(buildGameEl 已写 data-gt-id, 此处再校验一道)。
+      (async function _postCard(){
+        if(document.querySelector('[data-gt-id="'+row.id+'"]')) return;
+        const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+        if(el){ $('#stream').appendChild(el); scrollStream(); }
+        try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+          if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+        }catch(e){ console.warn('[gt] post table card failed', e); }
+      })();
+      // 后台开局(补灵魂→eh_gt_start 转 playing→start_hand 发牌)。★v91: _gtPokerEnter 已挂起
+      //   牌桌 UI 并设置 _gtActiveTable, gtStart 末尾命中 _gtActiveTable.id===id 短路走 start_hand,
+      //   不再 gtLaunchLocal 重挂, 无闪烁。补灵魂(200-500ms*批次)与开局 RPC 在后台进行, 不阻塞 UI。
+      gtStart(row.id).catch(()=>{});
+    }
+  }finally{ _gtLaunching=false; }
 }
 // 灵魂补位: 把当前所有空位从小到大依次坐满 —— 先用房里【真灵魂】一席一位, 灵魂不够时用【灵魂分身】继续补到无空位。
 // 由 gtStart 在开局前调用 —— 「开始」即用灵魂(真身份/头像)填满, 不再是匿名 AI 机器人;分身顶原灵魂头像、名标"原名·分身[序号]"。
@@ -9607,6 +9629,7 @@ async function launchTexas(){
 let _gtSoulBatchActive=false;   // 防重入: 批次补位进行中时, gtStart(setTimeout 触发)再调本函数直接返回
 let _gtStarting=false;          // ★v82 gtStart 进行中(await 补灵魂+eh_gt_start), gtCheckAutoStart 期间不重复触发
 let _gtNextHandPending=false;   // ★v82 上一手结束→延迟触发下一手 start_hand 的去重锁
+let _gtLaunching=false;          // ★v91 launch* 防重入锁: 连点游戏命令只跑一次, 阻止竞态产生多张牌桌卡/重复开局
 async function gtSeatSoulsIntoEmpties(row){
   // 无房主: 只有引擎持有者(座位最小真人)才补灵魂; 非引擎持有者不操作
   if(!row || row.status!=='lobby' || gtEngineHolder(row)!==myUid) return 0;
@@ -9873,34 +9896,42 @@ async function launchGuandan(){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=launchGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('guandan')) return;
-  // 开一张【联机牌桌】(幂等: 同房已有活桌则复用同一张, 不叠第二桌)。房里其他真人可点卡加入。
-  let row=null;
-  try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'guandan',p_name:me.name,p_emoji:me.emoji});
-    if(error) throw error; row=data; }
-  catch(e){ toast('开桌失败，稍后再试'); return; }
-  if(!row){ toast('开桌失败'); return; }
-  // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌
-  if(row.game && row.game!=='guandan'){
-    const g={nlhe:'德州',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'其他牌局';
-    toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开掼蛋');
-    await gtGotoExistingTable(row); return;
-  }
-  _gtTables.set(row.id,row);
-  // 大结构(与德州一致·主人): 点入口=进【全屏牌桌页·招募态】, 不自动发牌 —— 房主先邀真人/灵魂,
-  //   看座位满意再点「开始 ▶」(gtStart 补满灵魂+发牌); 真人凑满 4 席经 realtime 自动开局(见上游 2179)。
-  if(row.host_uid===myUid && row.status==='lobby') gtLaunchGuandanLobby(row);
-  // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); 已有卡则静默复用。
-  if(row.host_uid===myUid && !row.msg_id){
-    const text=window.EHTable ? EHTable.encode(row.id,'guandan') : ('game|gt|'+row.id+'|guandan');
-    const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
-    const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
-    if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
-    try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
-      if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
-    }catch(e){ console.warn('[gt] post table card failed', e); }
-  } else if(row.host_uid!==myUid || row.status==='playing'){
-    await gtGotoExistingTable(row);
-  }
+  // ★v91 防重入: 连点 /掼蛋 只跑一次, 避免竞态贴多张牌桌卡
+  if(_gtLaunching) return;
+  _gtLaunching=true;
+  try{
+    try{ toast('正在开桌…', 1200); }catch(_){}
+    // 开一张【联机牌桌】(幂等: 同房已有活桌则复用同一张, 不叠第二桌)。房里其他真人可点卡加入。
+    let row=null;
+    try{ const {data,error}=await sb.rpc('eh_gt_open',{p_room:curRoom.id,p_game:'guandan',p_name:me.name,p_emoji:me.emoji});
+      if(error) throw error; row=data; }
+    catch(e){ toast('开桌失败，稍后再试'); return; }
+    if(!row){ toast('开桌失败'); return; }
+    // 一房一桌: 别人已开了别的游戏 → 别静默塞进错桌
+    if(row.game && row.game!=='guandan'){
+      const g={nlhe:'德州',ddz:'斗地主',doudizhu:'斗地主'}[row.game]||'其他牌局';
+      toast('房间里已有一桌'+g+' · 点牌桌卡加入, 或等它结束再开掼蛋');
+      await gtGotoExistingTable(row); return;
+    }
+    _gtTables.set(row.id,row);
+    // 大结构(与德州一致·主人): 点入口=进【全屏牌桌页·招募态】, 不自动发牌 —— 房主先邀真人/灵魂,
+    //   看座位满意再点「开始 ▶」(gtStart 补满灵魂+发牌); 真人凑满 4 席经 realtime 自动开局(见上游 2179)。
+    if(row.host_uid===myUid && row.status==='lobby') gtLaunchGuandanLobby(row);
+    // 牌桌卡供房里其他真人加入/断线重进(仅落库, 本地不 scroll 抢镜); ★v91 已有同 table_id 卡则跳过(幂等)
+    if(row.host_uid===myUid && !row.msg_id){
+      if(!document.querySelector('[data-gt-id="'+row.id+'"]')){
+        const text=window.EHTable ? EHTable.encode(row.id,'guandan') : ('game|gt|'+row.id+'|guandan');
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
+        if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
+        try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
+          if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
+        }catch(e){ console.warn('[gt] post table card failed', e); }
+      }
+    } else if(row.host_uid!==myUid || row.status==='playing'){
+      await gtGotoExistingTable(row);
+    }
+  }finally{ _gtLaunching=false; }
 }
 // 结束后往聊天室发一张掼蛋战绩卡(kind:'game', gd 事件)。含胜负/名次/升级/双下/炸弹 + 再来一局入口。
 async function postGuandanResult(res, log, names, meta, ids){
