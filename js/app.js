@@ -1325,6 +1325,8 @@ function gtCheckNoHumansThenClose(row){
   if(!r || r.status==='closed') return;
   const humans=(r.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
   if(humans>0) return;
+  // ★v89: 有真人在等待队列时不散桌 — 他们可以入座继续玩
+  if(_gtWaitingHumans && _gtWaitingHumans.length>0) return;
   // ★v61: 如果有 guest 正在进桌(pokerSession 存在且是 guest 状态), 不触发散桌
   if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
   setTimeout(async ()=>{
@@ -1345,6 +1347,8 @@ function gtCheckNoHumansThenClose(row){
     if(still===0){
       // ★v61: 再次检查 pokerSession, 5s 内有人进桌就不散
       if(_gtPokerSession && _gtPokerSession.tableId===r.id) return;
+      // ★v89: 等待队列有真人时不散桌
+      if(_gtWaitingHumans && _gtWaitingHumans.length>0) return;
       // ★v34: 广播 dissolve 让所有在线客户端立刻回聊天室
       try{ if(_gtPlayChan && _gtActiveTable && _gtActiveTable.id===r.id){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId:r.id}}); } }catch(_){}
       try{ toast('桌上没有真人了，牌桌自动解散'); }catch(_){}
@@ -3682,7 +3686,7 @@ async function _gtEnterPokerServer(row) {
     onSeatIdle: function(seat, info) {
       if (info && info.vacate && info.mine) {
         try { if (!window.EH_SERVER_HOST) gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
-        try { gtRpc('eh_gt_set_away', {p_table: tableId, p_away: true}); } catch(_) {}
+        try { gtLeave(tableId); } catch(_) {}   // ★v89: 超时离座用 gtLeave 释放座位(非 set_away), 座位变 empty 供等待队列入座 + 触发无真人散桌链路
         try { gtCheckNoHumansThenClose(row); } catch(_) {}
         _gtBroadcastPlayerAway(tableId);
         _gtCleanupPlay();
@@ -4289,7 +4293,7 @@ async function gtLaunchPoker(row, resumeSnap){
     // ★v34: 多次不操作被迫起身(doEnterSpectator) → 标 away + 显示离席提示条
     onSeatIdle:(seat, info)=>{
       if(info && info.vacate && info.mine){
-        try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){}
+        try{ gtLeave(row.id); }catch(_){}   // ★v89: 超时离座用 gtLeave 释放座位(非 set_away), 座位变 empty 供等待队列入座 + 触发无真人散桌链路
         // 被强制起身：检查是否还有其他真人
         const _fr2=_gtTables.get(row.id)||row;
         const _isHost = gtEngineHolder(_fr2) === myUid;
@@ -4689,7 +4693,7 @@ async function _gtEnterPokerV2(row){
         const fr=_gtTables.get(tableId)||row;
         const _isHost=gtEngineHolder(fr)===myUid;
         try{ gtSettleChipsToGlobal(_gtMyFinalStack); }catch(_){}   // ★v57 Bug7: 离桌结算回全局账户
-        try{ gtRpc('eh_gt_set_away',{p_table:tableId, p_away:true}); }catch(_){}
+        try{ gtLeave(tableId); }catch(_){}   // ★v89: 超时离座用 gtLeave 释放座位(非 set_away), 座位变 empty 供等待队列入座 + 触发无真人散桌链路
         if(_isHost){ _gtHandleHostLeave(tableId, fr.seats, myUid); }
         _gtBroadcastPlayerAway(tableId);
         _gtCleanupPlay();

@@ -163,10 +163,6 @@
     --bg:#eff8f8; --bg2:#daf1ef; --panel:rgba(255,255,255,.9); --panel-solid:#ffffff; --line:color-mix(in srgb, var(--accent) 28%, transparent); --line2:color-mix(in srgb, var(--accent) 42%, transparent); --ink:#0c312e; --sub:#3d8f89; --dim:#81bbb7; --cyan:var(--accent); --magenta:#ef006e; --violet:#7b5cff; --amber:#C8892E; --green:#148566; --accent:#007f76; --grid:color-mix(in srgb, var(--accent) 6%, transparent); --glow-cyan:0 2px 10px color-mix(in srgb, var(--accent) 18%, transparent); --glow-mag:0 2px 10px rgba(239,0,110,0.16);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  /* ★v89 全局去 300ms 触发延迟: 所有可点元素 touch-action:manipulation(去双击缩放等待)。
-     不影响需要原生滚动的容器(它们显式声明 pan-y/pan-x/none, 优先级更高)。 */
-  button,a,[role="button"],input[type="button"],input[type="submit"],input[type="reset"],.tool-btn,.me-btn,.gear,.bgm-btn,.nohover,
-  .rm,.ch,.card-btn,.bt-btn,.dbtn,.pm-item,.emoji-btn,.skin-opt,.mode-opt,.tarot-card,.enter-card,.back,.reroll,.pk-chip{touch-action:manipulation}
   /* ============ EH_MOBILE_COMPAT 移动端兼容性增强 ============ */
   /* 1. 去掉 iOS/安卓对表单控件的系统默认样式(内阴影/圆角/箭头),让 EH 自定义样式生效 */
   input,textarea,select,button{
@@ -722,7 +718,7 @@
   /* 触屏点后短暂禁用指针, 强制脱落 :hover, 不再粘住 */
   .nohover{pointer-events:none!important}
   /* 顶栏按钮: 按下瞬时反馈 + 浮层开启时保持选中态(全设备) */
-  .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92);transition-duration:.05s}
+  .tool-btn:active,.me-btn:active,.gear:active{transform:scale(.92)}
   .tool-btn.active,.me-btn.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
 
   /* BGM 按钮: emoji 图标(🎵/🔇), 与工具栏其它 emoji 统一。开=轻微呼吸, 静音=灰淡 */
