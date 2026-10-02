@@ -47,7 +47,7 @@
     // journey-exempt: 牌桌 CSS 竖屏贴底/横屏紧凑 — 契约由 scripts/test-pk-layout-contract.js + journey-pk-ios-layout.js 覆盖
     const s = document.createElement('style'); s.id = CSS_ID;
     s.textContent = `
-.pk-room{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;overflow:hidden;
+.pk-room{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;overflow:hidden;max-width:100vw;max-height:100%;
   background:linear-gradient(180deg,var(--bg2,var(--bg2)),var(--bg,#070a12));border-radius:inherit;
   animation:pkRoomIn .22s cubic-bezier(.2,.9,.3,1);
   --cw:34px;--ch:48px;--cn:12px;--cs:10px;--cc:18px;--bcw:38px;--bch:54px;--banner:15px;
@@ -120,7 +120,7 @@
 .pk-room.eh-rot .pk-acts{ min-height: 0 !important; }
 .pk-room.eh-rot .pk-me{ min-height: 0 !important; }
 @keyframes pkRoomIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
+.pk-bar{display:flex;align-items:center;gap:10px;flex-shrink:0;max-width:100%;overflow-x:hidden;border-bottom:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
   padding:calc(11px + env(safe-area-inset-top,0px)) max(15px,env(safe-area-inset-right,0px)) 11px max(15px,env(safe-area-inset-left,0px))}
 .pk-title{font-weight:800;letter-spacing:.06em;color:var(--ink);font-size:15px;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
 .pk-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:var(--glow-cyan)}
@@ -133,7 +133,7 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
   .pk-blinds{top:52%;font-size:11px}  /* 矮屏: 抬高避开本人座位(CY下移后同步抬高) */
 }
 /* 操作区固定骨架: 滑杆、快捷键、提示/快捷行、按钮行都固定高度, 状态切换不改变 felt 高度。 */
-.pk-acts{height:161px;min-height:161px;flex:0 0 161px;box-sizing:border-box}
+.pk-acts{height:161px;min-height:161px;flex:0 0 161px;box-sizing:border-box;max-width:100%;overflow-x:hidden}
 .pk-acts>.pk-raise{height:32px;min-height:32px;flex:none;box-sizing:border-box}
 .pk-acts>.pk-quick,.pk-acts>.pk-prehint{height:40px;min-height:40px;flex:0 0 40px;box-sizing:border-box}
 .pk-acts>.pk-row{height:54px;min-height:54px;flex:none;box-sizing:border-box}
@@ -183,7 +183,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
  *   旧的 top:52% 让底池/公共牌/提示与这两个下翼席的头像糊在一起(主人反馈"中间区域被遮挡")——见探针实测。
  *   而顶席(90°)到中心之间是大片空绒面。上移后底池+公共牌独占这块上中方空白, 下翼席让开, 层次分明。
  *   (下注筹码现按席摆各家身前 ccy=CY+(cy-CY)*0.62, 不再中心汇聚, 故不复"糊在一起"的老问题。) */
-.pk-center{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;width:88%}
+.pk-center{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;width:88%;max-width:100%;box-sizing:border-box}
 .pk-pot{font-size:13px;color:var(--amber);font-weight:800;letter-spacing:.03em;display:flex;align-items:center;gap:6px;
   background:rgba(4,10,14,.5);border:1px solid color-mix(in srgb, var(--amber) 35%, transparent);border-radius:999px;padding:3px 12px;white-space:nowrap}
 .pk-pot .pc{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#e0a020);box-shadow:0 1px 2px rgba(0,0,0,.4)}
@@ -341,7 +341,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-room .pk-board .card.back.dim{opacity:.6}
 .card.dim{opacity:.5}
 /* 我的座位条 */
-.pk-me{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px 4px;flex-shrink:0}  /* 居中 */
+.pk-me{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px 4px;flex-shrink:0;max-width:100%;box-sizing:border-box}  /* 居中 */
 .pk-me .pk-hole{display:flex;gap:6px}
 .pk-me .pk-hole .card.justdealt{animation:pkDeal .34s ease both}
 @keyframes pkDeal{from{transform:translateY(30px) scale(.7);opacity:0}to{transform:none;opacity:1}}
@@ -374,7 +374,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-b{border-radius:12px;font-weight:700;letter-spacing:.01em}
 .pk-quick .pk-qbtn{border-radius:10px}
 .pk-raise input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-9px}
-.pk-raise{display:flex;align-items:center;gap:9px}
+.pk-raise{display:flex;align-items:center;gap:9px;max-width:100%;box-sizing:border-box;overflow-x:hidden}
 .pk-raise.hidden{display:none}
 /* ★.reserved: 灰掉但保留高度 —— 操作条骨架恒定, 滑杆/快捷非我回合时灰掉显示(不可点击), 按钮行不上下跳(主人反馈"按钮别跳来跳去") */
 .pk-raise.reserved,.pk-quick.reserved{opacity:.25;pointer-events:none}
@@ -389,11 +389,11 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-raise input[type=range]::-moz-range-progress{height:8px;border-radius:999px;background:var(--accent)}
 .pk-raise input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid var(--panel-solid,#fff);box-shadow:0 1px 5px rgba(0,0,0,.35)}
 .pk-raise .pk-amt{min-width:58px;text-align:center;font-size:14px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
-.pk-quick{display:flex;gap:6px}
-.pk-qbtn{flex:1;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer}
+.pk-quick{display:flex;gap:6px;max-width:100%;box-sizing:border-box}
+.pk-qbtn{flex:1;min-width:0;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;overflow:hidden}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-qbtn:not(:disabled):hover{filter:brightness(1.15)}
-.pk-row{display:flex;gap:9px;justify-content:center}
+.pk-row{display:flex;gap:9px;justify-content:center;max-width:100%;box-sizing:border-box}
 /* ★恒定高度 + flex 垂直居中: 单行(弃牌/预选)与两行(跟注 114/加注 至 404)按钮一律 min-height:54px 同高,
  *   状态在"预选条(单行)↔我的回合(两行)↔骨架"之间切换时按钮行不再忽高忽低跳动(主人反馈"按钮高度不一样,来回跳跃")。
  *   长文字靠 flex-center + nowrap 居中不溢出; 主标题字号用 clamp 随按钮宽自适应, 保证"文字长也定宽美观"。 */
@@ -441,7 +441,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 /* 结算浮层可滚动(输光/多池高结算超出 felt 高度时, justify-content:center 会把卡片上下两头一起挤出 overflow:hidden 的 felt,
    底部"再来一局/收工"被裁掉 → 主人"德州输光后没法继续玩"的真因)。改用 overflow-y:auto 容器 + 卡片 margin:auto:
    内容矮时垂直居中, 内容高时可滚动且首尾都够得着(flex 里唯一不裁切的居中写法, 优于 justify-content:center)。 */
-.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+.pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
 .pk-over-card{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);box-sizing:border-box;
   padding:22px 20px 18px;border-radius:20px;animation:pkOverCard .28s cubic-bezier(.2,.9,.3,1) both;
@@ -480,7 +480,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-chat-fab:active{transform:scale(.9)}
 .pk-room.is-land .pk-chat-fab{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .pk-chat-pop{position:absolute;right:12px;bottom:calc(220px + env(safe-area-inset-bottom,0px));z-index:17;
-  width:min(300px,78vw);background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:10px;
+  width:min(300px,78vw);max-width:calc(100vw - 24px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:10px;
   box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none}
 .pk-chat-pop.on{opacity:1;transform:none;pointer-events:auto}
 .pk-chat-pop .pk-qc-rowwrap{display:flex;flex-direction:column;gap:7px}

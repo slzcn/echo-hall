@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261002-v86';
+window.__EH_APP_VER = '20261002-v87';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1306,6 +1306,11 @@ function _gtStartIdleClose(tableId){
   _gtStopIdleClose();
   _gtIdleCloseT=setInterval(function(){
     if(!_gtActiveTable){ _gtStopIdleClose(); return; }
+    // ★v87 fix Bug2(打牌中自动退出): 本人处于活跃 host/guest/spectator 会话且有引擎 → 绝不被 idleClose 踢出。
+    //   原逻辑只认"真人点 .pk-acts 按钮"为有人操作, 打牌中等 AI/灵魂出牌或长牌局时真人 120s 不点按钮就被误散桌。
+    //   现 snap/act/host_ping/hello 广播都刷新 _gtLastHumanAct; 真正空转(无任何广播)的桌才到 120s 回收。这里再兜底。
+    var _inGame=_ehGame && _gtPokerSession && (_gtPokerSession.state==='host'||_gtPokerSession.state==='guest'||_gtPokerSession.state==='spectator') && _gtPokerSession.tableId===_gtActiveTable.id;
+    if(_inGame){ _gtLastHumanAct=Date.now(); return; }
     if(Date.now()-_gtLastHumanAct > GT_IDLE_CLOSE_MS){
       _gtStopIdleClose();
       try{ toast('2分钟无人操作，牌桌已自动解散'); }catch(_){}
@@ -1481,6 +1486,7 @@ function gtWatchHostPing(chan, hostUid, tableId){
   chan.on('broadcast',{event:'host_ping'}, ({payload})=>{
     // 无房主: 引擎持有者动态转移, 认任何 host_ping 发送者(同 channel 只有引擎持有者才发 host_ping)
     if(payload && payload.uid){ _gtLastHostAt = Date.now();
+      gtMarkHumanAct();   // ★v87 fix Bug2: host 心跳在=桌在动, 刷新 idleClose
       try{ if(_ehGame && _ehGame.setConn && _ehGame.connState && _ehGame.connState()==='host_offline') _ehGame.setConn('online'); }catch(_){ }
     }
   });
@@ -3122,7 +3128,7 @@ function gtSeatPageCSS(){
   if(document.getElementById('gtSeatPageCSS')) return;
   const s=document.createElement('style'); s.id='gtSeatPageCSS';
   s.textContent=[
-    '.gt-seatpage{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;',
+    '.gt-seatpage{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;overflow:hidden;',
       'padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(18px + env(safe-area-inset-bottom,0px));',
       'background:var(--bg2,#0d1524);backdrop-filter:blur(8px);animation:gtspIn .22s ease}',
     '@keyframes gtspIn{from{opacity:0}to{opacity:1}}',
@@ -3356,10 +3362,14 @@ function gtWireHostChannel(tableId){
   const rowRef=()=>_gtTables.get(tableId);
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!payload||typeof payload.seat!=='number') return;
+      gtMarkHumanAct();   // ★v87 fix Bug2: 任何出牌广播(含 AI/灵魂)都算"桌上有人", 刷新 idleClose 时钟
       gtAcceptRemoteAct(tableId, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
-    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); })
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); gtMarkHumanAct(); })
     .on('broadcast',{event:'dissolve'}, ()=>{ // ★v34: 收到散桌广播 → 立刻回聊天室
+      // ★v87 核查(路径1): dissolve 是显式广播, 仅由 gtCheckNoHumansThenClose / _gtClosePlay / 引擎 onDissolve 发出,
+      //   不会因网络抖动或 realtime 状态更新自动触发; gtCheckNoHumansThenClose 已用 anyHuman(含 away 真人) 守卫,
+      //   打牌中真人都在 → 不会误发 dissolve。故此处直接清场, 不加延迟/再确认(避免真散桌时卡住)。
       try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
       _gtCleanupPlay(); try{ toast('牌桌已解散'); }catch(_){}
       try{ _gtHideTableCard(tableId); }catch(_){}
@@ -3580,6 +3590,7 @@ async function _gtEnterPokerServer(row) {
 
   chan.on('broadcast', {event:'snap'}, function(payload) {
     var snap = payload && payload.payload;
+    gtMarkHumanAct();   // ★v87 fix Bug2: 快照广播=桌上在动, 刷新 idleClose 时钟(覆盖 AI/灵魂出牌+resync)
     if (!_ehGame || !_ehGame.applySnapshot || !snap) return;
     try { _ehGame.applySnapshot(snap); } catch(e) { _ehCatch('applySnapshot', e); window.ehReportError('manual', 'snapshot_apply_failed', { error: e && e.message }); }
     try { _gtSnapCacheSet(tableId, snap); } catch(_) {}
@@ -4164,9 +4175,10 @@ async function gtLaunchPoker(row, resumeSnap){
       if(!payload||typeof payload.seat!=='number') return;
       // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
       // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
+      gtMarkHumanAct();   // ★v87 fix Bug2: 出牌广播刷新 idleClose, 打牌中不会被误散桌
       gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
     })
-    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync){ _ehGame.resync(); } else { _gtPendingHello=true; } })  // ★v62 Bug3: _ehGame null 时延迟 resync
+    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync){ _ehGame.resync(); } else { _gtPendingHello=true; } gtMarkHumanAct(); })  // ★v62 Bug3: _ehGame null 时延迟 resync
     .on('broadcast',{event:'dissolve'}, ()=>{ // ★v63 场景4: 收到散桌广播 → 立刻回聊天室
       try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){}
       try{ _ehGame=null; }catch(_){}
