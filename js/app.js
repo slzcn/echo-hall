@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261002-v83';
+window.__EH_APP_VER = '20261002-v84';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1146,7 +1146,7 @@ function _gtPokerBindUnload(tableId){
           }
         }
         // ★v62 Bug5: 关浏览器时同步结算筹码回全局账户, 否则桌上筹码随散桌丢失
-        if(_gtMyFinalStack > 0 && _pagehideAccessToken){
+        if(_gtMyFinalStack > 0 && _pagehideAccessToken && !window.EH_SERVER_HOST){
           try{
             fetch(SB_URL+'/rest/v1/rpc/eh_update_chips',{
               method:'POST', keepalive:true,
@@ -3646,10 +3646,11 @@ async function _gtEnterPokerServer(row) {
 
   var _pkMyStack = PK_WALLET_GRANT;
   try {
-    var _gchips = await gtFetchGlobalChips();
-    if (_gchips <= 0) { try { toast('全局筹码不足，无法入座'); } catch(_) {} gtSpectatePoker(row); return; }
+    // ★v84 fix: 服务端模式筹码权威在 Edge Function(eh_chips_set), 不能调 gtFetchGlobalChips(清零 eh_chips),
+    //   否则 Edge Function start_hand 读到 0 → 真人 stack=0 sitOut 立刻被踢/无法操作。
+    //   只读展示值, 真实 stack 由快照 applySnapshot 覆盖; 不因 0 拒绝入桌(可能是中途旁观/上一手刚输光)。
+    var _gchips = await gtReadChipsReadOnly();
     _pkMyStack = _gchips;
-    try { toast('入座 ' + _gchips + ' 筹码(全部带入)', 1800); } catch(_) {}
   } catch(e) { _ehCatch('gtBuyInFlow', e); }
   _gtMyFinalStack = _pkMyStack;
 
@@ -3668,7 +3669,7 @@ async function _gtEnterPokerServer(row) {
     onSeatResume: function(seat) { var sd = (typeof seat === 'number') ? seat : A.mySeat; try { chan.send({type:'broadcast', event:'resume', payload:{seat: sd, uid: myUid}}); } catch(_) {} },
     onSeatIdle: function(seat, info) {
       if (info && info.vacate && info.mine) {
-        try { gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
+        try { if (!window.EH_SERVER_HOST) gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
         try { gtRpc('eh_gt_set_away', {p_table: tableId, p_away: true}); } catch(_) {}
         try { gtCheckNoHumansThenClose(row); } catch(_) {}
         _gtBroadcastPlayerAway(tableId);
@@ -3685,7 +3686,7 @@ async function _gtEnterPokerServer(row) {
     },
     onGrabSeat: function() { _gtGrabSeat(row); },
     onBust: function() {
-      try { gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
+      try { if (!window.EH_SERVER_HOST) gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
       try { gtRpc('eh_gt_set_away', {p_table: row.id, p_away: true}); } catch(_) {}
       try { gtCheckNoHumansThenClose(row); } catch(_) {}
       _gtBroadcastPlayerAway(row.id);
@@ -3701,7 +3702,7 @@ async function _gtEnterPokerServer(row) {
     },
     onBustCount: function() { try { ehRecordBust('nlhe'); } catch(_) {} },
     onExit: function() {
-      try { gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
+      try { if (!window.EH_SERVER_HOST) gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
       _setPokerState('away', tableId);
       _gtBroadcastPlayerAway(tableId);
       try { gtRpc('eh_gt_set_away', {p_table: tableId, p_away: true}); } catch(_) {}
@@ -3904,6 +3905,17 @@ const PK_WALLET_MIN = 1000;
 let _gtMyFinalStack = 0;  // ★v58: 本桌我的实时筹码快照(离桌时结算回全局账户)
 
 // ★v58: 全局筹码账户(Supabase eh_user_stats.chips) —— 落座取走全部筹码(RPC 内清零), 离桌把剩余全部写回
+// ★v84 fix: 只读筹码(不零 eh_chips), 用于服务端模式/旁观 — 筹码权威在 Edge Function 或入桌时才取走。
+//   gtFetchGlobalChips 会调 eh_get_or_refill_chips 清零账户, 旁观/服务端展示若调它会把筹码清零,
+//   导致服务端 start_hand 读到 0(stack=0 sitOut 立刻被踢/无法操作)或旁观后真实入桌筹码丢失。
+async function gtReadChipsReadOnly(){
+  try{
+    const r = await sb.rpc('eh_chips_get', { p_uid: myUid, p_game: 'nlhe' });
+    if(r && r.error){ _ehCatch('gtReadChips', r.error); return PK_WALLET_GRANT; }
+    const v = r && r.data;
+    return (typeof v === 'number' && v > 0) ? v : PK_WALLET_GRANT;
+  }catch(e){ _ehCatch('gtReadChips', e); return PK_WALLET_GRANT; }
+}
 async function gtFetchGlobalChips(){
   try{
     const {data,error}=await sb.rpc('eh_get_or_refill_chips',{p_uid:myUid});
@@ -4372,7 +4384,8 @@ async function gtSpectatePoker(row){
   // ★v67 Bug7: 旁观者进桌也读全局筹码, 抢座入桌时 startStack 正确
   var _pkMyStack = PK_WALLET_GRANT;
   try{
-    const _gchips = await gtFetchGlobalChips();
+    // ★v84 fix: 旁观只读筹码展示, 不调 gtFetchGlobalChips(清零) — 旁观清零会让真实入桌时筹码丢失/服务端读到 0
+    const _gchips = await gtReadChipsReadOnly();
     if(_gchips > 0){ _pkMyStack = _gchips; }
   }catch(e){ _ehCatch('gtSpectateChips', e); }
   _gtMyFinalStack = _pkMyStack;

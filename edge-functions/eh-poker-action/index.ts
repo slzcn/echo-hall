@@ -1004,7 +1004,11 @@ Deno.serve(async (req: Request) => {
         names.push(s.name || '玩家');
         isAI.push(s.kind !== 'human');
         uids.push(s.uid);
-        const chips = chipsMap && chipsMap[s.uid] !== undefined ? chipsMap[s.uid] : (s.chips || 2000);
+        // ★v84 fix: away 真人按 sitOut 处理(stack=0 不发牌不要求行动), 否则手牌会卡在等离线玩家行动(服务端无 turn 超时)。
+        //   其 eh_chips 余额不动: hand-over 的 eh_chips_set 跳过 sitOut&&start===0 的玩家(见下方)。
+        const isAwayHuman = (s.kind === 'human' && s.away);
+        const chips = isAwayHuman ? 0
+          : (chipsMap && chipsMap[s.uid] !== undefined ? chipsMap[s.uid] : (s.chips || 2000));
         stacks.push(chips);
       }
 
@@ -1080,7 +1084,9 @@ Deno.serve(async (req: Request) => {
 
       if (state.phase === 'over' && state.result) {
         for (const p of state.players) {
-          if (p.uid && !p.isAI) {
+          // ★v84 fix: 跳过未参与本手的座(sitOut 且 start===0, 即 away 真人/开手就破产),
+          //   否则用 p.stack=0 覆盖掉他们 eh_chips 里的真实余额。
+          if (p.uid && !p.isAI && !(p.sitOut && p.start === 0)) {
             try {
               await adminClient.rpc('eh_chips_set', {
                 p_uid: p.uid, p_game: 'nlhe', p_chips: p.stack,
