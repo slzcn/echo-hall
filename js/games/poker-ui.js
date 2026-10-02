@@ -200,8 +200,8 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
    全灰(grayscale)红黑不分就分不清花色了。忠实表现"已弃但仍可辨认弃了什么"。 */
 .pk-seat.folded .pk-avr,.pk-seat.folded .nm,.pk-seat.folded .stk{opacity:.4;filter:grayscale(.7)}
 .pk-seat.folded .card{opacity:.72;filter:none}
-.pk-avr{width:var(--av,44px);height:var(--av,44px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;position:relative;transition:background .15s}
-.pk-seat.turn .pk-avr{background:conic-gradient(from -90deg,var(--accent) calc(var(--p,360)*1deg),var(--line,color-mix(in srgb, var(--accent) 18%, transparent)) 0)}
+.pk-avr{width:var(--av,44px);height:var(--av,44px);border-radius:50%;display:grid;place-items:center;padding:3px;box-sizing:border-box;position:relative}
+.pk-seat.turn .pk-avr{background:conic-gradient(from -90deg,var(--accent) calc(var(--p,360)*1deg),var(--line,color-mix(in srgb, var(--accent) 18%, transparent)) 0);will-change:background}
 .pk-avr .av{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--avf,20px);background:var(--panel-solid,var(--panel-solid));border:1.5px solid var(--line2);position:relative}
 /* 行动席发光改脉冲(对齐 ddz/掼蛋): 静态发光扫一眼抓不住"轮到谁", 脉冲把眼睛拉过去 */
 .pk-seat.turn .pk-avr .av{box-shadow:0 0 14px var(--accent,color-mix(in srgb, var(--accent) 60%, transparent));animation:pkSeatTurn 1.1s ease-in-out infinite}
@@ -390,7 +390,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-raise input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid var(--panel-solid,#fff);box-shadow:0 1px 5px rgba(0,0,0,.35)}
 .pk-raise .pk-amt{min-width:58px;text-align:center;font-size:14px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .pk-quick{display:flex;gap:6px;max-width:100%;box-sizing:border-box}
-.pk-qbtn{flex:1;min-width:0;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;overflow:hidden}
+.pk-qbtn{flex:1;min-width:0;min-height:38px;padding:6px 0;border-radius:9px;font-size:11px;font-weight:700;border:1px solid var(--line2);background:var(--panel);color:var(--sub);cursor:pointer;overflow:hidden;touch-action:manipulation}
 .pk-qbtn:active{transform:scale(.95)}
 .pk-qbtn:not(:disabled):hover{filter:brightness(1.15)}
 .pk-row{display:flex;gap:9px;justify-content:center;max-width:100%;box-sizing:border-box}
@@ -400,7 +400,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-b{flex:1;min-width:0;max-width:150px;min-height:54px;padding:6px 6px;border-radius:12px;font-weight:800;
   font-size:clamp(13px,3.7vw,15px);line-height:1.16;cursor:pointer;white-space:nowrap;overflow:hidden;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.03em;transition:.14s}
+  border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.03em;touch-action:manipulation;transition:transform .08s ease-out,filter .14s}
 .pk-b:active{transform:scale(.96)}
 .pk-b:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 /* ★fix: 操作按钮补 hover 反馈(桌面端/平板): 轻微提亮+微缩, 与顶栏圆钮 hover 行为一致 */
@@ -432,7 +432,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
  *   统一到 38px 后, 骨架/预选条/我的回合三态 .pk-acts 恒 163px, felt 高不变, 牌桌纹丝不动。 */
 .pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;
   min-height:38px;display:flex;align-items:center;justify-content:center}
-.pk-preb{font-size:13px;padding:10px 0}
+.pk-preb{font-size:13px;padding:10px 0;touch-action:manipulation}
 .pk-preb:not(.queued){background:var(--panel);color:var(--ink);border-color:var(--line2);box-shadow:none}
 .pk-preb.queued.fold{background:color-mix(in srgb, var(--magenta) 18%, transparent);color:var(--ink);border-color:var(--magenta);box-shadow:0 0 12px color-mix(in srgb, var(--magenta) 35%, transparent),inset 0 0 0 1.5px color-mix(in srgb, var(--magenta) 60%, transparent)}
 .pk-preb.queued:not(.fold):not(.call){background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)}
@@ -2433,12 +2433,12 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           const tickRing=()=>{
             const remain=Math.max(0, ringDur-(Date.now()-turnStart));
             const deg=Math.round((ringDur?remain/ringDur:0)*360);
-            if(deg!==lastDegN){ seatEl.style.setProperty('--p',deg); lastDegN=deg; }
+            if(deg!==lastDegN){ const aEl=seatEl.querySelector('.pk-avr'); if(aEl) aEl.style.setProperty('--p',deg); lastDegN=deg; }
             if(remain<=0){ ringRAF=null; return; }
             ringRAF=requestAnimationFrame(tickRing);
           };
           tickRing();
-        } else if (seatEl){ seatEl.style.setProperty('--p', 360); }
+        } else if (seatEl){ const aEl=seatEl.querySelector(".pk-avr"); if(aEl) aEl.style.setProperty("--p", 360); }
         return;
       }
       // 降频: 每帧只在整度数/整秒变化时才写 DOM(conic 环 1° 步进视觉等价), 免每秒几十次无谓重绘回流。
@@ -2447,7 +2447,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const remain=Math.max(0,turnDur-(Date.now()-turnStart));
         const frac=turnDur?(remain/turnDur):0;
         const deg=Math.round(frac*360);
-        if(seatEl && deg!==lastDeg){ seatEl.style.setProperty('--p',deg); lastDeg=deg; }
+        if(seatEl && deg!==lastDeg){ const aEl=seatEl.querySelector('.pk-avr'); if(aEl) aEl.style.setProperty('--p',deg); lastDeg=deg; }
         const sec=Math.ceil(remain/1000);
         if(sec!==lastSec){
           if(secEl && digitSeat){ secEl.textContent=sec; secEl.classList.toggle('urgent',sec<=5); secEl.classList.remove('think'); }
@@ -2787,8 +2787,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastMyTurn=false;
       animPhase='preflop';
       lastPotShown=-1;
-      lastBoardSig='';
-      lastMeSig='';
       setTimeout(() => { _lastActsSig=''; }, 50);   // ★fix(v59安卓): 延迟清签名护栏, 免合成 click 在 clearHandSelection 之后触发又误选过牌
       try{ els.acts.querySelectorAll('button').forEach(b=>b.blur()); }catch(_){}   // ★fix(安卓): 清焦点残留, 免合成 click 命中
     }
@@ -2821,7 +2819,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       handNo++;
       st = newHand();
       clearHandSelection();
-      lastBoardLen=0; dealAnim=true;
+      lastBoardSig=''; lastMeSig=''; lastBoardLen=0; dealAnim=true;
       sfx('deal');
       renderAll(); positionSeats();
     }
@@ -2934,7 +2932,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       introSeating = false; arrived = null; lastSeated = -1;
       st = newHand();
       clearHandSelection();
-      lastBoardLen=0; dealAnim=true;
+      lastBoardSig=''; lastMeSig=''; lastBoardLen=0; dealAnim=true;
       sfx('deal');
       renderAll(); positionSeats();
     }
