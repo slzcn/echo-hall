@@ -67,7 +67,7 @@
 .pk-room.is-land .pk-bar{padding-top:calc(4px + env(safe-area-inset-top,0px));padding-bottom:4px}
 .pk-room.is-land .pk-felt{overflow:visible}
 .pk-room.is-land .pk-table{top:4px;bottom:4px}
-.pk-room.is-land .pk-me{padding:2px max(16px,env(safe-area-inset-left,0px)) calc(2px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));gap:10px;justify-content:center}
+.pk-room.is-land .pk-me{padding:2px max(16px,env(safe-area-inset-left,0px)) calc(2px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));gap:10px;justify-content:center;min-height:50px}
 /* 横屏动作栏: 左右内边距兜 safe-area(刘海横屏在两侧) —— 否则最外侧按钮会缩进刘海/圆角被切角 */
 .pk-room.is-land .pk-acts{gap:5px;padding:5px max(14px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
 .pk-room.is-land .pk-raise input[type=range]{height:18px}
@@ -341,7 +341,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-room .pk-board .card.back.dim{opacity:.6}
 .card.dim{opacity:.5}
 /* 我的座位条 */
-.pk-me{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px 4px;flex-shrink:0;max-width:100%;box-sizing:border-box}  /* 居中 */
+.pk-me{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 16px;flex-shrink:0;min-height:64px;max-width:100%;box-sizing:border-box}  /* 提示区: 列向 + 垂直居中(预选/跟注/胜率等提示文字与聊天按钮共此区, 上下居中) */
 .pk-me .pk-hole{display:flex;gap:6px}
 .pk-me .pk-hole .card.justdealt{animation:pkDeal .34s ease both}
 @keyframes pkDeal{from{transform:translateY(30px) scale(.7);opacity:0}to{transform:none;opacity:1}}
@@ -1926,7 +1926,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const meSig = st.phase+'|'+(mine?1:0)+'|'+(spectating?1:0)+'|'+(showdown?1:0)+'|'+(p.folded?1:0)+'|'+(p.allin?1:0)+'|'+p.stack
         +'|'+(st.button===mySeat?1:0)+'|'+myBlind+'|'+callAmt+'|'+(dealAnim?1:0)+'|'+boardSig+'|'+madeStr
         +'|'+holeCards.map(c=>c?(c.suit+''+c.rank):'x').join(',')
-        +'|'+(st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'');
+        +'|'+(st.result&&st.result.winnersBySeat?st.result.winnersBySeat.join(','):'')
+        +'|pre:'+(preAct||'');
       if (meSig === lastMeSig) return;
       lastMeSig = meSig;
       let hint='';
@@ -1948,7 +1949,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             if (la.toCall>0){ const odds=la.toCall/((st.pot||0)+la.toCall); hint += ` · 需赢 ${Math.round(odds*100)}%`; }
           }catch(e){ _ehCatch('poker.equityHint', e); }
         }
-      } else { els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 等待中提示已在顶部, 底部留空
+      } else {
+        // ★预选中态: 提示统一放提示区(.pk-me), 与其他提示文字共用同一容器; 不再放进操作区(.pk-acts)
+        if (preAct){
+          els.me.innerHTML = `
+            <div class="pk-info" style="flex:1;text-align:center">
+              <div class="pk-hint">🕒 预选中 · 再点取消</div>
+            </div>`;
+          lastMeSig=meSig; return;
+        }
+        els.me.innerHTML=''; lastMeSig=meSig; return;   // ★T92 等待中提示已在顶部, 底部留空
+      }
       // "我"的头像/名字/筹码/底牌(正面)已画在椭圆底部座位(见 seatHTML 的 pk-me-seat 分支), 倒计时走座位环。
       //   这条桌外 pk-me 只留一行操作提示(需跟注/可过牌/胜率/当前成手), 紧贴下方操作按钮, 不再重复展示我的信息。
       els.me.innerHTML = `
@@ -2138,7 +2149,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const btn = (key,label,cls)=>`<button class="pk-b pk-preb${on===key?' queued':''}${cls?' '+cls:''}" data-pre="${key}">${label}</button>`;
       els.acts.innerHTML = `
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
-        <div class="pk-prehint">🕒 预选中</div>
+        <div class="pk-prehint" aria-hidden="true"><!-- 预选中文案已移至提示区 .pk-me; 此 div 仅保留 40px 占位以维持 .pk-acts 恒高 --></div>
         <div class="pk-row pk-prerow">
           ${btn('checkfold','过牌/弃牌','fold')}
           ${btn('check','过牌')}
@@ -2148,7 +2159,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const k=b.dataset.pre;
         preAct = (preAct===k) ? null : k;   // 再点同一个 = 取消预选
         sfx('cardsel');
-        renderActs(true);
+        renderActs(true); renderMe();   // 同步刷新提示区(.pk-me)的"预选中"提示
       }));
     }
     // 轮到我: 按【当前】合法动作复核已勾预选并执行, 或因实况变化作废。返回 true=已代打(状态已推进)。
