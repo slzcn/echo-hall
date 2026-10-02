@@ -970,6 +970,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── get_state: 返回当前快照(中途加入玩家用) ──
+    if (action === 'get_state') {
+      if (!state) return json({ ok: false, error: 'no_active_hand' }, 400);
+      const turnDeadlineMs = hsRow?.turn_deadline ? new Date(hsRow.turn_deadline).getTime() : 0;
+      const snap = snapshot(state, handNum, turnDeadlineMs);
+      return json({ ok: true, snap });
+    }
+
     // ── start_hand: 开新一手牌 ──
     if (action === 'start_hand') {
       if (state && state.phase !== 'over' && state.phase !== 'showdown') {
