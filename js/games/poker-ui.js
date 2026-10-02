@@ -524,6 +524,9 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-offline-tag{position:absolute;top:-4px;right:-4px;background:#666;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px;white-space:nowrap;z-index:5;pointer-events:none}
 @keyframes pkConnBlink{0%,100%{opacity:.62}50%{opacity:1}}
 .pk-chip.hidden-alert{border-color:var(--magenta)!important;box-shadow:0 10px 28px color-mix(in srgb,var(--ink) 22%,transparent),0 0 20px color-mix(in srgb,var(--magenta) 70%,transparent)!important}
+/* ★v89 折叠保活: chip 落位后的轻入动画(装饰, 不阻塞切换)。牌桌已 display:none, 聊天室立即可见。 */
+.pk-chip.pk-chip-in{animation:pkChipIn .22s cubic-bezier(.2,.9,.3,1) both}
+@keyframes pkChipIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
 /* ── 本桌累计净盈亏(相对买入 buy-in 的净额): 座位小徽标 + 我的座位条 + 结算逐席列 ── */
 .pk-seat .pk-net{font-size:9.5px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin-top:1px;letter-spacing:.02em}
 .pk-net.up{color:var(--accent)}
@@ -1215,14 +1218,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function minimize(){
       if (minimized) return; minimized=true;
-      if (root.EHTableOrient) root.EHTableOrient.clear(room);       room.classList.remove('pk-expanding'); room.classList.add('pk-collapsing');
-      setTimeout(()=>{ if(minimized) room.style.display='none'; }, 240);
+      if (root.EHTableOrient) root.EHTableOrient.clear(room);
+      // ★v89 立即响应: 牌桌立刻隐藏(display:none 同步生效), 聊天室瞬切可见, 不再播 240ms 折叠动画
+      //   阻塞切换——折叠动画是装饰, 不能挡"返回"本身。chip 落位后用一段轻入动画点缀(不阻塞)。
+      room.classList.remove('pk-expanding','pk-collapsing');
+      room.style.display='none';
       if (!chip){
-        chip=document.createElement('div'); chip.className='pk-chip';
+        chip=document.createElement('div'); chip.className='pk-chip pk-chip-in';
         chip.innerHTML=`<span class="ck-ic">🎰</span><span class="ck-tx"><b class="ck-t">德州扑克</b><span class="ck-s"></span></span><span class="ck-x">↗</span>`;
         chip.addEventListener('click', restore);
         mountEl.appendChild(chip);
-      } else chip.style.display='';
+      } else { chip.style.display=''; chip.classList.remove('pk-chip-in'); void chip.offsetWidth; chip.classList.add('pk-chip-in'); }
       renderAll(); sfx('click');
     }
     function restore(){
@@ -1235,7 +1241,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     // 「✕ 返回」: 牌局进行中一律折叠保活(主人: 本手没结束就返回, 再进要接着玩, 不是新开一桌);
     //   有远程真人靠本机 host 当裁判时也必须折叠(close 会杀全桌); 只有 lobby / 本手已结束才真散桌离场。
-    $('#pkX').addEventListener('click', ()=>{
+    // ★v89 返回键改 bindTap(pointerup): 比 click 早一拍, 配合 minimize() 立即隐藏牌桌, 返回聊天室零延迟。
+    bindTap($('#pkX'), ()=>{
       const handLive = st.phase!=='lobby' && st.phase!=='over';
       if (remoteSeats.length>0 || isGuest || handLive) minimize(); else close();
     });
@@ -2114,7 +2121,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }));
       bindTap($('#pkFold'), ()=>humanAct('fold'));
       bindTap($('#pkCall'), ()=>humanAct(la.canCheck?'check':'call'));
-      if(rb) rb.addEventListener('click', ()=>{
+      // ★v89 加注/全下键改走 bindTap(pointerup): 与弃牌/跟注一致, 比 click 早一拍触发, 移动端无 300ms 触发延迟。
+      if(rb) bindTap(rb, ()=>{
         // 全下(把全部筹码梭进去)要二次确认防误触: 第一次点亮"确认全下", 3.5s 内再点才执行, 逾时/拖离自动撤销。
         if(raiseTo>=max && !allinArmed){
           allinArmed=true; rb.classList.add('confirm');
