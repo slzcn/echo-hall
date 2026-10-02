@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261002-v91';
+window.__EH_APP_VER = '20261002-v92';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3224,7 +3224,12 @@ function gtLaunchLocal(row){
   gtCloseSeatingPage();   // 落打牌页前收掉座位页(host 走完摆阵/发牌)
   if(row && row.id) _gtRememberGame(row.id);   // 刷新留在牌局
   if(_restoreActiveGameIfAny(row.game==='nlhe'?'nlhe':row.game==='guandan'?'guandan':'doudizhu')) return;
-  if(row.game==='nlhe') return _gtPokerEnter(row);
+  // ★v92: 引擎持有者走 host 路径(gtLaunchPoker), 非引擎持有者走 guest 路径(_gtPokerEnter)。
+  //   v91 在 launchTexas 调 _gtPokerEnter(guest) 导致引擎持有者卡在废弃招募页; 正确路径是 host。
+  if(row.game==='nlhe'){
+    if(gtEngineHolder(row)===myUid) return gtLaunchPoker(row, null);
+    return _gtPokerEnter(row);
+  }
   if(row.game==='guandan') return gtLaunchGuandan(row);
   if(row.game==='ddz') return gtLaunchDdz(row);
 }
@@ -9599,11 +9604,10 @@ async function launchTexas(){
       return;
     }
     if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-      // ★v91 乐观进入(Bug2): 立即进牌桌 UI(招募态), 不等贴卡 / 补灵魂 / eh_gt_start。
-      //   _gtPokerEnter 内部 async: gtEnsureSeated(本机已入座→no-op) + 读筹码后 EHPokerGame.open
-      //   挂起招募态牌桌 UI(约 300ms), 用户点击后即时看到牌桌而非长时间空白。
-      //   eh_gt_open 已把开桌者入座 seat0(kind=human), gtEnsureSeated 不会与本桌补灵魂竞态。
-      try{ _gtPokerEnter(row); }catch(e){ _ehCatch('gtEarlyEnter', e); }
+      // ★v92: 不再先进招募态(v91 _gtPokerEnter 走 guest 路径, 引擎持有者无 host 权威, 卡在废弃招募页)。
+      //   直接 gtStart: 补灵魂→eh_gt_start 转 playing→gtLaunchLocal→gtLaunchPoker(host 路径)
+      //   进牌桌 playing 态(有底牌/操作按钮/筹码), 招募页完全跳过。
+      //   补灵魂(200-500ms*批次)与开局 RPC 在后台进行, 完成后自动落牌桌 playing 态。
       // 后台贴牌桌卡(留档 + 供房里其他真人点卡加入)。★v91 卡片幂等: 同 table_id 已有卡则跳过,
       //   防止任何竞态/重入产生第二条卡(buildGameEl 已写 data-gt-id, 此处再校验一道)。
       (async function _postCard(){
@@ -9616,10 +9620,9 @@ async function launchTexas(){
           if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
         }catch(e){ console.warn('[gt] post table card failed', e); }
       })();
-      // 后台开局(补灵魂→eh_gt_start 转 playing→start_hand 发牌)。★v91: _gtPokerEnter 已挂起
-      //   牌桌 UI 并设置 _gtActiveTable, gtStart 末尾命中 _gtActiveTable.id===id 短路走 start_hand,
-      //   不再 gtLaunchLocal 重挂, 无闪烁。补灵魂(200-500ms*批次)与开局 RPC 在后台进行, 不阻塞 UI。
-      gtStart(row.id).catch(()=>{});
+      // 后台开局: 补灵魂→eh_gt_start 转 playing→gtLaunchLocal→gtLaunchPoker(host 路径)进牌桌。
+      //   ★v92: gtLaunchLocal 已修(引擎持有者走 gtLaunchPoker host 路径, 不再走 _gtPokerEnter guest 路径)。
+      gtStart(row.id).catch((e)=>{ _ehCatch('gtLaunchStart', e); try{ toast('开局失败，请重试'); }catch(_){} });
     }
   }finally{ _gtLaunching=false; }
 }
