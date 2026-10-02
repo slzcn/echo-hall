@@ -3646,9 +3646,10 @@ async function _gtEnterPokerServer(row) {
 
   var _pkMyStack = PK_WALLET_GRANT;
   try {
-    // ★v84 fix: 服务端模式筹码权威在 Edge Function(eh_chips_set), 不能调 gtFetchGlobalChips(清零 eh_chips),
-    //   否则 Edge Function start_hand 读到 0 → 真人 stack=0 sitOut 立刻被踢/无法操作。
-    //   只读展示值, 真实 stack 由快照 applySnapshot 覆盖; 不因 0 拒绝入桌(可能是中途旁观/上一手刚输光)。
+    // ★v84 fix: 服务端模式筹码权威在 Edge Function(读写 eh_chips 表)。旧路径 gtFetchGlobalChips
+    //   会调 eh_get_or_refill_chips 清零的是【eh_user_stats.chips】(另一张表), 与 Edge Function 用的
+    //   eh_chips 不是一个账户 — 进桌清零 eh_user_stats、离桌 gtSettleChipsToGlobal 又往 eh_user_stats
+    //   delta 累加, 既不动 eh_chips 反而把 eh_user_stats 改脏。这里只读 eh_chips 展示, 真实 stack 由快照覆盖。
     var _gchips = await gtReadChipsReadOnly();
     _pkMyStack = _gchips;
   } catch(e) { _ehCatch('gtBuyInFlow', e); }
