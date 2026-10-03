@@ -311,7 +311,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
    ★top 从 14% 下移到 26%: 14% 正压顶部中央席(对手数为奇数时 deg=90 那席落在 cx50%/cy14%),
    摊牌时横幅与该席头像/名字/气泡重叠(实测重叠~11px)。26% 落在"顶席气泡(~18%)"与"公共牌区(~40%)"之间的空档, 两不相撞。 */
 .pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
-  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:nowrap;
+  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:normal;max-width:92vw;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;
   padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
   border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
@@ -320,6 +320,10 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(234,244,244,.92));border-color:var(--line2,color-mix(in srgb, var(--accent) 42%, transparent));box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 14px color-mix(in srgb, var(--accent) 10%, transparent)}
 html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rgba(200,137,46,.55);box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 18px rgba(200,137,46,.22)}
 @keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.pk-winline .pk-wc{font-size:17px;color:var(--amber);text-shadow:0 0 10px color-mix(in srgb,var(--amber) 60%,transparent)}
+.pk-winline .pk-go{pointer-events:auto;font-size:12px;font-weight:900;letter-spacing:.04em;color:var(--ink);background:color-mix(in srgb,var(--amber) 22%,transparent);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);padding:4px 16px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pk-winline .pk-go:hover{background:color-mix(in srgb,var(--amber) 36%,transparent)}
+html[data-mode="day"] .pk-winline .pk-wc{color:var(--amber,#C8892E)}
 @keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
@@ -2529,12 +2533,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           const potTotal = potTotalAll;
           const handName = (res.wentToShowdown && res.reveal && champSeat!=null && res.reveal[champSeat]) ? res.reveal[champSeat].hand : '';
           const cDelta = (champSeat!=null && res.delta && typeof res.delta[champSeat]==='number') ? res.delta[champSeat] : null;
-          const line = won
-            ? `🏆 你收池 ${potWon} · 本手 ${delta>=0?'+':''}${delta} · 桌面 ${my.stack}${handName?(' · '+handName):''}`
+          const foldTag = res.wentToShowdown ? '' : ' · 其余弃牌';
+          const line = (won
+            ? `🏆 你<b class="pk-wc">+${delta}</b> 收池 ${potWon} · 桌面 ${my.stack}${handName?(' · '+handName):''}`
             : (champCount>1
                 ? `🏆 ${champCount} 家平分底池 ${potTotal} · 你 ${delta>=0?'+':''}${delta}`
-                : `🏆 ${escapeHtml(champName)}${cDelta!=null&&cDelta>0?` 净赢 +${cDelta}`:` 收池 ${potTotal}`} · 你 ${delta>=0?'+':''}${delta}`);
+                : `🏆 ${escapeHtml(champName)}${cDelta!=null&&cDelta>0?` 净赢 <b class="pk-wc">+${cDelta}</b>`:` 收池 ${potTotal}`} · 你 ${delta>=0?'+':''}${delta}`))
+            + foldTag + ` <button class="pk-go" type="button">继续 ▶</button>`;
           showWinBanner(line, won);
+          // ★v94: 「继续 ▶」可提前发下一手(否则 5s 后自动)
+          if(_winBanner){ const _go=_winBanner.querySelector('.pk-go'); if(_go) _go.addEventListener('click', ()=>{ if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; } hideWinBanner(); nextHand(); }); }
           if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
           if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); pkCelebrate(false); }
           else if(delta<0){ sfx('void'); }
@@ -2549,11 +2557,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           emitWallet();
           if (minimized) updateChip();
           // 自动发下一手: host 到点 nextHand; 客人等权威快照(applySnapshot 会清横幅接下一手)
-          // ★T91.1 再来一局直进: 自动发牌延迟从 2300ms 缩到 600ms(只留收筹码动画时间, 不再多等)
+          // ★v94: 结算停留 5s 让玩家看清赢家/牌型/筹码/底牌(摊牌牌面已铺在各席); 「继续 ▶」可提前发下一手
           // journey-exempt: 再来一局直进(延迟缩短) — 复用 journey-poker-play 覆盖
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
           if (!isGuest){
-            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 600);
+            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 5000);
           }
           return;
         }
@@ -2697,14 +2705,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       else if(delta<0){ sfx('void'); }
 
       // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
-      //   联机有其他真人时给多一点时间读结算(5s), 纯单机 3s。破产离桌不自动进下一手。
+      //   ★v94: 统一停 5s 让玩家读摊牌结算。破产离桌不自动进下一手。
       // autoT 提升为 room 级 overTimer(见 clearTimers): 若 close() 在结算倒计时中被外部调用(app.js gtClose),
       //   本地 autoT 曾残留继续 nextHand() 打到已 detach 的 DOM 上、永远重排 —— 现在 clearTimers 会一并清掉。
       function stopAuto(){ if(overTimer){ clearInterval(overTimer); overTimer=null; } }
       stopAuto();
       if (!isGuest && !matchOver){
-        // 多局连打提速: 结算只停够看清赢家(联机 4s 让多名真人读摊牌 / 单机 3s 读净盈亏+摊牌), 到点即自动发下一手。
-        let left = (remoteSeats.length>0) ? 4 : 3;
+        // ★v94: 结算停留 5s(原联机 4s / 单机 3s), 让玩家看清赢家牌型/筹码/摊牌底牌后自动发下一手。
+        let left = 5;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         overTimer=setInterval(()=>{
           left--;
