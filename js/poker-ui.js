@@ -349,7 +349,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
    对手是牌背、我是正面, 同一套落座动画; 由 runDealAnim() 逐张挂 animation-delay。一次性(both), 本手内重渲不再触发(dealAnim 门控)。 */
 .pk-seat .pk-mini-hole .card.pk-dealing{animation:pkDealIn .32s cubic-bezier(.2,.85,.3,1) both}
 @keyframes pkDealIn{from{opacity:0;transform:translateY(-40px) scale(.42) rotate(-7deg)}55%{opacity:1}to{opacity:1;transform:none}}
-.pk-me .pk-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pk-me .pk-info{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;flex:1 1 auto;height:100%;text-align:center}  /* v94: 提示区内容垂直+水平居中(预选/跟注/胜率), height:100% 保证 min-height:64px 内可靠居中 */
 .pk-me .pk-nmrow{display:flex;align-items:center;gap:7px}
 .pk-me .pk-nm{font-size:14px;font-weight:800;color:var(--ink);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-me .pk-nm.turn{color:var(--accent)}
@@ -1135,8 +1135,27 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const els = { felt:$('#pkFelt'), table:$('#pkTable'), board:$('#pkBoard'), pot:$('#pkPot'),
       msg:$('#pkMsg'), me:$('#pkMe'), acts:$('#pkActs'), blinds:$('#pkBlinds'), toast:$('#pkToast') };
 
-    function toast(m, ms){ els.toast.textContent=m; els.toast.classList.add('show');
-      clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'), ms||1300); }
+    // ★v94 toast 队列+去重: 多条提示同时来不互相覆盖; 默认 3s 自动消失(一次性通知语义, 非持续状态)
+    const _toastQ=[];
+    let _toastShow=false;
+    function _toastDrain(){
+      if(_toastShow) return;
+      const n=_toastQ.shift();
+      if(!n) return;
+      _toastShow=true;
+      els.toast.textContent=n.m; els.toast.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t=setTimeout(()=>{ els.toast.classList.remove('show'); _toastShow=false;
+        if(_toastQ.length) setTimeout(_toastDrain,120); }, n.ms);
+    }
+    function toast(m, ms){
+      const msg=String(m==null?'':m);
+      // 去重: 正在显示或已在队列的同文案直接跳过, 避免堆叠闪烁
+      if(_toastShow && els.toast.textContent===msg) return;
+      if(_toastQ.some(n=>n.m===msg)) return;
+      _toastQ.push({m:msg, ms:ms||3000});
+      _toastDrain();
+    }
     function say(seat, msg){
       // 延一帧再写气泡: afterAction 里 say() 常在同步 renderAll() 之前调用, 而 renderOpponents
       // 会整段 remove/重建 .pk-seat 节点, 直接写会被当帧重建吞掉(气泡从不显示)。rAF 到点时
@@ -1926,6 +1945,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       else { els.msg.className='pk-msg'; els.msg.innerHTML=cp+specTag+(st.players[seat]?escapeHtml(st.players[seat].name):'…')+' 思考中… · '+streetName(); }
     }
 
+    // ★v94 提示区统一入口: 所有 .pk-me 内容落笔经此函数, 单一来源避免多分支各自 innerHTML 造成残留/不一居中
+    function setMeHint(html){
+      if(!els.me) return;
+      els.me.innerHTML = html ? ('<div class="pk-info">'+html+'</div>') : '';
+    }
     function renderMe(){
       if (mySeat<0 || !st.players[mySeat]){
         // 旁观(已让座): 底部 bar 统一承载旁观提示, me 条留空(CSS .pk-spectating 下整条隐藏), 牌桌与底部 bar 紧凑贴合
@@ -1933,12 +1957,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         lastMeSig=''; return;
       }
       if (st.phase==='lobby'){
-        // "我"已画在椭圆底部座位(见 positionSeats 招募态), 这里的 pk-me 条不再重复头像,
-        //   只留一行居中房主提示, 与 pk-acts 的「开始」按钮上下呼应。
-        els.me.innerHTML = `
-          <div class="pk-info" style="flex:1;justify-content:center;text-align:center">
-            <div class="pk-hint">🪑 招募中 · 满 2 席自动开始（含灵魂）</div>
-          </div>`;
+        // ★v94: 招募提示已在顶部 .pk-msg(席位进度+今日次数), 底部 .pk-me 不再重复——消除双区同文案
+        setMeHint('');
         lastMeSig=''; return;
       }
       const p=st.players[mySeat];
@@ -1967,10 +1987,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       lastMeSig = meSig;
       let hint='';
       // journey-exempt: 提示文案统一顶部(弃牌/全下/结算不再重复), 全下读牌改all in — 复用 journey-poker-play 覆盖
-      if (spectating){ madeStr=''; els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 旁观提示已在顶部, 底部留空
-      if (st.phase==='seating'){ els.me.innerHTML=''; lastMeSig=meSig; return; }
-      if (st.phase==='waiting'){ els.me.innerHTML=''; lastMeSig=meSig; return; }
-      if (st.phase==='over' || p.folded || p.allin){ els.me.innerHTML=''; lastMeSig=meSig; return; }   // ★T92 弃牌/全下/结算提示已统一顶部
+      if (spectating){ madeStr=''; setMeHint(''); lastMeSig=meSig; return; }   // ★T92 旁观提示已在顶部, 底部留空
+      if (st.phase==='seating'){ setMeHint(''); lastMeSig=meSig; return; }
+      if (st.phase==='waiting'){ setMeHint(''); lastMeSig=meSig; return; }
+      if (st.phase==='over' || p.folded || p.allin){ setMeHint(''); lastMeSig=meSig; return; }   // ★T92 弃牌/全下/结算提示已统一顶部
       if (mine){
         const la=Engine.legalActions(st, mySeat);
         hint = la.toCall>0 ? `需跟注 <b>${la.callAmount}</b>` : '可过牌或下注';
@@ -1987,20 +2007,16 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       } else {
         // ★预选中态: 提示统一放提示区(.pk-me), 与其他提示文字共用同一容器; 不再放进操作区(.pk-acts)
         if (preAct){
-          els.me.innerHTML = `
-            <div class="pk-info" style="flex:1;justify-content:center;text-align:center">
-              <div class="pk-hint">🕒 预选中 · 再点取消</div>
-            </div>`;
+          // ★v94: 预选中文案统一走 setMeHint(单一入口), 居中由 .pk-me .pk-info CSS 保证
+          setMeHint('<div class="pk-hint">🕒 预选中 · 再点取消</div>');
           lastMeSig=meSig; return;
         }
-        els.me.innerHTML=''; lastMeSig=meSig; return;   // ★T92 等待中提示已在顶部, 底部留空
+        setMeHint(''); lastMeSig=meSig; return;   // ★T92 等待中提示已在顶部, 底部留空
       }
       // "我"的头像/名字/筹码/底牌(正面)已画在椭圆底部座位(见 seatHTML 的 pk-me-seat 分支), 倒计时走座位环。
       //   这条桌外 pk-me 只留一行操作提示(需跟注/可过牌/胜率/当前成手), 紧贴下方操作按钮, 不再重复展示我的信息。
-      els.me.innerHTML = `
-        <div class="pk-info" style="flex:1;justify-content:center;text-align:center">
-          <div class="pk-hint">${hint}${madeStr?` · 当前 <b>${escapeHtml(madeStr)}</b>`:''}</div>
-        </div>`;
+      // ★v94: 提示区内容统一经 setMeHint 落笔, 不再散落多处 innerHTML
+      setMeHint('<div class="pk-hint">'+hint+(madeStr?(' · 当前 <b>'+escapeHtml(madeStr)+'</b>'):'')+'</div>');
       dealAnim=false;
     }
 
