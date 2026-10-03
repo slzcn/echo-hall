@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v104';
+window.__EH_APP_VER = '20261003-v105';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1146,7 +1146,7 @@ function _gtPokerBindUnload(tableId){
           }
         }
         // ★v62 Bug5: 关浏览器时同步结算筹码回全局账户, 否则桌上筹码随散桌丢失
-        if(_gtMyFinalStack > 0 && _pagehideAccessToken && !window.EH_SERVER_HOST){
+        if(!_gtSettled && _gtMyFinalStack > 0 && _pagehideAccessToken && !window.EH_SERVER_HOST){
           try{
             fetch(SB_URL+'/rest/v1/rpc/eh_update_chips',{
               method:'POST', keepalive:true,
@@ -3692,10 +3692,11 @@ async function _gtEnterPokerServer(row) {
   _gtActiveTable = {id: tableId, host: false};
   _setPokerState('guest', tableId);
 
-  // ★v103 乐观进入: 牌桌 UI 先挂起(不等筹码 RPC), 后台读 eh_chips 更新 _gtMyFinalStack;
+  // ★v105 乐观进入: 牌桌 UI 先挂起(不等筹码 RPC), 后台读 eh_chips 更新 _gtMyFinalStack;
   //   真实 stack 由首帧快照覆盖(见 rebuildFromSnap), 招募态短暂显示初始授权额(PK_WALLET_GRANT)无实质影响。
   var _pkMyStack = PK_WALLET_GRANT;
   _gtMyFinalStack = _pkMyStack;
+  _gtSettled = false;  // ★v105: 入桌重置结算标志
 
   _ehGame = window.EHPokerGame.open({
     scoreKey: 'gtsc:' + row.id,
@@ -3753,7 +3754,7 @@ async function _gtEnterPokerServer(row) {
       _gtCleanupPlay();
     },
   });
-  // ★v103 后台读真实筹码(不阻塞 UI 挂起); 到账后更新 _gtMyFinalStack 供离桌结算, 真实 stack 由首帧快照覆盖。
+  // ★v105 后台读真实筹码(不阻塞 UI 挂起); 到账后更新 _gtMyFinalStack 供离桌结算, 真实 stack 由首帧快照覆盖。
   gtReadChipsReadOnly().then(function(_gchips){ _gtMyFinalStack = _gchips; }).catch(function(e){ _ehCatch('gtBuyInFlow', e); });
   _gtStartTurnAlert();
   _gtPokerBindUnload(tableId);
@@ -3948,6 +3949,7 @@ const PK_WALLET_GRANT = 5000;
 const PK_WALLET_MIN = 1000;
 // ★v58: 不再有"买入量"概念 — 落座带全部全局筹码入桌(RPC 取筹码后账户清零), 离桌把剩余全部写回
 let _gtMyFinalStack = 0;  // ★v58: 本桌我的实时筹码快照(离桌时结算回全局账户)
+let _gtSettled = false;  // ★v105: 离桌结算幂等标志 — 防止 onExit/onBust/onSeatIdle/pagehide 多处重复 delta 累加
 
 // ★v58: 全局筹码账户(Supabase eh_user_stats.chips) —— 落座取走全部筹码(RPC 内清零), 离桌把剩余全部写回
 // ★v84 fix: 只读筹码(不零 eh_chips), 用于服务端模式/旁观 — 筹码权威在 Edge Function 或入桌时才取走。
@@ -3970,10 +3972,16 @@ async function gtFetchGlobalChips(){
   }catch(e){ _ehCatch('gtGetChips',e); return PK_WALLET_GRANT; }
 }
 function gtSettleChipsToGlobal(finalStack){
-  // ★v58: 离桌把桌上剩余筹码全部加回全局账户(带入时账户已清零, 净值即盈亏)
+  // ★v105 fix: 真人筹码累加bug — gtSettleChipsToGlobal 在 onExit/onBust/onSeatIdle/pagehide
+  //   多处触发, eh_update_chips 用 p_delta 累加到 eh_user_stats, 同一桌离场被算多次 → 筹码膨胀到百万。
+  //   幂等保护: 每桌只结算一次; 结算后 _gtMyFinalStack 清零, pagehide 读到 0 不再重复加。
+  if(_gtSettled) return;
   const n=Math.max(0, Math.round(Number(finalStack)||0));
   _gtMyFinalStack=n;
+  _gtSettled=true;
   try{ sb.rpc('eh_update_chips',{p_uid:myUid, p_delta:n}).then(function(){}, function(){}); }catch(e){ _ehCatch('gtSettleChips',e); }
+  // 结算后清零: pagehide handler 直接读 _gtMyFinalStack, 清零后不会重复 delta
+  _gtMyFinalStack=0;
 }
 const _EH_SCORE = (function(){
   const mod = window.EH_SCORE_MODULE;
@@ -4296,6 +4304,7 @@ async function gtLaunchPoker(row, resumeSnap){
     try{ toast('入座 '+_gchips+' 筹码(全部带入)', 1800); }catch(_){}
   }catch(e){ _ehCatch('gtBuyInFlow',e); }
   _gtMyFinalStack = _pkMyStack;
+  _gtSettled = false;  // ★v105: 入桌重置结算标志
   try{ await pkPrefetchChips(A.ids, 'nlhe'); }catch(_){}   // ★fix: 开桌批量预取灵魂/真人筹码, 避免退回本地账本
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
@@ -4458,6 +4467,7 @@ async function gtSpectatePoker(row){
     if(_gchips > 0){ _pkMyStack = _gchips; }
   }catch(e){ _ehCatch('gtSpectateChips', e); }
   _gtMyFinalStack = _pkMyStack;
+  _gtSettled = false;  // ★v105: 入桌重置结算标志
   _gtActiveTable={id:row.id,host:false,spectating:true};
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,
@@ -4701,6 +4711,7 @@ async function _gtEnterPokerV2(row){
     _pkMyStack = _gchips;   // ★v58: 全部全局筹码作为 startStack
   }catch(e){ _ehCatch('gtGuestBuyIn',e); }
   _gtMyFinalStack = _pkMyStack;
+  _gtSettled = false;  // ★v105: 入桌重置结算标志
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,
     mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
@@ -9627,7 +9638,7 @@ async function launchTexas(){
       return;
     }
     if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-      // ★v103 乐观进入: 点 /德州 后立刻落牌桌 UI(招募态, 显示"正在开桌…"), 不等补灵魂/开局 RPC。
+      // ★v105 乐观进入: 点 /德州 后立刻落牌桌 UI(招募态, 显示"正在开桌…"), 不等补灵魂/开局 RPC。
       //   gtLaunchLocal→gtLaunchPoker→_gtEnterPokerServer 同步挂起牌桌(lobby 态), 用户瞬间看到牌桌;
       //   后台再跑 gtStart(补灵魂→eh_gt_start 转 playing→start_hand 发牌)。
       //   牌桌 UI 已挂起后(_gtActiveTable.id===id), gtStart 走 gtPokerAction(start_hand) 分支不重复挂桌,
@@ -9702,9 +9713,9 @@ async function gtSeatSoulsIntoEmpties(row){
         try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[ei],p_soul:souls[ei].auth_uid}); n++; origins.push(souls[ei].auth_uid);
           // ★v82 不再在此嵌套触发 gtStart: gtStart 已 await 本函数, 嵌套会与 eh_gt_start 竞态锁死 lobby→playing 使后续灵魂无法入座。
         }catch(_){}
-        if(i<bs-1) await _sleep(50+Math.random()*80);   // ★v103 批次内随机间隔(缩短: UI 已挂起, 不必模拟慢走, 加速开局)
+        if(i<bs-1) await _sleep(50+Math.random()*80);   // ★v105 批次内随机间隔(缩短: UI 已挂起, 不必模拟慢走, 加速开局)
       }
-      if(ei<empties.length&&ei<souls.length&&ei<soulCap) await _sleep(50+Math.random()*80);   // ★v103 批次间随机间隔(缩短, 同上)
+      if(ei<empties.length&&ei<souls.length&&ei<soulCap) await _sleep(50+Math.random()*80);   // ★v105 批次间随机间隔(缩短, 同上)
     }
   }finally{ _gtSoulBatchActive=false; }
   // pass2: 真灵魂坐完仍有空位 → 借在场灵魂身份克隆"分身"填满(灵魂分身, 非匿名机器人)。德州跳过, 空位留给真人+host AI。
