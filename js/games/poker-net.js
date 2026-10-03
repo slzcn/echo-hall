@@ -90,6 +90,7 @@
       n: state.n, button: state.button, sb: state.sb, bb: state.bb,
       sbSeat: state.sbSeat, bbSeat: state.bbSeat,   // 权威盲位席号(公开信息, 客人角标直接用, 无需底牌)
       currentBet: state.currentBet, minRaise: state.minRaise, aggressor: state.aggressor,
+      raiseCount: state.raiseCount || 0,
       toAct: state.toAct, pot: state.pot,
       board: (state.board || []).map(cardPlain),
       players: (state.players || []).map(function(p){
@@ -122,6 +123,7 @@
       n: snap.n, button: snap.button, sb: snap.sb, bb: snap.bb,
       sbSeat: snap.sbSeat, bbSeat: snap.bbSeat,
       currentBet: snap.currentBet, minRaise: snap.minRaise, aggressor: snap.aggressor,
+      raiseCount: snap.raiseCount || 0,
       toAct: snap.toAct, pot: snap.pot,
       turnDeadline: snap.turnDeadline || 0, turnDurMs: snap.turnDurMs || 0,               // v52: 透传死线+满格时长, guest armTurn 据 turnDeadline 反推 turnStart
       board: (snap.board || []).map(cardFull),

@@ -39,6 +39,8 @@
   const PHASES = ['preflop', 'flop', 'turn', 'river', 'showdown', 'over'];
   const NEXT_STREET = { preflop:'flop', flop:'turn', turn:'river', river:'showdown' };
   const STREET_DEAL = { flop:3, turn:1, river:1 };
+  // 每街(下注轮)加注上限: 含开注, 超过后只能跟注/过牌/弃牌/全下(全下不受限)
+  const MAX_RAISES_PER_STREET = 2;
 
   // ── 发牌偏置(让"买得到牌"成为大概率, 治「过于随机基本无牌可打」) ──
   //   主人问题: 纯随机洗牌下 6 人桌起手约七成是散牌垃圾, 灵魂级联全弃 → 死桌无聊。
@@ -145,7 +147,7 @@
       players, board: [],
       _deck: { cards, cursor: 0 },
       street: 'preflop', currentBet: 0, minRaise: bb, aggressor: null,
-      toAct: -1, pot: 0, result: null,
+      toAct: -1, pot: 0, raiseCount: 0, result: null,
       log: [{ t:'deal', seed, button, sb, bb, n, stacks: stacks.slice(), names: names.slice(), actionBias }],
     };
 
@@ -218,11 +220,12 @@
     const callAmount = Math.min(toCall, p.stack);
     const maxTo = p.street + p.stack;                 // 全下到达的总额
     let canBet = false, canRaise = false, minTo = 0;
+    const raiseCapped = state.raiseCount >= MAX_RAISES_PER_STREET;
     if (state.currentBet === 0){
-      canBet = p.stack > 0;
+      canBet = p.stack > 0 && !raiseCapped;
       minTo = Math.min(state.bb, maxTo);              // 最小开注=大盲(不足则全下)
     } else if (p.stack > toCall){                     // 有跟注之外的筹码才能加注
-      canRaise = true;
+      canRaise = !raiseCapped;
       minTo = Math.min(state.currentBet + state.minRaise, maxTo);   // 不足全额加注→只能全下
     }
     return {
@@ -259,6 +262,9 @@
       else { to = amount; if (typeof to !== 'number') throw new Error('need_amount'); }
       if (to <= state.currentBet && !(action === 'allin')) throw new Error('raise_too_small');
       if (to > p.street + p.stack) throw new Error('over_stack');
+      // 加注上限: bet/raise(非全下)受 MAX_RAISES_PER_STREET 限制; 全下不受限
+      if ((action === 'bet' || action === 'raise') && state.raiseCount >= MAX_RAISES_PER_STREET)
+        throw new Error('raise_cap');
       const isOpen = state.currentBet === 0;
       const raiseSize = to - state.currentBet;
       const isAllin = (to === p.street + p.stack);
@@ -284,6 +290,8 @@
         state.currentBet = to;
         state.aggressor = seat;
       }
+      // 全额加注(含开注)才计数; 全下短加不计数, 也不占名额
+      if (fullRaise && !isAllin) state.raiseCount++;
       state.log.push({ t:'action', seat, action: (action==='allin'?'allin':action), amount: to, put, street: state.street });
     } else {
       throw new Error('bad_action');
@@ -322,6 +330,7 @@
   function advanceStreet(state){
     for (const p of state.players){ p.street = 0; p.acted = false; }
     state.currentBet = 0; state.minRaise = state.bb; state.aggressor = null;
+    state.raiseCount = 0;  // 新下注轮: 加注计数重置
 
     const ns = NEXT_STREET[state.street];
     if (ns === 'showdown') return showdown(state);

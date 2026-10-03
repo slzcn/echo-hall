@@ -44,6 +44,7 @@ interface GameState {
   _deck: { cards: Card[]; cursor: number };
   street: string; currentBet: number; minRaise: number;
   aggressor: number | null; toAct: number; pot: number;
+  raiseCount: number;  // 本街加注次数(含开注), 每街重置; 上限 MAX_RAISES_PER_STREET
   result: any; log: any[];
   sbSeat?: number; bbSeat?: number;
 }
@@ -105,6 +106,9 @@ function shuffle(cards: Card[], seed?: number): { seed: number; cards: Card[] } 
 }
 
 const DEFAULT_ACTION_BIAS = 0.55;
+
+// 每街(下注轮)加注上限: 含开注, 超过后只能跟注/过牌/弃牌/全下(全下不受限)
+const MAX_RAISES_PER_STREET = 2;
 function holePlayable(a: Card, b: Card): boolean {
   if (a.rank === b.rank) return true;
   if (a.suit === b.suit) return true;
@@ -306,7 +310,7 @@ function createGame(opts: GameOpts): GameState {
     players, board: [],
     _deck: { cards, cursor: 0 },
     street: 'preflop', currentBet: 0, minRaise: bb, aggressor: null,
-    toAct: -1, pot: 0, result: null,
+    toAct: -1, pot: 0, raiseCount: 0, result: null,
     log: [{ t:'deal', seed, button, sb, bb, n, stacks: stacks.slice(), names: names.slice(), actionBias }],
   };
 
@@ -344,11 +348,12 @@ function legalActions(state: GameState, seat: number): LegalActions {
   const callAmount = Math.min(toCall, p.stack);
   const maxTo = p.street + p.stack;
   let canBet = false, canRaise = false, minTo = 0;
+  const raiseCapped = state.raiseCount >= MAX_RAISES_PER_STREET;
   if (state.currentBet === 0) {
-    canBet = p.stack > 0;
+    canBet = p.stack > 0 && !raiseCapped;
     minTo = Math.min(state.bb, maxTo);
   } else if (p.stack > toCall) {
-    canRaise = true;
+    canRaise = !raiseCapped;
     minTo = Math.min(state.currentBet + state.minRaise, maxTo);
   }
   return {
@@ -444,6 +449,7 @@ function showdown(state: GameState): any {
 function advanceStreet(state: GameState): any {
   for (const p of state.players) { p.street = 0; p.acted = false; }
   state.currentBet = 0; state.minRaise = state.bb; state.aggressor = null;
+  state.raiseCount = 0;  // 新下注轮: 加注计数重置
   const ns = NEXT_STREET[state.street];
   if (ns === 'showdown') return showdown(state);
   dealStreet(state, ns);
@@ -490,6 +496,9 @@ function applyAction(state: GameState, seat: number, action: string, amount?: nu
     else { to = amount!; if (typeof to !== 'number') throw new Error('need_amount'); }
     if (to <= state.currentBet && !(action === 'allin')) throw new Error('raise_too_small');
     if (to > p.street + p.stack) throw new Error('over_stack');
+    // 加注上限: bet/raise(非全下)受 MAX_RAISES_PER_STREET 限制; 全下不受限
+    if ((action === 'bet' || action === 'raise') && state.raiseCount >= MAX_RAISES_PER_STREET)
+      throw new Error('raise_cap');
     const isOpen = state.currentBet === 0;
     const raiseSize = to - state.currentBet;
     const isAllin = (to === p.street + p.stack);
@@ -509,6 +518,8 @@ function applyAction(state: GameState, seat: number, action: string, amount?: nu
       state.currentBet = to;
       state.aggressor = seat;
     }
+    // 全额加注(含开注)才计数; 全下短加不计数, 也不占名额
+    if (fullRaise && !isAllin) state.raiseCount++;
     state.log.push({ t:'action', seat, action: (action==='allin'?'allin':action), amount: to, put, street: state.street });
   } else {
     throw new Error('bad_action');
@@ -721,6 +732,7 @@ function snapshot(state: GameState, handNo: number, turnDeadlineMs?: number): an
     n: state.n, button: state.button, sb: state.sb, bb: state.bb,
     sbSeat: state.sbSeat, bbSeat: state.bbSeat,
     currentBet: state.currentBet, minRaise: state.minRaise, aggressor: state.aggressor,
+    raiseCount: state.raiseCount,
     toAct: state.toAct, pot: state.pot,
     board: (state.board || []).map(cardPlain),
     players: (state.players || []).map((p) => ({
@@ -790,6 +802,7 @@ function serializeState(state: GameState, handNum: number): any {
     full_state: {
       seed: state.seed, n: state.n, sb: state.sb, bb: state.bb,
       aggressor: state.aggressor,
+      raiseCount: state.raiseCount,
       result: state.result,
       log: state.log,
       button: state.button,
@@ -841,6 +854,7 @@ function deserializeState(row: any): { state: GameState; handNum: number } | nul
     currentBet: row.current_bet || 0,
     minRaise: row.min_raise || 0,
     aggressor: fs.aggressor ?? null,
+    raiseCount: fs.raiseCount ?? 0,
     toAct: row.action_seat ?? -1,
     pot: row.pot_total || 0,
     result: fs.result || null,
