@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v100';
+window.__EH_APP_VER = '20261003-v101';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1107,7 +1107,7 @@ const _EH_GT_NET = (function(){
 function _gtRememberGame(id){ try{ if(id) localStorage.setItem('eh_last_game', String(id)); }catch(_){} }
 function _gtForgetGame(){ try{ localStorage.removeItem('eh_last_game'); }catch(_){} }
 function _gtLastGame(){ try{ return localStorage.getItem('eh_last_game') || ''; }catch(_){ return ''; } }
-function _gtCleanupPlay(){ if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveWaitingBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; try{ if(_gtMyBeatTimer){ clearInterval(_gtMyBeatTimer); _gtMyBeatTimer=null; } }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtOfflineSeats.clear(); }catch(e){ _ehCatch('gtCleanup', e); } if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
+function _gtCleanupPlay(){ try{ if(_ehGame && typeof _ehGame.close==='function'){ _ehGame.close(); } }catch(e){ _ehCatch('gtCleanup_close', e); } _ehGame=null; if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveWaitingBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; try{ if(_gtMyBeatTimer){ clearInterval(_gtMyBeatTimer); _gtMyBeatTimer=null; } }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtOfflineSeats.clear(); }catch(e){ _ehCatch('gtCleanup', e); } if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ★v64: 找下一个非 away 真人 uid 作为 host 转移目标(供 keepalive 离场和主动离场共用)
 function _gtFindNextHost(tableId){
@@ -4447,7 +4447,7 @@ async function gtSpectatePoker(row){
     // 旁观时点空位/底部"坐下" → 走 app 级抢位(DB join + 重入为玩家), 不走引擎本地 resume(guest 无引擎权威)
     onGrabSeat:()=>{ _gtGrabSeat(row); },
   });
-  try{ toast('旁观中 · 点空位或底部坐下', 2000); }catch(_){}
+  try{ toast('旁观中 · 点空位可入座', 2000); }catch(_){}
 }
 // 旁观抢位悬浮按钮: 监听 _gtTables 变化, 出现空位/away 席位时显示
 function _gtStartGrabButton(row){
@@ -4472,31 +4472,9 @@ let _gtWaitingHumans = [];        // ★v64: 等待入座的真人 uid 队列(�
 let _gtConsecutiveNoSeat = 0;     // ★v64: 连续没有空位的手牌数
 function _gtShowAwayBar(tableId){
   _gtRemoveAwayBar();
-  var bar=document.createElement('div');
-  bar.id='_gtAwayBar';
-  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9998;display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(0,20,40,.92);border-top:1px solid #00e5ff;box-shadow:0 -2px 12px rgba(0,229,255,.3),0 0 24px rgba(0,229,255,.08) inset;';
-  bar.innerHTML='<span style="color:#00e5ff;font-size:14px;font-weight:600;letter-spacing:.5px;text-shadow:0 0 6px rgba(0,229,255,.5)">你已离席 · 可坐下等待下一局</span>'
-    +'<button id="_gtAwayBack" style="padding:8px 18px;border:1px solid rgba(0,229,255,.5);border-radius:9px;background:transparent;color:#00e5ff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:background .15s">返回聊天室</button>'
-    +'<button id="_gtAwaySit" style="padding:8px 18px;border:1px solid #00e5ff;border-radius:9px;background:rgba(0,229,255,.15);color:#00e5ff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.5px;box-shadow:0 0 8px rgba(0,229,255,.4);transition:background .15s,box-shadow .15s">坐下</button>';
-  document.body.appendChild(bar);
-  var btnBack=document.getElementById('_gtAwayBack');
-  var btnSit=document.getElementById('_gtAwaySit');
-  if(btnBack) btnBack.onclick=function(){
-    _gtRemoveAwayBar();
-    try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
-    _gtCleanupPlay();
-  };
-  if(btnSit) btnSit.onclick=function(){
-    _gtRemoveAwayBar();
-    // 引擎持有者(host)仍跑引擎 → 用引擎内 resumeSeat 就地回座; 否则走 DB join
-    if(_ehGame && typeof _ehGame.isSpectating==='function' && _ehGame.isSpectating() && typeof _ehGame.resumeSeat==='function'){
-      _gtWaitNextHand.set(myUid, tableId);
-      try{ _ehGame.resumeSeat(); }catch(e){ _ehCatch('awayBar_resumeSeat', e); }
-    } else {
-      var _row=_gtTables.get(tableId);
-      if(_row){ _gtWaitNextHand.set(myUid, tableId); _gtGrabSeat(_row); }
-    }
-  };
+  // ★v99: 旁观提示改由引擎提示区(setMeHint)承载, 不再单独占底部栏
+  //   删除"返回聊天室"(顶部←已有) + "坐下"(点空位入座)按钮
+  //   旁观文案"旁观中 · 点空位可入座"由引擎 renderMe 在 mySeat<0 时自动渲染
 }
 function _gtRemoveAwayBar(){
   var bar=document.getElementById('_gtAwayBar');

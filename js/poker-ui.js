@@ -358,7 +358,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-me .pk-hint b{color:var(--accent)}
 .pk-spectate-tag{font-size:11px;color:var(--sub);margin-right:8px;white-space:nowrap}
 /* 旁观态: 收掉 pk-me; 操作区保持与打牌态同高(三键常驻), 不闪不跳 */
-.pk-room.pk-spectating .pk-me{display:none}
+.pk-room.pk-spectating .pk-me{display:flex;min-height:40px;align-items:center;justify-content:center}.pk-room.pk-spectating .pk-acts{display:none}
 .pk-spectate-bar{display:flex;align-items:center;justify-content:center;width:100%}
 .pk-spectate-pill{display:inline-flex;align-items:center;gap:18px;padding:7px 8px 7px 18px;border-radius:999px;background:var(--panel-solid);border:1px solid var(--line2);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 .pk-spectate-pill .pk-spectate-tag{font-size:13px;color:var(--sub);white-space:nowrap;font-weight:600;margin:0}
@@ -1950,8 +1950,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function renderMe(){
       if (mySeat<0 || !st.players[mySeat]){
-        // 旁观(已让座): 底部 bar 统一承载旁观提示, me 条留空(CSS .pk-spectating 下整条隐藏), 牌桌与底部 bar 紧凑贴合
-        els.me.innerHTML='';
+        // ★v99: 旁观提示由引擎提示区(.pk-me)承载, 不再单独占底部栏
+        setMeHint('旁观中 · 点空位可入座');
         lastMeSig=''; return;
       }
       if (st.phase==='lobby'){
@@ -2078,16 +2078,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (spectating || mySeat<0){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        // ★T92 提示统一到顶部: 底部只放按钮(坐下), 不再重复"旁观中"文案
-        els.acts.innerHTML = `
-        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
-        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
-        <div class="pk-row">
-          <button class="pk-b fold" disabled>弃牌</button>
-          <button class="pk-b call" id="pkResume">🪑 坐下</button>
-          <button class="pk-b raise" disabled>加注</button>
-        </div>`;
-        const rb=$('#pkResume'); if(rb) bindTap(rb, ()=>{ if (onGrabSeat){ onGrabSeat(); } else { resumeSeat(); } });
+        // ★v99: 旁观时底部操作栏完全隐藏(CSS .pk-spectating .pk-acts{display:none})
+        //   旁观文案移到提示区(.pk-me)由 renderMe 显示, 点空位入座复用引擎空位点击
+        els.acts.innerHTML = '';
         return;
       }
       const offline = isGuest && connState!=='online';
