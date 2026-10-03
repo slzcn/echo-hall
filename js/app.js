@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v103';
+window.__EH_APP_VER = '20261003-v104';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3613,6 +3613,33 @@ async function _gtEnterPokerServer(row) {
         _gtNextHandPending = false;
         var _fr2 = _gtTables.get(tableId);
         if (!_fr2 || _fr2.status !== 'playing') return;
+        // ★v104: 换座预约落地 —— 下一手开始前检查 _ehGame.seatReserve(), 目标座位仍空则换位(旧座 gtLeave + 新座 gtJoin),
+        //   筹码随身份迁移保持不变; 目标已被占 → 清除预约 + toast 提示。换位链自行触发 start_hand, 否则照常开下一手。
+        try {
+          var _rsv = (_ehGame && typeof _ehGame.seatReserve === 'function') ? _ehGame.seatReserve() : null;
+          if (_rsv && typeof _rsv.target === 'number') {
+            var _A = gtSeatArrays(_fr2);
+            if (_A.mySeat >= 0 && _rsv.target !== _A.mySeat) {
+              var _tgt = (_fr2.seats || []).find(function(x){ return x && x.seat === _rsv.target; });
+              if (_tgt && (_tgt.kind === 'empty' || !_tgt.kind)) {
+                gtLeave(tableId).then(function(){ return gtJoin(tableId, _rsv.target); })
+                  .then(function(){
+                    try { if (_ehGame && _ehGame.clearSeatReserve) _ehGame.clearSeatReserve(); } catch(_){}
+                    sb.functions.invoke('eh-poker-action', { body: { table_id: tableId, action: 'start_hand' } }).catch(function(){});
+                  })
+                  .catch(function(e){
+                    try { if (_ehGame && _ehGame.clearSeatReserve) _ehGame.clearSeatReserve(); } catch(_){}
+                    try { toast('换位失败，下局再试'); } catch(_){}
+                    sb.functions.invoke('eh-poker-action', { body: { table_id: tableId, action: 'start_hand' } }).catch(function(){});
+                  });
+                return;   // 换位链异步自行触发 start_hand, 不走下面
+              } else {
+                try { toast('该座位已被占用', 2200); } catch(_){}
+                try { if (_ehGame && _ehGame.clearSeatReserve) _ehGame.clearSeatReserve(); } catch(_){}
+              }
+            }
+          }
+        } catch(_) {}
         sb.functions.invoke('eh-poker-action', { body: { table_id: tableId, action: 'start_hand' } }).catch(function(){});
       }, 4000);
     }

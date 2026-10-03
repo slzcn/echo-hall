@@ -580,14 +580,10 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),color-mix(in srgb, var(--accent) 5%, transparent) 60%,transparent 82%);
   border-color:color-mix(in srgb, var(--accent) 16%, transparent);box-shadow:inset 0 0 46px color-mix(in srgb, var(--accent) 6%, transparent),0 8px 30px color-mix(in srgb, var(--accent) 6%, transparent)}
-/* 邀请入座菜单(招募态点空位弹出): 与掼蛋 .gd-invite-menu 同款 */
-.pk-invite-menu{position:absolute;z-index:40;width:220px;max-height:60%;overflow:auto}
-.pk-invite-menu .im-ttl{font-size:11px;font-weight:800;color:var(--accent);padding:4px 8px 6px;letter-spacing:.04em}
-.pk-invite-menu .im-sep{font-size:10px;color:var(--dim);padding:6px 8px 2px}
-.pk-invite-menu .im-empty{font-size:11px;color:var(--dim);padding:6px 8px}
-.pk-invite-menu .im-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;
-  padding:8px 10px;color:var(--ink);font-size:13px;cursor:pointer}
-.pk-invite-menu .im-item:hover{background:color-mix(in srgb, var(--accent) 12%, transparent)}
+/* ★v103: 空位换座预约 —— 删除"邀请补位"菜单后, 空位点击改为预约换座(下局自动换位) */
+.pk-seat.pk-reserved{box-shadow:0 0 0 2px var(--accent),0 0 14px rgba(0,229,255,.45);border-radius:14px}
+.pk-seat.pk-reserved .pk-avr .av{color:var(--accent);font-weight:800}
+.pk-btn-bl.swap{background:color-mix(in srgb,var(--accent) 22%,var(--panel-solid));color:var(--accent);border-color:var(--accent);text-shadow:none}
 
 `;
     document.head.appendChild(s);
@@ -781,6 +777,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (onSeatResume){ try{ onSeatResume(mySeat, { uid: ids?ids[mySeat]:null }); }catch(e){ _ehCatch('poker.onSeatResume', e); } }
       try{ renderActs(true); renderMsg(); renderMe(); }catch(_){}
     }
+    // ★v103: 换座预约 —— 本地 UI 状态 {target,uid}, 不写 DB。已在座真人点空位 → 预约; 再点同位取消; 点别位切换。
+    //   下一手开始前由 app.js(start_hand 定时器)读 seatReserve() 执行: 目标仍空 → gtLeave+gtJoin 换位; 已占 → 清除+提示。
+    function toggleSeatReserve(target){
+      if (mySeat<0 || target===mySeat) return;
+      if (seatReserve && seatReserve.target===target){ seatReserve=null; try{ toast('已取消换座预约',1600); }catch(_){} }
+      else { seatReserve={target:target, uid:(ids&&ids[mySeat])||null}; try{ toast('已预约换座 · 下局开始自动换位',2000); }catch(_){} }
+      try{ renderOpponents(true); renderMe(); }catch(_){}
+    }
     // host 侧: 把超时 idleOut 移出的远程真人席放回 remoteSeats, 停 AI 代打并重武装回合。
     function resumeRemote(seat){
       if (isGuest || typeof seat !== 'number' || seat < 0 || seat === mySeat) return false;
@@ -903,6 +907,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let vacatedUid = names.map(()=>null);
     const onSeatVacate = (typeof opts.onSeatVacate==='function') ? opts.onSeatVacate : null;
     const canInvite = true;                            // 真人邀请权限一致
+    let seatReserve = null;   // ★v103: 换座预约 {target,uid} 本地 UI 状态, 不写 DB; 下局开始前 app.js 读取并执行换位
     const BOT_POOL = [
       {name:'阿岩',  e:'🗿', archetype:'cool'},      // 冷静→紧
       {name:'小凶',  e:'🔥', archetype:'sharp'},     // 锐利→紧凶
@@ -1209,7 +1214,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; try{ if(root.EHTableOrient) root.EHTableOrient.reflect(room); }catch(_){} positionSeats(); }); };
     const onOrient = ()=>{ setTimeout(onResize, 120); };
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onOrient); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
+    function close(){ minimized=false; seatReserve=null; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onOrient); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
       if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
 
     // ── 折叠 / 展开(返回聊天但牌局继续) ──
@@ -1352,7 +1357,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (p.kind==='empty'){
         return `<div class="pk-seat pk-lobby-empty" data-seat="${seat}" data-invite="${p.dbSeat}" style="--p:360">
           <div class="pk-avr"><div class="av">＋</div></div>
-          <div class="nm">空位</div><div class="stk pk-lob">邀请补位</div></div>`;
+          <div class="nm">空位</div><div class="stk pk-lob">空位</div></div>`;
       }
       const isMe = seat===mySeat;
       // clone=灵魂分身(本机 AI 顶灵魂身份代打的副本)→ 标「分身」, 别冒充真人「玩家」(状态忠实)
@@ -1451,14 +1456,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p=st.players[seat];
       if(!p) return seatEmptyHTML(seat);   // ★T93 空值守卫: 座位不存在时退占位, 防 p.folded/p.hole 崩
-      // 空位(机器人输光离场 / 旁观让座 / 满座旁观者看到的空椅): 画成"＋ 可坐/可邀"占位 —— 旁观时点空位直接坐下。
+      // ★v103: 空位(机器人输光离场 / 旁观让座 / 满座旁观者看到的空椅)——删除"邀请补位", 改为:
+      //   旁观者点空位 → 直接入座(原逻辑); 已在座真人点空位 → 预约换座(下局开始前自动换位)。
       if (seat!==mySeat && (vacated[seat] || (p && p.kind==='empty'))){
         const spect = spectating || mySeat<0;
-        const canFill = !isGuest && canInvite;   // ★fix: guest 无 lobbyCtx/邀请权限, 点空位会走 inviteBot 创建仅本地幽灵机器人
-        return `<div class="pk-seat pk-vacant${canFill||spect?'':' locked'}" data-seat="${seat}"${(canFill||spect)?` data-invite="${seat}"`:''} style="--p:360">
+        const isRes = seatReserve && seatReserve.target===seat;
+        const canClick = spect || mySeat>=0;   // 旁观者可入座; 已在座真人可预约换位
+        const label = spect ? '点击入座' : (isRes ? '已预约' : '点击预约');
+        return `<div class="pk-seat pk-vacant${isRes?' pk-reserved':''}${canClick?'':' locked'}" data-seat="${seat}"${canClick?` data-reserve="${seat}"`:''} style="--p:360">
           <div class="pk-avr"><div class="av">＋</div></div>
           <div class="nm">空位</div>
-          <div class="stk pk-vac">${spect?'点击入座':(canFill?'邀请补位':'空位')}</div>
+          <div class="stk pk-vac">${label}</div>
           <div class="pk-mini-hole"></div><div class="pk-say"></div></div>`;
       }
       // 已受邀但本手尚未发牌(引擎坐席仍 sitOut): 画成"入座中·下一手"占位, 不参与本手。
@@ -1488,13 +1496,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       }
       const dbtn = seat===st.button ? `<span class="pk-btn-d">D</span>` : '';
       const blbtn = blindBadge(seat);
+      const swpbtn = (seat===mySeat && seatReserve && typeof seatReserve.target==='number') ? '<span class="pk-btn-bl swap">→换位</span>' : '';
       // ★v38: 断线玩家视觉标记 — 灰色遮罩 + "断线"小标签
       const seatUid = ids ? ids[seat] : null;
       const isOffline = seatUid && offlineUids.has(seatUid);
       // ★T89.1 牌桌座位头像长按互动: 非我方、有 uid(真人/灵魂)的座位加 data-atname/data-uid, 让 app.js headEl 认到
       const uidAttr = (seat !== mySeat && seatUid) ? ` data-atname="${escapeHtml(p.name)}" data-uid="${seatUid}"` : '';
       return `<div class="pk-seat${seat===mySeat?' pk-me-seat':''}${st.toAct===seat&&st.phase!=='over'?' turn':''}${p.folded?' folded':''}${p.allin?' allin':''}${won?' win':''}${isOffline?' offline':''}" data-seat="${seat}" style="--p:360">
-        <div class="pk-avr"${isOffline?' style="filter:grayscale(1) opacity(0.5)':''}${uidAttr}><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}${isOffline?'<span class="pk-offline-tag">断线</span>':''}<span class="pk-sec"></span></div>
+        <div class="pk-avr"${isOffline?' style="filter:grayscale(1) opacity(0.5)':''}${uidAttr}><div class="av">${avatars[seat]||'🤖'}</div>${dbtn}${blbtn}${swpbtn}${p.allin&&!p.folded?'<span class="pk-allin-tag">ALL IN</span>':''}${isOffline?'<span class="pk-offline-tag">断线</span>':''}<span class="pk-sec"></span></div>
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="stk">${p.allin?'全下':'💰'} <b>${p.allin?'':p.stack}</b></div>
         ${hole}
@@ -1637,10 +1646,10 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       positionSeats();
       if (st.phase==='lobby'){ bindLobbySeats(); }
       else {
-        // 打牌态空位(机器人离场后): 点击 → 邀请补位菜单(机器人/灵魂/真人)
-        els.table.querySelectorAll('.pk-vacant[data-invite]').forEach(el=>{
-          const s=+el.dataset.invite;
-          el.onclick=()=>{ if (onGrabSeat){ onGrabSeat(s); } else { resumeSeat(s); } };   // ★v59: 点空位直接入座, 不再弹邀请菜单
+        // ★v103: 打牌态空位点击 —— 旁观者入座(原逻辑); 已在座真人预约换座(下局自动换位)。删除"邀请补位"。
+        els.table.querySelectorAll('.pk-vacant[data-reserve]').forEach(el=>{
+          const s=+el.dataset.reserve;
+          el.onclick=()=>{ if (spectating || mySeat<0){ if (onGrabSeat){ onGrabSeat(s); } else { resumeSeat(s); } } else { toggleSeatReserve(s); } };
         });
         // 新一手: 底牌已发且尚未渲过发牌动画(dealAnim 仅在开手为真, renderMe 后置否) → 逐张错峰飞入。
         //   放在 positionSeats 之后: 座位已就位, 动画只作用于每张牌自身 transform, 不影响布局。
@@ -2869,7 +2878,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (aliveSeats().length < 2){
         try{ autoFillVacants(); }catch(_){}
         if (aliveSeats().length < 2){
-          try{ toast('桌上暂时没人 · 点空位邀请补位', 3200); }catch(_){}
+          try{ toast('桌上暂时没人 · 点空位入座/预约换位', 3200); }catch(_){}
           renderOpponents(true); positionSeats();
           return;
         }
@@ -3097,6 +3106,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       // 主动离座旁观: 必须真进 spectating(旧实现只 idleOut, resumeSeat 永不触发 onSeatResume)
       enterSpectator: doEnterSpectator,
       resumeSeat, resumeRemote,
+      seatReserve:()=>seatReserve, clearSeatReserve:()=>{seatReserve=null; try{renderOpponents(true);renderMe();}catch(_){}},
       fillSeat, freeSoulsForSeat, autoFillVacants, vacantSeatsForFill,
       _forceTimeout:()=>onHumanTimeout(),   // 测试驱动: 触发一次我方超时代打+计数
       _bustSeat:(seat)=>{ if(st.players[seat]){ st.players[seat].stack=0; } stacks[seat]=0; },  // 测试: 把某席筹码清零(模拟输光)
