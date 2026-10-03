@@ -479,12 +479,12 @@ html[data-mode="day"] .pk-winline .pk-wc{color:var(--amber,#C8892E)}
 .pk-toast{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);padding:8px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:10;pointer-events:none;text-align:center;max-width:80%}
 .pk-toast.show{opacity:1}
 /* T86 边打边聊: 右下 💬 浮钮 + 弹出式快捷交流条(预设短语/表情/打字), 不占操作区、不挡牌面 */
-.pk-chat-fab{position:absolute;right:12px;bottom:calc(174px + env(safe-area-inset-bottom,0px));width:40px;height:40px;border-radius:50%;
+.pk-chat-fab{position:absolute;right:8px;bottom:calc(174px + env(safe-area-inset-bottom,0px));width:40px;height:40px;border-radius:50%;
   background:var(--panel-solid);border:1px solid var(--line2);color:var(--ink);font-size:18px;cursor:pointer;z-index:16;
   display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);transition:transform .14s,border-color .14s}
 .pk-chat-fab:active{transform:scale(.9)}
 .pk-room.is-land .pk-chat-fab{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
-.pk-chat-pop{position:absolute;right:12px;bottom:calc(220px + env(safe-area-inset-bottom,0px));z-index:17;
+.pk-chat-pop{position:absolute;right:8px;bottom:calc(220px + env(safe-area-inset-bottom,0px));z-index:17;
   width:min(300px,78vw);max-width:calc(100vw - 24px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:10px;
   box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none}
 .pk-chat-pop.on{opacity:1;transform:none;pointer-events:auto}

@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v96';
+window.__EH_APP_VER = '20261003-v97';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -12152,28 +12152,142 @@ var _ehWinStreak={};
 // 缓存近期宿敌信息 (避免重复查询)
 var _ehRivalCache={};
 
-// 传说时刻 fallback 文案
+// 传说时刻 fallback 文案库 (按场景分组, 触发时随机取一条; {name}/{pot}/{n}/{bombs} 占位)
 var _ehLegendFallbacks={
-  royal_flush:function(n){return n+'在霓虹深处亮出同花顺，江湖从此记住了这个名字。';},
-  big_win:function(n){return n+'一把赢走半桌筹码，赌坊为之震动。';},
-  spring:function(n){return n+'以春天之势横扫全场，对手甚至没来得及出牌。';},
-  bombs:function(n){return n+'连掷炸弹，牌桌在爆炸中颤抖。';},
-  win_streak:function(n){return n+'三连胜，名字在这张牌桌上开始流传。';},
-  bust:function(n){return n+'将最后的筹码推入底池，赌注是尊严。';}
+  // 连胜类 (n=连胜局数)
+  win_streak:[
+    '{name} 两连胜，手气正旺。',
+    '{name} 三连胜，名字在这张牌桌上开始流传。',
+    '{name} 四连胜，灵魂们开始交换眼神。',
+    '{name} 五连胜，这桌上已经没有人敢轻易跟注了。',
+    '{name} 六连胜，传说不是吹出来的。',
+    '{name} 连胜{n}局，今晚的主角已经确定。',
+    '连胜{n}局，{name} 把这张桌子变成了自己的舞台。'
+  ],
+  // 大底池赢 (底池 > 大盲注*20)
+  big_pot:[
+    '{name} 赢走了一座小山。',
+    '底池 {pot}，{name} 全收。今晚最大的一锅。',
+    '{name} 一手清空了半张桌子的筹码。',
+    '这锅底池，够买好几顿火锅了。',
+    '{name} 微笑着把筹码推到自己面前。',
+    '一座筹码山倒向 {name} 这边。'
+  ],
+  // 全下赢
+  all_in_win:[
+    '{name} 背水一战，赢了。',
+    '{name} 把所有筹码推进去，然后赢了。',
+    '全下，然后赢。{name} 今晚不怕死。',
+    '{name} 的筹码一度归零，又满血复活。',
+    '孤注一掷，{name} 押上了全部。'
+  ],
+  // 强牌型: 同花顺
+  royal_flush:[
+    '{name} 亮出同花顺，全桌沉默。',
+    '同花顺！{name} 今晚开了一把好牌。',
+    '{name} 在霓虹深处亮出同花顺，江湖从此记住了这个名字。',
+    '同花顺落桌，{name} 收走了所有人的敬畏。',
+    '{name} 亮出同花顺，对手连话都说不出来。'
+  ],
+  // 强牌型: 四条
+  quads:[
+    '四条！{name} 今晚开了一把好牌。',
+    '{name} 翻出四条，这桌没人能挡。',
+    '四条压场，{name} 稳稳收走这锅。',
+    '{name} 的四条让对手哑口无言。'
+  ],
+  // 强牌型: 葫芦
+  full_house:[
+    '葫芦压场，{name} 稳稳收走这锅。',
+    '{name} 凑出葫芦，对手只能叹气。',
+    '葫芦一出，{name} 的牌型让全桌安静。',
+    '{name} 用葫芦锁定了这锅底池。'
+  ],
+  // 弃牌赢 (所有人弃牌)
+  fold_win:[
+    '所有人都弃了，{name} 甚至没有亮牌。',
+    '{name} 一个眼神，其他人全弃了。',
+    '没人敢跟，{name} 不战而胜。',
+    '{name} 的气场今晚有点强。',
+    '一桌人齐刷刷弃牌，{name} 笑纳底池。'
+  ],
+  // 逆转赢 (翻牌前落后, 最终赢)
+  comeback:[
+    '{name} 翻牌前不被看好，最后赢了。',
+    '牌桌上没有必输的局。{name} 证明了这一点。',
+    '{name} 用一张河牌改变了结局。',
+    '从落后到翻盘，{name} 演了一出好戏。',
+    '所有人都觉得 {name} 输定了，然后河牌来了。'
+  ],
+  // 宿敌对决赢
+  rival_win:[
+    '{name} 再次击败了老对手。',
+    '宿敌相遇，{name} 笑到了最后。',
+    '这两个人的恩怨，今晚又多了一笔。',
+    '老对手又败在 {name} 手下，这账越记越长。'
+  ],
+  // 大赢兜底 (赢走半桌筹码)
+  big_win:[
+    '{name} 一把赢走半桌筹码，赌坊为之震动。',
+    '{name} 今晚的手气，让人嫉妒。',
+    '这一手，{name} 打得漂亮。',
+    '{name} 出手，必有故事。'
+  ],
+  // 输光
+  bust:[
+    '{name} 将最后的筹码推入底池，赌注是尊严。',
+    '{name} 筹码清零，但传奇故事才刚开始。',
+    '倾家荡产的一手，{name} 没有退缩。',
+    '{name} 输光了，但这场赌局会被讲很久。'
+  ],
+  // 斗地主春天
+  spring:[
+    '{name} 以春天之势横扫全场，对手甚至没来得及出牌。',
+    '春天！{name} 让对手从头到尾没出过一张牌。',
+    '一场春天，{name} 把牌桌变成了个人秀。',
+    '{name} 的春天，对手连挣扎的机会都没有。'
+  ],
+  // 炸弹
+  bombs:[
+    '{name} 连掷炸弹，牌桌在爆炸中颤抖。',
+    '炸弹连环！{name} 把对手炸得哑口无言。',
+    '{name} 的炸弹把这桌炸开了锅。',
+    '一枚接一枚的炸弹，{name} 炸出了传说。'
+  ],
+  // 通用/随机
+  generic:[
+    '{name} 今晚的手气，让人嫉妒。',
+    '牌桌上的风水，今晚全在 {name} 这边。',
+    '{name} 出手，必有故事。',
+    '这一手，{name} 打得漂亮。',
+    '{name} 的牌技，让这桌人叹服。',
+    '今晚的牌桌，{name} 是当之无愧的主角。',
+    '{name} 在这张牌桌留下了传说。'
+  ]
 };
+
+// 按场景随机取一条 fallback 文案, 替换 {name}/{pot}/{n}/{bombs} 占位
+function _ehPickLegend(trigger,name,extra){
+  var arr=_ehLegendFallbacks[trigger]||_ehLegendFallbacks.generic;
+  var tpl=arr[Math.floor(Math.random()*arr.length)]||arr[0]||((name||'玩家')+'在这张牌桌留下了传说。');
+  return String(tpl)
+    .replace(/\{name\}/g,name||'玩家')
+    .replace(/\{pot\}/g,(extra&&extra.pot!=null)?extra.pot:'')
+    .replace(/\{n\}/g,(extra&&extra.streak!=null)?extra.streak:3)
+    .replace(/\{bombs\}/g,(extra&&extra.bombs!=null)?extra.bombs:3);
+}
 
 // 主函数: 触发传说时刻
 async function ehLegendMoment(uid,name,trigger,game,extra){
   if(!uid||!name) return;
   try{
-    var fbFn=_ehLegendFallbacks[trigger]||function(n){return n+'在这张牌桌留下了传说。';};
-    var fallback=fbFn(name).slice(0,40);
+    var fallback=_ehPickLegend(trigger,name,extra).slice(0,60);
     // 调 AI 生成
     var text=await _ehFunAI('legend',{
       uid:uid,name:name,trigger:trigger,game:game,
       extra:extra||'',fallback:fallback
     });
-    var finalText=(text||fallback).slice(0,40);
+    var finalText=(text||fallback).slice(0,60);
     // 广播
     ehLegendBroadcast(uid,name,finalText,trigger);
     // 本地展示
@@ -12239,34 +12353,80 @@ function ehLegendCheck(game,res,meta,names,ids){
 
     // ── 德州触发条件 ──
     if(game==='nlhe'){
-      // 同花顺或更高牌型赢了
+      // ── 强牌型赢 (同花顺/四条/葫芦) ──
       var handName=(meta&&meta.handName)||'';
-      if(handName&&/同花顺|皇家同花顺|straight.?flush|royal/i.test(handName)){
-        var winners=(res.winnersBySeat||[]);
-        if(winners.indexOf(mySeat)>=0){
+      var winners=(res.winnersBySeat||[]);
+      var iWon=winners.indexOf(mySeat)>=0;
+      if(handName&&iWon){
+        if(/同花顺|皇家同花顺|straight.?flush|royal/i.test(handName)){
           ehLegendMoment(myUidLocal,myName,'royal_flush',game,{hand:handName});
           _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
           return;
         }
+        if(/四条|四头|quads|four.?of.?a.?kind/i.test(handName)){
+          ehLegendMoment(myUidLocal,myName,'quads',game,{hand:handName});
+          _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+          return;
+        }
+        if(/葫芦|full.?house|满堂红/i.test(handName)){
+          ehLegendMoment(myUidLocal,myName,'full_house',game,{hand:handName});
+          _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+          return;
+        }
       }
-      // 赢了全桌筹码的50%以上
       var delta=(meta&&meta.delta)||0;
       var potTotal=0;
       (res.pots||[]).forEach(function(p){potTotal+=(p&&p.amount||0);});
+      // ── 大底池赢 (底池 > 大盲注*20) ──
+      var bb=(meta&&meta.bigBlind)||(res&&res.bigBlind)||50;
+      if(iWon&&potTotal>0&&potTotal>=bb*20){
+        ehLegendMoment(myUidLocal,myName,'big_pot',game,{pot:potTotal});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // ── 全下赢 ──
+      var allInFlag=(meta&&meta.allIn)||((res&&res.allIn&&res.allIn.length)?true:false);
+      if(iWon&&allInFlag){
+        ehLegendMoment(myUidLocal,myName,'all_in_win',game,{pot:potTotal});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // ── 弃牌赢 (其他人都弃了) ──
+      var foldedCount=(res&&res.foldedCount!=null)?res.foldedCount:((res&&res.folded||[]).length);
+      if(iWon&&foldedCount>0&&foldedCount>=(names.length-1)){
+        ehLegendMoment(myUidLocal,myName,'fold_win',game,{});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // ── 逆转赢 (翻牌前落后, 最终赢) ──
+      var preflopWin=(meta&&typeof meta.preflopWin==='number')?meta.preflopWin:null;
+      if(iWon&&preflopWin!=null&&preflopWin<0.5){
+        ehLegendMoment(myUidLocal,myName,'comeback',game,{});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // ── 宿敌对决赢 (未到连胜里程碑时触发, 让连胜3+仍走 win_streak) ──
+      var rivalInfo=_ehRivalCache[myUidLocal];
+      var _preStreak=_ehWinStreak[game+':'+myUidLocal]||0;
+      if(iWon&&rivalInfo&&_preStreak<2){
+        ehLegendMoment(myUidLocal,myName,'rival_win',game,{});
+        _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
+        return;
+      }
+      // ── 大赢兜底 (赢走半桌筹码) ──
       if(delta>0&&potTotal>0&&delta>=potTotal*0.5){
         ehLegendMoment(myUidLocal,myName,'big_win',game,{pot:potTotal,delta:delta});
         _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,true);
         return;
       }
-      // 输光了 (筹码归零)
+      // ── 输光了 (筹码归零) ──
       if(delta<0&&Math.abs(delta)>=5000){
         ehLegendMoment(myUidLocal,myName,'bust',game,{delta:delta});
         _ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,false);
         return;
       }
-      // 连胜检测
-      var won=((res.winnersBySeat||[]).indexOf(mySeat)>=0);
-      if(_ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,won)) return;
+      // ── 连胜检测 ──
+      if(_ehComebackAndStreak(game,res,meta,names,ids,mySeat,myUidLocal,myName,iWon)) return;
     }
 
     // ── 斗地主触发条件 ──
