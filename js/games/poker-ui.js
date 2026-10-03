@@ -2541,7 +2541,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
                 : `🏆 ${escapeHtml(champName)}${cDelta!=null&&cDelta>0?` 净赢 <b class="pk-wc">+${cDelta}</b>`:` 收池 ${potTotal}`} · 你 ${delta>=0?'+':''}${delta}`))
             + foldTag + ` <button class="pk-go" type="button">继续 ▶</button>`;
           showWinBanner(line, won);
-          // ★v94: 「继续 ▶」可提前发下一手(否则 5s 后自动)
+          // ★v95: 「继续 ▶」可提前发下一手(否则 5s 后自动)
           if(_winBanner){ const _go=_winBanner.querySelector('.pk-go'); if(_go) _go.addEventListener('click', ()=>{ if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; } hideWinBanner(); nextHand(); }); }
           if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
           if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); pkCelebrate(false); }
@@ -2557,7 +2557,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           emitWallet();
           if (minimized) updateChip();
           // 自动发下一手: host 到点 nextHand; 客人等权威快照(applySnapshot 会清横幅接下一手)
-          // ★v94: 结算停留 5s 让玩家看清赢家/牌型/筹码/底牌(摊牌牌面已铺在各席); 「继续 ▶」可提前发下一手
+          // ★v95: 结算停留 5s 让玩家看清赢家/牌型/筹码/底牌(摊牌牌面已铺在各席); 「继续 ▶」可提前发下一手
           // journey-exempt: 再来一局直进(延迟缩短) — 复用 journey-poker-play 覆盖
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
           if (!isGuest){
@@ -2705,13 +2705,13 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       else if(delta<0){ sfx('void'); }
 
       // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
-      //   ★v94: 统一停 5s 让玩家读摊牌结算。破产离桌不自动进下一手。
+      //   ★v95: 统一停 5s 让玩家读摊牌结算。破产离桌不自动进下一手。
       // autoT 提升为 room 级 overTimer(见 clearTimers): 若 close() 在结算倒计时中被外部调用(app.js gtClose),
       //   本地 autoT 曾残留继续 nextHand() 打到已 detach 的 DOM 上、永远重排 —— 现在 clearTimers 会一并清掉。
       function stopAuto(){ if(overTimer){ clearInterval(overTimer); overTimer=null; } }
       stopAuto();
       if (!isGuest && !matchOver){
-        // ★v94: 结算停留 5s(原联机 4s / 单机 3s), 让玩家看清赢家牌型/筹码/摊牌底牌后自动发下一手。
+        // ★v95: 结算停留 5s(原联机 4s / 单机 3s), 让玩家看清赢家牌型/筹码/摊牌底牌后自动发下一手。
         let left = 5;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         overTimer=setInterval(()=>{
