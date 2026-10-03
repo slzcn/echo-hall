@@ -284,8 +284,9 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-my-hole .card .cn{top:3px;left:5px}
 .pk-my-hole .card .cs{display:none}
 .pk-say{position:absolute;top:calc(var(--av,44px) + 2px);left:50%;transform:translateX(-50%);font-size:11px;color:var(--ink);background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line);border-radius:10px;padding:3px 8px;max-width:min(140px,42vw);opacity:0;transition:opacity .2s;pointer-events:none;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pk-seat[data-side="left"] .pk-say{left:0;right:auto;transform:none;max-width:min(140px,38vw)}
-.pk-seat[data-side="right"] .pk-say{right:0;left:auto;transform:none;max-width:min(140px,38vw)}
+.pk-seat[data-side="left"] .pk-say{left:50%;right:auto;transform:none;max-width:min(140px,38vw)}
+.pk-seat[data-side="right"] .pk-say{right:50%;left:auto;transform:none;max-width:min(140px,38vw)}
+.pk-me-seat .pk-say{top:auto;bottom:calc(100% + 2px)}
 .pk-say.show{opacity:1}
 /* 身前投入筹码(朝中央) —— ★T93 手机端不超出显示区: max-width + 省略号 */
 .pk-commit{position:absolute;transform:translate(-50%,-50%);z-index:3;display:flex;align-items:center;gap:4px;
@@ -492,7 +493,7 @@ html[data-mode="day"] .pk-winline .pk-wc{color:var(--amber,#C8892E)}
 .pk-chat-pop .pk-qc-chip{padding:6px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--ink);
   font-size:13px;cursor:pointer;transition:background .12s}
 .pk-chat-pop .pk-qc-chip:active{background:color-mix(in srgb,var(--accent) 22%,transparent)}
-.pk-chat-pop .pk-qc-type{display:flex;gap:6px}
+.pk-chat-pop .pk-qc-type{display:flex;gap:6px;margin-top:12px}
 .pk-chat-pop .pk-qc-type input{flex:1;min-width:0;height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--bg2,rgba(0,0,0,.2));
   color:var(--ink);padding:0 10px;font-size:14px;outline:none}
 .pk-chat-pop .pk-qc-send{flex:0 0 auto;height:36px;padding:0 14px;border-radius:9px;border:none;background:var(--accent);color:var(--btn-ink,#04060c);font-weight:700;cursor:pointer}
