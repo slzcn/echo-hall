@@ -175,69 +175,89 @@
     const result = (action, amount, why, equity) =>
       ({ action, amount, meta: { equity: Math.round((equity || 0) * 100) / 100, why, persona: P.name } });
 
-    // ── 翻前: Chen 打分 + 位置 + 对手数 + 短码推 ──
+    // ── 翻前: Chen 打分驱动(理性赢钱策略) ──
+    //   强牌(Chen≥10, AA/KK/QQ/AKs)→加注(受每轮2次上限约束)
+    //   中等(Chen 6-9)→跟注, 不主动加注
+    //   弱牌(Chen<6)→80%弃牌, 20%跟注(偶尔慢玩)
+    //   bluff 整体 10%, 只在底池小、对手少时
     if (state.street === 'preflop' && state.board.length === 0){
       const chen = chenScore(p.hole);
       const bbLeft = p.stack / state.bb;
-      // 门槛: 性格基线 + 对手数微调(每2个对手才抬1, 封顶+2) + 无位置再抬 1
-      //   反回退(主人反馈"翻前几乎全弃"): 旧式"每多一对手抬1"在6人桌把门槛抬到+4~+5,
-      //   紧凶(默认)playable 变成 Chen≥12(仅JJ+/AKs≈3%)→级联全弃成死桌。多人局理应收紧,
-      //   但线性叠加过陡; 改成 floor((nOpp-1)/2) 封顶2, 6人桌只抬+2, 保留人越多越紧的方向感。
-      let gate = P.chenGate + Math.min(2, Math.floor(Math.max(0, nOpp - 1) / 2)) - (pos ? 1 : 0);
-      const strong = chen >= gate + 4;
-      const playable = chen >= gate;
+      const strong = chen >= 10;          // AA/KK/QQ/AKs
+      const medium = chen >= 6 && chen < 10;
+      const weak = chen < 6;
 
-      // 短码(≤10bb): 强牌直接推, 够玩则跟, 否则弃
-      if (bbLeft <= 10){
+      // 全下保护: 筹码 < 大盲 5 倍 → 强牌直接全下, 弱牌弃牌, 不再跟注消耗
+      if (bbLeft < 5){
         if (strong && (la.canRaise || la.canBet)) return result('allin', la.maxRaiseTo, `短码强牌(Chen ${chen})直接全下`, 0.6);
         if (la.canCheck) return result('check', 0, `短码免费看翻牌`, 0.4);
-        if (playable && la.canCall && la.toCall <= p.stack * 0.25) return result('call', 0, `短码跟注博一手(Chen ${chen})`, 0.42);
-        return result('fold', 0, `短码弱牌(Chen ${chen})弃`, 0.2);
+        if (weak) return result('fold', 0, `短码弱牌(Chen ${chen})弃牌`, 0.2);
+        if (medium && la.canCall && la.toCall <= p.stack * 0.20) return result('call', 0, `短码中等牌(Chen ${chen})跟注`, 0.45);
+        return result('fold', 0, `短码边缘牌(Chen ${chen})弃牌`, 0.25);
       }
 
       // 正常筹码
       if (la.canCheck){
-        // 大盲免费看牌位: 强牌几乎必加注隔离(仅偶尔慢打诈), 否则过牌
-        if (strong && (la.canRaise || la.canBet) && roll() > (coachAggro ? 0.03 : (0.12 / coachCautionFactor))) return sizeBetR(state, la, P.betFrac, `大盲位强牌(Chen ${chen})加注隔离`, 0.6);
+        // 大盲免费看牌位: 强牌加注隔离(受每轮2次上限约束), 否则过牌
+        if (strong && (la.canRaise || la.canBet)) return sizeBetR(state, la, P.betFrac, `强起手(Chen ${chen})加注隔离`, 0.6);
         return result('check', 0, `大盲免费看翻牌`, 0.45);
       }
-      if (playable){
-        // 强牌几乎必加注(激进度只决定是否偶尔慢打设陷阱), 中强牌按 3bet 频率加注, 否则跟注入池
-        if (strong && (la.canRaise || la.canBet) && roll() > (coachAggro ? 0.03 : (0.12 / coachCautionFactor))) return sizeBetR(state, la, P.betFrac, `强起手(Chen ${chen})加注`, 0.6);
-        if (la.canRaise && chen >= gate + 2 && roll() < P.threeBet) return sizeBetR(state, la, P.betFrac, `中强牌(Chen ${chen})主动加注`, 0.52);
-        if (la.canCall) return result('call', 0, `够玩(Chen ${chen})跟注入池`, 0.45);
+      if (strong){
+        // 强牌加注(受每轮2次上限约束), 加注被上限封住则跟注
+        if (la.canRaise || la.canBet) return sizeBetR(state, la, P.betFrac, `强起手(Chen ${chen})加注`, 0.6);
+        if (la.canCall) return result('call', 0, `强牌(Chen ${chen})跟注`, 0.55);
       }
-      // 诈唬偷盲: 有位置 + 面对小注 + 骰子命中
-      if (pos && la.canRaise && la.toCall <= state.bb * 1.5 && roll() < P.bluff)
-        return sizeBetR(state, la, P.betFrac, `有位置偷盲诈唬`, 0.35);
+      if (medium){
+        // 中等牌跟注, 不主动加注
+        if (la.canCall) return result('call', 0, `中等起手(Chen ${chen})跟注`, 0.45);
+        if (la.canCheck) return result('check', 0, `中等起手(Chen ${chen})过牌`, 0.42);
+      }
+      // 弱牌(Chen<6): 80%弃牌, 20%跟注(偶尔慢玩); bluff 10% 仅底池小+对手少
+      if (la.canCheck) return result('check', 0, `弱起手(Chen ${chen})过牌`, 0.3);
+      if (roll() < 0.20 && la.canCall && la.toCall <= state.bb * 1.5) return result('call', 0, `弱牌慢玩(Chen ${chen})跟注`, 0.35);
+      if (pos && nOpp <= 2 && (la.canRaise || la.canBet) && la.toCall <= state.bb * 1.5 && roll() < 0.10) return sizeBetR(state, la, P.betFrac, `有位置偷盲诈唬`, 0.35);
       return result('fold', 0, `起手偏弱(Chen ${chen})弃牌`, 0.2);
     }
 
-    // ── 翻后: 蒙特卡洛胜率 vs 彩池赔率 ──
+    // ── 翻后: 胜率(equity)驱动(理性赢钱策略) ──
+    //   胜率>70%→加注; 50-70%→跟注; 30-50%→跟注(若跟注<底池25%)否则弃牌; <30%→弃牌(10% bluff)
+    //   底池赔率保护: 跟注额>底池1/3 且 胜率<40% → 直接弃牌
+    //   随机扰动 ±5%, 让灵魂行为不完全可预测
     const samples = opts.samples || 160;
-    const eq = equityMC(p.hole, state.board, Math.max(1, nOpp), rng, samples);
+    let eq = equityMC(p.hole, state.board, Math.max(1, nOpp), rng, samples);
+    eq = Math.max(0, Math.min(1, eq + (roll() - 0.5) * 0.10));   // ±5% 扰动
     const potOdds = la.toCall > 0 ? la.toCall / (state.pot + la.toCall) : 0;
 
+    // 全下保护: 翻后短码(<5bb) → 强牌全下, 弱牌弃牌
+    const bbLeftPost = p.stack / state.bb;
+    if (bbLeftPost < 5){
+      if (eq >= 0.60 && (la.canRaise || la.canBet)) return result('allin', la.maxRaiseTo, `短码强成手(胜率${pct(eq)})全下`, eq);
+      if (la.canCheck) return result('check', 0, `短码控池过牌(胜率${pct(eq)})`, eq);
+      if (eq >= 0.45 && la.toCall <= p.stack * 0.4 && la.canCall) return result('call', 0, `短码中等(胜率${pct(eq)})跟注`, eq);
+      return result('fold', 0, `短码弱牌(胜率${pct(eq)})弃牌`, eq);
+    }
+
     if (la.canCheck){
-      // 无人下注: 强牌价值下注, 弱牌按诈唬频率偷池, 否则过牌控池
-      if (eq >= 0.62 && roll() < P.aggr * coachCautionFactor * (coachAggro ? 1.25 : 1)) return sizeBetR(state, la, P.betFrac, `成手较强(胜率${pct(eq)})价值下注`, eq);
-      if (eq < 0.35 && pos && roll() < P.bluff) return sizeBetR(state, la, P.betFrac, `低胜率+有位置诈唬`, eq);
-      if (eq >= 0.50 && roll() < P.aggr * 0.6 * coachCautionFactor * (coachAggro ? 1.2 : 1)) return sizeBetR(state, la, P.betFrac * 0.7, `中等牌薄价值下注(胜率${pct(eq)})`, eq);
+      // 无人下注
+      if (eq > 0.70 && (la.canRaise || la.canBet)) return sizeBetR(state, la, P.betFrac, `强成手(胜率${pct(eq)})价值下注`, eq);
+      // 50-70% / 30-50%: 控池过牌(无人下注时不必自掏)
+      // 胜率<30%: 偶尔 bluff 10%(底池小、对手少)
+      if (eq < 0.30 && pos && nOpp <= 2 && (la.canBet || la.canRaise) && roll() < 0.10) return sizeBetR(state, la, P.betFrac * 0.8, `低胜率诈唬偷池`, eq);
       return result('check', 0, `控池过牌(胜率${pct(eq)})`, eq);
     }
 
-    // 面对下注: 比较胜率与赔率
-    const callLine = Math.max(potOdds, 0);              // 跟注保本线
-    const stickyLine = P.callEq;                        // 性格允许的最低跟注线
-    // 强牌加注价值/半诈唬
-    if (eq >= 0.66 && (la.canRaise) && roll() < P.aggr * coachCautionFactor * (coachAggro ? 1.25 : 1)) return sizeBetR(state, la, P.betFrac, `强牌(胜率${pct(eq)})加注要价值`, eq);
-    if (eq >= 0.55 && (la.canRaise) && roll() < P.threeBet * coachCautionFactor * (coachAggro ? 1.2 : 1)) return sizeBetR(state, la, P.betFrac * 0.8, `较强(胜率${pct(eq)})主动加注`, eq);
-    // 有利可图或性格粘 → 跟注
-    if (eq >= callLine && eq >= Math.min(stickyLine, 0.5)) return result('call', 0, `胜率${pct(eq)}≥赔率${pct(callLine)}跟注`, eq);
-    if (P.key === 'station' && eq >= stickyLine) return result('call', 0, `跟注站硬跟(胜率${pct(eq)})`, eq);
-    // 有听牌隐含赔率的半诈唬加注
-    if (eq >= 0.30 && la.canRaise && pos && roll() < P.bluff) return sizeBetR(state, la, P.betFrac * 0.9, `听牌半诈唬加注`, eq);
-    return result('fold', 0, `胜率${pct(eq)}<赔率${pct(callLine)}弃牌`, eq);
+    // 面对下注: 比较胜率与底池赔率
+    // 底池赔率保护: 跟注额 > 底池 1/3 且 胜率 < 40% → 直接弃牌
+    if (la.toCall > state.pot / 3 && eq < 0.40) return result('fold', 0, `赔率不利(胜率${pct(eq)}<40%, 跟注>底池1/3)弃牌`, eq);
+    if (eq > 0.70 && la.canRaise) return sizeBetR(state, la, P.betFrac, `强成手(胜率${pct(eq)})加注要价值`, eq);
+    if (eq >= 0.50) return result('call', 0, `胜率${pct(eq)}跟注`, eq);   // 50-70% 跟注
+    // 30-50%: 跟注金额 < 底池 25% 才跟, 否则弃牌
+    if (eq >= 0.30){
+      if (la.toCall < state.pot * 0.25 && la.canCall) return result('call', 0, `边缘胜率${pct(eq)}小注跟注`, eq);
+      return result('fold', 0, `边缘胜率${pct(eq)}大注弃牌`, eq);
+    }
+    // 胜率<30%: 弃牌, 偶尔 bluff 10%
+    if (pos && nOpp <= 2 && la.canRaise && roll() < 0.10) return sizeBetR(state, la, P.betFrac * 0.8, `低胜率半诈唬`, eq);
   }
 
   // sizeBet 包一层带 meta 的返回

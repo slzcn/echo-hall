@@ -943,7 +943,7 @@ async function broadcastSnapshot(client: any, tableId: string, snap: any): Promi
   } catch {}
 }
 
-const TURN_DEADLINE_MS = 30000;
+const TURN_DEADLINE_MS = 15000; // ★v95: 15s(原 30s, 任务需求 真人下注倒计时)
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });

@@ -24,7 +24,7 @@
   'use strict';
   const Engine = root.EHPokerEngine, AI = root.EHPokerAI, Eval = root.EHPokerEval;
 
-  const HUMAN_ACT_MS = 30000; // ★v89: 30s 倒计时(对齐服务端 TURN_DEADLINE_MS, 任务需求)
+  const HUMAN_ACT_MS = 15000; // ★v95: 15s 倒计时(对齐服务端 TURN_DEADLINE_MS, 任务需求; 原 30s)
   // 灵魂"思考→出手"时长: 2.2~7s 人类般节奏(旧 0.9~1.8s 太快, 环刚亮就消失像"从1s起")。
   //   这是真正出手的时刻; 座位倒计时环另按满格 ACT_MS 显示(见 armTurn turnDur), 到点前出手→环随回合切换重置。
   const AI_MIN_MS = 2200, AI_JIT_MS = 4800;
