@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v99';
+window.__EH_APP_VER = '20261003-v98';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -4108,12 +4108,15 @@ function pkSeatStackFor(seat, ctx){
     if (isMine) return bankChips('nlhe', GRANT);
     if (!id) return GRANT;
     // 服务端权威筹码优先(T84): 预取缓存命中即用, 否则退本地账本(并顺手触发一次异步预取补缓存)
-    if (_pkChipCache.has(id)) return Math.max(0, Math.round(_pkChipCache.get(id)));
-    try{ pkPrefetchChips([id], 'nlhe'); }catch(_){}
-    // ★fix: 本地账本兜底加防膨胀上限 — 历史累积的脏值(localStorage) 不应作为买入,
-    //   超过 GRANT*10(50000) 视为脏数据, 回退 GRANT, 由后续 emitStacks 写回正确值
-    const _lb = bankChipsOf('nlhe', id, GRANT);
-    return (_lb > PK_WALLET_GRANT * 10) ? GRANT : _lb;
+    var _v;
+    if (_pkChipCache.has(id)) _v = Math.max(0, Math.round(_pkChipCache.get(id)));
+    else {
+      try{ pkPrefetchChips([id], 'nlhe'); }catch(_){}
+      _v = bankChipsOf('nlhe', id, GRANT);
+    }
+    // ★fix: 灵魂筹码 rebuy — 不足5000补满到5000; >=5000保留(含赢来的, 不截断不上限)。
+    //   v94 的 50000 截断会清零赢了很多的灵魂, 已删; 结算用绝对值写回(bumpSeatBanks)无 delta 累加膨胀。
+    return (_v < GRANT) ? GRANT : _v;
   }catch(_){ return GRANT; }
 }
 // 结算后写回全席筹码: 存真实值; chipsOf 读到 <买入门槛 时回补 1000(清零后从1000开始)。
