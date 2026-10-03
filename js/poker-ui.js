@@ -480,8 +480,8 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 .pk-chat-fab:active{transform:scale(.9)}
 .pk-room.is-land .pk-chat-fab{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .pk-chat-pop{position:absolute;right:12px;bottom:calc(220px + env(safe-area-inset-bottom,0px));z-index:17;
-  width:min(300px,78vw);max-width:calc(100vw - 24px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:10px;
-  box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none}
+  width:min(300px,78vw);max-width:calc(100vw - 24px);box-sizing:border-box;
+  opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none}
 .pk-chat-pop.on{opacity:1;transform:none;pointer-events:auto}
 .pk-chat-pop .pk-qc-rowwrap{display:flex;flex-direction:column;gap:7px}
 .pk-chat-pop .pk-qc-row{display:flex;flex-wrap:wrap;gap:6px}
@@ -581,9 +581,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),color-mix(in srgb, var(--accent) 5%, transparent) 60%,transparent 82%);
   border-color:color-mix(in srgb, var(--accent) 16%, transparent);box-shadow:inset 0 0 46px color-mix(in srgb, var(--accent) 6%, transparent),0 8px 30px color-mix(in srgb, var(--accent) 6%, transparent)}
 /* 邀请入座菜单(招募态点空位弹出): 与掼蛋 .gd-invite-menu 同款 */
-.pk-invite-menu{position:absolute;z-index:40;width:220px;max-height:60%;overflow:auto;padding:6px;
-  background:var(--panel-solid,var(--panel-solid));border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));border-radius:12px;
-  box-shadow:0 8px 26px rgba(0,0,0,.5)}
+.pk-invite-menu{position:absolute;z-index:40;width:220px;max-height:60%;overflow:auto}
 .pk-invite-menu .im-ttl{font-size:11px;font-weight:800;color:var(--accent);padding:4px 8px 6px;letter-spacing:.04em}
 .pk-invite-menu .im-sep{font-size:10px;color:var(--dim);padding:6px 8px 2px}
 .pk-invite-menu .im-empty{font-size:11px;color:var(--dim);padding:6px 8px}
@@ -1122,7 +1120,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       <div class="pk-me" id="pkMe"></div>
       <div class="pk-acts" id="pkActs"></div>
       <button class="pk-chat-fab" id="pkChatFab" aria-label="聊天" title="边打边聊">💬</button>
-      <div class="pk-chat-pop" id="pkChatPop" hidden></div>
+      <div class="pk-chat-pop eh-dropdown" id="pkChatPop" hidden></div>
       <div class="pk-toast" id="pkToast"></div>`;
     mountEl.appendChild(room);
     // 开桌把 #hall 撑满视口: 盖住桌面态 top:12px/左右留边, 露出的页面底色(主人: 顶上红条突兀)
