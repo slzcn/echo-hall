@@ -580,7 +580,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rg
 html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
   background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.55),color-mix(in srgb, var(--accent) 5%, transparent) 60%,transparent 82%);
   border-color:color-mix(in srgb, var(--accent) 16%, transparent);box-shadow:inset 0 0 46px color-mix(in srgb, var(--accent) 6%, transparent),0 8px 30px color-mix(in srgb, var(--accent) 6%, transparent)}
-/* ★v103: 空位换座预约 —— 删除"邀请补位"菜单后, 空位点击改为预约换座(下局自动换位) */
+/* ★v104: 空位换座预约 —— 删除"邀请补位"菜单后, 空位点击改为预约换座(下局自动换位) */
 .pk-seat.pk-reserved{box-shadow:0 0 0 2px var(--accent),0 0 14px rgba(0,229,255,.45);border-radius:14px}
 .pk-seat.pk-reserved .pk-avr .av{color:var(--accent);font-weight:800}
 .pk-btn-bl.swap{background:color-mix(in srgb,var(--accent) 22%,var(--panel-solid));color:var(--accent);border-color:var(--accent);text-shadow:none}
@@ -777,7 +777,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (onSeatResume){ try{ onSeatResume(mySeat, { uid: ids?ids[mySeat]:null }); }catch(e){ _ehCatch('poker.onSeatResume', e); } }
       try{ renderActs(true); renderMsg(); renderMe(); }catch(_){}
     }
-    // ★v103: 换座预约 —— 本地 UI 状态 {target,uid}, 不写 DB。已在座真人点空位 → 预约; 再点同位取消; 点别位切换。
+    // ★v104: 换座预约 —— 本地 UI 状态 {target,uid}, 不写 DB。已在座真人点空位 → 预约; 再点同位取消; 点别位切换。
     //   下一手开始前由 app.js(start_hand 定时器)读 seatReserve() 执行: 目标仍空 → gtLeave+gtJoin 换位; 已占 → 清除+提示。
     function toggleSeatReserve(target){
       if (mySeat<0 || target===mySeat) return;
@@ -907,7 +907,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     let vacatedUid = names.map(()=>null);
     const onSeatVacate = (typeof opts.onSeatVacate==='function') ? opts.onSeatVacate : null;
     const canInvite = true;                            // 真人邀请权限一致
-    let seatReserve = null;   // ★v103: 换座预约 {target,uid} 本地 UI 状态, 不写 DB; 下局开始前 app.js 读取并执行换位
+    let seatReserve = null;   // ★v104: 换座预约 {target,uid} 本地 UI 状态, 不写 DB; 下局开始前 app.js 读取并执行换位
     const BOT_POOL = [
       {name:'阿岩',  e:'🗿', archetype:'cool'},      // 冷静→紧
       {name:'小凶',  e:'🔥', archetype:'sharp'},     // 锐利→紧凶
@@ -1456,7 +1456,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (st.phase==='lobby') return lobbySeatHTML(seat);
       const p=st.players[seat];
       if(!p) return seatEmptyHTML(seat);   // ★T93 空值守卫: 座位不存在时退占位, 防 p.folded/p.hole 崩
-      // ★v103: 空位(机器人输光离场 / 旁观让座 / 满座旁观者看到的空椅)——删除"邀请补位", 改为:
+      // ★v104: 空位(机器人输光离场 / 旁观让座 / 满座旁观者看到的空椅)——删除"邀请补位", 改为:
       //   旁观者点空位 → 直接入座(原逻辑); 已在座真人点空位 → 预约换座(下局开始前自动换位)。
       if (seat!==mySeat && (vacated[seat] || (p && p.kind==='empty'))){
         const spect = spectating || mySeat<0;
@@ -1646,7 +1646,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       positionSeats();
       if (st.phase==='lobby'){ bindLobbySeats(); }
       else {
-        // ★v103: 打牌态空位点击 —— 旁观者入座(原逻辑); 已在座真人预约换座(下局自动换位)。删除"邀请补位"。
+        // ★v104: 打牌态空位点击 —— 旁观者入座(原逻辑); 已在座真人预约换座(下局自动换位)。删除"邀请补位"。
         els.table.querySelectorAll('.pk-vacant[data-reserve]').forEach(el=>{
           const s=+el.dataset.reserve;
           el.onclick=()=>{ if (spectating || mySeat<0){ if (onGrabSeat){ onGrabSeat(s); } else { resumeSeat(s); } } else { toggleSeatReserve(s); } };
