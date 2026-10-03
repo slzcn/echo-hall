@@ -312,7 +312,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
    ★top 从 14% 下移到 26%: 14% 正压顶部中央席(对手数为奇数时 deg=90 那席落在 cx50%/cy14%),
    摊牌时横幅与该席头像/名字/气泡重叠(实测重叠~11px)。26% 落在"顶席气泡(~18%)"与"公共牌区(~40%)"之间的空档, 两不相撞。 */
 .pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
-  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:normal;max-width:92vw;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;
+  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:normal;max-width:92vw;text-align:center;
   padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
   border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
@@ -321,10 +321,10 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(234,244,244,.92));border-color:var(--line2,color-mix(in srgb, var(--accent) 42%, transparent));box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 14px color-mix(in srgb, var(--accent) 10%, transparent)}
 html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rgba(200,137,46,.55);box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 18px rgba(200,137,46,.22)}
 @keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
-.pk-winline .pk-wc{font-size:17px;color:var(--amber);text-shadow:0 0 10px color-mix(in srgb,var(--amber) 60%,transparent)}
-.pk-winline .pk-go{pointer-events:auto;font-size:12px;font-weight:900;letter-spacing:.04em;color:var(--ink);background:color-mix(in srgb,var(--amber) 22%,transparent);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);padding:4px 16px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.pk-winline .pk-go:hover{background:color-mix(in srgb,var(--amber) 36%,transparent)}
-html[data-mode="day"] .pk-winline .pk-wc{color:var(--amber,#C8892E)}
+.pk-winline .pk-wc{font-size:13px;font-weight:700;color:inherit}
+.pk-winline .pk-go{pointer-events:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:transparent;border:1px solid color-mix(in srgb,var(--ink) 26%,transparent);padding:3px 12px;border-radius:999px;cursor:pointer;opacity:.75;-webkit-tap-highlight-color:transparent}
+.pk-winline .pk-go:hover{opacity:1;border-color:color-mix(in srgb,var(--ink) 45%,transparent)}
+html[data-mode="day"] .pk-winline .pk-wc{color:inherit}
 @keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
