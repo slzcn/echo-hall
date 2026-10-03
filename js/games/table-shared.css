@@ -1644,62 +1644,14 @@ html[data-mode="day"] .pk-room  .pk-table::after{
   letter-spacing: .05em !important;
 }
 
-/* ── 牌桌顶栏 🎨 浮动换肤面板(与 EhAudioMenu 同级 z-index) ── */
-/* ★T93 牌桌浮动菜单: 复用聊天室 .skin-menu 样式, 仅补 fixed 定位(牌桌浮层下 absolute 会错位) */
+/* ★T93/v96 牌桌顶栏浮动菜单(🎨换肤/🎵背景音乐/🔔音效三档): 全部复用聊天室 .skin-menu 容器类,
+   只补 fixed 定位(牌桌浮层下 absolute 会错位)。宽度/圆角/背景/内边距/阴影与聊天室弹层完全一致。
+   旧的 .eh-theme-menu / .eh-audio-menu 独立样式(min-width 168/186、backdrop-filter)已删除,避免分叉。 */
 .eh-theme-float,.eh-bgm-float,.eh-audio-float{position:fixed;z-index:99999;display:flex!important}
 /* 音效三开关行: 复用 skin-opt 结构, label 撑开 + ✓ 勾选态 */
 .eh-audio-row{justify-content:space-between}
 .eh-audio-row .ck{opacity:0;font-size:13px;flex:0 0 auto}
 .eh-audio-row .ck.on{opacity:1;color:var(--accent,var(--cyan))}
-.eh-theme-menu{
-  position:fixed; z-index:99999; min-width:168px; padding:6px;
-  background:var(--panel-solid); border:1px solid var(--line2); border-radius:14px;
-  box-shadow:0 14px 34px rgba(0,0,0,.28),0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent) inset;
-  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
-}
-.eh-theme-menu .tm-hd{ padding:5px 12px 6px; font:800 11px/1 inherit; letter-spacing:.12em; color:var(--sub); }
-.eh-theme-menu .tm-modes{ display:flex; gap:2px; padding:3px; margin:0 6px 6px; background:var(--bg2); border-radius:10px; }
-.eh-theme-menu .tm-mode{
-  flex:1; text-align:center; padding:7px 6px; border:none; cursor:pointer; border-radius:7px;
-  font:600 12px/1 inherit; transition:.15s; background:transparent; color:var(--sub);
-}
-.eh-theme-menu .tm-mode.on{ background:var(--panel-solid); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.15); }
-.eh-theme-menu .tm-theme{
-  display:flex; align-items:center; gap:10px; width:100%; padding:8px 12px; border:none;
-  background:transparent; color:var(--ink); font:600 13px/1.2 inherit; cursor:pointer; border-radius:10px;
-  -webkit-tap-highlight-color:transparent; text-align:left;
-}
-.eh-theme-menu .tm-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
-.eh-theme-menu .tm-nm{ flex:1; text-align:left; }
-.eh-theme-menu .tm-ck{ font-size:12px; opacity:0; }
-.eh-theme-menu .tm-ck.on{ opacity:1; }
-
-/* ── 牌桌 🎵 声音三开关面板 ── */
-.eh-audio-menu{
-  position:fixed; z-index:99999; min-width:186px; padding:6px;
-  background:var(--panel-solid); border:1px solid var(--line2); border-radius:14px;
-  box-shadow:0 14px 34px rgba(0,0,0,.28),0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent) inset;
-  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
-}
-.eh-audio-menu .am-hd{ padding:5px 12px 6px; font:800 11px/1 inherit; letter-spacing:.12em; color:var(--sub); }
-.eh-audio-menu .am-row{
-  display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%;
-  padding:9px 12px; border:none; background:transparent; color:var(--ink);
-  font:600 13px/1.2 inherit; cursor:pointer; border-radius:10px; -webkit-tap-highlight-color:transparent;
-}
-.eh-audio-menu .am-sw{
-  min-width:44px; text-align:center; padding:3px 0; border-radius:999px;
-  font:800 11px/1 inherit; transition:all .16s;
-}
-.eh-audio-menu .am-sw.on{
-  background:var(--accent); color:var(--panel-solid);
-  box-shadow:0 0 10px color-mix(in srgb,var(--accent) 45%,transparent);
-}
-.eh-audio-menu .am-sw.off{
-  background:transparent; color:var(--dim); border:1px solid var(--line2);
-}
 
 /* ── 顶栏工具钮统一(与聊天室 .tool-btn 同规格 36px 圆角方) + 触感 ── */
 .ddz-mus, .gd-mus, .pk-mus,
