@@ -587,7 +587,9 @@
   /* ★icon 切页不横移: 聊天室 .hall-tools 在 .hall-top(padding-right:--hall-px)内, icon 右沿=#hall 右沿-hall-px。
      首页 .lobby-head 无此 padding, 故 lobby-tools 也内缩一个 --hall-px 使两页 icon 右沿对齐(实测 DELTA 18→0)。 */
   .lobby-tools{position:absolute;top:0;right:var(--hall-px)}
-  .skin-menu{position:absolute;top:56px;right:0;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:50;box-shadow:0 12px 40px var(--shadow-lg);min-width:150px}
+  /* 公共浮层基类 .eh-dropdown: 以主题选择浮层(.skin-menu)为基准,统一所有按钮触发浮层的视觉(背景/边框/圆角/阴影/内边距/溢出裁剪)。各浮层保留各自定位与宽度/max-height/滚动行为。 */
+  .eh-dropdown{background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:6px;box-shadow:0 12px 40px var(--shadow-lg);overflow:hidden}
+  .skin-menu{position:absolute;top:56px;right:0;display:none;flex-direction:column;gap:2px;z-index:50;min-width:150px}
   .skin-menu.on{display:flex}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;min-height:44px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
   .skin-opt:hover{background:var(--panel);color:var(--ink)}
@@ -995,8 +997,7 @@
   .game-verdict.gv-win .gv-badge{animation:winGlow 1.4s ease-in-out infinite}
   @keyframes winGlow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--gc,var(--amber)) 40%,transparent)}50%{box-shadow:0 0 16px 3px color-mix(in srgb,var(--gc,var(--amber)) 55%,transparent)}}
   /* 「对TA」头像菜单 */
-  .peer-menu{position:fixed;z-index:72;min-width:132px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:12px;
-    box-shadow:0 10px 30px -8px rgba(0,0,0,.6);padding:5px;opacity:0;transform:translateY(-6px) scale(.96);
+  .peer-menu{position:fixed;z-index:72;min-width:132px;opacity:0;transform:translateY(-6px) scale(.96);
     transition:opacity .14s,transform .14s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
   .peer-menu.on{opacity:1;transform:translateY(0) scale(1)}
   .peer-menu .pm-hd{font-size:11px;color:var(--dim);padding:5px 10px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1181,8 +1182,8 @@
   /* 神曲模式按钮里的音符: 跟随当前曲风色(--song-c), 与神曲卡片的♪符号统一 */
   
   /* ＋ 花样菜单 */
-  .plus-menu{position:absolute;bottom:calc(100% + 10px);left:16px;background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;
-    padding:6px;display:none;flex-direction:column;gap:2px;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);min-width:220px}
+  .plus-menu{position:absolute;bottom:calc(100% + 10px);left:16px;
+    display:none;flex-direction:column;gap:2px;z-index:35;min-width:220px}
   .plus-menu.on{display:flex}
   .pm-item{display:flex;align-items:center;gap:12px;padding:11px 12px;min-height:44px;border-radius:10px;cursor:pointer;transition:.12s}
   .pm-item:hover{background:var(--hover)}
@@ -1453,8 +1454,8 @@
   /* 斜杠命令菜单 —— max-height 封顶防被 #hall(overflow:hidden)裁掉(遮挡), 溢出走 bindMenuTap 手动滚。
      touch-action:none: 原生触摸滚动交给 bindMenuTap 手动驱动(pointerdown 已 preventDefault 挡了原生滚动),
      两者并存会双倍滚; 关掉原生的, 只留手动, 滚动与"点选/滑动分离"判定同源、不打架。 */
-  .slash-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;background:var(--panel-solid);
-    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:35;box-shadow:0 20px 50px var(--shadow-lg);
+  .slash-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;
+    display:none;z-index:35;
     max-height:min(46vh,340px);max-height:min(46dvh,340px);overflow-y:auto;overscroll-behavior:contain;touch-action:none;-webkit-overflow-scrolling:touch;
     scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--cyan) 30%,transparent) transparent}
   /* ★细化滚动条: 默认原生滚动条在部分安卓/折叠屏渲染成一整根不透明深色粗条, 压住圆角很突兀。
@@ -1481,8 +1482,8 @@
   .eh-day-left.zero{color:var(--magenta);background:color-mix(in srgb,var(--magenta) 12%,transparent);border-color:color-mix(in srgb,var(--magenta) 30%,transparent)}
 
   /* @提及菜单(复用 slash-menu 定位)+ 候选项 */
-  .at-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;background:var(--panel-solid);
-    border:1px solid var(--line2);border-radius:14px;padding:6px;display:none;z-index:36;box-shadow:0 20px 50px var(--shadow-lg);
+  .at-menu{position:absolute;bottom:calc(100% + 10px);left:16px;right:16px;max-width:420px;
+    display:none;z-index:36;
     max-height:min(46vh,300px);max-height:min(46dvh,300px);overflow-y:auto;overscroll-behavior:contain;touch-action:none;-webkit-overflow-scrolling:touch}
   .at-menu.on{display:block}
   .at-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 11px;border-radius:9px;cursor:pointer;transition:.12s}
@@ -2272,7 +2273,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20261003-v98';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20261003-v100';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2593,8 +2594,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <div class="tool-btn" id="skinBtn" role="button" tabindex="0" aria-label="皮肤" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtn" role="button" tabindex="0" aria-label="个人空间" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMe"></span></div>
       </div>
-      <div class="skin-menu" id="skinMenu"></div>
-      <div class="skin-menu bgm-menu" id="bgmMenu"></div>
+      <div class="skin-menu eh-dropdown" id="skinMenu"></div>
+      <div class="skin-menu bgm-menu eh-dropdown" id="bgmMenu"></div>
     </div>
     <div class="sec-label"><span class="sl-t" data-txt="hallOfficial">📡 官方频道</span></div>
     <div class="channels" id="channels"></div>
@@ -2633,8 +2634,8 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
         <div class="tool-btn" id="skinBtnHall" role="button" tabindex="0" aria-label="皮肤" title="皮肤" data-txt-title="titleSkin">🎨</div>
         <div class="tool-btn me-avatar" id="meBtnHall" role="button" tabindex="0" aria-label="个人空间" title="个人空间" data-txt-title="titleProfile">🦊<span class="dm-dot" id="dmDotMeHall"></span></div>
       </div>
-      <div class="skin-menu hall-skin-menu" id="skinMenuHall"></div>
-      <div class="skin-menu hall-skin-menu bgm-menu" id="bgmMenuHall"></div>
+      <div class="skin-menu hall-skin-menu eh-dropdown" id="skinMenuHall"></div>
+      <div class="skin-menu hall-skin-menu bgm-menu eh-dropdown" id="bgmMenuHall"></div>
     </div>
     <div class="presence" id="presence"></div>
     <div class="stream" id="stream" role="log" aria-live="polite" aria-relevant="additions" aria-busy="false"></div>
@@ -2659,15 +2660,15 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
       </div>
       <button type="button" class="go" id="goBtn" style="display:none" aria-label="发送消息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
       <!-- ＋ 花样菜单: 三种特殊发言方式 -->
-      <div class="plus-menu" id="plusMenu">
+      <div class="plus-menu eh-dropdown" id="plusMenu">
         <div class="pm-item" id="pmVoice" role="button" tabindex="0" aria-label="语音留声"><span class="pm-ic">🎙️</span><span class="pm-tx"><b data-txt="modeVoiceTitle">语音留声</b><i data-txt="modeVoiceSub">按住录音，松手发送</i></span></div>
         <div class="pm-item" id="pmVoid" role="button" tabindex="0" aria-label="说给虚空"><span class="pm-ic"><span style="display:inline-block;transform:translateY(-3px)">🕳️</span></span><span class="pm-tx"><b data-txt="modeVoidTitle">说给虚空</b><i data-txt="modeVoidSub">匿名 · 5分钟后消散</i></span></div>
         <div class="pm-item" id="pmSong" role="button" tabindex="0" aria-label="文字神曲"><span class="pm-ic">🎵</span><span class="pm-tx"><b data-txt="modeSingTitle">文字神曲</b><i data-txt="modeSingSub">把输入的话，唱出来</i></span></div>
         <div class="pm-item" id="pmBottle" role="button" tabindex="0" aria-label="漂流瓶"><span class="pm-ic">🌊</span><span class="pm-tx"><b>漂流瓶</b><i>匿名 · 跨房随波漂流</i></span></div>
       </div>
       <div class="emoji-tray" id="emojiTray"></div>
-      <div class="slash-menu" id="slashMenu"></div>
-      <div class="at-menu" id="atMenu"></div>
+      <div class="slash-menu eh-dropdown" id="slashMenu"></div>
+      <div class="at-menu eh-dropdown" id="atMenu"></div>
     </form>
   </div>
 
@@ -2751,52 +2752,52 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
   };
 })();
 </script>
-<script defer src="./js/config.js?v=20261003-v98"></script>
-<script defer src="./js/config-runtime.js?v=20261003-v98"></script>
+<script defer src="./js/config.js?v=20261003-v100"></script>
+<script defer src="./js/config-runtime.js?v=20261003-v100"></script>
 <!-- 斗地主小游戏引擎(纯函数内核,客户端与未来 Edge 共用同一份) -->
-<script defer src="./js/games/deck.js?v=20261003-v98"></script>
+<script defer src="./js/games/deck.js?v=20261003-v100"></script>
 <!-- 牌桌内嵌聊天坞 + 弹幕(F2 边打边聊): 两桌共用, 须在 game-ui/guandan-ui 之前加载 -->
-<link rel="stylesheet" href="./js/games/table-shared.css?v=20261003-v98">
-<script defer src="./js/games/table-chat.js?v=20261003-v98"></script>
+<link rel="stylesheet" href="./js/games/table-shared.css?v=20261003-v100">
+<script defer src="./js/games/table-chat.js?v=20261003-v100"></script>
 <!-- 横竖屏切换(仍在聊天室内): 对牌桌浮层做 CSS rotate, 三款 UI 顶栏 ⟳ 钮调用 window.EHTableOrient -->
-<script defer src="./js/games/table-orient.js?v=20261003-v98"></script>
+<script defer src="./js/games/table-orient.js?v=20261003-v100"></script>
 <!-- 牌桌高光引擎(三游戏共用分级庆祝): 须先于三款 UI 就绪, UI showOver 读 window.EHTableFx -->
-<script defer src="./js/games/table-fx.js?v=20261003-v98"></script>
+<script defer src="./js/games/table-fx.js?v=20261003-v100"></script>
 <!-- 斗地主真人联机传输层(脱敏快照 · 防作弊): 必须先于 game-ui 加载, UI 启动时读 window.EHDdzNet -->
 <!-- 掼蛋(4 席 2 队 · 级牌/百搭 · 进贡): 与斗地主共用 deck.js -->
 <!-- 掼蛋真人联机传输层: 同样须先于 guandan-ui 加载, UI 读 window.EHGuandanNet -->
 <!-- 德州扑克(无限注 · 全局意识 AI · 5 灵魂性格): 与斗地主/掼蛋共用 deck.js -->
 <!-- 真人联机传输层必须先于 UI 加载，UI 启动时读取 window.EHPokerNet -->
-<script defer src="./js/games/table-net.js?v=20261003-v98"></script>
-<script defer src="./js/game-loader.js?v=20261003-v98"></script>
-<script defer src="./js/sfx-engine.js?v=20261003-v98"></script>
-  <script defer src="./js/modules/lobby.js?v=20261003-v98"></script>
-  <script defer src="./js/modules/gt-net.js?v=20261003-v98"></script>
-  <script defer src="./js/modules/score.js?v=20261003-v98"></script>
-<script defer src="./js/modules/auth.js?v=20261003-v98"></script>
-<script defer src="./js/modules/bgm.js?v=20261003-v98"></script>
-<script defer src="./js/modules/room.js?v=20261003-v98"></script>
-<script defer src="./js/modules/messages.js?v=20261003-v98"></script>
-<script defer src="./js/app.js?v=20261003-v98"></script>
-<script defer src="./js/keyboard.js?v=20261003-v98"></script>
-<script defer src="./js/boot.js?v=20261003-v98"></script>
-<script defer src="./js/dm.js?v=20261003-v98"></script>
+<script defer src="./js/games/table-net.js?v=20261003-v100"></script>
+<script defer src="./js/game-loader.js?v=20261003-v100"></script>
+<script defer src="./js/sfx-engine.js?v=20261003-v100"></script>
+  <script defer src="./js/modules/lobby.js?v=20261003-v100"></script>
+  <script defer src="./js/modules/gt-net.js?v=20261003-v100"></script>
+  <script defer src="./js/modules/score.js?v=20261003-v100"></script>
+<script defer src="./js/modules/auth.js?v=20261003-v100"></script>
+<script defer src="./js/modules/bgm.js?v=20261003-v100"></script>
+<script defer src="./js/modules/room.js?v=20261003-v100"></script>
+<script defer src="./js/modules/messages.js?v=20261003-v100"></script>
+<script defer src="./js/app.js?v=20261003-v100"></script>
+<script defer src="./js/keyboard.js?v=20261003-v100"></script>
+<script defer src="./js/boot.js?v=20261003-v100"></script>
+<script defer src="./js/dm.js?v=20261003-v100"></script>
 <!-- ============ 酷炫氛围特效 ============ -->
-<script defer src="./js/ambient-fx.js?v=20261003-v98"></script>
+<script defer src="./js/ambient-fx.js?v=20261003-v100"></script>
 <!-- 诊断层: 仅 ?debug=1 时启用, 页面右上角显示实时日志 -->
 <!-- debug-overlay 仍下线（V44 主人验收干净效果），需调试时取消注释
-<script defer src="./js/debug-overlay.js?v=20261003-v98"></script>
+<script defer src="./js/debug-overlay.js?v=20261003-v100"></script>
 -->
 <!-- ★键盘诊断浮层放回加载: 内部门禁(仅 ?kbdebug / localStorage / 安卓)才挂, 普通用户无感。
      此前它被整段注释掉 = 无论怎么刷都看不到浮层的真因。 -->
-<script defer src="./js/kbdebug.js?v=20261003-v98"></script>
+<script defer src="./js/kbdebug.js?v=20261003-v100"></script>
 <!-- ===== PWA v2 (重写): 注册 Service Worker ===== -->
-<script defer src="./js/sw-register.js?v=20261003-v98"></script>
+<script defer src="./js/sw-register.js?v=20261003-v100"></script>
 
 <!-- ===== PWA v2 (重写): 大厅底部"安装到桌面"按钮 + 版本号 ===== -->
-<script defer src="./js/pwa-install.js?v=20261003-v98"></script>
+<script defer src="./js/pwa-install.js?v=20261003-v100"></script>
 
-<script defer src="./js/pull-refresh.js?v=20261003-v98"></script>
+<script defer src="./js/pull-refresh.js?v=20261003-v100"></script>
 <!-- ★内联键盘探针(双保险): 内联=随导航请求走, 不受外部 js 文件持久缓存影响; 无条件执行, 必然显示。
      ?kbdebug 时在屏幕【顶部】显真机视口信号(键盘盖不到顶); 用于定位主聊天室"输入框被键盘遮"到底差在哪个信号。
      普通访问(无参数)完全不挂, 无感。带 ?nokbdebug 关闭。 -->
