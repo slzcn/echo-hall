@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v96';
+window.__EH_APP_VER = '20261003-v94';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3435,6 +3435,7 @@ function gtLaunchPokerLobby(row){
   const A0=gtSeatArrays(row);
   let lastHandWritten=-1;
   _gtActiveTable={id:row.id,host:true};
+  try{ pkPrefetchChips(A0.ids, 'nlhe'); }catch(_){}   // ★fix: 开桌批量预取灵魂/真人筹码, 避免退回本地账本
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,
     lobby:true, isHost:true, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
@@ -4092,7 +4093,9 @@ async function pkPrefetchChips(ids, game){
     if(!uids.length || !sb) return;
     const { data, error } = await sb.rpc('eh_chips_get_many', { p_uids: uids, p_game: game||'nlhe' });
     if(error) throw error;
-    if(data && typeof data==='object'){ Object.keys(data).forEach(u=>{ const v=Number(data[u]); if(Number.isFinite(v)) _pkChipCache.set(u, v); }); }
+    // ★fix: 不覆盖已有缓存 — pkSeatStacksWrite 已用运行时绝对值更新缓存,
+    //   异步预取可能读到旧 DB 值覆盖回正确的运行时值, 导致下一手 p.start 与 rec.chips 脱钩
+    if(data && typeof data==='object'){ Object.keys(data).forEach(u=>{ const v=Number(data[u]); if(Number.isFinite(v) && !_pkChipCache.has(u)) _pkChipCache.set(u, v); }); }
   }catch(e){ _ehCatch('pkPrefetchChips', e); }
 }
 // 牌桌每席买入: 我=本人账本; 有 uid 的灵魂/分身/远程真人=服务端权威筹码(缓存); 无 id 的匿名机器人=GRANT。
@@ -4107,7 +4110,10 @@ function pkSeatStackFor(seat, ctx){
     // 服务端权威筹码优先(T84): 预取缓存命中即用, 否则退本地账本(并顺手触发一次异步预取补缓存)
     if (_pkChipCache.has(id)) return Math.max(0, Math.round(_pkChipCache.get(id)));
     try{ pkPrefetchChips([id], 'nlhe'); }catch(_){}
-    return bankChipsOf('nlhe', id, GRANT);
+    // ★fix: 本地账本兜底加防膨胀上限 — 历史累积的脏值(localStorage) 不应作为买入,
+    //   超过 GRANT*10(50000) 视为脏数据, 回退 GRANT, 由后续 emitStacks 写回正确值
+    const _lb = bankChipsOf('nlhe', id, GRANT);
+    return (_lb > PK_WALLET_GRANT * 10) ? GRANT : _lb;
   }catch(_){ return GRANT; }
 }
 // 结算后写回全席筹码: 存真实值; chipsOf 读到 <买入门槛 时回补 1000(清零后从1000开始)。
@@ -4143,6 +4149,18 @@ function bumpSeatBanks(game, res, A){
       else if(game==='guandan'){ delta=d; won=(seat%2)===res.winnerTeam; }
       else if(game==='nlhe'){ delta=d; won=(res.winnersBySeat||[]).includes(seat); }
       if(id===myUid || (me && id===me.id)) bankBump(game, delta, won);
+      else if(game==='nlhe'){
+        // ★fix: 灵魂/远程真人 NLHE 筹码用绝对值写回(bankSetOf), 不用 delta 累加(bankBumpOf)。
+        //   bankBumpOf 以 rec.chips(本地账本) 为基准加 delta, 当 rec.chips ≠ p.start(引擎起始码)
+        //   ——因 pkPrefetchChips 未在开桌时批量预取, pkSeatStackFor 退回本地账本/异步预取竞态
+        //   导致缓存与本地账本不同步 —— 会算出 rec.chips + delta ≠ p.stack 的错误值。
+        //   常规手 showOver 不调 emitStacks(只在 nextHand 600ms 后调), 若用户在此间离开,
+        //   错误值残留在 localStorage 并跨会话累积 → 灵魂筹码滚到几十万。
+        //   改用 res.stacks[seat] 绝对值 bankSetOf, 幂等无累积, 不依赖 rec.chips 与 p.start 一致。
+        const stk=(res.stacks && typeof res.stacks[seat]==='number') ? res.stacks[seat] : null;
+        if(stk!=null) bankSetOf('nlhe', id, { chips: Math.max(0, Math.round(stk)) });
+        else bankBumpOf(game, id, delta, won);
+      }
       else bankBumpOf(game, id, delta, won);
     }
   }catch(e){ console.warn('[bank] seats', e&&e.message); }
@@ -4252,6 +4270,7 @@ async function gtLaunchPoker(row, resumeSnap){
     try{ toast('入座 '+_gchips+' 筹码(全部带入)', 1800); }catch(_){}
   }catch(e){ _ehCatch('gtBuyInFlow',e); }
   _gtMyFinalStack = _pkMyStack;
+  try{ await pkPrefetchChips(A.ids, 'nlhe'); }catch(_){}   // ★fix: 开桌批量预取灵魂/真人筹码, 避免退回本地账本
   _ehGame = window.EHPokerGame.open({
     scoreKey:'gtsc:'+row.id,   // 本桌累计记分持久化键(重进/刷新不清零)
     names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids,
@@ -10459,15 +10478,7 @@ function ixFloatUp(str, tx, ty){
 
 // ============ toast ============
 let toastT=null;
-let _lastToastMsg='', _lastToastT=0;
-function toast(msg, dur){
-  const s=String(msg==null?"":msg);
-  // ★v94 去重: 同文案 1.2s 内不重复弹(避免堆叠/闪烁); 默认 3s 自动消失(一次性通知语义)
-  const now=Date.now();
-  if(_lastToastMsg===s && now-_lastToastT<1200) return;
-  _lastToastMsg=s; _lastToastT=now;
-  const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(s)){ try{ EhSfx.play('error'); }catch(e){} } t.textContent=s; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'), dur||3000);
-}
+function toast(msg, dur){ const t=$('#toast'); if(/失败|错误|不支持|请先|无权限|err|fail/i.test(String(msg||''))){ try{ EhSfx.play('error'); }catch(e){} } t.textContent=String(msg==null?"":msg); t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'), dur||2600); }
 // 后端错误 → 友好中文: 只在后端返回的是中文说明时采用它, 否则用 fallback。防原始英文码
 // (unauthorized/forbidden/not_found 等)直接弹给用户(见截图)。
 function friendlyErr(raw, fallback){ return (raw && /[一-龥]/.test(String(raw))) ? String(raw) : (fallback||'操作失败，请重试'); }
