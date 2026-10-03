@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261003-v102';
+window.__EH_APP_VER = '20261003-v103';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3665,15 +3665,9 @@ async function _gtEnterPokerServer(row) {
   _gtActiveTable = {id: tableId, host: false};
   _setPokerState('guest', tableId);
 
+  // ★v103 乐观进入: 牌桌 UI 先挂起(不等筹码 RPC), 后台读 eh_chips 更新 _gtMyFinalStack;
+  //   真实 stack 由首帧快照覆盖(见 rebuildFromSnap), 招募态短暂显示初始授权额(PK_WALLET_GRANT)无实质影响。
   var _pkMyStack = PK_WALLET_GRANT;
-  try {
-    // ★v84 fix: 服务端模式筹码权威在 Edge Function(读写 eh_chips 表)。旧路径 gtFetchGlobalChips
-    //   会调 eh_get_or_refill_chips 清零的是【eh_user_stats.chips】(另一张表), 与 Edge Function 用的
-    //   eh_chips 不是一个账户 — 进桌清零 eh_user_stats、离桌 gtSettleChipsToGlobal 又往 eh_user_stats
-    //   delta 累加, 既不动 eh_chips 反而把 eh_user_stats 改脏。这里只读 eh_chips 展示, 真实 stack 由快照覆盖。
-    var _gchips = await gtReadChipsReadOnly();
-    _pkMyStack = _gchips;
-  } catch(e) { _ehCatch('gtBuyInFlow', e); }
   _gtMyFinalStack = _pkMyStack;
 
   _ehGame = window.EHPokerGame.open({
@@ -3732,6 +3726,8 @@ async function _gtEnterPokerServer(row) {
       _gtCleanupPlay();
     },
   });
+  // ★v103 后台读真实筹码(不阻塞 UI 挂起); 到账后更新 _gtMyFinalStack 供离桌结算, 真实 stack 由首帧快照覆盖。
+  gtReadChipsReadOnly().then(function(_gchips){ _gtMyFinalStack = _gchips; }).catch(function(e){ _ehCatch('gtBuyInFlow', e); });
   _gtStartTurnAlert();
   _gtPokerBindUnload(tableId);
   // ★v82 无房主服务端模式: 进桌后触发 start_hand(Edge Function 发牌+广播脱敏快照)。
@@ -9604,10 +9600,12 @@ async function launchTexas(){
       return;
     }
     if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-      // ★v92: 不再先进招募态(v91 _gtPokerEnter 走 guest 路径, 引擎持有者无 host 权威, 卡在废弃招募页)。
-      //   直接 gtStart: 补灵魂→eh_gt_start 转 playing→gtLaunchLocal→gtLaunchPoker(host 路径)
-      //   进牌桌 playing 态(有底牌/操作按钮/筹码), 招募页完全跳过。
-      //   补灵魂(200-500ms*批次)与开局 RPC 在后台进行, 完成后自动落牌桌 playing 态。
+      // ★v103 乐观进入: 点 /德州 后立刻落牌桌 UI(招募态, 显示"正在开桌…"), 不等补灵魂/开局 RPC。
+      //   gtLaunchLocal→gtLaunchPoker→_gtEnterPokerServer 同步挂起牌桌(lobby 态), 用户瞬间看到牌桌;
+      //   后台再跑 gtStart(补灵魂→eh_gt_start 转 playing→start_hand 发牌)。
+      //   牌桌 UI 已挂起后(_gtActiveTable.id===id), gtStart 走 gtPokerAction(start_hand) 分支不重复挂桌,
+      //   由 realtime broadcast 'snap' 自动把 UI 从 lobby 转 playing(见 applySnapshot)。
+      try{ gtLaunchLocal(row); }catch(e){ _ehCatch('gtLaunchEarly', e); }
       // 后台贴牌桌卡(留档 + 供房里其他真人点卡加入)。★v91 卡片幂等: 同 table_id 已有卡则跳过,
       //   防止任何竞态/重入产生第二条卡(buildGameEl 已写 data-gt-id, 此处再校验一道)。
       (async function _postCard(){
@@ -9620,8 +9618,8 @@ async function launchTexas(){
           if(data){ if(el) el.dataset.mid=data.id; await sb.rpc('eh_gt_set_msg',{p_table:row.id,p_msg:data.id}); }
         }catch(e){ console.warn('[gt] post table card failed', e); }
       })();
-      // 后台开局: 补灵魂→eh_gt_start 转 playing→gtLaunchLocal→gtLaunchPoker(host 路径)进牌桌。
-      //   ★v92: gtLaunchLocal 已修(引擎持有者走 gtLaunchPoker host 路径, 不再走 _gtPokerEnter guest 路径)。
+      // 后台开局: 补灵魂→eh_gt_start 转 playing→start_hand 发牌(牌桌 UI 已由上方 gtLaunchLocal 挂起,
+      //   由 realtime broadcast 'snap' 自动转 playing; gtStart 走 _gtActiveTable 分支不重复挂桌)。
       gtStart(row.id).catch((e)=>{ _ehCatch('gtLaunchStart', e); try{ toast('开局失败，请重试'); }catch(_){} });
     }
   }finally{ _gtLaunching=false; }
@@ -9677,9 +9675,9 @@ async function gtSeatSoulsIntoEmpties(row){
         try{ await gtRpc('eh_gt_seat_soul',{p_table:row.id,p_seat:empties[ei],p_soul:souls[ei].auth_uid}); n++; origins.push(souls[ei].auth_uid);
           // ★v82 不再在此嵌套触发 gtStart: gtStart 已 await 本函数, 嵌套会与 eh_gt_start 竞态锁死 lobby→playing 使后续灵魂无法入座。
         }catch(_){}
-        if(i<bs-1) await _sleep(200+Math.random()*300);   // 批次内随机间隔
+        if(i<bs-1) await _sleep(50+Math.random()*80);   // ★v103 批次内随机间隔(缩短: UI 已挂起, 不必模拟慢走, 加速开局)
       }
-      if(ei<empties.length&&ei<souls.length&&ei<soulCap) await _sleep(200+Math.random()*300);   // 批次间随机间隔
+      if(ei<empties.length&&ei<souls.length&&ei<soulCap) await _sleep(50+Math.random()*80);   // ★v103 批次间随机间隔(缩短, 同上)
     }
   }finally{ _gtSoulBatchActive=false; }
   // pass2: 真灵魂坐完仍有空位 → 借在场灵魂身份克隆"分身"填满(灵魂分身, 非匿名机器人)。德州跳过, 空位留给真人+host AI。
