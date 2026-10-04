@@ -267,7 +267,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-me .pk-hole .card.justdealt::after{content:'';position:absolute;inset:2px;border-radius:inherit;
   background:linear-gradient(180deg,transparent 35%,color-mix(in srgb,var(--accent) 32%,transparent));animation:pkDealTrail .34s ease forwards;pointer-events:none}
 .pk-cd{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
-.pk-mini-hole{display:flex;gap:2px;margin-top:1px;min-height:1px}
+.pk-mini-hole{display:flex;gap:5px;margin-top:1px;min-height:1px}
 .pk-mini-hole .card{margin:0}
 /* "我"的桌底座位(pk-me-seat): 底牌正面朝上, 比对手牌背大且带花色可读; 头像点青光 + 名字点青, 一眼认出"这是你" */
 .pk-me-seat .pk-avr .av{box-shadow:0 0 0 2px var(--accent),0 0 12px color-mix(in srgb, var(--accent) 35%, transparent)}
@@ -279,7 +279,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-me-seat .stk{margin:1px 0 2px;font-size:12px}
 /* "我"的底牌: 放大到可读尺寸, 去掉角标花色(.cs)——30px 小牌上"角标rank+角标花色+居中大花色"三元素挤成一坨(主人反馈"元素都叠一起了");
  *   只留【左上角 rank + 居中大花色】= 干净的标准读法, 两张牌间距也拉开。 */
-.pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:7px;margin-top:2px}
+.pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:5px;margin-top:2px}
 .pk-my-hole .card{box-shadow:0 3px 8px rgba(0,0,0,.5)}
 .pk-my-hole .card .cn{top:3px;left:5px}
 .pk-my-hole .card .cs{display:none}
@@ -469,7 +469,7 @@ html[data-mode="day"] .pk-winline .pk-wc{color:inherit}
 .pk-over .pk-showrows .mk{text-align:center;font-size:13px}
 .pk-over .pk-showrows .nm{justify-self:start;white-space:nowrap;font-weight:600}
 .pk-over .pk-showrows .nm.won{color:var(--ink)}
-.pk-over .pk-showrows .cd{display:inline-flex;gap:3px;justify-self:center}
+.pk-over .pk-showrows .cd{display:inline-flex;gap:5px;justify-self:center}
 .pk-over .pk-showrows .hn{justify-self:end;color:var(--amber);font-weight:700;font-size:11.5px}
 .pk-over .pk-showrows .pk-foldwin{grid-column:1/-1;text-align:center;color:var(--ink)}
 /* 成手高亮: 赢家最优 5 张(公共牌+底牌)镶金框, 一眼看清靠哪几张赢 */
