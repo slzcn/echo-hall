@@ -508,7 +508,7 @@
       const P=window.EhAudioPrefs;
       panel=document.createElement('div');
       // ★T93 完全 copy 聊天室 .skin-menu 结构, 交互与显示一致(不加"音效"标题头)
-      panel.className='skin-menu eh-audio-float on';
+      panel.className='skin-menu eh-audio-float eh-dropdown on';
       // 音效档三分开关互不干扰(背景音乐已拆到独立按钮, 不在此面板): 关谁只停谁
       panel.appendChild(row('🔔 音效',   ()=>P.sfx(),   v=>P.setSfx(v),   repaint));
       panel.appendChild(row('📳 震动',   ()=>P.haptic(),v=>P.setHaptic(v),repaint));
@@ -521,7 +521,7 @@
       left=Math.max(8,left);
       let top=ar.bottom+8;
       if(top+pr.height>window.innerHeight-8) top=Math.max(8, ar.top-pr.height-8);
-      panel.style.cssText='left:'+left+'px;top:'+top+'px';
+      panel.style.cssText='position:fixed;left:'+left+'px;top:'+top+'px;z-index:80;right:auto';
       curAnchor=anchor;
       onDoc=(e)=>{ if(panel && !panel.contains(e.target) && e.target!==anchor && !anchor.contains(e.target)) close(); };
       setTimeout(()=>{ try{ document.addEventListener('pointerdown', onDoc, true); }catch(e){} },0);
