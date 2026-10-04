@@ -1856,7 +1856,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function showWinBanner(html, win){
       hideWinBanner();
       const b=document.createElement('div');
-      b.className='pk-winline'+(win?' win':'');
+      b.className='pk-winline eh-dropdown'+(win?' win':'');
       b.innerHTML=html;
       els.felt.appendChild(b);
       _winBanner=b;
