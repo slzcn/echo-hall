@@ -308,23 +308,23 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 /* 结算浮层带推池动画时: 前 ~330ms 保持透明, 让底池筹码在可见绒面上飞向赢家, 之后再淡入盖住 */
 .pk-over.payout-in{animation:pkOverPayoutIn .58s ease both}
 @keyframes pkOverPayoutIn{0%,56%{opacity:0}100%{opacity:1}}
-/* 桌面赢家横幅(单机常规手替代结算弹窗): 居中一行, 弹入停留→随自动发牌淡出。z 低于卡牌高亮, 不挡摊牌牌面。
-   ★top 从 14% 下移到 26%: 14% 正压顶部中央席(对手数为奇数时 deg=90 那席落在 cx50%/cy14%),
-   摊牌时横幅与该席头像/名字/气泡重叠(实测重叠~11px)。26% 落在"顶席气泡(~18%)"与"公共牌区(~40%)"之间的空档, 两不相撞。 */
-.pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
+/* 桌面赢家横幅(单机常规手替代结算弹窗): 居中一行轻量小字, 弹入停留→随自动发牌淡出。
+   ★v109: 去掉暗色胶囊背景/阴影/模糊(原浮层遮罩挡摊牌牌面), 改纯文字 + text-shadow, 不遮挡牌桌内容。
+   z-index 降到 4(低于卡牌高亮与座位), top 26% 落在顶席气泡与公共牌区之间的空档, 两不相撞。 */
+.pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:4;pointer-events:none;
   font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:normal;max-width:92vw;text-align:center;
-  padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
-  border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
-  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
-.pk-winline.win{color:var(--amber);border-color:color-mix(in srgb, var(--amber) 50%, transparent);box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 22px color-mix(in srgb, var(--amber) 28%, transparent)}
+  padding:0;text-shadow:0 2px 10px rgba(0,0,0,.75),0 0 6px rgba(0,0,0,.5);
+  animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
+.pk-winline.win{color:var(--amber);text-shadow:0 0 12px color-mix(in srgb,var(--amber) 55%,transparent),0 2px 8px rgba(0,0,0,.6)}
 .pk-winline.out{animation:pkWinOut .24s ease forwards}
-html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(234,244,244,.92));border-color:var(--line2,color-mix(in srgb, var(--accent) 42%, transparent));box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 14px color-mix(in srgb, var(--accent) 10%, transparent)}
-html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rgba(200,137,46,.55);box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 18px rgba(200,137,46,.22)}
+html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);text-shadow:0 2px 8px rgba(255,255,255,.85),0 0 5px rgba(255,255,255,.6)}
+html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);text-shadow:0 0 12px rgba(200,137,46,.5),0 2px 6px rgba(255,255,255,.7)}
 @keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
 .pk-winline .pk-wc{font-size:13px;font-weight:700;color:inherit}
-.pk-winline .pk-go{pointer-events:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:transparent;border:1px solid color-mix(in srgb,var(--ink) 26%,transparent);padding:3px 12px;border-radius:999px;cursor:pointer;opacity:.75;-webkit-tap-highlight-color:transparent}
+.pk-winline .pk-go{pointer-events:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:color-mix(in srgb,var(--ink) 12%,transparent);border:1px solid color-mix(in srgb,var(--ink) 26%,transparent);padding:3px 12px;border-radius:999px;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent}
 .pk-winline .pk-go:hover{opacity:1;border-color:color-mix(in srgb,var(--ink) 45%,transparent)}
 html[data-mode="day"] .pk-winline .pk-wc{color:inherit}
+html[data-mode="day"] .pk-winline .pk-go{color:var(--ink,#0c312e);background:rgba(255,255,255,.5);border-color:color-mix(in srgb,var(--ink,#0c312e) 30%,transparent)}
 @keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
@@ -2551,11 +2551,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           emitWallet();
           if (minimized) updateChip();
           // 自动发下一手: host 到点 nextHand; 客人等权威快照(applySnapshot 会清横幅接下一手)
-          // ★v95: 结算停留 5s 让玩家看清赢家/牌型/筹码/底牌(摊牌牌面已铺在各席); 「继续 ▶」可提前发下一手
+          // ★v109: 结算停留 3s(原 5s 太久), 让玩家看清赢家/牌型/筹码/底牌(摊牌牌面已铺在各席); 「继续 ▶」可提前发下一手
           // journey-exempt: 再来一局直进(延迟缩短) — 复用 journey-poker-play 覆盖
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
           if (!isGuest){
-            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 5000);
+            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 3000);
           }
           return;
         }
@@ -2699,14 +2699,14 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       else if(delta<0){ sfx('void'); }
 
       // host(单机/联机)常规: 倒计时结束全自动开下一手(无手动按钮; "收工"可停)。
-      //   ★v95: 统一停 5s 让玩家读摊牌结算。破产离桌不自动进下一手。
+      //   ★v109: 统一停 3s 让玩家读摊牌结算。破产离桌不自动进下一手。
       // autoT 提升为 room 级 overTimer(见 clearTimers): 若 close() 在结算倒计时中被外部调用(app.js gtClose),
       //   本地 autoT 曾残留继续 nextHand() 打到已 detach 的 DOM 上、永远重排 —— 现在 clearTimers 会一并清掉。
       function stopAuto(){ if(overTimer){ clearInterval(overTimer); overTimer=null; } }
       stopAuto();
       if (!isGuest && !matchOver){
-        // ★v95: 结算停留 5s(原联机 4s / 单机 3s), 让玩家看清赢家牌型/筹码/摊牌底牌后自动发下一手。
-        let left = 5;
+        // ★v109: 结算停留 3s, 让玩家看清赢家牌型/筹码/摊牌底牌后自动发下一手。
+        let left = 3;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         overTimer=setInterval(()=>{
           left--;
@@ -2969,6 +2969,9 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     // ── guest 端: 收公共快照 / 收自己底牌 → 组伪状态渲染(全程不碰引擎权威) ──
     function feedHand(cards){
+      // ★v109: 收到新底牌=新一手铁证, 强制清零 preAct, 不依赖 applySnapshot 的 handNo 比对时序
+      // (安卓 PWA 后台/前台切换时快照可能迟到或乱序, 仅靠 handNo!==prevHand 清零会被跳过 → 预选中残留到下一手)。
+      preAct=null;
       myHole = (cards||[]).map(c => (typeof c==='string') ? idCard(c)
         : (c && c.rank!=null ? Engine.pokerCard(c.rank, c.suit) : null)).filter(Boolean);
       if (isGuest && lastSnap) rebuildFromSnap(lastSnap);
