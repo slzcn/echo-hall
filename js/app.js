@@ -3572,6 +3572,7 @@ function gtPullHoleCards(tableId, tries) {
     var data = result.data, error = result.error;
     if (error) { console.warn('[nlhe] hole cards', error.message); return; }
     var cards = (data && data.cards) || [];
+    if (_ehGame && _ehGame.clearPreAct) _ehGame.clearPreAct();
     if (_ehGame && _ehGame.feedHand) _ehGame.feedHand(cards);
     if ((!cards || !cards.length) && _ehGame && typeof _ehGame.needsHand === 'function' && _ehGame.needsHand() && tries < 5) {
       setTimeout(function() { gtPullHoleCards(tableId, tries + 1); }, 350);
@@ -4663,6 +4664,7 @@ async function _gtEnterPokerV2(row){
   const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
   const pull=(tries)=>{ tries=tries||0; sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
       if(error){ console.warn('[nlhe] my hand', error.message); return; }
+      if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
       if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(data||[]);
       // ★v74fix: 拉到空手牌但引擎仍需要底牌(新一手已发给我)→ 短延时重拉, 给 host 的 set_hands 落库时间。
       //   原 pull 只在新一手快照到时拉一次, 与 host 写库竞态拉空 → 看不到底牌/操作按钮迟迟不出现; 重试自愈。
@@ -4904,6 +4906,7 @@ async function gtEnterGuandan(row){
         const h=data||[];
         // 手牌行还没写好(张数对不上期望) → 短延时自愈重拉, 最多 4 次
         if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
+        if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
         if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
       }, ()=>{});
     }; go(); };
@@ -5011,6 +5014,7 @@ async function gtEnterDdz(row){
         if(error){ console.warn('[ddz] my hand', error.message); return; }
         const h=data||[];
         if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
+        if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
         if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
       }, ()=>{});
     }; go(); };
