@@ -24,7 +24,7 @@
   'use strict';
   const Engine = root.EHPokerEngine, AI = root.EHPokerAI, Eval = root.EHPokerEval;
 
-  const HUMAN_ACT_MS = 30000; // ★v89: 30s 倒计时(对齐服务端 TURN_DEADLINE_MS, 任务需求)
+  const HUMAN_ACT_MS = 15000; // 15s 倒计时(对齐任务需求, 原 30s 太长)
   // 灵魂"思考→出手"时长: 2.2~7s 人类般节奏(旧 0.9~1.8s 太快, 环刚亮就消失像"从1s起")。
   //   这是真正出手的时刻; 座位倒计时环另按满格 ACT_MS 显示(见 armTurn turnDur), 到点前出手→环随回合切换重置。
   const AI_MIN_MS = 2200, AI_JIT_MS = 4800;
@@ -312,13 +312,12 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
    摊牌时横幅与该席头像/名字/气泡重叠(实测重叠~11px)。26% 落在"顶席气泡(~18%)"与"公共牌区(~40%)"之间的空档, 两不相撞。 */
 .pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
   font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:nowrap;
-  padding:7px 18px;border-radius:999px;background:linear-gradient(180deg,rgba(19,42,41,.92),rgba(6,12,18,.9));
-  border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+  padding:7px 18px;border-radius:999px;
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
-.pk-winline.win{color:var(--amber);border-color:color-mix(in srgb, var(--amber) 50%, transparent);box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 22px color-mix(in srgb, var(--amber) 28%, transparent)}
+.pk-winline.win{color:var(--amber)}
 .pk-winline.out{animation:pkWinOut .24s ease forwards}
-html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(234,244,244,.92));border-color:var(--line2,color-mix(in srgb, var(--accent) 42%, transparent));box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 14px color-mix(in srgb, var(--accent) 10%, transparent)}
-html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);border-color:rgba(200,137,46,.55);box-shadow:0 6px 20px color-mix(in srgb, var(--accent) 16%, transparent),0 0 18px rgba(200,137,46,.22)}
+html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e)}
+html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E)}
 @keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
 @keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
@@ -1912,7 +1911,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function showWinBanner(html, win){
       hideWinBanner();
       const b=document.createElement('div');
-      b.className='pk-winline'+(win?' win':'');
+      b.className='pk-winline eh-dropdown'+(win?' win':'');
       b.innerHTML=html;
       els.felt.appendChild(b);
       _winBanner=b;
@@ -2608,7 +2607,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           // journey-exempt: 再来一局直进(延迟缩短) — 复用 journey-poker-play 覆盖
           if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; }
           if (!isGuest){
-            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 600);
+            overTimer = setTimeout(()=>{ overTimer=null; hideWinBanner(); nextHand(); }, 3000);
           }
           return;
         }
@@ -2759,7 +2758,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       stopAuto();
       if (!isGuest && !matchOver){
         // 多局连打提速: 结算只停够看清赢家(联机 4s 让多名真人读摊牌 / 单机 3s 读净盈亏+摊牌), 到点即自动发下一手。
-        let left = (remoteSeats.length>0) ? 4 : 3;
+        let left = 3;
         const cd=over.querySelector('#pkCd'); if(cd) cd.textContent='('+left+'s)';
         overTimer=setInterval(()=>{
           left--;
@@ -3100,7 +3099,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, lastSnap:()=>lastSnap,
       // T89.2 牌桌显示发言气泡: 按 uid 找座位冒气泡(房间消息 realtime 到达时 app.js 调用, 让游戏内也看得到聊天)
       sayByUid:(uid, msg, name)=>{ try{ if(!msg) return false; if(uid&&ids){ for(let i=0;i<ids.length;i++){ if(ids[i]===uid){ say(i, String(msg).slice(0,60)); return true; } } } const nm=String(name||''); if(nm){ for(let i=0;i<st.players.length;i++){ const p=st.players[i]; if(p&&p.name===nm){ say(i, String(msg).slice(0,60)); return true; } } } }catch(_){} return false; },
-      applyMove, resync, applySnapshot, feedHand, needsHand, updateRoster, mySeat:()=>mySeat,
+      applyMove, resync, applySnapshot, feedHand, clearPreAct:()=>{ preAct=null; try{ renderActs(); }catch(_){} }, needsHand, updateRoster, mySeat:()=>mySeat,
       setConn, connState:()=>connState, setOfflineUids,
       isSpectating:()=>spectating,
       // 主动离座旁观: 必须真进 spectating(旧实现只 idleOut, resumeSeat 永不触发 onSeatResume)
