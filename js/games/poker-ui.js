@@ -1888,6 +1888,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const seat=st.toAct;
       // 旁观中: msg 标出旁观态, 同时保留「轮到谁/谁思考中」跟上牌局节奏
       const specTag = (spectating||mySeat<0) ? '🔭 旁观中 · ' : '';
+      // ★v108: 旁观态只提示"点空位可入座"(底部坐下按钮已删, 入座靠点空位)
+      if (spectating||mySeat<0){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+'🔭 旁观中 · 点空位可入座'; return; }
       // ★T92 提示统一到顶部: 我已弃牌/已全下 的状态在顶部说一次(底部不再重复 waitbar 文案)
       const meP=(mySeat>=0)?st.players[mySeat]:null;
       if(meP && meP.folded){ els.msg.className='pk-msg'; els.msg.innerHTML=cp+specTag+'🏳️ 已弃牌 · 观战中'; return; }
@@ -2029,20 +2031,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       room.classList.toggle('pk-spectating', !!(spectating||mySeat<0));
       if (st.phase==='lobby'){ _lastActsSig='lobby'; renderLobbyCtrl(); return; }
       const p = (mySeat>=0) ? st.players[mySeat] : null;
-      // 旁观(已让座): 显示坐下入口, 无操作键 —— 不是 AI 代打
+      // ★v108: 旁观(已让座)底部不再放"坐下"按钮(入座靠点空位), 只留同高禁用骨架
       if (spectating || mySeat<0){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        // ★T92 提示统一到顶部: 底部只放按钮(坐下), 不再重复"旁观中"文案
-        els.acts.innerHTML = `
-        <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
-        <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
-        <div class="pk-row">
-          <button class="pk-b fold" disabled>弃牌</button>
-          <button class="pk-b call" id="pkResume">🪑 坐下</button>
-          <button class="pk-b raise" disabled>加注</button>
-        </div>`;
-        const rb=$('#pkResume'); if(rb) bindTap(rb, ()=>{ if (onGrabSeat){ onGrabSeat(); } else { resumeSeat(); } });
+        els.acts.innerHTML = actsWaitBar();
         return;
       }
       const offline = isGuest && connState!=='online';
