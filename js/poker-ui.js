@@ -267,7 +267,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-me .pk-hole .card.justdealt::after{content:'';position:absolute;inset:2px;border-radius:inherit;
   background:linear-gradient(180deg,transparent 35%,color-mix(in srgb,var(--accent) 32%,transparent));animation:pkDealTrail .34s ease forwards;pointer-events:none}
 .pk-cd{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
-.pk-mini-hole{display:flex;gap:2px;margin-top:1px;min-height:1px}
+.pk-mini-hole{display:flex;gap:5px;margin-top:1px;min-height:1px}
 .pk-mini-hole .card{margin:0}
 /* "我"的桌底座位(pk-me-seat): 底牌正面朝上, 比对手牌背大且带花色可读; 头像点青光 + 名字点青, 一眼认出"这是你" */
 .pk-me-seat .pk-avr .av{box-shadow:0 0 0 2px var(--accent),0 0 12px color-mix(in srgb, var(--accent) 35%, transparent)}
@@ -279,7 +279,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-me-seat .stk{margin:1px 0 2px;font-size:12px}
 /* "我"的底牌: 放大到可读尺寸, 去掉角标花色(.cs)——30px 小牌上"角标rank+角标花色+居中大花色"三元素挤成一坨(主人反馈"元素都叠一起了");
  *   只留【左上角 rank + 居中大花色】= 干净的标准读法, 两张牌间距也拉开。 */
-.pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:7px;margin-top:2px}
+.pk-my-hole{--cw:38px;--ch:52px;--cn:17px;--cc:24px;gap:5px;margin-top:2px}
 .pk-my-hole .card{box-shadow:0 3px 8px rgba(0,0,0,.5)}
 .pk-my-hole .card .cn{top:3px;left:5px}
 .pk-my-hole .card .cs{display:none}
@@ -442,7 +442,7 @@ html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E)}
    内容矮时垂直居中, 内容高时可滚动且首尾都够得着(flex 里唯一不裁切的居中写法, 优于 justify-content:center)。 */
 .pk-over{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   background:radial-gradient(ellipse at 50% 40%,rgba(6,14,20,.72),rgba(3,5,10,.9));backdrop-filter:blur(5px);animation:pkRoomIn .2s;padding:16px;box-sizing:border-box;text-align:center}
-.pk-over-card{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);box-sizing:border-box;
+.pk-over-card{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:min(340px,92%);max-height:85vh;overflow-y:auto;box-sizing:border-box;
   padding:22px 20px 18px;border-radius:20px;animation:pkOverCard .28s cubic-bezier(.2,.9,.3,1) both;
   background:linear-gradient(180deg,rgba(19,42,41,.66),rgba(6,12,18,.72));border:1px solid var(--line2,color-mix(in srgb, var(--accent) 40%, transparent));
   box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
