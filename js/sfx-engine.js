@@ -495,7 +495,9 @@
       const sw=document.createElement('span'); sw.className='ck';
       const paint=()=>{ const on=get();
         sw.textContent=on?'✓':'';
-        sw.classList.toggle('on', !!on);
+        // ★fix: 对齐聊天室 .skin-opt 规范——.ck 的 opacity 由父级 .active 控制
+        //   (.skin-opt.active .ck{opacity:1}), 旧版 toggle 'on' 在 .ck 上无对应 CSS, 勾号始终不可见。
+        r.classList.toggle('active', !!on);
       };
       paint();
       r.appendChild(sw);
