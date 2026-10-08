@@ -2076,7 +2076,12 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       aiStep(seat);
     }
 
+    let _lastCtrlSig='';
     function renderCtrl(){
+      // ★T94 签名护栏: 状态未变跳过重建(出牌后每秒 renderAll 不再白白重建操作区)
+      const _sig=[spectating, st.phase, st.turn, connState, (st.table&&st.table.lastPlay&&st.table.lastPlay.seat), selected.size].join('|');
+      if(_sig===_lastCtrlSig) return;
+      _lastCtrlSig=_sig;
       if (spectating){
         els.ctrl.innerHTML=`<div class="gd-acts"><span class="eh-spectate-tag">🔭 旁观中 · 已让座</span><button class="gd-btn primary" id="gdResume">🪑 坐下</button></div>`;
         const rb=$('#gdResume'); if(rb) bindTap(rb, ()=>{ if (onGrabSeat){ onGrabSeat(); } else { resumeSeat(); } });

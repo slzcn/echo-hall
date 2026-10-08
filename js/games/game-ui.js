@@ -1822,7 +1822,12 @@ html[data-mode="day"] .ddz-felt::before{
       sfx('deal'); broadcast(); renderAll();
       startRematch._busy = false;
     }
+    let _lastCtrlSig='';
     function renderCtrl(){
+      // ★T94 签名护栏: 状态未变跳过重建(出牌后每秒 renderAll 不再白白重建操作区)
+      const _sig=[winReveal, st.phase, st.turn, connState, spectating, selected.size].join('|');
+      if(_sig===_lastCtrlSig) return;
+      _lastCtrlSig=_sig;
       if (winReveal){ els.ctrl.innerHTML = ''; return; }   // 制胜亮牌过渡: 先不弹"再来一局/返回房间", 让制胜手安静亮一拍
       if (st.phase === 'lobby'){ renderLobbyCtrl(); return; }
       if (st.phase === 'over'){ renderOverCtrl(); return; }
