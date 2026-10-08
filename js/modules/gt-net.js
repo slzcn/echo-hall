@@ -39,19 +39,21 @@
       };
       try {
         if (!rpc || !tableId) { sendBc('bc'); return; }
+        // ★T95 乐观发送: 广播先行(消掉 RPC 往返的串行延迟, guest 出牌体感减半),
+        //   RPC 放后台跑做 JWT→座位绑定校验 + eh_logs 审计。host 的 acceptMove 用 uid 重映射兜底
+        //   (gtAcceptRemoteAct 先按 uid 认座位, 合法玩家 uid 必匹配 → 立即放行), 非伪造者零等待。
+        sendBc('bc');
         rpc(tableId, seat, move).then(function (res) {
           var data = res && res.data;
           var err = res && res.error;
-          if (err) { sendBc('bc'); return; }
+          if (err) return;                       // RPC 失败只丢审计, 动作已送达 host(已校验), 不回滚
           if (data && data.ok === false) {
-            // RPC 校验没过(座位写错/状态漂移)也回退 broadcast: uid 还会对, host 按 uid 认座位;
-            //   一刀切 return 会让客人干等 8s 超时再弹「出牌没成功」。
-            sendBc('bc');
+            // JWT 绑座失败(真正伪造/席位已重分配): host 端 uid 重映射已拦伪造, 这里仅审计记录
+            try { if (console && console.debug) console.debug('[gt-net] act audit rejected', data.error); } catch (e) {}
             return;
           }
-          // RPC 成功: 标记 via=rpc, host 可据此收紧密性
-          sendBc('rpc');
-        }, function () { sendBc('bc'); });
+          // RPC 成功: 审计记账完成(动作已即时生效, 无需补发)
+        }, function () { /* RPC 网络失败: 同上, 动作已送达, 静默丢审计 */ });
       } catch (e) { sendBc('bc'); }
     }
     // host 侧 act 授权(支持 requireViaRpc: 有 via 字段时只认 rpc, 兼容旧客户端无 via)

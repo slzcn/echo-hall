@@ -1200,9 +1200,6 @@ function gtGuestSendAct(chan, tableId, seat, move){
   const sendBc = function(){
     try{ chan.send({type:'broadcast',event:'act',payload:{seat:seat, move:move, uid:myUid}}); }catch(e){ _ehCatch('gtGuestSendAct', e); window.ehReportError('manual', 'guest_action_failed', { action: move, error: e && e.message }); }
   };
-  // ★fix: 引擎转移窗口(host 离场→新 host 接管约1-3s)内 guest 发出的 action 可能被拒/超时。
-  //   connState===host_offline 或 RPC 被拒时, 不立刻报错, 等2s重发一次; 仍失败才 toast。免客人误以为出牌失败。
-  const _transferInProgress = function(){ try{ return _ehGame && _ehGame.connState && _ehGame.connState()==='host_offline'; }catch(_){ return false; } };
   if (_EH_GT_NET){
     _EH_GT_NET.sendAct(chan, tableId, seat, move, myUid, function(tid, st, mv){
       if (!sb || !sb.rpc) return Promise.reject(new Error('no-rpc'));
@@ -1213,32 +1210,28 @@ function gtGuestSendAct(chan, tableId, seat, move){
   const _doRpc = function(retries){
     try{
       if (!sb || !sb.rpc || !tableId){ sendBc(); return; }
+      // ★T95 乐观发送: 广播先行(消掉 RPC 往返串行延迟), RPC 放后台做 JWT→座位校验+审计。
+      //   host 的 acceptMove 用 uid 重映射兜底, 合法玩家零等待; RPC 失败只丢审计不回滚(host 已校验)。
+      sendBc();
       sb.rpc('eh_gt_act', { p_table: tableId, p_seat: seat, p_move: move || null })
         .then(function(res){
           var data = res && res.data;
           var err = res && res.error;
           if (err){
             console.warn('[gt] eh_gt_act rpc', err.message);
-            if (retries > 0 && _transferInProgress()){ setTimeout(function(){ _doRpc(retries-1); }, 2000); return; }
-            sendBc();
-            return;
+            return;   // 审计失败, 动作已送达 host(已校验), 不重发
           }
           if (data && data.ok === false){
-            // 引擎转移窗口内被拒 → 等2s重试一次, 仍被拒才报错
-            // journey-exempt: 文案一致性 — journey-ui-consistency.js
-            if (retries > 0 && _transferInProgress()){ setTimeout(function(){ _doRpc(retries-1); }, 2000); return; }
-            try{ toast('出牌没成功，请再试一次'); }catch(_){ _ehCatch('gtActReject',_); }
+            // JWT 绑座失败(真正伪造/席位已重分配): host 端 uid 重映射已拦伪造, 仅审计记录
+            console.debug('[gt] act audit rejected', data && data.error);
             return;
           }
-          sendBc();
         }, function(){
-          // RPC reject: 转移窗口内重试一次, 否则降级广播
-          if (retries > 0 && _transferInProgress()){ setTimeout(function(){ _doRpc(retries-1); }, 2000); return; }
-          sendBc();
+          // RPC reject: 网络失败, 动作已送达 host(已校验), 静默丢审计
         });
     }catch(e){ sendBc(); }
   };
-  _doRpc(1);
+  _doRpc(0);
 }
 function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid, via){
   if (!_ehGame || !_ehGame.applyMove || typeof seat !== 'number') return;
