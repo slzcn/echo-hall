@@ -222,7 +222,7 @@ html[data-mode="day"] .gd-felt::before{
 .gd-lastplay.fresh{animation:gdLpIn .22s ease-out}
 @keyframes gdLpIn{from{opacity:0;transform:translateY(-4px) scale(.92)}to{opacity:1;transform:none}}
 /* 中央 */
-.gd-banner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s;text-align:center}
+.gd-banner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);min-height:18px;display:flex;align-items:center;gap:6px;transition:.15s;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gd-banner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px color-mix(in srgb, var(--accent) 75%, transparent);border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb, var(--accent) 26%, transparent),color-mix(in srgb, var(--accent) 5%, transparent));animation:gdTurnPulse 1.05s ease-in-out infinite}
 .gd-banner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800}
 .gd-banner .clk.urgent{color:var(--magenta);animation:gdBlink .6s steps(2,start) infinite}

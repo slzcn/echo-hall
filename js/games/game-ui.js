@@ -287,7 +287,7 @@ html[data-mode="day"] .ddz-felt::before{
   background:radial-gradient(ellipse 66% 58% at 50% 40%,color-mix(in srgb,var(--accent) 38%,#fff),color-mix(in srgb,var(--accent) 18%,#fff) 54%,color-mix(in srgb,var(--accent) 10%,var(--bg)) 100%);
   border:2px solid color-mix(in srgb,var(--accent) 24%,transparent);box-shadow:inset 0 2px 26px rgba(0,80,74,.1),0 10px 30px color-mix(in srgb, var(--accent) 10%, transparent),inset 0 0 0 1px rgba(255,255,255,.5),inset 0 1px 0 rgba(255,255,255,.7)}
 /* 定高(非 min-height): 轮到我/轮到他两态字号/胶囊不同, 若用 min-height 会撑高列 → justify-content:center 每回合竖向重排=牌桌"跳一下"。钉死高度, 字靠 flex 居中不撑盒。 */
-.ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);height:26px;box-sizing:border-box;line-height:1;padding:0 12px;display:flex;align-items:center;justify-content:center;gap:6px;transition:color .15s,background .15s}
+.ddz-turnbanner{font-size:var(--banner,13px);letter-spacing:.05em;color:var(--sub);height:26px;box-sizing:border-box;line-height:1;padding:0 12px;display:flex;align-items:center;justify-content:center;gap:6px;transition:color .15s,background .15s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ddz-turnbanner.mine{color:var(--ink);font-weight:800;font-size:15px;text-shadow:0 0 8px color-mix(in srgb, var(--accent) 75%, transparent);border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb, var(--accent) 26%, transparent),color-mix(in srgb, var(--accent) 5%, transparent));animation:ddzTurnPulse 1.05s ease-in-out infinite}
 /* 秒数留固定宽: 不留则 18s→9s 每秒字宽变→居中的胶囊每秒横向抖=第二种"跳来跳去" */
 .ddz-turnbanner .clk{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:800;min-width:2.2em;display:inline-block;text-align:center}
@@ -2266,10 +2266,15 @@ html[data-mode="day"] .ddz-felt::before{
       }
       if (st.phase!=='play' || st.turn!==mySeat) return;
       const target = (st.table.lastPlay && st.table.lastPlay.seat!==mySeat) ? st.table.lastPlay.parse : null;
-      const mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:target,
-        lastSeat: st.table.lastPlay ? st.table.lastPlay.seat : null,
-        handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
-      if (mv.action==='pass'){ doPass(mySeat); return; }
+      // ★T94 边界: AI.decide 可能抛错(掼蛋有 try/catch), mv.cards 可能为空 → 崩
+      let mv=null;
+      try{
+        mv = AI.decide({ seat:mySeat, hand:st.players[mySeat].hand, tableParse:target,
+          lastSeat: st.table.lastPlay ? st.table.lastPlay.seat : null,
+          handsLeft: st.players.map(p=>p.hand.length), landlord: st.landlord, iAmLandlord: mySeat===st.landlord, log: st.log });
+      }catch(_){}
+      if(!mv || !mv.cards) return;
+      if(mv.action==='pass'){ doPass(mySeat); return; }
       selected = new Set(mv.cards.map(c=>c.id)); doPlay();
     }
     // ── 人类超时兜底(与断线托管同一逻辑) ──
