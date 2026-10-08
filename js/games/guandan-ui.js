@@ -366,7 +366,8 @@ html[data-mode="day"] .gd-felt::before{
   font-size:clamp(13px,4vw,16px);line-height:1.15;cursor:pointer;white-space:nowrap;overflow:hidden;
   display:flex;align-items:center;justify-content:center;gap:4px;
   border:1px solid var(--line2);background:var(--panel);color:var(--ink);letter-spacing:.04em;transition:.14s}
-.gd-btn:active{transform:scale(.96)}
+.gd-btn:not(:disabled):hover{filter:brightness(1.12)}
+.gd-btn:not(:disabled):hover:active{transform:scale(.96)}
 .gd-btn.primary{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
 .gd-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .gd-btn.ghost{background:transparent;color:var(--sub)}

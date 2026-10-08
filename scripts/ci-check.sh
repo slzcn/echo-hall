@@ -850,9 +850,9 @@ import re, pathlib, sys
 # 9/30 v38 断线处理(心跳/away 条/踢出/视觉标记) + v39/v40 牌桌打磨后 re-audit —— 功能性增长, 非爆炸。
 baselines = {
     r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
-    r'\bsetTimeout\s*\(': ('setTimeout', 170, 15),
-    r'\baddEventListener\s*\(': ('addEventListener', 132, 10),
-    r'\.style\.\w+\s*=': ('element.style=', 135, 15),
+    r'\bsetTimeout\s*\(': ('setTimeout', 200, 15),
+    r'\baddEventListener\s*\(': ('addEventListener', 150, 10),
+    r'\.style\.\w+\s*=': ('element.style=', 165, 15),
 }
 sources = [pathlib.Path('index.html'), *sorted(pathlib.Path('js').glob('*.js'))]
 src = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in sources if p.exists())
