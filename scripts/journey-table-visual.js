@@ -130,8 +130,9 @@ assert(/eh_gt_open/.test(LT) && /eh_gt_set_msg/.test(LT), 'launchTexas 走真牌
 // 第1条(主人复述 2026-09-14「游戏指令发出后都进牌桌招募态, 可邀真人, 不立即开始」):
 //   三个入口(德州/斗地主/掼蛋)开桌都落各自招募态(gtLaunch{Poker,Ddz,Guandan}Lobby), 不再 await gtStart 自动发牌。
 // 2026-09-29 并行: 德州开桌即补灵魂自动开局(跳过招募等待页), 第一个灵魂到位 gtStart
-assert(/gtSeatSoulsIntoEmpties/.test(LT) && /gtStart\(/.test(LT),
-  '第1条: launchTexas 开桌补灵魂自动开局(gtStart)');
+// ★T94 断言更新: 补灵魂 gtSeatSoulsIntoEmpties 已内聚进 gtStart(见 app.js), launchTexas 只需调 gtStart
+assert(/gtStart\(/.test(LT) && /gtSeatSoulsIntoEmpties/.test(APP),
+  '第1条: launchTexas 开桌补灵魂自动开局(gtStart → gtSeatSoulsIntoEmpties)');
 const LDZ = (APP.match(/async function launchDoudizhu\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/gtLaunchDdzLobby\s*\(/.test(LDZ) && !/await gtStart\s*\(/.test(LDZ),
   '第1条: launchDoudizhu 开桌落招募态(gtLaunchDdzLobby), 不自动 gtStart 发牌');

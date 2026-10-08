@@ -183,9 +183,16 @@
     if (state.street === 'preflop' && state.board.length === 0){
       const chen = chenScore(p.hole);
       const bbLeft = p.stack / state.bb;
+      // ★T94 人格差异化: 强/中/弱分类保持(保游戏流), 用 chenGate 调节【弱牌入池率】让各人格松紧不同:
+      //   岩石(gate 8)弱牌几乎全弃 · 疯子(gate 1)弱牌多跟 —— 入池数真正拉开(测试"疯子入池明显多于岩石")。
+      const gate = (P && P.chenGate != null) ? P.chenGate : 6;
       const strong = chen >= 10;          // AA/KK/QQ/AKs
       const medium = chen >= 6 && chen < 10;
       const weak = chen < 6;
+      // 弱牌跟注概率: gate 越低(越松)越爱进池, gate 越高越弃
+      const weakEnter = Math.max(0.05, (10 - gate) / 20);   // gate 8→0.1, gate 6→0.2, gate 1→0.45
+      // 中等牌(Chen 6-9)也按人格调松紧: 紧人(gate 高)只打中等牌上沿
+      const mediumEnter = Math.min(1, Math.max(0.35, (16 - gate) / 10));   // gate 8→0.8, gate 6→1, gate 1→1
 
       // 全下保护: 筹码 < 大盲 5 倍 → 强牌直接全下, 弱牌弃牌, 不再跟注消耗
       if (bbLeft < 5){
@@ -208,14 +215,20 @@
         if (la.canCall) return result('call', 0, `强牌(Chen ${chen})跟注`, 0.55);
       }
       if (medium){
-        // 中等牌跟注, 不主动加注
-        if (la.canCall) return result('call', 0, `中等起手(Chen ${chen})跟注`, 0.45);
+        // 中等牌跟注, 不主动加注; 紧人(gate 高)对中等牌更挑剔 → 部分弃掉
         if (la.canCheck) return result('check', 0, `中等起手(Chen ${chen})过牌`, 0.42);
+        if (la.canCall && roll() < mediumEnter) return result('call', 0, `中等起手(Chen ${chen})跟注`, 0.45);
+        return result('fold', 0, `中等起手(Chen ${chen})偏紧弃牌`, 0.22);
       }
       // 弱牌(Chen<6): 80%弃牌, 20%跟注(偶尔慢玩); bluff 10% 仅底池小+对手少
-      if (la.canCheck) return result('check', 0, `弱起手(Chen ${chen})过牌`, 0.3);
-      if (roll() < 0.20 && la.canCall && la.toCall <= state.bb * 1.5) return result('call', 0, `弱牌慢玩(Chen ${chen})跟注`, 0.35);
-      if (pos && nOpp <= 2 && (la.canRaise || la.canBet) && la.toCall <= state.bb * 1.5 && roll() < 0.10) return sizeBetR(state, la, P.betFrac, `有位置偷盲诈唬`, 0.35);
+      // ★T94 策略影响决策: take_control 压力→弱牌也多偷盲/加注; preserve_bombs/低风险→弱牌全弃
+      if (la.canCheck){
+        if (coachAggro && nOpp <= 2 && (la.canRaise || la.canBet) && roll() < 0.35) return sizeBetR(state, la, P.betFrac, `策略压制·偷盲`, 0.3);
+        return result('check', 0, `弱起手(Chen ${chen})过牌`, 0.3);
+      }
+      const weakEnterP = coachAggro ? Math.min(0.55, weakEnter + 0.25) : (coachCaution ? weakEnter * coachCautionFactor * 0.5 : weakEnter);
+      if (roll() < weakEnterP && la.canCall && la.toCall <= state.bb * 1.5) return result('call', 0, `弱牌慢玩(Chen ${chen})跟注`, 0.35);
+      if (pos && nOpp <= 2 && (la.canRaise || la.canBet) && la.toCall <= state.bb * 1.5 && roll() < (coachAggro?0.35:0.10)) return sizeBetR(state, la, P.betFrac, `有位置偷盲诈唬`, 0.35);
       return result('fold', 0, `起手偏弱(Chen ${chen})弃牌`, 0.2);
     }
 
@@ -258,6 +271,9 @@
     }
     // 胜率<30%: 弃牌, 偶尔 bluff 10%
     if (pos && nOpp <= 2 && la.canRaise && roll() < 0.10) return sizeBetR(state, la, P.betFrac * 0.8, `低胜率半诈唬`, eq);
+    // ★T94 兜底: 上面诈唬未触发时原来【落空无返回】→ decide 返回 undefined → 调用方 break → 局不终局(300局测试未结束真因)。
+    if (la.canCheck) return result('check', 0, `低胜率过牌(胜率${pct(eq)})`, eq);
+    return result('fold', 0, `低胜率弃牌(胜率${pct(eq)})`, eq);
   }
 
   // sizeBet 包一层带 meta 的返回

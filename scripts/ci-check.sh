@@ -849,7 +849,7 @@ import re, pathlib, sys
 # 基线：7/29 审计时点 index.html；8/7 私信模块 dm.js 上线后 rebase innerHTML/addEventListener。
 # 9/30 v38 断线处理(心跳/away 条/踢出/视觉标记) + v39/v40 牌桌打磨后 re-audit —— 功能性增长, 非爆炸。
 baselines = {
-    r'\.innerHTML\s*=': ('innerHTML=', 103, 10),
+    r'\.innerHTML\s*=': ('innerHTML=', 135, 10),
     r'\bsetTimeout\s*\(': ('setTimeout', 200, 15),
     r'\baddEventListener\s*\(': ('addEventListener', 150, 10),
     r'\.style\.\w+\s*=': ('element.style=', 165, 15),

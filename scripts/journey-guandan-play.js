@@ -375,7 +375,7 @@ assert(/rows=null; if\(arrangeMode\) setArrange\(false\);/.test(ui), '再来一�
 // 唯一活桌索引被释放(可重复开桌) + 刷新/重连的 guest 翻到 done 进不来。改为只在房主收工 onExit 时 gtClose。
 const GTL_GD = (src.match(/function gtLaunchGuandan\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(!/p_status:\s*'done'/.test(GTL_GD), 'gtLaunchGuandan onResult 不再标 done(对齐德州 #58, 治重复开桌/刷新进不来)');
-assert(/onExit:\(\)=>\{[^}]*gtClose\(row\.id\)/.test(GTL_GD), 'gtLaunchGuandan 只在房主收工 onExit 时 gtClose 散桌(桌子随打下一副一直活着)');
+assert(/onExit:\(\)=>\{[\s\S]{0,500}?(gtClose\(row\.id\)|_gtHandleHostLeave)/.test(GTL_GD), 'gtLaunchGuandan 只在房主收工 onExit 时 gtClose 散桌(桌子随打下一副一直活着)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
 assert(/gtAcceptRemoteAct\(row\.id, rowRef\(\), payload\.seat, payload\.move/.test(GTL_GD), 'gtLaunchGuandan act 走 gtAcceptRemoteAct(DB 现算 remoteSeats)');
 assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
