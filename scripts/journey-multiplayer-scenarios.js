@@ -31,15 +31,19 @@ function eq(a, b, m){ if(a!==b) throw new Error(m+' (expected '+b+', got '+a+')'
 
 // ───────────────────── 静态断言: 修复点到位 ─────────────────────
 console.log('\n# 静态断言: 源码修复点');
-it('gtEngineHolder: away 真人不算引擎持有者', ()=> /humanSeats=seats\.filter\(s=>s && s\.kind==='human' && s\.uid && !s\.away\)/.test(src));
-it('gtCheckEngineTransfer: 接管前取 guest lastSnap 传 resumeSnap', ()=> /_ehGame\.lastSnap\(\)/.test(src) && /gtLaunchPoker\(row,\s*_resumeSnap\)/.test(src));
-it('gtCheckEngineTransfer: 接管后立刻 resync 广播', ()=> /gtLaunchPoker\(row,\s*_resumeSnap\);[\s\S]*?_ehGame\.resync\(\)/.test(src));
+// ★v82 无房主架构: gtEngineHolder 直接返回 row.host_uid(DB 权威, away/离场由 eh_gt_set_host RPC 仲裁改 host_uid)
+it('gtEngineHolder: 返回 DB 权威 host_uid(away 过滤移到 eh_gt_set_host RPC)', ()=> /function gtEngineHolder\(row\)\{[\s\S]*?return\s*\(row && row\.host_uid\)\s*\?\s*row\.host_uid\s*:\s*null/.test(src));
+// ★乐观发送重构: 快照兜底加 _gtSnapCache, 签名 gtLaunchPoker(row, _resumeSnap || _gtSnapCache.get(...) || null)
+it('gtCheckEngineTransfer: 接管前取 guest lastSnap 传 resumeSnap', ()=> /_ehGame\.lastSnap\(\)/.test(src) && /gtLaunchPoker\(row,\s*_resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null\)/.test(src));
+it('gtCheckEngineTransfer: 接管后立刻 resync 广播', ()=> /gtLaunchPoker\(row,\s*_resumeSnap[\s\S]*?_ehGame\.resync\(\)/.test(src));
 it('gtCheckEngineTransfer: 不在桌里路径用缓存快照 resume(不重新发牌)', ()=> /_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null/.test(src));
-it('gtLaunchPoker: 收 resumeSnap 参数并传给 open', ()=> /function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src) && /resumeSnap:\s*resumeSnap\s*\|\|\s*null/.test(src));
+it('gtLaunchPoker: 收 resumeSnap 参数并传给 open', ()=> /function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src) && /resumeSnap:\s*resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null,\s*\/\/.+v33/.test(src));
 it('poker-ui open: resumeSnap 用 pseudoState 重建 st + 恢复 handNo/stacks', ()=> /opts\.resumeSnap\s*&&\s*PokerNet/.test(pk) && /pseudoState\(_rs,\s*mySeat,\s*myHole\)/.test(pk) && /handNo\s*=\s*_rs\.handNo/.test(pk) && /stacks\s*=\s*_rs\.players\.map/.test(pk));
 it('poker-ui: 暴露 lastSnap() 供接管取快照', ()=> /lastSnap:\(\)=>lastSnap/.test(pk));
-it('gtGuestSendAct: 转移窗口(host_offline)内等2s重试, 非窗口立刻报错', ()=> /connState\(\)==='host_offline'/.test(src) && /setTimeout\(function\(\)\{\s*_doRpc\(retries-1\)/.test(src));
-it('gtWatchHostPing: 45s 无 host_ping → host_offline; 收到 host_ping → online', ()=> /gap>45000/.test(src) && /setConn\('host_offline'\)/.test(src) && /setConn\('online'\)/.test(src));
+// ★T95 乐观发送: gtGuestSendAct 广播先行(sendBc)+ RPC 审计后台跑, 已废弃 _transferInProgress 转移窗口重试
+it('gtGuestSendAct: 乐观发送(广播先行 sendBc + RPC 后台审计, 无转移窗口重试)', ()=> /乐观发送/.test(src) && /_EH_GT_NET\.sendAct\(chan,\s*tableId,\s*seat,\s*move,\s*myUid/.test(src));
+// ★v38 心跳加速: host_ping 超时阈值 45s→15s(配合 player_beat), 断线玩家更快被接管
+it('gtWatchHostPing: 15s 无 host_ping → host_offline; 收到 host_ping → online', ()=> /gap>15000/.test(src) && /setConn\('host_offline'\)/.test(src) && /setConn\('online'\)/.test(src));
 it('gtCheckNoHumansThenClose: 无在座真人 → 自动散桌', ()=> /function gtCheckNoHumansThenClose/.test(src) && /桌上没有真人了，牌桌自动解散/.test(src));
 it('poker-net snapshot: 含 handNo/players[].stack/button/pot', ()=> /handNo:/.test(net) && /stack:/.test(net) && /button:/.test(net) && /pot:/.test(net));
 

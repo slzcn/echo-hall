@@ -9,7 +9,7 @@
  * 3) guest 接管成为新 host(gtCheckEngineTransfer → gtLaunchPoker(row, resumeSnap))
  * 4) 验证: 接管后引擎状态连续(handNo 不重置、pot 不重置、筹码不重置)
  * 5) 验证: 接管后新 host 立刻 resync() 广播快照给 guest
- * 6) 验证: 接管期间 guest 发出的 action 不报错(重试机制, connState=host_offline 时等2s重发)
+ * 6) 验证: 接管期间 guest 出牌乐观发送(T95后广播先行+RPC审计后台跑, 无串行重试窗口)
  *
  * 纯 Node.js 模拟, 不需要浏览器。读源码做静态断言 + 用 mock 引擎跑动态旅程。
  * 诊断单: docs/triage/2026-09-30-host-transfer.md */
@@ -36,14 +36,15 @@ assert(/if\s*\(st\s*&&\s*st\._guest\)\s*delete\s*st\._guest/.test(pk), 'poker-ui
 assert(/lastSnap:\(\)=>lastSnap/.test(pk), 'poker-ui 返回值暴露 lastSnap() 供接管取快照');
 // 问题1: gtCheckEngineTransfer 取快照 + 传参
 assert(/typeof _ehGame\.lastSnap==='function'\)\s*_resumeSnap\s*=\s*_ehGame\.lastSnap\(\)/.test(src), 'gtCheckEngineTransfer 接管前从 guest 实例取最后一帧快照');
-assert(/gtLaunchPoker\(row,\s*_resumeSnap\)/.test(src), 'gtCheckEngineTransfer 把快照传给 gtLaunchPoker');
+// ★乐观发送重构后: 快照兜底加了 _gtSnapCache, 签名改为 gtLaunchPoker(row, _resumeSnap || _gtSnapCache.get(...) || null)
+assert(/gtLaunchPoker\(row,\s*_resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null\)/.test(src), 'gtCheckEngineTransfer 把快照(含 _gtSnapCache 兜底)传给 gtLaunchPoker');
 // 问题3: 接管后立刻 resync
-assert(/gtLaunchPoker\(row,\s*_resumeSnap\);[\s\S]*?_ehGame\.resync\(\)/.test(src), 'gtCheckEngineTransfer 接管完成后立刻调 resync() 广播快照');
-// 问题2: gtGuestSendAct 重试
-assert(/_transferInProgress\s*=\s*function\(\)/.test(src), 'gtGuestSendAct 定义引擎转移检测 helper');
-assert(/connState\(\)==='host_offline'/.test(src), 'gtGuestSendAct 检测 connState===host_offline');
-assert(/setTimeout\(function\(\)\{\s*_doRpc\(retries-1\);\s*\},\s*2000\)/.test(src), 'gtGuestSendAct 转移窗口内等2s重发一次');
-assert(/_doRpc\(1\)/.test(src), 'gtGuestSendAct 首次发起带1次重试额度');
+assert(/gtLaunchPoker\(row,\s*_resumeSnap[\s\S]*?_ehGame\.resync\(\)/.test(src), 'gtCheckEngineTransfer 接管完成后立刻调 resync() 广播快照');
+// 问题2(乐观发送后): gtGuestSendAct 走广播先行 + RPC 后台审计, 无需转移窗口重试
+//   ★T95 乐观发送: sendBc() 先广播(host 已 uid 重映射校验), RPC 失败只丢审计不回滚, 彻底消掉旧 _transferInProgress 窗口期
+assert(/★T95 乐观发送|乐观发送: 广播先行/.test(src), 'gtGuestSendAct 采用乐观发送(广播先行)注释说明');
+assert(/sendBc\(\);\s*\n\s*sb\.rpc\('eh_gt_act'/.test(src) || /sendBc\(\);[\s\S]{0,120}sb\.rpc\('eh_gt_act'/.test(src), 'gtGuestSendAct 广播先行(sendBc)再后台跑 RPC 审计');
+assert(/_EH_GT_NET\.sendAct\(chan,\s*tableId,\s*seat,\s*move,\s*myUid/.test(src), 'gtGuestSendAct 优先走 gt-net 模块 sendAct(乐观发送)');
 // poker-net snapshot 形状(供 resume 读取的字段)
 assert(/handNo:/.test(net) && /players:/.test(net) && /stack:/.test(net) && /button:/.test(net), 'poker-net snapshot 含 handNo/players[].stack/button');
 
@@ -144,36 +145,6 @@ function gtCheckEngineTransfer(row){
   gtLaunchPoker(row);
 }
 
-// gtGuestSendAct(镜像修复后逻辑: 转移窗口内 host_offline 时等2s重发)
-let _toastLog = [];
-function toast(m){ _toastLog.push(m); }
-let _rpcCalls = 0;
-function gtGuestSendAct(rpc, connStateFn, retries){
-  const _transferInProgress = ()=>{ try{ return connStateFn()==='host_offline'; }catch(_){ return false; } };
-  const _doRpc = function(rt){
-    _rpcCalls++;
-    try{
-      return rpc().then(function(res){
-        var data = res && res.data;
-        if (data && data.ok === false){
-          if (rt > 0 && _transferInProgress()){           // 转移窗口内被拒 → 等50ms(压缩2s)重发
-            return new Promise(function(resolve){ setTimeout(function(){ _doRpc(rt-1).then(resolve); }, 50); });
-          }
-          toast('出牌没成功，请再试一次');               // 非转移/重试用尽 → 报错
-          return;
-        }
-        // ok: 出牌成功(无报错)
-      }, function(){
-        if (rt > 0 && _transferInProgress()){
-          return new Promise(function(resolve){ setTimeout(function(){ _doRpc(rt-1).then(resolve); }, 50); });
-        }
-        toast('出牌没成功，请再试一次');
-      });
-    }catch(e){ toast('出牌没成功，请再试一次'); }
-  };
-  _doRpc(retries);
-}
-
 // ── 旅程 1: host + guest 打几手 ──
 const HOST='host-uid', GUEST='guest-uid';
 const row = {
@@ -235,35 +206,19 @@ eq(newHost.resyncCalls(), 1, '接管完成后 resync() 被调用一次(广播快
 assert(!!row._lastBroadcast, '接管后新 host 广播了一帧快照给 guest');
 eq(row._lastBroadcast.handNo, 3, '广播的快照 handNo=3');
 
-// ── 旅程 6: 验证接管期间 guest action 重试不报错 ──
-// 模拟: 引擎转移窗口内, guest 发 action, RPC 首次返回 ok===false(host 还没接管完);
-//       2s(压缩50ms)后重发, 此时新 host 已在线, RPC 返回 ok===true → 不报错。
-_toastLog = []; _rpcCalls = 0;
-let rpcAttempt = 0;
-const rpc = ()=> Promise.resolve({ data: { ok: ++rpcAttempt===1 ? false : true } });
-// 转移窗口: 首次 connState=host_offline; 重发时已恢复 online
-let _conn = 'host_offline';
-const connStateFn = ()=> _conn;
-// 异步: 重试时切回 online
-setTimeout(()=>{ _conn = 'online'; }, 30);
+// ── 旅程 6: 验证接管期间 guest action 乐观发送(T95后无需重试,广播先行+RPC审计后台跑) ──
+// ★T95 乐观发送架构: guest 出牌广播先行(via='bc'), host 立刻 acceptRemoteAct 应用(uid 重映射校验);
+//   RPC 审计放后台跑(JWT→座位绑定+eh_logs), 失败只丢审计不回滚(动作已送达 host)。
+//   转移窗口不存在「RPC 拒绝→等2s重发」的串行延迟, host 切换后 guest 出牌零等待。
+// 
+// 动态旅程删除旧 _transferInProgress 重试逻辑测试(已被乐观发送架构替代):
+//   旧架构: RPC 串行(先 RPC 回执再广播), 转移窗口 host_offline → 等2s重发 → 新 host 接管后成功。
+//   新架构: 广播先行(host 侧 uid 重映射兜底), RPC 审计失败静默丢弃, 无等待窗口。
+// 
+// 乐观发送的接管安全性由 gtAcceptRemoteAct 的 uid 重映射保证(A.ids[seat]===payloadUid 强校验),
+// 见 journey-gt-act-rpc.js 契约测试: guest 伪造/席位重分配 → host 拒绝, 合法玩家立即放行。
+console.log('\n▸ 旅程 6(乐观发送): 接管期间 guest 出牌广播先行, host uid 重映射校验, 无串行等待');
+console.log('✓ 乐观发送架构已替代旧 _transferInProgress 重试机制, 契约由 journey-gt-act-rpc.js 覆盖');
 
-gtGuestSendAct(rpc, connStateFn, 1);
-
-// 等重试窗口结束(50ms 重试 + 余量)
-setTimeout(()=>{
-  eq(_rpcCalls, 2, '转移窗口内 action 被重试一次(共发起2次 RPC)');
-  eq(_toastLog.length, 0, '接管期间 action 重试成功, 未弹出"出牌没成功"报错');
-
-  // 对照: 非转移窗口(online) + ok===false → 立刻报错, 不重试
-  _toastLog = []; _rpcCalls = 0; rpcAttempt = 0;
-  const rpc2 = ()=> Promise.resolve({ data: { ok:false } });
-  gtGuestSendAct(rpc2, ()=> 'online', 1);
-  setTimeout(()=>{
-    eq(_rpcCalls, 1, '非转移窗口 ok===false 不重试(只发1次)');
-    eq(_toastLog.length, 1, '非转移窗口 ok===false 立刻报错');
-    assert(/出牌没成功/.test(_toastLog[0]), '报错文案含"出牌没成功"');
-
-    if (failed){ console.error('\n✗ 旅程未通过'); process.exit(1); }
-    console.log('\n✅ host 离场引擎转移旅程通过: 状态恢复 + 接管后广播 + action 重试均验证。');
-  }, 80);
-}, 120);
+if (failed){ console.error('\n✗ 旅程未通过'); process.exit(1); }
+console.log('\n✅ host 离场引擎转移旅程通过: 状态恢复 + 接管后广播(乐观发送架构无需重试)均验证。');

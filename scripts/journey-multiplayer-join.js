@@ -17,7 +17,8 @@ const ok=(c,m)=>{ if(c){pass++; console.log('  ✓ '+m);} else {fail++; console.
 
 // ── 1) 统一入座助手存在, 三款 guest 都先走它 ──
 ok(/async function gtEnsureSeated/.test(APP), 'gtEnsureSeated 统一入座助手存在');
-ok(/gtEnterPoker[\s\S]{0,800}gtEnsureSeated/.test(APP), '德州 guest 走 gtEnsureSeated');
+// ★v57 新增 host 掉线接管 + 牌局进行中旁观守卫后, 函数头到 gtEnsureSeated 距离增至 ~2000 字符(合法增长)
+ok(/(?:_gtEnterPokerV2|_gtEnterPokerServer)[\s\S]{0,2200}gtEnsureSeated/.test(APP), '德州 guest 走 gtEnsureSeated');
 ok(/gtEnterGuandan[\s\S]{0,800}gtEnsureSeated/.test(APP), '掼蛋 guest 走 gtEnsureSeated');
 ok(/gtEnterDdz[\s\S]{0,800}gtEnsureSeated/.test(APP), '斗地主 guest 走 gtEnsureSeated');
 ok(!/function gtEnterGuandan[\s\S]{0,500}你不在这桌/.test(APP), '掼蛋不再抛「你不在这桌」');
