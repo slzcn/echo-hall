@@ -150,9 +150,11 @@ html[data-mode="day"] .pk-blinds{color:rgba(0,92,82,.34);text-shadow:0 1px 0 rgb
 .pk-mus:hover,.pk-x:hover,.pk-skin:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));box-shadow:0 0 16px -4px var(--accent,var(--cyan))}
 .pk-mus:active,.pk-x:active,.pk-skin:active{transform:scale(.92)}
 .pk-mus.muted{opacity:.55;filter:grayscale(.4)}
-/* BGM 按钮: 开=轻微呼吸, 静音=灰淡(与聊天室 bgm-btn 同款) */
-.pk-mus:not(.muted){animation:pkBgmBreath 2.4s ease-in-out infinite}
+/* BGM 按钮: 开=轻微呼吸, 静音=灰淡(与聊天室 bgm-btn 同款)。★只音乐按钮呼吸, 音效(pk-sfx)不呼吸——对齐房间仅 .bgm-btn 呼吸 */
+.pk-mus:not(.muted):not(.pk-sfx){animation:pkBgmBreath 2.4s ease-in-out infinite}
 @keyframes pkBgmBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+/* 浮层开启时按钮保持选中态(对齐房间 .tool-btn.active) */
+.pk-mus.active,.pk-skin.active,.pk-x.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
 .pk-rot.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 /* 窄屏(手机 <380px)顶栏防溢出: 收紧间距/边距, 给盲注 chip 让位(三钮已纯图标, 无需收字) */
 @media (max-width:379px){
@@ -190,7 +192,7 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 .pk-board{display:flex;gap:5px;min-height:var(--ch,48px);align-items:center;justify-content:center;flex-wrap:wrap}
 .pk-board .card.flip-in{animation:pkFlip .34s cubic-bezier(.2,.9,.3,1) both}
 @keyframes pkFlip{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
-.pk-msg{font-size:var(--banner,13px);color:var(--sub);min-height:16px;text-align:center;padding:8px 16px}
+.pk-msg{font-size:var(--banner,13px);color:var(--sub);min-height:16px;text-align:center;padding:8px 16px;display:flex;align-items:center;justify-content:center;line-height:1.4}
 .pk-msg.mine{color:var(--ink);font-weight:800;text-shadow:0 0 8px color-mix(in srgb, var(--accent) 75%, transparent);border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb, var(--accent) 26%, transparent),color-mix(in srgb, var(--accent) 5%, transparent));animation:pkTurnPulse 1.05s ease-in-out infinite}
 /* 轮到自己行动: 提示条化作发光脉冲胶囊(halo+微缩放, 纯 box-shadow/transform 不改盒模型→不引入跳动) */
 @keyframes pkTurnPulse{0%,100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent),0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}50%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 70%,transparent),0 0 16px 3px color-mix(in srgb,var(--accent) 55%,transparent)}}
@@ -2768,6 +2770,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         const wasHuman = !isAI[s], nowHuman = !A.isAI[s];
         const newUid = A.ids ? (A.ids[s] || null) : null;
         const realOccupant = !!newUid;              // 真人 uid / 指定灵魂 auth_uid(空位·AI 占位 id 为 null)
+        // ★fix(真人变机器人0): 同一 uid 仍在座, 但新名册把这个真人降级成了 AI(kind 字段异常/realtime 推来残缺中间态)
+        //   → 保守拒绝降级, 保持真人身份。真人真离场时 uid 会变 null 或换人, 不会命中此护栏。
+        //   根因: DB row 偶发推来 kind 缺失的中间态, gtSeatArrays 据此算 isAI=true + name='机器人N', 真人就被顶成机器人。
+        if (wasHuman && !nowHuman && newUid && ids && ids[s] && newUid === ids[s]){
+          // 同一真人 uid 还在, 却被标成 AI → 忽略本次降级, 只刷新可能变化的名字/头像(仍按真人保留)
+          if (A.names[s] && !/^机器人\d*$/.test(A.names[s])) names[s] = A.names[s];
+          if (A.avatars[s]) avatars[s] = A.avatars[s];
+          continue;
+        }
         names[s]   = A.names[s];
         avatars[s] = A.avatars[s];
         isAI[s]    = A.isAI[s];

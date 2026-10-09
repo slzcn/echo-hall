@@ -46,6 +46,8 @@ it('gtGuestSendAct: 乐观发送(广播先行 sendBc + RPC 后台审计, 无转�
 it('gtWatchHostPing: 15s 无 host_ping → host_offline; 收到 host_ping → online', ()=> /gap>15000/.test(src) && /setConn\('host_offline'\)/.test(src) && /setConn\('online'\)/.test(src));
 it('gtCheckNoHumansThenClose: 无在座真人 → 自动散桌', ()=> /function gtCheckNoHumansThenClose/.test(src) && /桌上没有真人了，牌桌自动解散/.test(src));
 it('poker-net snapshot: 含 handNo/players[].stack/button/pot', ()=> /handNo:/.test(net) && /stack:/.test(net) && /button:/.test(net) && /pot:/.test(net));
+// ★fix(真人变机器人0): applyPendingRoster 护栏——同一真人 uid 仍在座却被标 AI → 拒绝降级, 保持真人身份
+it('applyPendingRoster: 同一真人uid被标AI时拒绝降级(防真人变机器人0)', ()=> /wasHuman\s*&&\s*!nowHuman\s*&&\s*newUid\s*&&\s*ids\s*&&\s*ids\[s\]\s*&&\s*newUid\s*===\s*ids\[s\]/.test(pk) && /机器人/.test(pk));
 
 // ───────────────────── mock 引擎 + 牌桌状态机(镜像 app.js) ─────────────────────
 const START = 1000;

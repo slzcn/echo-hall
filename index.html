@@ -591,6 +591,9 @@
   .eh-dropdown{background:var(--panel-solid);border:1px solid var(--line2);border-radius:14px;padding:4px;box-shadow:0 12px 40px var(--shadow-lg);overflow:hidden}
   .skin-menu{position:absolute;top:56px;right:0;display:none;flex-direction:column;gap:2px;z-index:50;min-width:150px}
   .skin-menu.on{display:flex}
+  /* ★fix(浮层太宽): 牌桌🎨/🎵 浮层固定宽度, 与房间 skin-menu 视觉一致(JS 侧已加 right:auto 清掉基类拉伸) */
+  .eh-theme-float{width:200px;max-width:calc(100vw - 16px)}
+  .eh-bgm-float{width:240px;max-width:calc(100vw - 16px)}
   .skin-opt{display:flex;align-items:center;gap:9px;padding:9px 12px;min-height:44px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--sub);transition:.15s}
   .skin-opt:hover{background:var(--panel);color:var(--ink)}
   .skin-opt.active{color:var(--ink);background:var(--hover)}
@@ -2273,7 +2276,7 @@
    2. 初次 check 延后到 load+300ms (避免与首屏渲染争带宽)
    3. 重载前打 __ehJustReloaded 标记 (与 SW controllerchange 协同: SW 不再额外 reload) */
 (function(){
-  var BUILD_VER='20261004-v109';  window.__EH_BUILD_VER=BUILD_VER;
+  var BUILD_VER='20261004-v110';  window.__EH_BUILD_VER=BUILD_VER;
   // ★硬恢复(治"版本标记漂移锁死"): 普通重载(?v=latest)后【仍】非最新 = SW/缓存层在返回旧壳或
   //   旧 app.js —— serveVersionedJs 对 /js/*.js?v= 走持久 cache-first, 一旦某次漂移窗口把旧字节
   //   缓存在某个 ?v= URL 下, 同 URL 永不重下, 页面被永久锁在旧代码(清道夫等修复根本没送达)。
@@ -2778,7 +2781,7 @@ try{var _bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').
 <script defer src="./js/modules/bgm.js?v=20261004-v109"></script>
 <script defer src="./js/modules/room.js?v=20261004-v109"></script>
 <script defer src="./js/modules/messages.js?v=20261004-v109"></script>
-<script defer src="./js/app.js?v=20261004-v109"></script>
+<script defer src="./js/app.js?v=20261004-v110"></script>
 <script defer src="./js/keyboard.js?v=20261004-v109"></script>
 <script defer src="./js/boot.js?v=20261004-v109"></script>
 <script defer src="./js/dm.js?v=20261004-v109"></script>
