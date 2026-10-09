@@ -4324,7 +4324,6 @@ async function gtLaunchPoker(row, resumeSnap){
     const _gchips = await gtFetchGlobalChips();
     if(_gchips <= 0){ try{ toast('全局筹码不足，无法入座'); }catch(_){} _gtCleanupPlay(); return; }
     _pkMyStack = _gchips;   // ★v58: 全部全局筹码作为 startStack
-    try{ toast('入座 '+_gchips+' 筹码(全部带入)', 1800); }catch(_){}
   }catch(e){ _ehCatch('gtBuyInFlow',e); }
   _gtMyFinalStack = _pkMyStack;
   try{ await pkPrefetchChips(A.ids, 'nlhe'); }catch(_){}   // ★fix: 开桌批量预取灵魂/真人筹码, 避免退回本地账本

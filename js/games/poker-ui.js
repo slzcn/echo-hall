@@ -2533,10 +2533,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
             : (champCount>1
                 ? `🏆 ${champCount} 家平分底池 ${potTotal} · 你 ${delta>=0?'+':''}${delta}`
                 : `🏆 ${escapeHtml(champName)}${cDelta!=null&&cDelta>0?` 净赢 <b class="pk-wc">+${cDelta}</b>`:` 收池 ${potTotal}`} · 你 ${delta>=0?'+':''}${delta}`))
-            + foldTag + ` <button class="pk-go" type="button">继续 ▶</button>`;
+            + foldTag;
           showWinBanner(line, won);
-          // ★v95: 「继续 ▶」可提前发下一手(否则 5s 后自动)
-          if(_winBanner){ const _go=_winBanner.querySelector('.pk-go'); if(_go) _go.addEventListener('click', ()=>{ if(overTimer){ clearTimeout(overTimer); clearInterval(overTimer); overTimer=null; } hideWinBanner(); nextHand(); }); }
           if ((res.winnersBySeat||[]).length) payoutChipsFx(res.winnersBySeat);
           if(won){ sfx('sparkle'); setTimeout(()=>sfx('bloom'),160); pkCelebrate(false); }
           else if(delta<0){ sfx('void'); }
