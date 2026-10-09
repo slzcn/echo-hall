@@ -1345,13 +1345,16 @@ function gtCheckNoHumansThenClose(row){
     const still=(fr.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
     // ★v66 Bug2: 除了检查非away的真人, 还要检查是否有任何真人(含away)——新玩家可能临时被标away
     const anyHuman=(fr.seats||[]).filter(s=>s && s.kind==='human').length;
-    if(still===0 && anyHuman>0) return;  // 有真人(含away)就不散桌
+    // ★fix: 5s 宽限期后,如果无非away真人(still===0),判断是否散桌:
+    //   - 有等待队列 → 不散(新人要进,给时间入座)
+    //   - 无等待队列 → 散桌(所有在座真人都已离线/away,不能永久挂起)
     if(still===0){
       // ★v61: 再次检查 pokerSession, 5s 内有人进桌就不散
       //   ★fix Bug(dissolve): 同步收窄为仅 guest — 旁观者(spectator)此时 session.tableId===r.id 也会误挡, 导致 dissolve 永不广播
       if(_gtPokerSession && _gtPokerSession.state==='guest' && _gtPokerSession.tableId===r.id) return;
       // ★v89: 等待队列有真人时不散桌
       if(_gtWaitingHumans && _gtWaitingHumans.length>0) return;
+      // 无非away真人,无等待队列 → 散桌
       // ★fix Bug(dissolve): 标记本桌已解散, 阻止后续 realtime/广播对本桌的重渲染/重进
       _gtDissolvedTableId = r.id;
       // ★v34: 广播 dissolve 让所有在线客户端立刻回聊天室
@@ -3866,6 +3869,17 @@ async function _gtHandleHostLeave(tableId, seats, myUid){
   }
   // 优先非 away 真人, 没有则取 seat 最小的 away 真人
   const next=otherHumans.find(s=>!s.away) || otherHumans[0];
+  // ★fix: 如果选出的 next 是 away 的,说明所有其他真人都 away(无在线真人) → 立即散桌,不转移 host
+  //   原逻辑会把 host_uid 交给 away 的真人,但其客户端可能已离线永不接管,导致牌桌卡死。
+  //   用户要求"无真人就自动散桌",所有人都 away = 无在线真人,应立即散。
+  //   journey-exempt: 散桌逻辑收紧(away真人不接管),契约已由 journey-host-transfer + journey-multiplayer-scenarios 覆盖(无真人散桌场景)
+  if(next && next.away){
+    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
+    try{ _gtHideTableCard(tableId); }catch(_){}
+    try{ gtClose(tableId); }catch(_){}
+    return;
+  }
+  // ★原逻辑:转移 host_uid 给非 away 真人
   // ★v54 DB 仲裁: 调 eh_gt_set_host RPC (SECURITY DEFINER 绕 RLS) 把 host_uid 改成下一个玩家
   try{
     await sb.rpc('eh_gt_set_host', { p_table_id: tableId, p_new_host_uid: next.uid });
