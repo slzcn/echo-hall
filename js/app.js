@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v117';
+window.__EH_APP_VER = '20261004-v118';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3939,7 +3939,15 @@ function gtCheckEngineTransfer(row){
             gtLaunchGuandan(_fr);
           }
         }
-      }catch(e2){ console.error('[gt] 接管重试失败', e2 && e2.message, e2); }
+      }catch(e2){
+        console.error('[gt] 接管重试失败', e2 && e2.message, e2);
+        // ★fix(P1接管失败兜底): 重试仍失败 → 散桌(host接管是刚需,无host=游戏无法继续)
+        //   场景:新host网络故障/引擎损坏/刷新页面,重试时已不在桌
+        try {
+          console.warn('[gt] 接管重试仍失败,散桌', row.id);
+          gtClose(row.id);
+        } catch(_) {}
+      }
     }, 5000);
   }
 }
@@ -4347,6 +4355,16 @@ async function gtLaunchPoker(row, resumeSnap){
     // ★T92 无人解散回调: 三游戏 checkNoHumansThenDissolve 调用, 散桌回聊天室
     onDissolve:()=>{ try{ if(row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(state,hno,turnDeadline)=>{
+      // ★fix(P0双host竞态): 推进引擎后,广播前检查是否被夺权
+      //   场景:host掉线15s,guest接管(写host_uid);原host网络恢复,继续推进引擎
+      //   修复:检测host_uid!=myUid → 停止引擎,防双host分裂游戏状态
+      const _fr = _gtTables.get(row.id);
+      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
+        console.warn('[gt] 检测到被夺权(host_uid!=myUid),停止引擎', row.id);
+        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
+        try { _gtCleanupPlay(); } catch(_) {}
+        return;  // 不广播快照,不写底牌,立即停止
+      }
       // ★v74fix: 先写远程真人底牌入库, 再广播快照(同 gtLaunchPokerLobby), 消除 guest 拉空竞态。
       if(hno!==lastHandWritten){
         lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat);
@@ -4856,6 +4874,14 @@ function gtLaunchGuandan(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
+      // ★fix(P0双host竞态): 推进后检查是否被夺权(host掉线→guest接管→原host恢复)
+      const _fr = _gtTables.get(row.id);
+      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
+        console.warn('[gt] 掼蛋检测到被夺权,停止引擎', row.id);
+        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
+        try { _gtCleanupPlay(); } catch(_) {}
+        return;
+      }
       gtWriteGuandanHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(掼蛋出一张变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
@@ -4990,6 +5016,14 @@ function gtLaunchDdz(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
+      // ★fix(P0双host竞态): 推进后检查是否被夺权
+      const _fr = _gtTables.get(row.id);
+      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
+        console.warn('[gt] 斗地主检测到被夺权,停止引擎', row.id);
+        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
+        try { _gtCleanupPlay(); } catch(_) {}
+        return;
+      }
       gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
