@@ -1199,8 +1199,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; try{ if(root.EHTableOrient) root.EHTableOrient.reflect(room); }catch(_){} positionSeats(); }); };
     const onOrient = ()=>{ setTimeout(onResize, 120); };
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onOrient); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
-      if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
+    function close(){ 
+      _exited=true;  // ★fix: 立即标记已退出,防止 close 后残留的 updateRoster/renderAll 调用
+      minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); clearWalkIn(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onOrient); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
+      if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} }
+    }
 
     // ── 折叠 / 展开(返回聊天但牌局继续) ──
     let minimized=false, chip=null;
@@ -2029,6 +2032,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     let _lastActsSig='';
     function renderActs(force){
+      // ★fix(防重复点击恢复): 签名早退前先恢复按钮 enabled,防失败 toast 后签名不变导致按钮卡禁用
+      try{ els.acts.querySelectorAll('button').forEach(b=>b.disabled=false); }catch(_){}
       // 旁观态钩子: 收掉 pk-me + 压缩 pk-acts 高度, 底部只留一条旁观 bar
       room.classList.toggle('pk-spectating', !!(spectating||mySeat<0));
       if (st.phase==='lobby'){ _lastActsSig='lobby'; renderLobbyCtrl(); return; }
@@ -2180,6 +2185,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     function humanAct(action, amount, auto){
       if (st.toAct!==mySeat || awaitingHost) return;
+      // ★fix(防重复点击): 立即禁用所有动作按钮,不依赖下一帧 renderActs —— 点到 renderAll 的 ~50ms 窗口会被重复点击
+      try{ els.acts.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){}
       if (!auto){
         resetMiss(mySeat);
         // 手动点按 = 清掉预选/加注额残留, 免下一回合被当成"已选中"的默认动作
@@ -2757,6 +2764,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   引擎座位数(n)固定不变(德州 seat_count 恒定), 只切换每席"真人 remote / 本机 AI"的驱动方, 座号不错位。
     let pendingRoster = null;
     function updateRoster(A){
+      if(_exited) return;  // ★fix: close后拒绝updateRoster,防散桌后残留渲染
       if (isGuest || !A || !Array.isArray(A.names) || A.names.length !== n) return;
       pendingRoster = A;
     }
@@ -2962,6 +2970,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
 
     function renderAll(){
+      if(_exited) return;  // ★fix: close后拒绝renderAll,防散桌后残留渲染
       room.dataset.phase = st.phase;   // 招募态桌面化的 CSS 钩子: [data-phase="lobby"] 命中一整套空桌样式(打牌态无此属性→不受影响)
       maybeCollectChips();   // 街结束→筹码归池(须在 renderOpponents 重建座位/清 commit 之前捕获旧位置)
       renderPot(); renderBoard(); renderOpponents(); renderMe(); renderMsg();

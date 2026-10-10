@@ -1015,8 +1015,11 @@ html[data-mode="day"] .ddz-felt::before{
     let _rzRAF=0;
     const onResize = ()=>{ if(_rzRAF) return; _rzRAF=requestAnimationFrame(()=>{ _rzRAF=0; layoutHand(); }); };
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } closeInviteMenu(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
-      if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
+    function close(){ 
+      _exited=true;  // ★fix: 立即标记已退出,防 close 后残留渲染
+      minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } closeInviteMenu(); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
+      if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} }
+    }
     window.addEventListener('resize', onResize);
 
     // ── 划选: 指针涂抹式多选(点=单选 / 拖过整段=连选), 取代逐张 click, 与掼蛋同源 ──
@@ -1830,6 +1833,8 @@ html[data-mode="day"] .ddz-felt::before{
     }
     let _lastCtrlSig='';
     function renderCtrl(){
+      // ★fix(防重复点击恢复): 签名早退前先恢复按钮 enabled,防失败 toast 后签名不变导致按钮卡禁用
+      try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=false); }catch(_){}
       // ★T94 签名护栏: 状态未变跳过重建(出牌后每秒 renderAll 不再白白重建操作区)
       const _sig=[winReveal, st.phase, st.turn, connState, spectating, selected.size].join('|');
       if(_sig===_lastCtrlSig) return;
@@ -2135,6 +2140,8 @@ html[data-mode="day"] .ddz-felt::before{
     }
     function doPlay(){
       const cards = [...selected].map(findCardById).filter(Boolean);
+      // ★fix(防重复点击): 有选牌时立即禁用控制区按钮
+      if(cards.length){ try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){} }
       if (isGuest){   // 真人路径同一套: 回传 + 本地立刻出牌进下家
         if (!cards.length || awaitingHost) return;
         if (onAction) onAction({ action:'play', cards: cards.map(c=>c.id) });
@@ -2156,6 +2163,8 @@ html[data-mode="day"] .ddz-felt::before{
     function doPass(seat){
       if (isGuest){   // 真人路径同一套: 回传 + 本地立刻不出进下家
         if (seat!==mySeat || awaitingHost) return;
+        // ★fix(防重复点击): 立即禁用控制区按钮
+        if(seat===mySeat){ try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){} }
         if (onAction) onAction({ action:'pass' });
         awaitingHost=true;
         try { Engine.applyPass(st, seat); }
@@ -2164,6 +2173,8 @@ html[data-mode="day"] .ddz-felt::before{
         say(seat,'不出'); sayOp(seat,'不出');
         renderAll(); return;
       }
+      // ★fix(防重复点击): host 分支也立即禁用按钮
+      if(seat===mySeat){ try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){} }
       try { Engine.applyPass(st, seat); } catch(e){ toast('现在不能不出'); return; }
       if (seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
       say(seat,'不出'); sayOp(seat,'不出');
@@ -2364,6 +2375,7 @@ html[data-mode="day"] .ddz-felt::before{
 
     // 每次状态推进后统一重绘 + 重新武装当前回合(倒计时/AI 行动)
     function renderAll(){
+      if(_exited) return;  // ★fix: close后拒绝renderAll,防散桌后残留渲染
       room.classList.toggle('is-lobby', st.phase==='lobby');   // 招募态复用对局桌骨架, 仅隐未发牌无意义元素
       room.classList.toggle('is-over', st.phase==='over' && !winReveal);      // 结算态: 就地亮牌+中央结果横幅, 隐落牌/上家/倍数徽标(winReveal 期间先不切, 让制胜手留在桌心)
       if (lastLord===null && st.landlord!=null){

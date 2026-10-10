@@ -1057,8 +1057,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       clearTimeout(_settleTO); _settleTO=setTimeout(kick, 320);
     }
     let _exited=false;
-    function close(){ minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } if(_settleRAF){ cancelAnimationFrame(_settleRAF); _settleRAF=0; } clearTimeout(_settleTO); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
-      if(!_exited){ _exited=true; if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} } } }
+    function close(){ 
+      _exited=true;  // ★fix: 立即标记已退出,防 close 后残留渲染
+      minimized=false; try{ if(root.EHStrategy) root.EHStrategy.clear(strategyMatchId); }catch(_){} try{ if(root.EhGameBgm) root.EhGameBgm.exit(); }catch(_){} try{ closeInviteMenu(); }catch(_){} clearTimers(); if(_rzRAF){ cancelAnimationFrame(_rzRAF); _rzRAF=0; } if(_settleRAF){ cancelAnimationFrame(_settleRAF); _settleRAF=0; } clearTimeout(_settleTO); window.removeEventListener('resize', onResize); if(root.EHTableOrient) root.EHTableOrient.clear(room); if(dock) dock.destroy(); if(chip){ chip.remove(); chip=null; } room.remove(); try{ (mountEl.closest('#hall')||mountEl).classList.remove('game-on'); document.documentElement.classList.remove('game-on'); }catch(_){}
+      if(typeof opts.onExit==='function'){ try{ opts.onExit(); }catch(_){} }
+    }
 
     // ── F1 融合: 折叠(返回聊天但牌局继续) / 展开(回牌桌); 见 game-ui.js 同款注释 ──
     let minimized=false, chip=null;
@@ -2084,6 +2087,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
 
     let _lastCtrlSig='';
     function renderCtrl(){
+      // ★fix(防重复点击恢复): 签名早退前先恢复按钮 enabled,防失败 toast 后签名不变导致按钮卡禁用
+      try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=false); }catch(_){}
       // ★T94 签名护栏: 状态未变跳过重建(出牌后每秒 renderAll 不再白白重建操作区)
       const _sig=[spectating, st.phase, st.turn, connState, (st.table&&st.table.lastPlay&&st.table.lastPlay.seat), selected.size].join('|');
       if(_sig===_lastCtrlSig) return;
@@ -2253,6 +2258,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     function doPlay(){
       if (st.phase!=='play' || st.turn!==mySeat) return;   // 防重复提交/非我回合空点(双击时第二发不再弹"非法牌型"toast)
       const cards=[...selected].map(findCardById).filter(Boolean);
+      // ★fix(防重复点击): 有合法选牌时立即禁用控制区按钮,不依赖下一帧重绘
+      if(cards.length){ try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){} }
       if (isGuest){   // 真人路径同一套: 回传 + 本地立刻出牌进下家
         if (!cards.length || awaitingHost) return;
         if (onAction) onAction({ action:'play', cards: cards.map(c=>c.id) });
@@ -2271,6 +2278,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     function doPass(seat){
       if (isGuest){   // 真人路径同一套: 回传 + 本地立刻不出进下家
         if (awaitingHost) return;
+        // ★fix(防重复点击): 立即禁用控制区按钮
+        try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){}
         if (onAction) onAction({ action:'pass' });
         awaitingHost=true;
         try{ var rp=Engine.applyPass(st, seat); }
@@ -2278,6 +2287,8 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
         if(seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }
         say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp); return;
       }
+      // ★fix(防重复点击): host 分支也立即禁用按钮
+      try{ els.ctrl.querySelectorAll('button').forEach(b=>b.disabled=true); }catch(_){}
       try{ var rp=Engine.applyPass(st, seat); }catch(e){ toast('现在不能不出'); return; }
       if(seat===mySeat){ sfx('pass'); selected.clear(); hintCycle=[]; }   // 我不出 → 收回选中的牌
       say(seat,'不出'); sayOp(seat,'不出'); passFx(seat); afterMove(rp);
@@ -2789,6 +2800,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     }
 
     function renderAll(){
+      if(_exited) return;  // ★fix: close后拒绝renderAll,防散桌后残留渲染
       updateTrickActs();   // 先派生各席本圈最近动作, 供 renderSeats 常驻"上一手牌"
       renderSeats(); renderScore(); renderMatePeek(); renderTable(); renderHand(); setBanner(); renderCtrl();
       armTurn(minimized ? null : onHumanTimeout);   // 折叠期间不催我的回合(离席看聊天不该被自动过牌)

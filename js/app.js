@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v112';
+window.__EH_APP_VER = '20261004-v113';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2849,8 +2849,9 @@ async function setupGameTables(room){
       }
       // host 侧德州: 座位名册变了(有人中途坐下空位/离座) → 喂给正在跑的引擎, 下一手重组牌手
       //   (真人上桌换掉 AI 顶位 / 走人的席回落 AI)。引擎逐手 newHand 时读最新名册, 座号固定不错位。
+      // ★fix(散桌残留渲染): status=closed(散桌)时不再 updateRoster —— 防止 SQL 清理座位后 realtime 推残缺 seats → 触发"机器人0"渲染, 然后才 dissolve。
       if(_gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host && row.game==='nlhe'
-         && _ehGame && typeof _ehGame.updateRoster==='function'){
+         && row.status!=='closed' && _ehGame && typeof _ehGame.updateRoster==='function'){
         try{ _ehGame.updateRoster(gtSeatArrays(row)); }catch(_){ _ehCatch('gtUpdateRoster',_); }
       }
       // 无房主架构: realtime 收到座位/状态变化后检查自动开桌 + 引擎转移
