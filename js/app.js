@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v111';
+window.__EH_APP_VER = '20261004-v112';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3949,9 +3949,13 @@ function gtSeatArrays(row){
   const names=[],avatars=[],isAI=[],ids=[],souls=[];
   seats.forEach((s,i)=>{
     const human=s.kind==='human';
-    // 兜底名与 SQL(eh_gt_start 补位)统一叫「机器人N」——旧版这里叫「牌手N」, 同一批 AI 两条路径两个词, 主人反馈"命名不一致"。座位号(seat)对齐 SQL 用真实席位而非渲染下标 i。
-    names[i]=s.name || (human?'玩家':(s.kind==='soul'?'灵魂':'机器人'+(typeof s.seat==='number'?s.seat:i+1)));
-    avatars[i]=s.emoji || (human?'🙂':(s.kind==='soul'?'👤':'🤖'));
+    const hasSoul = s.kind==='soul' && soulMap[s.uid];
+    // ★fix(机器人0根因): 兜底命名时检查 uid —— 如果座位有 uid(真人/灵魂), 即使 kind 字段异常(all in/bust/散桌时 DB 推来残缺中间态), 也不该叫"机器人"。
+    //   根因链路: DB seats[{kind:null,uid:'abc'}] → gtSeatArrays 只看 kind → 兜底命名"机器人N" → 引擎 player.name → renderOpponents 显示"机器人0"。
+    //   修复: 先检查 uid 存在性(真人/灵魂的可靠判据), 再用 kind 精确分类。all in 后只有真 AI 才该叫"机器人"。
+    const isRealHuman = s.uid && (human || !hasSoul);  // 有 uid 且 (kind='human' 或 kind 不是 'soul')
+    names[i]=s.name || (isRealHuman?'玩家':(hasSoul?'灵魂':'机器人'+(typeof s.seat==='number'?s.seat:i+1)));
+    avatars[i]=s.emoji || (isRealHuman?'🙂':(hasSoul?'👤':'🤖'));
     isAI[i]=!human;                       // 灵魂/AI/空位一律 host 本机 AI 代打
     ids[i]=s.uid||null;
     const soul=(s.kind==='soul'&&soulMap[s.uid])||null;
