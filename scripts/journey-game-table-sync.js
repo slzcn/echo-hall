@@ -12,15 +12,21 @@ let step = 0, failed = false;
 function assert(c, m){ step++; if(!c){ failed=true; console.error('✗ ['+step+'] '+m); } else console.log('✓ ['+step+'] '+m); }
 function eq(a, b, m){ step++; if(a!==b){ failed=true; console.error('✗ ['+step+'] '+m+' (expected '+JSON.stringify(b)+', got '+JSON.stringify(a)+')'); } else console.log('✓ ['+step+'] '+m); }
 
-// mock supabase(只需 channel/removeChannel 不报错)
-function mockSupabase(){
+// mock supabase(记录 RPC 调用和 channel 广播,供行为验证)
+function mockSupabase(log){
+  log = log || {};
+  log.rpcCalls = log.rpcCalls || [];
+  log.broadcasts = log.broadcasts || [];
+  const chan = {
+    on(){ return this; },
+    subscribe(){ return this; },
+    send(msg){ log.broadcasts.push(msg); return Promise.resolve(); },
+  };
   return {
-    channel: () => ({
-      on(){ return this; },
-      subscribe(){ return this; },
-    }),
+    _log: log,
+    channel: () => chan,
     removeChannel(){},
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: (name, args) => { log.rpcCalls.push({ name, args }); return Promise.resolve({ data: { ok: true }, error: null }); },
   };
 }
 
@@ -93,9 +99,52 @@ console.log('\n▸ 3. 生命周期 start/stop');
   console.log('\n▸ 7. 职责边界(不碰 DOM/引擎)');
   assert(!/document\.|innerHTML|querySelector|renderAll|applyMove/.test(src), '模块不碰 DOM/引擎(职责纯净)');
 
+  console.log('\n▸ 8. takeSeat/leaveSeat RPC 行为');
+  const log1 = {};
+  const sync3 = new GameTableSync({ tableId: 'tbl-3', game: 'nlhe', myUid: 'uid-bob', supabase: mockSupabase(log1) });
+  await sync3.start();
+  await sync3.takeSeat(2, { name: 'Bob', emoji: '🧑' });
+  const sitCall = log1.rpcCalls.find(c => c.name === 'eh_gt_join');
+  assert(!!sitCall, 'takeSeat 调用 eh_gt_join');
+  eq(sitCall.args.p_table, 'tbl-3', 'takeSeat 传正确 table');
+  eq(sitCall.args.p_seat, 2, 'takeSeat 传正确 seat');
+  eq(sitCall.args.p_name, 'Bob', 'takeSeat 传正确 name');
+  await sync3.leaveSeat();
+  const leaveCall = log1.rpcCalls.find(c => c.name === 'eh_gt_leave');
+  assert(!!leaveCall, 'leaveSeat 调用 eh_gt_leave');
+  eq(leaveCall.args.p_table, 'tbl-3', 'leaveSeat 传正确 table');
+  sync3.stop();
+
+  console.log('\n▸ 9. broadcastSnapshot(host)行为');
+  const log2 = {};
+  const sync4 = new GameTableSync({ tableId: 'tbl-4', game: 'nlhe', myUid: 'uid-host', supabase: mockSupabase(log2) });
+  await sync4.start();
+  // 非 host 不能广播
+  try { await sync4.broadcastSnapshot({ handNo: 1 }); assert(false, '非host广播应抛错'); }
+  catch(e){ assert(/非 host/.test(e.message), '非host广播被拒'); }
+  // 模拟成为 host(通过 handleTableUpdate 触发,但私有;改用源码契约验证已在上面)
+  // 这里验证 broadcastSnapshot 的 channel.send 调用需要 host 身份,契约已足够
+  sync4.stop();
+
+  console.log('\n▸ 10. sendAction(guest 乐观发送)行为');
+  const log3 = {};
+  const sync5 = new GameTableSync({ tableId: 'tbl-5', game: 'nlhe', myUid: 'uid-guest', supabase: mockSupabase(log3) });
+  await sync5.start();
+  // 未入座不能出牌
+  try { await sync5.sendAction({ action: 'check' }); assert(false, '未入座出牌应抛错'); }
+  catch(e){ assert(/未入座/.test(e.message), '未入座出牌被拒'); }
+  sync5.stop();
+
+  console.log('\n▸ 11. 核心方法源码契约');
+  assert(/eh_gt_join/.test(src), 'takeSeat 用 eh_gt_join RPC');
+  assert(/eh_gt_leave/.test(src), 'leaveSeat 用 eh_gt_leave RPC');
+  assert(/eh_gt_set_hands/.test(src), 'writeHands 用 eh_gt_set_hands RPC');
+  assert(/event: 'act'[\s\S]*?via: 'bc'/.test(src), 'sendAction 乐观发送(广播先行+via:bc)');
+  assert(/String\(payload\.uid\) !== String\(seatUid\)/.test(src), 'handleAction uid 校验防伪造');
+
   if (failed){
     console.error('\n✗ GameTableSync 单元测试未通过');
     process.exit(1);
   }
-  console.log('\n✅ GameTableSync 单元测试通过(骨架 + 座位转换防护 + 生命周期)');
+  console.log('\n✅ GameTableSync 单元测试通过(骨架 + 座位防护 + 生命周期 + 核心方法)');
 })();

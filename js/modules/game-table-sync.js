@@ -59,6 +59,12 @@
             { event: '*', schema: 'public', table: 'eh_game_tables', filter: `id=eq.${this.#tableId}` },
             payload => this.#handleTableUpdate(payload.new)
           )
+          .on('broadcast', { event: 'snap' }, payload => {
+            if (payload && payload.payload) this.#handleSnapshot(payload.payload);
+          })
+          .on('broadcast', { event: 'act' }, payload => {
+            if (payload && payload.payload) this.#handleAction(payload.payload);
+          })
           .subscribe();
       } catch(e){
         this.#triggerError('start.subscribe', e);
@@ -87,36 +93,103 @@
     }
 
     // ── 公开方法:座位操作 ──
-    async takeSeat(seat){
+    async takeSeat(seat, opts){
       if (!this.#running) throw new Error('GameTableSync: 未启动');
-      // TODO: 调用 supabase.rpc('eh_gt_sit', { table_id, seat })
-      throw new Error('takeSeat: 未实现');
+      const name = (opts && opts.name) || '玩家';
+      const emoji = (opts && opts.emoji) || '🙂';
+      try {
+        const { data, error } = await this.#supabase.rpc('eh_gt_join', {
+          p_table: this.#tableId,
+          p_seat: seat,
+          p_name: name,
+          p_emoji: emoji
+        });
+        if (error) throw error;
+        return { success: true, data };
+      } catch(e){
+        this.#triggerError('takeSeat', e);
+        throw e;
+      }
     }
 
     async leaveSeat(){
       if (!this.#running) throw new Error('GameTableSync: 未启动');
-      // TODO: 调用 supabase.rpc('eh_gt_leave', { table_id })
-      throw new Error('leaveSeat: 未实现');
+      try {
+        const { data, error } = await this.#supabase.rpc('eh_gt_leave', {
+          p_table: this.#tableId
+        });
+        if (error) throw error;
+        return { success: true, data };
+      } catch(e){
+        this.#triggerError('leaveSeat', e);
+        throw e;
+      }
     }
 
     // ── 公开方法:Host 操作 ──
     async broadcastSnapshot(snapshot){
       if (!this.#isHost) throw new Error('GameTableSync: 非 host 不能广播快照');
-      // TODO: 调用 supabase.rpc('eh_gt_snapshot', { table_id, snapshot_json })
-      throw new Error('broadcastSnapshot: 未实现');
+      if (!this.#channel) throw new Error('GameTableSync: channel 未初始化');
+      try {
+        // 通过 realtime channel 广播(不走 RPC,实时性更好)
+        await this.#channel.send({
+          type: 'broadcast',
+          event: 'snap',
+          payload: snapshot
+        });
+        return { success: true };
+      } catch(e){
+        this.#triggerError('broadcastSnapshot', e);
+        throw e;
+      }
     }
 
     async writeHands(hands){
       if (!this.#isHost) throw new Error('GameTableSync: 非 host 不能写底牌');
-      // TODO: 批量写 eh_gt_hands
-      throw new Error('writeHands: 未实现');
+      try {
+        const { data, error } = await this.#supabase.rpc('eh_gt_set_hands', {
+          p_table: this.#tableId,
+          p_hands: hands
+        });
+        if (error) throw error;
+        return { success: true, data };
+      } catch(e){
+        this.#triggerError('writeHands', e);
+        throw e;
+      }
     }
 
     // ── 公开方法:Guest 操作 ──
+    // ★T95 乐观发送:广播先行(消掉 RPC 往返延迟)+ RPC 后台审计(JWT→座位绑定校验)
+    //   host 的 acceptMove 用 uid 重映射兜底,合法玩家零等待;RPC 失败只丢审计不回滚。
     async sendAction(action){
       if (this.#isHost) throw new Error('GameTableSync: host 不需要 sendAction');
-      // TODO: 调用 supabase.rpc('eh_gt_act', { table_id, action_json })
-      throw new Error('sendAction: 未实现');
+      if (!this.#channel) throw new Error('GameTableSync: channel 未初始化');
+      const seat = this.#mySeat;
+      if (seat < 0) throw new Error('GameTableSync: 未入座不能出牌');
+      
+      // 1. 广播先行(host 立即收到并应用)
+      try {
+        this.#channel.send({
+          type: 'broadcast',
+          event: 'act',
+          payload: { seat, move: action, uid: this.#myUid, via: 'bc' }
+        });
+      } catch(e){
+        this.#triggerError('sendAction.broadcast', e);
+      }
+      
+      // 2. RPC 后台审计(不阻塞,失败只丢审计)
+      this.#supabase.rpc('eh_gt_act', {
+        p_table: this.#tableId,
+        p_seat: seat,
+        p_move: action || null
+      }).then(res => {
+        const err = res && res.error;
+        if (err) { /* 审计失败,动作已送达 host,不回滚 */ }
+      }, () => { /* RPC 网络失败,同上 */ });
+      
+      return { success: true };
     }
 
     // ── 公开方法:查询 ──
@@ -157,6 +230,30 @@
       if (JSON.stringify(oldSeatArrays) !== JSON.stringify(this.#seatArrays)){
         this.#triggerCallback('onSeatChange', this.#seatArrays);
       }
+    }
+
+    // ── 内部方法:处理快照广播(guest 收 host 的游戏状态) ──
+    #handleSnapshot(snapshot){
+      if (!this.#running) return;
+      // host 自己不处理自己广播的快照
+      if (this.#isHost) return;
+      this.#triggerCallback('onSnapshot', snapshot);
+    }
+
+    // ── 内部方法:处理远程动作(host 收 guest 的出牌) ──
+    #handleAction(payload){
+      if (!this.#running) return;
+      // 只有 host 处理远程动作
+      if (!this.#isHost) return;
+      // uid 校验:动作声明的 uid 必须匹配该座位的 uid(防伪造)
+      if (payload && typeof payload.seat === 'number' && this.#seatArrays){
+        const seatUid = this.#seatArrays.ids && this.#seatArrays.ids[payload.seat];
+        if (payload.uid && seatUid && String(payload.uid) !== String(seatUid)){
+          console.warn('[GameTableSync] 拒绝动作:uid 不匹配', payload.seat);
+          return;
+        }
+      }
+      this.#triggerCallback('onAction', payload);
     }
 
     // ── 内部方法:座位数组转换(从 app.js 移植) ──

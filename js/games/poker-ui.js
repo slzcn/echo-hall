@@ -2811,6 +2811,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       normalizeBotNames();   // 名册更新后同样统一本机 AI 兜底名为花名
       personaBySeat = names.map((_, seat) => personaFor(seat));
       remoteSeats.length = 0; (A.remoteSeats || []).forEach(x => remoteSeats.push(x));
+      
+      // ★fix(统一座位身份源): 同步 names[]/avatars[] 到 st.players[].name/emoji,
+      //   消除"引擎历史用旧名字 vs 渲染用新名字"的数据分裂(架构审查报告1.2)
+      if (st && st.players){
+        for (let s=0; s<st.players.length; s++){
+          if (st.players[s]){
+            st.players[s].name = names[s] || ('席'+s);
+            if (avatars && avatars[s]) st.players[s].emoji = avatars[s];
+          }
+        }
+      }
     }
 
     // 主人诉求: 点"返回"后不再无限后台连打 —— 到"下一局开始"这一刻就离场。
