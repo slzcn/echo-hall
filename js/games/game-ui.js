@@ -1915,7 +1915,10 @@ html[data-mode="day"] .ddz-felt::before{
       const noBeat = myTurn && mustBeat && !canBeat;
       // 提示钮: 有多套可出方案可循环, 或队友领出且我能压(点一下给"让队友走"引导) 才亮。
       const hintOn = myTurn && (plays.length>1 || (mustBeat && canBeat));
+      // ★fix(等待交互): 非我回合显示等待文案,而非空白灰骨架
+      const waitTag = !myTurn ? '<span class="eh-spectate-tag" style="opacity:0.6;margin-bottom:8px">⏳ 等待其他玩家…</span>' : '';
       els.ctrl.innerHTML = `<div class="ddz-acts">
+        ${waitTag}
         <button class="ddz-btn ${noBeat?'primary':'ghost'}" id="ddzPass" ${!myTurn||!mustBeat?'disabled':''}>${noBeat?'要不起':'不出'}</button>
         <button class="ddz-btn ghost" id="ddzHint" ${hintOn?'':'disabled'}>提示</button>
         <button class="ddz-btn primary" id="ddzPlay" disabled>出牌</button>

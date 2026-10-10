@@ -2127,7 +2127,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       const passPrimary = mateLead || noBeat;                               // 高亮引导"不出"
       // 主标恒短("不出"), 事由放 .bt 小字副标(与"出牌 <三连对>"同构) → 按钮不被长文撑破/裁字。
       const passLbl = mateLead ? '不出 <span class="bt">队友当家</span>' : (noBeat ? '不出 <span class="bt">压不过</span>' : '不出');
+      // ★fix(等待交互): 非我回合显示等待文案,而非空白灰骨架
+      const waitTag = !myTurn ? '<span class="eh-spectate-tag" style="opacity:0.6;margin-bottom:8px">⏳ 等待其他玩家…</span>' : '';
       els.ctrl.innerHTML=`<div class="gd-acts">
+        ${waitTag}
         <button class="gd-btn ${passPrimary?'primary':'ghost'}" id="gdPass" ${!myTurn||!mustBeat?'disabled':''}>${passLbl}</button>
         <button class="gd-btn ghost" id="gdHint" ${!myTurn||plays.length<=1?'disabled':''}>提示</button>
         <button class="gd-btn primary" id="gdPlay" disabled>出牌</button>
