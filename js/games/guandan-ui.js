@@ -95,7 +95,7 @@
 .gd-lvl b{color:#fff}
 /* 顶栏功能钮组(主人诉求·再统一): 音乐/横屏/返回 三颗同尺寸磨砂圆钮 + 同族线性图标(SVG 等大等粗, 单色跟随 currentColor),
    告别 emoji🎵/字符⟳/文字"返回"混搭致"元素大小不一"。悬浮青光按压回弹; 返回保留红调、旋转激活亮青。 */
-.gd-mus,.gd-x{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
+.gd-mus,.gd-x,.gd-skin,.gd-auto{width:44px;height:44px;border-radius:12px;flex-shrink:0;cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;color:var(--sub);
   border:1px solid var(--line,color-mix(in srgb, var(--accent) 24%, transparent));
   background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.18));
@@ -104,10 +104,15 @@
 .gd-mus{margin-left:0}
 .gd-bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .gd-ico{width:18px;height:18px;display:block}
-.gd-mus:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
+.gd-mus:hover,.gd-skin:hover,.gd-auto:hover{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 12px rgba(0,0,0,.32),0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)}
-.gd-mus:active:active,.gd-x:active{transform:scale(.92)}
+.gd-mus:active:active,.gd-x:active,.gd-skin:active,.gd-auto:active{transform:scale(.92)}
 .gd-mus.muted{color:var(--dim);opacity:.8}
+/* BGM 按钮: 开=轻微呼吸, 静音=灰淡(对齐德州/房间)。★只音乐按钮呼吸, 音效(gd-sfx)不呼吸 */
+.gd-mus:not(.muted):not(.gd-sfx){animation:gdBgmBreath 2.4s ease-in-out infinite}
+@keyframes gdBgmBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+/* 浮层开启/托管开启时按钮保持选中态(对齐德州/房间) */
+.gd-mus.active,.gd-x.active,.gd-skin.active,.gd-auto.active{color:var(--accent,var(--cyan));border-color:var(--accent,var(--cyan));background:color-mix(in srgb,var(--accent,var(--cyan)) 14%,transparent)}
 .gd-rot.on{color:var(--accent);border-color:var(--accent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 14px color-mix(in srgb, var(--accent) 50%, transparent)}
 .gd-x:hover{color:var(--magenta);border-color:color-mix(in srgb,var(--magenta) 55%,transparent);
@@ -934,7 +939,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
         <div class="gd-title"><span class="dot"></span>掼蛋</div>
         <div class="gd-lvl" id="gdLvl"></div>
         <div class="gd-bar-right">
-          <button class="gd-mus" id="gdSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
+          <button class="gd-mus gd-sfx" id="gdSfx" aria-label="音效·震动·读牌" title="音效·震动·读牌">${ICO_SFX_ON}</button>
           <button class="gd-mus" id="gdMus" aria-label="氛围音乐" title="氛围音乐">${ICO_MUS_ON}</button>
           <button class="gd-skin eh-skin" id="gdSkin" aria-label="皮肤" title="皮肤">🎨</button>
           <button class="gd-auto" id="gdAuto" aria-label="托管开关" title="托管 · AI 替你自动出牌">${ICO_AUTO}</button>
