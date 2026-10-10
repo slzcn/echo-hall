@@ -2004,14 +2004,19 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 无操作占位态(旁观/等待/已弃/已全下/离线): 底部=纯操作区, 不放提示文案。
     //   提示统一由顶部 pk-msg 承载(T88/T92: 顶部=提示, 底部=按钮/占位, 不混用不重复)。
     //   ★T93 与骨架/激活态【同高同结构】三行(raise+quick+row), 切换 felt 纹丝不动, 不再抖版。
-    function actsWaitBar(){
+    function actsWaitBar(reason){
+      // ★fix(all in交互): 显示明确状态文案,而非空白灰骨架
+      let tag = '';
+      if (reason === 'folded') tag = '<span class="eh-spectate-tag">🏳️ 已弃牌 · 观战中</span>';
+      else if (reason === 'allin') tag = '<span class="eh-spectate-tag">💎 已全下 · 等待摊牌</span>';
+      else if (reason === 'spectate') tag = '<span class="eh-spectate-tag">🔭 旁观中 · 已让座</span>';
+      else tag = '<span class="eh-spectate-tag" style="opacity:0.6">⏳ 等待其他玩家…</span>';
+      
       return `
         <div class="pk-raise reserved"><input type="range" disabled><span class="pk-amt"></span></div>
         <div class="pk-quick reserved"><button class="pk-qbtn" disabled>最小</button><button class="pk-qbtn" disabled>½池</button><button class="pk-qbtn" disabled>⅔池</button><button class="pk-qbtn" disabled>底池</button><button class="pk-qbtn" disabled>全下</button></div>
         <div class="pk-row">
-          <button class="pk-b fold" disabled>弃牌</button>
-          <button class="pk-b call" disabled></button>
-          <button class="pk-b raise" disabled>加注</button>
+          ${tag}
         </div>`;
     }
     // 招募态操作区: 补满 / 邀真人 / 开始(满 2 席自动开, 开始作兜底)
@@ -2042,7 +2047,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       if (spectating || mySeat<0){
         if(!force && _lastActsSig==='spectate') return;
         _lastActsSig='spectate';
-        els.acts.innerHTML = actsWaitBar();
+        els.acts.innerHTML = actsWaitBar('spectate');
         return;
       }
       const offline = isGuest && connState!=='online';
@@ -2061,10 +2066,11 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
           return;
         }
         // ★T93 提示统一到顶部: 底部只放高度占位, 不再重复状态文案(已弃牌/全下/等待等)
-        const sig='wait:'+(p&&p.folded?'f':p&&p.allin?'a':'w')+st.phase+offline;
+        const reason = p&&p.folded ? 'folded' : p&&p.allin ? 'allin' : 'wait';
+        const sig='wait:'+reason+st.phase+offline;
         if(!force && sig===_lastActsSig) return;
         _lastActsSig=sig;
-        els.acts.innerHTML = actsWaitBar();
+        els.acts.innerHTML = actsWaitBar(reason);
         return;
       }
       // ★fix: 我的回合加签名护栏 — 先校正 raiseTo 再算签名, 签名未变则跳过重建,
