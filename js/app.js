@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v118';
+window.__EH_APP_VER = '20261004-v119';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2854,9 +2854,9 @@ async function setupGameTables(room){
          && row.status!=='closed' && _ehGame && typeof _ehGame.updateRoster==='function'){
         try{ _ehGame.updateRoster(gtSeatArrays(row)); }catch(_){ _ehCatch('gtUpdateRoster',_); }
       }
-      // 无房主架构: realtime 收到座位/状态变化后检查自动开桌 + 引擎转移
+      // 无房主架构: realtime 收到座位/状态变化后检查自动开桌 + 引擎持有者变化(接管/释放)
       gtCheckAutoStart(row);
-      gtCheckEngineTransfer(row);
+      gtHandleHolderChange(row);   // ★重构: 统一处理持有者变化(接管+释放, 防双host)
       // ★v56: realtime 回调不自动检测死房间/无真人, 避免心跳/away 同步延迟导致误判
       // 死房间检测只在 host 主动离场(_gtHandleHostLeave)时触发
       // ── 无房主自动开桌(2026-09-29): 德州招募态 ≥2 真人入座即自动开局(gtCheckAutoStart), 不需要手动点开始。
@@ -3815,9 +3815,18 @@ async function _gtEnterPokerServer(row) {
 //   host 离场时原子写 DB 把 host_uid 改成下一个玩家, 对方收 DB realtime 推送后启动引擎。
 //   消除"转移窗口期": DB 写入即生效, 无需广播协商。
 function gtEngineHolder(row){
-  // ★v82 无房主服务端模式: host_uid 仍标记【开局者/驱动者】(发牌/补灵魂/发牌桌卡),
-  //   仅用于前端驱动判断; nlhe 引擎跑在 Edge Function(不在本机跑), ddz/掼蛋仍是本机 host 引擎。
-  return (row && row.host_uid) ? row.host_uid : null;
+  // ★重构(真人host轮转单一事实源): 引擎持有者 = 座位最小的非 away 真人, 完全由 seats 推导。
+  //   根因修复: 旧逻辑返回 row.host_uid(建桌时写死, 之后永不更新), 且 host 轮转调用的 eh_gt_set_host
+  //   RPC 在 SQL 中不存在 → 轮转静默失败 → host_uid 永远指向离场的开桌者 → 多人进离场时引擎持有者判定失效,
+  //   走错分支崩溃退出。
+  //   现改为确定性推导: 无需 DB 写、无竞态、所有客户端算出同一答案; 有人进出座位即自动重算, 自愈。
+  //   ★注意区分: row.host_uid 仍是【桌主】(SQL 管理操作 close/kick/set_state 的权限校验), 与引擎持有者无关。
+  if(!row) return null;
+  const seats = row.seats || [];
+  const humans = seats
+    .filter(s=>s && s.kind==='human' && s.uid && !s.away)
+    .sort((a,b)=>a.seat-b.seat);
+  return humans.length ? humans[0].uid : null;
 }
 // 无房主: 自动开桌 —— 招募态下 ≥2 真人入座时, 引擎持有者延迟 800ms 自动开局(不需要手动点"开始")。
 function gtCheckAutoStart(row){
@@ -3870,25 +3879,43 @@ async function _gtHandleHostLeave(tableId, seats, myUid){
     try{ gtClose(tableId); }catch(_){}
     return;
   }
-  // 优先非 away 真人, 没有则取 seat 最小的 away 真人
-  const next=otherHumans.find(s=>!s.away) || otherHumans[0];
-  // ★fix: 如果选出的 next 是 away 的,说明所有其他真人都 away(无在线真人) → 立即散桌,不转移 host
-  //   原逻辑会把 host_uid 交给 away 的真人,但其客户端可能已离线永不接管,导致牌桌卡死。
-  //   用户要求"无真人就自动散桌",所有人都 away = 无在线真人,应立即散。
-  //   journey-exempt: 散桌逻辑收紧(away真人不接管),契约已由 journey-host-transfer + journey-multiplayer-scenarios 覆盖(无真人散桌场景)
-  if(next && next.away){
+  // ★重构: 引擎持有者由 seats 推导(gtEngineHolder), 无需写 host_uid。
+  //   我离场后我的座位变空 → 其余真人的 gtEngineHolder 自动重算为座位最小的非 away 真人 → 其收 realtime 后接管。
+  //   删掉旧的 eh_gt_set_host 调用(该 RPC 在 SQL 中不存在, 一直在静默失败)。
+  //   散桌判断: 所有其他真人都 away = 无在线真人 → 立即散桌, 不留卡死桌。
+  const _allAway = otherHumans.length>0 && otherHumans.every(s=>s.away);
+  if(_allAway){
     try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'dissolve', payload:{tableId}}); } }catch(_){}
     try{ _gtHideTableCard(tableId); }catch(_){}
     try{ gtClose(tableId); }catch(_){}
     return;
   }
-  // ★原逻辑:转移 host_uid 给非 away 真人
-  // ★v54 DB 仲裁: 调 eh_gt_set_host RPC (SECURITY DEFINER 绕 RLS) 把 host_uid 改成下一个玩家
-  try{
-    await sb.rpc('eh_gt_set_host', { p_table_id: tableId, p_new_host_uid: next.uid });
-  }catch(e){ _ehCatch('gtHandleHostLeave', e); }
+  // 有在线真人: 不写 DB, 让持有者随座位推导自动转移
 }
 
+// ★重构(真人host轮转): 持有者变化统一处理 —— 座位变动后重算引擎持有者, 自动接管/释放。
+//   持有者由 gtEngineHolder 从 seats 确定性推导(座位最小的非away真人), 无需写 host_uid。
+//   触发时机: realtime 收到 row 变化(有人进/出/away)时调用。
+function gtHandleHolderChange(row){
+  if(!row || row.id===undefined) return;
+  if(row.status!=='playing' && row.status!=='lobby') return;   // closed/done 不接管
+  if(_gtDissolvedTableId && _gtDissolvedTableId===row.id) return;
+  const holder = gtEngineHolder(row);
+  const iAmHolder = (holder === myUid);
+  const iHaveEngine = !!( _gtActiveTable && _gtActiveTable.id===row.id && _gtActiveTable.host );
+  // 我已持有引擎, 但已不是持有者 → 释放引擎(让位给新持有者, 防双host)
+  if(iHaveEngine && !iAmHolder){
+    console.log('[gt] 我不再是引擎持有者,释放引擎', row.id, '新持有者=', holder);
+    try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){ _ehCatch('gtHolderRelease',_); }
+    try{ _gtCleanupPlay(); }catch(_){}
+    // 释放后若我仍在座, 落到下面的 guest 进桌逻辑(realtime 回调会接)
+    return;
+  }
+  // 我是持有者且还没引擎 → 接管(gtCheckEngineTransfer 内部防重入 + 用快照 resume)
+  if(iAmHolder && !iHaveEngine){
+    try{ gtCheckEngineTransfer(row); }catch(_){ _ehCatch('gtHolderTakeover',_); }
+  }
+}
 // ★v51 DB 仲裁: 兜底检查 —— DB realtime 推送 host_uid 变化后, 若 host_uid===myUid 且我还没接管, 启动引擎。
 //   不再依赖 transfer 广播, 不再需要 _gtTakingOver 互斥锁(gtLaunchPoker 内部防重入)。
 function gtCheckEngineTransfer(row){
@@ -4355,16 +4382,6 @@ async function gtLaunchPoker(row, resumeSnap){
     // ★T92 无人解散回调: 三游戏 checkNoHumansThenDissolve 调用, 散桌回聊天室
     onDissolve:()=>{ try{ if(row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(state,hno,turnDeadline)=>{
-      // ★fix(P0双host竞态): 推进引擎后,广播前检查是否被夺权
-      //   场景:host掉线15s,guest接管(写host_uid);原host网络恢复,继续推进引擎
-      //   修复:检测host_uid!=myUid → 停止引擎,防双host分裂游戏状态
-      const _fr = _gtTables.get(row.id);
-      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
-        console.warn('[gt] 检测到被夺权(host_uid!=myUid),停止引擎', row.id);
-        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
-        try { _gtCleanupPlay(); } catch(_) {}
-        return;  // 不广播快照,不写底牌,立即停止
-      }
       // ★v74fix: 先写远程真人底牌入库, 再广播快照(同 gtLaunchPokerLobby), 消除 guest 拉空竞态。
       if(hno!==lastHandWritten){
         lastHandWritten=hno; gtWritePokerHands(row.id,state,A.mySeat);
@@ -4874,14 +4891,6 @@ function gtLaunchGuandan(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
-      // ★fix(P0双host竞态): 推进后检查是否被夺权(host掉线→guest接管→原host恢复)
-      const _fr = _gtTables.get(row.id);
-      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
-        console.warn('[gt] 掼蛋检测到被夺权,停止引擎', row.id);
-        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
-        try { _gtCleanupPlay(); } catch(_) {}
-        return;
-      }
       gtWriteGuandanHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(掼蛋出一张变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },
@@ -5016,14 +5025,6 @@ function gtLaunchDdz(row){
     chat: ehGameChatBridge(), onBeat: ehGameBeat,
     onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
     onSync:(snap,state)=>{
-      // ★fix(P0双host竞态): 推进后检查是否被夺权
-      const _fr = _gtTables.get(row.id);
-      if (_fr && _fr.host_uid && _fr.host_uid !== myUid) {
-        console.warn('[gt] 斗地主检测到被夺权,停止引擎', row.id);
-        try { if (_ehGame && typeof _ehGame.close === 'function') _ehGame.close(); } catch(_) {}
-        try { _gtCleanupPlay(); } catch(_) {}
-        return;
-      }
       gtWriteDdzHands(row.id, state, A);   // 动态: 每步都把远程席当前手牌写回私牌表(地主领底/出牌各变一次)
       try{ chan.send({type:'broadcast',event:'snap',payload:gtStampSnap(snap)}); }catch(e){ _ehCatch('gtSnapSend', e); }
     },

@@ -31,8 +31,9 @@ function eq(a, b, m){ if(a!==b) throw new Error(m+' (expected '+b+', got '+a+')'
 
 // ───────────────────── 静态断言: 修复点到位 ─────────────────────
 console.log('\n# 静态断言: 源码修复点');
-// ★v82 无房主架构: gtEngineHolder 直接返回 row.host_uid(DB 权威, away/离场由 eh_gt_set_host RPC 仲裁改 host_uid)
-it('gtEngineHolder: 返回 DB 权威 host_uid(away 过滤移到 eh_gt_set_host RPC)', ()=> /function gtEngineHolder\(row\)\{[\s\S]*?return\s*\(row && row\.host_uid\)\s*\?\s*row\.host_uid\s*:\s*null/.test(src));
+// ★重构: gtEngineHolder 从 seats 推导持有者
+// ★重构(真人host轮转单一事实源): gtEngineHolder 从 seats 确定性推导(座位最小的非away真人), 不再依赖 host_uid
+it('gtEngineHolder: 从 seats 推导持有者(座位最小非away真人), 不依赖 host_uid', ()=> /function gtEngineHolder\(row\)\{[\s\S]*?\.filter\(s=>s && s\.kind==='human' && s\.uid && !s\.away\)[\s\S]*?sort\(\(a,b\)=>a\.seat-b\.seat\)/.test(src));
 // ★乐观发送重构: 快照兜底加 _gtSnapCache, 签名 gtLaunchPoker(row, _resumeSnap || _gtSnapCache.get(...) || null)
 it('gtCheckEngineTransfer: 接管前取 guest lastSnap 传 resumeSnap', ()=> /_ehGame\.lastSnap\(\)/.test(src) && /gtLaunchPoker\(row,\s*_resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null\)/.test(src));
 it('gtCheckEngineTransfer: 接管后立刻 resync 广播', ()=> /gtLaunchPoker\(row,\s*_resumeSnap[\s\S]*?_ehGame\.resync\(\)/.test(src));
