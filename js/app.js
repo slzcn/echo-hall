@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v128';
+window.__EH_APP_VER = '20261004-v129';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -4452,41 +4452,28 @@ async function _gtGrabSeat(row){
 }
 
 // ── 德州联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己底牌; 出牌发回 host 权威校验。──
+// 德州进桌前置: host掉线立即接管 + 进行中未入座转旁观。返回 true=已处理
+function _gtPokerPreEnter(row){
+  const fr=_gtTables.get(row.id)||row;
+  if(fr && fr.status==='playing' && fr.host_uid){
+    const hostSeat=(fr.seats||[]).find(s=>s&&s.kind==='human'&&s.uid===fr.host_uid);
+    if(hostSeat && hostSeat.away && _gtLastHostAt>0 && (Date.now()-_gtLastHostAt)>30000 && gtEngineHolder(fr)===myUid){
+      try{ gtCheckEngineTransfer(fr); }catch(_){}
+    }
+  }
+  if(row.status==='playing' && gtSeatArrays(row).mySeat<0){
+    try{ toast('当前手牌进行中 · 旁观等下一手再入座', 2500); }catch(_){}
+    if(!_gtWaitingHumans.includes(myUid)) _gtWaitingHumans.push(myUid);
+    try{ sb.channel('gt-play:'+row.id).send({type:'broadcast', event:'waiting_seat', payload:{uid:myUid, tableId:row.id}}); }catch(_){}
+    gtSpectatePoker(row);
+    return true;
+  }
+  return false;
+}
 async function _gtEnterPokerV2(row){
-  
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=_gtEnterPokerV2; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
   if(!ehDailyPlayGate('nlhe')) return;
-
-
-  try{
-    const fr=_gtTables.get(row.id)||row;
-    if(fr && fr.status==='playing' && fr.host_uid){
-      const hostSeat=(fr.seats||[]).find(s=>s&&s.kind==='human'&&s.uid===fr.host_uid);
-      if(hostSeat && hostSeat.away && _gtLastHostAt>0 && (Date.now()-_gtLastHostAt)>30000){
-        // ★v57 Bug3: 接管条件修正 —— host 掉线时【我应是接任者(gtEngineHolder===myUid)】才触发接管;
-        //   原 !== 写反, 配合 gtCheckEngineTransfer 内部 !==myUid 早退, 永不接管。
-        if(gtEngineHolder(fr)===myUid){ try{ gtCheckEngineTransfer(fr); }catch(_){} }
-      }
-    }
-  }catch(_){}
-  // ★v57 Bug4: 牌局进行中新玩家(未入座)进桌 → 先旁观等下一手, 不中途插座
-  try{
-    const _preA = gtSeatArrays(row);
-    if(row.status==='playing' && _preA.mySeat<0){
-      try{ toast('当前手牌进行中 · 旁观等下一手再入座', 2500); }catch(_){}
-
-      if(!_gtWaitingHumans.includes(myUid)){
-        _gtWaitingHumans.push(myUid);
-      }
-      // 广播告知 host 有人在等座(host 收到后触发 _gtProcessWaitingQueue)
-      try{
-        const _waitChan = sb.channel('gt-play:'+row.id);
-        _waitChan.send({type:'broadcast', event:'waiting_seat', payload:{uid:myUid, tableId:row.id}});
-      }catch(_){}
-      gtSpectatePoker(row);
-      return;
-    }
-  }catch(_){}
+  if(_gtPokerPreEnter(row)) return;
   // ★多人进同一桌: 统一先入座, 不再「你不在这桌」把人拒之门外
   row = await gtEnsureSeated(row);
   let A=gtSeatArrays(row);

@@ -243,3 +243,7 @@ assert(sawShowdown || sawFoldWin, '旅程覆盖摊牌/弃牌收池至少一种�
 
 console.log(`\n德州联机旅程: ${step} 步${failed?' —— 有失败':' 全过'}`);
 process.exit(failed ? 1 : 0);
+
+// ★v129 德州进桌前置提取: _gtPokerPreEnter
+assert(/function _gtPokerPreEnter/.test(src), '_gtPokerPreEnter 存在(进桌前host接管+进行中转旁观)');
+assert(/_gtPokerPreEnter\(row\)/.test(src), '_gtEnterPokerV2 调用 _gtPokerPreEnter');
