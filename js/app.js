@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v132';
+window.__EH_APP_VER = '20261004-v133';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2882,19 +2882,6 @@ async function setupGameTables(room){
   }catch(_){}
 }
 // 玩家离场的统一处理: 标 away → 广播 → 清理(所有游戏共用)
-function _gtOnPlayerExit(row){
-  if(_gtReleasingHolder) return;
-  const tableId = row.id;
-  const fr = _gtTables.get(tableId) || row;
-  const isHost = gtEngineHolder(fr) === myUid;
-  try{ gtSettleChipsToGlobal(_gtMyFinalStack); }catch(_){}
-  _setPokerState('away', tableId);
-  if(isHost) try{ _gtHandleHostLeave(tableId, fr.seats, myUid); }catch(_){}
-  _gtBroadcastPlayerAway(tableId);
-  try{ gtRpc('eh_gt_set_away', {p_table: tableId, p_away: true}); }catch(_){}
-  _gtCleanupPlay();
-}
-// 桌主收工(引擎消失必须散桌)
 function _gtOnHostQuit(row){
   if(_gtReleasingHolder) return;
   _gtCleanupPlay();
@@ -3868,36 +3855,9 @@ function bankSet(game, patch){ return _EH_SCORE ? _EH_SCORE.set(game, patch) : b
 function bankChips(game, grant){ return _EH_SCORE ? _EH_SCORE.chips(game, grant) : PK_WALLET_GRANT; }
 function bankBump(game, delta, won){ return _EH_SCORE ? _EH_SCORE.bump(game, delta, won) : bankGet(game); }
 function bankOpenOpts(game, grant){ return _EH_SCORE ? _EH_SCORE.openOpts(game, grant) : { chips: PK_WALLET_GRANT, onWallet: function(){} }; }
-function bankMigrateFromLocalAnon(){ try{ if(_EH_SCORE) _EH_SCORE.migrateFromLocalAnon(); }catch(e){ _ehCatch('bankMigrate', e); } }
 function bankChipsOf(game, subject, grant){ return _EH_SCORE ? _EH_SCORE.chipsOf(game, subject, grant) : PK_WALLET_GRANT; }
 function bankBumpOf(game, subject, delta, won){ return _EH_SCORE ? _EH_SCORE.bumpOf(game, subject, delta, won) : null; }
 function bankSetOf(game, subject, patch){ return _EH_SCORE ? _EH_SCORE.setOf(game, subject, patch) : null; }
-function pkWallet(){ return bankChips('nlhe', PK_WALLET_GRANT); }
-function pkSetWallet(v){ bankSet('nlhe', { chips: Math.max(0, Math.round(Number(v)||0)) }); }
-try{
-  window.EH_BANK_GET = bankGet;
-  window.EH_BANK_SET = bankSet;
-  window.EH_BANK_CHIPS = bankChips;
-  window.EH_BANK_BUMP = bankBump;
-  window.EH_BANK_CHIPS_OF = bankChipsOf;
-  window.EH_BANK_BUMP_OF = bankBumpOf;
-  window.EH_BANK_SET_OF = bankSetOf;
-  window.EH_DAILY_PLAYS = {
-    max: (_EH_SCORE && _EH_SCORE.DAY_MAX) || 5,
-    // game: nlhe | doudizhu | guandan — 分游戏独立, 德州打满不锁另两款
-    plays: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlays(game) : 0; },
-    bump: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayBump(game) : 0; },
-    reached: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayReached(game) : false; },
-    left: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayLeft(game) : 0; },
-    setFromServer: function(map){ return _EH_SCORE && _EH_SCORE.setDailyFromServer ? _EH_SCORE.setDailyFromServer(map) : null; },
-  };
-}catch(_){}
-const EH_GAME_LABEL = { nlhe:'德州', doudizhu:'斗地主', guandan:'掼蛋' };
-const EH_GAME_KEY_BY_CMD = { '/斗地主':'doudizhu', '/ddz':'doudizhu', '/doudizhu':'doudizhu',
-  '/掼蛋':'guandan', '/guandan':'guandan', '/gd':'guandan',
-  '/德州':'nlhe', '/texas':'nlhe', '/poker':'nlhe', '/holdem':'nlhe',
-  '/德州联机':'nlhe', '/texas-online':'nlhe', '/holdem-online':'nlhe', '/poker-online':'nlhe' };
-// 开桌页/战绩卡常驻「今日还可输光 N 次」(额度=输光次数, 不是局数)
 function ehDailyLeftTip(game){
   try{
     const d = window.EH_DAILY_PLAYS;
@@ -4349,18 +4309,6 @@ async function gtSpectatePoker(row){
   try{ toast('旁观中 · 点空位可入座', 2000); }catch(_){}
 }
 // 旁观抢位悬浮按钮: 监听 _gtTables 变化, 出现空位/away 席位时显示
-function _gtStartGrabButton(row){
-  _gtRemoveGrabButton();
-  var btn=document.createElement('button');
-  btn.id='_gtGrabSeatBtn';
-  btn.textContent='抢位 🪑';
-  btn.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;display:none;padding:8px 20px;border:1px solid #00e5ff;border-radius:9px;background:rgba(0,229,255,0.12);color:#00e5ff;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px;box-shadow:0 0 8px rgba(0,229,255,0.4);transition:background .15s,box-shadow .15s;';
-  btn.onmouseenter=function(){ btn.classList.add('hover'); };
-  btn.onmouseleave=function(){ btn.classList.remove('hover'); };
-  btn.onclick=function(){ _gtGrabSeat(row); };
-  document.body.appendChild(btn);
-  _gtUpdateGrabButton(row);
-}
 function _gtRemoveGrabButton(){
   var old=document.getElementById('_gtGrabSeatBtn');
   if(old){ try{ old.remove(); }catch(_){} }
@@ -7883,14 +7831,6 @@ async function loadMasterManifest(){
     const j=await tryFetch('reload'); EH_MASTER_MANIFEST=j; return j;
   }
 }
-async function decodeMp3ArrayBuffer(ctx, ab){
-  const copy=ab.slice(0);
-  return await new Promise((res,rej)=>ctx.decodeAudioData(copy,res,rej));
-}
-
-// ---- 神曲解码缓存 + 预取预解码：点击后秒播，不重复下载解码整首 ----
-const _EH_SONG_CACHE=new Map();      // url → 已解码 AudioBuffer
-const _EH_SONG_FETCHING=new Map();   // url → 正在预取的 Promise(防并发重复拉)
 async function getSongBuffer(ctx, url){
   if(!url) return null;
   const hit=_EH_SONG_CACHE.get(url);
@@ -8877,19 +8817,6 @@ window.addEventListener('pageshow', ()=>{ try{ window.__ehKbGuardBg && window.__
 window.addEventListener('focus', ()=>{ try{ window.__ehKbGuardBg && window.__ehKbGuardBg(); }catch(_){ _ehCatch('windowFocus',_); } foregroundResync(); });
 // 音频加固: 清唱/翻唱接口失败时降级本地可听 + 可点重试
 const _EH_ACAPELLA_TIMERS = new Map();   // mid → 超时标记 timer(公网 Edge 失败降级用)
-function _ehAcapellaTimeoutMark(mid){
-  try{
-    const stream=document.getElementById('stream'); if(!stream) return;
-    const msg=stream.querySelector('.msg[data-mid="'+mid+'"]'); if(!msg) return;
-    const card=msg.querySelector('.song-card'); if(!card) return;
-    if(!card.classList.contains('pending')) return;
-    card.classList.remove('pending');
-    card.classList.add('timeout','local-ok');
-    const cm=card.querySelector('.song-composing'); if(cm) cm.textContent='清唱服务不可用 · 可本地试听';
-    const btn=card.querySelector('.song-play'); if(btn) btn.setAttribute('data-tip','本地试听 · 点击可唱');
-  }catch(_){ _ehCatch('generateAndPersistSong',_); }
-  finally{ _EH_ACAPELLA_TIMERS.delete(String(mid)); }
-}
 async function generateAndPersistSong(mid, lyric, sid, el){
   try{ _ehDbg('[song] gen start mid=', mid, 'sid=', sid); }catch(_){ _ehCatch('generateAndPersistSong',_); }
   if(!mid || _EH_SONG_GENERATING.has(mid)) return;
