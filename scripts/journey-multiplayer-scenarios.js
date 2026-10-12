@@ -38,7 +38,7 @@ it('gtEngineHolder: 从 seats 推导持有者(座位最小非away真人), 不依
 it('gtCheckEngineTransfer: 接管前取 guest lastSnap 传 resumeSnap', ()=> /_ehGame\.lastSnap\(\)/.test(src) && /_launchEngineFor\(row,\s*game,\s*resumeSnap/.test(src));
 it('gtCheckEngineTransfer: 接管后立刻 resync 广播', ()=> /_ehGame\.resync\(\)/.test(src));
 it('gtCheckEngineTransfer: 不在桌里路径用缓存快照 resume(不重新发牌)', ()=> /_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null/.test(src));
-it('gtLaunchPoker: 收 resumeSnap 参数并传给 open', ()=> /function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src) && /resumeSnap:\s*resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null,\s*\/\/.+v33/.test(src));
+it('gtLaunchPoker: 收 resumeSnap 参数并传给 open', ()=> /function gtLaunchPoker\(row,\s*resumeSnap\)/.test(src) && /resumeSnap:\s*resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null/.test(src));
 it('poker-ui open: resumeSnap 用 pseudoState 重建 st + 恢复 handNo/stacks', ()=> /opts\.resumeSnap\s*&&\s*PokerNet/.test(pk) && /pseudoState\(_rs,\s*mySeat,\s*myHole\)/.test(pk) && /handNo\s*=\s*_rs\.handNo/.test(pk) && /stacks\s*=\s*_rs\.players\.map/.test(pk));
 it('poker-ui: 暴露 lastSnap() 供接管取快照', ()=> /lastSnap:\(\)=>lastSnap/.test(pk));
 // ★T95 乐观发送: gtGuestSendAct 广播先行(sendBc)+ RPC 审计后台跑, 已废弃 _transferInProgress 转移窗口重试
