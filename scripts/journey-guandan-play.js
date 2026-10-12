@@ -387,3 +387,7 @@ assert(/lockedGroups/.test(ui) && /runGroups[\s\S]{0,400}lockedGroups/.test(ui),
 assert(/🔒 锁定/.test(ui) && /🔓 解锁/.test(ui), '理牌钮: 选中≥2 显锁定, 有锁定显解锁');
 
 console.log('\n✅ 掼蛋旅程全部通过');
+
+// ★v128 Guest 进桌重构: 提取 _gtEnterGuestGame 共享框架
+assert(/function _gtEnterGuestGame/.test(src), '_gtEnterGuestGame 共享框架存在(斗地主/掼蛋guest复用)');
+assert(/await _gtEnterGuestGame\('guandan'/.test(src), 'gtEnterGuandan 调用共享框架');

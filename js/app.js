@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v127';
+window.__EH_APP_VER = '20261004-v128';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2890,6 +2890,49 @@ function _gtOnHostQuit(row){
   _gtCleanupPlay();
   gtClose(row.id);
 }
+// 斗地主/掼蛋共享的 guest 进桌(德州 guest 走 _gtEnterPokerV2, 流程差异大不并入)
+async function _gtEnterGuestGame(game, row, openFn){
+  if(!ehDailyPlayGate(game==='ddz'?'doudizhu':'guandan')) return;
+  row = await gtEnsureSeated(row);
+  const A = gtSeatArrays(row);
+  if(A.mySeat<0){ _gtEnterWaiting(row); return; }
+  const inLobby = row.status==='lobby';
+  _gtCleanupPlay();
+  let lastMyCount=-1;
+  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
+  const pullHand=(expect)=>{ let tries=0; const go=()=>{
+      sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
+        if(error){ console.warn(`[${game}] my hand`, error.message); return; }
+        const h=data||[];
+        if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
+        if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
+        if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
+      }, ()=>{});
+    }; go(); };
+  chan.on('broadcast',{event:'snap'}, ({payload})=>{
+      if(!_ehGame||!_ehGame.onSnapshot||!payload) return;
+      _ehGame.onSnapshot(payload);
+      const mc=(payload.players&&payload.players[A.mySeat])?payload.players[A.mySeat].handCount:null;
+      if(typeof mc==='number' && mc!==lastMyCount){ lastMyCount=mc; if(mc>0) pullHand(mc); }
+    });
+  gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
+  gtWatchHostPing(chan, row.host_uid, row.id);
+  _gtActiveTable={id:row.id,host:false};
+  _ehGame = openFn({
+    scoreKey:'gtsc:'+row.id,
+    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
+    lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
+    chat: ehGameChatBridge(),
+    onDissolve:()=>{ try{ if(row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
+    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
+    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
+    onSeatIdle:(seat, info)=>{ if(info && info.vacate){ try{ gtLeave(row.id); }catch(_){} } },
+    onGrabSeat:()=>{ _gtGrabSeat(row); },
+    onExit:()=>{ _gtCleanupPlay(); },
+  });
+  _gtStartTurnAlert();
+  setTimeout(()=>pullHand(), 300);
+}
 function _gtOnTableRealtime(row){
   const inThis = _gtActiveTable && _gtActiveTable.id===row.id;
   // 旁观中: 更新抢座按钮 + 检查散桌
@@ -4685,50 +4728,7 @@ function _gtEnterWaiting(row){
 
 async function gtEnterGuandan(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=gtEnterGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
-  if(!ehDailyPlayGate('guandan')) return;
-  // 多人进同一桌: 统一先入座(与德州/斗地主同一条路径)
-  row = await gtEnsureSeated(row);
-  let A=gtSeatArrays(row);
-  if(A.mySeat<0){ _gtEnterWaiting(row); return; }
-  const inLobby = row.status==='lobby';
-  _gtCleanupPlay();
-  let lastMyCount=-1;
-  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
-  const pullHand=(expect)=>{ let tries=0; const go=()=>{
-      sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
-        if(error){ console.warn('[gd] my hand', error.message); return; }
-        const h=data||[];
-        // 手牌行还没写好(张数对不上期望) → 短延时自愈重拉, 最多 4 次
-        if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
-        if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
-        if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
-      }, ()=>{});
-    }; go(); };
-  chan.on('broadcast',{event:'snap'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.onSnapshot||!payload) return;
-      _ehGame.onSnapshot(payload);
-      const mc=(payload.players&&payload.players[A.mySeat])?payload.players[A.mySeat].handCount:null;
-      if(typeof mc==='number' && mc!==lastMyCount){ lastMyCount=mc; if(mc>0) pullHand(mc); }
-    });
-  gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
-  gtWatchHostPing(chan, row.host_uid, row.id);
-  _gtActiveTable={id:row.id,host:false};
-  _ehGame = window.EHGuandanGame.open({
-    scoreKey:'gtsc:'+row.id,
-    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, souls:A.souls, ids:A.ids, mySeat:A.mySeat,
-    lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
-    chat: ehGameChatBridge(),
-    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
-    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
-    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
-    // 旁观=腾座(不是 AI 代打): 通知 DB 让出座位, 留在房间可点空位再坐
-    onSeatIdle:(seat, info)=>{ if(info && info.vacate){ try{ gtLeave(row.id); }catch(_){} } },
-    onGrabSeat:()=>{ _gtGrabSeat(row); },
-
-    onExit:()=>{ _gtOnPlayerExit(row); },
-  });
-  _gtStartTurnAlert();
-  setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
+  await _gtEnterGuestGame('guandan', row, window.EHGuandanGame.open);
 }
 
 // ── 斗地主联机 · 手牌落库: 斗地主手牌【动态】(地主领 3 张底牌 / 每次出牌减少), 故 host 每步都重写各远程真人席当前手牌。
@@ -4794,48 +4794,7 @@ function gtLaunchDdz(row){
 //   手牌动态: 自己张数一变(发牌 17 / 抢到地主 +3=20 / 我出牌减少) 就重拉; 写库与广播竞态时张数对不上短延时自愈重拉。
 async function gtEnterDdz(row){
   if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=gtEnterDdz; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
-  if(!ehDailyPlayGate('doudizhu')) return;
-  // 多人进同一桌: 统一先入座, 不再「你不在这桌」把人拒之门外
-  row = await gtEnsureSeated(row);
-  let A=gtSeatArrays(row);
-  if(A.mySeat<0){ _gtEnterWaiting(row); return; }
-  const inLobby = row.status==='lobby';
-  _gtCleanupPlay();
-  let lastMyCount=-1;
-  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
-  const pullHand=(expect)=>{ let tries=0; const go=()=>{
-      sb.rpc('eh_gt_my_hand',{p_table:row.id}).then(({data,error})=>{
-        if(error){ console.warn('[ddz] my hand', error.message); return; }
-        const h=data||[];
-        if(typeof expect==='number' && h.length!==expect && tries<4){ tries++; setTimeout(go,220); return; }
-        if(_ehGame&&_ehGame.clearPreAct) _ehGame.clearPreAct();
-        if(_ehGame&&_ehGame.feedHand) _ehGame.feedHand(h);
-      }, ()=>{});
-    }; go(); };
-  chan.on('broadcast',{event:'snap'}, ({payload})=>{
-      if(!_ehGame||!_ehGame.onSnapshot||!payload) return;
-      _ehGame.onSnapshot(payload);
-      const mc=(payload.players&&payload.players[A.mySeat])?payload.players[A.mySeat].handCount:null;
-      if(typeof mc==='number' && mc!==lastMyCount){ lastMyCount=mc; if(mc>0) pullHand(mc); }
-    });
-  gtBindConnStatus(chan, { onReconnected:()=>{ try{ chan.send({type:'broadcast',event:'hello',payload:{uid:myUid}}); }catch(_){ } } });
-  gtWatchHostPing(chan, row.host_uid, row.id);
-  _gtActiveTable={id:row.id,host:false};
-  _ehGame = window.EHDdzGame.open({
-    scoreKey:'gtsc:'+row.id,
-    mode:'guest', names:A.names, avatars:A.avatars, isAI:A.isAI, mySeat:A.mySeat,
-    lobby:inLobby, isHost:false, lobbySeats:row.seats, lobbyCtx:gtCtx(row),
-    chat: ehGameChatBridge(),
-    onDissolve:()=>{ try{ if(typeof row!=="undefined"&&row&&row.id) gtClose(row.id); }catch(_){} try{ _gtCleanupPlay(); }catch(_){} },
-    onAction:(move)=>{ gtGuestSendAct(chan, row.id, A.myDbSeat>=0?A.myDbSeat:A.mySeat, move); },
-    onSeatResume:(seat)=>{ const sd=(typeof seat==='number')?seat:A.mySeat; try{ chan.send({type:'broadcast',event:'resume',payload:{seat:sd, uid:myUid}}); }catch(_){} },
-    // 旁观=腾座(不是 AI 代打): 通知 DB 让出座位, 留在房间可点空位再坐
-    onSeatIdle:(seat, info)=>{ if(info && info.vacate){ try{ gtLeave(row.id); }catch(_){} } },
-    onGrabSeat:()=>{ _gtGrabSeat(row); },
-    onExit:()=>{ _gtCleanupPlay(); },   // 客人收工: 本地清场(席位保留, 可重进)
-  });
-  _gtStartTurnAlert();
-  setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
+  await _gtEnterGuestGame('ddz', row, window.EHDdzGame.open);
 }
 
 async function beat(extra){

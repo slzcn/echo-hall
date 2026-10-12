@@ -276,3 +276,7 @@ assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcce
 assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 
 console.log('\n✅ 斗地主旅程全部通过');
+
+// ★v128 Guest 进桌重构: 提取 _gtEnterGuestGame 共享框架
+assert(/function _gtEnterGuestGame/.test(src), '_gtEnterGuestGame 共享框架存在(斗地主/掼蛋guest复用)');
+assert(/await _gtEnterGuestGame\('ddz'/.test(src), 'gtEnterDdz 调用共享框架');
