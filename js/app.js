@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v120';
+window.__EH_APP_VER = '20261004-v121';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1113,7 +1113,9 @@ const _EH_GT_NET = (function(){
 function _gtRememberGame(id){ try{ if(id) localStorage.setItem('eh_last_game', String(id)); }catch(_){} }
 function _gtForgetGame(){ try{ localStorage.removeItem('eh_last_game'); }catch(_){} }
 function _gtLastGame(){ try{ return localStorage.getItem('eh_last_game') || ''; }catch(_){ return ''; } }
-function _gtCleanupPlay(){ try{ if(_ehGame && typeof _ehGame.close==='function'){ _ehGame.close(); } }catch(e){ _ehCatch('gtCleanup_close', e); } _ehGame=null; if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveWaitingBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; try{ if(_gtMyBeatTimer){ clearInterval(_gtMyBeatTimer); _gtMyBeatTimer=null; } }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtOfflineSeats.clear(); }catch(e){ _ehCatch('gtCleanup', e); } if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} }
+function _gtCleanupPlay(){ 
+  _gtReleasingHolder = true;   // ★系统清理非用户离场: close()触发的onExit跳过away标记,防误进旁观
+  try{ if(_ehGame && typeof _ehGame.close==='function'){ _ehGame.close(); } }catch(e){ _ehCatch('gtCleanup_close', e); } _ehGame=null; if(_gtPlayChan){ try{ sb.removeChannel(_gtPlayChan); }catch(e){ _ehCatch('gtCleanup', e); } _gtPlayChan=null; } _gtActiveTable=null; _gtSnapSeq=0; if(_EH_GT_NET){ try{ _EH_GT_NET.resetSeq(); }catch(_){} } try{ _gtStopPing(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtStopTurnAlert(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _turnFlashTitle(false); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveGrabButton(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveAwayBar(); }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtRemoveWaitingBar(); }catch(e){ _ehCatch('gtCleanup', e); } _gtPokerUnbindUnload(); _gtPendingHello=false; _gtWaitingHumans=[]; _gtConsecutiveNoSeat=0; try{ if(_gtMyBeatTimer){ clearInterval(_gtMyBeatTimer); _gtMyBeatTimer=null; } }catch(e){ _ehCatch('gtCleanup', e); } try{ _gtOfflineSeats.clear(); }catch(e){ _ehCatch('gtCleanup', e); } if(!_gtPokerSession||_gtPokerSession.state!=='away'){_setPokerState(null);} _gtReleasingHolder = false; }
 window._ehCleanupRoomPlay=_gtCleanupPlay;
 // ★v64: 找下一个非 away 真人 uid 作为 host 转移目标(供 keepalive 离场和主动离场共用)
 function _gtFindNextHost(tableId){
@@ -2879,7 +2881,9 @@ async function setupGameTables(room){
       }
       if(row.status==='closed' && _gtActiveTable && _gtActiveTable.id===row.id){
         _gtDissolvedTableId = row.id;   // ★fix Bug(dissolve): 标记已解散, 阻止后续 realtime 重渲染/重进
+        _gtReleasingHolder = true;   // ★散桌非用户离场: close()跳过 away 标记
         try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){ _ehCatch('gtCloseGame',_); }
+        _gtReleasingHolder = false;
         _gtCleanupPlay();
         try{ toast('牌桌已解散'); }catch(_){}
       }
@@ -3937,7 +3941,9 @@ function gtCheckEngineTransfer(row){
   // 我是新 host, 用缓存的最近一帧快照 resume, 避免重新发牌丢牌局状态
   var _resumeSnap = null;
   try{ if(_ehGame && typeof _ehGame.lastSnap==='function') _resumeSnap = _ehGame.lastSnap(); }catch(_){ _ehCatch('gtEngineTakeover',_); }
+  _gtReleasingHolder = true;   // ★接管前清理旧引擎非用户离场: 跳过 away 标记
   if(_ehGame){ try{ _ehGame.close(); }catch(_){ _ehCatch('gtEngineTakeover',_); } _ehGame=null; }
+  _gtReleasingHolder = false;
   try{ _gtCleanupPlay(); }catch(_){}
   _gtActiveTable = null;
   try {

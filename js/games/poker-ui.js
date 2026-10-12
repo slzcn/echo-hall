@@ -690,6 +690,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     const missStreak = {};                 // seat -> 连续超时次数
     let _handsIdle = 0;                    // 连续整局无本人响应局数(>=2 自动离座)
     let _actedThisHand = false;            // 本手我是否有过有效操作
+    let _hadTurnThisHand = false;          // ★fix(误进旁观): 本手我是否有过回合(有回合但没操作才算idle)
     let spectating = false;                // 本人(mySeat)是否已离座旁观
     function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; if(seat===mySeat){ _actedThisHand=true; _handsIdle=0; } }
     function doEnterSpectator(){
@@ -720,13 +721,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         try{ renderActs(true); renderMsg(); renderMe(); renderOpponents(true); positionSeats(); }catch(_){}
     }
     function _clearAutoTrusteeOnNewDeal(){
-      // 两局整局无本人操作 → 起身旁观(与斗地主/掼蛋同契约); 有过动作即清零。
-      //   单机练习桌(isLocalSolo)只代打不离座 —— 超时把席交 AI, 绝不把本人踢进旁观。
-      if(!_actedThisHand) _handsIdle++; else _handsIdle=0;
+      // ★fix(误进旁观): 只有【有回合但没操作】才算 idle。
+      //   原逻辑: ! _actedThisHand 就计 idle —— 手牌没轮到自己(别人全弃牌)或用了预选也被误计 → 2局就强制旁观。
+      //   现改为: 有回合(_hadTurnThisHand)但没操作(! _actedThisHand)才算 idle; 没回合=正常打牌, 不计。
+      if(_hadTurnThisHand && !_actedThisHand) _handsIdle++; else _handsIdle=0;
       if(_handsIdle>=2 && !spectating && !isLocalSolo){
         try{ doEnterSpectator(); }catch(_){}
       }
       _actedThisHand=false;
+      _hadTurnThisHand=false;
     }
     function bumpMiss(seat){
       // ★v89: server 模式(isGuest 但 EH_SERVER_HOST)也要跟踪自己席的超时计数, 否则服务端无人触发离座
@@ -2378,6 +2381,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       const seat=st.toAct;
       if (seat<0 || !st.players[seat]) { turnSeatActive=-1; return; }
       const mine = seat===mySeat && !spectating;   // 旁观后我这席(isAI 已置真)按 AI 席自动推进, 不再算"我的回合"
+      if(mine) _hadTurnThisHand = true;   // ★fix(误进旁观): 标记本手有过回合, 只有有回合但没操作才算idle
       // 轮到我且有预选: 先按实况复核执行/作废。执行成功则状态已推进(afterAction→renderAll→armTurn 重入), 中止本次。
       if (mine && preAct){ if (consumePreAction()) return; }
       if (mine && !lastMyTurn){ sfx('yourturn'); vibrate(8); }
