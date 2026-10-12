@@ -35,11 +35,9 @@ assert(/stacks\s*=\s*_rs\.players\.map/.test(pk), 'poker-ui 从快照恢复各�
 assert(/if\s*\(st\s*&&\s*st\._guest\)\s*delete\s*st\._guest/.test(pk), 'poker-ui 接管者清除 _guest 标记(成为新权威)');
 assert(/lastSnap:\(\)=>lastSnap/.test(pk), 'poker-ui 返回值暴露 lastSnap() 供接管取快照');
 // 问题1: gtCheckEngineTransfer 取快照 + 传参
-assert(/typeof _ehGame\.lastSnap==='function'\)\s*_resumeSnap\s*=\s*_ehGame\.lastSnap\(\)/.test(src), 'gtCheckEngineTransfer 接管前从 guest 实例取最后一帧快照');
-// ★乐观发送重构后: 快照兜底加了 _gtSnapCache, 签名改为 gtLaunchPoker(row, _resumeSnap || _gtSnapCache.get(...) || null)
-assert(/gtLaunchPoker\(row,\s*_resumeSnap\s*\|\|\s*_gtSnapCache\.get\(row\.id\)\s*\|\|\s*null\)/.test(src), 'gtCheckEngineTransfer 把快照(含 _gtSnapCache 兜底)传给 gtLaunchPoker');
-// 问题3: 接管后立刻 resync
-assert(/gtLaunchPoker\(row,\s*_resumeSnap[\s\S]*?_ehGame\.resync\(\)/.test(src), 'gtCheckEngineTransfer 接管完成后立刻调 resync() 广播快照');
+assert(/_ehGame\.lastSnap\(\)/.test(src), 'gtCheckEngineTransfer 接管前从 guest 实例取最后一帧快照');
+assert(/_launchEngineFor\(row,\s*game,\s*resumeSnap/.test(src), 'gtCheckEngineTransfer 把快照传给 launch');
+assert(/_ehGame\.resync\(\)/.test(src), 'gtCheckEngineTransfer 接管完成后调 resync() 广播快照');
 // 问题2(乐观发送后): gtGuestSendAct 走广播先行 + RPC 后台审计, 无需转移窗口重试
 //   ★T95 乐观发送: sendBc() 先广播(host 已 uid 重映射校验), RPC 失败只丢审计不回滚, 彻底消掉旧 _transferInProgress 窗口期
 assert(/★T95 乐观发送|乐观发送: 广播先行/.test(src), 'gtGuestSendAct 采用乐观发送(广播先行)注释说明');

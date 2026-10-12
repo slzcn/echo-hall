@@ -720,10 +720,7 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         try{ renderActs(true); renderMsg(); renderMe(); renderOpponents(true); positionSeats(); }catch(_){}
     }
     function _clearAutoTrusteeOnNewDeal(){
-      // ★fix(误进旁观): 只有【真正超时】才算 idle。
-      //   原逻辑: !_actedThisHand 就计 idle —— 手牌没轮到自己(别人全弃牌)也被误计 → 2局强制旁观。
-      //   上一版用 _hadTurnThisHand, 但 armTurn 在 st.toAct===mySeat 时就设了, 即使手牌立刻结束也算"有回合" → 仍误计。
-      //   现改为: missStreak>0(真实超时次数)才算 idle; 没超时=正常打牌, 不计。
+      // 只有真实超时(missStreak>0)才算 idle, 防手牌没轮到自己(别人全弃牌)被误计
       if(missStreak[mySeat] > 0 && !_actedThisHand) _handsIdle++; else _handsIdle=0;
       if(_handsIdle>=2 && !spectating && !isLocalSolo){
         try{ doEnterSpectator(); }catch(_){}
