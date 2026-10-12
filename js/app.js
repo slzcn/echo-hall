@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v126';
+window.__EH_APP_VER = '20261004-v127';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2871,7 +2871,25 @@ async function setupGameTables(room){
     }catch(_){}
   }catch(_){}
 }
-// 桌行变化的统一处理: 名册更新/持有者切换/自动进桌/散桌清理
+// 玩家离场的统一处理: 标 away → 广播 → 清理(所有游戏共用)
+function _gtOnPlayerExit(row){
+  if(_gtReleasingHolder) return;
+  const tableId = row.id;
+  const fr = _gtTables.get(tableId) || row;
+  const isHost = gtEngineHolder(fr) === myUid;
+  try{ gtSettleChipsToGlobal(_gtMyFinalStack); }catch(_){}
+  _setPokerState('away', tableId);
+  if(isHost) try{ _gtHandleHostLeave(tableId, fr.seats, myUid); }catch(_){}
+  _gtBroadcastPlayerAway(tableId);
+  try{ gtRpc('eh_gt_set_away', {p_table: tableId, p_away: true}); }catch(_){}
+  _gtCleanupPlay();
+}
+// 桌主收工(引擎消失必须散桌)
+function _gtOnHostQuit(row){
+  if(_gtReleasingHolder) return;
+  _gtCleanupPlay();
+  gtClose(row.id);
+}
 function _gtOnTableRealtime(row){
   const inThis = _gtActiveTable && _gtActiveTable.id===row.id;
   // 旁观中: 更新抢座按钮 + 检查散桌
@@ -3440,7 +3458,7 @@ function gtLaunchDdzLobby(row){
 
       try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
-    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
+    onExit:()=>{ _gtOnHostQuit(row); },   // 房主收工 → 引擎权威消失必须散桌
   });
   _gtStartTurnAlert();
 }
@@ -3540,7 +3558,7 @@ function gtLaunchGuandanLobby(row){
 
       try{ _gtProcessWaitingQueue(row); }catch(_){}
     },
-    onExit:()=>{ _gtCleanupPlay(); gtClose(row.id); },   // 房主收工 → 引擎权威消失必须散桌
+    onExit:()=>{ _gtOnHostQuit(row); },   // 房主收工 → 引擎权威消失必须散桌
   });
   _gtStartTurnAlert();
 }
@@ -4634,7 +4652,7 @@ function gtLaunchGuandan(row){
       try{ gtCheckNoHumansThenClose(row); }catch(_){}
     },
 
-    onExit:()=>{ try{ _setPokerState('away', row.id); _gtBroadcastPlayerAway(row.id); try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){} try{ _gtHandleHostLeave(row.id, (_gtTables.get(row.id)||row).seats, myUid); }catch(_){} }catch(_){} _gtCleanupPlay(); },
+    onExit:()=>{ _gtOnHostQuit(row); },
   });
   _gtStartTurnAlert();
 }
@@ -4707,7 +4725,7 @@ async function gtEnterGuandan(row){
     onSeatIdle:(seat, info)=>{ if(info && info.vacate){ try{ gtLeave(row.id); }catch(_){} } },
     onGrabSeat:()=>{ _gtGrabSeat(row); },
 
-    onExit:()=>{ try{ _setPokerState('away', row.id); _gtBroadcastPlayerAway(row.id); try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){} }catch(_){} _gtCleanupPlay(); },
+    onExit:()=>{ _gtOnPlayerExit(row); },
   });
   _gtStartTurnAlert();
   setTimeout(()=>pullHand(), 300);   // 兜底: host 此刻可能正等我(不广播), 主动拉一次手牌
@@ -4768,7 +4786,7 @@ function gtLaunchDdz(row){
       try{ gtCheckNoHumansThenClose(row); }catch(_){}
     },
 
-    onExit:()=>{ try{ _setPokerState('away', row.id); _gtBroadcastPlayerAway(row.id); try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){} try{ _gtHandleHostLeave(row.id, (_gtTables.get(row.id)||row).seats, myUid); }catch(_){} }catch(_){} _gtCleanupPlay(); },
+    onExit:()=>{ _gtOnHostQuit(row); },
   });
   _gtStartTurnAlert();
 }
@@ -9433,11 +9451,7 @@ async function launchTexas(){
       return;
     }
     if(gtEngineHolder(row)===myUid && row.status==='lobby'){
-      // ★v103 乐观进入: 点 /德州 后立刻落牌桌 UI(招募态, 显示"正在开桌…"), 不等补灵魂/开局 RPC。
-      //   gtLaunchLocal→gtLaunchPoker→_gtEnterPokerServer 同步挂起牌桌(lobby 态), 用户瞬间看到牌桌;
-      //   后台再跑 gtStart(补灵魂→eh_gt_start 转 playing→start_hand 发牌)。
-      //   牌桌 UI 已挂起后(_gtActiveTable.id===id), gtStart 走 gtPokerAction(start_hand) 分支不重复挂桌,
-      //   由 realtime broadcast 'snap' 自动把 UI 从 lobby 转 playing(见 applySnapshot)。
+      // 乐观进入: 点德州后立刻落牌桌 UI(招募态), 后台跑 gtStart(补灵魂→开局→发牌)
       try{ gtLaunchLocal(row); }catch(e){ _ehCatch('gtLaunchEarly', e); }
       // 后台贴牌桌卡(留档 + 供房里其他真人点卡加入)。★v91 卡片幂等: 同 table_id 已有卡则跳过,
       //   防止任何竞态/重入产生第二条卡(buildGameEl 已写 data-gt-id, 此处再校验一道)。
