@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v130';
+window.__EH_APP_VER = '20261004-v131';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1594,6 +1594,19 @@ function gtWirePlayerAway(chan, rowRef, tableId){
     }catch(e){ _ehCatch('gtPlayerAwayRecv', e); }
   });
   return chan;
+}
+// 德州心跳: host/guest 共享的发送心跳+接收offline标记(host额外的超时检查在gtLaunchPoker内)
+// journey-exempt: 提取重复心跳逻辑无行为变化,journey-poker-online 已覆盖心跳/offline/away 完整流程
+function _gtWirePokerBeat(chan, mySeat){
+  _gtMyBeatTimer = setInterval(function(){
+    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'player_beat', payload:{uid: myUid, seat: mySeat, ts: Date.now()}}); } }catch(_){}
+  }, 8000);
+  chan.on('broadcast', {event:'player_offline'}, function(p){
+    if(p && p.payload && p.payload.uid){
+      _gtOfflineSeats.add(p.payload.uid);
+      try{ if(_ehGame && _ehGame.setOfflineUids){ _ehGame.setOfflineUids(Array.from(_gtOfflineSeats)); } }catch(_){}
+    }
+  });
 }
 // wrap _gtCleanupPlay 停心跳(在下一步替换处已合并)
 
@@ -4112,9 +4125,7 @@ async function gtLaunchPoker(row, resumeSnap){
   gtBindConnStatus(chan);
   gtStartHostPing(chan, row.id);
 
-  _gtMyBeatTimer = setInterval(function(){
-    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'player_beat', payload:{uid: myUid, seat: A.mySeat, ts: Date.now()}}); } }catch(_){}
-  }, 8000);
+  _gtWirePokerBeat(chan, A.mySeat);
   // host 监听 player_beat, 记录每个玩家最后心跳时间
   chan.on('broadcast', {event:'player_beat'}, function(p){
     if(p && p.payload && p.payload.uid){
@@ -4136,13 +4147,6 @@ async function gtLaunchPoker(row, resumeSnap){
       }
     });
   }, 10000);
-  // 收到 player_offline 广播: 更新本地断线标记 + UI
-  chan.on('broadcast', {event:'player_offline'}, function(p){
-    if(p && p.payload && p.payload.uid){
-      _gtOfflineSeats.add(p.payload.uid);
-      try{ if(_ehGame && _ehGame.setOfflineUids){ _ehGame.setOfflineUids(Array.from(_gtOfflineSeats)); } }catch(_){}
-    }
-  });
 
   chan.on('broadcast', {event:'waiting_seat'}, function(p){
     if(p && p.payload && p.payload.tableId===row.id){
@@ -4544,16 +4548,7 @@ async function _gtEnterPokerV2(row){
   gtWatchHostPing(chan, gtEngineHolder(row), row.id);
   gtWirePlayerAway(chan, function(){ return _gtTables.get(row.id)||row; }, row.id);
 
-  _gtMyBeatTimer = setInterval(function(){
-    try{ if(_gtPlayChan){ _gtPlayChan.send({type:'broadcast', event:'player_beat', payload:{uid: myUid, seat: A.mySeat, ts: Date.now()}}); } }catch(_){}
-  }, 8000);
-  // 收到 player_offline 广播: 更新本地断线标记 + UI
-  chan.on('broadcast', {event:'player_offline'}, function(p){
-    if(p && p.payload && p.payload.uid){
-      _gtOfflineSeats.add(p.payload.uid);
-      try{ if(_ehGame && _ehGame.setOfflineUids){ _ehGame.setOfflineUids(Array.from(_gtOfflineSeats)); } }catch(_){}
-    }
-  });
+  _gtWirePokerBeat(chan, A.mySeat);
   _gtActiveTable={id:row.id,host:false};
   _setPokerState('guest', row.id);
 
@@ -4658,18 +4653,7 @@ function gtLaunchGuandan(row){
   if(A.n<4){ toast('掼蛋要坐满 4 席才能开打'); return; }
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
-  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
-  const rowRef=()=>_gtTables.get(row.id)||row;
-  chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!payload||typeof payload.seat!=='number') return;
-      // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
-      // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
-    })
-    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
-  gtWireHostResume(chan, row.id, rowRef());
-  gtBindConnStatus(chan);
-  gtStartHostPing(chan, row.id);
+  const chan=gtWireHostChannel(row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
     scoreKey:'gtsc:'+row.id,
@@ -4749,18 +4733,7 @@ function gtLaunchDdz(row){
   if(A.n<3){ toast('斗地主要坐满 3 席才能开打'); return; }
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
-  const chan=sb.channel('gt-play:'+row.id); _gtPlayChan=chan;
-  const rowRef=()=>_gtTables.get(row.id)||row;
-  chan.on('broadcast',{event:'act'}, ({payload})=>{
-      if(!payload||typeof payload.seat!=='number') return;
-      // 授权源=DB 座位现算(禁固化 A.remoteSeats): 中途顶替入座/超时接管后的真人动作都要认。
-      // 仍拒 host/AI/灵魂席伪造(#61); 远程真人互冒留待 phase-2 Edge/RPC。
-      gtAcceptRemoteAct(row.id, rowRef(), payload.seat, payload.move, payload.uid, payload.via);
-    })
-    .on('broadcast',{event:'hello'}, ()=>{ if(_ehGame&&_ehGame.resync) _ehGame.resync(); });  // 新客人上线 → 立刻补一帧
-  gtWireHostResume(chan, row.id, rowRef());
-  gtBindConnStatus(chan);
-  gtStartHostPing(chan, row.id);
+  const chan=gtWireHostChannel(row.id);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
     scoreKey:'gtsc:'+row.id,
