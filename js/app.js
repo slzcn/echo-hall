@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v121';
+window.__EH_APP_VER = '20261004-v122';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1252,7 +1252,8 @@ function gtAcceptRemoteAct(tableId, fallbackRow, seat, move, payloadUid, via){
     : (function(){
         if (!Array.isArray(A.remoteSeats) || A.remoteSeats.indexOf(seat) < 0) return { ok:false };
         var uid = A.ids && A.ids[seat];
-        // if (payloadUid && uid && String(payloadUid) !== String(uid)) return { ok:false };  // 放宽 uid 校验，只要 seat 在 remoteSeats 里就接受
+        // ★恢复uid校验(全项目审查发现): 防止任何客户端伪造他人出牌
+        if (payloadUid && uid && String(payloadUid) !== String(uid)) return { ok:false };
         return { ok:true };
       })();
   if (!chk.ok) return;
@@ -1348,8 +1349,6 @@ function gtCheckNoHumansThenClose(row){
     if(!fr) fr=_gtTables.get(r.id);
     if(!fr || fr.status==='closed') return;
     const still=(fr.seats||[]).filter(s=>s && s.kind==='human' && !s.away).length;
-    // ★v66 Bug2: 除了检查非away的真人, 还要检查是否有任何真人(含away)——新玩家可能临时被标away
-    const anyHuman=(fr.seats||[]).filter(s=>s && s.kind==='human').length;
     // ★fix: 5s 宽限期后,如果无非away真人(still===0),判断是否散桌:
     //   - 有等待队列 → 不散(新人要进,给时间入座)
     //   - 无等待队列 → 散桌(所有在座真人都已离线/away,不能永久挂起)
@@ -1385,9 +1384,9 @@ function _gtCheckDeadRoom(row){
   if(!humans.length) return false;                 // 没真人 → 走 gtCheckNoHumansThenClose
   // ★v55 收紧条件1: 所有真人座位都是 away(没有任何非 away 的真人)
   if(!humans.every(s=>s.away)) return false;
-  // ★v55 收紧条件2: host_uid 对应的玩家在 seats 里不存在, 或明确标记了 away
-  const hostSeat = seats.find(s=>s&&s.kind==='human'&&s.uid===hostUid);
-  if(hostUid && hostSeat && !hostSeat.away) return false;
+  // ★v55 收紧条件2: 引擎持有者非away则不判死房间(改用 gtEngineHolder, 与新架构一致)
+  const holder = gtEngineHolder(r);
+  if(holder && !humans.every(s=>s.away)) return false;
   // ★v55 收紧条件3: 距离上次心跳超过 60s(从 30s 放宽, 避免正常桌被误判)
   if(lastBeat > 0 && (Date.now() - lastBeat) < 60000) return false;
   // ★v55 收紧条件4: 当前没有正在进行的手牌(gameState !== 'playing' 或底池为 0)
@@ -3307,7 +3306,7 @@ function _gtProcessWaitingQueue(row){
       var shouldKick = (_gtConsecutiveNoSeat >= 2) || (Math.random() < 0.6);
       if(shouldKick){
         var aiSeats = seats.filter(function(s){
-          return s.kind && s.kind!=='human' && s.kind!=='empty' && s.seat!==0;
+          return s.kind && s.kind!=='human' && s.kind!=='empty';   // ★修复: 移除 seat!==0 限制, seat 0 无特殊含义(新架构)
         });
         if(aiSeats.length){
           var victim = aiSeats[Math.floor(Math.random()*aiSeats.length)];
