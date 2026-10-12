@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v119';
+window.__EH_APP_VER = '20261004-v120';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1077,6 +1077,7 @@ let gtReapTimer = null;    // 房内定时回收陈旧桌(5min 没人玩自动�
 let _gtPlayChan = null;    // Realtime 对局频道(gt-play:<tableId>): host 广播脱敏快照 / 客人回传动作
 const _gtTables = new Map();  // table_id → 最新 table 行(牌桌卡按此渲染)
 let _gtActiveTable = null;     // 我当前所在的联机桌 {id, host} —— 供"房主散桌→guest 清场"判定; 单机/无桌时为 null
+let _gtReleasingHolder = false;  // ★修复(3-4局后进旁观): 引擎让位(非用户离场)时置 true, onExit 跳过 away 标记
 let _gtSnapSeq = 0;            // 兼容: EH_GT_NET 缺失时的本地序号
 // ★v37: 多人德州统一状态机 — 所有状态转换经此对象, DB realtime 据此拦截 away 自动拉回
 var _gtPokerSession = null; // { state, tableId } state: null|'host'|'guest'|'spectator'|'away'
@@ -3496,6 +3497,7 @@ function gtLaunchPokerLobby(row){
     },
     // ★临时离席: 标记 away 不腾席; 清本地引擎, 还有其他非 away 真人则引擎转移, 没有则散桌。
     onExit:()=>{
+      if(_gtReleasingHolder) return;   // ★让位非离场: 跳过 away 标记
       try{ gtRpc('eh_gt_set_away',{p_table:row.id, p_away:true}); }catch(_){}
       // ★v44: 主动广播 player_away, 其他客户端立刻清座位 UI(不等 DB realtime)
       _gtBroadcastPlayerAway(row.id);
@@ -3768,6 +3770,7 @@ async function _gtEnterPokerServer(row) {
     },
     onBustCount: function() { try { ehRecordBust('nlhe'); } catch(_) {} },
     onExit: function() {
+      if(_gtReleasingHolder) return;   // ★让位非离场: 跳过 away 标记
       try { if (!window.EH_SERVER_HOST) gtSettleChipsToGlobal(_gtMyFinalStack); } catch(_) {}
       _setPokerState('away', tableId);
       _gtBroadcastPlayerAway(tableId);
@@ -3906,7 +3909,9 @@ function gtHandleHolderChange(row){
   // 我已持有引擎, 但已不是持有者 → 释放引擎(让位给新持有者, 防双host)
   if(iHaveEngine && !iAmHolder){
     console.log('[gt] 我不再是引擎持有者,释放引擎', row.id, '新持有者=', holder);
+    _gtReleasingHolder = true;   // ★让位非离场: onExit 跳过 away 标记, 防误进旁观
     try{ if(_ehGame && typeof _ehGame.close==='function') _ehGame.close(); }catch(_){ _ehCatch('gtHolderRelease',_); }
+    _gtReleasingHolder = false;
     try{ _gtCleanupPlay(); }catch(_){}
     // 释放后若我仍在座, 落到下面的 guest 进桌逻辑(realtime 回调会接)
     return;
@@ -4445,6 +4450,10 @@ async function gtLaunchPoker(row, resumeSnap){
     // ★v51 DB 仲裁: host 点返回 → 直接写 DB 把 host_uid 改给下一个玩家, 不发 transfer 广播。
     //   对方收 DB realtime 推送后由 gtCheckEngineTransfer 启动引擎。无其他真人 → 散桌。
     onExit:()=>{
+      // ★修复(3-4局后进旁观): 引擎让位(非用户离场)时跳过所有离场副作用
+      //   让位场景: gtHandleHolderChange 检测到持有者变化, close() 触发 onExit
+      //   若不跳过: eh_gt_set_away(p_away:true) 会把在座玩家标为 away → 下次进桌被判离座 → 旁观
+      if(_gtReleasingHolder) return;
       const tableId = row.id;
       const _fr=_gtTables.get(tableId) || row;
       const _isHost = gtEngineHolder(_fr) === myUid;
