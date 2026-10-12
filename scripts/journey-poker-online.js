@@ -247,3 +247,7 @@ process.exit(failed ? 1 : 0);
 // ★v129 德州进桌前置提取: _gtPokerPreEnter
 assert(/function _gtPokerPreEnter/.test(src), '_gtPokerPreEnter 存在(进桌前host接管+进行中转旁观)');
 assert(/_gtPokerPreEnter\(row\)/.test(src), '_gtEnterPokerV2 调用 _gtPokerPreEnter');
+
+// ★v130 游戏加载检查提取: _gtEnsureLoaded(消除13处重复)
+assert(/function _gtEnsureLoaded\(game, retry\)/.test(src), '_gtEnsureLoaded 存在(统一游戏模块就绪检查)');
+assert(/_gtEnsureLoaded\('poker'/.test(src), '德州用 _gtEnsureLoaded');

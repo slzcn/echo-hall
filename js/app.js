@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v129';
+window.__EH_APP_VER = '20261004-v130';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2890,6 +2890,17 @@ function _gtOnHostQuit(row){
   _gtCleanupPlay();
   gtClose(row.id);
 }
+// 游戏模块就绪检查: 未就绪则异步加载后重跑 retry。返回 true=已就绪可继续, false=加载中(调用方 return)
+function _gtEnsureLoaded(game, retry){
+  if(window.EHGameLoader && window.EHGameLoader.isReady(game)) return true;
+  toast('牌桌加载中…');
+  if(window.EHGameLoader){
+    window.EHGameLoader.ensure(game)
+      .then(()=>{ try{ retry(); }catch(e){ _ehCatch('gameRelaunch',e); } })
+      .catch(e=>{ _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); });
+  } else { toast('游戏加载器未初始化，请刷新页面'); }
+  return false;
+}
 // 斗地主/掼蛋共享的 guest 进桌(德州 guest 走 _gtEnterPokerV2, 流程差异大不并入)
 async function _gtEnterGuestGame(game, row, openFn){
   if(!ehDailyPlayGate(game==='ddz'?'doudizhu':'guandan')) return;
@@ -3475,7 +3486,7 @@ function gtWireHostChannel(tableId){
 //   故发牌前后座位变动(灵魂入座/真人换座)都自动生效, 无需重挂或固化名册。──
 function gtLaunchDdzLobby(row){
   if(!ehDailyPlayGate('doudizhu')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=gtLaunchDdzLobby; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('ddz', function(){ gtLaunchDdzLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
   const chan=gtWireHostChannel(row.id);
   const A0=gtSeatArrays(row);
@@ -3511,7 +3522,7 @@ function gtLaunchDdzLobby(row){
 //   host 点开始 → startDeal 就地转正局(同一 room 不重挂)。名册在 onSync/onResult 里实时从 DB 重算, 中途换座自动生效。
 function gtLaunchPokerLobby(row){
   if(!ehDailyPlayGate('nlhe')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtLaunchPokerLobby; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('poker', function(){ gtLaunchPokerLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
   const chan=gtWireHostChannel(row.id);
   const A0=gtSeatArrays(row);
@@ -3575,7 +3586,7 @@ function gtLaunchPokerLobby(row){
 //   名册在 onSync/onResult 里实时从 DB 重算, 中途换座自动生效。
 function gtLaunchGuandanLobby(row){
   if(!ehDailyPlayGate('guandan')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=gtLaunchGuandanLobby; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('guandan', function(){ gtLaunchGuandanLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
   const chan=gtWireHostChannel(row.id);
   const A0=gtSeatArrays(row);
@@ -4075,7 +4086,7 @@ async function gtLaunchPoker(row, resumeSnap){
   
   // 命名收口(架构排查#3): 曾短暂改名 _gtLaunchPokerV2, 现统一回 gtLaunchPoker; 勿再改名
   if(!ehDailyPlayGate('nlhe')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtLaunchPoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('poker', function(){ gtLaunchPoker.apply(null, arguments); })) return;
   const A=gtSeatArrays(row);
   if(A.mySeat<0) A.mySeat=0;   // 新建桌时我尚未入座, 默认坐0号位
   _gtCleanupPlay();
@@ -4255,7 +4266,7 @@ async function gtLaunchPoker(row, resumeSnap){
 // ── 旁观者: 满座时以旁观身份进入牌桌, 可看牌局但无操作按钮; 有空位时显示抢位按钮。──
 async function gtSpectatePoker(row){
   if(_gtDissolvedTableId && row && _gtDissolvedTableId===row.id){ return; }
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=gtSpectatePoker; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('poker', function(){ gtSpectatePoker.apply(null, arguments); })) return;
 
   _gtCleanupPlay();
   _setPokerState('spectator', row.id);
@@ -4471,7 +4482,7 @@ function _gtPokerPreEnter(row){
   return false;
 }
 async function _gtEnterPokerV2(row){
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=_gtEnterPokerV2; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('poker', function(){ _gtEnterPokerV2.apply(null, arguments); })) return;
   if(!ehDailyPlayGate('nlhe')) return;
   if(_gtPokerPreEnter(row)) return;
   // ★多人进同一桌: 统一先入座, 不再「你不在这桌」把人拒之门外
@@ -4641,7 +4652,7 @@ function gtWriteGuandanHands(tableId, state, A){
 // ── 掼蛋联机 · HOST: 本机跑引擎当裁判, 每步产脱敏公共快照广播 + 重写远程席当前手牌; 收远程动作经引擎校验后应用。──
 function gtLaunchGuandan(row){
   if(!ehDailyPlayGate('guandan')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=gtLaunchGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('guandan', function(){ gtLaunchGuandan.apply(null, arguments); })) return;
   const A=gtSeatArrays(row);
   if(A.mySeat<0){ toast('你不在这桌'); return; }
   if(A.n<4){ toast('掼蛋要坐满 4 席才能开打'); return; }
@@ -4714,7 +4725,7 @@ function _gtEnterWaiting(row){
 }
 
 async function gtEnterGuandan(row){
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=gtEnterGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('guandan', function(){ gtEnterGuandan.apply(null, arguments); })) return;
   await _gtEnterGuestGame('guandan', row, window.EHGuandanGame.open);
 }
 
@@ -4732,7 +4743,7 @@ function gtWriteDdzHands(tableId, state, A){
 //   反作弊: 快照永不带 seed/log/任何人 hand, 只 handCount; 底牌(bottom)在地主揭晓前只给 bottomCount, 揭晓后才公开。
 function gtLaunchDdz(row){
   if(!ehDailyPlayGate('doudizhu')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=gtLaunchDdz; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('ddz', function(){ gtLaunchDdz.apply(null, arguments); })) return;
   const A=gtSeatArrays(row);
   if(A.mySeat<0){ toast('你不在这桌'); return; }
   if(A.n<3){ toast('斗地主要坐满 3 席才能开打'); return; }
@@ -4780,7 +4791,7 @@ function gtLaunchDdz(row){
 // ── 斗地主联机 · GUEST: 不跑引擎; 收公共快照渲染 + 拉自己手牌; 叫分/出牌/不出发回 host 权威校验。──
 //   手牌动态: 自己张数一变(发牌 17 / 抢到地主 +3=20 / 我出牌减少) 就重拉; 写库与广播竞态时张数对不上短延时自愈重拉。
 async function gtEnterDdz(row){
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=gtEnterDdz; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('ddz', function(){ gtEnterDdz.apply(null, arguments); })) return;
   await _gtEnterGuestGame('ddz', row, window.EHDdzGame.open);
 }
 
@@ -9323,7 +9334,7 @@ function _restoreActiveGameIfAny(wantGame){
 //   host 权威跑引擎见 gtLaunchDdz; 座位不满 3 真人时空位/灵魂由 host 本机 AI 代打(即单机陪玩体验)。
 async function launchDoudizhu(){
   if(!ehDailyPlayGate('doudizhu')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('ddz'))){ var __args=arguments,__self=launchDoudizhu; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('ddz').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('ddz', function(){ launchDoudizhu.apply(null, arguments); })) return;
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('doudizhu')) return;
   // ★v91 防重入: 连点 /斗地主 只跑一次, 避免竞态贴多张牌桌卡
@@ -9370,7 +9381,7 @@ async function launchDoudizhu(){
 //    合并了旧 /德州(单机陪玩) 与 /德州联机(座位大厅): 只此一条, 单人和联机是同一张桌子。
 async function launchTexas(){
   if(!ehDailyPlayGate('nlhe')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('poker'))){ var __args=arguments,__self=launchTexas; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('poker').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('poker', function(){ launchTexas.apply(null, arguments); })) return;
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('nlhe')) return;
   // ★v91 防重入: 连点 /德州 期间只跑一次, 避免 eh_gt_open 幂等返回同一桌(row.msg_id 尚未回填)时
@@ -9687,7 +9698,7 @@ async function recordGameResult(game, res, log, names, avatars, souls){
 // ── 掼蛋:唤起入室牌桌。4 席 2 队(0&2 一队/1&3 一队), 3 家 AI 用房里灵魂命名/头像。──
 async function launchGuandan(){
   if(!ehDailyPlayGate('guandan')) return;
-  if(!(window.EHGameLoader&&window.EHGameLoader.isReady('guandan'))){ var __args=arguments,__self=launchGuandan; toast('牌桌加载中…'); if(window.EHGameLoader){ window.EHGameLoader.ensure('guandan').then(function(){ try{ __self.apply(null,__args); }catch(e){ try{ console.warn('relaunch fail',e); }catch(_){} _ehCatch('gameRelaunch',e); } }).catch(function(e){ try{ console.warn('game load failed',e); }catch(_){} _ehCatch('gameLoad',e); toast('游戏加载失败，请刷新页面'); }); } else{ toast('游戏加载器未初始化，请刷新页面'); } return; }
+  if(!_gtEnsureLoaded('guandan', function(){ launchGuandan.apply(null, arguments); })) return;
   if(!curRoom){ toast('先进一个房间再开局'); return; }
   if(_restoreActiveGameIfAny('guandan')) return;
   // ★v91 防重入: 连点 /掼蛋 只跑一次, 避免竞态贴多张牌桌卡

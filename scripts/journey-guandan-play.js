@@ -391,3 +391,7 @@ console.log('\n✅ 掼蛋旅程全部通过');
 // ★v128 Guest 进桌重构: 提取 _gtEnterGuestGame 共享框架
 assert(/function _gtEnterGuestGame/.test(src), '_gtEnterGuestGame 共享框架存在(斗地主/掼蛋guest复用)');
 assert(/await _gtEnterGuestGame\('guandan'/.test(src), 'gtEnterGuandan 调用共享框架');
+
+// ★v130 游戏加载检查提取
+assert(/function _gtEnsureLoaded/.test(src), '_gtEnsureLoaded 存在');
+assert(/_gtEnsureLoaded\('guandan'/.test(src), '掼蛋用 _gtEnsureLoaded');
