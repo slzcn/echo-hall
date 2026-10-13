@@ -149,14 +149,14 @@ assert(/game===.guandan.[\s\S]*?gtLaunchGuandanLobby\(row\)/.test(LL), '第1条:
 // gtLaunch{Ddz,Poker,Guandan}Lobby: 就地挂真牌桌招募态 + 先接好 host 权威通道(招募态不广播, 发牌一刻才推首帧)。
 const DL = (APP.match(/function gtLaunchDdzLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/EHDdzGame\.open\(/.test(DL) && /lobby:true/.test(DL) && /isHost:true/.test(DL), '第1条: gtLaunchDdzLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
-assert(/gtWireHostChannel\(row\.id\)/.test(DL), 'gtLaunchDdzLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+assert(/gtWireHostChannel\(row\.id, row\)/.test(DL), 'gtLaunchDdzLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
 const PL = (APP.match(/function gtLaunchPokerLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/EHPokerGame\.open\(/.test(PL) && /lobby:true/.test(PL) && /isHost:true/.test(PL), '第1条: gtLaunchPokerLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
-assert(/gtWireHostChannel\(row\.id\)/.test(PL), 'gtLaunchPokerLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+assert(/gtWireHostChannel\(row\.id, row\)/.test(PL), 'gtLaunchPokerLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
 const GL = (APP.match(/function gtLaunchGuandanLobby\(row\)\{[\s\S]*?\n\}/) || [''])[0];
 assert(/EHGuandanGame\.open\(/.test(GL) && /lobby:true/.test(GL) && /isHost:true/.test(GL), '第1条: gtLaunchGuandanLobby 以招募态挂真牌桌(lobby:true,isHost:true)');
-assert(/gtWireHostChannel\(row\.id\)/.test(GL), 'gtLaunchGuandanLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
-assert(/function gtWireHostChannel\(tableId\)\{[\s\S]*?gt-play:/.test(APP), '有 gtWireHostChannel: host 侧 gt-play 通道接线(act 只认远程真人席)');
+assert(/gtWireHostChannel\(row\.id, row\)/.test(GL), 'gtLaunchGuandanLobby 招募态即接好 gt-play 通道(gtWireHostChannel)');
+assert(/function gtWireHostChannel\(tableId, fallbackRow\)\{[\s\S]*?gt-play:/.test(APP), '有 gtWireHostChannel: host 侧 gt-play 通道接线(act 只认远程真人席)');
 // DDZ 引擎: 招募态占位局 + 就地发牌 + 座位实时刷新, 供 app 的 deal-in-place 驱动。
 assert(/function lobbyState\(seats\)/.test(DDZ) && /phase:'lobby'/.test(DDZ), 'game-ui: 有 lobbyState 招募占位局(phase:lobby)');
 assert(/function startDeal\(A, seed\)[\s\S]*?Engine\.createGame/.test(DDZ), 'game-ui: 有 startDeal 就地发牌(换名册建真局, 不重挂 room)');

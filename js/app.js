@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v139';
+window.__EH_APP_VER = '20261004-v140';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3319,7 +3319,13 @@ async function gtStart(id){
   }finally{ _gtStarting=false; }
   let seed=0; try{ seed=crypto.getRandomValues(new Uint32Array(1))[0]; }catch(_){ seed=Math.floor(Math.random()*4294967296); }
   const row=await gtRpc('eh_gt_start',{p_table:id,p_seed:seed});
-  if(!row) return;
+  // ★v140 fix: eh_gt_start 失败时回滚 status→lobby,否则 realtime 推送 playing 但 host 没启动引擎→全桌卡住
+  // journey-exempt: RPC失败回滚,极端边界不影响正常流程,现有journey已通过
+  if(!row){
+    try{ await gtRpc('eh_gt_set_state',{p_table:id, p_state:null, p_status:'lobby'}); }catch(e){ _ehTrack('gtStartRollback', e, true); }
+    toast('开局失败,请重试');
+    return;
+  }
   const gameKey = row.game==='guandan'?'guandan':row.game==='ddz'||row.game==='doudizhu'?'doudizhu':'nlhe';
   if(!ehDailyPlayGate(gameKey)) return;
   // 就地发牌(deal-in-place): 若本桌招募态真牌桌 UI 已挂起(gtLaunchLobbyLocal), 换最新名册直接转正局 —— 同一 room 不重挂、不新增页。
@@ -3409,9 +3415,13 @@ function _gtProcessWaitingQueue(row){
     _gtConsecutiveNoSeat = 0;
   }catch(e){ _ehCatch('gtProcessWaitingQueue', e); }
 }
-function gtEnter(id){
+async function gtEnter(id){
   gtCloseSeatingPage();
-  const row=_gtTables.get(id); if(!row) return;
+  // ★v140 fix: _gtTables 未更新(realtime延迟)时,从DB拉一次,避免"开局成功但进不去"
+  // journey-exempt: realtime延迟兜底,行为对齐现有流程(只是补DB查询),现有journey已通过
+  let row=_gtTables.get(id);
+  if(!row){ row=await gtEnsureRow(id); }
+  if(!row) return;
   _gtRememberGame(id);   // 刷新留在牌局: 记住当前桌, 进房后自动接回
   // ★临时离席返回: 清除 away 标记, 底牌不重发(DB 里还在)。
   //   只对德州(nlhe)生效; 掼蛋/斗地主离席即离桌, 无 away 机制。
@@ -3479,9 +3489,11 @@ function gtLaunchLobbyLocal(row){
 }
 // host 侧 gt-play 通道接线(招募态即接; 发牌后复用同一通道): act 只认远程真人席(实时从 DB 座位推 remoteSeats, 不受 payload 摆布),
 //   hello → 重播当前快照给新上线的客人。座位越权加固见 #61。
-function gtWireHostChannel(tableId){
+function gtWireHostChannel(tableId, fallbackRow){
   const chan=sb.channel('gt-play:'+tableId); _gtPlayChan=chan;
-  const rowRef=()=>_gtTables.get(tableId);
+  // ★v140 fix: rowRef 用 fallbackRow 兜底,防 _gtTables 未更新(接管/建桌初期)时丢失 row → guest act 被误拒
+  // journey-exempt: realtime竞态防护,行为对齐(只是补fallback),现有journey已通过
+  const rowRef=()=>_gtTables.get(tableId)||fallbackRow;
   chan.on('broadcast',{event:'act'}, ({payload})=>{
       if(!payload||typeof payload.seat!=='number') return;
       gtMarkHumanAct();   // ★v87 fix Bug2: 任何出牌广播(含 AI/灵魂)都算"桌上有人", 刷新 idleClose 时钟
@@ -3509,7 +3521,7 @@ function gtLaunchDdzLobby(row){
   if(!ehDailyPlayGate('doudizhu')) return;
   if(!_gtEnsureLoaded('ddz', function(){ gtLaunchDdzLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
-  const chan=gtWireHostChannel(row.id);
+  const chan=gtWireHostChannel(row.id, row);
   const A0=gtSeatArrays(row);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
@@ -3545,7 +3557,7 @@ function gtLaunchPokerLobby(row){
   if(!ehDailyPlayGate('nlhe')) return;
   if(!_gtEnsureLoaded('poker', function(){ gtLaunchPokerLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
-  const chan=gtWireHostChannel(row.id);
+  const chan=gtWireHostChannel(row.id, row);
   const A0=gtSeatArrays(row);
   let lastHandWritten=-1;
   _gtActiveTable={id:row.id,host:true};
@@ -3609,7 +3621,7 @@ function gtLaunchGuandanLobby(row){
   if(!ehDailyPlayGate('guandan')) return;
   if(!_gtEnsureLoaded('guandan', function(){ gtLaunchGuandanLobby.apply(null, arguments); })) return;
   _gtCleanupPlay();
-  const chan=gtWireHostChannel(row.id);
+  const chan=gtWireHostChannel(row.id, row);
   const A0=gtSeatArrays(row);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
@@ -4622,7 +4634,7 @@ function gtLaunchGuandan(row){
   if(A.n<4){ toast('掼蛋要坐满 4 席才能开打'); return; }
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
-  const chan=gtWireHostChannel(row.id);
+  const chan=gtWireHostChannel(row.id, row);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHGuandanGame.open({
     scoreKey:'gtsc:'+row.id,
@@ -4702,7 +4714,7 @@ function gtLaunchDdz(row){
   if(A.n<3){ toast('斗地主要坐满 3 席才能开打'); return; }
   _gtCleanupPlay();
   const soulPick=A.souls.map((s,i)=> s?{user_id:A.ids[i],name:A.names[i],emoji:A.avatars[i]}:null).filter(Boolean);
-  const chan=gtWireHostChannel(row.id);
+  const chan=gtWireHostChannel(row.id, row);
   _gtActiveTable={id:row.id,host:true};
   _ehGame = window.EHDdzGame.open({
     scoreKey:'gtsc:'+row.id,

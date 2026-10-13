@@ -272,7 +272,7 @@ assert(!/p_status:\s*'done'/.test(GTL_DDZ), 'gtLaunchDdz onResult 不再标 done
 assert(/onExit:\(\)=>\{[\s\S]{0,500}?(_gtOnHostQuit\(row\)|gtClose\(row\.id\)|_gtHandleHostLeave)/.test(GTL_DDZ), 'gtLaunchDdz 只在房主收工 onExit 时 gtClose 散桌(桌子随再来一局一直活着)');
 // #61 座位越权加固: host 收到的 'act' 只认远程真人席; 伪造 host/AI/灵魂席动作被 remoteSeats 白名单拒
 // ★v131: gtLaunchDdz 用 gtWireHostChannel 统一通道设置(act → gtAcceptRemoteAct 由 gtWireHostChannel 保证)
-assert(/gtWireHostChannel\(row\.id\)/.test(GTL_DDZ), 'gtLaunchDdz 用 gtWireHostChannel 统一通道(包含 act → gtAcceptRemoteAct)');
+assert(/gtWireHostChannel\(row\.id, row\)/.test(GTL_DDZ), 'gtLaunchDdz 用 gtWireHostChannel 统一通道(包含 act → gtAcceptRemoteAct)');
 assert(/remoteSeats\.indexOf\(seat\) < 0\) return/.test(src) && /function gtAcceptRemoteAct/.test(src), 'gtAcceptRemoteAct 仍按 remoteSeats 白名单拒非远程真人席(#61)');
 assert(/gtLiveSeatArrays/.test(src) && /gtWireHostResume/.test(src), '联机 host: 现算座位 + resume 回座通道已接线');
 
