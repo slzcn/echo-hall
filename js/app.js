@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v134';
+window.__EH_APP_VER = '20261004-v135';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -2038,6 +2038,21 @@ function preRestoreScene(){
   const nt=$('#hallNameTxt'); if(nt) nt.innerHTML=esc(r.name);
   const pr=$('#presence'); if(pr) pr.innerHTML=presenceSkeleton(3);
   goScene('hall'); setConn(false,'连接中');
+}
+// enterRoom 公共初始化路径: joinAsMember + 并行查询 + role赋值 + 跨场景记忆
+// journey-exempt: 提取公共代码无行为变化,keep-alive和全量路径原本就执行相同逻辑
+async function _enterRoomSetup(room, firstTask){
+  if(await joinAsMember(room)===false) return false;
+  const results = await Promise.allSettled([
+    firstTask,  // keep-alive: refreshSnapshotTail(room) / 全量: loadHistory(true) 或 histP
+    sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
+    setupPresence(room), setupGameTables(room),
+    loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions())
+  ]);
+  room.role = results[1]?.value?.data?.role || 'member';
+  { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
+  // 跨场景记忆：进房后为每个灵魂构建记忆摘要并写入 eh_souls.memory_summary
+  try{ if(roomSouls.length && myUid){ roomSouls.forEach(s=>{ if(s&&s.auth_uid){ ehSoulBuildMemoryContext(room.id, s.auth_uid, myUid).catch(()=>{}); } }); } }catch(_){ _ehCatch('enterRoom.mem',_); }
   return true;
 }
 async function enterRoom(room){
@@ -2089,22 +2104,11 @@ async function enterRoom(room){
     if(enterEpoch!==roomEpoch || !curRoom || curRoom.id!==room.id) return;
     subscribeMessages(room.id);      // 补挂订阅接离开期间/后续新消息(连接灯由其 subscribe 状态驱动)
     try{ entranceBanner(room); }catch(_){ _ehCatch('enterRoom',_); }   // 进场动效: keep-alive 回房也要演(否则快速回房看不到进场特效)
-    if(await joinAsMember(room)===false) return;
-    // allSettled: 任一查询失败也不拖垮其余(避免一次网络抖动 → Promise.all reject → 卡"连接中")
-    const [memRes] = await Promise.allSettled([
-      sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-      setupPresence(room),
-      setupGameTables(room),           // 联机牌桌座位实时同步
-      refreshSnapshotTail(room),       // 后台静默补拉最新一屏，覆盖空窗期新消息(保证最终一致)
-      loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions())           // 拉本房灵魂居民(展示层)
-    ]);
+    // keep-alive 的 firstTask = refreshSnapshotTail(补拉最新一屏覆盖空窗期新消息)
+    if(await _enterRoomSetup(room, refreshSnapshotTail(room))===false) return;
     // ★keep-alive 贴的是旧 DOM 快照, 跳过了 loadHistory→loadRoomUserIdentity。这里从还原后的 DOM
     //   扫 uid 补一次真人权威身份表, 让离场者改名(如 61女王→热血狼)在秒回房路径也跟随, 不留旧名。
     loadRoomUserIdentity();
-    // 跨场景记忆：进房后为每个灵魂构建记忆摘要并写入 eh_souls.memory_summary
-    try{ if(roomSouls.length && myUid){ roomSouls.forEach(s=>{ if(s&&s.auth_uid){ ehSoulBuildMemoryContext(room.id, s.auth_uid, myUid).catch(()=>{}); } }); } }catch(_){ _ehCatch('enterRoom.mem',_); }
-    room.role = memRes?.value?.data?.role || 'member';
-    { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
     return;
   }
   // ---- 无快照: 原全量流程 ----
@@ -2126,18 +2130,8 @@ async function enterRoom(room){
   subscribeMessages(room.id);   // 连接灯由其 subscribe 状态驱动
   const isPublic = room.kind==='official' || room.kind==='public';
   const histP = isPublic ? loadHistory(true) : null;
-  if(await joinAsMember(room)===false) return;
-  const tasks=[ histP || loadHistory(true),
-    sb.from('eh_members').select('role').eq('room_id',room.id).eq('user_id',myUid).maybeSingle(),
-    setupPresence(room), setupGameTables(room),
-    loadRoomSouls(room.id), (_interactions.length?Promise.resolve():loadInteractions()) ];
-  // allSettled: 单个失败不拖垮全流程,不再因一次抖动卡死在"连接中"
-  const results = await Promise.allSettled(tasks);
-  const memRes = results[1];
-  room.role = memRes?.value?.data?.role || 'member';
-  { const g=$('#gearBtn'); if(g) g.classList.toggle('show', room.role==='owner' && room.kind!=='official'); }
-  // 跨场景记忆：进房后为每个灵魂构建记忆摘要并写入 eh_souls.memory_summary
-  try{ if(roomSouls.length && myUid){ roomSouls.forEach(s=>{ if(s&&s.auth_uid){ ehSoulBuildMemoryContext(room.id, s.auth_uid, myUid).catch(()=>{}); } }); } }catch(_){ _ehCatch('enterRoom.mem',_); }
+  // 全量路径的 firstTask = loadHistory(公开房乐观并行启动,私密房懒加载)
+  if(await _enterRoomSetup(room, histP || loadHistory(true))===false) return;
   try{ entranceBanner(room); }catch(_){ try{ sysMsg(`你以 <b>${esc(me.name)}</b> 的身份进入了「${esc(room.name)}」`); }catch(__){ _ehCatch('enterRoom',__); } }
   // EH_OPT_TAROT_DELAY: 塔罗牌不再进场秒弹(打扰), 改为在房内待够约1小时后随机弹一次(当天没弹过).
   scheduleDailyTarot(room && room.id);
