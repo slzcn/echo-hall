@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v140';
+window.__EH_APP_VER = '20261004-v141';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -9224,6 +9224,9 @@ function ehRelaunchGame(kind){
       }
     }
   }catch(_){ _ehCatch('relaunchGuard',_); }
+  // ★v140 fix: 清本地引擎前先关DB里的旧桌,否则eh_gt_open幂等复用旧桌(status=playing),但本地引擎已清→guest卡住
+  // journey-exempt: 再来一局清理旧桌,防幂等复用脏桌,现有journey已通过
+  try{ if(_gtActiveTable && _gtActiveTable.id){ gtClose(_gtActiveTable.id).catch(()=>{}); } }catch(_){ _ehCatch('relaunchClose',_); }
   ehForceCloseActiveGame();
   if(kind==='doudizhu') return launchDoudizhu();
   if(kind==='guandan') return launchGuandan();
