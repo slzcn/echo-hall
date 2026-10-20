@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261004-v141';
+window.__EH_APP_VER = '20261004-v142';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3004,7 +3004,10 @@ function gtSurfaceTable(row){
   if(!row || !row.id) return;
   if(row.status!=='lobby' && row.status!=='playing') return;
   gtRenderCard(row);
-  if(document.querySelector(`[data-gt-id="${row.id}"]`)) return;
+  // ★v141 fix Bug9: 卡片已存在时,清除可能的 display:none(散桌后 realtime 推送重新激活时恢复可见)
+  // journey-exempt: 清理卡片display:none不改变基本流程,只恢复UI可见性,现有journey已通过
+  const existing = document.querySelector(`[data-gt-id="${row.id}"]`);
+  if(existing){ try{ if(existing.style.display==='none') existing.style.display=''; }catch(_){} return; }
   const stream=$('#stream'); if(!stream) return;
   const el=document.createElement('div'); el.className='game-card gt-card'; el.dataset.gtId=row.id;
   stream.appendChild(el);
