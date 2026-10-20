@@ -1879,13 +1879,17 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const myTribute = myTributeTurn();   // 进贡阶段: 候选牌高亮(build 后 markTribute 补类)
       const r = orderedRows(); const top = r[0], bot = r[1];   // 按大小/按牌型都走两排叠牌渲染, 只是顺序不同
-      // 增量护栏(同斗地主): 手牌结构(排/列 id / 回合锁 / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
+      // 增量护栏(同斗地主): 手牌结构(排/列 id / 理牌态 / 级牌 / 发牌帧)未变 → 不整段重建。
       //   免每秒一次重绘的 innerHTML churn + layoutRow 强制回流; 且不在别家回合把我正拖排/涂选的 DOM 拆掉。
-      const structSig = (myTurn?1:0)+'|'+(myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'+sortMode+'|'
+      // ★v143 fix手牌闪烁: 移除 myTurn 判断,回合切换不触发重建;locked状态走CSS类动态切换。
+      const structSig = (myTribute?'T'+tributeSel:'')+'|'+(arrangeMode?1:0)+'|'+(dealAnim?1:0)+'|'+st.level+'|'+sortMode+'|'
         + top.map(c=>c.id).join(',')+'#'+bot.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
       els.hand.classList.toggle('has-sel', selected.size>0); try{ refreshSortBtn(); }catch(_){}
       if (structSig === lastHandSig){
+        // ★v143: 手牌内容没变,但回合可能切换 → 只切locked类,不重建DOM(消除闪烁)
+        const canPlay = st.phase==='play' || arrangeMode || myTribute;
+        els.hand.classList.toggle('locked', !canPlay);
         // 结构没变、只是选牌变了 → 只在既有牌上切 .sel, 升降走 CSS transform 过渡(丝滑), 不整段重建
         if (selSig !== lastSelSig){
           lastSelSig = selSig;

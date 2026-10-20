@@ -1569,12 +1569,16 @@ html[data-mode="day"] .ddz-felt::before{
     function renderHand(){
       const myTurn = st.phase==='play' && st.turn===mySeat && !(isGuest && awaitingHost);
       const order = handOrder();
-      // 增量护栏: 手牌结构(id/回合锁/发牌帧)未变 → 不整段重建。
+      // 增量护栏: 手牌结构(id/发牌帧)未变 → 不整段重建。
       //   省掉对家/AI 回合(每秒一次)重绘里的 innerHTML churn + layoutHand 强制回流;
       //   更关键: 我正涂抹选牌时若别家触发 renderAll, 不再把我脚下的手牌 DOM 拆了重建(打断连选)。
-      const structSig = (myTurn?1:0)+'|'+(dealAnim?1:0)+'|'+order.map(c=>c.id).join(',');
+      // ★v143 fix手牌闪烁bug: 移除 myTurn 判断,回合切换不触发手牌重建,只在手牌内容真正变化时重建。
+      //   locked状态(能否选牌)由CSS .ddz-hand.locked控制,不需要重建DOM来切换交互性。
+      const structSig = (dealAnim?1:0)+'|'+order.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
       if (structSig === lastHandSig){
+        // ★v143: 手牌内容没变,但回合可能切换 → 只切 locked 类(控制能否选牌),不重建DOM(消除闪烁)
+        els.hand.classList.toggle('locked', !myTurn);
         // 结构没变、只是选牌变了 → 只在既有牌上增删 .sel, 让升起/落下走 CSS transform 过渡(丝滑),
         // 不再整段重建 17~27 张 DOM(那会打断 .14s 过渡并强制回流 = 点牌卡顿的主因)。
         if (selSig !== lastSelSig){
