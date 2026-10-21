@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>监控测试</title></head>
+<body>
+<div class="ddz-room">
+  <div class="ddz-hand">
+    <div class="card">3</div>
+    <div class="card">4</div>
+  </div>
+  <div class="ddz-turnbanner mine">轮到你</div>
+</div>
+<script>
+// 测试监控代码
+(function(){
+  var log = [];
+  var renderCount = 0;
+  var lastRenderTime = 0;
+  
+  setInterval(function(){
+    var room = document.querySelector('.ddz-room');
+    if (!room) { console.log('no room'); return; }
+    
+    var handCards = document.querySelectorAll('.ddz-hand .card');
+    var now = Date.now();
+    var handHTML = document.querySelector('.ddz-hand')?.innerHTML?.length || 0;
+    
+    if (window._lastHandHTML !== handHTML) {
+      renderCount++;
+      var interval = now - lastRenderTime;
+      lastRenderTime = now;
+      
+      var entry = { time: new Date().toLocaleTimeString(), renderNo: renderCount, interval: interval + 'ms', cardCount: handCards.length };
+      log.push(entry);
+      console.log('[记录]', entry);
+      
+      window._lastCardCount = handCards.length;
+      window._lastHandHTML = handHTML;
+    }
+  }, 200);
+  
+  window._monitorLog = log;
+  console.log('✓ 监控已启动');
+  
+  // 2秒后模拟手牌变化
+  setTimeout(function(){
+    document.querySelector('.ddz-hand').innerHTML += '<div class="card">5</div>';
+    console.log('>>> 模拟添加一张牌');
+  }, 2000);
+  
+  // 4秒后输出日志
+  setTimeout(function(){
+    console.log('=== 最终日志 ===', window._monitorLog);
+    if (window._monitorLog.length >= 2) {
+      console.log('✅ 监控代码工作正常,捕获了'+window._monitorLog.length+'次变化');
+    } else {
+      console.log('❌ 监控代码可能有问题');
+    }
+  }, 4000);
+})();
+</script>
+</body>
+</html>
