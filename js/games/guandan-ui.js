@@ -734,12 +734,10 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
         try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
     }
     function _clearAutoTrusteeOnNewDeal(){
-      // 两局没响应 -> 自动离座: 上一手整局挂机/无本人操作才累计; 有过动作即清零。
-      //   单机练习桌(isLocalSolo)只托管代打, 不把本人踢进旁观。
-      if(!_actedThisHand && (trusteeAuto || spectating)) _handsIdle++; else _handsIdle=0;
-      if(_handsIdle>=2 && !spectating && !isLocalSolo){
-        try{ doEnterSpectator(); }catch(_){}
-      }
+      // ★v144 修复"无故弃牌/自动退出": 停用「连续两局无本人操作 → 自动强制让座旁观」, 与斗地主一致。
+      //   原判定把"这副没轮到我操作"误当挂机, 累计两局 doEnterSpectator 踢人 → 玩家无故被让座/游戏结束。
+      //   超时仍由自动托管兜底代打; 真·离座只走用户主动「🔭 旁观」。
+      _handsIdle=0;
       _actedThisHand=false;
       if(trusteeAuto){ trustee=false; trusteeAuto=false; paintAuto(); }
     }

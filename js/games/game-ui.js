@@ -1229,12 +1229,12 @@ html[data-mode="day"] .ddz-felt::before{
         try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
     }
     function _clearAutoTrusteeOnNewDeal(){
-      // 两局没响应 -> 自动离座: 上一手整局挂机/无本人操作才累计; 有过动作即清零。
-      //   单机练习桌(isLocalSolo)只托管代打, 不把本人踢进旁观。
-      if(!_actedThisHand && (trusteeAuto || spectating)) _handsIdle++; else _handsIdle=0;
-      if(_handsIdle>=2 && !spectating && !isLocalSolo){
-        try{ doEnterSpectator(); }catch(_){}
-      }
+      // ★v144 修复"无故弃牌/自动退出": 彻底停用「连续两局无本人操作 → 自动强制让座旁观」。
+      //   原判定 _actedThisHand 太脆: 一副牌没轮到我操作(没抢地主/被一条龙带走)也算"挂机",
+      //   累计两局就把本人 doEnterSpectator 踢出座位 → 玩家表现为"玩着玩着无故被让座/游戏结束"。
+      //   与同文件 checkNoHumansThenDissolve(L713 已禁用, 注释"防误触发踢人")保持一致: 宁可不踢。
+      //   超时仍由自动托管(trusteeAuto)兜底代打, 只是不再把人赶出座位; 真·离座只走用户主动「🔭 旁观」。
+      _handsIdle=0;
       _actedThisHand=false;
       if (trusteeAuto){ trustee=false; trusteeAuto=false; try{ paintAuto(); }catch(_){} try{ renderAll(); }catch(_){} }
     }
@@ -1576,13 +1576,7 @@ html[data-mode="day"] .ddz-felt::before{
       //   locked状态(能否选牌)由CSS .ddz-hand.locked控制,不需要重建DOM来切换交互性。
       const structSig = (dealAnim?1:0)+'|'+order.map(c=>c.id).join(',');
       const selSig = [...selected].sort().join(',');
-      
-      // ★v143调试: 记录renderHand调用和去重效果
-      if (!window._renderStats) window._renderStats = { total: 0, skipped: 0, rebuilt: 0 };
-      window._renderStats.total++;
-      
       if (structSig === lastHandSig){
-        window._renderStats.skipped++;
         // ★v143: 手牌内容没变,但回合可能切换 → 只切 locked 类(控制能否选牌),不重建DOM(消除闪烁)
         els.hand.classList.toggle('locked', !myTurn);
         // 结构没变、只是选牌变了 → 只在既有牌上增删 .sel, 让升起/落下走 CSS transform 过渡(丝滑),
@@ -1595,7 +1589,6 @@ html[data-mode="day"] .ddz-felt::before{
         return;
       }
       lastHandSig = structSig; lastSelSig = selSig;
-      window._renderStats.rebuilt++;
       els.hand.className = 'ddz-hand' + (myTurn?'':' locked');
       els.hand.innerHTML = '';
       const deal = dealAnim; dealAnim = false;   // 只在发牌那一帧错峰入场, 之后普通重绘不动画
@@ -2403,19 +2396,6 @@ html[data-mode="day"] .ddz-felt::before{
       updateTrickActs();   // 先派生各席本圈最近动作, 供 renderSeats 常驻"上一手牌"
       renderSeats(); renderTable(); renderHand(); setBanner(); renderCtrl();
       justCrowned = false;
-      
-      // ★v143调试: 在顶部显示renderHand统计,验证去重是否生效
-      if (window._renderStats && st.phase !== 'lobby') {
-        const s = window._renderStats;
-        const skipRate = s.total > 0 ? ((s.skipped / s.total) * 100).toFixed(0) : 0;
-        if (!window._statsEl) {
-          window._statsEl = document.createElement('div');
-          window._statsEl.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#0f0;padding:4px 8px;font-size:11px;border-radius:4px;z-index:9999;pointer-events:none;font-family:monospace;';
-          document.body.appendChild(window._statsEl);
-        }
-        window._statsEl.textContent = `renderHand: ${s.total}次调用 | ${s.rebuilt}次重建 | ${s.skipped}次跳过(${skipRate}%)`;
-      }
-      
       // guest 无本地引擎(host 托管超时); 折叠期间也不催我的回合(离席看聊天不该被自动过牌)
       armTurn((isGuest || minimized) ? null : onHumanTimeout);
       broadcast();                                // host: 推送每席脱敏快照
