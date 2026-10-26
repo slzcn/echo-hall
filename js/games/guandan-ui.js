@@ -705,8 +705,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
     const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const onGrabSeat = (typeof opts.onGrabSeat==='function') ? opts.onGrabSeat : null;  // 旁观点空位: 走 app 抢位
-    // 单机练习桌: 超时只托管代打, 绝不把本人踢进旁观(与德州 isLocalSolo 同契约)
-    const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const missStreak = {};                 // seat -> 连续超时次数
     // ★手动托管: 顶栏第二钮, 跨局保留, 只由 🤖 钮开关(连续超时不再开托管, 改为自动离座)
     let trustee = false;
@@ -743,8 +741,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose 统一处理。
     function idleOut(seat){
       missStreak[seat] = 0;
-      // 单机练习桌: 超时已由 onHumanTimeout 自动代打, 不把本人踢进旁观(没有别的真人, 离座无意义)
-      if (seat===mySeat && isLocalSolo) return;
       if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);

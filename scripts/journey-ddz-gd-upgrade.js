@@ -2,7 +2,7 @@
 'use strict';
 /* journey-ddz-gd-upgrade.js — 斗地主/掼蛋对标德州近期优化的契约回归
  * 1) 旁观=起身让座(vacate:true), 不是「AI 接手」冒充托管
- * 2) 单机练习桌(isLocalSolo)绝不自动离座
+ * 2) 两次超时无条件自动离座(不存 isLocalSolo 豁免 — 三款均无真·离线单机桌)
  * 3) 空位点击入座(旁观中) + onGrabSeat
  * 4) 旁观三处文案一致(旁观中 · 已让座 / 坐下)
  * 5) 招募空位旁观时显示「点击入座」
@@ -20,10 +20,11 @@ for (const [src, tag] of [[DZ,'斗地主'],[GD,'掼蛋']]){
   ok(/vacate:\s*true/.test(src), tag+': 旁观通知腾座 vacate:true');
   ok(/起身旁观 · 座位已让出/.test(src), tag+': 文案「起身旁观 · 座位已让出」');
   ok(!/离座旁观, AI 接手/.test(src) || /vacate:\s*true/.test(src), tag+': 不再用「AI 接手」冒充让座');
-  ok(/isLocalSolo/.test(src), tag+': 有 isLocalSolo 单机守卫');
-  // v145: 连续两次超时 idleOut → 真离座; 单机练习桌(isLocalSolo)豁免不踢
-  ok(/if \(seat===mySeat && isLocalSolo\) return;/.test(src),
-     tag+': 单机练习桌超时不自动离座(isLocalSolo 豁免)');
+  ok(!/isLocalSolo/.test(src), tag+': 斗地主/掼蛋无 isLocalSolo 死变量(没有真·离线单机桌)');
+  // v146: 两次超时 idleOut(我) → 无条件真离座(三款没有真·离线单机桌, host 独自对 AI 也是联机桌,
+  //   挂机该离座 → 无真人则解散。此前 isLocalSolo 豁免把"host 独自对 AI"误挡, 用户反馈"多次超时不离座")。
+  ok(/if \(seat===mySeat && isLocalSolo\) return;/.test(src)===false,
+     tag+': 【已移除】isLocalSolo 离座豁免(联机 host 独自挂机也离座)');
   ok(/if \(seat===mySeat\)\{ doEnterSpectator\(\); return; \}/.test(src),
      tag+': 连续超时 idleOut(我) → doEnterSpectator 真离座');
   ok(/onGrabSeat/.test(src), tag+': 支持 onGrabSeat 抢位');

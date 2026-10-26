@@ -731,8 +731,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose + 每手 onResult 后统一判定。
     function idleOut(seat){
       missStreak[seat] = 0;
-      // 单机练习桌: 不把本人踢进旁观(没有别的真人, 离座无意义; 超时本就由引擎自动推进)
-      if (seat===mySeat && isLocalSolo) return;
       if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真起身让座
       // 别席超时: 该席交本机 AI 打完本手(不是托管功能, 是不让牌局卡死), 下一手可被补位
       const nm = (st.players[seat] && st.players[seat].name) || names[seat] || ('席'+seat);

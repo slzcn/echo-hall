@@ -675,8 +675,6 @@ html[data-mode="day"] .ddz-felt::before{
     const onSeatIdle = (typeof opts.onSeatIdle==='function') ? opts.onSeatIdle : null;
     const onSeatResume = (typeof opts.onSeatResume==='function') ? opts.onSeatResume : null;  // 联机: 玩家手动接管 → 通知 app 重新入座(单机无此回调)
     const onGrabSeat = (typeof opts.onGrabSeat==='function') ? opts.onGrabSeat : null;  // 旁观点空位: 走 app 抢位
-    // 单机练习桌: 超时只托管代打, 绝不把本人踢进旁观(与德州 isLocalSolo 同契约)
-    const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const missStreak = {};                 // seat -> 连续超时次数
     let spectating = false;                // 本人(mySeat)是否已离座旁观
     let trustee = false;                    // 手动托管: 我这席交 AI 代打(叫分/加倍/出牌全自动), 跨局保留, 只由顶栏 🤖 钮开关
@@ -697,8 +695,6 @@ html[data-mode="day"] .ddz-felt::before{
     //   (带 DB 二次核查 + away 感知 + 5s 宽限), game-ui 不再自行判定散桌。
     function idleOut(seat){
       missStreak[seat] = 0;
-      // 单机练习桌: 超时已由 onHumanTimeout 自动代打, 不把本人踢进旁观(没有别的真人, 离座无意义)
-      if (seat===mySeat && isLocalSolo) return;
       if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 顶完本局

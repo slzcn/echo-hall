@@ -31,10 +31,11 @@ if (!win.EHDdzGame || typeof win.EHDdzGame.open!=='function'){ console.error('EH
 
 const RUN_MS = Number(process.env.REPRO_MS) || 20000;
 let vacate=false, spec=false, idleSeats=[];
-// mode:'online' 避开 isLocalSolo 豁免(单机桌不离座); host 席全程挂机
+// ★还原真实 host 联机桌条件: app.js 的 host 启动【不传 mode】→ 默认 'local'; 独自对 AI 时 remoteSeats 为空。
+//   这正是用户实际场景(建桌对 AI, 没有别的真人)。之前脚本传 mode:'online' 绕过了 isLocalSolo, 没复现到真 bug。
 const game=win.EHDdzGame.open({
   mount: win.document.getElementById('hall'),
-  mode:'online', mySeat:0, seed:42, isHost:true, actMs:30, maxMiss:2,
+  mySeat:0, seed:42, isHost:true, actMs:30, maxMiss:2,
   onSeatIdle:(seat,info)=>{ idleSeats.push(seat); if(info&&info.vacate) vacate=true; },
   onSync:()=>{},
 });
