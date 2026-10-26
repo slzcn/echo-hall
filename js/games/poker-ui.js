@@ -440,10 +440,16 @@ html[data-mode="day"] .pk-winline .pk-go{color:var(--ink,#0c312e);background:rgb
 .pk-prehint{font-size:11px;color:var(--sub);text-align:center;letter-spacing:.06em;opacity:.85;
   min-height:38px;display:flex;align-items:center;justify-content:center}
 .pk-preb{font-size:13px;padding:10px 0;touch-action:manipulation}
-.pk-preb:not(.queued){background:var(--panel);color:var(--ink);border-color:var(--line2);box-shadow:none}
-.pk-preb.queued.fold{background:color-mix(in srgb, var(--magenta) 18%, transparent);color:var(--ink);border-color:var(--magenta);box-shadow:0 0 12px color-mix(in srgb, var(--magenta) 35%, transparent),inset 0 0 0 1.5px color-mix(in srgb, var(--magenta) 60%, transparent)}
-.pk-preb.queued:not(.fold):not(.call){background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--ink);border-color:var(--accent);box-shadow:0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)}
-.pk-preb.queued.call{background:var(--accent);color:var(--btn-ink,#04060c);border-color:var(--accent);box-shadow:var(--glow-cyan)}
+/* 预选键配色方案(三态统一): 未选=白底描边中性; 选中=语义色淡底 + 描边 + 1.5px 内描边环(ink 字读得清)。
+ *   三颗同一视觉重量, 只用色相/浓度区分语义: 过牌/弃牌=magenta(风险) · 过牌=--sub(中性) · 跟任意注=accent(跟钱, 浓度最重)。
+ *   都【不实心满填】——实心满填是"我的回合真·出牌键"(.pk-b.call/.raise/.allin)的强调级别; 预选只是"勾好的意向",
+ *   实心会读成"被按下/已选中"主键(主人反馈「跟任意注」像选中态)。
+ *   未选规则特指到 .pk-b.pk-preb 提权, 稳妥压过 .pk-b.call 的实心规则(防未选的"跟任意注"漏出实心色)。 */
+.pk-b.pk-preb:not(.queued){background:var(--panel);color:var(--ink);border-color:var(--line2);box-shadow:none;font-weight:700}
+.pk-preb.queued{color:var(--ink);font-weight:800}
+.pk-preb.queued.fold{background:color-mix(in srgb, var(--magenta) 16%, var(--panel-solid));border-color:var(--magenta);box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--magenta) 55%, transparent)}
+.pk-preb.queued:not(.fold):not(.call){background:color-mix(in srgb, var(--sub) 14%, var(--panel-solid));border-color:color-mix(in srgb, var(--sub) 52%, transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--sub) 32%, transparent)}
+.pk-preb.queued.call{background:color-mix(in srgb, var(--accent) 20%, var(--panel-solid));border-color:var(--accent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 56%, transparent),0 2px 10px color-mix(in srgb, var(--accent) 20%, transparent)}
 /* 结算 */
 /* 结算浮层可滚动(输光/多池高结算超出 felt 高度时, justify-content:center 会把卡片上下两头一起挤出 overflow:hidden 的 felt,
    底部"再来一局/收工"被裁掉 → 主人"德州输光后没法继续玩"的真因)。改用 overflow-y:auto 容器 + 卡片 margin:auto:
