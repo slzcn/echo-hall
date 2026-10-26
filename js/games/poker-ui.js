@@ -688,10 +688,8 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     // 旁观者点空位/底部"坐下": guest 满座旁观无引擎权威, 走 app 级抢位(DB join + 重入); 未提供时退回本地 resumeSeat(host/单机)
     const onGrabSeat = (typeof opts.onGrabSeat==='function') ? opts.onGrabSeat : null;
     const missStreak = {};                 // seat -> 连续超时次数
-    let _handsIdle = 0;                    // 连续整局无本人响应局数(>=2 自动离座)
-    let _actedThisHand = false;            // 本手我是否有过有效操作
     let spectating = false;                // 本人(mySeat)是否已离座旁观
-    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; if(seat===mySeat){ _actedThisHand=true; _handsIdle=0; } }
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function doEnterSpectator(){
       // ★旁观 = 起身让座(不是 AI 代打/托管): 腾空座位、留在房间, 想玩点空位再坐
       if (spectating) return;
@@ -719,14 +717,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
         mySeat = -1;
         try{ renderActs(true); renderMsg(); renderMe(); renderOpponents(true); positionSeats(); }catch(_){}
     }
-    function _clearAutoTrusteeOnNewDeal(){
-      // 只有真实超时(missStreak>0)才算 idle, 防手牌没轮到自己(别人全弃牌)被误计
-      if(missStreak[mySeat] > 0 && !_actedThisHand) _handsIdle++; else _handsIdle=0;
-      if(_handsIdle>=2 && !spectating && !isLocalSolo){
-        try{ doEnterSpectator(); }catch(_){}
-      }
-      _actedThisHand=false;
-    }
     function bumpMiss(seat){
       // ★v89: server 模式(isGuest 但 EH_SERVER_HOST)也要跟踪自己席的超时计数, 否则服务端无人触发离座
       if (isGuest && !window.EH_SERVER_HOST) return;   // guest 模式: host 跟踪远程席超时
@@ -735,32 +725,24 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
+    // ── 连续超时 → 自动离座(v145 统一规则, 三款一致) ──
+    //   我这席 → doEnterSpectator() 真起身让座(德州腾空座位, 不交 AI 代打);
+    //   别席(远程真人) → 交本机 AI 打完本手不让牌局卡死, 下一手可被补位。
+    //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose + 每手 onResult 后统一判定。
     function idleOut(seat){
       missStreak[seat] = 0;
-      const nm = (st.players[seat] && st.players[seat].name) || names[seat] || ('席'+seat);
-      if (seat===mySeat){
-        // 我的超时 = 起身旁观(让座), 不是 AI 代打
-        doEnterSpectator();
-        // ★T91.3 起身后检查: 座位上还有真人 → 牌局继续(可点空位再坐); 没有了 → 自动解散房间
-        checkNoHumansThenDissolve();
-        return;
-      }
+      // 单机练习桌: 不把本人踢进旁观(没有别的真人, 离座无意义; 超时本就由引擎自动推进)
+      if (seat===mySeat && isLocalSolo) return;
+      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真起身让座
       // 别席超时: 该席交本机 AI 打完本手(不是托管功能, 是不让牌局卡死), 下一手可被补位
+      const nm = (st.players[seat] && st.players[seat].name) || names[seat] || ('席'+seat);
       isAI[seat] = true;
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
       if (personaBySeat) personaBySeat[seat] = personaFor(seat);
       toast(nm+' 连续超时 · 已离座');
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, 灵魂接手' }); }catch(_){}
-      if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine: seat===mySeat }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
-      try{ renderActs(true); if(seat===mySeat){ renderMsg(); renderMe(); } }catch(_){}
-      // ★T91.3 检查是否还有真人在座
-      checkNoHumansThenDissolve();
-    }
-    // ★T91.3 三次不响应转旁观后的兜底: 座位上没有真人(全是 AI/空位/旁观)→ 自动解散房间, 所有人回聊天室
-    //   还有真人 → 牌局继续(旁观者可点空位, 下一局继续玩)。
-    function checkNoHumansThenDissolve(){
-      // v74: 禁用「连续超时/起身后无真人→自动散桌」(超时/状态触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
-      return;
+      if (onSeatIdle){ try{ onSeatIdle(seat, { uid: ids?ids[seat]:null, mine:false }); }catch(e){ _ehCatch('poker.onSeatIdle', e); } }
+      try{ renderActs(true); }catch(_){}
     }
 // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   德州: idleOut 把我这席置 isAI + 配灵魂人格代打; 接管须逆向(收回 isAI/人格)、归零连超时账、
@@ -2874,7 +2856,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
 
     // 单机: 本场结束(真人输光)后从头再来 —— 全员按账本真实筹码重新带入(破产/清零回补 1000)
     function resetMatch(){
-      _clearAutoTrusteeOnNewDeal();
       if (!isGuest && pkLimitReached()){
         showDailyCap();
         return;
@@ -2912,7 +2893,6 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       startWalkIns();   // 名册刷新后仍在招募态 → 确保路人入座定时器在跑(内部去重, 不会重复排程)
     }
     function startDeal(A, seed){
-      _clearAutoTrusteeOnNewDeal();
       if (st.phase!=='lobby') return;
       // journey-exempt: 每日局数门禁 + seatBuyIn 账本 — journey-chip-authenticity.js
       if (!isGuest && pkLimitReached()){

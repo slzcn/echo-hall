@@ -21,9 +21,11 @@ for (const [src, tag] of [[DZ,'斗地主'],[GD,'掼蛋']]){
   ok(/起身旁观 · 座位已让出/.test(src), tag+': 文案「起身旁观 · 座位已让出」');
   ok(!/离座旁观, AI 接手/.test(src) || /vacate:\s*true/.test(src), tag+': 不再用「AI 接手」冒充让座');
   ok(/isLocalSolo/.test(src), tag+': 有 isLocalSolo 单机守卫');
-  ok(/_handsIdle>=2 && !spectating && !isLocalSolo/.test(src.replace(/\s+/g,' ')) ||
-     /_handsIdle\s*>=\s*2\s*&&\s*!spectating\s*&&\s*!isLocalSolo/.test(src),
-     tag+': 两局无响应离座跳过单机');
+  // v145: 连续两次超时 idleOut → 真离座; 单机练习桌(isLocalSolo)豁免不踢
+  ok(/if \(seat===mySeat && isLocalSolo\) return;/.test(src),
+     tag+': 单机练习桌超时不自动离座(isLocalSolo 豁免)');
+  ok(/if \(seat===mySeat\)\{ doEnterSpectator\(\); return; \}/.test(src),
+     tag+': 连续超时 idleOut(我) → doEnterSpectator 真离座');
   ok(/onGrabSeat/.test(src), tag+': 支持 onGrabSeat 抢位');
   ok(/旁观中 · 已让座/.test(src), tag+': 操作栏「旁观中 · 已让座」');
   ok(/🪑 坐下/.test(src), tag+': 旁观操作「坐下」(不是「我回来了」)');

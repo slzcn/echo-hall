@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 'use strict';
-/* repro-auto-fold.js — 真实复现并回归验证"无故弃牌/自动退出"(v144)
+/* repro-auto-fold.js — v145 统一规则真实复现:连续两次超时→自动离座 + 通知腾座(散桌由 app 判)
  *
  * 用 jsdom 真加载 game-ui.js, 开一局斗地主桌(我=0席, host), 思考时长压到 30ms, 全程不操作,
- * 让真实计时器与游戏循环自己跑(armTurn→onHumanTimeout→bumpMiss→idleOut→trusteeAuto;
- * over 后 host 续局 → _clearAutoTrusteeOnNewDeal 累计 _handsIdle)。跑若干局后检查:
+ * 让真实计时器与游戏循环自己跑: armTurn→onHumanTimeout→bumpMiss, 连续 MAX_MISS=2 次真实超时
+ * → idleOut(mySeat)→doEnterSpectator 真离座, 并 onSeatIdle({vacate:true}) 通知 app 腾 DB 座。
  *
- *   修复前(HEAD): 连续数局挂机 → doEnterSpectator 把本人踢成旁观(spec=true),
- *     host 席更触发 vacate(散桌) → 表现为"玩着玩着无故弃牌/游戏自动结束"。
- *   修复后(v144): AI 托管(trusteeAuto)照常兜底代打, 但本人【永不】被自动踢旁观、【不】散桌。
- *
- * 判定: spec=false 且 vacate=false 为通过。用时约 45s(需跑够多局才暴露跨局累计)。
+ * 判定(新规则):
+ *   - 全程挂机应当在连续两次超时后【进入旁观】(spec=true) 且【触发腾座 vacate】(vacate=true)。
+ *   - 这是期望行为(两次超时自动离座), 不是 bug。配合 app 侧 gtCheckNoHumansThenClose 即"无真人自动解散"。
+ *   - 反面保证(见 journey-spectator-regression): 只要有操作 resetMiss, 就永不误进旁观。
  */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const { JSDOM } = require('jsdom');
@@ -30,28 +29,29 @@ for (const f of ['js/games/deck.js','js/games/ddz-rules.js','js/games/ddz-engine
 }
 if (!win.EHDdzGame || typeof win.EHDdzGame.open!=='function'){ console.error('EHDdzGame.open 不可用'); process.exit(2); }
 
-const RUN_MS = Number(process.env.REPRO_MS) || 45000;
-let vacate=false, spec=false, over=0;
+const RUN_MS = Number(process.env.REPRO_MS) || 20000;
+let vacate=false, spec=false, idleSeats=[];
+// mode:'online' 避开 isLocalSolo 豁免(单机桌不离座); host 席全程挂机
 const game=win.EHDdzGame.open({
   mount: win.document.getElementById('hall'),
   mode:'online', mySeat:0, seed:42, isHost:true, actMs:30, maxMiss:2,
-  onSeatIdle:(seat,info)=>{ if(info&&info.vacate) vacate=true; },
+  onSeatIdle:(seat,info)=>{ idleSeats.push(seat); if(info&&info.vacate) vacate=true; },
   onSync:()=>{},
 });
 
+let firstSpecAt=0; const t0=Date.now();
 const poll=setInterval(()=>{
-  const st=game.state();
-  if (st.phase==='over'){ over++; try{ game.startDeal(); }catch(_){} }
-  if (game.isSpectating()) spec=true;
-}, 25);
+  if (game.isSpectating() && !spec){ spec=true; firstSpecAt=Date.now()-t0; }
+}, 15);
 
-console.log('真实异步复现: 斗地主 host 席全程挂机, actMs=30ms, 运行 '+(RUN_MS/1000)+'s …');
+console.log('真实异步复现(v145): 斗地主 host 席全程挂机, actMs=30ms, 期望连续两次超时后自动离座 …');
 setTimeout(()=>{
   clearInterval(poll);
-  console.log('  跑完约 '+over+' 局 · spectating(被踢旁观)='+spec+' · vacate(散桌)='+vacate+' · isTrustee(AI托管)='+game.isTrustee());
-  const failed = spec || vacate;
-  if (!failed) console.log('✅ 通过: 全程挂机 '+over+' 局, 玩家未被自动踢旁观、未散桌(AI 托管兜底代打)');
-  else console.error('❌ bug 仍在: 玩家被自动弃牌/让座(spec='+spec+' vacate='+vacate+')');
+  console.log('  spectating(已离座旁观)='+spec+(spec?(' @~'+firstSpecAt+'ms'):'')+' · vacate(通知腾座)='+vacate);
+  // 期望: 挂机两次超时后进入旁观 + 腾座
+  const ok = spec && vacate;
+  if (ok) console.log('✅ 通过: 连续两次超时 → 自动离座旁观 + 通知 app 腾座(无真人则由 app 解散)');
+  else console.error('❌ 未达期望: 全程挂机应在两次超时后自动离座(spec='+spec+' vacate='+vacate+')');
   try{ game.close(); }catch(_){}
-  process.exit(failed?1:0);
+  process.exit(ok?0:1);
 }, RUN_MS);

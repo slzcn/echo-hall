@@ -678,13 +678,10 @@ html[data-mode="day"] .ddz-felt::before{
     // 单机练习桌: 超时只托管代打, 绝不把本人踢进旁观(与德州 isLocalSolo 同契约)
     const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const missStreak = {};                 // seat -> 连续超时次数
-    let _handsIdle = 0;                    // 连续整局无本人响应局数(>=2 自动离座)
-    let _actedThisHand = false;            // 本手我是否有过有效操作
     let spectating = false;                // 本人(mySeat)是否已离座旁观
-    let trustee = false;                    // 托管: 我这席交 AI 代打(叫分/加倍/出牌全自动)
-    let trusteeAuto = false;                // 连续超时自动开启的托管: 仅本局有效(新局自动收回)
+    let trustee = false;                    // 手动托管: 我这席交 AI 代打(叫分/加倍/出牌全自动), 跨局保留, 只由顶栏 🤖 钮开关
     const TRUSTEE_MS = 650;                 // 托管代打前的短延时(让人看清是自动出的, 不瞬闪)
-    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; if(seat===mySeat){ _actedThisHand=true; _handsIdle=0; } }
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function bumpMiss(seat){
       if (isGuest) return;                 // guest 无权威, 自身超时由 host 侧(onRemoteTimeout)计
       // 只盯"本该真人推进却没推进"的席: 我(未旁观) 或 仍在场的远程真人席(未转 AI)
@@ -692,26 +689,23 @@ html[data-mode="day"] .ddz-felt::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
+    // ── 连续超时 → 自动离座(v145 统一规则) ──
+    //   达 MAX_MISS 次连续超时判定挂机:
+    //     我这席 → doEnterSpectator() 真起身让座(当前局交本机 AI 顶完, 腾 DB 座, 留房可再坐);
+    //     远程真人席(host 权威) → 移出 remoteSeats 转本机 AI 顶完本局, 通知 app 腾座。
+    //   离座后"无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose 统一处理
+    //   (带 DB 二次核查 + away 感知 + 5s 宽限), game-ui 不再自行判定散桌。
     function idleOut(seat){
       missStreak[seat] = 0;
+      // 单机练习桌: 超时已由 onHumanTimeout 自动代打, 不把本人踢进旁观(没有别的真人, 离座无意义)
+      if (seat===mySeat && isLocalSolo) return;
+      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
-      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 托管
-      if (seat===mySeat){
-        // ★主人: 多次过牌/超时 → 进自动模式, 【只在一局内有效】; 顶栏托管钮可手动开(跨局保留)
-        if (!trustee){ trustee = true; trusteeAuto = true; try{ paintAuto(); }catch(_){}
-          toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200); }
-      }
-      else { toast(nm+' 连续超时 · 已离座, AI 接手'); }
+      const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 顶完本局
+      toast(nm+' 连续超时 · 已离座, AI 接手');
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, AI 接手' }); }catch(_){}
-      if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
+      if (onSeatIdle){ try{ onSeatIdle(seat, { mine:false }); }catch(e){ try{ _ehCatch('ddz.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
-      // ★T92 无人解散兜底: 起身后桌上没真人(全 AI/托管)→ 自动解散房间
-      checkNoHumansThenDissolve();
-    }
-    // ★T92 三次不响应后的兜底: 没有真人(全 AI/托管/空位)→ 自动解散, 所有人回聊天室
-    function checkNoHumansThenDissolve(){
-      // v74: 禁用「连续超时后无真人→自动散桌」(超时/状态触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
-      return;
     }
     // 手动取消旁观、拿回自己的座位(主人诉求"进自动后应可手动取消恢复")。
     //   旁观期间该席由 AI 托管; 接管时归零连超时账、清可能已排的 AI 代打, 再 renderAll 重武装本回合。
@@ -1211,32 +1205,22 @@ html[data-mode="day"] .ddz-felt::before{
       on = !!on;
       if (trustee === on) return;
       trustee = on;
-      if (!on) trusteeAuto = false;
-      if (on){ toast(trusteeAuto ? '🤖 本局自动托管 · 新一局自动收回' : '🤖 已托管（跨局）· AI 替你打'); }
+      if (on){ toast('🤖 已托管 · AI 替你打（可点此收回）'); }
       else { clearTimers(); toast('已收回托管 · 由你操作'); }
       sfx('click'); paintAuto(); renderAll();
     }
+    // 起身让座: 主动点「🔭 旁观」或连续超时 idleOut 都走这里。腾 DB 座(onSeatIdle vacate), 当前这局交本机 AI
+    //   顶完(斗地主固定 3 席不能中途缺人), 留在房间可点空位/「坐下」再玩。无真人在座→散桌由 app 侧统一判。
     function doEnterSpectator(){
-      // ★旁观 = 起身让座(与德州同契约): 通知腾 DB 座, 本席交 AI 打完当前手(固定阵型不能中途缺人),
-      //   留在房间可点空位/「坐下」再玩。文案统一「已让座」, 不再说「AI 接手」冒充托管。
       if (spectating) return;
-        spectating = true;
-        missStreak[mySeat] = 0;
-        if (Array.isArray(gameIsAI)) gameIsAI[mySeat] = true;   // 当前手由本机 AI 顶完(斗地主固定 3 席)
-        const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
-        try{ emitBeat({ type:'leave', actor:nm, text:'🪑 '+nm+' 起身旁观 · 座位已让出' }); }catch(_){}
-        if (onSeatIdle){ try{ onSeatIdle(mySeat, { mine:true, vacate:true }); }catch(_){} }
-        try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
-    }
-    function _clearAutoTrusteeOnNewDeal(){
-      // ★v144 修复"无故弃牌/自动退出": 彻底停用「连续两局无本人操作 → 自动强制让座旁观」。
-      //   原判定 _actedThisHand 太脆: 一副牌没轮到我操作(没抢地主/被一条龙带走)也算"挂机",
-      //   累计两局就把本人 doEnterSpectator 踢出座位 → 玩家表现为"玩着玩着无故被让座/游戏结束"。
-      //   与同文件 checkNoHumansThenDissolve(L713 已禁用, 注释"防误触发踢人")保持一致: 宁可不踢。
-      //   超时仍由自动托管(trusteeAuto)兜底代打, 只是不再把人赶出座位; 真·离座只走用户主动「🔭 旁观」。
-      _handsIdle=0;
-      _actedThisHand=false;
-      if (trusteeAuto){ trustee=false; trusteeAuto=false; try{ paintAuto(); }catch(_){} try{ renderAll(); }catch(_){} }
+      spectating = true;
+      missStreak[mySeat] = 0;
+      if (Array.isArray(gameIsAI)) gameIsAI[mySeat] = true;   // 当前手由本机 AI 顶完
+      const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
+      toast('连续超时 · 已起身让座（点空位可再坐）', 3000);
+      try{ emitBeat({ type:'leave', actor:nm, text:'🪑 '+nm+' 起身旁观 · 座位已让出' }); }catch(_){}
+      if (onSeatIdle){ try{ onSeatIdle(mySeat, { mine:true, vacate:true }); }catch(_){} }
+      try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
     }
     if (autoBtn) autoBtn.addEventListener('click', ()=> setTrustee(!trustee));
     paintAuto();
@@ -1826,7 +1810,6 @@ html[data-mode="day"] .ddz-felt::before{
     }
     // 再来一局: 就地重建新局(同一 room 不重挂 → 顺势接发牌入场动画), 复位一局态标志。host 广播新局首帧。
     function startRematch(){
-      _clearAutoTrusteeOnNewDeal();
       if (startRematch._busy) return; startRematch._busy = true;   // 防连点
       showOver._done = false; _overBeatDone = false;
       st = Engine.createGame({ isAI: gameIsAI, names, doubling: DOUBLING, firstBidSeat: nextBidLead() });
@@ -2316,7 +2299,7 @@ html[data-mode="day"] .ddz-felt::before{
           if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); acted=true; }
         }
       }
-      if (acted) bumpMiss(mySeat);   // 累计我的超时(达阈值→本局自动托管)
+      if (acted) bumpMiss(mySeat);   // 累计我的超时(达 MAX_MISS → idleOut 自动离座)
     }
 
     // ── 制胜亮牌过渡(主人反馈"赢的人最后出的什么没看清就赢了"): 终局那一手先以"对局态"留在桌心亮
@@ -2453,7 +2436,6 @@ html[data-mode="day"] .ddz-felt::before{
         // 必须带 game: 不传会默认查 nlhe → 德州打满后误锁斗地主
         // 每日上限只管德州输光; 斗地主无筹码概念, 不设局数闸
       }
-      _clearAutoTrusteeOnNewDeal();
       if (A){
         if (Array.isArray(A.names)) names = A.names;
         if (Array.isArray(A.avatars)) avatars = A.avatars;
@@ -2484,7 +2466,7 @@ html[data-mode="day"] .ddz-felt::before{
       enterSpectator: doEnterSpectator,
       resumeSeat, resumeRemote,
       _forceTimeout:()=>onHumanTimeout(), missOf:s=>missStreak[s]||0,
-      isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
+      isTrustee:()=>trustee, setTrustee,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
       onRoomMsg:m=>{ if(dock) dock.onRoomMsg(m); } };

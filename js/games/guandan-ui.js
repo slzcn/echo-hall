@@ -708,38 +708,29 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     // 单机练习桌: 超时只托管代打, 绝不把本人踢进旁观(与德州 isLocalSolo 同契约)
     const isLocalSolo = (mode === 'local' && remoteSeats.length === 0 && !isGuest);
     const missStreak = {};                 // seat -> 连续超时次数
-    let _handsIdle = 0;                    // 连续整局无本人响应局数(>=2 自动离座)
-    let _actedThisHand = false;            // 本手我是否有过有效操作
-    // ★托管: 顶栏第二钮; 连续超时自动开=仅本局, 手动开=跨局保留(主人诉求)
-    let trustee = false, trusteeAuto = false;
+    // ★手动托管: 顶栏第二钮, 跨局保留, 只由 🤖 钮开关(连续超时不再开托管, 改为自动离座)
+    let trustee = false;
     const TRUSTEE_MS = 650;
-    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; if(seat===mySeat){ _actedThisHand=true; _handsIdle=0; } }
+    function resetMiss(seat){ if(missStreak[seat]) missStreak[seat]=0; }
     function paintAuto(){ const b=$('#gdAuto'); if(b) b.classList.toggle('on', !!trustee); }
     function setTrustee(on){
       on=!!on; if(trustee===on) return;
-      trustee=on; if(!on) trusteeAuto=false;
-      toast(on?(trusteeAuto?'🤖 本局自动托管 · 新一局自动收回':'🤖 已托管（跨局）· AI 替你打'):'已收回托管 · 由你操作');
+      trustee=on;
+      toast(on?'🤖 已托管 · AI 替你打（可点此收回）':'已收回托管 · 由你操作');
       sfx('click'); paintAuto(); try{ renderAll(); }catch(_){}
     }
+    // 起身让座: 主动点「🔭 旁观」或连续超时 idleOut 都走这里。腾 DB 座(onSeatIdle vacate), 当前这副交本机 AI
+    //   顶完(4 席固定阵型不能中途缺人), 留在房间可点空位/「坐下」再玩。无真人在座→散桌由 app 侧统一判。
     function doEnterSpectator(){
-      // ★旁观 = 起身让座(与德州同契约): 通知腾 DB 座, 本席交 AI 打完当前手(4 席固定阵型不能中途缺人),
-      //   留在房间可点空位/「坐下」再玩。
       if (spectating) return;
-        spectating = true;
-        missStreak[mySeat] = 0;
-        if (Array.isArray(seatIsAI)) seatIsAI[mySeat] = true;
-        const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
-        try{ emitBeat({ type:'leave', actor:nm, text:'🪑 '+nm+' 起身旁观 · 座位已让出' }); }catch(_){}
-        if (onSeatIdle){ try{ onSeatIdle(mySeat, { mine:true, vacate:true }); }catch(_){} }
-        try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
-    }
-    function _clearAutoTrusteeOnNewDeal(){
-      // ★v144 修复"无故弃牌/自动退出": 停用「连续两局无本人操作 → 自动强制让座旁观」, 与斗地主一致。
-      //   原判定把"这副没轮到我操作"误当挂机, 累计两局 doEnterSpectator 踢人 → 玩家无故被让座/游戏结束。
-      //   超时仍由自动托管兜底代打; 真·离座只走用户主动「🔭 旁观」。
-      _handsIdle=0;
-      _actedThisHand=false;
-      if(trusteeAuto){ trustee=false; trusteeAuto=false; paintAuto(); }
+      spectating = true;
+      missStreak[mySeat] = 0;
+      if (Array.isArray(seatIsAI)) seatIsAI[mySeat] = true;
+      const nm = (st.players[mySeat] && st.players[mySeat].name) || '我';
+      toast('连续超时 · 已起身让座（点空位可再坐）', 3000);
+      try{ emitBeat({ type:'leave', actor:nm, text:'🪑 '+nm+' 起身旁观 · 座位已让出' }); }catch(_){}
+      if (onSeatIdle){ try{ onSeatIdle(mySeat, { mine:true, vacate:true }); }catch(_){} }
+      try{ renderCtrl(); setBanner(); renderSeats(); }catch(_){ try{ renderAll(); }catch(_){} }
     }
     function bumpMiss(seat){
       if (isGuest) return;
@@ -747,24 +738,20 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
+    // ── 连续超时 → 自动离座(v145 统一规则, 三款一致) ──
+    //   我这席 → doEnterSpectator() 真起身让座; 远程真人席(host 权威) → 移出 remoteSeats 转本机 AI 顶完本副。
+    //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose 统一处理。
     function idleOut(seat){
       missStreak[seat] = 0;
+      // 单机练习桌: 超时已由 onHumanTimeout 自动代打, 不把本人踢进旁观(没有别的真人, 离座无意义)
+      if (seat===mySeat && isLocalSolo) return;
+      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
-      if (seat===mySeat){
-        if (!trustee){ trustee=true; trusteeAuto=true; paintAuto();
-          toast('连续超时 '+MAX_MISS+' 次 · 本局已自动托管（可点顶栏 🤖 收回）', 3200); }
-      } else { toast(nm+' 连续超时 · 已离座, AI 接手'); }
+      toast(nm+' 连续超时 · 已离座, AI 接手');
       try{ emitBeat({ type:'idle', actor:nm, text:'💤 '+nm+' 挂机离座, AI 接手' }); }catch(_){}
-      if (onSeatIdle){ try{ onSeatIdle(seat, { mine: seat===mySeat }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
+      if (onSeatIdle){ try{ onSeatIdle(seat, { mine:false }); }catch(e){ try{ _ehCatch('gd.onSeatIdle', e); }catch(__){} } }
       try{ renderCtrl(); }catch(_){}
-      // ★T92 无人解散兜底: 起身后桌上没真人(全 AI/托管)→ 自动解散房间
-      checkNoHumansThenDissolve();
-    }
-    // ★T92 三次不响应后的兜底: 没有真人(全 AI/托管/空位)→ 自动解散, 所有人回聊天室
-    function checkNoHumansThenDissolve(){
-      // v74: 禁用「连续超时后无真人→自动散桌」(超时/状态触发), 防误触发踢人; 散桌只走主动退出/host主动散桌
-      return;
     }
     function trusteeStep(){
       if (spectating || !trustee || isGuest) return;
@@ -2782,7 +2769,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
             over.remove();
             st=newDeal(); dealNo++; selected.clear(); hintCycle=[]; lastShownKey=''; dealAnim=true; lastMyTurn=false; lastFinishedN=0;
             tributeSel=null; rows=null; if(arrangeMode) setArrange(false);
-            _clearAutoTrusteeOnNewDeal();
             sfx('deal'); broadcast(); renderAll(); settleHandLayout(); showTributeBanner();
           };
           let done=false; const once=()=>{ if(done) return; done=true; go(); };
@@ -2832,7 +2818,6 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       }
       try{ closeInviteMenu(); }catch(_){}
       // names/avatars/remoteSeats 是 const, seatIsAI 是 let — 一律原地改元素, 别重新赋值(gameIsAI 是 seatIsAI 同引用)
-      _clearAutoTrusteeOnNewDeal();
       if (A){
         if (Array.isArray(A.names) && A.names.length===4){ for(let i=0;i<4;i++){ names[i]=A.names[i]; avatars[i]=A.avatars[i]; } }
         if (Array.isArray(A.isAI)) A.isAI.forEach((v,i)=>{ if(i<4) seatIsAI[i]=v; });
@@ -2859,7 +2844,7 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     return { close, minimize, restore, isMinimized:()=>minimized, state:()=>st, mySeat:()=>mySeat,
       // ★T92 聊天气泡: 按名字找座位冒气泡(掼蛋无 uid 数组, 用 name 匹配; 与德州 sayByUid 同效果)
       sayByUid:(uid, msg, name)=>{ try{ if(!msg) return false; const nm=String(name||''); for(let i=0;i<st.players.length;i++){ const p=st.players[i]; if(p && nm && p.name===nm){ say(i, String(msg).slice(0,60)); return true; } } }catch(_){} return false; },
-      isTrustee:()=>trustee, setTrustee, isTrusteeAuto:()=>trusteeAuto,
+      isTrustee:()=>trustee, setTrustee,
       applyMove, setConn, connState:()=>connState,
       onSnapshot: applySnapshot, feedHand, resync: broadcast, isGuest:()=>isGuest,
       isLobby:()=>st.phase==='lobby', setLobby, startDeal,
