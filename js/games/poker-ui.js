@@ -310,23 +310,24 @@ html[data-mode="day"] .pk-table::after{box-shadow:inset 0 0 0 1px rgba(255,255,2
 /* 结算浮层带推池动画时: 前 ~330ms 保持透明, 让底池筹码在可见绒面上飞向赢家, 之后再淡入盖住 */
 .pk-over.payout-in{animation:pkOverPayoutIn .58s ease both}
 @keyframes pkOverPayoutIn{0%,56%{opacity:0}100%{opacity:1}}
-/* 桌面赢家横幅(单机常规手替代结算弹窗): 居中一行轻量小字, 弹入停留→随自动发牌淡出。
-   ★v109: 去掉暗色胶囊背景/阴影/模糊(原浮层遮罩挡摊牌牌面), 改纯文字 + text-shadow, 不遮挡牌桌内容。
-   z-index 降到 4(低于卡牌高亮与座位), top 26% 落在顶席气泡与公共牌区之间的空档, 两不相撞。 */
-.pk-winline{position:absolute;left:50%;top:26%;transform:translateX(-50%);z-index:4;pointer-events:none;
-  font-size:14px;font-weight:900;letter-spacing:.03em;color:var(--ink);white-space:normal;max-width:92vw;text-align:center;
-  padding:0;text-shadow:0 2px 10px rgba(0,0,0,.75),0 0 6px rgba(0,0,0,.5);
+/* 桌面赢家横幅(单机常规手替代结算弹窗): 弹入停留→随自动发牌淡出。
+   ★样式对齐下注/底池药丸(.pk-pot): 深底半透明 + 彩色描边 + 全圆角胶囊 + 舒适内边距;
+   去掉 .eh-dropdown 浮层基类(它带 panel-solid 实底+大阴影, 像块补丁糊在牌桌上——主人反馈"太丑")。
+   胜=amber 描边(同底池金), 负=magenta 描边; 轻阴影不遮牌面, z-index 4 低于卡牌/座位。 */
+.pk-winline{position:absolute;left:50%;top:25%;transform:translateX(-50%);z-index:4;pointer-events:none;
+  font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(255,255,255,.94);white-space:normal;max-width:min(86vw,520px);text-align:center;
+  padding:7px 16px;border-radius:999px;box-sizing:border-box;
+  background:rgba(4,10,14,.52);border:1px solid color-mix(in srgb, var(--line2) 75%, transparent);
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
   animation:pkWinIn .34s cubic-bezier(.2,.9,.3,1) both}
-.pk-winline.win{color:var(--amber);text-shadow:0 0 12px color-mix(in srgb,var(--amber) 55%,transparent),0 2px 8px rgba(0,0,0,.6)}
+.pk-winline.win{color:var(--amber);border-color:color-mix(in srgb, var(--amber) 42%, transparent);
+  box-shadow:0 4px 14px rgba(0,0,0,.28),0 0 12px color-mix(in srgb,var(--amber) 22%,transparent)}
+.pk-winline:not(.win){color:color-mix(in srgb, var(--magenta) 78%, #fff);border-color:color-mix(in srgb, var(--magenta) 38%, transparent)}
 .pk-winline.out{animation:pkWinOut .24s ease forwards}
-html[data-mode="day"] .pk-winline{color:var(--ink,#0c312e);text-shadow:0 2px 8px rgba(255,255,255,.85),0 0 5px rgba(255,255,255,.6)}
-html[data-mode="day"] .pk-winline.win{color:var(--amber,#C8892E);text-shadow:0 0 12px rgba(200,137,46,.5),0 2px 6px rgba(255,255,255,.7)}
 @keyframes pkWinIn{from{opacity:0;transform:translateX(-50%) translateY(-8px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
-.pk-winline .pk-wc{font-size:13px;font-weight:700;color:inherit}
-.pk-winline .pk-go{pointer-events:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:color-mix(in srgb,var(--ink) 12%,transparent);border:1px solid color-mix(in srgb,var(--ink) 26%,transparent);padding:3px 12px;border-radius:999px;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent}
-.pk-winline .pk-go:hover{opacity:1;border-color:color-mix(in srgb,var(--ink) 45%,transparent)}
-html[data-mode="day"] .pk-winline .pk-wc{color:inherit}
-html[data-mode="day"] .pk-winline .pk-go{color:var(--ink,#0c312e);background:rgba(255,255,255,.5);border-color:color-mix(in srgb,var(--ink,#0c312e) 30%,transparent)}
+.pk-winline .pk-wc{font-size:13px;font-weight:800;color:inherit}
+.pk-winline .pk-go{pointer-events:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:rgba(255,255,255,.92);background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:3px 12px;border-radius:999px;cursor:pointer;opacity:.9;-webkit-tap-highlight-color:transparent}
+.pk-winline .pk-go:hover{opacity:1;border-color:rgba(255,255,255,.5)}
 @keyframes pkWinOut{to{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.96)}}
 /* 卡牌 */
 .card{width:var(--cw,34px);height:var(--ch,48px);border-radius:6px;background:#fff;position:relative;flex:none;
@@ -1846,10 +1847,17 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     function showWinBanner(html, win){
       hideWinBanner();
       const b=document.createElement('div');
-      b.className='pk-winline eh-dropdown'+(win?' win':'');
+      b.className='pk-winline'+(win?' win':'');   // 不带 .eh-dropdown: 浮层基类的实底+大阴影会糊住牌桌
       b.innerHTML=html;
       els.felt.appendChild(b);
       _winBanner=b;
+      // 边距: 贴底池药丸【上方 10px】定位 —— 按实测矩形自适应屏高, 两行文案也不压底池/公共牌;
+      //   至少留 6px 顶边距(极矮屏向上让位)。CSS top:25% 仅作兜底(测不到矩形时)。
+      try{
+        const fr=els.felt.getBoundingClientRect(), pr=els.pot.getBoundingClientRect();
+        const top=pr.top-fr.top-b.offsetHeight-10;
+        b.style.top=Math.max(6, top)+'px';
+      }catch(_){}
     }
     function hideWinBanner(){
       if(!_winBanner) return;
