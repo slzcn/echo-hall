@@ -222,10 +222,10 @@ Deno.serve(async (req) => {
   }
 
 
-  // ── v49: 本局剧情 (max_tokens=150，短文字) ──
+  // ── v49: 本局剧情 (短文字; 额度 400: 推理模型要留 reasoning 空间, 150 会推理吃光返回空正文) ──
   if (body.type === 'plotline') {
     const messages = buildPlotlinePrompt(body)
-    const { text: raw, debug } = await callLLM(messages, 150)
+    const { text: raw, debug } = await callLLM(messages, 400)
     if (!raw) return json({ ok: false, error: 'llm_timeout', text: '', debug })
     let text = raw.replace(/^[\s\S]*["'"「『]|[\s\S]*["'"」』]$/g, '').replace(/\n/g, '').trim()
     if (text.length > 20) text = text.slice(0, 20)
