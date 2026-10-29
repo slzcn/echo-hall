@@ -17,7 +17,9 @@ console.log('\n── 补位同型(灵魂优先) ──');
 assert(/function fillSeat\(/.test(ddz) && /function freeSoulsForSeat\(/.test(ddz), '斗地主 fillSeat + 灵魂优先');
 assert(/function fillSeat\(/.test(gd) && /function freeSoulsForSeat\(/.test(gd), '掼蛋 fillSeat + 灵魂优先');
 assert(/function fillSeat\(/.test(pk), '德州 fillSeat');
-assert(/data-fill/.test(ddz) && /data-fill/.test(gd) && /data-fill/.test(pk), '三桌菜单单一补位入口');
+// v150: 德州 v59 起点空位直接入座(邀请弹窗有意移除), 无 data-fill 菜单项; 补位统一走 fillSeat(灵魂优先)。
+assert(/data-fill/.test(ddz) && /data-fill/.test(gd), '斗地主/掼蛋菜单单一补位入口 data-fill');
+assert(/function fillSeat\(/.test(pk) && /data-invite/.test(pk), '德州补位入口=点空位 data-invite→fillSeat(无弹窗)');
 
 console.log('\n── 联机反冒名 ──');
 assert(/payload\.uid/.test(app) && /payloadUid/.test(app), 'host 校验 act.uid 与 DB 座位一致');

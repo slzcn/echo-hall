@@ -15,7 +15,7 @@ assert(/#ddzCtrl[\s\S]{0,80}margin-top:\s*auto/.test(sh), '招募操作区钉底
 assert(/min-height:\s*500px[\s\S]{0,200}is-lobby/.test(sh) || /max-height:\s*500px/.test(sh), '横屏矮盒降级');
 assert(/min-width:\s*900px/.test(sh) && /max-width:\s*900px/.test(sh), '桌面限宽居中');
 assert(/lob \? 42 : 40/.test(pk) && /lob \? 24 : 32/.test(pk), '德州招募椭圆压扁(RX/RY)');
-assert(/lob \? \(land \? 48 : 40\)/.test(pk), '德州招募中心上移');
+assert(/lob \? \(land \? 48 : 36\)/.test(pk), '德州招募中心上移(CY 竖屏 36)');
 assert(/flex: 1 1 auto/.test(sh), '对局态中央弹性');
 assert(/pwa-standalone/.test(sh) && /is-lobby/.test(sh), 'PWA 招募顶部收敛');
 

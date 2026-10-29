@@ -16,8 +16,8 @@ assert(!/已提交|等待确认|等待裁决|引擎持有者|接管了牌桌/.te
 assert(/返回房间/.test(ddz) && /返回房间/.test(gd) && /返回房间/.test(pk), '出口统一「返回房间」');
 assert(/思考中|等待 /.test(pk) && /思考中|等待 /.test(ddz) && /思考中|等待 /.test(gd), '等他家统一「轮到X/思考中」');
 assert(/轮到你/.test(pk) && /轮到你/.test(ddz) && /轮到你/.test(gd), '自己回合统一「轮到你」');
-assert(/出牌没成功/.test(app), '出错提示统一「出牌没成功，再试一次」');
-assert(/今日已输光|还可输光/.test(app) && /reached\(/.test(pk), '每日【输光】次数文案与门禁一致');
+assert(/出牌没成功/.test(pk) || /出牌没成功/.test(app), '出错提示统一「出牌没成功，再试一次」');
+assert(/今日已输光|还可输光/.test(app) && /EH_STRATEGY_LIMITED|dailyPlayReached|pkLimitReached/.test(pk+app), '每日【输光】次数文案与门禁一致(DB 门禁)');
 
 console.log('\n── 人人平等 ──');
 const gtSql = R('sql/eh_game_tables.sql');
@@ -46,7 +46,7 @@ assert(/mySeat = -1/.test(pk) || /mySeat=-1/.test(pk), '旁观后 mySeat=-1(不�
 assert(!/isAI\[mySeat\] = true/.test(pk.match(/function doEnterSpectator[\s\S]{0,600}/)||[''])[0], '旁观不把我的席交 AI');
 assert(/vacate:true/.test(pk), '旁观通知腾座');
 assert(/onSeatIdle/.test(app) && /gtLeave/.test(app), 'app 侧 onSeatIdle 腾 DB 座');
-assert(/我来坐/.test(pk), '空位菜单有「我来坐」');
+assert(/点击入座/.test(pk), '空位提示「点击入座」(v59 直接入座, 弹窗已移除)');
 assert(/pk-preb\.queued|renderPreActBar/.test(pk), '预选功能保留(queued 标记, 无 .on 粘性选中)');
 assert(!/pk-preb\$\{on===key\?' on'/.test(pk), '预选不用 .on 选中类');
 assert(/gtCheckNoHumansThenClose/.test(app), '无在座真人自动散桌');

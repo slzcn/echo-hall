@@ -27,7 +27,7 @@ assert(/function emitStacks/.test(pk) && /opts\.onStacks/.test(pk), 'poker-ui �
 assert(/i === mySeat \? MY_START : START/.test(pk), '无 stackFor 时我这席 MY_START 兜底');
 assert(/EH_DAILY_PLAYS/.test(src) && /ehDailyPlayGate/.test(src), 'app.js 每日门禁 EH_DAILY_PLAYS');
 assert(/ehDailyPlayGate\('\w+'\)/.test(src), '门禁按游戏分闸');
-assert(/d.reached\('nlhe'\)|reached\('nlhe'\)/.test(pk+src), '德州门禁不锁其他游戏');
+assert(/if\(g !== 'nlhe'\) return true/.test(src) || /if\(g !== 'nlhe'\) return true;/.test(src), '德州门禁不锁其他游戏(非 nlhe 直接放行)');
 assert(/pkLimitReached/.test(pk) && /pkAddPlay/.test(pk), 'poker-ui 输光计数+到顶拒发');
 assert(/bumpSeatBanks/.test(src), 'bumpGameStats 经 bumpSeatBanks 沉淀全席(含灵魂)');
 assert(/EH_BANK_SET_OF/.test(ddz) && /EH_BANK_CHIPS_OF/.test(ddz), '斗地主累计分也按 uid 沉淀灵魂/真人');
@@ -76,7 +76,7 @@ assert(/dailyPlayReached\(game\) \{ return dailyPlays\(game\) >= DAY_MAX; \}/.te
 assert(/dailyPlayLeft\(game\) \{ return Math.max\(0, DAY_MAX - dailyPlays\(game\)\); \}/.test(score), 'left = DAY_MAX - plays');
 assert(/function ehRefreshDailyPlays/.test(src) && /eh_game_plays/.test(src), 'app 拉 eh_game_plays 灌今日计数');
 assert(/return true;\s*\}\s*\/\//.test(src) === false || !/永远放行/.test(src), 'ehDailyPlayGate 不再「永远放行」');
-assert(/d\.reached && d\.reached\(g\)/.test(src) || /d\.reached\(g\)/.test(src), '门禁真的查 reached(g)');
+assert(/EH_STRATEGY_LIMITED/.test(src) && /ehCheckStrategyLimit/.test(src), '门禁真的查限制(DB eh_game_strategy_limits 为权威, 非永远放行)');
 assert(/ehRecordBust/.test(src) && !/ehRecordPlay\(/.test(src.replace(/ehRecordBust/g,'')), '每日只记输光(ehRecordBust), 不再每手落账');
 assert(/me\.email=email/.test(src) || /me\.email\s*=\s*email/.test(src), 'doRegister 把注册邮箱写进 me(验证邮件入口依赖)');
 const boot = R('js/boot.js');

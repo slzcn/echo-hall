@@ -21,7 +21,7 @@ assert(/shouldPersistSnap/.test(app), '快照节流走模块');
 
 console.log('\n── B 联机: via=rpc ──');
 assert(/via:\s*via \|\| 'bc'|via \|\| .bc./.test(gt) || /via: via \|\| 'bc'/.test(gt) || /via: via \|\| .bc./.test(gt) || /via: via/.test(gt), 'guest act 带 via 标记');
-assert(/sendBc\('rpc'\)/.test(gt), 'RPC 成功后 via=rpc');
+assert(/sendBc\('bc'\)[\s\S]{0,400}rpc\(/.test(gt) && /审计/.test(gt), 'T95 乐观广播先行+RPC 后台审计(不再 RPC 后补发 via=rpc)');
 assert(/requireViaRpc/.test(gt), 'host 支持 requireViaRpc');
 assert(/payload\.via/.test(app), 'app host 读 payload.via');
 

@@ -14,7 +14,7 @@ const ok=(c,m)=>{ if(c){pass++;console.log('  ✓ '+m);} else {fail++;console.lo
 console.log('\n── 源码契约 ──');
 ok(/eh_bank_v1/.test(score) || /eh_bank_v1/.test(src), '存在按 uid 的 eh_bank_v1 账本');
 ok(/function bankChips\(/.test(src) && /bankBump|bump: bump/.test(score+src), 'bankChips/bankBump 已实现');
-ok(/function bankMigrateFromLocalAnon\(/.test(src), '匿名→uid 账本迁移');
+ok(/function migrateFromLocalAnon\(/.test(score) && /migrateFromLocalAnon\(\)/.test(score), '匿名→uid 账本迁移(modules/score.js, uid 变化时自动跑)');
 ok(/function seatBuyIn/.test(pk) && /i === mySeat \? MY_START : START/.test(pk) || /stacks = names\.map\(\(_, i\) => \(i === mySeat \? MY_START : START\)\)/.test(pk),
   'poker startDeal/seatBuyIn 我这席用 MY_START(不重置 1000)');
 ok(/myStack: bankOpenOpts\('nlhe'\)\.chips/.test(src), '招募态 open 传入生涯筹码');

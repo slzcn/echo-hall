@@ -19,8 +19,9 @@ const ok=(c,m)=>{ if(c){pass++; console.log('  ✓ '+m);} else {fail++; console.
 ok(/async function gtEnsureSeated/.test(APP), 'gtEnsureSeated 统一入座助手存在');
 // ★v57 新增 host 掉线接管 + 牌局进行中旁观守卫后, 函数头到 gtEnsureSeated 距离增至 ~2000 字符(合法增长)
 ok(/(?:_gtEnterPokerV2|_gtEnterPokerServer)[\s\S]{0,2200}gtEnsureSeated/.test(APP), '德州 guest 走 gtEnsureSeated');
-ok(/gtEnterGuandan[\s\S]{0,800}gtEnsureSeated/.test(APP), '掼蛋 guest 走 gtEnsureSeated');
-ok(/gtEnterDdz[\s\S]{0,800}gtEnsureSeated/.test(APP), '斗地主 guest 走 gtEnsureSeated');
+// v150: 掼蛋/斗地主 guest 入口重构进共享 _gtEnterGuestGame(gtEnsureSeated 在其中统一调用), 断言兼容直调/助手两种形态
+ok(/gtEnterGuandan[\s\S]{0,200}_gtEnterGuestGame/.test(APP) && /_gtEnterGuestGame[\s\S]{0,2200}gtEnsureSeated/.test(APP), '掼蛋 guest 走 gtEnsureSeated(经 _gtEnterGuestGame)');
+ok(/gtEnterDdz[\s\S]{0,200}_gtEnterGuestGame/.test(APP) && /_gtEnterGuestGame[\s\S]{0,2200}gtEnsureSeated/.test(APP), '斗地主 guest 走 gtEnsureSeated(经 _gtEnterGuestGame)');
 ok(!/function gtEnterGuandan[\s\S]{0,500}你不在这桌/.test(APP), '掼蛋不再抛「你不在这桌」');
 ok(!/function gtEnterDdz[\s\S]{0,500}你不在这桌/.test(APP), '斗地主不再抛「你不在这桌」');
 ok(/function (?:gtEnterPoker|_gtEnterPokerV2)[\s\S]{0,2500}gtSpectatePoker/.test(APP), '德州满座才旁观');

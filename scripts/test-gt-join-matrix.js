@@ -18,13 +18,16 @@ function bot(seat){ return { seat, kind:'ai', uid:'bot'+seat, name:'机器人'+s
 function soul(seat){ return { seat, kind:'soul', uid:'soul'+seat, name:'灵魂'+seat, emoji:'👤' }; }
 
 const fnSrc=[
-  APP.slice(APP.indexOf('async function gtEnsureSeated'), APP.indexOf('function gtEnter(')),
+  // 边界必须带 'async ' 前缀, 否则切在 async 与 function 之间留下裸 'async ' 令牌(vm 解析炸)
+  APP.slice(APP.indexOf('async function gtEnsureSeated'), APP.indexOf('async function gtEnter(')),
   APP.slice(APP.indexOf('function gtEngineHolder'), APP.indexOf('// 无房主: 自动开桌')),
   APP.slice(APP.indexOf('function gtSeatArrays'), APP.indexOf('// host: 只把【远程真人席】')),
 ].join('\n');
 const calls=[];
 const sb={ myUid:'uid-me', roomSouls:[], gtJoin:async(id,seat)=>{ calls.push(seat); return sb.__ret; },
-  _gtTables:new Map(), gtRenderCard(){}, _ehCatch(){}, toast(){}, console };
+  _gtTables:new Map(), gtRenderCard(){}, _ehCatch(){}, toast(){}, console,
+  // 切片函数引用的 app.js 闭包全局桩(vm 注入源码不含外层闭包, 需自备)
+  _gtWaitingHumans:[], _gtProcessWaitingQueue(){}, _gtConsecutiveNoSeat:0, _gtPlayChan:null, _gtGrabSeat(){} };
 vm.createContext(sb);
 vm.runInContext(fnSrc + '\nthis.api={gtEnsureSeated,gtEngineHolder,gtSeatArrays};', sb);
 const api=sb.api;
@@ -46,10 +49,10 @@ ok(api.gtEngineHolder(mkRow('nlhe',[empty(0),bot(1)]))===null, '无真人返回 
   await api.gtEnsureSeated(mkRow('nlhe',[human(1,'uid-me'),empty(0)]));
   ok(calls.length===0, '已在座不再 join');
 
-  // 德州可顶替 AI/灵魂
+  // 德州无空位: v64 契约 = 进等待队列不立即顶替, _gtProcessWaitingQueue 异步踢 AI 让座(动态让座)
   calls.length=0; sb.__ret=mkRow('nlhe',[human(0,'uid-me'),bot(1)]);
   await api.gtEnsureSeated(mkRow('nlhe',[soul(0),bot(1),human(2,'x')]));
-  ok(calls.length===1 && (calls[0]===0||calls[0]===1), '德州无空位时顶替 AI/灵魂席');
+  ok(calls.length===0, '德州无空位→等待队列(v64 不立即顶替, AI 让座在 _gtProcessWaitingQueue)');
 
   // 斗地主/掼蛋只坐空位
   calls.length=0; sb.__ret=null;
@@ -66,7 +69,8 @@ ok(api.gtEngineHolder(mkRow('nlhe',[empty(0),bot(1)]))===null, '无真人返回 
   sb.gtJoin=async(id,seat)=>{ calls.push(seat); return sb.__ret; };
 
   console.log('\n── 满座分流(源码契约) ──');
-  ok(/gtSpectatePoker/.test(APP) && /座位已满 · 等有人离开再入座/.test(APP), '满座: 德州旁观 / 其余诚实提示');
+  ok(/gtSpectatePoker/.test(APP) && /等待空位/.test(APP), '满座: 德州旁观 + 等待空位文案(v64)');
+  ok(/_gtProcessWaitingQueue[\s\S]{0,900}gtKick/.test(APP), '动态 AI 让座: 等待队列踢 AI/灵魂席腾位');
   ok(/row\.game==='nlhe'\)\{\s*gtSpectatePoker/.test(APP.replace(/\s+/g,' ')), '仅德州满座走旁观');
 
   console.log('\n── SQL 一人两座 / 顶替约束 ──');

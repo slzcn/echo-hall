@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261020-v149';
+window.__EH_APP_VER = '20261020-v150';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -3921,6 +3921,28 @@ function bankOpenOpts(game, grant){ return _EH_SCORE ? _EH_SCORE.openOpts(game, 
 function bankChipsOf(game, subject, grant){ return _EH_SCORE ? _EH_SCORE.chipsOf(game, subject, grant) : PK_WALLET_GRANT; }
 function bankBumpOf(game, subject, delta, won){ return _EH_SCORE ? _EH_SCORE.bumpOf(game, subject, delta, won) : null; }
 function bankSetOf(game, subject, patch){ return _EH_SCORE ? _EH_SCORE.setOf(game, subject, patch) : null; }
+// ★v150 恢复(误删回归): 懒加载的游戏 chunk(game-ui/poker-ui/guandan-ui)靠 window.* 反查账本/每日计数。
+//   v133 瘦身按"定义后未被本文件调用"把这组导出当死代码删了 —— 但消费方在懒加载 chunk 里(当时扫描没覆盖),
+//   全部 typeof 守卫静默降级 → 斗地主/德州账本读写、每日次数提示失效。这不是死代码, 是跨 chunk 桥。
+try{
+  window.EH_BANK_GET = bankGet;
+  window.EH_BANK_SET = bankSet;
+  window.EH_BANK_CHIPS = bankChips;
+  window.EH_BANK_BUMP = bankBump;
+  window.EH_BANK_CHIPS_OF = bankChipsOf;
+  window.EH_BANK_BUMP_OF = bankBumpOf;
+  window.EH_BANK_SET_OF = bankSetOf;
+  window.EH_DAILY_PLAYS = {
+    max: (_EH_SCORE && _EH_SCORE.DAY_MAX) || 5,
+    // game: nlhe | doudizhu | guandan — 分游戏独立, 德州打满不锁另两款
+    plays: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlays(game) : 0; },
+    bump: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayBump(game) : 0; },
+    reached: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayReached(game) : false; },
+    left: function(game){ return _EH_SCORE ? _EH_SCORE.dailyPlayLeft(game) : 0; },
+    setFromServer: function(map){ return _EH_SCORE && _EH_SCORE.setDailyFromServer ? _EH_SCORE.setDailyFromServer(map) : null; },
+  };
+}catch(_){}
+const EH_GAME_LABEL = { nlhe:'德州', doudizhu:'斗地主', guandan:'掼蛋' };
 function ehDailyLeftTip(game){
   try{
     const d = window.EH_DAILY_PLAYS;

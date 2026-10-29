@@ -17,7 +17,7 @@ assert(/bindTap\(\$\(.#pkFold.\)\)/.test(pk) || /pkFold/.test(pk) && /bindTap\(/
 assert(/touch-action:\s*manipulation/.test(sh), '按钮 manipulation 取消点按延迟');
 assert(/transition:\s*transform \.08s/.test(sh), '压按动画 0.08s 跟手');
 assert(/邀请补位/.test(ddz) && /一键补满/.test(pk), '文案一致性保持');
-assert(/journey-exempt: 文案一致性/.test(app) || /出牌未通过校验/.test(app), 'RPC 文案已统一');
+assert(/journey-exempt: 文案一致性/.test(app) || /出牌没成功/.test(pk), 'RPC 文案已统一(出牌没成功，再试一次)');
 
 console.log('\n'+(failed?'❌ 有失败':'✅ 按钮跟手 + 文案一致性通过'));
 process.exit(failed?1:0);
