@@ -382,10 +382,14 @@
     return st;
   }
 
+  // handOf: 与 ddz-engine 对齐, 供 replay 及外部访问手牌
+  function handOf(state, seat){ return state.players[seat].hand; }
+
   return {
     createGame, applyPlay, applyPass, replay,
     applyTribute, tributeCandidates,
     teamOf, partnerOf, nextActive, activeCount,
+    handOf,   // 与 ddz-engine 对齐: 供 replay 及单测访问手牌
     _resolveTribute, _setupManualTribute, _move,   // 供单测
   };
 });

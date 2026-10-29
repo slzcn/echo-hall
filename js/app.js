@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261020-v150';
+window.__EH_APP_VER = '20261029-v151';
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -425,7 +425,7 @@ const ROOM_BGM=EH_CONFIG.roomBgm;
 // EH 操作音效：轻量 Web Audio 合成，不依赖外部音频文件；音色偏聊天/空间感，避免 VC 答题那种强游戏化。
 function bgmOn(){
   try{ const M=window.EH_BGM_MODULE; if(M && M.bgmOnFrom) return M.bgmOnFrom(LS_BGM); }catch(e){ _ehCatch('bgmOn', e); }
-  const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1';
+  try{ const v=localStorage.getItem(LS_BGM); return v===null?true:v==='1'; }catch(_){ return true; }
 }
 // 全部可用 BGM 曲目池(官方房各一首 + 公共/私密 fallback 各一首), 供大厅随机连播
 function bgmPool(){
@@ -3139,7 +3139,7 @@ function gtRenderPokerEntry(el,row){
     el.onclick=(e)=>{ if(e.target.closest('button')) return; gtGotoExistingTable(row); };
     // ★v63 场景1: 落座动画 — 座位数变化时加 seat-new class, 200ms 后移除
     try{
-      const prevHumans = el.dataset.prevHumans ? parseInt(el.dataset.prevHumans) : -1;
+      const prevHumans = el.dataset.prevHumans ? parseInt(el.dataset.prevHumans, 10) : -1;
       if(prevHumans >= 0 && humans > prevHumans){
         el.classList.add('seat-new');
         setTimeout(function(){ try{ el.classList.remove('seat-new'); }catch(_){} }, 200);
@@ -6661,7 +6661,6 @@ async function giftChips(toUid, toName, amount){
   }catch(e){ console.warn('giftChips', e); toast('赠送失败，稍后再试'); }
   finally{ _giftInFlight=false; }
 }
-document.addEventListener('click',e=>{ if(!e.target.closest('#peerMenu') && !e.target.closest('.pav')&&!e.target.closest('.msg .av')) hidePeerMenu(); });
 // 发一个互动: 本地立即演特效 + 写 kind=interact 消息广播给房里所有人  hidePeerMenu();
   // ★用 isSoulUser(uid,name) 而非 isSoulUid(uid): 漫游进房的灵魂只写 presence、不入 eh_room_souls,
   //   soulUidSet 里没它 → isSoulUid 会判成真人 → "发私信"入口漏出 + 互动误放行。按名字/花名册兜底根治。
