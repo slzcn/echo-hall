@@ -2294,7 +2294,7 @@
       catch(e){ location.reload(); } };
     var jobs=[];
     try{ if('serviceWorker' in navigator){ jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); }).catch(function(){})); } }catch(e){}
-    try{ if(window.caches && caches.keys){ jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); }).catch(function(){})); } }catch(e){}
+    try{ if(window.caches && caches.keys){ jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ if(/audio|lib/i.test(k)) return null; return caches.delete(k); })); }).catch(function(){})); } }catch(e){}
     Promise.all(jobs).then(fin).catch(fin);
     setTimeout(fin, 1500);   // 弱网下清理别挂住, 到点必刷
   }
