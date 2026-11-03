@@ -687,15 +687,18 @@ html[data-mode="day"] .ddz-felt::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
-    // ── 连续超时 → 自动离座(v145 统一规则) ──
-    //   达 MAX_MISS 次连续超时判定挂机:
-    //     我这席 → doEnterSpectator() 真起身让座(当前局交本机 AI 顶完, 腾 DB 座, 留房可再坐);
-    //     远程真人席(host 权威) → 移出 remoteSeats 转本机 AI 顶完本局, 通知 app 腾座。
-    //   离座后"无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose 统一处理
-    //   (带 DB 二次核查 + away 感知 + 5s 宽限), game-ui 不再自行判定散桌。
+    // ── 连续超时 ──
+    //   我这席: 只代打本回合，【不】自动离座/腾座。离座+gtCheckNoHumansThenClose 会把
+    //   单人桌(或最后一人)整局销毁 = 「游戏自动结束」(见 docs/triage/2026-11-02-game-auto-end-timeout-exit.md)。
+    //   远程真人席(host 权威): 移出 remoteSeats 转本机 AI 顶完本局, 通知 app 腾座防卡死。
+    //   真正离座走显式「旁观/返回」或 pagehide/away；空桌由 eh_gt_reap 回收。
     function idleOut(seat){
       missStreak[seat] = 0;
-      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
+      if (seat===mySeat){
+        toast('连续超时 · 已自动代打，座位保留');
+        try{ emitBeat({ type:'idle', actor:'我', text:'💤 连续超时，本手由系统代打（座位保留）' }); }catch(_){}
+        return;
+      }
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);   // 远程席移出→即刻转本机 AI 顶完本局
       toast(nm+' 连续超时 · 已离座, AI 接手');
@@ -2295,7 +2298,8 @@ html[data-mode="day"] .ddz-felt::before{
           if (mv.action==='play'){ toast('超时 · 自动出牌'); selected=new Set(mv.cards.map(c=>c.id)); doPlay(); acted=true; }
         }
       }
-      if (acted) bumpMiss(mySeat);   // 累计我的超时(达 MAX_MISS → idleOut 自动离座)
+      if (acted) bumpMiss(mySeat);   // 累计我的超时(达 MAX_MISS → idleOut 仅提示代打, 不离座)
+      else { turnSeatActive = -1; turnPhaseActive = ''; }   // 未推进: 强制下轮重起算, 防 remain=0 立刻再 expire
     }
 
     // ── 制胜亮牌过渡(主人反馈"赢的人最后出的什么没看清就赢了"): 终局那一手先以"对局态"留在桌心亮

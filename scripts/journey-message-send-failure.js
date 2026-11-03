@@ -15,7 +15,7 @@ async function flow(fail){
  assert(s.includes('markSendFailed(el,payload)'));
  assert(s.includes('data-retry-send="1"'));
  assert(s.includes("if(!curRoom || curRoom.id!==payload.room_id)"));
- assert(s.includes('finally{ _sendInFlight.delete(localId); }'));
+ assert(s.includes('finally{ if(_fp) _sendInFlight.delete(_fp); }') || s.includes('_sendInFlight.delete(_fp)'));
  assert(h.includes('.msg.send-failed'));
  console.log('✓ 生产实现含失败态、原地重试、切房保护和异常释放');
 })().catch(e=>{console.error('✗',e.stack||e);process.exit(1)});

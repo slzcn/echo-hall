@@ -732,13 +732,19 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
-    // ── 连续超时 → 自动离座(v145 统一规则, 三款一致) ──
-    //   我这席 → doEnterSpectator() 真起身让座(德州腾空座位, 不交 AI 代打);
-    //   别席(远程真人) → 交本机 AI 打完本手不让牌局卡死, 下一手可被补位。
-    //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose + 每手 onResult 后统一判定。
+    // ── 连续超时 ──
+    //   我这席: 只代打本回合，【不】自动离座/腾座。用户可能只是在读牌/切后台/弱网；
+    //   一旦本席 vacate 再叠加 gtCheckNoHumansThenClose，单人桌(或最后一人)会把整局销毁
+    //   = 「游戏自动结束」bug(docs/triage/2026-11-02-game-auto-end-timeout-exit.md)。
+    //   别席(远程真人): 交本机 AI 打完本手防卡死，下一手可被补位。
+    //   真正离座仍走显式「旁观/返回」或 pagehide/away；空桌由 eh_gt_reap 回收。
     function idleOut(seat){
       missStreak[seat] = 0;
-      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真起身让座
+      if (seat===mySeat){
+        toast('连续超时 · 已自动代打，座位保留');
+        try{ emitBeat({ type:'idle', actor:names[mySeat]||'我', text:'💤 连续超时，本手由系统代打（座位保留）' }); }catch(_){}
+        return;
+      }
       // 别席超时: 该席交本机 AI 打完本手(不是托管功能, 是不让牌局卡死), 下一手可被补位
       const nm = (st.players[seat] && st.players[seat].name) || names[seat] || ('席'+seat);
       isAI[seat] = true;
@@ -2491,10 +2497,15 @@ html[data-mode="day"] .pk-room[data-phase="lobby"] .pk-table::before{
     }
     function onHumanTimeout(){
       if (st.toAct!==mySeat || st.phase==='over' || spectating) return;
+      const beforeToAct = st.toAct;
       const la=Engine.legalActions(st, mySeat);
       if (la.canCheck){ toast('超时 · 自动过牌'); humanAct('check', undefined, true); }
       else { toast('超时 · 自动弃牌'); humanAct('fold', undefined, true); }
-      bumpMiss(mySeat);
+      // ★只在真正推进后计超时: humanAct 可能因 awaitingHost/apply 失败早退。
+      //   若早退仍 bumpMiss，且 turnStart 未重置，下次 armTurn remain=0 会立刻再 expire
+      //   → 假两连超时 → idleOut 误离座 → gtCheckNoHumansThenClose 整桌销毁(游戏自动结束)。
+      if (st.toAct!==beforeToAct || st.phase==='over') bumpMiss(mySeat);
+      else { turnSeatActive = -1; turnPhaseActive = ''; }   // 强制下轮重新起算思考窗
     }
 
     // 摊牌时该席最优 5 张成手牌的 id 集合(高亮用)。数据只取自 st.result(公开 reveal+board),

@@ -6,6 +6,31 @@
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
 window.__EH_APP_VER = '20261029-v151';
+// ★C5 运行时字节漂移核对: 注释/CI 声称可验「壳新 app.js 旧」, 但 index 自愈只比 BUILD_VER↔ver.txt。
+//   若 CDN 把旧字节写进新 ?v= 缓存, 壳与 ver.txt 一致却拿不到新逻辑。这里在脚本求值时交叉核对,
+//   不一致 → 触发硬恢复(与 index hardRecover 同策略: 清 shell/js 缓存后强刷)。
+try{
+  if(window.__EH_BUILD_VER && window.__EH_APP_VER && window.__EH_BUILD_VER !== window.__EH_APP_VER){
+    console.warn('[EH] app.js 字节漂移: __EH_APP_VER='+window.__EH_APP_VER+' != __EH_BUILD_VER='+window.__EH_BUILD_VER);
+    var _driftGuard='eh_drift_'+window.__EH_BUILD_VER, _driftDid=false;
+    try{ _driftDid=sessionStorage.getItem(_driftGuard)==='1'; }catch(_){}
+    if(!_driftDid){
+      try{ sessionStorage.setItem(_driftGuard,'1'); }catch(_){}
+      if(window.caches && caches.keys){
+        caches.keys().then(function(ks){
+          return Promise.all(ks.map(function(k){
+            // 保留音频/三方库持久缓存(C7): 只清 shell 与指纹 JS
+            if(/audio|lib/i.test(k)) return null;
+            return caches.delete(k);
+          }));
+        }).catch(function(){});
+      }
+      setTimeout(function(){
+        try{ var u=new URL(location.href); u.searchParams.set('_drift',Date.now()); location.replace(u.toString()); }catch(_){ location.reload(); }
+      }, 50);
+    }
+  }
+}catch(_){}
 // ★v83 全局开关: true=服务端 Edge Function 模式(德州), false=真人 host 模式(旧架构)
 //   只在进桌前读取; 牌局进行中不允许切换(见 EH_SET_SERVER_MODE 保护)
 //   切换: 在控制台执行 window.EH_SET_SERVER_MODE(true/false)
@@ -1178,20 +1203,17 @@ function _gtPokerBindUnload(tableId){
   _gtPokerUnloadHandler=function(){
     try{
       if(_pagehideAccessToken&&tableId){
-        // ★v57 Bug2: host 直接关浏览器前立刻把 host_uid 转给下一个在线真人(用 fetch keepalive 发 Supabase RPC),
-        //   guest 不必再等 15s 心跳超时才能接管。★v64: 提取为 _gtFindNextHost 共用。
+        // ★B11: eh_gt_set_host 在 SQL 不存在，keepalive 是死请求。关页把自己标 away，
+        //   其余真人经 seats→gtEngineHolder 重算接管。
         var _isHost = _gtActiveTable && _gtActiveTable.host && _gtActiveTable.id===tableId;
         if(_isHost){
-          var _nextUid = _gtFindNextHost(tableId);
-          if(_nextUid){
-            try{
-              fetch(SB_URL+'/rest/v1/rpc/eh_gt_set_host',{
-                method:'POST', keepalive:true,
-                headers:{ apikey:SB_ANON, Authorization:'Bearer '+_pagehideAccessToken, 'Content-Type':'application/json' },
-                body:JSON.stringify({ p_table_id:tableId, p_new_host_uid:_nextUid })
-              }).catch(function(){});
-            }catch(_){}
-          }
+          try{
+            fetch(SB_URL+'/rest/v1/rpc/eh_gt_set_away',{
+              method:'POST', keepalive:true,
+              headers:{ apikey:SB_ANON, Authorization:'Bearer '+_pagehideAccessToken, 'Content-Type':'application/json' },
+              body:JSON.stringify({ p_table:tableId, p_away:true })
+            }).catch(function(){});
+          }catch(_){}
         }
         // ★v62 Bug5: 关浏览器时同步结算筹码回全局账户, 否则桌上筹码随散桌丢失
         if(_gtMyFinalStack > 0 && _pagehideAccessToken){
@@ -1547,19 +1569,23 @@ function gtWatchHostPing(chan, hostUid, tableId){
     const gap = Date.now() - _gtLastHostAt;
     if(gap>15000){ // v38: 15s 超时(原45s太慢, 断线玩家占座不退); 配合 player_beat 心跳加速检测
       try{ if(_ehGame.setConn) _ehGame.setConn('host_offline'); }catch(_){ }
-      // ★v51 DB 仲裁: host_ping 超时 → 查 DB 确认 host_uid, 若 host 已失联且我应接管, 直接写 DB
+      // ★B11 接管闭环: host_ping 超时且失联 holder 座位仍非 away → gtEngineHolder 仍指向死者,
+      //   无人启动引擎、整桌卡死。v133 删掉无效 eh_gt_set_host 后没有补这一环。
+      //   正确做法: 把失联 holder 标 away → seats 变化经 realtime 重算 gtEngineHolder → 我接管。
       if(_gtPokerSession && _gtPokerSession.state==='guest' && _gtPokerSession.tableId===tableId){
         (async function(){
           try{
             const {data:tr}=await sb.from('eh_game_tables').select('host_uid,seats,status').eq('id',tableId).maybeSingle();
             if(!tr || tr.status!=='playing') return;
-            if(tr.host_uid===myUid) return;   // DB 里 host_uid 已是我 → 不用接管
-            // 我是 seat 最小的非 away 真人(排除当前 host) → 直接写 host_uid 为自己
-            const humans=(tr.seats||[]).filter(s=>s&&s.kind==='human'&&s.uid&&!s.away&&s.uid!==tr.host_uid).sort((a,b)=>a.seat-b.seat);
-            if(humans.length && humans[0].uid===myUid){
-              // ★v133 fix: 原 eh_gt_set_host RPC 在 SQL 中不存在,调用必失败。接管机制由 DB realtime → gtCheckEngineTransfer 处理
-              // journey-exempt: 删除无效RPC调用无行为变化,接管逻辑由DB realtime机制保证
-              // await sb.rpc('eh_gt_set_host', { p_table_id: tableId, p_new_host_uid: myUid });
+            const holder = (typeof gtEngineHolder==='function') ? gtEngineHolder(tr) : null;
+            if(!holder || holder===myUid) return;
+            // 去掉失联 holder 后，我是座位最小的非 away 真人 → 由我标 away（避免多人同时写 seats）
+            const next=(tr.seats||[])
+              .filter(s=>s&&s.kind==='human'&&s.uid&&!s.away&&s.uid!==holder)
+              .sort((a,b)=>a.seat-b.seat);
+            if(next.length && next[0].uid===myUid){
+              try{ gtHostMarkAway(tableId, holder, true); }catch(_){}
+              try{ toast('房主掉线 · 正在接管牌桌'); }catch(_){}
             }
           }catch(e){ _ehCatch('gtHostPingFallback', e); }
         })();
@@ -2285,9 +2311,32 @@ async function refreshSnapshotTail(room, fillOlder=false){
   flight={busy:true,pending:false,fillOlder}; _snapTailFlights.set(rid,flight);
   try{
     const isPublic = room.kind==='official' || room.kind==='public';
+    // ★先扫 DOM 得 domMaxMid: 补拉只接空窗新消息; 公开房 tail 用小 lim 增量, 不再每 20s 全量 500 行(P13)
+    const stream0=$('#stream');
+    let domMaxMid=0;
+    const domByMid=new Map();
+    if(stream0){
+      stream0.querySelectorAll('[data-mid]').forEach(e=>{
+        if(e.parentElement && e.parentElement.closest('[data-mid]')) return;
+        const key=String(e.dataset.mid||''); if(key) domByMid.set(key,e); const id=+key; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id;
+      });
+    }
     let rows;
-    if(isPublic){ const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim:TUNE('publicRecentLimit',500)}); rows=(data||[]).slice().reverse(); }
-    else { const {data}=await sb.from('eh_messages').select('*').eq('room_id',room.id).order('id',{ascending:false}).limit(HISTORY_PAGE()); rows=(data||[]).slice().reverse(); }
+    if(isPublic){
+      // fillOlder=补更早历史 → 仍用全量封顶; 平时 tail 只要空窗新消息 → 小 lim
+      const lim = fillOlder ? TUNE('publicRecentLimit',500) : TUNE('publicTailLimit',40);
+      const {data}=await sb.rpc('eh_public_recent',{rid:room.id,lim}); rows=(data||[]).slice().reverse();
+    } else {
+      let q = sb.from('eh_messages').select('*').eq('room_id',room.id);
+      if(!fillOlder && domMaxMid>0){
+        // 私密房 tail: 严格增量 id>domMaxMid, 正序取空窗(已是时间正序, 不再 reverse)
+        q = q.gt('id', domMaxMid).order('id',{ascending:true}).limit(TUNE('privateTailLimit',200));
+        const {data}=await q; rows=(data||[]);
+      }else{
+        q = q.order('id',{ascending:false}).limit(HISTORY_PAGE());
+        const {data}=await q; rows=(data||[]).slice().reverse();
+      }
+    }
     // ★防串房: await RPC(几百ms)期间用户可能已切到别的房, stream 已是新房的 DOM。
     //   若不校验就 append, 会把本房消息塞进当前(别的)房→串房。发现已离房则放弃。
     if(!curRoom || curRoom.id!==room.id) return;
@@ -2298,18 +2347,7 @@ async function refreshSnapshotTail(room, fillOlder=false){
     // 当前 DOM 里已渲染的最大 mid: 补拉只接"比它更新的空窗消息"(append到底部)。
     // 不去碰更早的历史消息——那些由 loadHistory 的 idle 分批渲染负责; 若补拉也去补,
     // 会和"还在队列里没进DOM"的分批消息撞车→重复渲染(实测见过一条消息×2)。
-    let domMaxMid=0;
-    // 扫所有带 mid 的行(含 .msg / .ixmsg 互动 / .actmsg / .recalled-tip), 别只扫 .msg——
-    // 否则互动/act 行不计入 domMaxMid, 且下面判重也漏, 刷新补拉会把它们反复 append(重复bug真因)。
-    const domByMid=new Map();
-    stream.querySelectorAll('[data-mid]').forEach(e=>{
-      // ★铁律(修"同一句冒三遍"真凶): 只认【消息行本身】, 跳过嵌在消息体内的同 mid 元素(.echo-bar 也带 data-mid)。
-      //   否则 echo-bar 在 DOM 里排在 .msg 之后 → domByMid.set 把同 mid 的映射覆盖成 echo-bar → 下面"空框修复"
-      //   见 echo-bar 无 .txt 误判为空框 → exist.replaceWith(整条msg) → 把一整条 .msg 塞进 .body(echo-bar 原位)
-      //   = 消息里套消息, 而 dedupStreamByMid 只扫 #stream 直接子节点看不见这层嵌套 → 永远不自愈。
-      if(e.parentElement && e.parentElement.closest('[data-mid]')) return;   // 有 [data-mid] 祖先 = 嵌套元素, 不是消息行
-      const key=String(e.dataset.mid||''); if(key) domByMid.set(key,e); const id=+key; if(!isNaN(id)&&id>domMaxMid) domMaxMid=id;
-    });
+    // (domByMid / domMaxMid 已在 fetch 前建好)
     let appended=0;
     rows.forEach(m=>{
       if(!m || m.id==null) return;
@@ -2458,47 +2496,51 @@ async function loadHistoryCore(first){
   const _enterRid = curRoom && curRoom.id;   // 进房时的房id: 拉取(await)期间可能切房, 渲染前校验防串房
   const isPublic = curRoom.kind==='official' || curRoom.kind==='public';
   let rows; let _usedCache=false;   // 本次首屏是否用了预取缓存(用了→进房后补拉最新, 覆盖预取到进房的空窗新消息)
+  let _newOldest=null;              // ★先落局部, rid 校验通过后再提交全局 oldestId(防串房覆盖游标)
   if(isPublic){
     // 优先用预取缓存(悬停/按下时已开始拉)，命中则瞬间显示；否则现拉
     let data;
-    const hit=prefetchCache[curRoom.id];
+    const hit=prefetchCache[_enterRid];
     // 关键: 预取 promise / RPC 都套 10s 超时。网络抖动时它们会 hang→await 永不返回→
     // loadHistory 卡死→消息永久空白(偶发"进房卡住"根因)。超时则降级现拉一次。
     if(first && !_cachePurged && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
       try{ data = await withTimeout(hit.p, 10000); }catch(_){ data=null; }
-      delete prefetchCache[curRoom.id]; _usedCache=true;
+      delete prefetchCache[_enterRid]; _usedCache=true;
     }
     if(data===undefined || data===null){   // 无缓存命中 或 缓存超时 → 现拉(也带超时)
-      try{ ({ data } = await withTimeout(sb.rpc('eh_public_recent',{ rid:curRoom.id, lim:TUNE('publicRecentLimit',500) }), 12000, { data:[] })); }
+      try{ ({ data } = await withTimeout(sb.rpc('eh_public_recent',{ rid:_enterRid, lim:TUNE('publicRecentLimit',500) }), 12000, { data:[] })); }
       catch(_){ data=[]; }
     }
     rows = (data||[]).slice().reverse();  // rpc 按 id desc 返回，倒回正序
-    if(rows.length){ oldestId = rows[0].id; }
+    if(rows.length){ _newOldest = rows[0].id; }
   } else {
     // 私密房: 首屏优先用预取缓存(命中则瞬开)，否则现拉分页
-    const hit=prefetchCache[curRoom.id];
+    const hit=prefetchCache[_enterRid];
     let histTimedOut=false, usedCacheRows=false;
     if(first && !_cachePurged && !oldestId && hit && Date.now()-hit.at < TUNE('prefetchTtlMs',60000)){
       try{
         const data = await withTimeout(hit.p, 15000);
         rows = (data||[]).slice().reverse();
-        if(rows.length){ oldestId = rows[0].id; }
+        if(rows.length){ _newOldest = rows[0].id; }
         _usedCache=true; usedCacheRows=true;
       }catch(e){ console.warn('private history cache timeout', e); histTimedOut=true; rows=[]; }
-      delete prefetchCache[curRoom.id];
+      delete prefetchCache[_enterRid];
     }
     if(!usedCacheRows){
-      let q = sb.from('eh_messages').select('*').eq('room_id',curRoom.id).order('id',{ascending:false}).limit(HISTORY_PAGE());
+      let q = sb.from('eh_messages').select('*').eq('room_id',_enterRid).order('id',{ascending:false}).limit(HISTORY_PAGE());
       if(oldestId) q = q.lt('id', oldestId);
       let data=[], error=null;
       try{ ({ data, error } = await withTimeout(q, 15000)); }
       catch(e){ console.warn('private history query timeout', e); histTimedOut=true; data=[]; }
       if(error){ console.warn('private history query', error); }
       rows = (data||[]).slice().reverse();
-      if(rows.length){ oldestId = rows[0].id; }
+      if(rows.length){ _newOldest = rows[0].id; }
     }
     if(histTimedOut && curRoom && curRoom.id===_enterRid){ try{ toast('历史加载超时，下拉重试'); }catch(_){ _ehCatch('loadHistory',_); } }
   }
+  // ★防串房: 拉取期间已切到别的房 → 放弃渲染, 且【不得】把本房游标写进全局 oldestId
+  if(!curRoom || curRoom.id!==_enterRid) return;
+  if(_newOldest!=null) oldestId = _newOldest;
   // 加载更多按钮(仅私密房分页；公开房走 rpc 封顶, 无更多)
   const canLoadMore = !isPublic && (rows.length===HISTORY_PAGE() || rows.length===TUNE('prefetchN',48));
   // ★灵魂投影去重: 同一句灵魂投影会同时产生 msg 留底 + proj 飞幕两条,
@@ -4474,25 +4516,28 @@ async function _gtGrabSeat(row){
     return;
   }
   if(target.away){ try{ await gtRpc('eh_gt_set_away',{p_table:row.id, p_away:false}); }catch(_){} }
+  // ★先 join 成功再拆旧局: 旧序 close→join 在 join 失败时会把进行中的牌局杀掉(B9)。
+  let jr=null;
+  try{
+    jr=await gtJoin(row.id, target.seat);
+  }catch(e){
+    _ehCatch('gtGrabSeat', e);
+    window.ehReportError('manual', 'grab_seat_failed', { error: e && e.message });
+    var msg = (e&&e.message)||'';
+    if(/not joinable|already started/.test(msg)){ try{ toast('这局暂时入不了座，下一手再试'); }catch(_){} return; }
+    if(/seat taken/.test(msg)){ try{ toast('这个座位刚被占了，再点别的空位'); }catch(_){} return; }
+    try{ toast('入座失败，请重试（当前牌局未中断）'); }catch(_){} 
+    return;
+  }
   try{ if(_ehGame && _ehGame.close) _ehGame.close(); }catch(_){}
   _gtCleanupPlay();
-  try{
-    var jr=await gtJoin(row.id, target.seat);
+  {
     var fr=jr||fresh; _gtTables.set(fr.id, fr);
 
     _gtWaitNextHand.set(myUid, fr.id);
     _gtRemoveAwayBar(); _gtShowWaitNextHand();
     try{ toast('已入座 · 等下一手发牌', 1800); }catch(_){}
     gtEnter(fr.id);
-  }catch(e){
-    _ehCatch('gtGrabSeat', e);
-    window.ehReportError('manual', 'grab_seat_failed', { error: e && e.message });
-    // 座位刚被抢/桌已变 → 拉最新再判
-    var again=await gtEnsureRow(row.id);
-    var msg = (e&&e.message)||'';
-    if(/not joinable|already started/.test(msg)){ try{ toast('这局暂时入不了座，下一手再试'); }catch(_){} return; }
-    if(/seat taken/.test(msg)){ try{ toast('这个座位刚被占了，再点别的空位'); }catch(_){} return; }
-    try{ toast('入座失败，请重试'); }catch(_){} 
   }
 }
 
@@ -5069,7 +5114,11 @@ function setConn(live,txt){ const el=$('#cntLed'); if(el){ el.classList.toggle('
 let EMOJI_ONLY_RE=null;
 try{ EMOJI_ONLY_RE=new RegExp('^(\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F|\\s)+$','u'); }catch(e){}
 const isEmojiOnly = t => !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(t||'') && (t||'').length<=12;
-const _sendInFlight = new Set();
+const _sendInFlight = new Map(); // 指纹 → 时间戳。旧实现按 localId 存 Set(每条新建 id 再 has 自己)永不命中 = 假锁
+function _sendFingerprint(payload){
+  if(!payload) return '';
+  return [payload.room_id||'', payload.user_id||'', payload.kind||'msg', payload.text||'', payload.reply_to||''].join('|');
+}
 function markSendFailed(el, payload){
   if(!el) return;
   el.classList.add('send-failed');
@@ -5081,14 +5130,39 @@ async function retryFailedSend(el){
   if(!el || !el.dataset.retryPayload || el.dataset.retrying==='1') return;
   let payload; try{ payload=JSON.parse(el.dataset.retryPayload); }catch(_){ return; }
   if(!curRoom || curRoom.id!==payload.room_id){ toast('已离开原房间，无法重试'); return; }
+  const fp=_sendFingerprint(payload);
+  if(fp && _sendInFlight.has(fp)){ toast('正在发送中…'); return; }
   el.dataset.retrying='1'; el.classList.add('send-retrying');
+  if(fp) _sendInFlight.set(fp, Date.now());
   try{
+    // ★幂等预检: 上次 insert 可能实际已成功(客户端超时才标失败)。2 分钟内同房/同用户/同文已有则不插第二条。
+    try{
+      const since=new Date(Date.now()-120000).toISOString();
+      const {data:existing}=await sb.from('eh_messages')
+        .select('id').eq('room_id', payload.room_id).eq('user_id', payload.user_id)
+        .eq('text', payload.text).eq('kind', payload.kind||'msg')
+        .gte('created_at', since).limit(1);
+      if(existing && existing.length){
+        el.dataset.mid=existing[0].id;
+        const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=existing[0].id;
+        el.classList.remove('send-failed','send-retrying'); delete el.dataset.retryPayload; delete el.dataset.retrying;
+        const bar=el.querySelector('.send-failed-bar'); if(bar) bar.remove();
+        try{ dedupStreamByMid($('#stream')); }catch(_){}
+        return;
+      }
+    }catch(_){ /* 预检失败则退回直接插入 */ }
     const {data,error}=await sb.from('eh_messages').insert(payload).select('id').single();
     if(error) throw error;
     el.classList.remove('send-failed','send-retrying'); delete el.dataset.retryPayload; delete el.dataset.retrying;
     const bar=el.querySelector('.send-failed-bar'); if(bar) bar.remove();
-    if(data){ el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id; }
+    if(data){
+      const dup=document.querySelector(`.msg[data-mid="${data.id}"]`);
+      if(dup && dup!==el) dup.remove();
+      el.dataset.mid=data.id; const eb=el.querySelector('.echo-bar'); if(eb) eb.dataset.mid=data.id;
+      try{ dedupStreamByMid($('#stream')); }catch(_){}
+    }
   }catch(e){ console.warn('retry send',e); el.dataset.retrying=''; el.classList.remove('send-retrying'); toast(EH_CONFIG.text.err_sendFail); }
+  finally{ if(fp) _sendInFlight.delete(fp); }
 }
 function fmtTime(ts){
   const d=ts?new Date(ts):new Date();
@@ -7122,7 +7196,7 @@ document.addEventListener('click',e=>{
 
 // ============ 发送 ============
 async function send(){
-  try{ _ehDbg('[send] rid=', curRoom&&curRoom.id, 'len=', ($('#input')&&$('#input').value||'').length); }catch(_){}
+  try{ _ehDbg('[send] rid=', curRoom&&curRoom.id, 'len=', ($('#cin')&&$('#cin').value||'').length); }catch(_){}
   const inp=$('#cin'); let text=inp.value.trim();
   // 眩晕期禁言(被 KO 后 15s 说不出话)——提到最前, 有内容才提示
   if(text && isStunned()){ const left=Math.ceil((_stunnedUntil-Date.now())/1000); toast(`💫 被打晕了，${left>0?left:1}秒后才能说话…`); return; }
@@ -7160,12 +7234,12 @@ async function send(){
     payload.emoji = '🕳️';
     payload.color = EH_CONFIG.voidC;
   }
-  // 乐观上屏
-  const localId='local_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-  if(_sendInFlight.has(localId)) return;
-  _sendInFlight.add(localId);
-  const optimistic={...payload, id:localId, created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
-  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=localId; $('#stream').appendChild(el); scrollStream();
+  // ★真防重: 按 payload 指纹锁在途发送。旧 localId 每次新建再 has 自己 = 假锁, 双击会双发。
+  const _fp=_sendFingerprint(payload);
+  if(_fp && _sendInFlight.has(_fp)) return;
+  if(_fp) _sendInFlight.set(_fp, Date.now());
+  const optimistic={...payload, id:'local_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), created_at:new Date().toISOString(), _replyRef: replyTo?.name?`${replyTo.name}: ${replyTo.text}`:null};
+  const el=buildMsgEl(optimistic); if(el){ el.dataset.mid=optimistic.id; $('#stream').appendChild(el); scrollStream();
     // 键盘态下 DOM/布局稳定晚于插入, 单次滚动常滚不到底(最后一条被输入栏盖) → 多拍兜底确保完全可见
     setTimeout(scrollStream,60); setTimeout(scrollStream,200); setTimeout(scrollStream,450);
     ehFx(el,'fx-send',650); }
@@ -7176,7 +7250,7 @@ async function send(){
   let data=null, error=null;
   try{ ({data,error}=await sb.from('eh_messages').insert(payload).select('id').single()); }
   catch(e){ error=e; }
-  finally{ _sendInFlight.delete(localId); }
+  finally{ if(_fp) _sendInFlight.delete(_fp); }
   if(error){ console.warn('send',error); markSendFailed(el,payload); toast(EH_CONFIG.text.err_sendFail); }
   // 回填真实 id：DOM data-mid + echo-bar + 长按闭包捕获的 optimistic.id 都更新
   // 竞态兜底: 若 realtime 抢先用真实 id 渲染了同一条(另建了 DOM), 这里回填时先删掉重复

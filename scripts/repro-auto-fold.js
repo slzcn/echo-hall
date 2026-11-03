@@ -45,14 +45,15 @@ const poll=setInterval(()=>{
   if (game.isSpectating() && !spec){ spec=true; firstSpecAt=Date.now()-t0; }
 }, 15);
 
-console.log('真实异步复现(v145): 斗地主 host 席全程挂机, actMs=30ms, 期望连续两次超时后自动离座 …');
+console.log('真实异步复现(2026-11-02 新契约): 斗地主 host 席全程挂机, actMs=30ms …');
 setTimeout(()=>{
   clearInterval(poll);
   console.log('  spectating(已离座旁观)='+spec+(spec?(' @~'+firstSpecAt+'ms'):'')+' · vacate(通知腾座)='+vacate);
-  // 期望: 挂机两次超时后进入旁观 + 腾座
-  const ok = spec && vacate;
-  if (ok) console.log('✅ 通过: 连续两次超时 → 自动离座旁观 + 通知 app 腾座(无真人则由 app 解散)');
-  else console.error('❌ 未达期望: 全程挂机应在两次超时后自动离座(spec='+spec+' vacate='+vacate+')');
+  // ★新契约(修「游戏自动结束」): 本席连续超时只代打，不离座/不腾座。
+  //   旧 v145/v146 期望 spec&&vacate — 会再触发 gtCheckNoHumansThenClose 把单人桌整桌销毁。
+  const ok = !spec && !vacate;
+  if (ok) console.log('✅ 通过: 连续两次超时后仍在座（座位保留，不会连锁解散）');
+  else console.error('❌ 未达期望: 本席超时不应离座/腾座(spec='+spec+' vacate='+vacate+')');
   try{ game.close(); }catch(_){}
   process.exit(ok?0:1);
 }, RUN_MS);

@@ -736,12 +736,16 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
       missStreak[seat] = (missStreak[seat]||0) + 1;
       if (missStreak[seat] >= MAX_MISS) idleOut(seat);
     }
-    // ── 连续超时 → 自动离座(v145 统一规则, 三款一致) ──
-    //   我这席 → doEnterSpectator() 真起身让座; 远程真人席(host 权威) → 移出 remoteSeats 转本机 AI 顶完本副。
-    //   "无真人在座自动解散"由 app 侧 onSeatIdle({vacate})→gtCheckNoHumansThenClose 统一处理。
+    // ── 连续超时 ──
+    //   我这席: 只代打本回合，【不】自动离座/腾座（防「游戏自动结束」连锁, 见诊断单）。
+    //   远程真人席: 移出 remoteSeats 转本机 AI 顶完本副。
     function idleOut(seat){
       missStreak[seat] = 0;
-      if (seat===mySeat){ doEnterSpectator(); return; }   // 我超时够阈值 → 真离座(非托管)
+      if (seat===mySeat){
+        toast('连续超时 · 已自动代打，座位保留');
+        try{ emitBeat({ type:'idle', actor:'我', text:'💤 连续超时，本手由系统代打（座位保留）' }); }catch(_){}
+        return;
+      }
       const nm = (st.players[seat] && st.players[seat].name) || ('席'+seat);
       const ri = remoteSeats.indexOf(seat); if(ri>=0) remoteSeats.splice(ri,1);
       toast(nm+' 连续超时 · 已离座, AI 接手');
@@ -2494,13 +2498,17 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     }
 
     function onHumanTimeout(){
-      bumpMiss(mySeat);
+      // ★先校验再计超时: 旧实现开头就 bumpMiss，trustee/旁观/非我回合也会累计
+      //   → 假两连超时 → idleOut 离座 → 整桌销毁(游戏自动结束)。
       if (trustee){ trusteeStep(); return; }
       if (spectating) return;                // 已离座旁观, 由 AI 托管, 不再走人席超时
-      if (st.phase!=='play' || st.turn!==mySeat) return;
+      if (st.phase!=='play' || st.turn!==mySeat) { turnSeatActive=-1; turnPhaseActive=''; return; }
+      const beforeTurn = st.turn;
       const mustBeat = st.table.lastPlay && st.table.lastPlay.seat!==mySeat;
       if (mustBeat){ toast('超时 · 自动不出'); doPass(mySeat); }
       else { const lead = AI.chooseLead(st.players[mySeat].hand, st.level); toast('超时 · 自动出牌'); selected=new Set(lead.map(c=>c.id)); doPlay(); }
+      if (st.turn!==beforeTurn || st.phase==='over') bumpMiss(mySeat);
+      else { turnSeatActive=-1; turnPhaseActive=''; }
     }
 
     // ── 手动进贡/还贡(仅纯单机): 当前任务的种类 give/return ─────────────
@@ -2568,10 +2576,11 @@ html[data-mode="day"] .gd-room[data-phase="lobby"] .gd-felt::before{
     }
     function onTributeTimeout(){
       if (spectating) return;
-      if (st.phase!=='tribute' || st.turn!==mySeat) return;
+      if (st.phase!=='tribute' || st.turn!==mySeat) { turnSeatActive=-1; return; }
       toast('超时 · 自动'+(tributeTaskKind()==='return'?'还贡':'进贡'));
+      const beforeTurn = st.turn;
       aiTribute(mySeat);
-      bumpMiss(mySeat);
+      if (st.turn!==beforeTurn || st.phase!=='tribute') bumpMiss(mySeat);
     }
     // 落一步进贡/还贡(人/AI 共用引擎裁决)。全部完成 → 引擎转 play + 定首出, 弹进贡摘要(与自动路径同视觉)。
     function doTribute(seat, cardId){
