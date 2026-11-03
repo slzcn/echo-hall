@@ -1,0 +1,12 @@
+-- ============================================================
+-- 一次性清空聊天室里的游戏记录(kind='game')
+-- 日期: 2026-11-02
+-- 背景: 主人诉求 —— 游戏在聊天室里的记录清空一次; 以后产生的默认只留 1 小时, 到点消散。
+--
+-- 范围: kind='game' 全部(牌桌卡 game|gt|… + 历史战绩卡 game|nlhe|/game|ddz|/game|gd|… + 海龟汤记录)。
+--   活牌桌不依赖持久卡消息 —— gtSurfaceTable 在进房/realtime 时本地补活桌卡, 清空后活桌入口自愈。
+--
+-- 后续: 新游戏记录创建时带 expires_at = now + 1h(GAME_TTL, 可经 tuning.gameTtlMs 调整),
+--   前端 buildMsgEl 对已过期记录不再渲染, 到点 scheduleGameDissolve 淡出消散(与虚空消息同族语义)。
+-- ============================================================
+delete from public.eh_messages where kind = 'game';

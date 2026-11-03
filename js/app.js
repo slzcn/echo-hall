@@ -5,7 +5,7 @@
 //   ver.txt 自愈(比 BUILD_VER)察觉不到(壳与 ver.txt 都是新的), app.js 却还是旧的 → 永久锁死。
 //   故这里硬编码本文件版本, 供 index.html 版本自愈与壳的 __EH_BUILD_VER / ver.txt 交叉核对,
 //   不一致=壳与主脚本来自不同部署→硬恢复。★发版时必须与 index.html 的 app.js?v= 同步(ci-check 第3b节门禁)。
-window.__EH_APP_VER = '20261029-v151';
+window.__EH_APP_VER = '20261103-v152';
 // ★C5 运行时字节漂移核对: 注释/CI 声称可验「壳新 app.js 旧」, 但 index 自愈只比 BUILD_VER↔ver.txt。
 //   若 CDN 把旧字节写进新 ?v= 缓存, 壳与 ver.txt 一致却拿不到新逻辑。这里在脚本求值时交叉核对,
 //   不一致 → 触发硬恢复(与 index hardRecover 同策略: 清 shell/js 缓存后强刷)。
@@ -1754,6 +1754,7 @@ let voidMode = false;      // 虚空模式: 下条消息匿名 + 限时消散
 // 用函数而非 const, 因 loadRemoteConfig 是异步的, 启动时固化 const 会拿不到远程值。
 const TUNE=(k,def)=>{ const v=EH_CONFIG.tuning&&EH_CONFIG.tuning[k]; return (typeof v==='number'&&!isNaN(v))?v:def; };
 const VOID_TTL = ()=>TUNE('voidTtlMs',300000);   // 虚空消息存活时长(ms)
+const GAME_TTL = ()=>TUNE('gameTtlMs',3600000);  // 游戏记录(牌桌卡/战绩卡)存活时长: 默认 1 小时, 到点消散(主人诉求)
 const VOID_NAMES = EH_CONFIG.identityPool.voidNames;
 let echoState = {};        // message_id -> { [emoji]: {count, mine} }  多情绪回声
 const HISTORY_PAGE = ()=>TUNE('historyPage',60);   // 私密房每页条数
@@ -5390,6 +5391,8 @@ function _buildMsgElRaw(m, isHistory){
   }
   // 🐢 海龟汤游戏消息: text = "game|事件|字段…"(turtleMsg 编码)。三种事件各自成卡。
   if(m.kind==='game'){
+    // ★游戏记录 1h 消散(主人诉求): expires_at 已过 → 历史/补拉一律不再渲染(库里记录只留 1 小时)。
+    if(m.expires_at && Date.now() > new Date(m.expires_at).getTime()) return null;
     const el=buildGameEl(m, isHistory);
     if(el && m.id!=null){ el.dataset.mid=m.id; el.dataset.kind='game'; }   // ★去重键
     // ★卡片补时间(修"卡片没有时间"): 与文字气泡一致标出 created_at。gt 联机牌桌卡会异步重渲 innerHTML
@@ -5397,6 +5400,7 @@ function _buildMsgElRaw(m, isHistory){
     if(el && m.created_at && !el.classList.contains('gt-card')){
       el.insertAdjacentHTML('beforeend', `<div class="gc-time">${fmtTime(m.created_at)}</div>`);
     }
+    if(el && m.expires_at) scheduleGameDissolve(el, m.expires_at);
     return el;
   }
   const el=document.createElement('div');
@@ -5494,6 +5498,29 @@ function scheduleVoidFade(el, expIso){
     }
     if(badge){ const mm=Math.floor(left/60000), ss=Math.floor((left%60000)/1000); badge.textContent=`· ${mm}:${String(ss).padStart(2,'0')} 后消散`; }
     el._voidT=setTimeout(tick, left>60000?15000:1000);
+  };
+  tick();
+}
+// 游戏记录(牌桌卡/战绩卡)到点消散: 与虚空同族淡出移除; 若是【仍活着的牌桌】的卡,
+//   消散后由 gtSurfaceTable 无缝补回一张本地活视图(无 TTL) —— 记录寿命与活桌入口解耦。
+function scheduleGameDissolve(el, expIso){
+  const exp=new Date(expIso).getTime();
+  const tick=()=>{
+    if(!el.isConnected){ try{ clearTimeout(el._gameT); }catch(_){} return; }
+    const left=exp-Date.now();
+    if(left<=0){
+      const gid=el.dataset && el.dataset.gtId;
+      el.classList.add('fading');
+      setTimeout(()=>{
+        if(el.parentNode) el.remove();
+        try{
+          const row = gid && window._gtTables && _gtTables.get ? _gtTables.get(gid) : null;
+          if(row && (row.status==='lobby' || row.status==='playing')) gtSurfaceTable(row);
+        }catch(_){}
+      },1200);
+      return;
+    }
+    el._gameT=setTimeout(tick, Math.min(left, 60000)+50);
   };
   tick();
 }
@@ -9433,7 +9460,7 @@ async function launchDoudizhu(){
     if(row.host_uid===myUid && !row.msg_id){
       if(!document.querySelector('[data-gt-id="'+row.id+'"]')){
         const text=window.EHTable ? EHTable.encode(row.id,'ddz') : ('game|gt|'+row.id+'|ddz');
-        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game',expires_at:new Date(Date.now()+GAME_TTL()).toISOString()};
         const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
         if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
         try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
@@ -9487,7 +9514,7 @@ async function launchTexas(){
       (async function _postCard(){
         if(document.querySelector('[data-gt-id="'+row.id+'"]')) return;
         const text=window.EHTable ? EHTable.encode(row.id,'nlhe') : ('game|gt|'+row.id+'|nlhe');
-        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game',expires_at:new Date(Date.now()+GAME_TTL()).toISOString()};
         const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
         if(el){ $('#stream').appendChild(el); scrollStream(); }
         try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
@@ -9798,7 +9825,7 @@ async function launchGuandan(){
     if(row.host_uid===myUid && !row.msg_id){
       if(!document.querySelector('[data-gt-id="'+row.id+'"]')){
         const text=window.EHTable ? EHTable.encode(row.id,'guandan') : ('game|gt|'+row.id+'|guandan');
-        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game'};
+        const payload={room_id:curRoom.id,user_id:myUid,name:me.name,emoji:me.emoji,color:me.color,text,kind:'game',expires_at:new Date(Date.now()+GAME_TTL()).toISOString()};
         const el=buildMsgEl({...payload,id:'local_'+Date.now(),created_at:new Date().toISOString()});
         if(el) $('#stream').appendChild(el);   // 本地先上屏(聊天流里, 不 scrollStream 以免抢镜); dataset.mid 落库后回填
         try{ const { data }=await sb.from('eh_messages').insert(payload).select('id').single();
