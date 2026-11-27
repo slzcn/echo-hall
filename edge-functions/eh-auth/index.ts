@@ -193,13 +193,14 @@ Deno.serve(async (req)=>{
       }, cr.status);
       uid = cr.body.id;
     }
-    // 写 eh_users 档案：把 username/email 写入用户行，转正后标记非匿名(合并原两次写)
-    const ins = await rest("eh_users?id=eq." + uid, "PATCH", {
+    // 写 eh_users 档案：upsert 兜底——档案行不存在时插入，避免 PATCH 未命中导致资料写空
+    const ins = await rest("eh_users?on_conflict=id", "POST", {
+      id: uid,
       username,
       email: email || null,
       is_anonymous: false
     }, {
-      Prefer: "return=minimal"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     });
     if (!ins.ok) return j({
       error: "账号记录写入失败",
