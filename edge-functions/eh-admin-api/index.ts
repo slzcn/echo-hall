@@ -636,11 +636,15 @@ Deno.serve(async (req)=>{
     }, {
       Prefer: "return=minimal"
     });
-    if (!uRes.ok) return j({
-      error: "写档案失败",
-      detail: uRes.body
-    }, uRes.status);
-    await sbWrite("eh_members", "POST", {
+    if (!uRes.ok) {
+      // 回滚：删除刚创建的 auth 身份，避免孤儿账号
+      await adminAuth("users/" + uid, "DELETE");
+      return j({
+        error: "写档案失败",
+        detail: uRes.body
+      }, uRes.status);
+    }
+    const mRes = await sbWrite("eh_members", "POST", {
       room_id: roomId,
       user_id: uid,
       role: "member",
@@ -650,16 +654,30 @@ Deno.serve(async (req)=>{
     }, {
       Prefer: "return=minimal"
     });
+    if (!mRes.ok) {
+      await sbWrite("eh_users?id=eq." + pgEq(uid), "DELETE", undefined, { Prefer: "return=minimal" });
+      await adminAuth("users/" + uid, "DELETE");
+      return j({
+        error: "写成员失败",
+        detail: mRes.body
+      }, mRes.status);
+    }
     const ins = await sbWrite("eh_souls", "POST", {
       room_id: roomId,
       auth_uid: uid,
       created_by: me.uid,
       ...fields
     });
-    if (!ins.ok) return j({
-      error: "写灵魂配置失败",
-      detail: ins.body
-    }, ins.status);
+    if (!ins.ok) {
+      // 逐级回滚：成员 → 档案 → auth 身份
+      await sbWrite("eh_members?user_id=eq." + pgEq(uid) + "&room_id=eq." + encodeURIComponent(roomId), "DELETE", undefined, { Prefer: "return=minimal" });
+      await sbWrite("eh_users?id=eq." + pgEq(uid), "DELETE", undefined, { Prefer: "return=minimal" });
+      await adminAuth("users/" + uid, "DELETE");
+      return j({
+        error: "写灵魂配置失败",
+        detail: ins.body
+      }, ins.status);
+    }
     return j({
       ok: true,
       soul: Array.isArray(ins.body) && ins.body[0]
