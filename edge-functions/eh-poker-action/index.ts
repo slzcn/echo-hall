@@ -25,10 +25,6 @@ const CORS = {
 const json = (body: any, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-// ═══════════════════════════════════════════════════════════════
-// 类型定义
-// ═══════════════════════════════════════════════════════════════
-
 interface Card { rank: number; suit: string; label: string; id: string; }
 interface Player {
   id: string; seat: number; name: string; isAI: boolean;
@@ -44,7 +40,7 @@ interface GameState {
   _deck: { cards: Card[]; cursor: number };
   street: string; currentBet: number; minRaise: number;
   aggressor: number | null; toAct: number; pot: number;
-  raiseCount: number;  // 本街加注次数(含开注), 每街重置; 上限 MAX_RAISES_PER_STREET
+  raiseCount: number;
   result: any; log: any[];
   sbSeat?: number; bbSeat?: number;
 }
@@ -59,10 +55,6 @@ interface GameOpts {
   stacks?: number[]; sb?: number; bb?: number;
   startStack?: number; button?: number; seed?: number; actionBias?: number;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// 牌模型 + 洗牌（移植自 deck.js + poker-engine.js）
-// ═══════════════════════════════════════════════════════════════
 
 const SUITS = ['♠','♥','♣','♦'] as const;
 const SUIT_KEY: Record<string, string> = { '♠':'s','♥':'h','♣':'c','♦':'d' };
@@ -106,8 +98,6 @@ function shuffle(cards: Card[], seed?: number): { seed: number; cards: Card[] } 
 }
 
 const DEFAULT_ACTION_BIAS = 0.55;
-
-// 每街(下注轮)加注上限: 含开注, 超过后只能跟注/过牌/弃牌/全下(全下不受限)
 const MAX_RAISES_PER_STREET = 2;
 function holePlayable(a: Card, b: Card): boolean {
   if (a.rank === b.rank) return true;
@@ -154,10 +144,6 @@ function arrangeActionDeck(cards: Card[], n: number, rng: () => number, strength
   }
   return cards;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// 牌型评估（移植自 poker-eval.js）
-// ═══════════════════════════════════════════════════════════════
 
 const CAT = { SF:8, QUADS:7, FULL:6, FLUSH:5, STRAIGHT:4, TRIPS:3, TWO_PAIR:2, PAIR:1, HIGH:0 } as const;
 const CAT_NAME: Record<number, string> = { 8:'同花顺', 7:'四条', 6:'葫芦', 5:'同花', 4:'顺子', 3:'三条', 2:'两对', 1:'一对', 0:'高牌' };
@@ -232,10 +218,6 @@ function compareEval(a: EvalResult, b: EvalResult): number {
   }
   return 0;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// 引擎状态机（移植自 poker-engine.js）
-// ═══════════════════════════════════════════════════════════════
 
 const NEXT_STREET: Record<string, string> = { preflop:'flop', flop:'turn', turn:'river', river:'showdown' };
 const STREET_DEAL: Record<string, number> = { flop:3, turn:1, river:1 };
