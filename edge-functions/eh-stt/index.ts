@@ -6,10 +6,13 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+
+const MAX_AUDIO_BYTES = 2 * 1024 * 1024
+const MAX_AUDIO_B64 = 2_500_000
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -27,6 +30,7 @@ Deno.serve(async (req) => {
     } else {
       const fd = await req.formData().catch(() => null)
       const f = fd && fd.get('file')
+      if (f && f.size > MAX_AUDIO_BYTES) return json({ ok: false, error: 'audio_too_large' }, 413)
       if (f && typeof f.arrayBuffer === 'function') {
         const ab = await f.arrayBuffer()
         let s = ''
@@ -37,41 +41,31 @@ Deno.serve(async (req) => {
       }
     }
     if (!audioB64) return json({ ok: false, error: 'missing_audio' }, 400)
+    if (audioB64.length > MAX_AUDIO_B64) return json({ ok: false, error: 'audio_too_large' }, 413)
 
     const mmKey = Deno.env.get('MINIMAX_API_KEY') || Deno.env.get('MIFY_KEY') || ''
     if (mmKey) {
-      // MiniMax speech recognition / audio understanding (兼容多端点)
       const candidates = [
-        {
-          url: 'https://api.minimaxi.chat/v1/audio/transcriptions',
-          body: { model: 'whisper-1', file: audioB64, language: lang },
-        },
-        {
-          url: 'https://api.minimax.chat/v1/audio/transcriptions',
-          body: { model: 'whisper-1', file: audioB64, language: lang },
-        },
-        {
-          url: 'https://api.minimaxi.chat/v1/audio_understanding',
-          body: { model: 'abab6.5s-chat', audio: audioB64, prompt: '请把语音转成中文文字，只输出转写结果' },
-        },
+        { url: 'https://api.minimaxi.chat/v1/audio/transcriptions', body: { model: 'whisper-1', file: audioB64, language: lang } },
+        { url: 'https://api.minimax.chat/v1/audio/transcriptions', body: { model: 'whisper-1', file: audioB64, language: lang } },
+        { url: 'https://api.minimaxi.chat/v1/audio_understanding', body: { model: 'abab6.5s-chat', audio: audioB64, prompt: '请把语音转成中文文字，只输出转写结果' } }
       ]
       for (const c of candidates) {
         try {
           const r = await fetch(c.url, {
             method: 'POST',
             headers: { Authorization: `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(c.body),
+            body: JSON.stringify(c.body)
           })
           const t = await r.text()
           let j = null
-          try { j = JSON.parse(t) } catch { /* noop */ }
+          try { j = JSON.parse(t) } catch {}
           if (!r.ok || !j) continue
           const text = j.text || j.transcript || j.data?.text || j.choices?.[0]?.message?.content || ''
           if (text && String(text).trim()) return json({ ok: true, text: String(text).trim(), provider: 'minimax' })
-        } catch { /* next */ }
+        } catch {}
       }
     }
-    // 公网可用回退: 前端浏览器 SpeechRecognition
     return json({ ok: false, fallback: 'browser_sr', reason: 'cloud_stt_unavailable' }, 200)
   } catch (e) {
     return json({ ok: false, error: 'exception', detail: String(e && e.message || e) }, 500)
